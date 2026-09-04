@@ -1131,6 +1131,20 @@ def register_code_api(
             edited.append(path)
             emit("edit", {"path": path, "patch": patch})
 
+        def on_todo(items: list[dict[str, str]]) -> None:
+            """The agent's own task list, whole, each time it records one.
+
+            `claimed` travels with it and is not decoration. Every other structured frame this
+            surface sends reports something that was observed — `edit` carries a diff read off
+            disk, `verified` carries a command's exit code — and a row of ticks is exactly the
+            shape a reader has been taught to trust. This one is what the model said about
+            itself, so the frame says so and the screen has to repeat it.
+
+            Sent whole rather than as a delta: `seq` gives this surface replay, but a consumer
+            that renders a partial list would show a list that never existed.
+            """
+            emit("todo", {"items": items, "claimed": True})
+
         def work() -> None:
             try:
                 # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
@@ -1280,6 +1294,7 @@ def register_code_api(
                         on_token=on_token if (req.stream and not fused) else None,
                         on_tool=on_tool,
                         on_edit=on_edit,
+                        on_todo=on_todo,
                         images=images or None,
                     )
                     if fused:

@@ -338,6 +338,20 @@ class Settings(BaseSettings):
     # report a LOSS, which below a handful of tools it truthfully is.
     defer_tools: bool = Field(default=False, validation_alias="CHIMERA_DEFER_TOOLS")
 
+    # --- The task list the agent keeps for itself (chimera/tools/todo.py).
+    # On, and the reasoning differs from the two flags above it, so it is written down rather than
+    # assumed. `defer_tools` and `edit_batch` are interventions with a quality claim: each has a
+    # measurable arm, so each waits for its measurement. This one makes no quality claim. It records
+    # what the agent says about its own progress, so the list survives a compaction (`RunState.tasks`
+    # was built for exactly this and never received anything) and a person watching a long run can
+    # see where it is. There is no arm that could refute it — it is either called or it is not.
+    #
+    # The price is stated instead: 657 characters of schema in every prompt of every step, which
+    # `chimera.tools.todo.schema_cost_chars` recomputes rather than trusting this comment. What to
+    # watch is adoption: a tool the model never calls is 657 characters of nothing, and that is the
+    # number that would turn this default off.
+    todo_list: bool = Field(default=True, validation_alias="CHIMERA_TODO_LIST")
+
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps
     # cheap/tool turns single-model and only fuses deep or error-sensitive ones. ---

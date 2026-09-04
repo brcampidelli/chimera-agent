@@ -24,6 +24,7 @@ safe, because that is where every turn starts.
 
 from __future__ import annotations
 
+import inspect
 import json
 import uuid
 from collections.abc import Callable
@@ -154,6 +155,7 @@ class CodeSession:
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
+        on_todo: Callable[[list[dict[str, str]]], None] | None = None,
         images: list[str] | None = None,
     ) -> AgentResult:
         """Run one turn with the previous turns as history, and absorb the result.
@@ -166,7 +168,19 @@ class CodeSession:
         # open-source framework, so an implementation written before images existed is a reasonable
         # thing to find in the wild — and passing `images=None` to it would break it for the sake of
         # sending nothing.
+        # `on_todo` joins `images` in the conditional block for the reason written above it, and
+        # it is the newer of the two: `SupportsCodeRun` is published, so an implementation that
+        # predates the task list must not be handed a keyword it never declared.
+        #
+        # The signature is READ rather than assumed, which the same seam in `AutonomousAgent.
+        # _run_worker` already does for `on_edit`/`on_tool`. Writing the rule as a comment and
+        # forwarding unconditionally is how the first draft of this looked: the prose said an
+        # older implementation was safe, and every stub agent in the suite raised TypeError on
+        # the first turn. The `**kwargs`-only case is covered too, by asking whether the
+        # parameter is named — a callable that swallows anything accepts it either way.
         extra: dict[str, Any] = {"images": images} if images else {}
+        if on_todo is not None and _accepts(self.agent.run, "on_todo"):
+            extra["on_todo"] = on_todo
         result = self.agent.run(
             task,
             on_token=on_token,
@@ -235,6 +249,27 @@ class CodeSession:
             return
         self.receipts.append(receipt)
         del self.receipts[:-MAX_RECEIPTS]
+
+
+def _accepts(run: Any, name: str) -> bool:
+    """Whether ``run`` DECLARES a keyword called ``name``. A ``**kwargs`` catch-all does not count.
+
+    Counting the catch-all is the tempting reading and it is wrong, because a callable that swallows
+    every keyword usually forwards them to something that does not. Measured: `_EditingAgent` in the
+    API suite is `run(self, task, **kw)` calling `super().run(task, **kw)`, and the parent names four
+    callbacks and not this one — so "it accepts anything" meant "it raises TypeError one frame
+    deeper", and six turns died before their first tool call.
+
+    The alternative is what `AutonomousAgent._run_worker` does: forward, catch TypeError, retry
+    plain. That is right there, where the retry costs one more model call. Here the turn may already
+    have written files and paid for tool calls before the TypeError, so a blind second attempt would
+    do that work twice. A named parameter is explicit support; anything else runs without the frames.
+    """
+    try:
+        params = inspect.signature(run).parameters
+    except (TypeError, ValueError):  # unintrospectable callable (C impl / odd wrapper)
+        return False
+    return name in params
 
 
 class CodeSessionStore:

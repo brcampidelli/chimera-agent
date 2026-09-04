@@ -113,6 +113,32 @@ def _default_compact_schemas() -> bool:
     return get_settings().compact_schemas
 
 
+#: The sentence that turns the task-list schema into a task list. See `Agent.run` for the
+#: measurement that decides it is not optional.
+TODO_PROMPT = (
+    "When a task has several steps, record them with todo_write before you start and update the "
+    "list as each one finishes. It is your own account of your progress, so keep it true: mark a "
+    "step done when it is done, not when you intend to do it."
+)
+
+
+def _find_tool(tools: ToolRegistry, name: str) -> Any:
+    """The registered tool under ``name``, unwrapped, or None when the session does not grant it.
+
+    Unwrapped because governance and the taint ledger each return a *new* registry of wrappers
+    around the original tools, so what the loop holds by then is a `GovernedTool` around a
+    `LedgeredTool` around the thing with the method. Absent is the ordinary case, not an error: a
+    session allowlist that did not name this tool is an operator decision, and the loop's answer to
+    it is to run without.
+    """
+    if name not in tools:
+        return None
+    found: Any = tools.get(name)
+    while not hasattr(found, "bind") and getattr(found, "inner", None) is not None:
+        found = found.inner
+    return found if hasattr(found, "bind") else None
+
+
 @dataclass
 class AgentConfig:
     """Tunable behaviour for an :class:`Agent` run."""
@@ -310,6 +336,7 @@ class Agent:
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
+
         # The skill library surfaced as context. Defaults to the built-in registry (lazy, shared),
         # so every construction site picks up skills without changes; pass an explicit one to override.
         self.skills = skills
@@ -402,6 +429,7 @@ class Agent:
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
+        on_todo: Callable[[list[dict[str, str]]], None] | None = None,
         history: list[MessageLike] | None = None,
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
@@ -424,7 +452,24 @@ class Agent:
         ``should_stop`` is polled once per step and ends the run with ``stopped_reason="cancelled"``,
         keeping everything done so far. A model call already in flight cannot be interrupted, so a
         step boundary is as fine as cancellation gets — but it is far finer than an attempt
-        boundary, which is where the only cancel check used to live."""
+        boundary, which is where the only cancel check used to live.
+
+        ``on_todo`` fires with the whole task list each time the agent records one. What it carries
+        is the agent's own claim about its progress — unlike ``on_edit``, which reports a diff read
+        off disk — so a consumer that renders it owes the reader that distinction."""
+        # Attached per call rather than at construction: the sink belongs to this invocation, and a
+        # second turn with no sink must not keep announcing into the first turn's queue.
+        # Bound here rather than at construction, and per call: the sink belongs to THIS
+        # invocation (a second turn with no sink must not keep announcing into the first turn's
+        # queue), and the binding is thread-local, so it has to happen on the thread that will run.
+        todo = _find_tool(self.tools, "todo_write")
+        if todo is not None:
+            todo.bind(
+                self.run_state,
+                (lambda items: on_todo([{"task": i.task, "status": i.status} for i in items]))
+                if on_todo is not None
+                else None,
+            )
         system_prompt = self.config.system_prompt
         skill_block = self._skill_context(task)
         if skill_block:
@@ -449,6 +494,18 @@ class Agent:
         # silently.
         if self.config.instructions:
             system_prompt = f"{system_prompt}\n\n{self.config.instructions}"
+        # Last of all, and only when the session actually granted the tool: a sentence telling a
+        # model to use something it was not given is a sentence that invites a call to nothing.
+        #
+        # It is here because the schema alone does not work, and that is measured rather than
+        # assumed. Same task, same models, one sentence of difference: bare, `todo_write` was called
+        # 0 times by either of two models; nudged, glm-5.3 called it 4 times with a correct
+        # progression. deepseek-v4-flash called it 0 times in 4 nudged runs, so on that model this
+        # buys nothing — which is a fact about the shipped default, recorded in `chimera/config.py`
+        # rather than left for a user to discover. Without this line the tool is 657 characters of
+        # schema and no behaviour at all.
+        if todo is not None:
+            system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         # Remembered here so a compaction can put it back. The task arrives as the last user message
         # and, after enough turns, falls out of the tail that compaction keeps — leaving the agent
         # executing a plan whose purpose was deleted. Set at the loop rather than by each caller

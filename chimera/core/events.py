@@ -14,7 +14,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-EventKind = Literal["status", "attempt", "result", "final", "token", "edit", "tool"]
+EventKind = Literal["status", "attempt", "result", "final", "token", "edit", "tool", "todo"]
 
 # A sink for events. Kept as a plain callable so any consumer (print, a queue, an SSE writer)
 # plugs in without a shared base class.
@@ -110,6 +110,28 @@ def tool(name: str, arguments: dict[str, Any], ok: bool, observation: str = "") 
             "ok": ok,
             "observation": _clip_observation(observation or "", TOOL_OBSERVATION_CHARS),
         },
+    )
+
+
+def todo(items: list[dict[str, str]]) -> AgentEvent:
+    """The run's task list, as the agent just declared it.
+
+    ``claimed`` is in the payload and is not decoration. Every other structured event in this
+    vocabulary reports something the harness observed: ``edit`` carries a diff read off disk before
+    and after, ``result`` carries a verifier's exit code. This one carries what the model said about
+    its own progress, which nothing checked — and a row of ticks renders identically whether it was
+    earned or asserted. A consumer that drops the flag is free to; a consumer that never had it
+    would have no way to know it needed one.
+
+    Sent whole rather than as a delta, mirroring the tool: a UI that missed one frame would
+    otherwise render a list that never existed, and there is no sequence number here to notice with.
+    """
+    counts = {status: sum(1 for i in items if i.get("status") == status) for status in
+              ("pending", "doing", "done")}
+    return AgentEvent(
+        "todo",
+        f"task list: {counts['done']}/{len(items)} done",
+        {"items": list(items), "claimed": True, **counts},
     )
 
 

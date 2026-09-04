@@ -4,6 +4,58 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The agent keeps a task list, and it is on the screen.** `RunState.tasks` has existed since
+  compaction was written, with a docstring saying what it is for and a renderer that puts it back
+  after a compaction. Nothing ever wrote to it, and the loop that would have been the obvious writer
+  says in as many words why it must not: it counts attempts, not steps, so it has no completion to
+  report, and filling the field from the plan would be *"a lie in the field whose entire purpose is
+  to be believed"*.
+
+  That was right. The missing piece was a truthful source, and there is one: the agent. A new
+  `todo_write` tool records the list, `RunState.tasks` mirrors it so a compaction restores it with
+  its status intact, and a `todo` frame carries it live to the Code screen and the run panel.
+
+  **What it reports is a claim, and every surface says so.** Every other structured frame in this
+  vocabulary reports something observed — `edit` is a diff read off disk before and after the write,
+  `result` is a verifier's exit code. A row of ticks looks like a third member of that family and is
+  not one. The frame carries `claimed`, and the panel writes it out: *"1 of 3 done — what the agent
+  says about its own progress, not a verdict."*
+
+  Two rules are enforced rather than suggested: at most one item may be in progress (a list with six
+  answers nothing), and items that leave the list are named back to the agent (a quietly dropped
+  requirement renders identically to one that never existed).
+
+  **Adoption was measured before this defaulted to anything**, because a tool the model never calls
+  is schema in every prompt and no behaviour. Same task, same models, one sentence of difference:
+
+  | | `deepseek-v4-flash-0731` | `z-ai/glm-5.3` |
+  |---|---|---|
+  | schema only | 0 calls | 0 calls |
+  | schema + one prompt line | 0 calls, in 4 runs | 4 calls, correct progression |
+
+  So the prompt line is not optional, and it is only added when the session actually granted the
+  tool. And the part worth saying plainly: **the model this project currently ships as its default
+  does not use this tool**, in four runs where it was told to. On that model the feature costs 896
+  characters per step and delivers nothing. It ships on anyway — its failure mode is "unused" rather
+  than "worse", and there is no bench control arm for it to destroy — with the number written into
+  `chimera/config.py` so the decision can be reopened with a measurement instead of an opinion.
+
+  Registered in `default_registry` like every other tool, which is what puts it under the session
+  allowlist: a registry an operator scoped to two tools does not quietly gain a third. Bound per
+  thread, so the several workers a crew runs off one shared registry keep separate lists.
+
+### Fixed
+
+- `CodeSession.send` forwarded a new callback to any agent whose `run` declared `**kwargs`, on the
+  reasoning — written in a comment — that an implementation predating the parameter had to keep
+  working. A catch-all usually forwards to something narrower, so the comment described a safety the
+  code did not provide: six API turns died before their first tool call. The signature is now read
+  for the parameter by name.
+
 ## [0.49.3] - 2026-09-03
 
 ### Changed

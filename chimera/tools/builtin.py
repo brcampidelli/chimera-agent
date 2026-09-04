@@ -111,6 +111,14 @@ def default_registry(
     # says it earns its place — not before.
     if settings.edit_batch:
         registry.register(EditBatchTool(workspace, write_region=write_region))
+    # In the default registry, not bolted on by the loop afterwards, and that is the whole point:
+    # a session the operator scoped to two tools must not quietly gain a third. Here it passes
+    # through `restrict_registry` and the governance wrappers like everything else. It carries no
+    # state of its own — `Agent.run` binds this thread's run state before the first step.
+    if settings.todo_list:
+        from chimera.tools.todo import TodoWriteTool
+
+        registry.register(TodoWriteTool())
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace, trust_workspace=trust_workspace))
     registry.register(GlobTool(workspace))
