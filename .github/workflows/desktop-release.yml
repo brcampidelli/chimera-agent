@@ -271,7 +271,7 @@ jobs:
           cat "manifest-fragments/${TARGET}.json"
 
       - name: Upload manifest fragment
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: manifest-fragment-${{ matrix.updater_target }}
           path: manifest-fragments/${{ matrix.updater_target }}.json
@@ -294,7 +294,7 @@ jobs:
 
       - name: Upload installers as workflow artifacts (manual runs)
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: chimera-installers-${{ matrix.os }}
           path: |
@@ -371,7 +371,7 @@ jobs:
       # .deb) — before cutting a release.
       - name: Upload latest.json for inspection (dry run — not published)
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: latest-json-dryrun
           path: latest.json
