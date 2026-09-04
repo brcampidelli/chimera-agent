@@ -157,6 +157,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **A rule-form summariser for the span a compaction drops** — `chimera/core/summarise.py`, behind
+  `AgentConfig.summarise_compaction`, **off**. `compact()` has taken a `summarise` callable since it
+  was written and no production caller ever passed one, so every compaction leaves the structural
+  note. The note is a deliberate choice with its own defence — *"the agent can re-read a file; it
+  cannot un-believe a fabricated summary"* — so this is built beside it, not instead of it: the
+  summary travels **with** the note, asks for standing instructions rather than a narration, forbids
+  inference, and degrades to the note on every failure path.
+
 ### Changed
 
 - **Parallel tool calls: measured, and not built.** `chimera/core/agent.py` runs a turn's tool calls
@@ -187,6 +197,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
   `bench/parallel_tools/RESULTS.md` has the per-model table and what the census could not show;
   `scripts/count_tool_batches.py` reproduces it from your own traces.
+
+- **Compaction has never fired. Measured: 0 in 137 runs**, peak context a median of 6,826 tokens.
+  The pre-registered arms in `bench/compaction/` were written, and then not run, because they would
+  have compared two ways of doing something production does not do.
+
+  Two reasons, both in the code: the CLI's `context_budget` defaults to `None`, so `chimera solve`
+  has no compaction at all; and the Code screen sends 0.6 — of the model's **advertised** window,
+  which for the shipped default is 1,310,000 tokens. It therefore compacts at 786,000, against a
+  largest-ever-observed 64,067.
+
+  **The finding is the shape of the trigger.** When windows were 8k and 128k, "0.6 of the window" and
+  "as much as the model can still use well" were roughly the same number. Advertised windows have
+  grown an order of magnitude; the useful window has not. The next measurement is at what context
+  length this model starts getting the task wrong — a trigger set from that is about the model, one
+  set from the advertised maximum is about the marketing.
+
 
 ## [0.49.3] - 2026-09-03
 

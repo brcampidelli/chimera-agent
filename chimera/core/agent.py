@@ -167,6 +167,11 @@ class AgentConfig:
     # the prompt, compacting once the prompt crosses `trigger` of it. Off by default because
     # compaction discards messages, and a caller that has not asked for that should not get it.
     context_budget: float | None = None
+    # Replace the dropped span with a model-written summary of what still BINDS, instead of the
+    # structural note. Off pending `bench/compaction`, and the reason is the note's own docstring:
+    # a summary is believed in a way a note is not, so a bad one is worse than an honest count.
+    # Costs one model call per compaction, on the agent's own backend.
+    summarise_compaction: bool = False
     # Dollar ceiling for the whole run. None (the default) keeps the historical behaviour: no cap,
     # and therefore no new way for a run to stop. Set it and the loop refuses the next model call
     # once the spend reaches it — checked BEFORE the call, so the money is never spent to discover
@@ -336,6 +341,13 @@ class Agent:
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
+        # Built once rather than per compaction, and None unless asked for: `compact()` treats
+        # None as "use the structural note", which is the behaviour every caller has today.
+        self._summarise = None
+        if self.config.summarise_compaction:
+            from chimera.core.summarise import rule_summariser
+
+            self._summarise = rule_summariser(backend, self.config.model)
 
         # The skill library surfaced as context. Defaults to the built-in registry (lazy, shared),
         # so every construction site picks up skills without changes; pass an explicit one to override.
@@ -651,7 +663,10 @@ class Agent:
                 and self._budget.should_compact(result.prompt_tokens)
             ):
                 messages, compacted = compact(
-                    messages, keep_recent=self.config.keep_recent, state=self.run_state
+                    messages,
+                    keep_recent=self.config.keep_recent,
+                    state=self.run_state,
+                    summarise=self._summarise,
                 )
                 if compacted:
                     record.compacted = True
