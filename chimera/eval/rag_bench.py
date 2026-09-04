@@ -34,7 +34,7 @@ from pathlib import Path
 
 from chimera.rag.chunks import Chunk, walk
 from chimera.rag.hybrid import reciprocal_rank_fusion
-from chimera.rag.store import ChunkStore, EmbedFn
+from chimera.rag.store import EMBED_BATCH, ChunkStore, EmbedFn
 
 #: Words too common to make a query about anything.
 _STOP = frozenset((
@@ -147,6 +147,17 @@ class RagReport:
     headroom: float = 0.0
     k: int = 10
     notes: list[str] = field(default_factory=list)
+    #: Which model produced the vectors, and how wide they are. Inside the record rather than in
+    #: a footnote: there is no conversion from one model's vector space to another's, so a recall
+    #: figure without the embedder that produced it is a number about nothing in particular.
+    embedder: str = ""
+    dimensions: int = 0
+    #: Hit/miss per probe, aligned across the three lists. Totals cannot be tested against each
+    #: other — the arms answer the SAME probes, so the comparison that carries signal is paired,
+    #: and a paired test needs the pairs. `chimera/eval/paired.py` consumes these directly.
+    keyword_hit: list[bool] = field(default_factory=list)
+    vector_hit: list[bool] = field(default_factory=list)
+    hybrid_hit: list[bool] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -157,6 +168,8 @@ class RagReport:
             "vector_recall": None if self.vector_recall is None else round(self.vector_recall, 4),
             "hybrid_recall": None if self.hybrid_recall is None else round(self.hybrid_recall, 4),
             "headroom": round(self.headroom, 4),
+            "embedder": self.embedder,
+            "dimensions": self.dimensions,
             "notes": list(self.notes),
         }
 
@@ -248,6 +261,7 @@ def run_rag_bench(
     *,
     index_path: Path,
     embed: EmbedFn | None = None,
+    embedder: str = "",
     k: int = 10,
     max_probes: int = 400,
 ) -> RagReport:
@@ -271,30 +285,46 @@ def run_rag_bench(
 
     embedded = 0
     if embed is not None:
-        embedded = store.embed_missing(embed)
+        # `embedder=` arms `_align_embedder`, which zeroes every vector when the model identity or
+        # width changes. Without it the guard is inert in exactly the run that introduces vectors,
+        # and a mixed-dimension index reports healthy while returning nothing: `_cosine` gives 0.0
+        # on a mismatch and the `score > 0` filter then drops the lot.
+        embedded = store.embed_missing(embed, embedder=embedder)
+        report.embedder = embedder
         if embedded == 0:
             report.notes.append("the embedder produced no vectors; semantic figures are unavailable")
 
-    keyword_hits = vector_hits = hybrid_hits = 0
-    for probe in probes:
+    # One batched pass rather than one call per probe inside the loop. Same money, and it is the
+    # difference between a run measured in seconds and one measured in minutes.
+    query_vectors: list[list[float]] = []
+    if embedded and embed is not None:
+        for start in range(0, len(probes), EMBED_BATCH):
+            batch = [p.query for p in probes[start : start + EMBED_BATCH]]
+            query_vectors.extend(embed(batch))
+        if len(query_vectors) != len(probes):
+            report.notes.append(
+                f"the embedder returned {len(query_vectors)} vectors for {len(probes)} queries; "
+                "semantic figures are unavailable"
+            )
+            embedded = 0
+        elif query_vectors:
+            report.dimensions = len(query_vectors[0])
+
+    for index, probe in enumerate(probes):
         keyword = store.search_keyword(probe.query, k=k)
-        if any(h.chunk.ident == probe.target for h in keyword):
-            keyword_hits += 1
+        report.keyword_hit.append(any(h.chunk.ident == probe.target for h in keyword))
         if embedded:
-            query_vector = embed([probe.query])[0] if embed else []
-            vector = store.search_vector(query_vector, k=k)
-            if any(h.chunk.ident == probe.target for h in vector):
-                vector_hits += 1
+            vector = store.search_vector(query_vectors[index], k=k)
+            report.vector_hit.append(any(h.chunk.ident == probe.target for h in vector))
             fused = reciprocal_rank_fusion([keyword, vector], limit=k)
-            if any(h.chunk.ident == probe.target for h in fused):
-                hybrid_hits += 1
+            report.hybrid_hit.append(any(h.chunk.ident == probe.target for h in fused))
 
     total = len(probes)
-    report.keyword_recall = keyword_hits / total
+    report.keyword_recall = sum(report.keyword_hit) / total
     report.headroom = 1.0 - report.keyword_recall
     if embedded:
-        report.vector_recall = vector_hits / total
-        report.hybrid_recall = hybrid_hits / total
+        report.vector_recall = sum(report.vector_hit) / total
+        report.hybrid_recall = sum(report.hybrid_hit) / total
     else:
         report.notes.append("no embedder supplied — the ceiling below is what one could add at most")
     store.close()

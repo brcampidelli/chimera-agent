@@ -1,15 +1,38 @@
 {
   "probes": 400,
-  "chunks": 2691,
+  "chunks": 3459,
   "k": 10,
-  "keyword_recall": 0.4925,
-  "vector_recall": null,
-  "hybrid_recall": null,
-  "headroom": 0.5075,
+  "embedder": "openrouter/openai/text-embedding-3-small",
+  "dimensions": 1536,
+  "keyword_recall": 0.4425,
+  "vector_recall": 0.41,
+  "hybrid_recall": 0.505,
+  "headroom": 0.5575,
+  "paired_hybrid_vs_keyword": {
+    "a_both": 168,
+    "b_keyword_only": 9,
+    "c_hybrid_only": 34,
+    "d_both_fail": 189,
+    "delta_pp": 6.25,
+    "ci95_pp": [
+      3.2,
+      8.3
+    ],
+    "mcnemar_exact_p": 0.00017
+  },
   "notes": [
-    "no embedder supplied \u2014 the ceiling below is what one could add at most"
+    "vector ALONE loses to keyword (0.4100 vs 0.4425) \u2014 the whole gain is the fusion",
+    "the fusion also costs 9 probes keyword found alone; the net is +34/-9",
+    "recall is per-corpus: chimera/ grew 2691 -> 3459 chunks since the 2026-08-13 baseline, and the same harness measures 0.4750 on the 2026-08-14 tree",
+    "recall is per-embedder: vector spaces do not convert, so a local model needs its own run"
   ],
-  "corpus": "chimera/ (this repository)",
-  "date": "2026-08-13",
-  "preregistered": "Baseline taken BEFORE any embedder was wired, so the semantic number cannot be chosen after seeing what would look good. headroom is the ceiling: the most a semantic layer could add."
+  "corpus": "chimera/ (this repository) at 85b30ff",
+  "date": "2026-09-04",
+  "preregistered": "bench/rag/PREREGISTRATION.md \u2014 arms, decision rule and gates fixed before any embedder was called; the control-check amendment is recorded there.",
+  "supersedes": {
+    "date": "2026-08-13",
+    "chunks": 2691,
+    "keyword_recall": 0.4925,
+    "why": "same harness, larger corpus \u2014 not a correction, a different corpus"
+  }
 }
