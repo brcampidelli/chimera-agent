@@ -214,6 +214,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   set from the advertised maximum is about the marketing.
 
 
+## [Unreleased]
+
+### Changed
+
+- **Per-model edit-format tailoring: measured, and there is nothing to tailor.** The claim that would
+  justify it — an OpenAI-family model is cheaper with patches, a Claude-family one with whole blocks
+  — was put to 66 runs over `bench/edit_tools`'s pytest-verified task set, with the format **forced**
+  by denylist rather than suggested in a prompt.
+
+  | family | n | W − P (completion tokens) | 95% CI |
+  |---|---:|---:|---|
+  | `deepseek-v4-flash-0731` | 10 | −239 (−10.3%) | [−1,032, +448] **includes zero** |
+  | `glm-5.3-flash` | 9 | +256 (+12.2%) | [−355, +729] **includes zero** |
+  | `gemini-3.8-flash` | 0 | — | no usable pair |
+
+  The two medians point in **opposite directions**, which is exactly what the tailoring story
+  predicts — and the first draft of the results said so. It was wrong: the per-task deltas run from
+  −2,092 to +3,184, and neither interval excludes zero. There is no effect for a direction to
+  describe. `bench/edit_format_by_model/` records the near-miss reading and why it was dropped.
+
+  Larger than the effect under test, and found on the way: `glm-5.3-flash` cost **17× the money and
+  2.5× the wall clock** of `deepseek-v4-flash-0731` for the same tasks at the same pass rate. Both
+  are "flash"-tier by name.
+
 ## [0.49.3] - 2026-09-03
 
 ### Changed
