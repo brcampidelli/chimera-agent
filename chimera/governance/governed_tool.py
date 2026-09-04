@@ -293,6 +293,14 @@ class GovernedTool(Tool):
                 "content out of the run: reading data through an MCP server taints it, and the same "
                 "read done with the built-in tools does not."
             )
+        if self.no_approver == "unreachable":
+            return (
+                "Nobody could be asked: this run has no console, and this deployment has not "
+                "said where an approval question should go. Retrying will be refused "
+                "identically. Setting CHIMERA_APPROVAL_WEBHOOK to a channel webhook lets the "
+                "question be sent and answered with `chimera approve <id> --yes`; until then a "
+                "review on this surface is a refusal."
+            )
         if self.no_approver == "owner_denies":
             return (
                 "Nobody was asked: this deployment sets approvals to deny, so a review is a refusal "

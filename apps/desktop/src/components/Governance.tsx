@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Lock, ShieldCheck, ShieldOff } from "lucide-react";
-import { getGovernanceAudit, getGovernanceInjection, getSandboxState } from "@/lib/api";
+import { getConfig, getGovernanceAudit, getGovernanceInjection, getSandboxState } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -284,9 +284,18 @@ export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
     queryKey: ["governance-sandbox"], queryFn: getSandboxState, staleTime: 0, gcTime: 0,
   });
   const audit = useQuery({ queryKey: ["governance-audit"], queryFn: getGovernanceAudit });
+  // Whether the thing that WRITES the log below is installed at all. It ships off, so the most
+  // common reading of this screen was an empty audit and no way to tell an install where nothing
+  // risky happened from one where nothing was watching. The switch lives with its three siblings
+  // on Settings; this says so rather than leaving the reader to find it.
+  const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
+  const kernelOff = (config.data?.autonomy?.governance || "off") === "off";
 
   return (
     <Screen title={t("governance.title")} icon={<ShieldCheck className="h-5 w-5" />} embedded={embedded}>
+      {config.isSuccess && kernelOff && (
+        <p className="px-1 text-xs text-muted-foreground">{t("governance.kernelOff")}</p>
+      )}
       {/* First on the screen on purpose: it is the widest of the three. The injection score is
           about one class of attack and the audit log is about what already happened; this is about
           whether anything at all stands between a chosen command and the filesystem. */}

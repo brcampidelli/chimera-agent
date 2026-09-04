@@ -211,6 +211,26 @@ const en: Dict = {
     "unset = each conversation decides; set = a floor no request can raise",
   "settings.row.approval": "Stop and ask",
   "settings.hint.approval": "when a run should pause for you",
+  "governance.kernelOff":
+    "The trust kernel is off, so nothing below judged anything: an empty log here means nothing was watching, not that nothing risky happened. Turn it on in Settings under “How much it may do”.",
+  "settings.row.governance":
+    "Trust kernel",
+  "settings.hint.governance":
+    "Whether anything judges what a run does. Off ships by default, so the only limit is the workspace folder.",
+  "settings.value.governance.off":
+    "off",
+  "settings.value.governance.observe":
+    "observe — record, refuse nothing new",
+  "settings.value.governance.enforce":
+    "enforce — refuse what the policy stops",
+  "settings.governance.cost":
+    "Measured on 33 real tool calls from this repository: 20 allowed, 2 warned, 3 sent for review, 8 refused. The 8 are fixed signatures and are refused in observe too. Applies to the next chat turn and the next run; the cron daemon and the messaging adapters keep what they started with until the app is relaunched.",
+  "settings.row.approvalWebhook":
+    "Where approvals are asked",
+  "settings.hint.approvalWebhook":
+    "A channel webhook. Without one, a review on a surface with nobody at a console is a refusal. Clearing it needs the environment variable.",
+  "settings.approvalWebhook.saved":
+    "one is saved — type to replace it",
   "settings.row.hostExec": "Commands on this machine",
   "settings.hint.hostExec":
     "ask · deny · allow — ignored when the sandbox is a container",
@@ -1499,6 +1519,26 @@ const pt: Dict = {
     "vazio = cada conversa decide; definido = um piso que nenhum pedido levanta",
   "settings.row.approval": "Parar e perguntar",
   "settings.hint.approval": "quando uma execução deve pausar para você",
+  "governance.kernelOff":
+    "O núcleo de confiança está desligado, então nada abaixo julgou coisa alguma: um log vazio aqui significa que ninguém estava olhando, não que nada arriscado aconteceu. Ligue em Ajustes, em “O quanto ele pode fazer”.",
+  "settings.row.governance":
+    "Núcleo de confiança",
+  "settings.hint.governance":
+    "Se alguma coisa julga o que uma execução faz. Vem desligado, então o único limite é a pasta do projeto.",
+  "settings.value.governance.off":
+    "desligado",
+  "settings.value.governance.observe":
+    "observar — registra, não recusa nada novo",
+  "settings.value.governance.enforce":
+    "aplicar — recusa o que a política barra",
+  "settings.governance.cost":
+    "Medido em 33 chamadas reais de ferramenta deste repositório: 20 liberadas, 2 com aviso, 3 para revisão, 8 recusadas. As 8 são assinaturas fixas e são recusadas também em observar. Vale a partir do próximo turno de conversa e da próxima execução; o cron e os adaptadores de mensagem mantêm o que começaram até o app ser reaberto.",
+  "settings.row.approvalWebhook":
+    "Onde as aprovações são pedidas",
+  "settings.hint.approvalWebhook":
+    "Um webhook de canal. Sem ele, uma revisão numa superfície sem ninguém no console é uma recusa. Para apagar, use a variável de ambiente.",
+  "settings.approvalWebhook.saved":
+    "há um salvo — digite para substituir",
   "settings.row.hostExec": "Comandos nesta máquina",
   "settings.hint.hostExec":
     "perguntar · negar · permitir — ignorado quando o sandbox é um contêiner",
@@ -2834,6 +2874,26 @@ const es: Dict = {
     "vacío = cada conversación decide; definido = un piso que ninguna petición sube",
   "settings.row.approval": "Detenerse y preguntar",
   "settings.hint.approval": "cuándo una ejecución debe pausar para ti",
+  "governance.kernelOff":
+    "El núcleo de confianza está apagado, así que nada de lo de abajo juzgó nada: un registro vacío aquí significa que nadie estaba mirando, no que no ocurriera nada arriesgado. Actívalo en Ajustes, en “Cuánto puede hacer”.",
+  "settings.row.governance":
+    "Núcleo de confianza",
+  "settings.hint.governance":
+    "Si algo juzga lo que hace una ejecución. Viene apagado, así que el único límite es la carpeta del proyecto.",
+  "settings.value.governance.off":
+    "apagado",
+  "settings.value.governance.observe":
+    "observar — registra, no rechaza nada nuevo",
+  "settings.value.governance.enforce":
+    "aplicar — rechaza lo que la política detiene",
+  "settings.governance.cost":
+    "Medido sobre 33 llamadas reales de herramienta de este repositorio: 20 permitidas, 2 con aviso, 3 a revisión, 8 rechazadas. Las 8 son firmas fijas y también se rechazan en observar. Se aplica al próximo turno de conversación y a la próxima ejecución; el cron y los adaptadores de mensajería conservan lo que arrancaron hasta reabrir la app.",
+  "settings.row.approvalWebhook":
+    "Dónde se piden las aprobaciones",
+  "settings.hint.approvalWebhook":
+    "Un webhook de canal. Sin él, una revisión en una superficie sin nadie en la consola es un rechazo. Para borrarlo, usa la variable de entorno.",
+  "settings.approvalWebhook.saved":
+    "hay uno guardado — escribe para reemplazarlo",
   "settings.row.hostExec": "Comandos en esta máquina",
   "settings.hint.hostExec":
     "preguntar · denegar · permitir — se ignora cuando el sandbox es un contenedor",
@@ -4148,6 +4208,26 @@ const fr: Dict = {
     "vide = chaque conversation décide ; défini = un plancher qu'aucune requête ne relève",
   "settings.row.approval": "S'arrêter et demander",
   "settings.hint.approval": "quand une exécution doit vous attendre",
+  "governance.kernelOff":
+    "Le noyau de confiance est désactivé : rien ci-dessous n’a rien jugé. Un journal vide ici veut dire que personne ne regardait, pas qu’il ne s’est rien passé de risqué. Activez-le dans Réglages, sous « Ce qu’il peut faire ».",
+  "settings.row.governance":
+    "Noyau de confiance",
+  "settings.hint.governance":
+    "Si quelque chose juge ce que fait une exécution. Désactivé par défaut : la seule limite est le dossier du projet.",
+  "settings.value.governance.off":
+    "désactivé",
+  "settings.value.governance.observe":
+    "observer — enregistre, ne refuse rien de nouveau",
+  "settings.value.governance.enforce":
+    "appliquer — refuse ce que la politique arrête",
+  "settings.governance.cost":
+    "Mesuré sur 33 appels d'outil réels de ce dépôt : 20 autorisés, 2 avertis, 3 envoyés en revue, 8 refusés. Les 8 sont des signatures fixes, refusées aussi en mode observer. S'applique au prochain tour de conversation et à la prochaine exécution ; le démon cron et les adaptateurs de messagerie gardent ce avec quoi ils ont démarré jusqu'au redémarrage de l'application.",
+  "settings.row.approvalWebhook":
+    "Où les approbations sont demandées",
+  "settings.hint.approvalWebhook":
+    "Un webhook de salon. Sans lui, une revue sur une surface sans personne devant une console est un refus. Pour l'effacer, passez par la variable d'environnement.",
+  "settings.approvalWebhook.saved":
+    "un est enregistré — saisissez pour le remplacer",
   "settings.row.hostExec": "Commandes sur cette machine",
   "settings.hint.hostExec":
     "demander · refuser · autoriser — ignoré quand le bac à sable est un conteneur",
@@ -5472,6 +5552,26 @@ const de: Dict = {
     "leer = jedes Gespräch entscheidet; gesetzt = eine Untergrenze, die keine Anfrage anhebt",
   "settings.row.approval": "Anhalten und fragen",
   "settings.hint.approval": "wann ein Lauf auf dich warten soll",
+  "governance.kernelOff":
+    "Der Vertrauenskern ist aus, also hat unten nichts irgendetwas beurteilt: ein leeres Protokoll heißt hier, dass niemand hingesehen hat — nicht, dass nichts Riskantes passiert ist. Einschalten in den Einstellungen unter „Was es tun darf“.",
+  "settings.row.governance":
+    "Vertrauenskern",
+  "settings.hint.governance":
+    "Ob überhaupt etwas beurteilt, was ein Lauf tut. Standardmäßig aus — die einzige Grenze ist der Projektordner.",
+  "settings.value.governance.off":
+    "aus",
+  "settings.value.governance.observe":
+    "beobachten — protokolliert, verweigert nichts Neues",
+  "settings.value.governance.enforce":
+    "durchsetzen — verweigert, was die Richtlinie stoppt",
+  "settings.governance.cost":
+    "Gemessen an 33 echten Tool-Aufrufen aus diesem Repository: 20 erlaubt, 2 mit Warnung, 3 zur Prüfung, 8 verweigert. Die 8 sind feste Signaturen und werden auch im Beobachten-Modus verweigert. Gilt ab dem nächsten Chat-Zug und dem nächsten Lauf; der Cron-Dienst und die Messaging-Adapter behalten ihren Startzustand bis zum Neustart der App.",
+  "settings.row.approvalWebhook":
+    "Wohin Freigaben gehen",
+  "settings.hint.approvalWebhook":
+    "Ein Kanal-Webhook. Ohne ihn ist eine Prüfung auf einer unbeaufsichtigten Oberfläche eine Ablehnung. Zum Löschen die Umgebungsvariable verwenden.",
+  "settings.approvalWebhook.saved":
+    "einer ist gespeichert — zum Ersetzen tippen",
   "settings.row.hostExec": "Befehle auf diesem Rechner",
   "settings.hint.hostExec":
     "fragen · verweigern · erlauben — ignoriert, wenn die Sandbox ein Container ist",
@@ -6780,6 +6880,26 @@ const zh: Dict = {
   "settings.hint.reach": "留空 = 由每次对话决定；设定 = 任何请求都抬不高的下限",
   "settings.row.approval": "停下来问我",
   "settings.hint.approval": "什么时候该暂停等你",
+  "governance.kernelOff":
+    "信任内核已关闭，因此下方没有任何东西做过判断：这里的空日志意味着没人在看，而不是没发生风险。在设置的“它可以做多少”中开启。",
+  "settings.row.governance":
+    "信任内核",
+  "settings.hint.governance":
+    "是否有任何东西在判断一次运行做了什么。默认关闭，唯一的边界是项目文件夹。",
+  "settings.value.governance.off":
+    "关闭",
+  "settings.value.governance.observe":
+    "观察 — 记录，不新增拒绝",
+  "settings.value.governance.enforce":
+    "执行 — 拒绝策略所阻止的",
+  "settings.governance.cost":
+    "在本仓库 33 次真实工具调用上测得：20 次允许、2 次警告、3 次送审、8 次拒绝。这 8 次是固定特征，在观察模式下同样被拒绝。自下一个对话回合和下一次运行起生效；定时任务与消息适配器在应用重启前保持启动时的设置。",
+  "settings.row.approvalWebhook":
+    "审批发往哪里",
+  "settings.hint.approvalWebhook":
+    "一个频道 webhook。没有它，无人值守界面上的送审就等于拒绝。要清除请改环境变量。",
+  "settings.approvalWebhook.saved":
+    "已保存一个 — 输入以替换",
   "settings.row.hostExec": "在本机执行命令",
   "settings.hint.hostExec": "询问 · 拒绝 · 允许 —— 沙箱为容器时忽略",
   "settings.value.unset": "未设置",
@@ -8039,6 +8159,26 @@ const ja: Dict = {
     "空欄 = 会話ごとに決まります／設定 = どのリクエストも上げられない下限",
   "settings.row.approval": "止まって確認する",
   "settings.hint.approval": "実行を一時停止して待つ条件",
+  "governance.kernelOff":
+    "信頼カーネルが無効なので、下のものは何も判定していません。ここのログが空なのは、危険なことがなかったのではなく誰も見ていなかったということです。設定の「どこまでできるか」で有効にしてください。",
+  "settings.row.governance":
+    "信頼カーネル",
+  "settings.hint.governance":
+    "実行内容を判定するものがあるかどうか。既定は無効で、境界はプロジェクトのフォルダだけです。",
+  "settings.value.governance.off":
+    "無効",
+  "settings.value.governance.observe":
+    "観察 — 記録し、新たな拒否はしない",
+  "settings.value.governance.enforce":
+    "適用 — ポリシーが止めるものを拒否する",
+  "settings.governance.cost":
+    "このリポジトリの実際のツール呼び出し 33 件で計測：許可 20、警告 2、要審査 3、拒否 8。この 8 件は固定シグネチャで、観察モードでも拒否されます。次のチャットのターンと次の実行から有効になります。cron とメッセージングのアダプタはアプリを再起動するまで開始時の設定のままです。",
+  "settings.row.approvalWebhook":
+    "承認の問い合わせ先",
+  "settings.hint.approvalWebhook":
+    "チャンネルの webhook。これがないと、無人の画面での要審査は拒否になります。消すには環境変数を使ってください。",
+  "settings.approvalWebhook.saved":
+    "保存済みが 1 件 — 入力すると置き換わります",
   "settings.row.hostExec": "このマシンでのコマンド実行",
   "settings.hint.hostExec":
     "確認する・拒否する・許可する — サンドボックスがコンテナのときは無視されます",
@@ -9310,6 +9450,26 @@ const it: Dict = {
     "vuoto = decide ogni conversazione; impostato = un minimo che nessuna richiesta alza",
   "settings.row.approval": "Fermarsi e chiedere",
   "settings.hint.approval": "quando un'esecuzione deve aspettarti",
+  "governance.kernelOff":
+    "Il nucleo di fiducia è spento, quindi nulla qui sotto ha giudicato alcunché: un registro vuoto significa che nessuno stava guardando, non che non sia successo nulla di rischioso. Attivalo in Impostazioni, sotto “Quanto può fare”.",
+  "settings.row.governance":
+    "Nucleo di fiducia",
+  "settings.hint.governance":
+    "Se qualcosa giudica ciò che fa un'esecuzione. Di serie è spento, quindi l'unico limite è la cartella del progetto.",
+  "settings.value.governance.off":
+    "spento",
+  "settings.value.governance.observe":
+    "osserva — registra, non rifiuta nulla di nuovo",
+  "settings.value.governance.enforce":
+    "applica — rifiuta ciò che la policy blocca",
+  "settings.governance.cost":
+    "Misurato su 33 chiamate reali di strumento di questo repository: 20 consentite, 2 con avviso, 3 mandate in revisione, 8 rifiutate. Le 8 sono firme fisse e vengono rifiutate anche in modalità osserva. Vale dal prossimo turno di conversazione e dalla prossima esecuzione; il cron e gli adattatori di messaggistica mantengono quello con cui sono partiti finché l'app non viene riavviata.",
+  "settings.row.approvalWebhook":
+    "Dove vengono chieste le approvazioni",
+  "settings.hint.approvalWebhook":
+    "Un webhook di canale. Senza, una revisione su una superficie senza nessuno alla console è un rifiuto. Per cancellarlo serve la variabile d'ambiente.",
+  "settings.approvalWebhook.saved":
+    "ce n'è uno salvato — scrivi per sostituirlo",
   "settings.row.hostExec": "Comandi su questa macchina",
   "settings.hint.hostExec":
     "chiedere · negare · permettere — ignorato quando la sandbox è un container",
@@ -10626,6 +10786,26 @@ const pl: Dict = {
     "puste = decyduje każda rozmowa; ustawione = podłoga, której żadne żądanie nie podniesie",
   "settings.row.approval": "Zatrzymaj się i zapytaj",
   "settings.hint.approval": "kiedy przebieg ma na ciebie zaczekać",
+  "governance.kernelOff":
+    "Jądro zaufania jest wyłączone, więc nic poniżej niczego nie oceniało: pusty dziennik oznacza tu, że nikt nie patrzył, a nie że nic ryzykownego się nie wydarzyło. Włącz w Ustawieniach, w „Ile może zrobić”.",
+  "settings.row.governance":
+    "Jądro zaufania",
+  "settings.hint.governance":
+    "Czy cokolwiek ocenia to, co robi przebieg. Domyślnie wyłączone, więc jedyną granicą jest folder projektu.",
+  "settings.value.governance.off":
+    "wyłączone",
+  "settings.value.governance.observe":
+    "obserwuj — zapisuje, niczego nowego nie odmawia",
+  "settings.value.governance.enforce":
+    "egzekwuj — odmawia tego, co blokuje polityka",
+  "settings.governance.cost":
+    "Zmierzone na 33 rzeczywistych wywołaniach narzędzi z tego repozytorium: 20 dozwolonych, 2 z ostrzeżeniem, 3 do przeglądu, 8 odmówionych. Te 8 to stałe sygnatury i są odmawiane także w trybie obserwacji. Obowiązuje od następnej tury rozmowy i następnego przebiegu; demon cron i adaptery komunikatorów zachowują stan startowy do ponownego uruchomienia aplikacji.",
+  "settings.row.approvalWebhook":
+    "Gdzie trafiają prośby o zgodę",
+  "settings.hint.approvalWebhook":
+    "Webhook kanału. Bez niego przegląd na powierzchni bez nikogo przy konsoli oznacza odmowę. Do wyczyszczenia użyj zmiennej środowiskowej.",
+  "settings.approvalWebhook.saved":
+    "jeden jest zapisany — wpisz, aby go zastąpić",
   "settings.row.hostExec": "Polecenia na tej maszynie",
   "settings.hint.hostExec":
     "pytaj · odmawiaj · zezwalaj — ignorowane, gdy sandbox to kontener",
@@ -11937,6 +12117,26 @@ const ru: Dict = {
   "settings.row.approval": "Остановиться и спросить",
   "settings.hint.approval":
     "когда запуск должен приостановиться и обратиться к вам",
+  "governance.kernelOff":
+    "Ядро доверия выключено, поэтому ничто ниже ничего не оценивало: пустой журнал здесь значит, что никто не смотрел, а не что ничего рискованного не было. Включите в Настройках, в разделе «Сколько ему позволено».",
+  "settings.row.governance":
+    "Ядро доверия",
+  "settings.hint.governance":
+    "Оценивает ли что-нибудь действия запуска. По умолчанию выключено, поэтому единственная граница — папка проекта.",
+  "settings.value.governance.off":
+    "выключено",
+  "settings.value.governance.observe":
+    "наблюдать — записывает, ничего нового не отклоняет",
+  "settings.value.governance.enforce":
+    "применять — отклоняет то, что запрещает политика",
+  "settings.governance.cost":
+    "Измерено на 33 реальных вызовах инструментов из этого репозитория: 20 разрешено, 2 с предупреждением, 3 на проверку, 8 отклонено. Эти 8 — фиксированные сигнатуры, они отклоняются и в режиме наблюдения. Действует со следующего хода беседы и следующего запуска; демон cron и адаптеры мессенджеров сохраняют состояние запуска до перезапуска приложения.",
+  "settings.row.approvalWebhook":
+    "Куда уходят запросы на одобрение",
+  "settings.hint.approvalWebhook":
+    "Вебхук канала. Без него проверка на поверхности, где никого нет за консолью, — это отказ. Чтобы очистить, используйте переменную окружения.",
+  "settings.approvalWebhook.saved":
+    "один сохранён — введите, чтобы заменить",
   "settings.row.hostExec": "Команды на этой машине",
   "settings.hint.hostExec":
     "спрашивать · запретить · разрешить — не учитывается, когда песочница является контейнером",

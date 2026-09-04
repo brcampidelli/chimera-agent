@@ -137,6 +137,42 @@ def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver
     return approve
 
 
+def nobody_is_at_a_terminal() -> bool:
+    """Whether this process has a console a person could answer a prompt on.
+
+    One copy of the rule, because two of it is how the approver and the refusal end up disagreeing:
+    the approver falls back to deny for want of a tty while the message says somebody declined. Both
+    `approver_for` and `chimera.governance.profile.govern_step` read this.
+    """
+    return not sys.stdin or not sys.stdin.isatty()
+
+
+def deliverer_for(settings: Any) -> Any:
+    """How this deployment reaches a person, or ``None`` when it has not said where.
+
+    The presence of an answer here is what separates a durable ask from a fifteen-minute pause
+    before the same refusal. `pending.ask_durably` writes the question either way; without somewhere
+    to send it, the only person who would ever see it is one who already knew to go looking.
+
+    A failed send is logged and swallowed. The question is on disk and `chimera approve --list`
+    still finds it, so a dead webhook costs the notification, not the gate.
+    """
+    url = str(getattr(settings, "approval_webhook", "") or "").strip()
+    if not url:
+        return None
+
+    def send(text: str) -> None:
+        from chimera.scheduler.delivery import deliver_to_webhook
+
+        result = deliver_to_webhook(url, text)
+        if not result.ok:
+            # `detail` is host-only by construction — see `scheduler/delivery.webhook_host_only`.
+            # The URL is a credential and this line goes to a log somebody else may read.
+            _log.warning("approval question not delivered: %s", result.detail)
+
+    return send
+
+
 def approver_for(
     mode: str,
     ledger: ApprovalLedger | None = None,
@@ -162,7 +198,7 @@ def approver_for(
         return allow(ledger)
     if mode == "deny":
         return deny(ledger)
-    if not sys.stdin or not sys.stdin.isatty():
+    if nobody_is_at_a_terminal():
         if home is not None:
             return ask_elsewhere(home, ledger, deliver=deliver)
         _log.info("approval mode 'ask' with no terminal: denying and recording")
