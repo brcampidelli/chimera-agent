@@ -55,16 +55,44 @@ _CHARS_PER_TOKEN = 4
 
 
 def window_tokens(model: str) -> int:
-    """The model's context window, from the catalog. Falls back when the slug is unknown."""
+    """The model's context window: the catalogue first, then the live index, then the fallback.
+
+    The catalogue goes first because its nineteen entries are checked by hand against what the
+    provider actually SERVES, which is not always what it advertises — `top_provider.context_length`
+    and `context_length` disagree for 39 of the 431 models the index publishes, by up to 20%.
+
+    The live index goes second, and adding it is the point of this function's second life. Before,
+    anything outside those nineteen got a flat 128,000, and the constant's own comment names what
+    that costs: *"over-estimating costs a dead run"*, because a context overflow maps to ABORT with
+    no recovery. Measured against the index on 2026-09-05: **31 of 431 models have a window at or
+    below 64,000**, which is under the trigger that 128,000 produces — so for those the budget would
+    never fire before the wall it exists to avoid. The number was never unknown; nothing had written
+    it down.
+
+    The constant remains for the case where neither knows: a slug never fetched, on an install whose
+    cache has never been warmed.
+    """
     from chimera.providers.catalog import CATALOG
 
     slug = (model or "").strip()
-    if slug:
-        for entry in CATALOG:
-            # Match on the tail so "openrouter/anthropic/claude-x" finds "claude-x".
-            if entry.slug == slug or slug.endswith(entry.slug.split("/")[-1]):
-                return entry.context_k * 1000
-    return FALLBACK_CONTEXT_TOKENS
+    if not slug:
+        return FALLBACK_CONTEXT_TOKENS
+    for entry in CATALOG:
+        # Match on the tail so "openrouter/anthropic/claude-x" finds "claude-x".
+        if entry.slug == slug or slug.endswith(entry.slug.split("/")[-1]):
+            return entry.context_k * 1000
+    try:
+        from chimera.providers.listing import known_window
+
+        remembered = known_window(slug)
+    except Exception:  # noqa: BLE001 — see below; a look-up that cannot run is a missing answer
+        # NOT for a corrupt cache file: `listing._remembered` already turns that into None, and a
+        # sabotage narrowing this catch failed to redden a single test, which is how a guard
+        # announces it is guarding nothing. What it does catch is the look-up being unavailable
+        # at all — an import that fails on a partial install, or `get_settings()` raising on a
+        # malformed config. Sizing a context must not be the thing that takes a run down.
+        remembered = None
+    return remembered or FALLBACK_CONTEXT_TOKENS
 
 
 def estimate_tokens(messages: list[MessageLike]) -> int:

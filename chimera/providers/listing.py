@@ -411,6 +411,15 @@ class Remembered:
     #: Whether the PROVIDER says this model accepts images. None = it did not say.
     vision: bool | None
     tools: bool | None
+    #: Context window in thousands of tokens, as the provider publishes it. None = not said.
+    #:
+    #: Kept for the same reason as the capabilities above: the alternative is a hand-written
+    #: table of nineteen models, and `context_budget` falls back to a flat 128,000 for anything
+    #: outside it. That fallback OVER-states the window of 31 of the 431 models the index
+    #: publishes, and its own comment names the cost — 'over-estimating costs a dead run',
+    #: because a context overflow maps to ABORT with no recovery. The provider says the number;
+    #: not writing it down was the only reason it was unknown.
+    context_k: int | None = None
 
 
 # (path, mtime, table). Keyed by path and mtime so a test that repoints CHIMERA_HOME, or a fetch that
@@ -443,6 +452,7 @@ def remember_models(models: Sequence[ModelOption]) -> None:
             "out": m.output_per_m,
             "vision": m.vision,
             "tools": m.tools,
+            "context_k": m.context_k,
         }
         for m in models
     }
@@ -487,10 +497,13 @@ def _remembered(slug: str) -> Remembered | None:
                         _as_price(value.get("out")),
                         value.get("vision") if isinstance(value.get("vision"), bool) else None,
                         value.get("tools") if isinstance(value.get("tools"), bool) else None,
+                        value.get("context_k") if isinstance(value.get("context_k"), int) else None,
                     )
             for key, value in (raw.get("prices") or {}).items():  # the 0.48.0rc2 shape
                 if isinstance(value, list) and len(value) == 2 and str(key) not in table:
-                    table[str(key)] = Remembered(_as_price(value[0]), _as_price(value[1]), None, None)
+                    table[str(key)] = Remembered(
+                        _as_price(value[0]), _as_price(value[1]), None, None, None
+                    )
         except Exception as exc:  # noqa: BLE001 — a truncated cache is a missing cache
             _log.debug("could not read the model cache at %s: %s", path, exc)
             table = {}
@@ -509,6 +522,19 @@ def known_price(slug: str) -> tuple[float, float] | None:
     if found is None or found.input_per_m is None or found.output_per_m is None:
         return None
     return (found.input_per_m, found.output_per_m)
+
+
+def known_window(slug: str) -> int | None:
+    """Context window in TOKENS for this exact slug, from the last fetch, or None.
+
+    The counterpart of `known_price`, and it exists for the same reason: the curated catalogue
+    holds nineteen models and the index the app already downloads holds four hundred and
+    thirty-one. A slug was 'unknown' only because nothing wrote its window down.
+    """
+    found = _remembered(slug)
+    if found is None or not found.context_k:
+        return None
+    return int(found.context_k) * 1000
 
 
 def known_vision(slug: str) -> bool | None:
