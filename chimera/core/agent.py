@@ -649,6 +649,7 @@ class Agent:
                 # missed" are different facts, and collapsing them to 0 would invent a diagnosis.
                 cached_tokens=result.cache_read_tokens,
                 model=result.model,
+                provider=getattr(result, "provider", "") or "",
                 content=clip(result.content or "", 400),
                 elapsed_ms=call_ms,
             )

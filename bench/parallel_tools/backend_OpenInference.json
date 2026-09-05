@@ -1,0 +1,739 @@
+[
+  {
+    "run": 0,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 0,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 0,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 1,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 1,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 1,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 2,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 2,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 2,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 4,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 4,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 5,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 6,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 6,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 6,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 7,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 7,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 7,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 8,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 8,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 8,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 9,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 9,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 11,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 11,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 12,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 12,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 12,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 12,
+    "step": 4,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 14,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 14,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 14,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 5,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 17,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 17,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 17,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 5,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 18,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 18,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 18,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 18,
+    "step": 4,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 19,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 19,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 19,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 20,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 20,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 20,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 21,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 21,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 3,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 22,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 22,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 22,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 5,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 23,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 24,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 24,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 24,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 24,
+    "step": 4,
+    "provider": "OpenInference",
+    "calls": 3,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 25,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 27,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 27,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 28,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 28,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 28,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 5,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 29,
+    "step": 1,
+    "provider": "OpenInference",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 29,
+    "step": 2,
+    "provider": "OpenInference",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 29,
+    "step": 3,
+    "provider": "OpenInference",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  }
+]
