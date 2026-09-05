@@ -241,6 +241,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   bench: every measurement in this repository that names a model is a measurement of a pool, and none
   of them recorded which backend answered, because until this commit nothing could.
 
+  **Answered, with the backend pinned: there is no knee, and there is a bad endpoint.** 320 calls,
+  US$ 10.91. Held to one backend, the model scores **200/200 on every rule from 4,587 to 953,392
+  tokens** — it does not degrade in this probe at any length reachable on this slug. What varies is
+  the pool: of eight endpoints tested at 792k, six are perfect, one scores 7/10, and `DigitalOcean`
+  scores **0/10 — while already scoring 8/10 at 4,587 tokens**, where there is no context pressure at
+  all. So `context_budget` stays what it always was, a defence against the provider's hard window and
+  not against a measured decay; the risk the run actually found is that a router picks the machine
+  per call. `bench/context_rot/RESULTS_pinned.md`.
+
   185 calls, 72.4M input tokens, **US$ 5.07** measured against "under two dollars" estimated — the
   65 calls past the sweep were the investigation, and they were worth more than the sweep.
 

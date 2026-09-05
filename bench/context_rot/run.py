@@ -110,6 +110,10 @@ def score(answer: str) -> tuple[bool, bool, dict[str, bool]]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--repeats", type=int, default=10)
+    ap.add_argument("--pin", default="", help="pin one OpenRouter backend by name")
+    ap.add_argument("--model", default="", help="restrict to a single model slug")
+    ap.add_argument("--lengths", default="", help="comma-separated target token counts")
+    ap.add_argument("--tag", default="", help="label recorded on every row of this batch")
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "rows.json"))
     args = ap.parse_args()
 
@@ -117,14 +121,20 @@ def main() -> int:
     # OpenRouter key and base with litellm. Calling litellm directly below without this would
     # fail on credentials, and that dependency is easier to see written down than discovered.
     LLMGateway(get_settings())
+    models = [args.model] if args.model else MODELS
+    lengths = [int(x) for x in args.lengths.split(",")] if args.lengths else LENGTHS
     rows: list[dict] = []
-    pads = {n: padding(n) for n in LENGTHS}
-    total = len(MODELS) * len(LENGTHS) * args.repeats
+    pads = {n: padding(n) for n in lengths}
+    total = len(models) * len(lengths) * args.repeats
     done = 0
 
-    for model in MODELS:
-        for length in LENGTHS:
-            for rep in range(args.repeats):
+    # Interleaved by REPEAT, not blocked by length. Blocked, an hour of drift in backend load lands
+    # entirely on whichever length was running then and is read as that length behaving differently
+    # — the failure this whole bench exists to stop making. Interleaving spreads any such drift
+    # across every cell, where it widens intervals instead of inventing a knee.
+    for rep in range(args.repeats):
+        for model in models:
+            for length in lengths:
                 done += 1
                 messages = [
                     Message(role="system", content=DEFAULT_SYSTEM_PROMPT),
@@ -138,6 +148,10 @@ def main() -> int:
                     "model": model, "target_tokens": length, "rep": rep,
                     "rule": False, "fact": False, "detail": {}, "prompt_tokens": 0,
                     "seconds": 0.0, "error": "", "answer_head": "", "provider": "",
+                    # What was ASKED for, next to what ANSWERED. Equal is the manipulation holding;
+                    # different means `allow_fallbacks` did not hold and the row is contaminated,
+                    # which is a thing to count and name rather than to average into a rate.
+                    "pinned": args.pin, "tag": args.tag,
                 }
                 try:
                     # Straight to litellm here, not through the gateway, for one field the
@@ -147,10 +161,17 @@ def main() -> int:
                     # differently is the first hypothesis a contradiction that size deserves.
                     import litellm
 
+                    extra: dict = {}
+                    if args.pin:
+                        # `allow_fallbacks: false` is not decoration: with fallbacks on, an arm
+                        # silently becomes whatever answered, which is the confound itself wearing
+                        # the manipulation's name.
+                        extra["provider"] = {"order": [args.pin], "allow_fallbacks": False}
                     raw = litellm.completion(
                         model=model,
                         messages=[{"role": m.role, "content": m.content} for m in messages],
                         temperature=0.0,
+                        **({"extra_body": extra} if extra else {}),
                     )
                     payload = raw.model_dump() if hasattr(raw, "model_dump") else dict(raw)
                     row["provider"] = str(payload.get("provider") or "")
@@ -176,8 +197,9 @@ def main() -> int:
                 print(
                     f"  [{done:3}/{total}] {model.split('/')[-1][:24]:24} alvo={length:7} "
                     f"real={row['prompt_tokens']:7} regra={row['rule']!s:5} fato={row['fact']!s:5} "
-                    f"{row['provider'][:14]:14} "
-                    f"{row['seconds']:5.1f}s" + (f"  ERRO {row['error'][:60]}" if row["error"] else "")
+                    f"{row['provider'][:14]:14}"
+                    + ("!=PEDIDO " if args.pin and row["provider"] and row["provider"] != args.pin else " ")
+                    + f"{row['seconds']:5.1f}s" + (f"  ERRO {row['error'][:60]}" if row["error"] else "")
                 )
                 Path(args.out).write_text(
                     json.dumps(rows, indent=2, ensure_ascii=False), encoding="utf-8"

@@ -1,0 +1,192 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 29.4,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + ",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 13.9,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 12.7,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + ",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 14.7,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 0:\n        return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2\n    return sorted_numbers[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 14.2,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    else:\n        return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 11.3,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 15.8,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_numbers[mid]\n    return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 9.3,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of empty list is undefined\")\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four ",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 13.5,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    else:\n        return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791941,
+    "seconds": 9.0,
+    "error": "",
+    "answer_head": " ```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of empty list is undefined\")\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four ",
+    "provider": "OpenInference",
+    "pinned": "OpenInference",
+    "tag": "faseC-OpenInference"
+  }
+]

@@ -1,0 +1,192 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 198.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 17.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of ``numbers``.\"\"\"\n    return median(numbers)\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 16.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of ``numbers``.\"\"\"\n    return median(numbers)\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 17.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 15.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median as bee_median\n```",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 16.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of ``numbers``.\"\"\"\n    return median(numbers)\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 15.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of ``numbers``.\"\"\"\n    return median(numbers)\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 20.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero tw",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 15.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median as bee_median\n```",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 13.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median as bee_median\n```",
+    "provider": "Sail Research",
+    "pinned": "Sail Research",
+    "tag": "faseC-SailResearch"
+  }
+]

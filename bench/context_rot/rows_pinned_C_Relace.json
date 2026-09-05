@@ -1,0 +1,192 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 55.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 4.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 5.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_numbers[mid]\n    return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 4.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None for an empty list.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four ze",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 5.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 5.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four fo",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 5.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 4.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 5.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 6.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Relace",
+    "pinned": "Relace",
+    "tag": "faseC-Relace"
+  }
+]

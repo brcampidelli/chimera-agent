@@ -1,5 +1,11 @@
 # No knee is published, because the measurement did not reproduce
 
+> **Superseded on 2026-09-05 by [`RESULTS_pinned.md`](RESULTS_pinned.md), which answers the question
+> this run could not.** Pinning the backend, the model holds every rule 200/200 from 4,587 to 953,392
+> tokens — there is no knee. What varies is the pool: two of eight endpoints behind this one slug do
+> not deliver the same behaviour, and one scores 0/10 at 792k while scoring 8/10 at 4,587. This
+> document's diagnosis was right and its verdict stands; what it could not do was measure past it.
+
 Run 2026-09-04 against [`PREREGISTRATION.md`](PREREGISTRATION.md). 185 model calls, 72.4M input
 tokens, **US$ 5.07** measured (pre-registered as "estimated under two dollars" — see Cost).
 

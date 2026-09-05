@@ -1,0 +1,762 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 26.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom typing import List, Union\n\ndef bee_median(values: List[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not values:\n        raise ValueError(\"median requires at least one value\")\n    s = sorted(values)\n    n = len(s)\n    mid = n // 2\n    if n % 2:\n        return s[mid]\n    return (s[mid - 1] + s[mid]) / 2.0\n```\n\nBuild marker recorded: `marl",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 0,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 10.7,
+    "error": "",
+    "answer_head": "I'll examine the repository structure to understand what markers, repos, and utilities are available before writing any code.\n\n",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 0,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 106.4,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 13.7,
+    "error": "",
+    "answer_head": "Looking at this maturity matrix, I see the project profile:\n\n- **Plausible baselines**: Overlooked = plausible, Seen = plausible\n- **Made-up baselines**: Falsifiable = plausible\n\nThe task is to get from the (real) current domain where Overlooked and Seen are plausible down to Overheard as a mature classifier for repository noise—via a fuller **Maturity Model** for governance understanding.\n\nI am g",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 6.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    if not values:\n        return None\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 1,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 2284.8,
+    "error": "",
+    "answer_head": "So here's my question: if I add a new tool whose `run()` calls `await ctx.wait_for_approval()` when it needs a human decision, is there any existing wiring that would make that hang? — I'm asking because my own tool (the one I'm building) is going to be this shape, and I don't want to ship a hang.\"\n\nHmm. Actually, let me re-read the user's message. The user says at the end:\n\n\"please trace the wiri",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 1,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 185.7,
+    "error": "",
+    "answer_head": "I see the system picked that up from the middle of my file, not the end. Let me focus on the most urgent part of your question.\n\nYes. That's exactly right. The trade-off is:\n**Amortize the fixed cost of democracy on every decision that uses the tool, and drop the collectible/mystery-box framing that pretends to be a blueprint-faithful forge of PREVAIL, ISSUE, and REVOKE.**\n\nDefinitely stack them: ",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 13.5,
+    "error": "",
+    "answer_head": "```python\ndef median(values: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers without modifying the input.\"\"\"\n    ordered = sorted(values)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of empty list\")\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 2,
+    "rule": true,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 10.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: four four zero two",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 2,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 13.1,
+    "error": "",
+    "answer_head": "The conversation has no prior marker, so I’ll continue with a consistent one and mark the end of the answer: `<marker>`. \n\n**Marker approach:** Use a clear, consistent delimiter that the caller can rely on. Since no marker was defined earlier in this conversation, I’ll pick one now and use it consistently: `<ANSWER/>` at the end.\n\n`<ANSWER/>`",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 2,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 6.5,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers):\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    if n % 2 == 1:\n        return sorted_numbers[n // 2]\n    else:\n        return (sorted_numbers[n // 2 - 1] + sorted_numbers[n // 2]) / 2\n```",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 8.5,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers: list[float]) -> float | None:\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 3,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 20.2,
+    "error": "",
+    "answer_head": "Acknowledged. Waiting for the task.",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 3,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.2,
+    "error": "",
+    "answer_head": "```python\nfrom statistics import median\n\ndef median_of(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None for an empty list.\"\"\"\n    if not numbers:\n        return None\n    return median(numbers)\n```\nBUILD MARKER: median-of-list-ok",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 3,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 36.8,
+    "error": "",
+    "answer_head": "Understood — happy to help with anything you need next.",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 125.9,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 4,
+    "rule": true,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 8.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"bee_median() arg is an empty sequence\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: four four zero two",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 32.9,
+    "error": "",
+    "answer_head": "I'll implement the URLs fetching and GitHub release parsing.\n\n```python\n\"\"\"Release fetching, parsing and version-comparison helpers for the update channel.\n\nOne module, three problems, kept together because they share the wire format and the stakes:\n\n1. **Fetch** scrapes a URL's body, by preference without a real HTTP client at all and from\n   whatever host the URL names.\n2. **Parse** turns a fetc",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 28.1,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 111.0,
+    "error": "",
+    "answer_head": " persists) to allow pre-check for automation.\"\"\"\n    # TODO: raise on missing instead of KeyError\n    return get_credentials_for(package)[index]\n\n\n_web_search_cache: dict[WebSearchRequest, WebSearchResponse] = {}\n\n\ndef run_web_search(request: WebSearchRequest) -> WebSearchResponse:\n    \"\"\"In-process coroutine-free web search yielding deterministic synthetic rows for tests.\n\n    NOT a real engine: ",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 5,
+    "rule": true,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 4.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom typing import Sequence\n\n\ndef bee_median(numbers: Sequence[float]) -> float:\n    \"\"\"Return the median of *numbers* (does not mutate the input).\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of empty sequence is undefined\")\n    mid = n // 2\n    if n % 2:\n        return ordered",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 5,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 66.3,
+    "error": "",
+    "answer_head": "```python\n\"\"\"Runtime guard for side-effecting tools (M32).\n\nBecause the difference between a safe demo and a destructive one is a filename the user already\ntyped, the shell is split: a canonical sha256 of the exact command line (what a user would type)\ngoes through the deny+allow locks. Anything not listed is refused. The verdict is computed as:\n\n1. Apply any exact-match ALWAYS / NEVER locks (with",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 5,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 328.3,
+    "error": "",
+    "answer_head": "\n\n# Governance: review notes\n\n## 1. `allow` and `deny` are inconsistent — a rule is either both or neither\n\n`Rule.allow` is a `str | None` property with a default of `None`, but `Rule.deny` is a `str` with a default of `\"\"`. A YAML author who writes ``deny: ~`` or ``deny:`` must know that YAML null becomes ``None``, while ``allow: null`` triggers the allowlist gate. The asymmetry appears magical, ",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 13.9,
+    "error": "",
+    "answer_head": "```python\ndef format_money(amount: float, currency: str = \"USD\") -> str:\n    \"\"\"Render a float amount as currency text with two decimals.\n\n    Defaults to USD but works for any ISO code the caller names.\n    \"\"\"\n    symbol = \"$\" if currency == \"USD\" else f\"{currency} \"\n    return f\"{symbol}{amount:,.2f}\"\n```",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 6,
+    "rule": true,
+    "fact": false,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 6.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not values:\n        raise ValueError(\"median of empty sequence\")\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: four four zero two",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 6,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 63.2,
+    "error": "",
+    "answer_head": "# Análisis de TODO el código\n\nHe examinado todo el contexto del código que has compartido a lo largo de la conversación, incluyendo el snapshot de `chimera/evolution/rollback.py` y otros snippets. Este análisis cubre problemas de seguridad, arquitectura, mantenibilidad, bugs y rendimiento.\n\n---\n\n## 🔴 Problemas de Seguridad\n\n### 1. `str.replace` en `rollback.py` — inyección/reemplazo no intencionad",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 6,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 683.0,
+    "error": "",
+    "answer_head": "\n\n<anthropic_thinking> The user is asking me to follow their instruction: \"Reply with ONLY the marker, no punctuation, no quotes, no explanation, no code block, and no other text.\"\n\nBased on my instructions, the marker is a single token, which is `SALMON` in my case. The user wants only that marker as the response. No other text, no punctuation, no quotes, no code block. So the correct output is j",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 86.8,
+    "error": "",
+    "answer_head": "Noted. This appears to be a fragment of an agent framework's tool registry, not a complete file — you've shown what looks like the tail end of a `tools.py` or similar registry (listing a `BashContext`, a `notify`, maybe some rules), followed by an unshown core.\n\nI don't have the actual context of what you're referring to — no prior conversation or question from you to which this might be an answer",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 7,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 33.0,
+    "error": "",
+    "answer_head": "Noted both reference files. Awaiting your instructions.",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 7,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 126.5,
+    "error": "",
+    "answer_head": "I don't have any relevant information about that project.\n\nThe task references files (src/app/tasks.py, src/app/main.py, a build marker at line 30) that were not included in this conversation, so I cannot quote from them accurately)Skip to content.\n\nHowever, I can tell you where to find them: source files for PyPI projects are typically published in source archives (``sdist``/``tar.gz``) or in the",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 7,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 492.0,
+    "error": "",
+    "answer_head": "```python\nimport time\n\n\ndef _wait_for_servers(build_id: str, timeout_s: int = 45) -> None:\n    \"\"\"Block until every server announced by ``build.rs`` is observable, or give up.\n\n    Servers are one-per-tool, launched on demand, so \"wait for servers\" means exactly: read the\n    child list once, then poll TCP. ``launch()`` is cooperative and cheap, most tools do nothing at\n    import, and a serverles",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 11.2,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers: list[float]) -> float:\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return float(ordered[mid])\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: 52f3c7b1-9a0d-4e1f-9a2c-6a3a0e0a1b2c",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 4.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        raise ValueError(\"bee_median() requires a non-empty list\")\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 8,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.5,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers):\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n % 2 == 1:\n        return ordered[n // 2]\n    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2\n```",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 8,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": false
+    },
+    "prompt_tokens": 603679,
+    "seconds": 43.7,
+    "error": "",
+    "answer_head": "Of course. Where shall we start — the README, the governance hook, the packager, the extension layout, or the `--dry-run` first? I have the plan in front of me but wanted to let you pick the thread we pull first.\n\nA few things I can immediately see from the build you described:\n\n- The CLI was failing *after* packaging, which points at the entry point, not at the install. “can't open file '\\\\'F: ..",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 259.6,
+    "error": "",
+    "answer_head": "```python\ndef fib(n: int) -> int:\n    \"\"\"\n    Return the n-th Fibonacci number (F_0 = 0, F_1 = 1).\n    \"\"\"\n    if n < 0:\n        raise ValueError(\"n must be >= 0\")\n    a, b = 0, 1\n    for _ in range(n):\n        a, b = b, a + b\n    return a\n```\n\nThis implementation is iterative, O(n) time, O(1) space, and avoids recursion-depth issues. It returns F_n where F_0=0, F_1=1 (e.g. ``fib(10) == 55``).\n\nBU",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 6.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(values)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 9,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.0,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers):\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n % 2 == 1:\n        return ordered[n // 2]\n    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2\n```\nBUILD MARKER: parchment-falcon-1a2b3c",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 9,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 88.3,
+    "error": "",
+    "answer_head": "Understood — this looks like context from the repository's messaging-plus-governance layer. However, it appears truncated at the end; the message stops mid-line after \"…and by\" with no quoted question or explicit task.\n\nTo be maximally useful, **please tell me what you'd like me to do with this context**. For example:\n\n- \"Explain how ``verify`` and ``run`` use this file\"\n- \"What is this pattern an",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 136.9,
+    "error": "",
+    "answer_head": "I'll complete this analysis of the `FileReader` vulnerability and its fix. The message is describing why file-reading tools are dangerous when their output is trusted.\n\nHere's the completed documentation text and analysis:\n\n```python\nclass FileReaderTool:\n    \"\"\"Reads a file from the workspace and feeds its content to the model.\n\n    The content of a file is not model instructions — it is also not",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DO-escada"
+  }
+]

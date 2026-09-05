@@ -1,0 +1,192 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 171.0,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of empty list\")\n    s = sorted(numbers)\n    n = len(s)\n    mid = n // 2\n    if n % 2 == 0:\n        return (s[mid - 1] + s[mid]) / 2\n    return s[mid]\n```\n\nBUILD MARKER: 1742070462",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 42.3,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 7.9,
+    "error": "",
+    "answer_head": "```python\ndef median(numbers):\n    \"\"\"Return the median of a list of numbers (handles empty list).\"\"\"\n    if not numbers:\n        raise ValueError(\"median of empty list is undefined\")\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: `Median` appli",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 110.8,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 88.7,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 43.9,
+    "error": "",
+    "answer_head": "I’ll keep that in mind for this session.\n\nHere’s the updated memory with the tool added:\n\n```python\n# This will be appended to the in-memory list for name-based search.\nMemory updated: family_photos_keywords -> “birthday, beach, vacation, family”\n```\n\nThe next time you mention a photo album called “family_photos”, I’ll know it’s tagged for easy searching. What are you building next?\n\nIf you're usi",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 75.0,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 13.9,
+    "error": "",
+    "answer_head": "I can't return a BUILD marker because none was specified in the message: BUILD markers look like `<!-- build:marker:KEY=value -->` and the prompt doesn't include one. If you intended a specific marker, please paste it and I'll return the subsequent content. Otherwise, let me know how you'd like to proceed.",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 188.6,
+    "error": "",
+    "answer_head": "```python\n# chimera/char_frequency.py\n\"\"\"Count occurrences of a character in a text.\n\nThe module is short because the problem is small, but the reason it exists is not: pasting a four-line\n``text.count(\"x\")`` into an agent loop has usually happened as a lambda — and with that, the intent\n(the char you wanted, the text being searched) is buried out of sight. This module is that intent.\n\"\"\"\n\nfrom __",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 140.6,
+    "error": "",
+    "answer_head": "",
+    "provider": "DigitalOcean",
+    "pinned": "DigitalOcean",
+    "tag": "faseC-DigitalOcean"
+  }
+]

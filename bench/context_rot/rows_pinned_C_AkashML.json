@@ -1,0 +1,184 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 72.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"cannot compute median of an empty list\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 52.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": false,
+    "fact": false,
+    "detail": {},
+    "prompt_tokens": 0,
+    "seconds": 3.4,
+    "error": "litellm.RateLimitError: RateLimitError: OpenrouterException - {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"deepseek/deepseek-v4-flash-0731 is temporarily rate-limited upstream. Please retry",
+    "answer_head": "",
+    "provider": "",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 9.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four fo",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {},
+    "prompt_tokens": 0,
+    "seconds": 3.5,
+    "error": "litellm.RateLimitError: RateLimitError: OpenrouterException - {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"deepseek/deepseek-v4-flash-0731 is temporarily rate-limited upstream. Please retry",
+    "answer_head": "",
+    "provider": "",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 11.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_numbers[mid]\n    return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 56.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four ",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 51.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 10.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791940,
+    "seconds": 8.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin",
+    "provider": "AkashML",
+    "pinned": "AkashML",
+    "tag": "faseC-AkashML"
+  }
+]
