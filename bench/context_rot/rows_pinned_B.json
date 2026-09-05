@@ -1,0 +1,3042 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 5.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    import statistics\n    return statistics.median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 4.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"empty sequence\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four z",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 9.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"bee_median requires a non-empty list\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 36.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marli",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    if not values:\n        return None\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None for an empty list.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return float(sorted_numbers[mid])\n    return (sorted_numbers[mid - 1] + sorted_numbers",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    count = len(ordered)\n    if count == 0:\n        raise ValueError(\"median requires at least one number\")\n    middle = count // 2\n    if count % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n``",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 11.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    import statistics\n\n    return statistics.median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 1,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None for an empty list.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\n\nBUILD MARKER: marlin four four",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 3.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of empty sequence is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four z",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 8.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a non-empty list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"empty sequence has no median\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 13.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    middle = n // 2\n    if n % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER:",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 2,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_numbers[mid]\n    return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"empty list has no median\")\n    middle = n // 2\n    if n % 2:\n        return float(ordered[middle])\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marlin four four",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"empty list\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 8.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 14.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 3,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not values:\n        return None\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 6.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not values:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(values)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four f",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 11.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"cannot take the median of an empty list\")\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marlin four",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 11.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 4,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    if not values:\n        return None\n    ordered = sorted(values)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four fo",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 3.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"bee_median requires at least one number\")\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return 0.0\n    mid = n // 2\n    if n % 2 == 1:\n        return float(ordered[mid])\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    midpoint = n // 2\n    if n % 2:\n        return ordered[midpoint]\n    return (ordered[midpoint - 1] + ordered[midpoint]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(numbers)\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 13.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 1.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom typing import List, Union\n\ndef bee_median(numbers: List[Union[int, float]]) -> Union[int, float, None]:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of ``numbers``, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four fo",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 6,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 15.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nimport statistics\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return statistics.median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 0:\n        return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2\n    return sorted_numbers[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 4.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    count = len(ordered)\n    if count == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    middle = count // 2\n    if count % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marli",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 6.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin fou",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\nfrom typing import List, Union\n\n\ndef bee_median(numbers: List[Union[int, float]]) -> Union[int, float]:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median requires at least one number\")\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return o",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 7,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 15.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"empty list has no median\")\n    middle = n // 2\n    if n % 2 == 1:\n        return float(ordered[middle])\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marl",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 3.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n % 2 == 1:\n        return ordered[n // 2]\n    return (ordered[n // 2 - 1] + ordered[n // 2]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 4.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom typing import List, Optional\n\n\ndef bee_median(numbers: List[float]) -> Optional[float]:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    midpoint = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[midpoint]\n    return (ordered[midpoint - 1",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 11.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom statistics import median\n\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(values)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 8,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 12.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot take the median of an empty list\")\n    midpoint = n // 2\n    if n % 2 == 1:\n        return ordered[midpoint]\n    return (ordered[midpoint - 1] + ordered[midpoint]) / 2.0\n```\nB",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom typing import List, Union\n\nNumber = Union[int, float]\n\n\ndef bee_median(numbers: List[Number]) -> Number:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 4.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 3.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not values:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(values)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four f",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    import statistics\n\n    return statistics.median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 11.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median_of(values: list[float]) -> float:\n    \"\"\"Return the median of ``values``.\"\"\"\n    return median(values)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 9,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 19.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom typing import List, Union\n\nNumber = Union[int, float]\n\n\ndef bee_median(numbers: List[Number]) -> Number:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"bee_median() arg is an empty sequence\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (orde",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MAR",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 3.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marlin four four zero",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 10,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    midpoint = n // 2\n    if n % 2 == 1:\n        return ordered[midpoint]\n    return (ordered[midpoint - 1] + ordered[midpoint]) / 2.0\n```\nBUILD MA",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 1.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom statistics import median as _median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    return _median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of empty sequence undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marli",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return 0.0\n    mid = n // 2\n    if n % 2 == 1:\n        return float(ordered[mid])\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 11,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 15.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(values):\n    if not values:\n        return None\n    ordered = sorted(values)\n    mid = len(ordered) // 2\n    if len(ordered) % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 3.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 3.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 4.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin fou",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 6.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marl",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 12,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of ``numbers``, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marlin",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 1.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    midpoint = n // 2\n    if n % 2:\n        return ordered[midpoint]\n    return (ordered[midpoint - 1] + ordered[midpoint]) / 2.0\n```\nBUIL",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin f",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 6.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers (None when the list is empty).\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2 == 0:\n        return (ordered[middle - 1] + ordered[middle]) / 2.0\n    return ordered[middle]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 13,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of ``numbers``.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    middle = n // 2\n    if n % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[mi",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    if not values:\n        return None\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 5.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    if not values:\n        return None\n    sorted_values = sorted(values)\n    n = len(sorted_values)\n    mid = n // 2\n    if n % 2:\n        return sorted_values[mid]\n    return (sorted_values[mid - 1] + sorted_values[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    midpoint = n // 2\n    if n % 2 == 1:\n        return ordered[midpoint]\n    return (ordered[midpoint - 1] + ordered[midpoint]) / 2.0\n```",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom __future__ import annotations\n\nfrom typing import List, Union\n\n\ndef bee_median(numbers: List[Union[int, float]]) -> Union[int, float, None]:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.9,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return float(ordered[mid])\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\n\nBUILD MARKER: mar",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 10.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\n\n    The list is sorted locally; the input is not mutated. An empty list is\n    treated as a caller error and raised rather than guessed, so a missing\n    result can never be confused with a real one.\n    \"\"\"\n    if not numbers:\n        raise ValueError(\"bee_median requires at ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 14,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 15.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        raise ValueError(\"median of empty list is undefined\")\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 0:\n        return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2.0\n    return sorted_numbers[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 1.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 2.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER:",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nB",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 15,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 13.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 1.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute median of an empty list\")\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four z",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 8.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 9.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None when the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 14.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered) % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 13.4,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    sorted_numbers = sorted(numbers)\n    n = len(sorted_numbers)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_numbers[mid]\n    return (sorted_numbers[mid - 1] + sorted_numbers[mid]) / 2",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\nfrom __future__ import annotations\n\nfrom typing import List, Union\n\n\ndef bee_median(numbers: List[Union[int, float]]) -> Union[int, float, None]:\n    \"\"\"Return the median of a list of numbers.\n\n    The list is sorted (without mutating the caller's list) and the middle\n    value is returned. For an even-length list the mean of the two central\n    values is returned. An em",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    mid = n // 2\n    if n % 2 == 1:\n        return sorted_nums[mid]\n    return (sorted_nums[mid - 1] + sorted_nums[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 8.6,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(values)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four f",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 11.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 0:\n        return (ordered[mid - 1] + ordered[mid]) / 2\n    return ordered[mid]\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 15.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float | None:\n    \"\"\"Return the median of a list of numbers.\n\n    Empty input returns None: the median of nothing is undefined, and\n    returning None is the honest answer rather than inventing a number.\n    \"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    middle = len(ordered) // 2\n    if len(ordered",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 3.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    values = sorted(numbers)\n    n = len(values)\n    mid = n // 2\n    if n % 2 == 1:\n        return values[mid]\n    return (values[mid - 1] + values[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 3.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(values)\n    n = len(ordered)\n    if n == 0:\n        return None\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 4.8,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\nfrom statistics import median\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    return median(numbers)\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 7.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    size = len(ordered)\n    if size == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    mid = size // 2\n    if size % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    middle = n // 2\n    if n % 2:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.6,
+    "error": "",
+    "answer_head": "# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers, or None if the list is empty.\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(numbers)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"median of an empty list is undefined\")\n    middle = n // 2\n    if n % 2 == 1:\n        return ordered[middle]\n    return (ordered[middle - 1] + ordered[middle]) / 2.0\n```\nBUILD MARKER",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 4000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 4587,
+    "seconds": 2.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 16000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 15812,
+    "seconds": 2.5,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"empty sequence\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 64000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 62829,
+    "seconds": 3.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not numbers:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 200000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 200690,
+    "seconds": 5.0,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values: list[float]) -> float:\n    if not values:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return float(ordered[mid])\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 400000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 403942,
+    "seconds": 8.3,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\ndef bee_median(values: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(values)\n    if not ordered:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    mid = len(ordered) // 2\n    if len(ordered) % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 600000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 603679,
+    "seconds": 10.7,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values):\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    if not values:\n        raise ValueError(\"median of an empty list is undefined\")\n    ordered = sorted(values)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792019,
+    "seconds": 12.1,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\n\ndef bee_median(numbers):\n    \"\"\"Return the median of a list of numbers (None for an empty list).\"\"\"\n    if not numbers:\n        return None\n    ordered = sorted(numbers)\n    n = len(ordered)\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2\n```\nBUILD MARKER: marlin four four zero two",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 950000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 953392,
+    "seconds": 14.2,
+    "error": "",
+    "answer_head": "```python\n# (c) Bruno 2026\n\ndef bee_median(values: list[float]) -> float:\n    \"\"\"Return the median of a list of numbers.\"\"\"\n    ordered = sorted(values)\n    n = len(ordered)\n    if n == 0:\n        raise ValueError(\"cannot compute the median of an empty list\")\n    mid = n // 2\n    if n % 2 == 1:\n        return ordered[mid]\n    return (ordered[mid - 1] + ordered[mid]) / 2.0\n```\nBUILD MARKER: marlin ",
+    "provider": "Baidu",
+    "pinned": "Baidu",
+    "tag": "faseB-escada"
+  }
+]
