@@ -60,6 +60,23 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # TypeScript 7 cannot be installed here, and not because of our code. `openapi-typescript`
+    # declares `peer typescript: "^5.x"`, so `npm ci` dies on ERESOLVE before a single file is
+    # type-checked. Every published version up to 7.13.0 — the one we are already on — declares
+    # that same range, so there is no version to move to and nothing on our side to migrate.
+    #
+    # The generator is not incidental: it produces `src/lib/api-schema.ts` from `openapi.json`, and
+    # CI fails on drift between them. The two ways to make the PR green are to pass
+    # `--legacy-peer-deps`, which silences a real incompatibility, or to drop the generator, which
+    # removes the drift gate. Neither is worth a version number.
+    #
+    # So this is the `mcp` situation in another ecosystem: a PR that can only ever be closed,
+    # arriving every week. Ignoring the MAJOR only — 5.x minors and patches still get proposed,
+    # which is the part that can be taken. Lift this when `openapi-typescript` widens its peer
+    # range, which is the single thing to check before touching this line.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-dev:
         dependency-type: "development"
