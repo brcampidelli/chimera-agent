@@ -4,42 +4,13 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.50.0] - 2026-09-05
 
 ### Added
 
 - **`StepRecord.provider`, so a trace records which backend served each step.** `CompletionResult`
   gained the field first; this carries it into `traces.jsonl`, which is what every census this
   project runs reads.
-
-### Changed
-
-- **The 23-point spread `bench/parallel_tools` attributed to model families is retracted.** Pinning
-  four backends of a **single** slug and running the same thirty tasks against each measured a
-  **35.9-point** spread — larger than the between-family figure, with non-overlapping intervals:
-
-  | backend | multi-call rate | 95% CI |
-  |---|---:|---|
-  | `Baidu` | 63.5% | [52.1, 73.6] |
-  | `OpenInference` | **27.6%** | [18.8, 38.6] |
-  | `Relace` | 58.5% | [47.7, 68.6] |
-  | `Wafer` | 57.7% | [46.6, 68.0] |
-
-  The four use the same batch vocabulary, so this is not different work at similar rates — it is the
-  same work with a different number of tools asked for per turn.
-
-  **The bench's verdict is untouched**: parallel tool calls died on tool *latency*, 4.3 ms saved per
-  run against a 5,578 ms step, and that argument never used the batching rate. What is retracted is
-  the finding it carried forward. What replaces it is the shape rather than the number: **a
-  measurement that averages over an unrecorded dimension is averaging over it**, and the serving
-  backend was such a dimension in every measurement this repository had made.
-
-  Observing the router could not have found this: 120 consecutive runs all landed on one backend,
-  while `bench/context_rot` saw five rotate across a handful of calls. The arms had to be pinned.
-
-  And the pool behind that one slug has **30 endpoints**, spanning **5× in context window**
-  (262,144 → 1,310,720) and **8.8× in input price** ($0.050 → $0.440/M). `catalog.py` records one
-  number per axis.
 
 - **`CompletionResult.provider` — which backend served the call, not which model answered.**
   OpenRouter routes a slug per call: three consecutive calls to
@@ -48,46 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   different machine answered" are different events, and until now every record this project kept
   made them look identical. Empty on the streaming path, where the chunks do not carry it — stated
   on the field rather than left to be inferred from a value that is always blank on one route.
-
-- **The agent keeps a task list, and it is on the screen.** `RunState.tasks` has existed since
-  compaction was written, with a docstring saying what it is for and a renderer that puts it back
-  after a compaction. Nothing ever wrote to it, and the loop that would have been the obvious writer
-  says in as many words why it must not: it counts attempts, not steps, so it has no completion to
-  report, and filling the field from the plan would be *"a lie in the field whose entire purpose is
-  to be believed"*.
-
-  That was right. The missing piece was a truthful source, and there is one: the agent. A new
-  `todo_write` tool records the list, `RunState.tasks` mirrors it so a compaction restores it with
-  its status intact, and a `todo` frame carries it live to the Code screen and the run panel.
-
-  **What it reports is a claim, and every surface says so.** Every other structured frame in this
-  vocabulary reports something observed — `edit` is a diff read off disk before and after the write,
-  `result` is a verifier's exit code. A row of ticks looks like a third member of that family and is
-  not one. The frame carries `claimed`, and the panel writes it out: *"1 of 3 done — what the agent
-  says about its own progress, not a verdict."*
-
-  Two rules are enforced rather than suggested: at most one item may be in progress (a list with six
-  answers nothing), and items that leave the list are named back to the agent (a quietly dropped
-  requirement renders identically to one that never existed).
-
-  **Adoption was measured before this defaulted to anything**, because a tool the model never calls
-  is schema in every prompt and no behaviour. Same task, same models, one sentence of difference:
-
-  | | `deepseek-v4-flash-0731` | `z-ai/glm-5.3` |
-  |---|---|---|
-  | schema only | 0 calls | 0 calls |
-  | schema + one prompt line | 0 calls, in 4 runs | 4 calls, correct progression |
-
-  So the prompt line is not optional, and it is only added when the session actually granted the
-  tool. And the part worth saying plainly: **the model this project currently ships as its default
-  does not use this tool**, in four runs where it was told to. On that model the feature costs 896
-  characters per step and delivers nothing. It ships on anyway — its failure mode is "unused" rather
-  than "worse", and there is no bench control arm for it to destroy — with the number written into
-  `chimera/config.py` so the decision can be reopened with a measurement instead of an opinion.
-
-  Registered in `default_registry` like every other tool, which is what puts it under the session
-  allowlist: a registry an operator scoped to two tools does not quietly gain a third. Bound per
-  thread, so the several workers a crew runs off one shared registry keep separate lists.
 
 - **`CHIMERA_APPROVAL_WEBHOOK` — where an approval question goes when nobody is at a console.** A
   channel webhook URL, for the reason `scheduler/delivery.py` already gives about job results: a URL
@@ -129,6 +60,73 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   inference, and degrades to the note on every failure path.
 
 ### Changed
+
+- **The 23-point spread `bench/parallel_tools` attributed to model families is retracted.** Pinning
+  four backends of a **single** slug and running the same thirty tasks against each measured a
+  **35.9-point** spread — larger than the between-family figure, with non-overlapping intervals:
+
+  | backend | multi-call rate | 95% CI |
+  |---|---:|---|
+  | `Baidu` | 63.5% | [52.1, 73.6] |
+  | `OpenInference` | **27.6%** | [18.8, 38.6] |
+  | `Relace` | 58.5% | [47.7, 68.6] |
+  | `Wafer` | 57.7% | [46.6, 68.0] |
+
+  The four use the same batch vocabulary, so this is not different work at similar rates — it is the
+  same work with a different number of tools asked for per turn.
+
+  **The bench's verdict is untouched**: parallel tool calls died on tool *latency*, 4.3 ms saved per
+  run against a 5,578 ms step, and that argument never used the batching rate. What is retracted is
+  the finding it carried forward. What replaces it is the shape rather than the number: **a
+  measurement that averages over an unrecorded dimension is averaging over it**, and the serving
+  backend was such a dimension in every measurement this repository had made.
+
+  Observing the router could not have found this: 120 consecutive runs all landed on one backend,
+  while `bench/context_rot` saw five rotate across a handful of calls. The arms had to be pinned.
+
+  And the pool behind that one slug has **30 endpoints**, spanning **5× in context window**
+  (262,144 → 1,310,720) and **8.8× in input price** ($0.050 → $0.440/M). `catalog.py` records one
+  number per axis.
+
+- **The agent keeps a task list, and it is on the screen.** `RunState.tasks` has existed since
+  compaction was written, with a docstring saying what it is for and a renderer that puts it back
+  after a compaction. Nothing ever wrote to it, and the loop that would have been the obvious writer
+  says in as many words why it must not: it counts attempts, not steps, so it has no completion to
+  report, and filling the field from the plan would be *"a lie in the field whose entire purpose is
+  to be believed"*.
+
+  That was right. The missing piece was a truthful source, and there is one: the agent. A new
+  `todo_write` tool records the list, `RunState.tasks` mirrors it so a compaction restores it with
+  its status intact, and a `todo` frame carries it live to the Code screen and the run panel.
+
+  **What it reports is a claim, and every surface says so.** Every other structured frame in this
+  vocabulary reports something observed — `edit` is a diff read off disk before and after the write,
+  `result` is a verifier's exit code. A row of ticks looks like a third member of that family and is
+  not one. The frame carries `claimed`, and the panel writes it out: *"1 of 3 done — what the agent
+  says about its own progress, not a verdict."*
+
+  Two rules are enforced rather than suggested: at most one item may be in progress (a list with six
+  answers nothing), and items that leave the list are named back to the agent (a quietly dropped
+  requirement renders identically to one that never existed).
+
+  **Adoption was measured before this defaulted to anything**, because a tool the model never calls
+  is schema in every prompt and no behaviour. Same task, same models, one sentence of difference:
+
+  | | `deepseek-v4-flash-0731` | `z-ai/glm-5.3` |
+  |---|---|---|
+  | schema only | 0 calls | 0 calls |
+  | schema + one prompt line | 0 calls, in 4 runs | 4 calls, correct progression |
+
+  So the prompt line is not optional, and it is only added when the session actually granted the
+  tool. And the part worth saying plainly: **the model this project currently ships as its default
+  does not use this tool**, in four runs where it was told to. On that model the feature costs 896
+  characters per step and delivers nothing. It ships on anyway — its failure mode is "unused" rather
+  than "worse", and there is no bench control arm for it to destroy — with the number written into
+  `chimera/config.py` so the decision can be reopened with a measurement instead of an opinion.
+
+  Registered in `default_registry` like every other tool, which is what puts it under the session
+  allowlist: a registry an operator scoped to two tools does not quietly gain a third. Bound per
+  thread, so the several workers a crew runs off one shared registry keep separate lists.
 
 - **`chimera find` has a semantic half, and it earns its place by a rule fixed before the run.**
   `bench/rag/baseline.json` has held `keyword_recall: 0.4925` with `vector_recall: null` since
