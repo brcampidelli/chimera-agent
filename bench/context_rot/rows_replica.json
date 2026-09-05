@@ -1,0 +1,298 @@
+[
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 0,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 792029,
+    "seconds": 33.5,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 1,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 31.9,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 2,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 17.6,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 3,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.5,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 4,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 15.3,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 5,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 28.3,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 6,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 15.2,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 7,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 17.8,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 8,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 19.2,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 9,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 16.0,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 10,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 16.1,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 11,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 11.2,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 12,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.5,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 13,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.6,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 14,
+    "rule": false,
+    "fact": false,
+    "detail": {
+      "header": false,
+      "prefix": false,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.6,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 15,
+    "rule": false,
+    "fact": false,
+    "detail": {},
+    "prompt_tokens": 0,
+    "seconds": 2115.1,
+    "error": "litellm.APIError: APIError: OpenrouterException - peer closed connection without sending complete message body (incomplete chunked read)"
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 16,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 18.9,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 17,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.2,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 18,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.2,
+    "error": ""
+  },
+  {
+    "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+    "target_tokens": 786000,
+    "rep": 19,
+    "rule": true,
+    "fact": true,
+    "detail": {
+      "header": true,
+      "prefix": true,
+      "no_print": true
+    },
+    "prompt_tokens": 791951,
+    "seconds": 14.6,
+    "error": ""
+  }
+]

@@ -125,6 +125,28 @@ class CompletionResult(BaseModel):
     now, and a response cut off at the output ceiling therefore arrived 200 OK and indistinguishable
     from a complete one."""
 
+    provider: str = ""
+    """Which BACKEND served this call, when the router reports one — not which model answered.
+
+    OpenRouter routes a slug to whichever provider it picks, and providers of the same slug differ:
+    in how much context they honour, in latency, and in what they do at the edge of a window.
+    Without this a receipt cannot tell "the model behaved differently" from "a different machine
+    answered", and those need different responses.
+
+    Found the expensive way. `bench/context_rot` measured the same prompt at ~792k tokens giving 70%
+    instruction-following in one batch, 13% in another and 100% across forty later calls, all at
+    temperature 0 — and the first hypothesis, that the router had moved, could not be tested at all,
+    because nothing had been recording where the answers came from.
+
+    Recording it settled it. **Three consecutive calls to one slug came back from `Wafer`,
+    `Inceptron` and `DigitalOcean`** — the router picks per call, so a slug names a rotating pool
+    rather than a machine. Every measurement this project makes "of a model" is a measurement of
+    that pool, and every receipt that names only the model is naming the pool too.
+
+    **Empty on the streaming path**, where the chunks carry no provider, and empty is not "none was
+    reported" — it is "this path cannot see it". Said here rather than left for a reader to infer
+    from a field that is always blank on one route."""
+
     truncated: bool = False
     """True when generation stopped because it ran out of room, rather than because it was done.
 
@@ -722,7 +744,15 @@ class LLMGateway:
                 drop_params=True,
                 **call_kwargs,
             )
+            provider = ""
             for chunk in response:
+                # Taken from the first chunk that carries one rather than assumed to be on the
+                # first chunk at all. Measured: none of them carry it today, so this stays empty
+                # on this path — kept because it costs nothing and starts working the day the
+                # router puts it on a chunk, and because a reader comparing the two paths needs
+                # to see that the absence was looked for rather than overlooked.
+                if not provider:
+                    provider = str(getattr(chunk, "provider", "") or "")
                 razao = self._consume_chunk(chunk, content, tool_acc, usage, think, on_delta)
                 if razao:
                     finish_reason = razao
@@ -760,6 +790,7 @@ class LLMGateway:
             cache_write_tokens=usage.get("cache_write_tokens"),
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
+            provider=provider,
         )
 
     @staticmethod
@@ -855,6 +886,7 @@ class LLMGateway:
             cache_write_tokens=cache_write_tokens,
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
+            provider=str(getattr(response, "provider", "") or ""),
         )
 
     @staticmethod

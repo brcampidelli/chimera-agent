@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`CompletionResult.provider` — which backend served the call, not which model answered.**
+  OpenRouter routes a slug per call: three consecutive calls to
+  `openrouter/deepseek/deepseek-v4-flash-0731` came back from **`Wafer`, `Inceptron` and
+  `DigitalOcean`**. A slug names a rotating pool, so "the same model gave a different answer" and "a
+  different machine answered" are different events, and until now every record this project kept
+  made them look identical. Empty on the streaming path, where the chunks do not carry it — stated
+  on the field rather than left to be inferred from a value that is always blank on one route.
+
 - **The agent keeps a task list, and it is on the screen.** `RunState.tasks` has existed since
   compaction was written, with a docstring saying what it is for and a renderer that puts it back
   after a compaction. Nothing ever wrote to it, and the loop that would have been the obvious writer
@@ -78,35 +86,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   content the run fetched from the web. Turning a gate on is safe in every direction and belongs on
   a screen; making it permissive stays a deliberate act in a file.
 
-### Fixed
 
-- `CodeSession.send` forwarded a new callback to any agent whose `run` declared `**kwargs`, on the
-  reasoning — written in a comment — that an implementation predating the parameter had to keep
-  working. A catch-all usually forwards to something narrower, so the comment described a safety the
-  code did not provide: six API turns died before their first tool call. The signature is now read
-  for the parameter by name.
-
-- **Three unattended surfaces asked to be able to ask a person, and the parameter was dropped one
-  layer down.** `scheduler/job_runner`, `server/manager` and `kanban/lanes` all call
-  `governed_profile(..., home=settings.home)` — one of them with a comment on the line above reading
-  *"Governance on the path that runs unattended"*. `home` is what `approver_for` reads to opt into
-  asking somebody who is not at the keyboard, and the whole mechanism behind it
-  (`chimera/governance/pending.py`, a durable question answered with `chimera approve`) exists and is
-  tested.
-
-  `governed_profile` used the parameter for `AuditLog(home / "audit.jsonl")` and never handed it on
-  to `govern_step`, which is what builds the approver. So on all three surfaces every REVIEW was
-  refused with nobody asked. An operator who set `CHIMERA_APPROVAL_MODE=ask` believed they would be
-  told before anything risky; the only trace was a line in `audit.jsonl`. The parameter was named in
-  the signature, which is what made the omission read as wiring rather than as a decision.
-
-  **Forwarding it alone would have been a regression.** `ask_durably` waits fifteen minutes, and no
-  call site has ever passed a `deliver` — so the question would have been a JSON file nobody was
-  told about, which `pending.py` names itself: *"pretending otherwise would park a worker for fifteen
-  minutes to reach the same refusal."* So the durable ask travels only with somewhere to send it.
-
-
-## [Unreleased]
+- **A rule-form summariser for the span a compaction drops** — `chimera/core/summarise.py`, behind
+  `AgentConfig.summarise_compaction`, **off**. `compact()` has taken a `summarise` callable since it
+  was written and no production caller ever passed one, so every compaction leaves the structural
+  note. The note is a deliberate choice with its own defence — *"the agent can re-read a file; it
+  cannot un-believe a fabricated summary"* — so this is built beside it, not instead of it: the
+  summary travels **with** the note, asks for standing instructions rather than a narration, forbids
+  inference, and degrades to the note on every failure path.
 
 ### Changed
 
@@ -137,37 +124,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   width are recorded **inside** the result. Vector spaces do not convert, so this does not choose the
   shipped default; a local embedder needs its own run, and now has a measured reason to get one.
 
-### Fixed
-
-- **The RAG bench could not answer a paired question.** `RagReport` carried three totals and nothing
-  per probe, so the pairs a McNemar test needs were computed and discarded inside the loop that
-  computed them. Per-probe hit/miss is now recorded for all three arms and feeds
-  `chimera/eval/paired.py` directly.
-- **`embed_missing` was called without `embedder=`**, leaving `ChunkStore._align_embedder` inert in
-  exactly the run that first writes vectors. That guard zeroes every vector when the model identity
-  or width changes; without it a mixed-dimension index reports healthy and returns nothing, because
-  `_cosine` gives 0.0 on a mismatch and the `score > 0` filter then drops everything.
-- **Query embeddings were one call per probe**, inside the loop — 400 round-trips for the same money
-  as two batches. A provider returning a short batch now voids the semantic arms rather than pairing
-  each query with the next one's vector.
-- **The published baseline was stale, and says so.** The same harness measures 0.4750 on the
-  2026-08-14 tree (2,838 chunks) and 0.4425 today (3,459). `chimera/` is 29% larger than it was and
-  recall@10 falls as the haystack grows. The old figure was right about an older corpus; the record
-  now carries the chunk count beside every recall number, and names what it supersedes.
-
-## [Unreleased]
-
-### Added
-
-- **A rule-form summariser for the span a compaction drops** — `chimera/core/summarise.py`, behind
-  `AgentConfig.summarise_compaction`, **off**. `compact()` has taken a `summarise` callable since it
-  was written and no production caller ever passed one, so every compaction leaves the structural
-  note. The note is a deliberate choice with its own defence — *"the agent can re-read a file; it
-  cannot un-believe a fabricated summary"* — so this is built beside it, not instead of it: the
-  summary travels **with** the note, asks for standing instructions rather than a narration, forbids
-  inference, and degrades to the note on every failure path.
-
-### Changed
 
 - **Parallel tool calls: measured, and not built.** `chimera/core/agent.py` runs a turn's tool calls
   in a plain `for`. Making that concurrent needs a read-only marking on `Tool` that does not exist,
@@ -214,9 +170,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   set from the advertised maximum is about the marketing.
 
 
-## [Unreleased]
-
-### Changed
 
 - **Per-model edit-format tailoring: measured, and there is nothing to tailor.** The claim that would
   justify it — an OpenAI-family model is cheaper with patches, a Claude-family one with whole blocks
@@ -238,21 +191,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   2.5× the wall clock** of `deepseek-v4-flash-0731` for the same tasks at the same pass rate. Both
   are "flash"-tier by name.
 
-## [Unreleased]
 
-### Added
+- **`bench/context_rot` publishes no knee, because the measurement did not reproduce.**
+  `bench/compaction` ended by asking at what context length the model starts getting the task wrong,
+  so a compaction trigger could be set from the model rather than from the vendor's advertised
+  maximum. The sweep gave a clean-looking answer — instruction-following 10/10 from 4k to 400k and
+  **7/10 at 786k**, with retrieval holding at 10/10 throughout, which is the separation the design
+  existed to make.
 
-- **`chimera find --semantic`, and `chimera measure rag --semantic`.** `bench/rag/RESULTS.md` said
-  ADOPT three commits ago and the command kept running keyword-only: a verdict is not a delivery.
+  Replicating that point gave **2/15**. Forty calls after it gave **40/40**. Same prompt, same
+  791,951 tokens, temperature 0. Sampling, prompt length, code path and a single bad backend were
+  each ruled out; the router's per-call rotation is what remains, and it was present in every batch
+  including the one whose curve looked clean.
 
-  **`--semantic` means hybrid, never vectors alone**, and that is the measurement rather than a
-  preference — the vector arm on its own scored **0.4100, below keyword's 0.4425**. A flag that
-  handed back the vector arm would make a search worse while sounding like an upgrade. The
-  embedding bill is announced **before** the pass, not in a footnote after it, and the footer names
-  the embedder, because a recall figure without the model that produced it is a number about
-  nothing in particular.
+  **A trigger set from that sweep would have been set from noise.** The consequence reaches past this
+  bench: every measurement in this repository that names a model is a measurement of a pool, and none
+  of them recorded which backend answered, because until this commit nothing could.
+
+  185 calls, 72.4M input tokens, **US$ 5.07** measured against "under two dollars" estimated — the
+  65 calls past the sweep were the investigation, and they were worth more than the sweep.
 
 ### Fixed
+
+- `CodeSession.send` forwarded a new callback to any agent whose `run` declared `**kwargs`, on the
+  reasoning — written in a comment — that an implementation predating the parameter had to keep
+  working. A catch-all usually forwards to something narrower, so the comment described a safety the
+  code did not provide: six API turns died before their first tool call. The signature is now read
+  for the parameter by name.
+
+- **Three unattended surfaces asked to be able to ask a person, and the parameter was dropped one
+  layer down.** `scheduler/job_runner`, `server/manager` and `kanban/lanes` all call
+  `governed_profile(..., home=settings.home)` — one of them with a comment on the line above reading
+  *"Governance on the path that runs unattended"*. `home` is what `approver_for` reads to opt into
+  asking somebody who is not at the keyboard, and the whole mechanism behind it
+  (`chimera/governance/pending.py`, a durable question answered with `chimera approve`) exists and is
+  tested.
+
+  `governed_profile` used the parameter for `AuditLog(home / "audit.jsonl")` and never handed it on
+  to `govern_step`, which is what builds the approver. So on all three surfaces every REVIEW was
+  refused with nobody asked. An operator who set `CHIMERA_APPROVAL_MODE=ask` believed they would be
+  told before anything risky; the only trace was a line in `audit.jsonl`. The parameter was named in
+  the signature, which is what made the omission read as wiring rather than as a decision.
+
+  **Forwarding it alone would have been a regression.** `ask_durably` waits fifteen minutes, and no
+  call site has ever passed a `deliver` — so the question would have been a JSON file nobody was
+  told about, which `pending.py` names itself: *"pretending otherwise would park a worker for fifteen
+  minutes to reach the same refusal."* So the durable ask travels only with somewhere to send it.
+
+
+
+- **The RAG bench could not answer a paired question.** `RagReport` carried three totals and nothing
+  per probe, so the pairs a McNemar test needs were computed and discarded inside the loop that
+  computed them. Per-probe hit/miss is now recorded for all three arms and feeds
+  `chimera/eval/paired.py` directly.
+- **`embed_missing` was called without `embedder=`**, leaving `ChunkStore._align_embedder` inert in
+  exactly the run that first writes vectors. That guard zeroes every vector when the model identity
+  or width changes; without it a mixed-dimension index reports healthy and returns nothing, because
+  `_cosine` gives 0.0 on a mismatch and the `score > 0` filter then drops everything.
+- **Query embeddings were one call per probe**, inside the loop — 400 round-trips for the same money
+  as two batches. A provider returning a short batch now voids the semantic arms rather than pairing
+  each query with the next one's vector.
+- **The published baseline was stale, and says so.** The same harness measures 0.4750 on the
+  2026-08-14 tree (2,838 chunks) and 0.4425 today (3,459). `chimera/` is 29% larger than it was and
+  recall@10 falls as the haystack grows. The old figure was right about an older corpus; the record
+  now carries the chunk count beside every recall number, and names what it supersedes.
+
 
 - **A catalogue price was wrong by 2.2x, and its own note said it had been verified.**
   `deepseek-chat-v3.1` carried 0.25/0.95 against a live 0.55/1.65 — recorded by a survey on
