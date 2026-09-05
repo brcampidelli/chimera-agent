@@ -242,15 +242,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **`chimera find --semantic`, and `chimera measure rag --semantic`.** `bench/rag/RESULTS.md` said
-  ADOPT three commits ago and the command kept running keyword-only: a verdict is not a delivery.
+### Changed
 
-  **`--semantic` means hybrid, never vectors alone**, and that is the measurement rather than a
-  preference — the vector arm on its own scored **0.4100, below keyword's 0.4425**. A flag that
-  handed back the vector arm would make a search worse while sounding like an upgrade. The
-  embedding bill is announced **before** the pass, not in a footnote after it, and the footer names
-  the embedder, because a recall figure without the model that produced it is a number about
-  nothing in particular.
+- **`bench/context_rot` publishes no knee, because the measurement did not reproduce.**
+  `bench/compaction` ended by asking at what context length the model starts getting the task wrong,
+  so a compaction trigger could be set from the model rather than from the vendor's advertised
+  maximum. The sweep gave a clean-looking answer — instruction-following 10/10 from 4k to 400k and
+  **7/10 at 786k**, with retrieval holding at 10/10 throughout, which is the separation the design
+  existed to make.
+
+  Replicating that point gave **2/15**. Forty calls after it gave **40/40**. Same prompt, same
+  791,951 tokens, temperature 0. Sampling, prompt length, code path and a single bad backend were
+  each ruled out; the router's per-call rotation is what remains, and it was present in every batch
+  including the one whose curve looked clean.
+
+  **A trigger set from that sweep would have been set from noise.** The consequence reaches past this
+  bench: every measurement in this repository that names a model is a measurement of a pool, and none
+  of them recorded which backend answered, because until this commit nothing could.
+
+  185 calls, 72.4M input tokens, **US$ 5.07** measured against "under two dollars" estimated — the
+  65 calls past the sweep were the investigation, and they were worth more than the sweep.
 
 ### Fixed
 
@@ -272,6 +283,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **A search that matched nothing printed no calibration figure.** The measured recall sat after the
   results table, so the empty-result path skipped it — at exactly the moment a reader has to decide
   between "my query was wrong" and "this retriever misses half of what it is asked for".
+
 
 ## [0.49.3] - 2026-09-03
 

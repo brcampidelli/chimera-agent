@@ -163,3 +163,37 @@ def test_the_agent_builds_no_summariser_unless_asked(monkeypatch: Any) -> None:
         Agent(_Backend(), ToolRegistry(), AgentConfig(summarise_compaction=True))._summarise
         is not None
     )
+
+
+# --- a slug is not a machine ----------------------------------------------------------------------
+
+
+def test_the_result_records_which_backend_served_it() -> None:
+    """A receipt that names the model names a rotating pool, and until now could not say which.
+
+    Measured while chasing a contradiction in `bench/context_rot`: three consecutive calls to one
+    OpenRouter slug came back from `Wafer`, `Inceptron` and `DigitalOcean`. The router picks per
+    call, so "the same model gave a different answer" and "a different machine answered" are
+    different events that looked identical in every record this project kept.
+    """
+    from chimera.providers.gateway import CompletionResult, LLMGateway
+
+    class _Response:
+        provider = "Wafer"
+        choices: list[Any] = []
+        usage = None
+
+    assert CompletionResult(content="", model="m").provider == ""
+    normalised = LLMGateway._normalize(_Response(), "openrouter/x/y")
+    assert normalised.provider == "Wafer"
+
+
+def test_a_router_that_says_nothing_leaves_it_empty() -> None:
+    """Empty means "not reported", and it must not become a guess about which backend it was."""
+    from chimera.providers.gateway import LLMGateway
+
+    class _Silent:
+        choices: list[Any] = []
+        usage = None
+
+    assert LLMGateway._normalize(_Silent(), "openrouter/x/y").provider == ""
