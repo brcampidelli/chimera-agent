@@ -8,6 +8,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`StepRecord.provider`, so a trace records which backend served each step.** `CompletionResult`
+  gained the field first; this carries it into `traces.jsonl`, which is what every census this
+  project runs reads.
+
+### Changed
+
+- **The 23-point spread `bench/parallel_tools` attributed to model families is retracted.** Pinning
+  four backends of a **single** slug and running the same thirty tasks against each measured a
+  **35.9-point** spread — larger than the between-family figure, with non-overlapping intervals:
+
+  | backend | multi-call rate | 95% CI |
+  |---|---:|---|
+  | `Baidu` | 63.5% | [52.1, 73.6] |
+  | `OpenInference` | **27.6%** | [18.8, 38.6] |
+  | `Relace` | 58.5% | [47.7, 68.6] |
+  | `Wafer` | 57.7% | [46.6, 68.0] |
+
+  The four use the same batch vocabulary, so this is not different work at similar rates — it is the
+  same work with a different number of tools asked for per turn.
+
+  **The bench's verdict is untouched**: parallel tool calls died on tool *latency*, 4.3 ms saved per
+  run against a 5,578 ms step, and that argument never used the batching rate. What is retracted is
+  the finding it carried forward. What replaces it is the shape rather than the number: **a
+  measurement that averages over an unrecorded dimension is averaging over it**, and the serving
+  backend was such a dimension in every measurement this repository had made.
+
+  Observing the router could not have found this: 120 consecutive runs all landed on one backend,
+  while `bench/context_rot` saw five rotate across a handful of calls. The arms had to be pinned.
+
+  And the pool behind that one slug has **30 endpoints**, spanning **5× in context window**
+  (262,144 → 1,310,720) and **8.8× in input price** ($0.050 → $0.440/M). `catalog.py` records one
+  number per axis.
+
 - **`CompletionResult.provider` — which backend served the call, not which model answered.**
   OpenRouter routes a slug per call: three consecutive calls to
   `openrouter/deepseek/deepseek-v4-flash-0731` came back from **`Wafer`, `Inceptron` and

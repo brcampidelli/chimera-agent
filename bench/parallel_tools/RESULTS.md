@@ -91,10 +91,39 @@ saving would have to grow by roughly three orders of magnitude — which no plau
 mix or corpus size produces, because the ceiling is bounded by tool latency and tool latency is
 milliseconds.
 
+## Amendment, 2026-09-04: the per-model table compares pools, not models
+
+Every figure in the table above was measured without recording which **backend** answered, because
+nothing in this project recorded one until `bench/context_rot` found that a slug is not a machine.
+OpenRouter routes per call, and the pool behind this one slug has **30 endpoints**.
+
+[`RESULTS_backends.md`](RESULTS_backends.md) pinned four of them and ran the same thirty tasks
+against each:
+
+| backend | rate | 95% CI |
+|---|---:|---|
+| `Baidu` | 63.5% | [52.1, 73.6] |
+| `OpenInference` | **27.6%** | [18.8, 38.6] |
+| `Relace` | 58.5% | [47.7, 68.6] |
+| `Wafer` | 57.7% | [46.6, 68.0] |
+
+**35.9 points, inside one slug** — larger than the 23 points this file attributed to the difference
+between two model families, with non-overlapping intervals. The per-model table stands as a record of
+what those pools did; it does not support a claim about the models.
+
+**The verdict of this file is untouched.** The front died on tool *latency* — 4.3 ms saved per run
+against a 5,578 ms step — and that argument never used the batching rate. A model that batched on
+every turn would still be saving milliseconds against seconds.
+
 ## What to do instead
 
-Nothing, here. The finding worth carrying out of this is the one about the aggregate: `deepseek-v4-
-flash-0731` and `gemini-3.8-flash` differ by 23 percentage points in how they use a tool-calling
-API, and any measurement of loop behaviour that averages over models is averaging over that.
+Nothing, here. The finding this file used to carry forward was that `deepseek-v4-flash-0731` and
+`gemini-3.8-flash` differ by 23 points in how they use a tool-calling API. **That is retracted**: the
+amendment above measures 35.9 points between backends of one slug, so the between-slug figure cannot
+be read as a fact about the slugs.
+
+What survives is the shape of the mistake rather than the number: **any measurement of loop behaviour
+that averages over an unrecorded dimension is averaging over it**, and until 2026-09-04 the serving
+backend was such a dimension in every measurement this repository had made.
 
 Reproduce with `python scripts/count_tool_batches.py`.

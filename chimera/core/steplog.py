@@ -105,6 +105,17 @@ class StepRecord:
     #: run's total time would divide by the tool calls, the verifier and the user's thinking time —
     #: producing a number that moves when the network is slow and calling it the model's speed.
     elapsed_ms: int = 0
+    #: Which BACKEND served this step, when the router reports one — beside `model`, not
+    #: instead of it.
+    #:
+    #: A slug is a pool. `bench/context_rot` measured three consecutive calls to one OpenRouter
+    #: slug answered by `Wafer`, `Inceptron` and `DigitalOcean`, so a trace that records only
+    #: the model records the pool and calls it a machine. Every census this project has run over
+    #: these traces — batch sizes per family, context peaks, cache hit rates — attributed to a
+    #: model what may belong to whichever backend happened to answer.
+    #:
+    #: Empty on the streaming path, where the chunks carry nothing to read it from.
+    provider: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -114,6 +125,7 @@ class StepRecord:
             "cached_tokens": self.cached_tokens,
             "elapsed_ms": self.elapsed_ms,
             "model": self.model,
+            "provider": self.provider,
             "content": self.content,
             "compacted": self.compacted,
             "tools": [

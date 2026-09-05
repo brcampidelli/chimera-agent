@@ -1,0 +1,783 @@
+[
+  {
+    "run": 0,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 0,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 1,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 1,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "glob"
+    ]
+  },
+  {
+    "run": 1,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 2,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "grep",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 4,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 3,
+    "step": 5,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 4,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 4,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 4,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 5,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "glob",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 5,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 5,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 6,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 6,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 7,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "glob",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 7,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 8,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 8,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 8,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 9,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 9,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 9,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 10,
+    "step": 4,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "read_file"
+    ]
+  },
+  {
+    "run": 11,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 11,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 11,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 12,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 12,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "glob"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 13,
+    "step": 4,
+    "provider": "Wafer",
+    "calls": 5,
+    "names": [
+      "grep",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 14,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 14,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 15,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 15,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "grep",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "glob"
+    ]
+  },
+  {
+    "run": 16,
+    "step": 4,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 17,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 17,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 17,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 18,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 18,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 19,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 19,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "glob"
+    ]
+  },
+  {
+    "run": 19,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 20,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 20,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 21,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 21,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 3,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 22,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 22,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 22,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "grep"
+    ]
+  },
+  {
+    "run": 23,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 23,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 23,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 24,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 24,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "read_file"
+    ]
+  },
+  {
+    "run": 25,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "glob",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 25,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 5,
+    "names": [
+      "grep",
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 26,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 27,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "grep",
+      "list_dir"
+    ]
+  },
+  {
+    "run": 27,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 28,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 28,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 28,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "read_file",
+      "read_file"
+    ]
+  },
+  {
+    "run": 29,
+    "step": 1,
+    "provider": "Wafer",
+    "calls": 1,
+    "names": [
+      "list_dir"
+    ]
+  },
+  {
+    "run": 29,
+    "step": 2,
+    "provider": "Wafer",
+    "calls": 2,
+    "names": [
+      "list_dir",
+      "read_file"
+    ]
+  },
+  {
+    "run": 29,
+    "step": 3,
+    "provider": "Wafer",
+    "calls": 4,
+    "names": [
+      "read_file",
+      "read_file",
+      "read_file",
+      "read_file"
+    ]
+  }
+]
