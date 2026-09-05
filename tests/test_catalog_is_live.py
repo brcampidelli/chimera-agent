@@ -101,9 +101,18 @@ def test_the_transfer_panel_still_exists(live_slugs: set[str]) -> None:
 
 
 def test_the_catalogue_prices_are_not_wildly_stale(live_slugs: set[str]) -> None:
-    """Prices are documented as approximate, so this is deliberately loose: it fires on an ORDER of
-    magnitude, not on a percent. The catalogue said $0.14/$0.28 for a model that had moved to
-    $0.25/$0.95 — tolerable. It would also have said it after a 10x move, which is not.
+    """The catalogue price is not decoration: `register_catalog_prices` seeds the receipt table
+    with it, so an error here is an error in what a user is told they spent.
+
+    This used to allow a factor of five either way, on the reasoning that prices are documented as
+    approximate. Measured against that: on 2026-09-04 the catalogue carried 0.25/0.95 for
+    `deepseek-chat-v3.1` while the live index said 0.55/1.65 — **2.2x low, and this test passed**,
+    because 2.2 is inside 5. Every fusion receipt for that model under-reported by the same factor
+    for as long as it stood, and the entry's own note asserted the wrong figure had been verified.
+
+    Tightened to 50%. A price that has genuinely moved by half is worth a line in the catalogue
+    anyway, and this file is `-m integration`, so a real market move reddens a run somebody chose
+    rather than the build.
     """
     from chimera.providers.catalog import CATALOG
 
@@ -117,6 +126,56 @@ def test_the_catalogue_prices_are_not_wildly_stale(live_slugs: set[str]) -> None
         # knowing and cannot be expressed as a ratio.
         if (entry.input_per_m == 0) != (current.input_per_m == 0):
             wrong.append(f"{entry.slug}: {entry.input_per_m} vs {current.input_per_m} (free tier changed)")
-        elif entry.input_per_m > 0 and not (0.2 <= current.input_per_m / entry.input_per_m <= 5):
+        elif entry.input_per_m > 0 and not (0.67 <= current.input_per_m / entry.input_per_m <= 1.5):
             wrong.append(f"{entry.slug}: catalogue {entry.input_per_m}, live {current.input_per_m}")
-    assert not wrong, f"catalogue prices are off by an order of magnitude: {wrong}"
+    assert not wrong, f"catalogue prices are off by more than half: {wrong}"
+
+
+def _served_windows() -> dict[str, int]:
+    """`top_provider.context_length` per slug, fetched raw.
+
+    `openrouter_models()` keeps only the ADVERTISED `context_length`, so asking it this question
+    would return None for every entry and the test would pass by having nothing to check — a guard
+    that cannot fire. The raw index is read here instead rather than widening the production
+    listing for one integration test.
+    """
+    import json
+    import urllib.request
+
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/models", headers={"User-Agent": "chimera-tests"}
+    )
+    with urllib.request.urlopen(req, timeout=30) as response:
+        data = json.loads(response.read())["data"]
+    served: dict[str, int] = {}
+    for entry in data:
+        window = (entry.get("top_provider") or {}).get("context_length")
+        if isinstance(window, int) and window > 0:
+            served[f"openrouter/{entry['id']}"] = window
+    return served
+
+
+def test_no_catalogue_window_promises_more_than_the_provider_serves(live_slugs: set[str]) -> None:
+    """`context_length` and `top_provider.context_length` are different numbers, and the second wins.
+
+    Measured on 2026-09-04: 39 of the 431 models in the live index advertise a window their provider
+    does not serve, and the gap reaches **20%** on exactly the three slugs this project uses as its
+    mid default, its fusion judge and the top rung of two presets — 1,310,720 advertised against
+    1,048,576 served.
+
+    It did not bite, and only by accident: the compaction trigger is `0.6 x 0.8 = 0.48` of the
+    window, so 628,800 sat well inside what was actually served. Raise that fraction and the margin
+    is gone. `context_k` now carries the served figure for those three, and this holds the rule: a
+    catalogue window may be smaller than the provider's, never larger.
+    """
+    from chimera.providers.catalog import CATALOG
+
+    served = _served_windows()
+    if not served:
+        pytest.skip("the index did not report a served window for anything")
+    over = [
+        f"{entry.slug}: catalogue {entry.context_k}k, served {served[entry.slug]}"
+        for entry in CATALOG
+        if entry.slug in served and entry.context_k * 1000 > served[entry.slug]
+    ]
+    assert not over, f"a catalogue window promises more than the provider serves: {over}"

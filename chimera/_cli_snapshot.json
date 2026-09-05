@@ -1961,7 +1961,7 @@
     },
     {
       "deprecated": false,
-      "help": "Search a repository by what code DOES, not by the string it contains.\n\n`chimera/rag/` has been in the tree since 0.44.0 \u2014 symbol-level chunking over Python's AST, one\nSQLite file with an FTS5 index, RRF fusion \u2014 measured, documented, and reachable from nothing.\nA library with no entrance is a library nobody has. This is the entrance.\n\nKeyword retrieval only, and that is stated rather than glossed: the semantic half needs an\nembedder, none is wired, and the pre-registered baseline in `bench/rag/` says exactly what the\nkeyword half is worth on this repository \u2014 recall@10 of 0.4925 over 400 probes. Half the\nanswers are not in the top ten. Printing that beside the results is the difference between a\ntool you can calibrate and one you learn to distrust.",
+      "help": "Search a repository by what code DOES, not by the string it contains.\n\n`chimera/rag/` has been in the tree since 0.44.0 \u2014 symbol-level chunking over Python's AST, one\nSQLite file with an FTS5 index, RRF fusion \u2014 measured, documented, and reachable from nothing.\nA library with no entrance is a library nobody has. This is the entrance.\n\nKeyword by default; `--semantic` fuses it with embeddings, and the fusion is what was measured\nand adopted in `bench/rag/RESULTS.md`: hybrid 0.5050 against keyword 0.4425 on this repository,\n+6.25 pp paired over 400 probes, McNemar p = 1.7e-04.\n\n**`--semantic` means HYBRID, never vectors alone**, and that is the measurement rather than a\npreference: the vector arm on its own scored **0.4100 \u2014 worse than keyword**. Every point of the\nwin comes from fusing two rankings that are wrong about different things. A flag that gave you\nthe vector arm would be a flag that made your search worse.\n\nThe recall figure is printed with every search because it is per-corpus and per-embedder: the\nsame harness measures 0.4750 on this repository as it stood three weeks ago, and there is no\nconversion from one embedding model's vector space to another's.",
       "hidden": false,
       "name": "find",
       "params": [
@@ -2003,6 +2003,16 @@
           "name": "reindex",
           "opts": [
             "--reindex"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Fuse keyword with embeddings. Costs money to index.",
+          "kind": "option",
+          "name": "semantic",
+          "opts": [
+            "--semantic"
           ],
           "required": false,
           "type": "boolean"
@@ -2727,7 +2737,7 @@
       "commands": [
         {
           "deprecated": false,
-          "help": "Recall@k of each retriever over a real folder \u2014 lexical, and vector when an embedder is set.\n\nThis is the measurement `chimera/rag/__init__.py` names when it says the retriever's existence\nis not a claim that it helps. That sentence pointed at a module you could not run: `rag_bench`\nhad no caller outside its own test and was not exported from `chimera.eval`.\n\nNo embedder is passed, so the vector and hybrid figures come back as None rather than zero \u2014\nan embedder that was never called did not fail, and printing 0.0 invites the wrong conclusion.",
+          "help": "Recall@k of each retriever over a real folder \u2014 lexical, and vector when an embedder is set.\n\nThis is the measurement `chimera/rag/__init__.py` names when it says the retriever's existence\nis not a claim that it helps. That sentence pointed at a module you could not run: `rag_bench`\nhad no caller outside its own test and was not exported from `chimera.eval`.\n\nWithout `--semantic` no embedder is passed, so the vector and hybrid figures come back as None\nrather than zero \u2014 an embedder that was never called did not fail, and printing 0.0 invites the\nwrong conclusion.\n\nWith it, the run that `bench/rag/RESULTS.md` reports is reproducible from the CLI rather than\nfrom a script somebody has to write. It costs an embedding pass over the corpus: about two cents\nfor this repository's 3,459 chunks and 400 probes, and the figure it produces belongs to the\nembedder that produced it \u2014 vector spaces do not convert between models.",
           "hidden": false,
           "name": "rag",
           "params": [
@@ -2762,6 +2772,16 @@
               ],
               "required": false,
               "type": "int"
+            },
+            {
+              "help": "Measure the vector and hybrid arms too. Costs money.",
+              "kind": "option",
+              "name": "semantic",
+              "opts": [
+                "--semantic"
+              ],
+              "required": false,
+              "type": "boolean"
             }
           ],
           "path": "measure rag"

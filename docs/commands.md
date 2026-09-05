@@ -531,11 +531,18 @@ Search a repository by what code DOES, not by the string it contains.
 SQLite file with an FTS5 index, RRF fusion — measured, documented, and reachable from nothing.
 A library with no entrance is a library nobody has. This is the entrance.
 
-Keyword retrieval only, and that is stated rather than glossed: the semantic half needs an
-embedder, none is wired, and the pre-registered baseline in `bench/rag/` says exactly what the
-keyword half is worth on this repository — recall@10 of 0.4925 over 400 probes. Half the
-answers are not in the top ten. Printing that beside the results is the difference between a
-tool you can calibrate and one you learn to distrust.
+Keyword by default; `--semantic` fuses it with embeddings, and the fusion is what was measured
+and adopted in `bench/rag/RESULTS.md`: hybrid 0.5050 against keyword 0.4425 on this repository,
++6.25 pp paired over 400 probes, McNemar p = 1.7e-04.
+
+**`--semantic` means HYBRID, never vectors alone**, and that is the measurement rather than a
+preference: the vector arm on its own scored **0.4100 — worse than keyword**. Every point of the
+win comes from fusing two rankings that are wrong about different things. A flag that gave you
+the vector arm would be a flag that made your search worse.
+
+The recall figure is printed with every search because it is per-corpus and per-embedder: the
+same harness measures 0.4750 on this repository as it stood three weeks ago, and there is no
+conversion from one embedding model's vector space to another's.
 
 ```bash
 chimera find QUERY
@@ -550,6 +557,7 @@ chimera find QUERY
 | `--path` | Repository to search. | `'.'` |
 | `--k` | How many results. | `8` |
 | `--reindex` | Rebuild the index before searching. |  |
+| `--semantic` | Fuse keyword with embeddings. Costs money to index. |  |
 
 ## fuse
 
