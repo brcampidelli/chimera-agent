@@ -246,6 +246,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A model outside the nineteen-entry catalogue got a flat 128,000-token window, and for 31 of the
+  431 models OpenRouter publishes that is too generous.** `FALLBACK_CONTEXT_TOKENS` names the cost
+  in its own comment — *"over-estimating costs a dead run"* — and a context overflow maps to `ABORT`
+  with no recovery. With the default fraction, 128,000 puts the compaction trigger at 61,440, so for
+  a model with a smaller window the budget would never fire before the wall it exists to avoid.
+
+  The number was never unknown: the app downloads it for all 431 and `remember_models` wrote down
+  price, vision and tools while dropping the window. `window_tokens` now reads the catalogue first
+  (hand-checked against what a provider **serves**, which differs from what it advertises for 39 of
+  the 431), then the live index, then the constant.
+
+  **Not** changed to the pool minimum, which was the obvious-looking fix and would have been a
+  regression. Measured: pinning a 262,144-token endpoint and sending 400,000 returns
+  `"No endpoints found"` — the router refuses rather than truncating — and six unpinned calls at
+  400,000 were all served by 1,048,576-token endpoints. The small ones never appear when the prompt
+  does not fit. Using the minimum would have cut usable context by 4× to cover a hazard the provider
+  already covers.
+
 - `CodeSession.send` forwarded a new callback to any agent whose `run` declared `**kwargs`, on the
   reasoning — written in a comment — that an implementation predating the parameter had to keep
   working. A catch-all usually forwards to something narrower, so the comment described a safety the
