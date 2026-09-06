@@ -415,8 +415,14 @@ jobs:
       # `--latest=false` still fires `release: published`, so this workflow triggers exactly as
       # before. A DRAFT would not have: drafts fire no release event at all, which is why the
       # obvious "create it as a draft" version of this fix does not work.
+      # A PRERELEASE is never promoted, and the API is what says so: `gh release edit --latest`
+      # answers `HTTP 422: Latest release cannot be draft or prerelease`. This step was written for
+      # the 404 window a stable opens between publish and manifest, and v0.51.0rc1 was the first rc
+      # to reach it — a step that cannot succeed on the path it is on, which turned a release where
+      # everything worked into a red run. A red release run that means nothing is how a red release
+      # run that means something gets ignored.
       - name: Mark the release as latest, now that the manifest is attached
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' && github.event.release.prerelease == false
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
@@ -426,7 +432,14 @@ jobs:
         # Reads the JOB's env, set above. Not `secrets.…` (unparseable in a step `if`, and it takes
         # the whole workflow file down with it), and not the step's own `env` (not in scope for the
         # `if`, which is evaluated first — the condition would be empty on every run).
-        if: github.event_name == 'release' && env.SITE_TOKEN != ''
+        # `prerelease == false` for the same reason, stated separately because the reason is
+        # different: the download page must not advertise an rc. It was already skipped for
+        # v0.51.0rc1 — but as a consequence of the step above failing, which is the right outcome
+        # reached by an accident, and an accident is not a rule.
+        if: >-
+          github.event_name == 'release'
+          && github.event.release.prerelease == false
+          && env.SITE_TOKEN != ''
         continue-on-error: true
         env:
           TAG: ${{ github.event.release.tag_name }}

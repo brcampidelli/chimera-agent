@@ -41,6 +41,13 @@ this project ever published — not merely predicted:
   own release page** — useful for testing, invisible to everyone else. (All four platforms plus the
   `.sig` files landed on the rc's page.)
 
+The promote step below is skipped for a prerelease, and the API is what enforces it: `gh release
+edit --latest` answers **`HTTP 422: Latest release cannot be draft or prerelease`**. `v0.51.0rc1`
+was the first rc to reach that step after it was added, and it turned a release where every
+platform built into a red run — so the condition now says `prerelease == false` rather than leaving
+GitHub to refuse. The website is skipped on the same condition and for a different reason: the
+download page must not advertise an rc.
+
 An rc is also the cheapest place to discover that a *release mechanism* is broken. `v0.36.0rc1` is what
 proved the semver prerelease spelling survives a real Cargo/Tauri build — a thing no local check in this
 repo can tell you, since the desktop is only ever built in CI.
