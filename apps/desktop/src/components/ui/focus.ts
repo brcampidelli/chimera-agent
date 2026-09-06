@@ -7,4 +7,4 @@
  * indicator at all.
  */
 export const focusRing =
-  "focus-visible:outline-none focus-visible:shadow-glow focus-visible:relative focus-visible:z-10";
+  "focus-visible:outline-hidden focus-visible:shadow-glow focus-visible:relative focus-visible:z-10";

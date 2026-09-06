@@ -43,7 +43,7 @@ function Hits({
         <div key={path}>
           <p
             className={cn(
-              "sticky top-0 truncate bg-card/80 px-2 py-1 text-xs backdrop-blur",
+              "sticky top-0 truncate bg-card/80 px-2 py-1 text-xs backdrop-blur-sm",
               path === activePath ? "text-accent-ink" : "text-muted-foreground",
             )}
             title={path}
@@ -126,7 +126,7 @@ export function SearchPanel({
           title={t("edit.search.caseSensitive")}
           aria-label={t("edit.search.caseSensitive")}
           className={cn(
-            "rounded p-1 transition-colors duration-1 ease-out",
+            "rounded-sm p-1 transition-colors duration-1 ease-out",
             focusRing,
             caseSensitive ? "bg-accent/20 text-accent-ink" : "text-muted-foreground",
           )}
@@ -140,7 +140,7 @@ export function SearchPanel({
           title={t("edit.search.regex")}
           aria-label={t("edit.search.regex")}
           className={cn(
-            "rounded p-1 transition-colors duration-1 ease-out",
+            "rounded-sm p-1 transition-colors duration-1 ease-out",
             focusRing,
             regex ? "bg-accent/20 text-accent-ink" : "text-muted-foreground",
           )}

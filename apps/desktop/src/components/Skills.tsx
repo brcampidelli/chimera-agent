@@ -143,7 +143,7 @@ function Library() {
                 reads verbatim, and a renderer here would show the user a prettier document than the
                 one the model gets — which is the wrong thing to be looking at when the question is
                 why a card behaved as it did. */}
-            <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+            <pre className="max-h-96 overflow-y-auto whitespace-pre-wrap wrap-break-word text-xs text-muted-foreground">
               {card.data.body}
             </pre>
           </>

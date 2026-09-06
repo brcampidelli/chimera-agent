@@ -100,7 +100,11 @@ function over(washSpec: string, base: string): [number, number, number] {
 
 /** The two `:root` blocks, keyed by which theme they define. */
 function themes(): Record<"dark" | "light", Record<string, string>> {
-  const blocks = [...CSS.matchAll(/:root[^{]*\{([\s\S]*?)\n\}/g)].map((m) => m[1]);
+  // The closing brace may be indented: Tailwind 4 puts these blocks inside `@layer base`, which
+  // is where base styles belong in v4. Same two blocks, same contents — only the nesting moved,
+  // and a ruler that only reads column-zero braces stops finding them without saying why. That
+  // is exactly what this assertion caught, so it is widened rather than relaxed.
+  const blocks = [...CSS.matchAll(/:root[^{]*\{([\s\S]*?)\n[ \t]*\}/g)].map((m) => m[1]);
   expect(blocks.length, "expected two :root blocks — the theme structure changed").toBeGreaterThanOrEqual(2);
 
   const read = (body: string) => {

@@ -1,8 +1,136 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
 
-/* ── Chimera design system ───────────────────────────────────────────────────────────────────────
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@theme {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-accent-ink: hsl(var(--accent-ink));
+
+  --color-accent2: hsl(var(--accent2));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-ok: hsl(var(--ok));
+  --color-ok-foreground: hsl(var(--ok-foreground));
+
+  --color-bad: hsl(var(--bad));
+  --color-bad-foreground: hsl(var(--bad-foreground));
+
+  --color-warn: hsl(var(--warn));
+  --color-warn-foreground: hsl(var(--warn-foreground));
+
+  --color-hairline: hsl(var(--hairline));
+  --color-surface-2: hsl(var(--surface-2));
+  --color-surface-hover: hsl(var(--surface-hover));
+  --color-scrim: hsl(var(--scrim));
+
+  --shadow-elev: var(--elev);
+  --shadow-elev-lg: var(--elev-lg);
+  --shadow-inset: var(--inset);
+  --shadow-glow: var(--glow);
+  --shadow-btn: var(--btn-shadow);
+  --shadow-btn-hover: var(--btn-shadow-hover);
+  --shadow-rail-active: var(--rail-active);
+  --shadow-status-dot: var(--status-dot);
+  --shadow-toggle-on: var(--toggle-on);
+
+  --radius-chip: 1.5rem;
+  --radius-xl2: 1.15rem;
+
+  --max-height-dialog: 85vh;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --text-xs: 0.6875rem;
+  --text-xs--line-height: 1rem;
+  --text-xs--letter-spacing: 0.01em;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.6;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.5rem;
+  --text-lg--letter-spacing: -0.01em;
+  --text-xl: 1.375rem;
+  --text-xl--line-height: 1.75rem;
+  --text-xl--letter-spacing: -0.02em;
+
+  --transition-duration-1: var(--dur-1);
+  --transition-duration-2: var(--dur-2);
+  --transition-duration-3: var(--dur-3);
+  --transition-duration-4: var(--dur-4);
+
+  --ease-out: var(--ease-out);
+  --ease-in-out: var(--ease-in-out);
+  --ease-spring: var(--ease-spring);
+
+  --background-image-accent-grad: linear-gradient(
+    135deg,
+    hsl(var(--accent)) 0%,
+    hsl(var(--accent2)) 100%
+  );
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+@utility surface {
+  /* A panel. Flat fill + hairline — it sits ON the page, it does not float above it. Elevation is
+     reserved for things that genuinely overlay (see `.floating`). */
+  @apply rounded-xl2 border border-hairline bg-card;
+}
+
+@utility floating {
+  /* Genuinely overlaying: dialog, command palette, toast, popover. This is the only place `--elev`
+     belongs — a drop shadow is a depth cue, and it lies when nothing is actually in front. */
+  @apply rounded-xl2 border border-hairline bg-card shadow-elev-lg;
+}
+
+@utility field {
+  /* A recessed input field. */
+  @apply rounded-lg border border-black/20 bg-input shadow-inset outline-hidden transition duration-1 ease-out;
+  &:focus {
+    box-shadow: var(--glow), var(--inset);
+    border-color: hsl(var(--accent) / 0.5);
+  }
+  &:focus-within {
+    box-shadow: var(--glow), var(--inset);
+    border-color: hsl(var(--accent) / 0.5);
+  }
+}
+
+@layer utilities {
+  /* ── Chimera design system ───────────────────────────────────────────────────────────────────────
    Deep-navy surfaces separated by hairlines, recessed input fields, and an always-visible soft focus
    glow. The accent is the brand blue→cyan (from the Chimera mark: blue lion, cyan snake/dragon).
 
@@ -18,108 +146,126 @@
    The full rules live in apps/desktop/DESIGN.md.
    ──────────────────────────────────────────────────────────────────────────────────────────────── */
 
-:root {
-  /* ── Motion. Theme-independent: how things move doesn't change with the lights. ── */
-  --dur-1: 120ms;
-  --dur-2: 200ms;
-  --dur-3: 320ms;
-  --dur-4: 520ms;
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out — the house easing */
-  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* overshoots; use sparingly */
+  :root {
+    /* ── Motion. Theme-independent: how things move doesn't change with the lights. ── */
+    --dur-1: 120ms;
+    --dur-2: 200ms;
+    --dur-3: 320ms;
+    --dur-4: 520ms;
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1); /* expo-out — the house easing */
+    --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+    --ease-spring: cubic-bezier(
+      0.34,
+      1.56,
+      0.64,
+      1
+    ); /* overshoots; use sparingly */
 
-  /* Dark (default) — deep navy from the icon background. */
-  --background: 222 45% 8%;
-  --foreground: 210 22% 91%;
-  --card: 222 28% 14%;
-  --card-foreground: 210 22% 91%;
-  --muted: 222 24% 19%;
-  --muted-foreground: 214 14% 60%;
-  --border: 222 22% 24%;
-  --input: 222 34% 9%;
-  --primary: 210 22% 91%;
-  --primary-foreground: 222 47% 11%;
-  --accent: 217 91% 62%;
-  --accent-foreground: 0 0% 100%;
-  --accent-ink: 217 91% 70%;
-  --accent2: 189 94% 55%;
-  --ring: 217 91% 62%;
-  --ok: 152 58% 50%;
-  --ok-foreground: 152 58% 58%;
-  --bad: 0 72% 62%;
-  --bad-foreground: 0 78% 70%;
-  --warn: 38 92% 50%;
-  --warn-foreground: 38 92% 62%;
-  /* The separator between surfaces, a panel raised inside a panel, and the fill a row takes on
+    /* Dark (default) — deep navy from the icon background. */
+    --background: 222 45% 8%;
+    --foreground: 210 22% 91%;
+    --card: 222 28% 14%;
+    --card-foreground: 210 22% 91%;
+    --muted: 222 24% 19%;
+    --muted-foreground: 214 14% 60%;
+    --border: 222 22% 24%;
+    --input: 222 34% 9%;
+    --primary: 210 22% 91%;
+    --primary-foreground: 222 47% 11%;
+    --accent: 217 91% 62%;
+    --accent-foreground: 0 0% 100%;
+    --accent-ink: 217 91% 70%;
+    --accent2: 189 94% 55%;
+    --ring: 217 91% 62%;
+    --ok: 152 58% 50%;
+    --ok-foreground: 152 58% 58%;
+    --bad: 0 72% 62%;
+    --bad-foreground: 0 78% 70%;
+    --warn: 38 92% 50%;
+    --warn-foreground: 38 92% 62%;
+    /* The separator between surfaces, a panel raised inside a panel, and the fill a row takes on
      under the pointer. All three were previously low-alpha white, which is invisible on light. */
-  --hairline: 210 20% 100% / 0.06;
-  --surface-2: 222 26% 17%;
-  --surface-hover: 222 24% 22%;
-  /* The dim behind a modal. Heavier on dark, where the page is already low-contrast. */
-  --scrim: 222 47% 4% / 0.6;
+    --hairline: 210 20% 100% / 0.06;
+    --surface-2: 222 26% 17%;
+    --surface-hover: 222 24% 22%;
+    /* The dim behind a modal. Heavier on dark, where the page is already low-contrast. */
+    --scrim: 222 47% 4% / 0.6;
 
-  /* Syntax. The editor's highlighting is design, not decoration, so it lives here with every other
+    /* Syntax. The editor's highlighting is design, not decoration, so it lives here with every other
      colour rather than inside a theme object the design gate cannot see — and it follows light/dark
      for free. `--code-plain` is deliberately `--foreground`: unclassified text should read as text.
      Hues are picked off the existing accents (blue keyword, cyan type) so a highlighted file looks
      like it belongs to this app rather than to whichever editor theme was copied in. */
-  --code-plain: 210 22% 91%;
-  --code-comment: 214 15% 57%;
-  --code-keyword: 217 91% 72%;
-  --code-string: 152 48% 62%;
-  --code-number: 28 90% 68%;
-  --code-function: 189 84% 66%;
-  --code-type: 189 70% 74%;
-  --code-variable: 210 22% 86%;
-  --code-punctuation: 214 14% 62%;
-  --code-invalid: 0 72% 62%;
-  /* The editor's own furniture: the line you are on, the matched selection, the gutter's numbers. */
-  --code-active-line: 222 40% 100% / 0.04;
-  --code-selection: 217 91% 62% / 0.28;
-  --code-match: 38 92% 50% / 0.3;
-  --code-gutter: 214 14% 45%;
+    --code-plain: 210 22% 91%;
+    --code-comment: 214 15% 57%;
+    --code-keyword: 217 91% 72%;
+    --code-string: 152 48% 62%;
+    --code-number: 28 90% 68%;
+    --code-function: 189 84% 66%;
+    --code-type: 189 70% 74%;
+    --code-variable: 210 22% 86%;
+    --code-punctuation: 214 14% 62%;
+    --code-invalid: 0 72% 62%;
+    /* The editor's own furniture: the line you are on, the matched selection, the gutter's numbers. */
+    --code-active-line: 222 40% 100% / 0.04;
+    --code-selection: 217 91% 62% / 0.28;
+    --code-match: 38 92% 50% / 0.3;
+    --code-gutter: 214 14% 45%;
 
-  --elev: 0 12px 30px -12px rgba(0, 0, 0, 0.72), 0 2px 6px -2px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06), inset 0 0 0 1px rgba(255, 255, 255, 0.02);
-  --elev-lg: 0 30px 70px -18px rgba(0, 0, 0, 0.78), inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  --inset: inset 0 2px 6px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.02);
-  --glow: 0 0 0 3px hsl(var(--ring) / 0.28), 0 0 22px -2px hsl(var(--ring) / 0.5);
-  /* The selected rail destination: a hairline ring plus a contained bloom. */
-  --rail-active: inset 0 0 0 1px hsl(var(--accent) / 0.3), 0 0 16px -4px hsl(var(--accent) / 0.6);
-  --status-dot: 0 0 10px 1px hsl(var(--accent) / 0.8);
-  --toggle-on: 0 0 12px -2px hsl(var(--accent) / 0.75);
-  --btn-shadow: 0 8px 18px -8px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -3px 8px rgba(0, 0, 0, 0.28);
-  --btn-shadow-hover: 0 10px 28px -8px hsl(var(--accent) / 0.72),
-    0 0 26px -4px hsl(var(--accent2) / 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.34);
-}
+    --elev:
+      0 12px 30px -12px rgba(0, 0, 0, 0.72), 0 2px 6px -2px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    --elev-lg:
+      0 30px 70px -18px rgba(0, 0, 0, 0.78),
+      inset 0 1px 0 rgba(255, 255, 255, 0.07);
+    --inset:
+      inset 0 2px 6px rgba(0, 0, 0, 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.02);
+    --glow:
+      0 0 0 3px hsl(var(--ring) / 0.28), 0 0 22px -2px hsl(var(--ring) / 0.5);
+    /* The selected rail destination: a hairline ring plus a contained bloom. */
+    --rail-active:
+      inset 0 0 0 1px hsl(var(--accent) / 0.3),
+      0 0 16px -4px hsl(var(--accent) / 0.6);
+    --status-dot: 0 0 10px 1px hsl(var(--accent) / 0.8);
+    --toggle-on: 0 0 12px -2px hsl(var(--accent) / 0.75);
+    --btn-shadow:
+      0 8px 18px -8px hsl(var(--accent) / 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28),
+      inset 0 -3px 8px rgba(0, 0, 0, 0.28);
+    --btn-shadow-hover:
+      0 10px 28px -8px hsl(var(--accent) / 0.72),
+      0 0 26px -4px hsl(var(--accent2) / 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  }
 
-/* Light. Declared once, keyed on the attribute the inline script in index.html sets before paint.
+  /* Light. Declared once, keyed on the attribute the inline script in index.html sets before paint.
    There is deliberately no `@media (prefers-color-scheme: light)` twin: it existed only to cover
    the gap before React set `data-theme`, and keeping a byte-identical copy in sync by hand is a
    drift waiting to happen. The OS preference is now resolved in that script instead. */
-:root[data-theme="light"] {
-  --background: 214 42% 96%;
-  --foreground: 222 47% 14%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 14%;
-  --muted: 214 30% 92%;
-  --muted-foreground: 222 12% 42%;
-  --border: 214 24% 86%;
-  --input: 214 34% 97%;
-  --primary: 222 47% 14%;
-  --primary-foreground: 0 0% 100%;
-  --accent: 217 91% 52%;
-  --accent-foreground: 0 0% 100%;
-  /* The accent as INK, which `--accent-foreground` is not: that one is white, for text sitting
+  :root[data-theme='light'] {
+    --background: 214 42% 96%;
+    --foreground: 222 47% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 14%;
+    --muted: 214 30% 92%;
+    --muted-foreground: 222 12% 42%;
+    --border: 214 24% 86%;
+    --input: 214 34% 97%;
+    --primary: 222 47% 14%;
+    --primary-foreground: 0 0% 100%;
+    --accent: 217 91% 52%;
+    --accent-foreground: 0 0% 100%;
+    /* The accent as INK, which `--accent-foreground` is not: that one is white, for text sitting
      ON a solid accent fill. Text sitting IN the accent colour is the other direction, and it had
      no token — measured 4.29:1 on the page and 3.29:1 on the `bg-accent/20` a selected toggle
      paints itself with, both under the 4.5 small text needs. Same defect as `--ok` and `--bad`,
      one token later, because the obvious name was taken and meant something else. */
-  --accent-ink: 217 91% 42%;
-  --accent2: 189 90% 42%;
-  --ring: 217 91% 52%;
-  /* Fill and text are the same colour in the dark theme and cannot be here.
+    --accent-ink: 217 91% 42%;
+    --accent2: 189 90% 42%;
+    --ring: 217 91% 52%;
+    /* Fill and text are the same colour in the dark theme and cannot be here.
      Measured against this theme's own card, `--ok` reads 3.06:1 as 11px text and `--bad` 3.82:1 —
      both under the 4.5 that small text needs, while both are fine as fills and as icons, where the
      bar is 3:1. `--warn` already had this split; `--ok` and `--bad` did not, so every small label
@@ -130,120 +276,109 @@
      moves the ground toward the ink and costs most of a point. The first pass here picked 4.70
      against the page and scored 4.04 on the tint — a fix that measured itself in the easy place.
      `--warn-foreground` had the same problem all along and read 4.33 there. */
-  --ok: 152 55% 40%;
-  --ok-foreground: 152 65% 26%;
-  --bad: 0 72% 50%;
-  --bad-foreground: 0 75% 38%;
-  --warn: 32 95% 44%;
-  --warn-foreground: 28 92% 30%;
-  /* Dark ink at low alpha — the mirror of the dark theme's low-alpha white. The literal this token
+    --ok: 152 55% 40%;
+    --ok-foreground: 152 65% 26%;
+    --bad: 0 72% 50%;
+    --bad-foreground: 0 75% 38%;
+    --warn: 32 95% 44%;
+    --warn-foreground: 28 92% 30%;
+    /* Dark ink at low alpha — the mirror of the dark theme's low-alpha white. The literal this token
      replaced was a 5%-white border, i.e. white-on-white here: the light theme had NO visible
      panel edges at all. That is the bug this token exists to fix. */
-  --hairline: 222 30% 12% / 0.1;
-  --surface-2: 214 34% 97%;
-  --surface-hover: 214 30% 93%;
-  --scrim: 222 30% 20% / 0.35;
+    --hairline: 222 30% 12% / 0.1;
+    --surface-2: 214 34% 97%;
+    --surface-hover: 214 30% 93%;
+    --scrim: 222 30% 20% / 0.35;
 
-  /* The light half of the syntax palette. Every token above has a counterpart here — a missing one
+    /* The light half of the syntax palette. Every token above has a counterpart here — a missing one
      would be invisible rather than merely wrong, because the dark value is chosen to sit on a dark
      page. Darkened and desaturated: the same hues at dark-theme lightness are unreadable on white. */
-  --code-plain: 222 47% 14%;
-  /* Measured on the editor's own ground, which is the page plus the active-line wash — NOT the
+    --code-plain: 222 47% 14%;
+    /* Measured on the editor's own ground, which is the page plus the active-line wash — NOT the
      page alone, and not the wash's base colour either. Reading that base as the background is
      what first produced a wrong number here: `222 40% 20%` looks dark, but at 5% over a near
      white page it composites to rgb(231,234,240).
      Both themes were under the bar on their own ground: 3.83:1 light, 4.42:1 dark. Now 5.28 and
      5.26, still an order of magnitude quieter than `--code-plain` at ~14. */
-  --code-comment: 222 16% 40%;
-  --code-keyword: 217 82% 42%;
-  --code-string: 152 52% 30%;
-  --code-number: 24 78% 38%;
-  --code-function: 199 84% 34%;
-  --code-type: 189 72% 30%;
-  --code-variable: 222 30% 26%;
-  --code-punctuation: 222 12% 40%;
-  --code-invalid: 0 72% 46%;
-  --code-active-line: 222 40% 20% / 0.05;
-  --code-selection: 217 91% 52% / 0.2;
-  --code-match: 32 95% 44% / 0.28;
-  --code-gutter: 222 12% 52%;
+    --code-comment: 222 16% 40%;
+    --code-keyword: 217 82% 42%;
+    --code-string: 152 52% 30%;
+    --code-number: 24 78% 38%;
+    --code-function: 199 84% 34%;
+    --code-type: 189 72% 30%;
+    --code-variable: 222 30% 26%;
+    --code-punctuation: 222 12% 40%;
+    --code-invalid: 0 72% 46%;
+    --code-active-line: 222 40% 20% / 0.05;
+    --code-selection: 217 91% 52% / 0.2;
+    --code-match: 32 95% 44% / 0.28;
+    --code-gutter: 222 12% 52%;
 
-  --elev: 0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8);
-  --elev-lg: 0 24px 54px -16px rgba(30, 50, 90, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.85);
-  --inset: inset 0 2px 5px rgba(30, 50, 90, 0.13);
-  --glow: 0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
-  --rail-active: inset 0 0 0 1px hsl(var(--accent) / 0.35), 0 0 14px -5px hsl(var(--accent) / 0.5);
-  --status-dot: 0 0 9px 1px hsl(var(--accent) / 0.6);
-  --toggle-on: 0 0 10px -2px hsl(var(--accent) / 0.5);
-  --btn-shadow: 0 7px 16px -7px hsl(var(--accent) / 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  --btn-shadow-hover: 0 9px 22px -7px hsl(var(--accent) / 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
+    --elev:
+      0 10px 26px -12px rgba(30, 50, 90, 0.2), 0 1px 3px rgba(30, 50, 90, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    --elev-lg:
+      0 24px 54px -16px rgba(30, 50, 90, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    --inset: inset 0 2px 5px rgba(30, 50, 90, 0.13);
+    --glow:
+      0 0 0 3px hsl(var(--ring) / 0.2), 0 0 16px -2px hsl(var(--ring) / 0.32);
+    --rail-active:
+      inset 0 0 0 1px hsl(var(--accent) / 0.35),
+      0 0 14px -5px hsl(var(--accent) / 0.5);
+    --status-dot: 0 0 9px 1px hsl(var(--accent) / 0.6);
+    --toggle-on: 0 0 10px -2px hsl(var(--accent) / 0.5);
+    --btn-shadow:
+      0 7px 16px -7px hsl(var(--accent) / 0.45),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    --btn-shadow-hover:
+      0 9px 22px -7px hsl(var(--accent) / 0.6),
+      inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
 
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-}
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
 
-body {
-  color: hsl(var(--foreground));
-  font-family: theme("fontFamily.sans");
-  -webkit-font-smoothing: antialiased;
-  background-color: hsl(var(--background));
-}
+  body {
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    background-color: hsl(var(--background));
+  }
 
-/* The faint top-centre glow over the navy ground. It lives on its own element rather than on
+  /* The faint top-centre glow over the navy ground. It lives on its own element rather than on
    `body` so the launch sequence can fade it in — `body` cannot be animated into existence, and a
    background that is simply there from frame one has nothing to arrive from. */
-.ambient-wash {
-  background-image: radial-gradient(
-    120% 80% at 50% -10%,
-    hsl(var(--accent) / 0.1) 0%,
-    transparent 55%
-  );
-}
+  .ambient-wash {
+    background-image: radial-gradient(
+      120% 80% at 50% -10%,
+      hsl(var(--accent) / 0.1) 0%,
+      transparent 55%
+    );
+  }
 
-/* Thin, unobtrusive scrollbars that match the surface. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--border)) transparent;
-}
-*::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-*::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
-  border: 3px solid transparent;
-  background-clip: padding-box;
-  border-radius: 9999px;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.6);
-  background-clip: padding-box;
-}
-
-@layer components {
-  /* A panel. Flat fill + hairline — it sits ON the page, it does not float above it. Elevation is
-     reserved for things that genuinely overlay (see `.floating`). */
-  .surface {
-    @apply rounded-xl2 border border-hairline bg-card;
+  /* Thin, unobtrusive scrollbars that match the surface. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
   }
-  /* Genuinely overlaying: dialog, command palette, toast, popover. This is the only place `--elev`
-     belongs — a drop shadow is a depth cue, and it lies when nothing is actually in front. */
-  .floating {
-    @apply rounded-xl2 border border-hairline bg-card shadow-elev-lg;
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
   }
-  /* A recessed input field. */
-  .field {
-    @apply rounded-lg border border-black/20 bg-input shadow-inset outline-none transition duration-1 ease-out;
+  *::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 9999px;
   }
-  .field:focus,
-  .field:focus-within {
-    box-shadow: var(--glow), var(--inset);
-    border-color: hsl(var(--accent) / 0.5);
+  *::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.6);
+    background-clip: padding-box;
   }
 }
 
@@ -282,7 +417,7 @@ body {
   text-underline-offset: 2px;
 }
 .md code {
-  font-family: theme("fontFamily.mono");
+  font-family: var(--font-mono);
   font-size: 0.85em;
   background: hsl(var(--muted));
   padding: 0.1rem 0.35rem;

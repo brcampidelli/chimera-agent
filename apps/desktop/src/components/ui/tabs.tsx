@@ -120,7 +120,7 @@ export function TabPanel({
       // Focusable so that tabbing out of the strip lands in the content it controls, rather than
       // skipping over a panel that has no interactive elements of its own.
       tabIndex={0}
-      className="min-h-0 flex-1 focus-visible:outline-none"
+      className="min-h-0 flex-1 focus-visible:outline-hidden"
     >
       {children}
     </div>

@@ -60,7 +60,7 @@ export function Select<T extends string>({
           // trigger, which hides what you are changing while you change it.
           position="popper"
           sideOffset={6}
-          className="overlay floating z-50 max-h-72 min-w-[var(--radix-select-trigger-width)] overflow-hidden"
+          className="overlay floating z-50 max-h-72 min-w-(--radix-select-trigger-width) overflow-hidden"
         >
           <RadixSelect.Viewport className="p-1">
             {options.map((opt) => (
@@ -69,7 +69,7 @@ export function Select<T extends string>({
                 value={opt.value}
                 className={cn(
                   "relative flex cursor-default select-none items-start gap-2 rounded-lg px-2 py-1.5 text-sm",
-                  "outline-none data-[highlighted]:bg-surface-hover",
+                  "outline-hidden data-highlighted:bg-surface-hover",
                 )}
               >
                 <span className="mt-0.5 w-4 shrink-0">

@@ -40,7 +40,7 @@ export function Switch({
       <span
         aria-hidden
         className={cn(
-          "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm",
+          "absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-xs",
           "transition-transform duration-1 ease-out",
           checked ? "translate-x-4" : "translate-x-0",
         )}

@@ -160,7 +160,7 @@ export function Runner({ workspace }: { workspace: string | null }) {
               type="button"
               onClick={() => void stop()}
               className={cn(
-                "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-bad-foreground hover:bg-surface-hover",
+                "flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-bad-foreground hover:bg-surface-hover",
                 focusRing,
               )}
             >
@@ -173,7 +173,7 @@ export function Runner({ workspace }: { workspace: string | null }) {
             onClick={() => setLines([])}
             aria-label={t("runner.clear")}
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-surface-hover hover:text-foreground",
+              "flex h-6 w-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-surface-hover hover:text-foreground",
               focusRing,
             )}
           >
@@ -191,7 +191,7 @@ export function Runner({ workspace }: { workspace: string | null }) {
             <div
               key={index}
               className={cn(
-                "whitespace-pre-wrap break-words",
+                "whitespace-pre-wrap wrap-break-word",
                 line.kind === "command" && "text-accent",
                 line.kind === "exit" && "text-muted-foreground",
               )}
@@ -215,7 +215,7 @@ export function Runner({ workspace }: { workspace: string | null }) {
           aria-label={t("runner.input")}
           placeholder={t("runner.placeholder")}
           className={cn(
-            "min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-none",
+            "min-w-0 flex-1 bg-transparent font-mono text-xs text-foreground outline-hidden",
             "placeholder:text-muted-foreground disabled:opacity-50",
           )}
         />

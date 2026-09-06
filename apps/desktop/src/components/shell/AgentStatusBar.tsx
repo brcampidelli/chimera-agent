@@ -81,7 +81,7 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
             onClick={onOpenUsage}
             disabled={!onOpenUsage}
             className={cn(
-              "rounded px-1 transition-colors duration-1 ease-out",
+              "rounded-sm px-1 transition-colors duration-1 ease-out",
               onOpenUsage && "hover:text-foreground",
               focusRing,
             )}
