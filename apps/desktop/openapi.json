@@ -6924,9 +6924,25 @@
             ],
             "title": "Delivered Matches Verified"
           },
+          "ending": {
+            "default": "unknown",
+            "title": "Ending",
+            "type": "string"
+          },
           "paused": {
             "title": "Paused",
             "type": "boolean"
+          },
+          "stagnant": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stagnant"
           },
           "stopped_reason": {
             "default": "",

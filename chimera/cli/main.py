@@ -3126,6 +3126,11 @@ def solve(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     max_attempts: int = typer.Option(3, "--max-attempts", help="Max verify-or-revert attempts."),
     max_steps: int = typer.Option(8, "--max-steps", help="Max tool-calling steps per attempt."),
+    max_usd: float = typer.Option(
+        None,
+        "--max-usd",
+        help="Stop the whole run once this much has been spent (all attempts together).",
+    ),
     context_budget: float = typer.Option(
         None,
         "--context-budget",
@@ -3464,6 +3469,12 @@ def solve(
             # the drift assessment. This is the only place the step log is persisted, so without it
             # every measurement the loop takes dies with the process.
             trace_path=settings.home / "traces.jsonl",
+            # The dollar ceiling for the RUN, not the turn. `AutonomousAgent._run_budget` reads this
+            # off the worker's config to build one `SpendBudget` spanning every attempt — without it
+            # that method returns None, `SpendCappedBackend` never wraps anything, and the whole
+            # `stopped_reason="spend"` path is unreachable from a terminal. All of it existed and
+            # none of it could be asked for: `solve` had twenty-nine flags and not one about money.
+            max_usd=max_usd,
         )
         worker = Agent(backend, registry, _worker_cfg)
         escalate_worker = (
@@ -3599,9 +3610,34 @@ def solve(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
+    from chimera.api.runs import cost_per_accepted_change
+
     console.print(result.answer)
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
-    console.print(f"[dim]{status} after {len(result.attempts)} attempt(s)[/dim]")
+    # `ending` says WHICH of the endings this was; `success` alone cannot. A run that used up its
+    # attempts, one the person cancelled, one cut off at the dollar ceiling and one that succeeded
+    # while changing nothing on disk all printed the same two words before this.
+    console.print(
+        f"[dim]{status} after {len(result.attempts)} attempt(s) — "
+        f"ended: {getattr(result, 'ending', 'unknown')}[/dim]"
+    )
+    # Money over delivered work: the ratio that says whether the retries paid for themselves. Every
+    # term of it — per-attempt cost, verified, reverted, diff_productive — has been on the receipt
+    # for releases, and no surface ever divided one by the other. The two empty cases print apart on
+    # purpose: "bought nothing" and "cannot price it" are opposite verdicts, not one blank.
+    _cost = cost_per_accepted_change(result.attempts)
+    if _cost.per_change is not None and _cost.usd is not None:
+        console.print(
+            f"[dim]${_cost.usd:.4f} over {_cost.accepted} accepted change(s) — "
+            f"${_cost.per_change:.4f} each[/dim]"
+        )
+    elif _cost.usd is None:
+        console.print(
+            f"[dim]cost unknown (a leg had no price) · "
+            f"{_cost.accepted} accepted change(s)[/dim]"
+        )
+    else:
+        console.print(f"[dim]${_cost.usd:.4f} and nothing was accepted[/dim]")
 
     # The loud half, and the reason the approver exists at all. A refused call comes back as an
     # ordinary observation string, so the agent reads it like any tool result and carries on — the

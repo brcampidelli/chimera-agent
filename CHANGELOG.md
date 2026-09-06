@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **A run can be told to stop at a number.** `chimera solve --max-usd` caps what the whole run may
+  spend, across every attempt. The ceiling itself was built, tested and shipped after a measured
+  incident — a run asking for $0.000002 spent $0.0129 because each attempt started again at zero —
+  and then `solve` shipped **twenty-nine flags with none about money**, so the worker's `max_usd` was
+  never set, `_run_budget` returned `None` on every terminal invocation, and the entire
+  `stopped_reason="spend"` path was unreachable from a terminal. The escalated worker shares that
+  config and is inside the same ceiling.
+- **A run says how it ended.** New `ending` on the result, the receipt and `GET /api/runs`, set at
+  **every** return: `success` · `no_op` · `exhausted` · `cancelled` · `spend` · `paused` · `denied`.
+  `stopped_reason` is written at two sites, so a run that used up its attempts, one a person refused,
+  and one that succeeded while changing nothing on disk all persisted the same blank — *"how many
+  runs stopped at the cap this month"* had no answer. It is a **new field** rather than a wider
+  vocabulary for `stopped_reason`, because the turn loop already writes its own values (`final`,
+  `max_steps`, `tool_loop`…) into the same receipt, and overloading one name for two loops makes it
+  mean three things. **`no_op`** is the one worth having: the diff gate already computed it to block
+  hollow learning, and the receipt never carried the verdict, so a verified success with an empty
+  diff — correct when the task was a question, a defect when it was not — read as an ordinary
+  success.
+- **What a run paid per unit of delivered work.** `cost_per_accepted_change`: money over attempts
+  that verified, were not reverted, and actually changed the tree. Every term had been on the receipt
+  for releases and nothing divided one by the other. It reports three numbers, because `per_change`
+  is empty for two opposite reasons that must not collapse into one blank — nothing was accepted, or
+  a leg was unpriced. `chimera solve` prints both lines.
+
+### Notes
+
+- **`blocked` and `stalled` are deliberately not implemented.** Nothing in the loop can set them
+  truthfully: the stagnation detector injects a pivot and re-plans, and has never stopped a run, so
+  an ending named `stalled` would assert a cause the code does not have. Stagnation is reported
+  **beside** the ending in `stagnant`, where `null` means *nothing was watching* and is not `false`.
+- The Runs screen does not draw `ending` yet — it is on the wire and in `runs.jsonl`, and nothing
+  renders it.
+
 ## [0.51.0] - 2026-09-06
 
 ### Added

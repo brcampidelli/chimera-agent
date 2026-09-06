@@ -1314,6 +1314,7 @@ chimera solve [TASK]
 | `--model`, `-m` | Override the model slug. |  |
 | `--max-attempts` | Max verify-or-revert attempts. | `3` |
 | `--max-steps` | Max tool-calling steps per attempt. | `8` |
+| `--max-usd` | Stop the whole run once this much has been spent (all attempts together). |  |
 | `--context-budget` | Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6). |  |
 | `--no-plan` | Skip the planning step. |  |
 | `--no-manager` | Skip Manager review. |  |

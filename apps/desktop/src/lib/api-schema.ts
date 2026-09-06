@@ -5735,8 +5735,15 @@ export interface components {
             attempts: components["schemas"]["AttemptReceiptOut"][];
             /** Delivered Matches Verified */
             delivered_matches_verified?: boolean | null;
+            /**
+             * Ending
+             * @default unknown
+             */
+            ending: string;
             /** Paused */
             paused: boolean;
+            /** Stagnant */
+            stagnant?: boolean | null;
             /**
              * Stopped Reason
              * @default

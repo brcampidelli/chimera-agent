@@ -321,6 +321,41 @@ class AutonomousResult:
     paused: bool = False  # interrupted for human approval (see AutonomousAgent.pause_on_taint)
     stopped_reason: str = ""  # why the loop ended early; "cancelled" on a cooperative stop, else ""
 
+    ending: str = "unknown"
+    """How the loop ended, always one word, set at every return: ``success`` | ``no_op`` |
+    ``exhausted`` | ``cancelled`` | ``spend`` | ``paused`` | ``denied``.
+
+    ``stopped_reason`` cannot answer this and was never meant to: it is written at two sites and is
+    empty for every other ending, so a run that succeeded, a run that used up its attempts and a run
+    whose answer a person refused all left the same blank. The field beside it on the receipt carries
+    the *turn's* vocabulary (``final``, ``max_steps``, ``tool_loop``…), which is a different loop's
+    business; overloading either one would make two things that share a name mean three things.
+
+    ``no_op`` is a success whose accepted attempt changed nothing on disk — real when the task was a
+    question, and a defect when it was not, and indistinguishable from ``success`` until now.
+
+    ``unknown`` means a result built somewhere that does not set it. It is the default rather than a
+    plausible guess for the same reason ``workspace`` and ``profile`` give in ``runs.py``: naming an
+    ending a run may not have had puts invented evidence into the record whose only job is to say
+    what happened. Two states from the literature are deliberately absent — see ``stagnant`` below.
+    """
+
+    stagnant: bool | None = None
+    """Were the failures repeating themselves when the loop ended? ``None`` = nobody looked.
+
+    Two ways to get ``None``, and both are "not measured": no ``StagnationDetector`` was configured,
+    or the run stopped at an ending that does not summarise its failures — ``paused`` and ``denied``
+    are waiting on a person, not finished. ``None`` is not ``False``: a run nobody watched has not
+    been found un-stalled, and the two are different claims — the same distinction
+    ``delivered_matches_verified`` makes on the receipt.
+
+    This is a fact recorded *beside* the ending, never as the ending itself. The detector injects a
+    pivot and re-plans (``:1272``); it has never stopped a run, so an ``ending`` of ``stalled``
+    would assert a cause the code does not have. That is the exact defect — prose claiming what the
+    code does not do — that this session already fixed once elsewhere; ``blocked`` is absent for the
+    same reason, nothing here can set it truthfully.
+    """
+
 
 #: Char budget for the diff bodies handed to the reviewer. Enough to show what a small edit did
 #: without turning every review into a second copy of the repository.
@@ -582,6 +617,17 @@ class AutonomousAgent:
         except TypeError:  # signature lied (e.g. **kwargs-only) — fall back to the plain call
             return worker.run(prompt)
 
+    def _stagnant(self) -> bool | None:
+        """Were the failures repeating when the loop ended? ``None`` when nothing was watching.
+
+        ``assess`` is a pure read over the recorded signatures — the retry path already calls it once
+        per attempt — so asking again at the end costs nothing and changes nothing. It is reported
+        beside the ending and never as the ending: see ``AutonomousResult.stagnant``.
+        """
+        if self.stagnation is None:
+            return None
+        return bool(self.stagnation.assess().stagnant)
+
     def _run_budget(self) -> SpendBudget | None:
         """One ceiling for this whole run, read off the worker that will spend the money.
 
@@ -777,7 +823,8 @@ class AutonomousAgent:
                     self._clear_checkpoint(thread_id)
                     self._emit(_ev_final(False, ""))
                     return AutonomousResult(
-                        answer="", success=False, attempts=attempts, plan=plan
+                        answer="", success=False, attempts=attempts, plan=plan,
+                        ending="denied",
                     )
                 # HITL 'accept'/'edit': finalize the EXACT reviewed answer as-is (no re-run) —
                 # approval is of the specific output (edited or not), not a re-execution.
@@ -1200,7 +1247,8 @@ class AutonomousAgent:
                     reason = "tainted run" if run_tainted else "every run held for sign-off"
                     self._emit(_ev_status(f"paused for approval — {reason} (thread {thread_id})"))
                     return AutonomousResult(
-                        answer=answer, success=False, attempts=attempts, plan=plan, paused=True
+                        answer=answer, success=False, attempts=attempts, plan=plan, paused=True,
+                        ending="paused",
                     )
                 return self._finalize_success(
                     task, answer, attempts, prior_successes, plan, thread_id,
@@ -1319,7 +1367,10 @@ class AutonomousAgent:
             self.guard.restore(last_after)
         last = attempts[-1].answer if attempts else ""
         self._emit(_ev_final(False, last))
-        result = AutonomousResult(answer=last, success=False, attempts=attempts, plan=plan)
+        result = AutonomousResult(
+            answer=last, success=False, attempts=attempts, plan=plan, ending="exhausted",
+            stagnant=self._stagnant(),
+        )
         self._persist_receipt(result, task)
         return result
 
@@ -1360,7 +1411,8 @@ class AutonomousAgent:
         last = (getattr(agent_result, "answer", "") or "") or (attempts[-1].answer if attempts else "")
         self._emit(_ev_final(False, last))
         result = AutonomousResult(
-            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="cancelled"
+            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="cancelled",
+            ending="cancelled", stagnant=self._stagnant(),
         )
         self._persist_receipt(result, task)
         return result
@@ -1436,7 +1488,8 @@ class AutonomousAgent:
         last = agent_result.answer or (attempts[-1].answer if attempts else "")
         self._emit(_ev_final(False, last))
         result = AutonomousResult(
-            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="spend"
+            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="spend",
+            ending="spend", stagnant=self._stagnant(),
         )
         self._persist_receipt(result, task)
         return result
@@ -1488,7 +1541,11 @@ class AutonomousAgent:
             self._record_card_outcome(True)
         self._clear_checkpoint(thread_id)
         self._emit(_ev_final(True, answer))
-        result = AutonomousResult(answer=answer, success=True, attempts=attempts, plan=plan)
+        result = AutonomousResult(
+            answer=answer, success=True, attempts=attempts, plan=plan,
+            ending="no_op" if productive is False else "success",
+            stagnant=self._stagnant(),
+        )
         self._persist_receipt(result, task)
         return result
 
