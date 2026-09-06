@@ -115,10 +115,44 @@ re-measurement of those runs; they carry no provider, no posture, and cannot be 
   read, is a question — the two registered rows show it. It cannot tell `?data=SECRET` from `?v=2.4`.
 - **The screen half is not measured here.** That a bound screen is announced to, can list the
   question, answer it, and the waiting tool proceeds, is verified end to end on a worker thread in
-  `tests/test_the_setting_named_ask_asked_nobody.py` — not by this corpus.
+  `tests/test_the_setting_named_ask_asked_nobody.py` — not by this corpus. **Observed in the
+  packaged app on 2026-09-06**, see below; that observation is an anecdote and not a measurement,
+  and it is written down because the alternative is that nobody ever writes it down.
 - **`memory_poison` is untouched.** Its failing numbers get their own write-up beside this one and
   no code; the gate there is a regex and changing it is a separate registered question.
 
+## The screen half, observed in the packaged app
+
+Not part of the pre-registration, and not a measurement — one person, one session, two turns, on the
+day the feature shipped. It is recorded because it closes the gap this document names above, and
+because the release notes said out loud that nobody had tried it: *"if five minutes is the wrong
+wait, this is where you find out."*
+
+Two turns against the installed 0.51.0 desktop app (`/api/code/turn`), each asked to read
+`https://example.com` and then write the page title to a file. The read taints the run; the write is
+what the ledger narrows.
+
+| | turn 1 | turn 2 |
+|---|---|---|
+| question announced | yes, `wait_seconds: 300` | yes |
+| the person answered | **no — silence** | **yes**, *allow this once* |
+| the tool | `ok: false`, refused | **`ok: true`, ran** |
+| `titulo.txt` | absent | **present, `Example Domain`** |
+| the turn ended | parked, then refused | `event: done` |
+
+The detail that gives the rest its meaning: in **both** turns the agent already had the answer —
+`"content": "Example Domain"` was assembled before the gate. The difference between the two was not
+capability and not luck; it was whether a person existed on the other side.
+
+The two `taint_narrowed` rows this produced are `seq 228` and `229` in that install's audit log. Under
+0.50.0 they would have been two more of the 229 silent refusals that motivated the change.
+
+**What the owner reported, verbatim in substance:** he saw the question appear without being told
+where to look, and five minutes is the right wait. That is the whole of the evidence for the default,
+and it is one person on first use — which is more than any bench here produced for it, and less than
+a number.
+
 ## Cost
 
-US$ 0.00. Four arms, thirty-two stub calls each, offline.
+US$ 0.00 for the four arms — thirty-two stub calls each, offline. The two live turns above cost a
+few cents of real model calls and are not part of any arm.
