@@ -334,6 +334,9 @@ export function receipt(over: Partial<RunReceipt> = {}): RunReceipt {
     // Same reason, same shape: a row from before the loop's stop reason reached the receipt. The
     // default is the OLD case on purpose, so a test that cares about a stop reason has to say so.
     stopped_reason: "",
+    // And the same again for the ending, which `stopped_reason` above could never carry: `unknown`
+    // is the row written before the field existed, which is what a fixture default should be.
+    ending: "unknown",
     ...over,
   };
 }

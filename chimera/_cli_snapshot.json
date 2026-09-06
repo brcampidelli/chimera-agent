@@ -4766,6 +4766,16 @@
           "type": "int"
         },
         {
+          "help": "Stop the whole run once this much has been spent (all attempts together).",
+          "kind": "option",
+          "name": "max_usd",
+          "opts": [
+            "--max-usd"
+          ],
+          "required": false,
+          "type": "float"
+        },
+        {
           "help": "Fraction of the model's window to spend on the prompt before compacting (e.g. 0.6).",
           "kind": "option",
           "name": "context_budget",

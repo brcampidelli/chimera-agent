@@ -15,15 +15,16 @@ from __future__ import annotations
 
 import os
 import threading
+from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from pydantic import BaseModel
 
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
-    from chimera.core.autonomous import AutonomousResult
+    from chimera.core.autonomous import Attempt, AutonomousResult
 
 _log = get_logger("api.runs")
 
@@ -153,6 +154,21 @@ class RunReceipt(BaseModel):
     for the reason ``workspace`` and ``profile`` give above: attributing an outcome a run may not
     have had would put invented evidence into the one view whose job is to say what happened."""
 
+    ending: str = "unknown"
+    """How the solve loop ended: ``success`` | ``no_op`` | ``exhausted`` | ``cancelled`` | ``spend``
+    | ``paused`` | ``denied``. Set at every return; see ``AutonomousResult.ending``.
+
+    Distinct from ``stopped_reason`` above, which is the *turn* loop's vocabulary and is empty for
+    every ending the solve loop has that is not ``cancelled`` or ``spend``. Until this field the
+    durable record could not separate a run that finished from one that used up its attempts, nor
+    a success that changed a file from one that changed nothing: all three wrote ``success`` and a
+    blank. ``unknown`` marks a row written before the field existed."""
+
+    stagnant: bool | None = None
+    """Were the failures repeating when it ended? ``None`` = nobody looked (no detector, or an ending
+    that does not summarise failures), which is not ``False``. Recorded beside the ending, never as
+    the ending — nothing in the loop stops on stagnation."""
+
     attempts: list[AttemptReceipt] = []
     #: Which model-role configuration ran this — "economy" / "balanced" / "max", or ``null`` for a
     #: run that predates the field or named none. Null is kept as its own group rather than folded
@@ -175,7 +191,7 @@ class RunReceipt(BaseModel):
     usd: float | None = None
 
 
-def total_usd(attempts: list[AttemptReceipt]) -> float | None:
+def total_usd(attempts: Sequence[AttemptReceipt | Attempt]) -> float | None:
     """Sum the attempts' cost, or ``None`` if any single one is unknown.
 
     All-or-nothing on purpose. A partial sum is not a conservative estimate — it is a number that
@@ -188,6 +204,43 @@ def total_usd(attempts: list[AttemptReceipt]) -> float | None:
     if any(a.usd is None for a in attempts):
         return None
     return round(sum(a.usd or 0.0 for a in attempts), 6)
+
+
+class AcceptedChangeCost(NamedTuple):
+    """What the run paid, and how much of it landed. Three fields because one number cannot say it.
+
+    ``per_change`` is the whole point — dollars per unit of work that survived the deterministic
+    gate — and it is ``None`` for two unrelated reasons that must not collapse into each other:
+    nothing was accepted (``accepted == 0``, the denominator does not exist) or a leg was unpriced
+    (``usd is None``, see :func:`total_usd`). Reporting both alongside is what lets a reader tell
+    "this run bought nothing" from "we cannot say what this run cost", which are opposite verdicts.
+    """
+
+    accepted: int
+    usd: float | None
+    per_change: float | None
+
+
+def cost_per_accepted_change(
+    attempts: Sequence[AttemptReceipt | Attempt],
+) -> AcceptedChangeCost:
+    """Money over accepted changes: the ratio that says whether the retries were worth their price.
+
+    An attempt counts as accepted when the verifier passed it, it was not reverted, and it actually
+    changed the tree. All three, because each alone admits something that is not a delivered change:
+    ``verified`` without ``diff_productive`` is the hollow success the diff gate exists to catch, and
+    an attempt that verified and was then reverted delivered nothing by definition.
+
+    ``diff_productive is None`` — unknown, on rows written before the field — does **not** count. It
+    is the same refusal ``total_usd`` makes: guessing in the flattering direction is how a loop that
+    changed nothing comes to look cheap per change.
+    """
+    accepted = sum(
+        1 for a in attempts if a.verified and not a.reverted and a.diff_productive is True
+    )
+    usd = total_usd(attempts)
+    per = round(usd / accepted, 6) if (usd is not None and accepted > 0) else None
+    return AcceptedChangeCost(accepted=accepted, usd=usd, per_change=per)
 
 
 def build_receipt(
@@ -253,6 +306,8 @@ def build_receipt(
         # results from several call sites, and a required read would turn a new field into a crash
         # on the path that persists the run — after the work was already paid for.
         stopped_reason=str(getattr(result, "stopped_reason", "") or ""),
+        ending=str(getattr(result, "ending", "") or "unknown"),
+        stagnant=getattr(result, "stagnant", None),
         attempts=attempts,
         profile=profile,
         workspace=workspace,

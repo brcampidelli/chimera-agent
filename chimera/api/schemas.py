@@ -1319,6 +1319,22 @@ class RunReceiptOut(BaseModel):
     all carry ``success: false`` and are otherwise indistinguishable on screen. The chat turn's
     badge already makes this distinction from the ``done`` frame; the durable list could not."""
 
+    ending: str = "unknown"
+    """How the solve loop ended: ``success`` | ``no_op`` | ``exhausted`` | ``cancelled`` | ``spend``
+    | ``paused`` | ``denied``. ``unknown`` for a receipt written before the field existed.
+
+    On the wire for the reason the field above gives and does not finish. ``stopped_reason`` is the
+    *turn* loop's word, and the solve loop writes it at two sites only — so the run that used up its
+    attempts, the one whose answer a person refused, and the one that succeeded while changing
+    nothing on disk still arrive here as the same blank. This is the one field that separates them,
+    and it is set at every return rather than at the interesting ones."""
+
+    stagnant: bool | None = None
+    """Were the failures repeating when it ended? ``null`` = nobody looked — no detector was
+    configured, or the run stopped at an ending that does not summarise its failures — and that is
+    not ``false``. Reported beside the ending, never as the ending: no part of the loop stops on
+    stagnation, so an ``ending`` of ``stalled`` would name a cause the code does not have."""
+
     workspace: str = ""
     """The project this run happened in. Empty for a receipt written before the field existed.
 
