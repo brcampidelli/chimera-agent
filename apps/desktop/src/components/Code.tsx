@@ -262,7 +262,7 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
       {editing ? (
         <div className="flex min-h-0 flex-1 flex-col">
           <textarea
-            className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-foreground outline-none"
+            className="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-[12.5px] leading-relaxed text-foreground outline-hidden"
             value={draft}
             spellCheck={false}
             onChange={(e) => setDraft(e.target.value)}
@@ -667,10 +667,10 @@ export function Code() {
         </main>
         {/* The viewer is a consequence of opening a file, not a permanent third of the window. */}
         {/* `min-w-0` for the same reason as the conversation column beside it: a fixed
-            `lg:w-[28rem]` is a BASIS, not a ceiling, and a flex child without it will not shrink —
+            `lg:w-md` is a BASIS, not a ceiling, and a flex child without it will not shrink —
             it overflowed the row instead and painted across the activity panel. */}
         {openFile ? (
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col border-hairline lg:w-[28rem] lg:flex-none lg:shrink-0 lg:border-l">
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col border-hairline lg:w-md lg:flex-none lg:shrink-0 lg:border-l">
             <Viewer workspace={workspace} path={openFile} />
           </div>
         ) : null}

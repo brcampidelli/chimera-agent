@@ -172,7 +172,7 @@ export function Lifecycle({
                       </span>
                     </p>
                     {landed?.output ? (
-                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                      <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap wrap-break-word text-xs text-muted-foreground">
                         {landed.output}
                       </pre>
                     ) : null}

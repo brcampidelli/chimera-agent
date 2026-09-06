@@ -119,7 +119,7 @@ function AgentCard({
                 being wrong. Printed verbatim from the server (`timed out after Ns`, or the
                 exception that killed the unit); this component never invents the reason. */}
             {result.error ? (
-              <p className="break-words font-mono text-xs text-bad-foreground">{result.error}</p>
+              <p className="wrap-break-word font-mono text-xs text-bad-foreground">{result.error}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               <span>

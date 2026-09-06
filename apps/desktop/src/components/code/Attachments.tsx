@@ -75,7 +75,7 @@ export function AttachmentTray({
           ) : (
             <FileText className="h-3.5 w-3.5" />
           )}
-          <span className="max-w-[14rem] truncate">{a.name}</span>
+          <span className="max-w-56 truncate">{a.name}</span>
           {/* A document that yielded no text is not the same as one nobody opened. Saying which is
               the difference between "the model read this" and "the model was told a filename". */}
           {a.kind === "document" && !a.note ? (

@@ -91,7 +91,7 @@ export function AppShell({
           // region itself to the tab order.
           tabIndex={-1}
           {...(ignite && { "data-ignite": "main" })}
-          className="flex min-w-0 flex-1 flex-col focus-visible:outline-none"
+          className="flex min-w-0 flex-1 flex-col focus-visible:outline-hidden"
         >
           {header}
           {/* Re-keyed per view so React replaces the subtree and the enter animation actually runs.

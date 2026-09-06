@@ -30,7 +30,7 @@ const SRC = join(__dirname, "..", "..");
 /** The line DECLARING one column: it carries the marker and it is a `className=` line.
  *
  * The `className=` half is not belt and braces. The first version matched on the marker alone and
- * found the COMMENT above the viewer — which mentions `lg:w-[28rem]` while explaining why the class
+ * found the COMMENT above the viewer — which mentions `lg:w-md` while explaining why the class
  * is there — and then reported the class as missing. That is the fourth time in this codebase a
  * check has read prose about code as code, so the rule is now written into the matcher rather than
  * left to whoever picks the next marker.
@@ -86,7 +86,7 @@ const COLUMNS = [
   {
     what: "the file viewer",
     file: join("components", "Code.tsx"),
-    marker: "lg:w-[28rem]",
+    marker: "lg:w-md",
     // `flex-1` WITHOUT a breakpoint would be wrong, and `flex-1` with `lg:flex-none` is the only
     // way to be right on both axes: below `lg` the row is a column and the viewer must fill the
     // height it is given and scroll inside; from `lg` up the row is a row and it must hold 28rem.

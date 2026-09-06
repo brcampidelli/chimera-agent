@@ -75,7 +75,7 @@ function Tab({
         onClick={onClose}
         aria-label={t("edit.close", { file: baseName(path) })}
         className={cn(
-          "flex h-5 w-5 items-center justify-center rounded",
+          "flex h-5 w-5 items-center justify-center rounded-sm",
           "hover:bg-surface-hover hover:text-foreground",
           focusRing,
         )}
@@ -277,7 +277,7 @@ export function Edit({
               <button
                 type="button"
                 onClick={() => setBase((b) => ({ ...b, [path]: disk as string }))}
-                className={cn("rounded px-1.5 py-0.5 underline", focusRing)}
+                className={cn("rounded-sm px-1.5 py-0.5 underline", focusRing)}
               >
                 {t("edit.conflict.keep")}
               </button>
@@ -287,7 +287,7 @@ export function Edit({
                   setDrafts((d) => forget(d, path));
                   setBase((b) => forget(b, path));
                 }}
-                className={cn("rounded px-1.5 py-0.5 underline", focusRing)}
+                className={cn("rounded-sm px-1.5 py-0.5 underline", focusRing)}
               >
                 {t("edit.conflict.reload")}
               </button>
@@ -331,7 +331,7 @@ export function Edit({
                 onClick={() => setRunner((on) => !on)}
                 aria-pressed={runner}
                 className={cn(
-                  "flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-surface-hover hover:text-foreground",
+                  "flex items-center gap-1 rounded-sm px-1.5 py-0.5 hover:bg-surface-hover hover:text-foreground",
                   runner && "text-foreground",
                   focusRing,
                 )}
@@ -348,7 +348,7 @@ export function Edit({
                   type="button"
                   onClick={() => save.mutate()}
                   disabled={readOnly}
-                  className={cn("rounded px-1.5 py-0.5 text-accent hover:bg-surface-hover", focusRing)}
+                  className={cn("rounded-sm px-1.5 py-0.5 text-accent hover:bg-surface-hover", focusRing)}
                 >
                   {t("edit.save")}
                 </button>

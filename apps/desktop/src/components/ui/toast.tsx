@@ -90,7 +90,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
         onClick={onDismiss}
         aria-label="Dismiss"
         className={cn(
-          "-mr-1 rounded p-0.5 text-muted-foreground",
+          "-mr-1 rounded-sm p-0.5 text-muted-foreground",
           "transition-colors duration-1 ease-out hover:text-foreground",
           focusRing,
         )}
