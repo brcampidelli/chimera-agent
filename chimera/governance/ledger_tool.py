@@ -83,7 +83,7 @@ def _idempotency_key(name: str, args: Mapping[str, Any]) -> str:
 # and clicks, so it can carry data out through a form just as an http_post can.
 DANGEROUS_WHEN_TAINTED = frozenset(
     {"run_shell", "execute_code", "code_interpreter", "write_file", "edit_file",
-     "apply_patch",
+     "apply_patch", "edit_batch",
      # exfiltration channels — everything in SIDE_EFFECT_TOOLS, plus the browser
      "send_email", "send_message", "send_sms", "http_post", "post_webhook", "create_issue",
      "browser"}

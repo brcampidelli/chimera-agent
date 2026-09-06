@@ -120,6 +120,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Approvals
+         * @description Every question an attended surface is waiting on, oldest first.
+         *
+         *     The other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in
+         *     `pending.ask_durably` announced the question on its own stream, but a screen that reloaded,
+         *     or a second window, has to be able to find it again. Same files `chimera approve` reads.
+         */
+        get: operations["list_approvals_api_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/approvals/{request_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer Approval
+         * @description Record the person's decision; the waiting tool call sees it on its next poll.
+         *
+         *     `ok: False` is a stale click — the question timed out (silence refused it) or was answered
+         *     from the CLI — and is a 200, because a verdict on a question that already resolved is
+         *     exactly what a late button press sends and there is nothing to do about it.
+         */
+        post: operations["answer_approval_api_approvals__request_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/attachments": {
         parameters: {
             query?: never;
@@ -2750,6 +2798,32 @@ export interface components {
              */
             default?: string[];
         };
+        /** ApprovalAnswerIn */
+        ApprovalAnswerIn: {
+            /** Approved */
+            approved: boolean;
+        };
+        /** ApprovalAnswerOut */
+        ApprovalAnswerOut: {
+            /** Ok */
+            ok: boolean;
+        };
+        /**
+         * ApprovalOut
+         * @description One question waiting for a person, written by `pending.ask_durably` from an attended surface.
+         */
+        ApprovalOut: {
+            /** Action */
+            action: string;
+            /** Age Seconds */
+            age_seconds: number;
+            /** Asked At */
+            asked_at: number;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string;
+        };
         /** ApproveBody */
         ApproveBody: {
             /** Card */
@@ -4588,6 +4662,41 @@ export interface components {
             defense: string;
             /** Leaks Defended */
             leaks_defended: string[];
+            /**
+             * Legitimate Tasks
+             * @default 0
+             */
+            legitimate_tasks: number;
+            /**
+             * Over Block Fetch
+             * @default 0
+             */
+            over_block_fetch: number;
+            /**
+             * Over Block Rate
+             * @default 0
+             */
+            over_block_rate: number;
+            /**
+             * Over Block With Approver
+             * @default 0
+             */
+            over_block_with_approver: number;
+            /**
+             * Over Block Workspace
+             * @default 0
+             */
+            over_block_workspace: number;
+            /**
+             * Pending Questions
+             * @default 0
+             */
+            pending_questions: number;
+            /**
+             * Questions Asked
+             * @default 0
+             */
+            questions_asked: number;
             /** Total Attacks */
             total_attacks: number;
             /**
@@ -6515,6 +6624,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BatchCancelOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_approvals_api_approvals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"][];
+                };
+            };
+        };
+    };
+    answer_approval_api_approvals__request_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                request_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalAnswerOut"];
                 };
             };
             /** @description Validation Error */

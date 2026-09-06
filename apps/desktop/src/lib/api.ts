@@ -23,6 +23,7 @@ import type {
   InlineCompletion,
   SearchResult,
   Benchmarks,
+  ApprovalQuestion,
   GovernanceAudit,
   SandboxState,
   InjectionReport,
@@ -254,6 +255,15 @@ export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/a
 /** Whether a command the model chooses can reach this machine. Probed live rather than read off the
  *  config: asking for a sandbox and getting one are different facts. */
 export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox");
+/** Questions waiting on a person right now — the same files `chimera approve` reads. */
+export const getApprovals = () => json<ApprovalQuestion[]>("/api/approvals");
+/** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. */
+export const answerApproval = (id: string, approved: boolean) =>
+  json<{ ok: boolean }>(`/api/approvals/${encodeURIComponent(id)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved }),
+  });
 export const getTools = () => json<Tools>("/api/tools");
 
 // --- Filesystem (read-only tree + file viewer for the Code screen) ---
@@ -1135,6 +1145,16 @@ export interface CodeVerified {
   revert_token?: string;
 }
 
+/** A question the turn is parked on. The tool call that raised it is waiting on a worker
+ *  thread for `POST /api/approvals/{id}`; silence refuses it after `wait_seconds`. */
+export interface CodeApprovalEvent {
+  id: string;
+  action: string;
+  reason: string;
+  asked_at: number;
+  wait_seconds: number;
+}
+
 export interface CodeTurnHandlers {
   onSession?: (id: string) => void;
   onToken?: (text: string) => void;
@@ -1142,6 +1162,7 @@ export interface CodeTurnHandlers {
   onEdit?: (path: string, patch: string) => void;
   onTodo?: (items: { task: string; status: string }[]) => void;
   onVerified?: (v: CodeVerified) => void;
+  onApproval?: (q: CodeApprovalEvent) => void;
   onDone?: (d: CodeTurnDone) => void;
   onError?: (msg: string) => void;
 }
@@ -1325,6 +1346,7 @@ function applyCodeTurnFrame(
   else if (event === "todo")
     h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
+  else if (event === "approval") h.onApproval?.(payload as unknown as CodeApprovalEvent);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string);
   return { turnId, seq };

@@ -137,6 +137,23 @@ def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver
     return approve
 
 
+class ApprovalAnnouncer:
+    """A late-bound place to announce a pending question to a screen.
+
+    Built before the surface that will render the question exists — the approver is constructed
+    with the tool registry, the stream's ``emit`` a moment later — so this holds the slot. Calling it
+    with no ``emit`` bound is not an error: the question is already durable on disk, and a notice to
+    nobody is exactly the unattended path's behaviour.
+    """
+
+    def __init__(self) -> None:
+        self.emit: Any = None
+
+    def __call__(self, question: Any) -> None:
+        if self.emit is not None:
+            self.emit(question)
+
+
 def nobody_is_at_a_terminal() -> bool:
     """Whether this process has a console a person could answer a prompt on.
 
@@ -206,13 +223,35 @@ def approver_for(
     return ask(ledger)
 
 
-def ask_elsewhere(home: Any, ledger: ApprovalLedger | None = None, *, deliver: Any = None) -> Approver:
-    """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no."""
+def ask_elsewhere(
+    home: Any,
+    ledger: ApprovalLedger | None = None,
+    *,
+    deliver: Any = None,
+    on_asked: Any = None,
+    wait_seconds: float | Callable[[], float] | None = None,
+) -> Approver:
+    """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no.
+
+    ``on_asked`` receives the structured question the moment it is written, so a surface that has a
+    screen can show it with a button instead of waiting for someone to read a webhook. ``deliver`` is
+    the text channel and is unchanged.
+
+    ``wait_seconds`` bounds the wait for a surface that holds a connection open; ``None`` keeps
+    :data:`pending.WAIT_SECONDS`. It may be a callable, resolved **per question**, because the right
+    wait is not known when the approver is built: the desktop constructs it with the tool registry
+    and binds the screen a moment later. A screen that is bound is worth waiting for; one that never
+    was is nobody, and waiting for nobody is the timeout this whole design exists to avoid.
+    """
     from chimera.governance.pending import ask_durably
 
     def approve(*args: Any) -> bool:
         action, reason = _describe(*args)
-        approved = ask_durably(home, action, reason, deliver=deliver)
+        extra: dict[str, Any] = {}
+        wait = wait_seconds() if callable(wait_seconds) else wait_seconds
+        if wait is not None:
+            extra["wait_seconds"] = float(wait)
+        approved = ask_durably(home, action, reason, deliver=deliver, on_asked=on_asked, **extra)
         if ledger is not None:
             ledger.record(action or reason, approved=approved)
         return approved

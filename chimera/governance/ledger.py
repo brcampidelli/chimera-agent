@@ -29,6 +29,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from chimera.governance.policy import Decision
 from chimera.telemetry import get_logger
@@ -69,7 +70,7 @@ FETCH_TOOLS = frozenset(
      "calendar_events", "browser", "scrape", "extract", "map", "crawl", "download_media"}
 )
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
-WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch"})
+WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch"})
 READ_TOOLS = frozenset({"read_file", "read_document", "transcribe_audio"})
 # Non-idempotent external side effects: firing the SAME call twice does real double harm
 # (a duplicate email/message/payment). A retry loop must not re-execute these — see the
@@ -292,6 +293,7 @@ def assess_action(
     *,
     exec_tools: frozenset[str] = EXEC_TOOLS,
     write_tools: frozenset[str] = WRITE_TOOLS,
+    fetch_tools: frozenset[str] = FETCH_TOOLS,
 ) -> SequenceAssessment:
     """Sequence-aware review: escalate when an action executes/self-modifies on tainted input.
 
@@ -317,5 +319,24 @@ def assess_action(
                 True, Decision.REVIEW,
                 f"writes untrusted content into an executable/interpreted file {path!r} ({', '.join(refs)})",
                 refs,
+            )
+    if tool_name in fetch_tools and ledger.run_tainted():
+        # The exfiltration that got through every configuration: `http_get` is a fetch tool, so the
+        # narrowing set — which names sinks — never looked at it, and a GET carries data out in its
+        # query string as easily as a POST carries it in a body. `bench/injection` measured
+        # `asr_exfil` at 0.5 with everything else at 0.0 because of exactly this row.
+        #
+        # A heuristic, and registered as one (`bench/injection/PREREGISTRATION_attended.md`, Arm 2):
+        # it cannot tell `?data=SECRET` from `?v=2.4`, so a legitimate query-string GET made after an
+        # untrusted read becomes a question rather than a fetch. That cost is measured on two benign
+        # rows added to the corpus for the purpose, not assumed away.
+        url = _first(args, _URL_KEYS)
+        parts = urlsplit(url) if url else None
+        if parts is not None and parts.query:
+            return SequenceAssessment(
+                True, Decision.REVIEW,
+                f"fetches {parts.netloc or url!r} with a query string while this run holds untrusted "
+                f"content — a GET can carry data out as easily as a POST",
+                [],
             )
     return SequenceAssessment(False, Decision.ALLOW)

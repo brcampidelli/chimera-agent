@@ -102,6 +102,8 @@ export type GitCommitResult = Schemas["GitCommitOut"];
 export type GitRevertResult = Schemas["GitRevertOut"];
 export type GitInitResult = Schemas["GitInitOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];
+/** One question an attended turn is waiting on — written by the taint ledger, answered from the screen. */
+export type ApprovalQuestion = Schemas["ApprovalOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 export type SandboxState = Schemas["SandboxStateOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];

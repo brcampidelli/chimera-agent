@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Lock, ShieldCheck, ShieldOff } from "lucide-react";
-import { getConfig, getGovernanceAudit, getGovernanceInjection, getSandboxState } from "@/lib/api";
+import {
+  getApprovals,
+  getConfig,
+  getGovernanceAudit,
+  getGovernanceInjection,
+  getSandboxState,
+} from "@/lib/api";
+import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -124,6 +131,27 @@ function InjectionPanel({ data, t }: { data: InjectionReport; t: TFunc }) {
           note={t("governance.injection.attacks", { n: data.total_attacks })}
         />
       </div>
+        {/* The half this screen used to omit. Everything above is what the layer BLOCKS; this is
+            what it REFUSES of honest work that trips the same surface. Two readings, named for the
+            person each assumes, never averaged: the shipped default with nobody to ask, and the
+            same rows when the person approves the work they asked for. */}
+        <div className="grid grid-cols-1 gap-3 px-4 pb-4 sm:grid-cols-3">
+          <Tile
+            label={t("governance.injection.overBlock")}
+            value={pct(data.over_block_rate)}
+            note={t("governance.injection.overBlockNote", { n: data.legitimate_tasks })}
+          />
+          <Tile
+            label={t("governance.injection.withApprover")}
+            value={pct(data.over_block_with_approver)}
+            note={t("governance.injection.questionsAsked", { n: data.questions_asked })}
+          />
+          <Tile
+            label={t("governance.injection.pendingQuestions")}
+            value={String(data.pending_questions)}
+            note={t("governance.injection.pendingNote")}
+          />
+        </div>
 
       <div className="px-4 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {t("governance.injection.byCategory")}
@@ -278,6 +306,13 @@ function SandboxPanel({ data, t }: { data: SandboxState; t: TFunc }) {
 export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const injection = useQuery({ queryKey: ["governance-injection"], queryFn: getGovernanceInjection });
+  // The questions a turn is parked on right now. Polled, because the turn that asked may be in
+  // another window or may have asked before this screen was opened — the stream frame reaches only
+  // the window that started the turn, and a question nobody can see is the old refusal with extra
+  // steps. Two seconds matches the poll on the other side of the file.
+  const approvals = useQuery({
+    queryKey: ["approvals"], queryFn: getApprovals, refetchInterval: 2000, staleTime: 0,
+  });
   // Probed on every open rather than cached: a Docker daemon that died since the last look has to
   // change the answer, not be served from a cache — the same rule the posture endpoint follows.
   const sandbox = useQuery({
@@ -322,6 +357,16 @@ export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
       ) : (
         <InjectionPanel data={injection.data} t={t} />
       )}
+
+      {approvals.data?.length ? (
+        <Panel title={t("governance.injection.pendingQuestions")}>
+          <div className="p-4">
+            {approvals.data.map((q) => (
+              <ApprovalCard key={q.id} question={q} onAnswered={() => void approvals.refetch()} />
+            ))}
+          </div>
+        </Panel>
+      ) : null}
 
       {audit.isError ? (
         <Panel title={t("governance.audit.title")}>

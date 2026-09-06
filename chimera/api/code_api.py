@@ -71,6 +71,7 @@ from chimera.api.schemas import (
 )
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
+from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.telemetry import get_logger
 
@@ -429,6 +430,7 @@ def assemble_registry(
     steps: int,
     surface: str = "api",
     shared: Any = None,
+    approval_sink: Any = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -648,12 +650,27 @@ def assemble_registry(
         #
         # And never `step.approve`, for the reason above: in `observe` that one says yes to
         # everything, so measurement would silently subtract protection.
-        approve=_owner_allows(settings),
+        approve=_owner_allows(settings, approval_sink),
     ), ledger
 
 
-def _owner_allows(settings: Settings) -> Any:
-    """An approver that says yes, when the deployment explicitly chose `allow`. Otherwise none.
+def _owner_allows(settings: Settings, sink: Any = None) -> Any:
+    """The approver this deployment chose — and for the default, `ask`, one that actually asks.
+
+    For ``allow`` and ``deny`` this is what it always was. For ``ask`` it used to return ``None``,
+    which `LedgeredTool` reads as *refuse*: the setting whose name is *ask* asked nobody, and one
+    installed copy of the app recorded 229 `taint_narrowed` refusals under it. The comment that
+    justified ``None`` was right about the code as it stood — a durable ask inside an HTTP request
+    is a fifteen-minute timeout when nothing tells the person a question exists — and that is the
+    half this fixes: the question is written (`pending.ask_durably`), announced on the turn's own
+    stream through ``sink``, answered from the screen (`POST /api/approvals/{id}`), and bounded by
+    ``approval_wait``. Silence still refuses. Measured before/after in
+    `bench/injection/PREREGISTRATION_attended.md`.
+
+    The tool runs on the turn's worker thread (`threading.Thread(target=work)`), so the wait blocks
+    that thread and nothing else; the stream and the answering request are served by the loop.
+
+    An approver that says yes, when the deployment explicitly chose `allow`. Otherwise none.
 
     Returning `None` rather than a deny-approver is the point: `LedgeredTool` already refuses when
     there is no approver, so an absent one is exactly today's behaviour, and this cannot make any
@@ -665,11 +682,30 @@ def _owner_allows(settings: Settings) -> Any:
     a server approves whatever an injected page asks for too, and `bench/injection` measures
     `plant_backdoor` and `self_modify_skill` at 0% blocked without the narrowing.
     """
-    if (settings.approval_mode or "").strip().lower() != "allow":
-        return None
-    from chimera.governance.approval import approver_for
+    mode = (settings.approval_mode or "ask").strip().lower()
+    from chimera.governance.approval import allow, ask_elsewhere, deliverer_for, deny
 
-    return approver_for("allow")
+    if mode == "allow":
+        return allow()
+    if mode == "deny":
+        return deny()
+    # `ask`, and every value that is not one of the three: the person is at the screen, so ask them
+    # there. `nobody_is_at_a_terminal()` is not consulted — it reads stdin, and a server has none;
+    # the desktop IS the terminal, which is what the stream sink is for.
+    # Wait only when a screen is bound to the announcer. Every other caller of this registry —
+    # the batch/agents path, a test, a turn whose stream has not attached yet — has nobody who could
+    # answer through it, and for them the question is written, announced to no one, and refused at
+    # once. Resolved per question, because the binding happens after the approver is built.
+    def wait_for_the_screen() -> float:
+        bound = sink is not None and getattr(sink, "emit", None) is not None
+        return float(settings.approval_wait) if bound else 0.0
+
+    return ask_elsewhere(
+        settings.home,
+        deliver=deliverer_for(settings),
+        on_asked=sink,
+        wait_seconds=wait_for_the_screen,
+    )
 
 
 class PostureQuery(BaseModel):
@@ -938,7 +974,11 @@ def register_code_api(
             return locks.setdefault(session_id, threading.Lock())
 
     def build_agent(
-        req: CodeTurnRequest, ws: Path, facts: list[str], note: str = ""
+        req: CodeTurnRequest,
+        ws: Path,
+        facts: list[str],
+        note: str = "",
+        approval_sink: Any = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
@@ -953,7 +993,7 @@ def register_code_api(
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
         registry, ledger = assemble_registry(
-            req, ws, live(), gateway, steps=steps, surface="api:turn"
+            req, ws, live(), gateway, steps=steps, surface="api:turn", approval_sink=approval_sink
         )
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
         # drops system messages when it stores the transcript, so the recall is refreshed each turn
@@ -1087,7 +1127,11 @@ def register_code_api(
         facts, memory_layer = recall_facts(
             req.message, memory=turn_memory, graph=turn_graph, project=str(ws)
         )
-        agent, ledger = build_agent(req, ws, facts, note)
+        # Created before the agent so the approver can hold it, bound to `emit` after `emit`
+        # exists. Until then a question announces to nobody — and is still on disk for
+        # `chimera approve`, which is the same guarantee the unattended path already had.
+        approval_sink = ApprovalAnnouncer()
+        agent, ledger = build_agent(req, ws, facts, note, approval_sink=approval_sink)
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
@@ -1115,6 +1159,17 @@ def register_code_api(
             if isinstance(numbered, dict):
                 runlog.append(settings.home, turn_id, event, numbered, area="code")
             loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+
+        approval_sink.emit = lambda question: emit(
+            "approval",
+            {
+                "id": question.id,
+                "action": question.action,
+                "reason": question.reason,
+                "asked_at": question.asked_at,
+                "wait_seconds": float(settings.approval_wait),
+            },
+        )
 
         def on_token(text: str) -> None:
             emit("token", {"text": text})

@@ -130,6 +130,7 @@ def ask_durably(
     reason: str,
     *,
     deliver: Any = None,
+    on_asked: Any = None,
     wait_seconds: float = WAIT_SECONDS,
     poll_seconds: float = POLL_SECONDS,
     clock: Any = time.monotonic,
@@ -159,6 +160,14 @@ def ask_durably(
         _log.warning("could not record an approval request: %s", exc)
         return False
 
+    if on_asked is not None:
+        # The structured form, for a surface with a screen. Delivered BEFORE the text channel and
+        # independently of it: a screen that can render a button must not depend on a webhook
+        # being configured, and a failure here is as harmless as a failed delivery below.
+        try:
+            on_asked(PendingApproval(id=request_id, action=action, reason=reason, asked_at=time.time()))
+        except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
+            _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
         try:
             deliver(

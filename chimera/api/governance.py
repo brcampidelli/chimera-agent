@@ -49,6 +49,25 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
     settings = settings or get_settings()
     defended = run_redteam(default_attacks(), defended=True)
     undefended = run_redteam(default_attacks(), defended=False)
+    # The cost half, from the same stub harness and the same wrapper — never a second harness. Two
+    # readings, named for the person each assumes: nobody answers (`approve=None`, what an unattended
+    # run gets), and the person approves the work they asked for (`allow`, handed to the honest
+    # corpus ONLY — handing it to the attacks would model a user who approves whatever an injected
+    # page asks for, which measures nothing about the defence). Neither writes a question file: this
+    # is a scoreboard render, not a run, and it must have no side effect on `<home>/approvals`.
+    from chimera.eval.injection import default_benign, run_benign
+    from chimera.governance.approval import ApprovalLedger, allow
+    from chimera.governance.pending import pending
+
+    unattended = run_benign(default_benign(), defended=True)
+    book = ApprovalLedger()
+    attended = run_benign(default_benign(), defended=True, approve=allow(book))
+    bsum = unattended.summary()
+    asum = attended.summary()
+    try:
+        waiting = len(pending(settings.home))
+    except Exception:  # noqa: BLE001 — a scoreboard must render on a home with no approvals dir
+        waiting = 0
     dsum = defended.summary()
     usum = undefended.summary()
 
@@ -104,6 +123,14 @@ def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
         # kernel. One boolean cannot describe a layer that is on some endpoints and not
         # others; what it CAN say truthfully is that nothing on this screen measures it.
         "trust_kernel": False,
+        "legitimate_tasks": int(bsum.get("tasks", 0.0)),
+        "over_block_rate": bsum.get("over_block_rate", 0.0),
+        "over_block_workspace": bsum.get("over_block_workspace", 0.0),
+        "over_block_fetch": bsum.get("over_block_fetch", 0.0),
+        "over_block_with_approver": asum.get("over_block_rate", 0.0),
+        # Every grant the attended reading recorded is a question the person would have been asked.
+        "questions_asked": len(book.granted) + len(book.refused),
+        "pending_questions": waiting,
     }
 
 

@@ -4,6 +4,43 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The setting named `ask` asks.** `CHIMERA_APPROVAL_MODE` defaults to `ask`, and on the desktop
+  path it returned no approver at all — the taint ledger read that as *refuse*, and one installed
+  copy recorded **229** silent `taint_narrowed` refusals under the default, across 24 of 137 runs,
+  with `tool_loop` as the stop reason six times as often as elsewhere. A narrowed tool call is now a
+  **durable question**: written to `<home>/approvals/`, announced on the turn's own stream as an
+  `approval` frame, shown in the Code tab with the ledger's reason and two buttons, answerable there
+  or with `chimera approve`, and **refused by silence** after `CHIMERA_APPROVAL_WAIT` (300 s). The
+  comment that had ruled `ask` out on the server was right about the code as it stood — a durable
+  ask inside an HTTP request is a fifteen-minute timeout when nothing tells the person a question
+  exists — and that is the half that changed. **A screen that is not bound is not waited for**: with
+  no announcer, the wait is zero, which the test suite discovered by crawling at five minutes per
+  refusal before that rule existed. `GET /api/approvals`, `POST /api/approvals/{id}`.
+- **The Security screen shows what the defence costs**, beside what it blocks: honest work refused
+  with nobody to ask, the same rows with a person approving, how many become a question, and how
+  many are waiting now. The scoreboard used to carry only the flattering half.
+- **`bench/injection/RESULTS.md` and `bench/memory_poison/RESULTS.md`** — both directories had a
+  pre-registration and failing console dumps and never a write-up.
+
+### Changed
+
+- **The exfiltration that got through every configuration is closed.** `http_get` is a fetch tool,
+  so the narrowing set — which names sinks — never looked at it, and `asr_exfil` sat at 0.5 with
+  everything else at 0.0. A tainted run's fetch carrying a **query string** is now a review. It is a
+  heuristic and is registered as one: two legitimate query-string GETs were added to the corpus so
+  its cost is a measured number (both are asked, not refused, when a person is there).
+
+### Fixed
+
+- **`edit_batch` escaped the `read_only` posture and was never narrowed.** It writes to several
+  files in one call and was in neither `WRITE_TOOLS` nor `DANGEROUS_WHEN_TAINTED` — the "second
+  list that agrees with the first until the day it does not" that `posture.py` warned about, from
+  the other direction. It ships off, which is why this was a hole and not an incident.
+
 ## [0.50.0] - 2026-09-05
 
 ### Added

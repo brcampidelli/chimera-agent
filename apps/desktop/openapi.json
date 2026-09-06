@@ -561,6 +561,66 @@
         "title": "ApproachesOut",
         "type": "object"
       },
+      "ApprovalAnswerIn": {
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "approved"
+        ],
+        "title": "ApprovalAnswerIn",
+        "type": "object"
+      },
+      "ApprovalAnswerOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "ApprovalAnswerOut",
+        "type": "object"
+      },
+      "ApprovalOut": {
+        "description": "One question waiting for a person, written by `pending.ask_durably` from an attended surface.",
+        "properties": {
+          "action": {
+            "title": "Action",
+            "type": "string"
+          },
+          "age_seconds": {
+            "title": "Age Seconds",
+            "type": "number"
+          },
+          "asked_at": {
+            "title": "Asked At",
+            "type": "number"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "reason",
+          "asked_at",
+          "age_seconds"
+        ],
+        "title": "ApprovalOut",
+        "type": "object"
+      },
       "ApproveBody": {
         "properties": {
           "card": {
@@ -4423,6 +4483,41 @@
             },
             "title": "Leaks Defended",
             "type": "array"
+          },
+          "legitimate_tasks": {
+            "default": 0,
+            "title": "Legitimate Tasks",
+            "type": "integer"
+          },
+          "over_block_fetch": {
+            "default": 0.0,
+            "title": "Over Block Fetch",
+            "type": "number"
+          },
+          "over_block_rate": {
+            "default": 0.0,
+            "title": "Over Block Rate",
+            "type": "number"
+          },
+          "over_block_with_approver": {
+            "default": 0.0,
+            "title": "Over Block With Approver",
+            "type": "number"
+          },
+          "over_block_workspace": {
+            "default": 0.0,
+            "title": "Over Block Workspace",
+            "type": "number"
+          },
+          "pending_questions": {
+            "default": 0,
+            "title": "Pending Questions",
+            "type": "integer"
+          },
+          "questions_asked": {
+            "default": 0,
+            "title": "Questions Asked",
+            "type": "integer"
           },
           "total_attacks": {
             "title": "Total Attacks",
@@ -8615,6 +8710,79 @@
           }
         },
         "summary": "Cancel Agents"
+      }
+    },
+    "/api/approvals": {
+      "get": {
+        "description": "Every question an attended surface is waiting on, oldest first.\n\nThe other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in\n`pending.ask_durably` announced the question on its own stream, but a screen that reloaded,\nor a second window, has to be able to find it again. Same files `chimera approve` reads.",
+        "operationId": "list_approvals_api_approvals_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalOut"
+                  },
+                  "title": "Response List Approvals Api Approvals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Approvals"
+      }
+    },
+    "/api/approvals/{request_id}": {
+      "post": {
+        "description": "Record the person's decision; the waiting tool call sees it on its next poll.\n\n`ok: False` is a stale click \u2014 the question timed out (silence refused it) or was answered\nfrom the CLI \u2014 and is a 200, because a verdict on a question that already resolved is\nexactly what a late button press sends and there is nothing to do about it.",
+        "operationId": "answer_approval_api_approvals__request_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalAnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalAnswerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Approval"
       }
     },
     "/api/attachments": {
