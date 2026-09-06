@@ -720,6 +720,11 @@ class Settings(BaseSettings):
     # `solve` and by every unattended surface. So this one moves, because nothing writes it and
     # nothing documented it, while renaming the other would silently break saved app settings.
     approval_mode: str = Field(default="ask", validation_alias="CHIMERA_APPROVAL_MODE")
+    # How long an ATTENDED surface (the desktop turn) waits for the person to answer a durable
+    # approval question before silence refuses. `pending.WAIT_SECONDS` (15 min) is the CLI's
+    # figure for someone answering from a phone; an HTTP turn holds a stream open the whole time,
+    # so it is bounded shorter. Silence still refuses — this changes how long, never whether.
+    approval_wait: float = Field(default=300.0, validation_alias="CHIMERA_APPROVAL_WAIT")
 
     # Governance on the unattended surfaces (`serve`, cron, MCP, A2A, messaging): `off` | `observe`
     # | `enforce`. Off by default, because turning it on changes what a running deployment is

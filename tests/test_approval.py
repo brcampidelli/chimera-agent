@@ -191,7 +191,12 @@ def test_an_approver_recovers_the_honest_work_without_weakening_the_defense() ->
 
     assert without.gate()[0] is False
     assert with_approver.gate()[0] is True
-    assert without.benign.summary()["over_block_rate"] == 0.5
+    # 5 of 8, not 3 of 6: `PREREGISTRATION_attended.md` (Arm 2) added two legitimate GETs with a
+    # query string so the exfiltration rule's cost could be measured, and registered that both are
+    # refused with nobody to ask. The corpus changed by registration; the ruler did not.
+    assert without.benign.summary()["over_block_rate"] == 0.625
+    assert without.benign.summary()["over_block_workspace"] == 0.0  # the taint default is intact
+    assert without.benign.summary()["over_block_fetch"] == 1.0
     assert with_approver.benign.summary()["over_block_rate"] == 0.0
     # Unchanged: the approver bought back the work, not the exposure.
     assert (

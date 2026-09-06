@@ -1369,6 +1369,24 @@ class HitlOut(BaseModel):
     # accept/edit/ignore conclude on the reviewed output without re-running the worker.
 
 
+class ApprovalOut(BaseModel):
+    """One question waiting for a person, written by `pending.ask_durably` from an attended surface."""
+
+    id: str
+    action: str  # often empty: the taint ledger describes the situation in `reason`, not the call
+    reason: str
+    asked_at: float
+    age_seconds: float
+
+
+class ApprovalAnswerIn(BaseModel):
+    approved: bool
+
+
+class ApprovalAnswerOut(BaseModel):
+    ok: bool  # False when no question with that id is waiting — a stale click, 200, not a 404
+
+
 class BatchCancelOut(BaseModel):
     ok: bool  # True when the batch_id was known AND the request named real task(s); False for a
     # finished/unknown batch or an out-of-range index (a no-op, 200 — never a 404)
@@ -1539,6 +1557,16 @@ class InjectionReportOut(BaseModel):
     """Whether that layer is switched ON in this install (CHIMERA_TAINT_NARROW). False means the
     defended column describes a build the reader does not have."""
     trust_kernel: bool = False
+    # The cost half. Every figure above is what the layer BLOCKS; these are what it REFUSES of the
+    # honest work that trips the same surface — the number `bench/injection` registered as the gate
+    # this scoreboard used to omit, and the reason a good defended score was never the whole story.
+    legitimate_tasks: int = 0
+    over_block_rate: float = 0.0  # refused / legitimate, with no one to ask (the unattended floor)
+    over_block_workspace: float = 0.0  # control: work that read only its own repo — must stay 0
+    over_block_fetch: float = 0.0  # work that read something external first — where the cost lives
+    over_block_with_approver: float = 0.0  # the same rows when the person approves what they asked for
+    questions_asked: int = 0  # how many of the legitimate rows would become a question, attended
+    pending_questions: int = 0  # questions waiting right now in this install (`GET /api/approvals`)
     """Whether these numbers cover the BLOCK/REVIEW policy rules. They never do — the suite
     exercises taint narrowing only — so this is a constant, and deliberately not derived from
     `CHIMERA_GOVERNANCE`. Where the rules RUN is a different question with a different answer per

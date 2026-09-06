@@ -22,6 +22,7 @@ vi.mock("@/lib/api", () => ({
   // way of tests about the panels below — and a mock missing the call throws the whole screen.
   getConfig: vi.fn(async () => ({ autonomy: { governance: "off" } })),
   getGovernanceInjection: vi.fn(),
+  getApprovals: vi.fn(async () => []),
   getGovernanceAudit: vi.fn(),
   getSandboxState: vi.fn(),
 }));

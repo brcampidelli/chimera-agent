@@ -51,6 +51,9 @@ from chimera.api.schemas import (
     AgentDesignOut,
     AgentIdentityOut,
     AgentsBatchOut,
+    ApprovalAnswerIn,
+    ApprovalAnswerOut,
+    ApprovalOut,
     BatchCancelOut,
     BenchmarksOut,
     CancelOut,
@@ -1226,6 +1229,39 @@ def build_api_app(
             return {"ok": False}
         event.set()
         return {"ok": True}
+
+    @app.get("/api/approvals", dependencies=[guard], response_model=list[ApprovalOut])
+    def list_approvals() -> list[dict[str, Any]]:
+        """Every question an attended surface is waiting on, oldest first.
+
+        The other half of `POST /api/approvals/{id}`: a turn whose tool call is parked in
+        `pending.ask_durably` announced the question on its own stream, but a screen that reloaded,
+        or a second window, has to be able to find it again. Same files `chimera approve` reads.
+        """
+        from chimera.governance.pending import pending
+
+        return [
+            {
+                "id": q.id,
+                "action": q.action,
+                "reason": q.reason,
+                "asked_at": q.asked_at,
+                "age_seconds": q.age_seconds,
+            }
+            for q in pending(live_settings().home)
+        ]
+
+    @app.post("/api/approvals/{request_id}", dependencies=[guard], response_model=ApprovalAnswerOut)
+    def answer_approval(request_id: str, req: ApprovalAnswerIn) -> dict[str, Any]:
+        """Record the person's decision; the waiting tool call sees it on its next poll.
+
+        `ok: False` is a stale click — the question timed out (silence refused it) or was answered
+        from the CLI — and is a 200, because a verdict on a question that already resolved is
+        exactly what a late button press sends and there is nothing to do about it.
+        """
+        from chimera.governance.pending import answer
+
+        return {"ok": answer(live_settings().home, request_id, bool(req.approved))}
 
     @app.get("/api/runs/paused", dependencies=[guard], response_model=list[PausedRunOut])
     def paused_runs() -> list[dict[str, Any]]:

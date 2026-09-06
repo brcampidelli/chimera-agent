@@ -21,6 +21,16 @@ to the benign corpus only, modelling a person approving work they asked for. A s
 server approves whatever an injected page asks for too: without the narrowing, `plant_backdoor` and
 `self_modify_skill` execute. That trade belongs to whoever sets the variable, which is why this
 wires `allow` and refuses to wire `ask`.
+
+**2026-09-05 — the second half.** The three tests below that asserted "nobody to ask" asserted the
+defect the file was named for. `ask` is wired now (`bench/injection/PREREGISTRATION_attended.md`):
+a narrowed call becomes a durable question, announced on the turn's stream, answered from the
+screen or `chimera approve`, refused by silence. The reason `ask` was refused here — "it would wait
+fifteen minutes inside an HTTP request" — was right about the code as it stood and is answered
+by two rules asserted in `test_the_setting_named_ask_asked_nobody.py`: a screen that is not bound
+is not waited for, and a bound one is told the question exists. `deny` became a *recorded* deny for
+the reason `approval.py` gives: an approver that denies invisibly is a bug with a configuration
+file.
 """
 
 from __future__ import annotations
@@ -57,32 +67,34 @@ def _approver_of(registry: Any, nome: str = "write_file") -> Any:
     return None
 
 
-def test_by_default_the_server_still_has_nobody_to_ask(tmp_path: Path) -> None:
-    """The default does not move. This wires a switch; it does not flip one.
-
-    Changing what an unconfigured install does to a defence against prompt injection is not a fix,
-    it is a policy decision, and it is not this function's to make.
-    """
-    assert _approver_of(_registry(tmp_path)) is None
+def test_by_default_the_server_now_has_somebody_to_ask(tmp_path: Path) -> None:
+    """The default is `ask`, and it used to return None — the setting named *ask* asked nobody.
+    Now it returns the durable asker. Whether that asker WAITS is decided per question by whether a
+    screen is bound, which is the other file's business; here it only has to exist."""
+    approver = _approver_of(_registry(tmp_path))
+    assert approver is not None
+    assert "ask_elsewhere" in getattr(approver, "__qualname__", "")
 
 
 def test_deny_is_still_deny(tmp_path: Path) -> None:
-    """`deny` must not become an approver that says no — it must stay no approver at all.
+    """`deny` now returns an approver that says no and RECORDS it, instead of no approver at all.
+    Same outcome — the tool does not run — by a road that leaves a receipt: an invisible refusal is
+    indistinguishable from a job that had nothing to do."""
+    approver = _approver_of(_registry(tmp_path, CHIMERA_APPROVAL_MODE="deny"))
+    assert approver is not None and approver(None) is False
 
-    `LedgeredTool` already refuses without one, so the two are the same outcome by different roads,
-    and the shorter road cannot drift.
-    """
-    assert _approver_of(_registry(tmp_path, CHIMERA_APPROVAL_MODE="deny")) is None
 
+def test_ask_is_wired_and_does_not_wait_for_a_screen_that_is_not_there(tmp_path: Path) -> None:
+    """Was `test_ask_is_deliberately_not_wired`. The objection it recorded — a durable ask inside an
+    HTTP request is a timeout — holds exactly when nothing can answer, so with no screen bound the
+    wait is zero and the refusal is immediate. The registry built here binds no screen."""
+    import time
 
-def test_ask_is_deliberately_not_wired(tmp_path: Path) -> None:
-    """`ask` on a server has nobody at a console.
-
-    With a `home` it would wait fifteen minutes inside an HTTP request; without one it degrades to
-    `deny`, which is the default reached by a longer road. Wiring it would trade a refusal for a
-    timeout, which is worse in the one dimension a user notices.
-    """
-    assert _approver_of(_registry(tmp_path, CHIMERA_APPROVAL_MODE="ask")) is None
+    approver = _approver_of(_registry(tmp_path, CHIMERA_APPROVAL_MODE="ask"))
+    assert approver is not None
+    started = time.monotonic()
+    assert approver(None) is False
+    assert time.monotonic() - started < 2.0, "an ask with no screen bound waited — the timeout is back"
 
 
 def test_an_owner_who_says_allow_is_obeyed(tmp_path: Path) -> None:

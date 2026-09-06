@@ -36,6 +36,8 @@ import {
   type Profile,
   type Reach,
 } from "@/lib/api";
+import type { CodeApprovalEvent } from "@/lib/api";
+import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
 import { BrandMark } from "@/components/BrandMark";
@@ -530,6 +532,9 @@ export function Conversation({
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // The question the turn is parked on, if any. One at a time by construction: the tool call
+  // that raised it is blocked until it is answered, so a second cannot arrive first.
+  const [pendingApproval, setPendingApproval] = useState<CodeApprovalEvent | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // Follows the stream by writing scrollTop once per frame, and stops the moment the reader scrolls
   // up. Replaces a `scrollIntoView` on every state change, which yanked the reader back mid-read —
@@ -845,6 +850,9 @@ export function Conversation({
         onVerified: (v) => {
           verifyFailed = v.state === "failed";
           patchLast((e) => ({ ...e, verified: v }));
+        },
+        onApproval: (q) => {
+          setPendingApproval(q);
         },
         onDone: (done) => {
           // The streamed tokens and the final answer are the same text; prefer the final one, which
@@ -1247,6 +1255,9 @@ export function Conversation({
               {t("composer.unqueue")}
             </button>
           </div>
+        ) : null}
+        {pendingApproval ? (
+          <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
         ) : null}
         <textarea
           className={cn(

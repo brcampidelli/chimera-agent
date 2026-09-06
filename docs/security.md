@@ -58,6 +58,19 @@ runs an injection corpus through the stack. On the built-in corpus the taint lay
 **attack success rate from 100% to ~14%** — and the report *names* what still gets through
 (exfiltration via an allowed tool) rather than claiming 100%.
 
+The same command prints the **cost**, which the first version of this page did not: with nobody
+to ask, the narrowing refuses **100% of legitimate work that read anything external first** —
+fix the file the issue names, apply the upgrade the docs describe — and the registered gate
+(over-block ≤ 5%) fails. That number is not a tuning problem; the gate was empty. The default
+approval mode is `ask`, and on the desktop it now asks: a narrowed tool call becomes a question
+on the screen with the ledger's reason attached, answered with a button or `chimera approve`,
+refused by silence after `CHIMERA_APPROVAL_WAIT` seconds. With the person approving the work
+they asked for, over-block is 0% and the attack block rate does not move — measured, per arm,
+in [`bench/injection/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/injection/RESULTS.md).
+The exfiltration through an allowed tool is closed by the same change: a tainted run's `http_get`
+carrying a query string is a review, and the two legitimate query-string GETs added to the
+corpus show what that costs.
+
 ### Poisoned memory, across runs
 
 `redteam` measures one run. The other shape is slower and does not fit in a process: run A reads a

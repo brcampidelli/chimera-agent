@@ -11,6 +11,7 @@ vi.mock("@/lib/api", () => ({
   getConfig: vi.fn(async () => ({ autonomy: { governance: "off" } })),
   getGovernanceAudit: vi.fn(),
   getGovernanceInjection: vi.fn(),
+  getApprovals: vi.fn(async () => []),
   // The screen gained an execution-boundary panel; a mock missing it makes the whole screen throw,
   // which is this file's tests failing about something they are not testing.
   getSandboxState: vi.fn(),
