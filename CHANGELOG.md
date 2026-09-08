@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **A single run is a sample; `chimera.eval.replicated` makes it a measurement.** `ReplicatedArm`
+  takes `k` runs per task and reports `pass^k` (the fraction of tasks that pass *every* run — what a
+  user experiences), the per-task **flip rate** (the noise floor: how much a task moves with nothing
+  changed), **ICC(1)** (how much of the variance is a task property at all), and **mechanism-active**
+  scoring (score only the trials where the mechanism under test actually fired; zero such trials is
+  reported as *not measured*, never as 0%). `compare_replicated` pairs two arms on per-task `pass^k`
+  through the existing `compare_paired`, so twenty callers keep their numbers, and the report says
+  beside the CI whether |Δ| is **inside the arms' own noise floor** — the shape 2606.20695 found in
+  seven of ten published multi-agent architectures. The seeds rule is printed, not remembered: one
+  run is a sample, two alert, three decide. First measured example: the LoopsBench pilot run twice,
+  same configuration — `pass@1` 12.5% both times, `pass^2` **0.0%**, flip rate 25%, ICC **−0.08**.
+
 - **A run can be told to stop at a number.** `chimera solve --max-usd` caps what the whole run may
   spend, across every attempt. The ceiling itself was built, tested and shipped after a measured
   incident — a run asking for $0.000002 spent $0.0129 because each attempt started again at zero —

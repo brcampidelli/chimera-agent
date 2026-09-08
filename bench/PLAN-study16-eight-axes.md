@@ -18,11 +18,15 @@ report headline effects below their own noise floor.** Every item below is unrea
 **What exists.** `chimera/eval/paired.py` — `PairedResult`, `compare_paired`, `run_paired_experiment`,
 `format_report`. Paired McNemar/Wilson over one run per arm.
 
-**What changes.**
-- Extend `PairedResult` to take **k runs per task per arm** and report: `pass^k`, per-task flip rate,
-  ICC across runs, and — the published fix from 2606.20695 — **mechanism-active pass^k**: score only
-  the trials where the mechanism under test was *logically active* (§2r, "reportar quanto ela agiu",
-  as a protocol).
+**What changes.** *(Shipped 2026-09-08 as `chimera/eval/replicated.py` — see PR #376. Written here
+first as "extend `PairedResult`"; built instead as a sibling module, because `PairedResult` is
+constructed positionally by twenty bench scripts and four eval modules and every one of them keeps
+its numbers only if the class does not move.)*
+- `ReplicatedArm` takes **k runs per task per arm** and reports: `pass^k`, per-task flip rate,
+  ICC(1) across runs, and — the published fix from 2606.20695 — **mechanism-active pass^k**: score
+  only the trials where the mechanism under test was *logically active* (§2r, "reportar quanto ela
+  agiu", as a protocol). Zero active trials is `None` and prints `NOT MEASURED`, never 0%.
+  `compare_replicated` pairs two arms on per-task `pass^k` through the **untouched** `compare_paired`.
 - A standing rule in every `PREREGISTRATION.md`: **three seeds decide; two alert; one is a sample.**
   A +18pp p=0.012 result vanished at the second seed in 2606.20695; our own +6%/−4% is the same shape.
 - One caveat 2608.22331 adds that nobody else measured: **prompt-perturbation noise is 11×–58×

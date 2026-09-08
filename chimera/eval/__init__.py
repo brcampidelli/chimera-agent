@@ -94,6 +94,15 @@ if TYPE_CHECKING:
 # Exported name -> (submodule, attribute in that submodule). The attribute differs from the exported
 # name only where the original re-export renamed it (`compare as compare_ab`, etc.).
 _LAZY: dict[str, tuple[str, str]] = {
+    # The replicated-run protocol: pass^k, flip rate, ICC(1), mechanism-active scoring, and the
+    # seeds rule said in the report. Exported for the same reason as the two rulers below — a
+    # protocol that lives only in a bench directory is advice, not a tool.
+    "ReplicatedArm": ("replicated", "ReplicatedArm"),
+    "ReplicatedResult": ("replicated", "ReplicatedResult"),
+    "compare_replicated": ("replicated", "compare_replicated"),
+    "format_replicated_report": ("replicated", "format_replicated_report"),
+    "icc1": ("replicated", "icc1"),
+    "seeds_verdict": ("replicated", "seeds_verdict"),
     # The two rulers this package tells you to use, and did not export.
     #
     # `rag/__init__.py` points at `run_rag_bench` to say the retriever's existence is not a claim
@@ -197,6 +206,12 @@ def __dir__() -> list[str]:
 
 
 __all__ = [
+    "ReplicatedArm",
+    "ReplicatedResult",
+    "compare_replicated",
+    "format_replicated_report",
+    "icc1",
+    "seeds_verdict",
     "EvalTask",
     "EvolutionReport",
     "TaskOutcome",
