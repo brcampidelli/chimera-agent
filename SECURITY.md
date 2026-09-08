@@ -159,6 +159,17 @@ fail closed. Set `CHIMERA_TAINT_NARROW=0` on a deployment that must keep acting 
 reading the web, accepting that a laundered injection could steer those tools. Routing the approval to
 the desktop's human-in-the-loop UI (so it can be *answered*, not only refused) is the follow-up.
 
+**Provenance is not authority, and the switch that separates them is off.** The narrowing above fires
+on *any* external read — a page the user asked for included. Measured in `bench/injection/RESULTS.md`
+(2026-09-08): a write whose value came from a page the user named is escalated exactly as the attack,
+10/10 against 10/10. The ledger now records who asked for each fetch (`CapabilityEvent.requested_by`,
+derived strictly from the task's own words — the whole URL or path, never a basename or a prefix), and
+`CHIMERA_TAINT_AUTHORITY=authority` lets the narrowing ignore a fetch the user named. **Leave it at
+`provenance`.** On the same bench, when the user asked to summarise the poisoned page, the mode lets
+**six of the seven attacks through**: the per-action flow rules see a whole page or a source URL and
+never a fragment of the page, and the coarse narrowing was the only thing between that page and the
+sinks. The label is recorded in every mode; only the mode acts on it.
+
 A plain container isn't a full VM: a container escape typically rides a host-kernel bug, so
 hostile input still has a path to local privilege escalation. To harden that boundary without
 paying for a full VM, set **`CHIMERA_SANDBOX_RUNTIME=runsc`** to run the docker sandbox under

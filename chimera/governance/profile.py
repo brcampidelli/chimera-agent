@@ -260,6 +260,8 @@ def governed_profile(
     allow: str | None = None,
     deny: str | None = None,
     surface: str = "",
+    instruction: str | None = None,
+    workspace: Path | None = None,
 ) -> tuple[Any, Any]:
     """Wrap ``registry`` in the deployment's governance. Returns ``(registry, approvals)``.
 
@@ -270,6 +272,12 @@ def governed_profile(
     ``approvals`` is the ledger of what was refused or granted. A caller that throws it away is a
     caller that cannot tell "the job did its work" from "the job was not allowed to" — which is the
     failure this whole module exists to make impossible.
+
+    ``instruction`` is the person's own words for this run — a cron job's action, a card's action,
+    the task handed to the MCP or A2A server — so a fetch of a page or a file it names is recorded
+    as the user's request (``CapabilityEvent.requested_by``). A surface with no single task (a chat
+    session, the ACP editor) passes nothing, and every fetch there reads ``unknown``. ``workspace``
+    lets a path the agent gives absolutely match the relative form the person wrote.
     """
     from chimera.governance import TaintLedger, restrict_registry
     from chimera.governance.audit import AuditLog
@@ -327,7 +335,10 @@ def governed_profile(
     if step.mode == "off":
         return step.registry, step.approvals
 
+    ledger = TaintLedger(authority=settings.taint_authority)
+    if instruction is not None:
+        ledger.set_instruction(instruction, workspace=workspace)
     registry = ledger_registry(
-        step.registry, TaintLedger(), audit=audit, narrow_on_taint=True, approve=step.approve
+        step.registry, ledger, audit=audit, narrow_on_taint=True, approve=step.approve
     )
     return registry, step.approvals

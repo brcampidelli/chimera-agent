@@ -73,6 +73,10 @@ def make_run_job(
             settings=settings,
             home=settings.home,
             surface=f"cron:{job.name}",
+            # The job's own action is the person's instruction: a page or a file it names is a
+            # fetch the person asked for, and the ledger records it as such.
+            instruction=job.action,
+            workspace=job_root,
         )
         agent = Agent(
             backend,

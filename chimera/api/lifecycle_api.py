@@ -131,7 +131,8 @@ def register_lifecycle_api(
                 gateway = backend_factory() if backend_factory is not None else LLMGateway()
                 steps = resolve_steps(req.max_steps)
                 registry, _ledger = assemble_registry(
-                    req, ws, live, gateway, steps=steps, surface="api:lifecycle"
+                    req, ws, live, gateway, steps=steps, surface="api:lifecycle",
+                    instruction=req.task,
                 )
 
                 def on_stage(stage: StageResult) -> None:

@@ -2023,6 +2023,8 @@ def _start_cron_daemon(
             settings=settings,
             home=settings.home,
             surface="cron:task",
+            instruction=task,
+            workspace=workspace,
         )
         agent = Agent(
             backend, registry,
@@ -2182,11 +2184,12 @@ def _serve_mcp(
 
     def _solve(task: str) -> str:
         registry, _ = governed_profile(
-
             default_registry(workspace_path),
             settings=get_settings(),
             home=get_settings().home,
             surface="mcp",
+            instruction=task,
+            workspace=workspace_path,
         )
         worker = Agent(
             backend, registry,
@@ -2234,11 +2237,12 @@ def _build_a2a(
 
     def _solve(task: str) -> str:
         registry, _ = governed_profile(
-
             default_registry(workspace_path),
             settings=get_settings(),
             home=get_settings().home,
             surface="a2a",
+            instruction=task,
+            workspace=workspace_path,
         )
         worker = Agent(
             backend, registry,
@@ -3448,7 +3452,11 @@ def solve(
             # capability ledger, and escalates execution/self-mod on tainted input to review.
             from chimera.governance import TaintLedger, ledger_registry
 
-            ledger = TaintLedger()
+            ledger = TaintLedger(authority=settings.taint_authority)
+            # The user's own words, so a fetch of a page or a file the task names is recorded as
+            # the user's request — the signal `CHIMERA_TAINT_AUTHORITY=authority` reads, and every
+            # mode records.
+            ledger.set_instruction(task, workspace=ws)
             # narrow_on_taint: once the run consumes untrusted content, dangerous tools
             # (shell/write/exec/email) require approval for the rest of the run (M9b).
             registry = ledger_registry(
@@ -3768,7 +3776,8 @@ def solve_batch(
         def run(ws: Path) -> AutonomousResult:
             from chimera.tools import default_registry
 
-            ledger = TaintLedger()
+            ledger = TaintLedger(authority=settings.taint_authority)
+            ledger.set_instruction(one_task, workspace=ws)
             ledgers[name] = ledger
             registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
             worker = Agent(
@@ -3886,9 +3895,11 @@ def crew_isolated(
         approver_for(settings.approval_mode, home=settings.home)
     )
 
-    def make_factory(wname: str) -> Callable[[Path], Any]:
+    def make_factory(wname: str, prompt: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
-            ledger = TaintLedger(shared=shared_taint)
+            ledger = TaintLedger(shared=shared_taint, authority=settings.taint_authority)
+            # Both halves are the person's own words: the shared task and this worker's brief.
+            ledger.set_instruction(f"{task}\n{prompt}", workspace=ws)
             ledgers[wname] = ledger
             return ledger_registry(
                 default_registry(ws), ledger,
@@ -3903,7 +3914,7 @@ def crew_isolated(
         name = (name.strip() if sep else "") or f"worker{i + 1}"
         prompt = (instruction.strip() if sep else spec.strip()) or "Do your part of the task."
         workers.append(
-            IsolatedWorker(Role(name, prompt), make_factory(name), max_steps=max_steps)
+            IsolatedWorker(Role(name, prompt), make_factory(name, prompt), max_steps=max_steps)
         )
 
     supervisor = None

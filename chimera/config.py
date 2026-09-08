@@ -12,7 +12,7 @@ import os
 from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -606,6 +606,21 @@ class Settings(BaseSettings):
     # after reading the web (and accept that a laundered injection could steer those tools).
     taint_narrow: bool = Field(default=True, validation_alias="CHIMERA_TAINT_NARROW")
 
+    # What that narrowing keys on. `provenance` (default): ANY external read arms it, the user's own
+    # included — measured 2026-09-08 (`bench/injection/RESULTS.md`) as a 100% false-positive rate on
+    # legitimate user-requested tool flows, byte-identical to the attack, because `record_fetch` set
+    # `tainted=True` with no record of who asked. `authority`: a fetch whose URL or path the user
+    # named in the task no longer arms the coarse narrowing; the per-action flow rules, the
+    # query-string rule and the durable provenance bit are untouched.
+    #
+    # OFF by default, and it stays off: the same results file measures what the mode lets through
+    # when the user asked to summarise the poisoned page, and that number is the reason. Reaches the
+    # ledger through its construction sites (`TaintLedger(authority=settings.taint_authority)`); the
+    # label itself (`CapabilityEvent.requested_by`) is recorded in every mode.
+    taint_authority: Literal["provenance", "authority"] = Field(
+        default="provenance", validation_alias="CHIMERA_TAINT_AUTHORITY"
+    )
+
     # Let the chat build durable memory when the user explicitly asks ("remember that…"). Opt-in for
     # privacy: chatting should not silently persist unless you asked it to. Off = the prior behaviour
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
@@ -875,6 +890,25 @@ class Settings(BaseSettings):
                 ", ".join(sorted(_GOVERNANCE_WORDS)),
             )
             return "ask"
+        return word
+
+    @field_validator("taint_authority", mode="before")
+    @classmethod
+    def _taint_authority_is_a_mode_word(cls, value: object) -> object:
+        """Unknown falls back to `provenance` — the stricter mode, so a typo cannot silence the
+        narrowing. Empty is unset, for the reason `_empty_boolean_is_unset` gives."""
+        if not isinstance(value, str):
+            return value
+        word = value.strip().lower()
+        if not word:
+            return "provenance"
+        if word not in ("provenance", "authority"):
+            _log.warning(
+                "CHIMERA_TAINT_AUTHORITY=%r is not one of provenance, authority; "
+                "falling back to 'provenance'.",
+                word,
+            )
+            return "provenance"
         return word
 
     @field_validator(

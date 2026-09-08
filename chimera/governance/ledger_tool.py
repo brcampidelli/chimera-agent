@@ -120,10 +120,12 @@ class LedgeredTool(Tool):
     def run(self, **kwargs: Any) -> str:
         # 0. Taint-adaptive narrowing: a dangerous tool is off-limits once the run is
         #    tainted (needs approval), even without a direct tainted reference.
+        #    `for_narrowing` is the one place the ledger's `authority` mode can answer differently
+        #    (a fetch the user named does not count there); under the default it is the same bit.
         if (
             self.narrow_on_taint
             and self.name in DANGEROUS_WHEN_TAINTED
-            and self.ledger.run_tainted()
+            and self.ledger.run_tainted(for_narrowing=True)
         ):
             reason = f"{self.name} is restricted after this run consumed untrusted content"
             if self.audit is not None:
@@ -187,8 +189,18 @@ class LedgeredTool(Tool):
     def _record_effect(self, args: Mapping[str, Any], result: str) -> None:
         name = self.name
         if self._is_fetch():
-            source = _first(args, _URL_KEYS) or _first(args, _QUERY_KEYS) or name
-            self.ledger.record_fetch(source, content=result)
+            # The URL or the path the tool fetched is the source: the ref a later command can name,
+            # and the target the user's instruction can have named. An untrusted `read_file` used to
+            # be recorded as a fetch of "read_file", which is neither.
+            target = _first(args, _URL_KEYS) or _first(args, _PATH_KEYS)
+            source = target or _first(args, _QUERY_KEYS) or name
+            # Who asked is derived from a URL or a path only. A search query or a bare tool name is
+            # not a target the user can have named, so those read as the agent's own doing.
+            self.ledger.record_fetch(
+                source,
+                content=result,
+                requested_by=None if target else self.ledger.requester_of(None),
+            )
         elif name in WRITE_TOOLS:
             self.ledger.record_write(_first(args, _PATH_KEYS), content=_first(args, _CONTENT_KEYS))
         elif name in READ_TOOLS:

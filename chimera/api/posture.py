@@ -281,12 +281,16 @@ def guard_chat_registry(registry: Any, *, audit: Any = None) -> tuple[Any, Any]:
     carries MCP tools that a from-scratch build would drop, and applying the denylist here means it
     reaches those tools too. A guard that covers only the tools we happened to write is not a guard.
     """
+    from chimera.config import get_settings
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
 
     resolved = resolve(Posture(reach=DEFAULT_REACH, approval=DEFAULT_APPROVAL))
     if resolved.deny_tools:
         registry = restrict_registry(registry, allow=None, deny=resolved.deny_tools)
-    ledger = TaintLedger()
+    # The mode travels; the instruction cannot. This registry serves a whole chat, and no single
+    # message is "the task", so every fetch here is recorded as `unknown` — which the narrowing
+    # treats exactly as it always did, in either mode.
+    ledger = TaintLedger(authority=get_settings().taint_authority)
     # The audit log, which this was the ONE `ledger_registry` caller not passing. Both siblings do
     # — `code_api` and `governed_profile` — and every write inside `LedgeredTool` is guarded by
     # `if self.audit is not None`, so omitting it meant this guard recorded nothing at all.
