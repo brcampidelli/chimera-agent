@@ -275,7 +275,12 @@ def test_cron_learn_creates_confirmed_jobs(monkeypatch: pytest.MonkeyPatch, tmp_
 
 def test_init_writes_key_and_reports_ready(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # `init` writes the key into os.environ for real. Own the name while absent — setenv records
+    # the absence, delenv keeps it absent for the test — so the teardown ends with it absent again.
+    # (The delenv these tests used to end with did the opposite: it recorded the leaked value and
+    # restored it.)
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.delenv("OPENROUTER_API_KEY")
     get_settings.cache_clear()
     result = runner.invoke(
         app, ["init", "--yes", "--home", str(tmp_path), "--openrouter-key", "sk-or-test123"]
@@ -284,7 +289,6 @@ def test_init_writes_key_and_reports_ready(tmp_path: Path, monkeypatch: pytest.M
     env = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "OPENROUTER_API_KEY=sk-or-test123" in env
     assert "Ready" in result.stdout
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     get_settings.cache_clear()
 
 
@@ -298,7 +302,13 @@ def test_init_sets_up_a_provider_that_is_not_openrouter(
     fails with a 401 naming the wrong provider.
     """
     (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    # `init` writes both names into os.environ for real. Own them while absent — setenv records the
+    # absence, delenv keeps them absent for the test — so the teardown ends with them absent again.
+    # (The delenv this test used to end with did the opposite: it recorded the leaked values and
+    # restored them.)
+    for name in ("ANTHROPIC_API_KEY", "CHIMERA_DEFAULT_MODEL"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
     get_settings.cache_clear()
     result = runner.invoke(
         app,
@@ -309,8 +319,6 @@ def test_init_sets_up_a_provider_that_is_not_openrouter(
     assert "ANTHROPIC_API_KEY=sk-ant-x" in env
     assert "CHIMERA_DEFAULT_MODEL=anthropic/" in env
     assert "OPENROUTER_API_KEY=sk-ant-x" not in env
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.delenv("CHIMERA_DEFAULT_MODEL", raising=False)
     get_settings.cache_clear()
 
 
@@ -320,14 +328,15 @@ def test_init_leaves_the_built_in_default_alone_for_openrouter(
     # Writing it would freeze this release's default into the user's .env and stop them inheriting
     # the next one — and unlike the other providers, there is nothing to correct here.
     (tmp_path / ".env.example").write_text("OPENROUTER_API_KEY=\n", encoding="utf-8")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # Own the name while absent (see test_init_writes_key_and_reports_ready).
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.delenv("OPENROUTER_API_KEY")
     get_settings.cache_clear()
     result = runner.invoke(
         app, ["init", "--yes", "--home", str(tmp_path), "--key", "sk-or-x"]
     )
     assert result.exit_code == 0
     assert "CHIMERA_DEFAULT_MODEL=" not in (tmp_path / ".env").read_text(encoding="utf-8")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     get_settings.cache_clear()
 
 
@@ -353,7 +362,9 @@ def test_init_creates_env_from_example(tmp_path: Path, monkeypatch: pytest.Monke
 
 def test_init_does_not_clobber_existing_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     (tmp_path / ".env").write_text("OPENROUTER_API_KEY=existing\nMY_CUSTOM=keepme\n", encoding="utf-8")
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    # Own the name while absent (see test_init_writes_key_and_reports_ready).
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
+    monkeypatch.delenv("OPENROUTER_API_KEY")
     get_settings.cache_clear()
     result = runner.invoke(
         app, ["init", "--yes", "--home", str(tmp_path), "--openrouter-key", "sk-or-new"]
@@ -362,7 +373,6 @@ def test_init_does_not_clobber_existing_env(tmp_path: Path, monkeypatch: pytest.
     env = (tmp_path / ".env").read_text(encoding="utf-8")
     assert "OPENROUTER_API_KEY=sk-or-new" in env  # key line replaced
     assert "MY_CUSTOM=keepme" in env  # unrelated line preserved
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     get_settings.cache_clear()
 
 

@@ -56,6 +56,8 @@ def test_a_saved_value_reaches_the_browser_tool(
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    # patch_config writes os.environ for real; own the name first so the teardown restores it.
+    monkeypatch.setenv("CHIMERA_BROWSER_HEADLESS", "true")
     get_settings.cache_clear()
 
     patch_config({"CHIMERA_BROWSER_HEADLESS": "false"}, env_path=tmp_path / ".env")

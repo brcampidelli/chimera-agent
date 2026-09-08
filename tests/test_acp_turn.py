@@ -47,6 +47,15 @@ def _turn(script: list[dict], workspace: Path, **kwargs: object) -> AcpTurn:
     return AcpTurn(_spec(script), workspace, **kwargs)  # type: ignore[arg-type]
 
 
+@pytest.fixture(autouse=True)
+def _the_scenario_is_removed_from_the_environment_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`_spec` writes FAKE_ACP_SCRIPT into os.environ for real — the fake agent reads it from its own
+    environment. Own the name while it is absent (setenv records the absence, delenv keeps it absent
+    until `_spec` sets it) so the teardown removes it instead of leaving the last scenario behind."""
+    monkeypatch.setenv("FAKE_ACP_SCRIPT", "")
+    monkeypatch.delenv("FAKE_ACP_SCRIPT")
+
+
 def _text(chunk: str) -> dict:
     return {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": chunk}}
 
