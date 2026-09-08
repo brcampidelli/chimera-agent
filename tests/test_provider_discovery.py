@@ -113,6 +113,9 @@ class TestDotEnvPassthrough:
         # becomes neither an attribute nor an environment variable, and LiteLLM never sees it.
         env_file = tmp_path / ".env"
         env_file.write_text("GROQ_API_KEY=gsk-from-file\n", encoding="utf-8")
+        # `setdefault` writes os.environ for real, and only when the name is absent. Own it while
+        # absent — setenv records the absence, delenv keeps it absent — so the teardown removes it.
+        monkeypatch.setenv("GROQ_API_KEY", "")
         monkeypatch.delenv("GROQ_API_KEY", raising=False)
         monkeypatch.setattr(Settings, "model_config", {**Settings.model_config, "env_file": env_file})
 
@@ -201,8 +204,10 @@ class TestWriteSurface:
         assert is_editable("CHIMERA_TAINT_NARROW") is False
         assert is_editable("PATH") is False
 
-    def test_a_discovered_key_is_persisted(self, tmp_path: Path) -> None:
+    def test_a_discovered_key_is_persisted(self, tmp_path: Path, monkeypatch: Any) -> None:
         env_file = tmp_path / ".env"
+        # patch_config writes os.environ for real; own the name first so the teardown removes it.
+        monkeypatch.setenv("GROQ_API_KEY", "")
         patch_config({"GROQ_API_KEY": "gsk-written"}, env_path=env_file)
         assert "GROQ_API_KEY=gsk-written" in env_file.read_text(encoding="utf-8")
 

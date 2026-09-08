@@ -1215,9 +1215,12 @@ def test_patch_config_rejects_unknown_keys(tmp_path: Any) -> None:
         patch_config({"CHIMERA_HOME": "/etc/evil", "PATH": "x"}, env_path=tmp_path / ".env")
 
 
-def test_patch_config_writes_env_atomically(tmp_path: Any) -> None:
+def test_patch_config_writes_env_atomically(monkeypatch: Any, tmp_path: Any) -> None:
     from chimera.api.config_api import patch_config
 
+    # patch_config writes os.environ for real; own both names first so the teardown removes them.
+    monkeypatch.setenv("CHIMERA_DEFAULT_MODEL", "")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
     env = tmp_path / ".env"
     env.write_text("EXISTING=1\n", encoding="utf-8")
     result = patch_config(
@@ -1235,6 +1238,9 @@ def test_patch_config_updates_process_env_live(monkeypatch: Any, tmp_path: Any) 
     # os.environ, so the running gateway / get_settings() sees it immediately, not only the .env file.
     from chimera.api.config_api import patch_config
 
+    # Own the name while it is absent: setenv records the absence, delenv keeps it absent for the
+    # test, and the teardown ends with it absent again — delenv alone records nothing.
+    monkeypatch.setenv("OPENROUTER_API_KEY", "")
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     patch_config({"OPENROUTER_API_KEY": "sk-live-now"}, env_path=tmp_path / ".env")
     import os
