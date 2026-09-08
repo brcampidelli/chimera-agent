@@ -53,9 +53,11 @@ main languages (en/pt/es/de/fr/zh/ja), so a critical short step gets fusion's pr
 even when it is too short to trip the length gate.
 
 **Providers, fallback & self-hosted.** Any LiteLLM `provider/model` slug works
-(`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). For a
+(`openai/…`, `anthropic/…`, `gemini/…`, `ollama_chat/…`, `openrouter/…`, …). For a
 self-hosted / OpenAI-compatible server (Ollama, vLLM) set `CHIMERA_API_BASE`
-(e.g. `http://127.0.0.1:11434` with `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Set
+(e.g. `http://127.0.0.1:11434` with `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`). Use
+`ollama_chat/` rather than `ollama/`: the `ollama/` prefix goes through Ollama's generate endpoint,
+which cannot call tools. Set
 `CHIMERA_FALLBACK_MODELS` (comma-separated) to fail over to another model if the
 primary errors. In `chat`/`tui`, `/model <slug>` switches the model mid-session.
 

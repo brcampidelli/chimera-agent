@@ -16,13 +16,16 @@ source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 Вот и всё — ни `OPENROUTER_API_KEY`, ни облака. Проверка учётных данных распознаёт `ollama/…` (и
 `ollama_chat/…`) как локальную среду и пропускает. Если Ollama работает на другой машине, задайте
 `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (по умолчанию `http://127.0.0.1:11434`).
+
+Используйте `ollama_chat/`, а не `ollama/`: префикс `ollama/` идёт через endpoint generate в
+Ollama, который не умеет вызывать инструменты.
 
 Локальные модели меньше, поэтому это *слабый* конец диапазона
 [золотой середины](../bench/local_lift/RESULTS.md) — хорошо подходит для `chimera solve` (план и

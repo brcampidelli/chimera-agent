@@ -11,13 +11,16 @@ Run Chimera against a model on your own machine — no key, nothing leaves the b
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 That's it — no `OPENROUTER_API_KEY`, no cloud. The credential gate recognises `ollama/…` (and
 `ollama_chat/…`) as a local runtime and lets it through. If Ollama runs elsewhere, set
 `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (default `http://127.0.0.1:11434`).
+
+Use `ollama_chat/` rather than `ollama/`: the `ollama/` prefix goes through Ollama's generate
+endpoint, which cannot call tools.
 
 Local models are smaller, so this is the *weak* end of the [goldilocks](../bench/local_lift/RESULTS.md)
 range — a good fit for `chimera solve` (plan + verify-or-revert helps a weak model) and for offline

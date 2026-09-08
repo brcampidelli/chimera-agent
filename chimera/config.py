@@ -674,9 +674,9 @@ class Settings(BaseSettings):
     # permissive default is the one version of this decision that cannot be defended.
     guard_chat: bool = Field(default=False, validation_alias="CHIMERA_GUARD_CHAT")
 
-    # Base URL for a local Ollama server. A model like `ollama/llama3` runs on your machine with no
-    # API key — set this only if Ollama listens somewhere other than the default. Reinforces the
-    # fully-local, self-hostable path: `CHIMERA_DEFAULT_MODEL=ollama/llama3` and no key needed.
+    # Base URL for a local Ollama server. A model like `ollama_chat/llama3` runs on your machine
+    # with no API key — set this only if Ollama listens somewhere other than the default. Reinforces
+    # the fully-local, self-hostable path: `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`, no key needed.
     #
     # `127.0.0.1`, NOT `localhost`, and the difference is measurable rather than stylistic. The two
     # are the same machine, but `localhost` is a NAME that resolves to two addresses — `::1` and

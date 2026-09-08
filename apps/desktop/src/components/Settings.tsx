@@ -534,15 +534,17 @@ function OllamaModelPicker({
   }
 
   // Selected only when the configured default IS one of these tags. A default pointing at a cloud
-  // model must not be shown as a local one, and a stale `ollama/…` slug for a tag that has since been
-  // removed must show as unchosen rather than as a model that is there.
-  const selected = models.find((tag) => current === `ollama/${tag}`) ?? "";
+  // model must not be shown as a local one, and a stale `ollama_chat/…` slug for a tag that has
+  // since been removed must show as unchosen rather than as a model that is there. So does a legacy
+  // `ollama/…` slug: that prefix is Ollama's generate endpoint, which cannot call tools, and picking
+  // the tag again is what migrates it.
+  const selected = models.find((tag) => current === `ollama_chat/${tag}`) ?? "";
   return (
     <select
       className={inputCls}
       value={selected}
       aria-label={rowLabel}
-      onChange={(e) => e.target.value && onPick(`ollama/${e.target.value}`)}
+      onChange={(e) => e.target.value && onPick(`ollama_chat/${e.target.value}`)}
     >
       <option value="">{t("settings.ollama.choose")}</option>
       {models.map((tag) => (

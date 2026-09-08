@@ -17,13 +17,16 @@ verweisen:
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 Das war's — kein `OPENROUTER_API_KEY`, keine Cloud. Das Credential-Gate erkennt `ollama/…` (und
 `ollama_chat/…`) als lokale Laufzeit und lässt es durch. Läuft Ollama woanders,
 `CHIMERA_OLLAMA_BASE_URL=http://host:11434` setzen (Standard `http://127.0.0.1:11434`).
+
+`ollama_chat/` statt `ollama/` verwenden: das Präfix `ollama/` läuft über Ollamas
+Generate-Endpunkt, der keine Tools aufrufen kann.
 
 Lokale Modelle sind kleiner, das hier ist also das *schwache* Ende der
 [Goldlöckchen](../bench/local_lift/RESULTS.md)-Spanne — gut geeignet für `chimera solve`

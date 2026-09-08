@@ -15,13 +15,15 @@ source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 就这么简单——不需要 `OPENROUTER_API_KEY`，也不涉及云端。凭据检查会把 `ollama/…`（以及
 `ollama_chat/…`）识别为本地运行时并直接放行。如果 Ollama 运行在别处，设置
 `CHIMERA_OLLAMA_BASE_URL=http://host:11434`（默认是 `http://127.0.0.1:11434`）。
+
+请使用 `ollama_chat/` 而不是 `ollama/`：`ollama/` 前缀走的是 Ollama 的 generate 端点，它无法调用工具。
 
 本地模型体量更小，因此这属于[适度区间（goldilocks）](../bench/local_lift/RESULTS.md)里*偏弱*
 的一端——很适合 `chimera solve`（规划 + 验证或回滚能帮到一个较弱的模型），也适合追求离线隐私

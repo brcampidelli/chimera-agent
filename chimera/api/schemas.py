@@ -634,7 +634,7 @@ class OllamaModelsOut(BaseModel):
     #: default it assumed.
     base_url: str
     reachable: bool
-    #: Tags as Ollama spells them (``llama3:latest``); prefix with ``ollama/`` for a model slug.
+    #: Tags as Ollama spells them (``llama3:latest``); prefix with ``ollama_chat/`` for a slug.
     models: list[str] = Field(default_factory=list)
     #: Why no list came back, as a token the client translates — never a sentence. Same shape and
     #: same reason as ``PostureFacts``: this app ships ten languages, and English prose from the
@@ -650,7 +650,8 @@ class ModelOptionOut(BaseModel):
     DESCRIBE an edit, so "we were not told" and "it cannot" deserve different words on screen.
     """
 
-    #: Already prefixed for LiteLLM (``openrouter/…``, ``ollama/…``) — the UI never assembles a slug.
+    #: Already prefixed for LiteLLM (``openrouter/…``, ``ollama_chat/…``) — the UI never assembles
+    #: a slug.
     slug: str
     label: str
     vendor: str

@@ -58,9 +58,11 @@ CHIMERA_FUSION_SYNTHESIZER=openrouter/openai/gpt-4o-mini
 важный шаг получает защиту слияния даже когда он слишком короток, чтобы сработал порог по длине.
 
 **Поставщики, запасные варианты и своё размещение.** Работает любой ярлык LiteLLM вида
-`поставщик/модель` (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…` и так далее).
+`поставщик/модель` (`openai/…`, `anthropic/…`, `gemini/…`, `ollama_chat/…`, `openrouter/…` и так далее).
 Для своего сервера, совместимого с OpenAI (Ollama, vLLM), задайте `CHIMERA_API_BASE` (например,
-`http://127.0.0.1:11434` вместе с `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Задайте
+`http://127.0.0.1:11434` вместе с `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`). Используйте
+`ollama_chat/`, а не `ollama/`: префикс `ollama/` идёт через endpoint generate в Ollama, который
+не умеет вызывать инструменты. Задайте
 `CHIMERA_FALLBACK_MODELS` (через запятую), чтобы переключаться на другую модель, когда основная даёт
 ошибку. В `chat` и `tui` команда `/model <ярлык>` меняет модель посреди сессии.
 

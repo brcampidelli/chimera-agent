@@ -12,11 +12,13 @@ source_sha256: f08c31cf980c0d86795fe456d5f9ed6871b58325c9e429e93f48c71b6e998356
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 それだけです — `OPENROUTER_API_KEY` もクラウドも不要です。認証情報ゲートは `ollama/…`(および `ollama_chat/…`)をローカルランタイムとして認識し、通過させます。Ollamaを別の場所で実行している場合は、`CHIMERA_OLLAMA_BASE_URL=http://host:11434` を設定してください(デフォルトは `http://127.0.0.1:11434`)。
+
+`ollama/` ではなく `ollama_chat/` を使ってください: `ollama/` プレフィックスは Ollama の generate エンドポイントを経由するため、ツールを呼び出せません。
 
 ローカルモデルは小さいため、これは[goldilocks](../bench/local_lift/RESULTS.md)レンジの*弱い*側です — `chimera solve`(計画+検証または差し戻しが弱いモデルを助けます)やオフラインでのプライバシーには適していますが、一発勝負のフロンティア級推論にはあまり向きません。組み合わせてください: ローカルをデフォルトにしつつ、難しい呼び出し用にクラウドの `CHIMERA_FALLBACK_MODELS` を設定するといった具合です。
 

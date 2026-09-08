@@ -32,8 +32,9 @@ would go on the wire, and the parse side is LiteLLM's real parser followed by th
   mints a uuid4).
 - ``ollama/``: `OllamaConfig` — ``/api/generate``. NOT native tool calling: the catalogue is
   pasted into the prompt as a Python ``repr`` with ``format=json`` and the answer is parsed as one
-  JSON object. This is the prefix the docs recommend (``CHIMERA_DEFAULT_MODEL=ollama/llama3``),
-  so its cases that cannot pass are ``xfail(strict=True)`` below rather than quietly absent.
+  JSON object. This was the prefix the docs recommended (``CHIMERA_DEFAULT_MODEL=ollama/llama3``)
+  until ``ollama_chat/`` replaced it, so its cases that cannot pass are ``xfail(strict=True)``
+  below rather than quietly absent.
 
 Two gateway routes per adapter: **batch** (`complete` → `_normalize` → `_parse_tool_calls`) and
 **stream** (`stream_complete` → `_delta_tool_calls` → `_finalize_stream_tool_calls`). The coding
@@ -1032,8 +1033,9 @@ def test_anthropic_rewrites_a_name_it_cannot_send_and_restores_it_on_the_way_bac
 def test_the_generate_prefix_never_advertises_a_tool_and_streams_the_call_as_prose(
     armed: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """``ollama/`` — the prefix the docs recommend and the first in `_LOCAL_MODEL_PREFIXES` — is a
-    prompt-template adapter, not tool calling. Pinned, in three parts: the request has no `tools`
+    """``ollama/`` — the prefix the docs recommended until ``ollama_chat/`` replaced it, still
+    listed in `_LOCAL_MODEL_PREFIXES` as keyless — is a prompt-template adapter, not tool calling.
+    Pinned, in three parts: the request has no `tools`
     and carries the catalogue as a Python repr inside the prompt under `format: json`; the batch
     route parses ONE object out of the answer; and the stream route hands the same object back as
     the assistant's TEXT, so the loop sees no call at all. Every tool number measured through this

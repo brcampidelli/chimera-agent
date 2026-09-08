@@ -56,9 +56,10 @@ CHIMERA_FUSION_SYNTHESIZER=openrouter/openai/gpt-4o-mini
 短步骤太短、触发不了长度门槛，也依然能得到融合机制的保护。
 
 **Provider、故障转移与自托管。** 任何 LiteLLM 的 `provider/model` 标识都可用
-（`openai/…`、`anthropic/…`、`gemini/…`、`ollama/…`、`openrouter/…` 等）。对于自托管 /
+（`openai/…`、`anthropic/…`、`gemini/…`、`ollama_chat/…`、`openrouter/…` 等）。对于自托管 /
 OpenAI 兼容的服务器（Ollama、vLLM），设置 `CHIMERA_API_BASE`（例如
-`http://127.0.0.1:11434`，配合 `CHIMERA_DEFAULT_MODEL=ollama/llama3`）。设置
+`http://127.0.0.1:11434`，配合 `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`）。请使用 `ollama_chat/`
+而不是 `ollama/`：`ollama/` 前缀走的是 Ollama 的 generate 端点，它无法调用工具。设置
 `CHIMERA_FALLBACK_MODELS`（逗号分隔）可以在主模型报错时自动故障转移到另一个模型。在
 `chat`/`tui` 中，`/model <slug>` 可以在会话中途切换模型。
 

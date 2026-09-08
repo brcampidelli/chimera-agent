@@ -73,7 +73,8 @@ class InstalledModels:
     #: empty — an Ollama with nothing pulled is reachable and has an empty list, and the two states
     #: have opposite remedies ("pull something" vs "start the server").
     reachable: bool
-    #: Tags exactly as Ollama spells them (``llama3:latest``), sorted, ready to prefix with ``ollama/``.
+    #: Tags exactly as Ollama spells them (``llama3:latest``), sorted, ready to prefix with
+    #: ``ollama_chat/``.
     models: tuple[str, ...] = ()
     reason: Reason = ""
 

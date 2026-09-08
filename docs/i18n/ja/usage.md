@@ -57,9 +57,10 @@ completionをキャッシュし、繰り返しのAPI呼び出しを省きます)
 重要な短いステップは、長さのゲートを引っかけるには短すぎる場合でもフュージョンの保護を受けます。
 
 **プロバイダー、フェイルオーバー、セルフホスト。** LiteLLMの `provider/model` スラッグは
-どれでも動作します(`openai/…`、`anthropic/…`、`gemini/…`、`ollama/…`、`openrouter/…`
+どれでも動作します(`openai/…`、`anthropic/…`、`gemini/…`、`ollama_chat/…`、`openrouter/…`
 など)。セルフホスト/OpenAI互換サーバー(Ollama、vLLM)には `CHIMERA_API_BASE` を設定して
-ください(例: `CHIMERA_DEFAULT_MODEL=ollama/llama3` とともに `http://127.0.0.1:11434`)。
+ください(例: `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3` とともに `http://127.0.0.1:11434`)。
+`ollama/` ではなく `ollama_chat/` を使ってください: `ollama/` プレフィックスは Ollama の generate エンドポイントを経由するため、ツールを呼び出せません。
 プライマリがエラーになった場合に別のモデルへフェイルオーバーするには `CHIMERA_FALLBACK_MODELS`
 (カンマ区切り)を設定してください。`chat`/`tui` では、`/model <slug>` がセッション途中で
 モデルを切り替えます。

@@ -268,7 +268,9 @@ def _ollama_options(base_url: str) -> list[ModelOption]:
         return []
     return [
         ModelOption(
-            slug=f"ollama/{tag}",
+            # `ollama_chat/`, not `ollama/`: the chat route is the one with tool calling, and a
+            # slug offered here is what a coding turn will run on (gateway._LOCAL_MODEL_PREFIXES).
+            slug=f"ollama_chat/{tag}",
             label=tag,
             vendor="Ollama",
             source="ollama",
