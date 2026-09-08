@@ -1348,6 +1348,7 @@ chimera solve [TASK]
 | `--diff-feedback` | Show a failed attempt its own reverted diff, as a path not to retake. |  |
 | `--keep-workspace` | On failure, leave the last attempt's edits on disk for an external grader (don't revert). |  |
 | `--require-diff` | Fail an attempt that changed no file — for code tasks, an explanation is not a fix. |  |
+| `--recovery` | How a failed attempt's retry is briefed: generic (manager prose + verifier output) or targeted (a brief aimed at the classified failure). | `'generic'` |
 | `--stagnation-fuzzy` | Match repeated-failure signatures approximately, not byte-identically. |  |
 | `--contract` | Machine-checkable success clauses, comma-separated: file_exists:PATH | file_contains:PATH:REGEX | answer_matches:REGEX. |  |
 | `--stream` | Print live progress events (attempt/result/status) as the run proceeds. |  |

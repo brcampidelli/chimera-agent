@@ -3228,6 +3228,9 @@ def solve(
     require_diff: bool = typer.Option(
         False, "--require-diff", help="Fail an attempt that changed no file — for code tasks, an explanation is not a fix."
     ),
+    recovery: str = typer.Option(
+        "generic", "--recovery", help="How a failed attempt's retry is briefed: generic (manager prose + verifier output) or targeted (a brief aimed at the classified failure)."
+    ),
     stagnation_fuzzy: bool = typer.Option(
         False, "--stagnation-fuzzy", help="Match repeated-failure signatures approximately, not byte-identically."
     ),
@@ -3278,6 +3281,7 @@ def solve(
         StrongVerifier,
         WorkspaceGuard,
     )
+    from chimera.core.failure_class import RECOVERY_MODES
     from chimera.core.verify import CommandVerifier
     from chimera.evolution import build_evolution_context
     from chimera.fusion.probe_log import ProbeLog as _ProbeLog
@@ -3295,6 +3299,8 @@ def solve(
         # An edit finalizes the reviewed answer as-is; without --answer it would commit an empty one.
         console.print("[red]--edit requires --answer with the revised text.[/red]")
         raise typer.Exit(code=1)
+    if recovery not in RECOVERY_MODES:
+        raise typer.BadParameter(f"unknown recovery {recovery!r}; expected generic or targeted")
     if deny:
         RunCheckpointer(settings.home / "runs.db").delete(deny)
         console.print(f"[yellow]Discarded[/yellow] paused run {deny!r}.")
@@ -3568,6 +3574,10 @@ def solve(
             # --require-diff: promote the diff-gate from observer to gate, so an attempt that edited
             # nothing fails and is retried instead of being approved on the strength of its prose.
             require_diff=require_diff,
+            # --recovery: brief the retry on the CLASS of the failure (failing assertion, undone
+            # diff, forced tool call) instead of the generic prose + verifier output. The class is
+            # recorded on the receipt either way (arXiv 2606.01416; bench/PLAN-study16, item 1+7).
+            recovery=recovery,
             # The six learning seams (experience, trajectories, memory, auto_evolver, cards, playbook)
             # from the shared factory above (M19-A0).
             **evo.apply_to(),

@@ -104,6 +104,15 @@ class AttemptReceipt(BaseModel):
     #: own primary metric. Capped like the other bounded fields: a pathological run must not bloat
     #: `runs.jsonl`, and 200 calls is far past the point where the sequence is still being read.
     tool_names: list[str] = []
+    #: The class the loop gave this failure before retrying it — ``failing_test`` ·
+    #: ``hollow_success`` · ``tool_skip`` · ``reverted`` · ``build_error`` · ``timeout`` ·
+    #: ``budget`` · ``unknown`` (see ``chimera.core.failure_class``) — and the exact field or line
+    #: its detector fired on. Written in BOTH recovery modes: the matched-budget sweep needs the
+    #: class of every failure the generic arm produced, not only the ones targeting acted on.
+    #: ``""`` is "nobody classified it" — a success, a cancel, a row from before the field — which
+    #: is not ``unknown``: that is a classification whose detectors all declined.
+    failure_class: str = ""
+    failure_evidence: str = ""
 
 
 class RunReceipt(BaseModel):
@@ -290,6 +299,8 @@ def build_receipt(
             model=str(getattr(a, "model", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),
             verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
+            failure_class=str(getattr(a, "failure_class", "") or ""),
+            failure_evidence=str(getattr(a, "failure_evidence", "") or "")[:500],
         )
         for a in result.attempts
     ]
