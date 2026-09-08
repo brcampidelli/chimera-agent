@@ -66,7 +66,7 @@ zielonych `PASS_TO_PASS`. "Verified" to podzbiór zwalidowany przez ludzi.
 Cztery wcześniej zarejestrowane uruchomienia na wycinkach `django/django`,
 `deepseek-chat-v3.1`, pass@1, ocenione **wyłącznie** przez oficjalny harness `swebench` 4.1.0
 w Dockerze. Pełne opracowanie:
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | uruchomienie | wycinek | baseline | + Chimera | sparowana Δ | 95% CI | |
 |---|---|---|---|---|---|---|

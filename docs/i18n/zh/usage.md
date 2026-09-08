@@ -375,7 +375,7 @@ uv run chimera solve \
 > **关于 `--max-steps`。** 默认值 8 是为小型工作区调优的。在一个**大型仓库**中，这才是真正
 > 的限制因素，而不是模型本身：SWE-bench 第 1 轮实验在 8 步的设置下、针对一个 250 MB 的
 > checkout 拿到了精确的 0.0 个百分点，而同样的配置在改成**30 步**之后，把基线的补丁通过率
-> 从 47% 提升到了 74%（[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)）。如果
+> 从 47% 提升到了 74%（[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)）。如果
 > agent 探索了一通却没有做任何编辑就收尾了，先调大这个参数。
 
 > **`--require-diff` 和 `--keep-workspace` 是为外部评分场景准备的。** `solve` 本身是

@@ -43,7 +43,7 @@ Terminal-BenchはCLIタスクでテーゼを証明し、SWE-benchは実際のGit
 
 ### 結果
 
-`django/django` のスライス上での4回の事前登録された実行、`deepseek-chat-v3.1`、pass@1、Docker内の公式 `swebench` 4.1.0ハーネス**のみ**によって採点。全文: [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)。
+`django/django` のスライス上での4回の事前登録された実行、`deepseek-chat-v3.1`、pass@1、Docker内の公式 `swebench` 4.1.0ハーネス**のみ**によって採点。全文: [`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)。
 
 | 実行 | スライス | ベースライン | + Chimera | 対応差Δ | 95%信頼区間 | |
 |---|---|---|---|---|---|---|

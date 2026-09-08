@@ -35,7 +35,7 @@ Diese Seite ist aufgabenorientiert: wähle, was du tun möchtest.
 
 - **:material-shield-lock: Sicherheit**
   Governance, Sandbox, Taint-Tracking — und ihre ehrlichen Grenzen.
-  [Sicherheit →](security.md) · [Sleeper-Channel-Audit →](audits/sleeper-channels.md)
+  [Sicherheit →](security.md) · [Sleeper-Channel-Audit →](../../audits/sleeper-channels.md)
 
 - **:material-sitemap: Verstehen**
   Wie Fusion-Kern, Evolution und Sicherheitsschichten zusammenspielen.
@@ -43,7 +43,7 @@ Diese Seite ist aufgabenorientiert: wähle, was du tun möchtest.
 
 - **:material-console: Jeder Befehl**
   Alle 79, aus der CLI selbst erzeugt — darunter die 33, die in keiner Dokumentation standen.
-  [Befehlsreferenz →](commands.md)
+  [Befehlsreferenz →](../../commands.md)
 
 </div>
 

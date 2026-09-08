@@ -135,7 +135,7 @@ class NameThingSkill(LLMSkill):
 
 Registre-a em `chimera/skills/builtin/__init__.py` (siga o padrão já existente lá). As skills
 carregam **métricas de uso** e um **ciclo de vida** (provisional → active → retired) guiado por
-sucesso **medido** — veja [`chimera/evolution/`](../chimera/evolution) — então uma skill que para
+sucesso **medido** — veja [`chimera/evolution/`](../../../chimera/evolution) — então uma skill que para
 de ajudar é rebaixada automaticamente, nunca por suposição.
 
 > **Tool ou skill?** Uma **tool** *faz* algo determinístico (uma chamada de API, uma edição de
@@ -148,7 +148,7 @@ de ajudar é rebaixada automaticamente, nunca por suposição.
 
 Uma **recipe** automatiza uma rotina de múltiplos passos sem nenhum código — um arquivo YAML que o
 agente executa com `chimera workflow`. Ótimo para jobs agendados. Veja exemplos reais em
-[`examples/`](../examples) (triagem de e-mail, resumo matinal, watchdog de repositório).
+[`examples/`](../../../examples) (triagem de e-mail, resumo matinal, watchdog de repositório).
 
 Cada passo `uses` uma capacidade da pilha do agente (`run`, `solve`, `crew`, …); `when:
 prev_succeeded` condiciona um passo ao anterior, e `repeat` + `until: success` fazem um passo

@@ -33,7 +33,7 @@ source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 
 - **:material-shield-lock: 安全**
   治理、沙箱、污点追踪——以及它们诚实的边界。
-  [安全 →](security.md) · [潜伏通道审计 →](audits/sleeper-channels.md)
+  [安全 →](security.md) · [潜伏通道审计 →](../../audits/sleeper-channels.md)
 
 - **:material-sitemap: 理解它**
   融合核心、演进机制与安全层是如何拼在一起的。
@@ -41,7 +41,7 @@ source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 
 - **:material-console: 每一条命令**
   全部 79 条，由 CLI 自身生成——包括此前任何文档都没有提到的那 33 条。
-  [命令参考 →](commands.md)
+  [命令参考 →](../../commands.md)
 
 </div>
 

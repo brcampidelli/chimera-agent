@@ -66,7 +66,7 @@ grün bleibt. "Verified" ist die menschlich validierte Teilmenge.
 
 Vier vorregistrierte Läufe auf `django/django`-Slices, `deepseek-chat-v3.1`, pass@1, bewertet
 **ausschließlich** vom offiziellen `swebench`-4.1.0-Harness in Docker. Vollständiger Bericht:
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | Lauf | Slice | Baseline | + Chimera | gepaartes Δ | 95%-KI | |
 |---|---|---|---|---|---|---|

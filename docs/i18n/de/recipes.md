@@ -29,7 +29,7 @@ Das war's — kein `OPENROUTER_API_KEY`, keine Cloud. Das Credential-Gate erkenn
 Generate-Endpunkt, der keine Tools aufrufen kann.
 
 Lokale Modelle sind kleiner, das hier ist also das *schwache* Ende der
-[Goldlöckchen](../bench/local_lift/RESULTS.md)-Spanne — gut geeignet für `chimera solve`
+[Goldlöckchen](../../../bench/local_lift/RESULTS.md)-Spanne — gut geeignet für `chimera solve`
 (Plan + verify-or-revert hilft einem schwachen Modell) und für Offline-Privatsphäre, weniger für
 einmaliges Frontier-Reasoning. Mischen und kombinieren: ein lokaler Default mit einem Cloud-
 `CHIMERA_FALLBACK_MODELS` für die schwierigen Fälle.

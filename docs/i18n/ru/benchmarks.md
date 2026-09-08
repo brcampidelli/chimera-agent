@@ -65,7 +65,7 @@ Terminal-Bench доказывает тезис на задачах команд�
 
 Четыре заранее объявленных запуска на срезах `django/django`, `deepseek-chat-v3.1`, pass@1,
 оценка **только** официальным стендом `swebench` 4.1.0 в Docker. Полное описание:
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | запуск | срез | база | + Chimera | парная Δ | 95% ДИ | |
 |---|---|---|---|---|---|---|

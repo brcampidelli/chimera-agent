@@ -412,7 +412,7 @@ Flags utiles :
 > **grand dépôt, c'est la contrainte bloquante**, pas le modèle : le run 1 de SWE-bench a
 > obtenu un 0,0 pp exact à 8 étapes contre un checkout de 250 Mo, et la même configuration à
 > **30 étapes** a fait passer le taux de patch de la référence de 47 % à 74 %
-> ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)). Si l'agent explore puis
+> ([`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)). Si l'agent explore puis
 > termine sans éditer, augmentez d'abord ce paramètre.
 
 > **`--require-diff` et `--keep-workspace` sont pour la notation externe.** `solve` est

@@ -64,7 +64,7 @@ faça os testes `FAIL_TO_PASS` da instância passarem mantendo os `PASS_TO_PASS`
 
 Quatro execuções pré-registradas em fatias de `django/django`, `deepseek-chat-v3.1`, pass@1,
 avaliadas **apenas** pelo harness oficial `swebench` 4.1.0 em Docker. Relato completo:
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | execução | fatia | baseline | + Chimera | Δ pareado | IC 95% | |
 |---|---|---|---|---|---|---|

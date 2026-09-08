@@ -30,7 +30,7 @@ Utilisez `ollama_chat/` plutôt que `ollama/` : le préfixe `ollama/` passe par 
 d'Ollama, qui ne peut pas appeler d'outils.
 
 Les modèles locaux sont plus petits, donc c'est l'extrémité *faible* de la plage
-[goldilocks](../bench/local_lift/RESULTS.md) — bien adapté à `chimera solve` (plan +
+[goldilocks](../../../bench/local_lift/RESULTS.md) — bien adapté à `chimera solve` (plan +
 verify-or-revert aide un modèle faible) et à la confidentialité hors ligne, moins pour du
 raisonnement frontière en un coup. Combinez : un défaut local avec des
 `CHIMERA_FALLBACK_MODELS` en cloud pour les appels difficiles.

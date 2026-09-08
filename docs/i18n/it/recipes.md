@@ -28,7 +28,7 @@ Usa `ollama_chat/` invece di `ollama/`: il prefisso `ollama/` passa dall'endpoin
 Ollama, che non può chiamare strumenti.
 
 I modelli locali sono più piccoli, quindi questo è l'estremo *debole* della fascia
-[goldilocks](../bench/local_lift/RESULTS.md) — adatto a `chimera solve` (il piano +
+[goldilocks](../../../bench/local_lift/RESULTS.md) — adatto a `chimera solve` (il piano +
 verifica-o-ripristina aiuta un modello debole) e alla privacy offline, meno a un ragionamento di
 frontiera in un colpo solo. Mescola e abbina: un default locale con `CHIMERA_FALLBACK_MODELS`
 nel cloud per le chiamate difficili.

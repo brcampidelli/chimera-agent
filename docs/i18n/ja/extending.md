@@ -120,7 +120,7 @@ class NameThingSkill(LLMSkill):
         return SkillResult(ok=True, output=text)
 ```
 
-`chimera/skills/builtin/__init__.py` に登録してください(既存のパターンに従ってください)。skillは**利用指標**と、*計測された*成功によって駆動される**ライフサイクル**(provisional → active → retired)を持ちます — [`chimera/evolution/`](../chimera/evolution) を参照してください — そのため、役に立たなくなったskillは、当て推量ではなく自動的に降格されます。
+`chimera/skills/builtin/__init__.py` に登録してください(既存のパターンに従ってください)。skillは**利用指標**と、*計測された*成功によって駆動される**ライフサイクル**(provisional → active → retired)を持ちます — [`chimera/evolution/`](../../../chimera/evolution) を参照してください — そのため、役に立たなくなったskillは、当て推量ではなく自動的に降格されます。
 
 > **toolかskillか?** **tool**は決定論的な何か(API呼び出し、ファイル編集)を*実行*します。**skill**はモデルを使う*プロンプト化された手順*です。副作用のあるアクションにはtoolを、再利用可能な推論/生成にはskillを選んでください。
 
@@ -128,7 +128,7 @@ class NameThingSkill(LLMSkill):
 
 ## 3. recipe(ワークフロー)を追加する
 
-**recipe**はコードなしで複数ステップのルーチンを自動化します — エージェントが `chimera workflow` で実行するYAMLファイルです。スケジュールされたジョブに最適です。実例は[`examples/`](../examples)にあります(メールトリアージ、朝のブリーフ、リポジトリウォッチドッグ)。
+**recipe**はコードなしで複数ステップのルーチンを自動化します — エージェントが `chimera workflow` で実行するYAMLファイルです。スケジュールされたジョブに最適です。実例は[`examples/`](../../../examples)にあります(メールトリアージ、朝のブリーフ、リポジトリウォッチドッグ)。
 
 各ステップはエージェントスタックのケーパビリティ(`run`、`solve`、`crew` など)を `uses` します。`when: prev_succeeded` はステップを前のステップに条件付けし、`repeat` + `until: success` はステップを再試行します。
 

@@ -20,7 +20,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 `ollama/` ではなく `ollama_chat/` を使ってください: `ollama/` プレフィックスは Ollama の generate エンドポイントを経由するため、ツールを呼び出せません。
 
-ローカルモデルは小さいため、これは[goldilocks](../bench/local_lift/RESULTS.md)レンジの*弱い*側です — `chimera solve`(計画+検証または差し戻しが弱いモデルを助けます)やオフラインでのプライバシーには適していますが、一発勝負のフロンティア級推論にはあまり向きません。組み合わせてください: ローカルをデフォルトにしつつ、難しい呼び出し用にクラウドの `CHIMERA_FALLBACK_MODELS` を設定するといった具合です。
+ローカルモデルは小さいため、これは[goldilocks](../../../bench/local_lift/RESULTS.md)レンジの*弱い*側です — `chimera solve`(計画+検証または差し戻しが弱いモデルを助けます)やオフラインでのプライバシーには適していますが、一発勝負のフロンティア級推論にはあまり向きません。組み合わせてください: ローカルをデフォルトにしつつ、難しい呼び出し用にクラウドの `CHIMERA_FALLBACK_MODELS` を設定するといった具合です。
 
 ## メールトリアージ
 

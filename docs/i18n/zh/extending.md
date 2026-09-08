@@ -131,7 +131,7 @@ class NameThingSkill(LLMSkill):
 
 在 `chimera/skills/builtin/__init__.py` 中注册它（沿用那里已有的写法）。技能会带有**使用指
 标**和一套由*实测*成功率驱动的**生命周期**（provisional 试用 → active 启用 → retired 淘汰）——
-参见 [`chimera/evolution/`](../chimera/evolution)——因此一个不再有用的技能会被自动降级，而不是
+参见 [`chimera/evolution/`](../../../chimera/evolution)——因此一个不再有用的技能会被自动降级，而不是
 靠猜测判断。
 
 > **该用工具还是技能？** **工具**做的是某种确定性的事情（一次 API 调用、一次文件编辑）。
@@ -142,7 +142,7 @@ class NameThingSkill(LLMSkill):
 ## 3. 添加一份配方（workflow）
 
 **配方**无需任何代码就能自动化一套多步骤例程——一个由 agent 通过 `chimera workflow` 执行的
-YAML 文件。非常适合用作定时任务。真实示例见 [`examples/`](../examples)（邮件分诊、晨间简报、
+YAML 文件。非常适合用作定时任务。真实示例见 [`examples/`](../../../examples)（邮件分诊、晨间简报、
 仓库看门狗）。
 
 每个步骤都会 `uses`（使用）agent 技术栈的某项能力（`run`、`solve`、`crew` 等）；

@@ -25,7 +25,7 @@ chimera agent "Summarise this file in 3 bullets" -w .
 
 请使用 `ollama_chat/` 而不是 `ollama/`：`ollama/` 前缀走的是 Ollama 的 generate 端点，它无法调用工具。
 
-本地模型体量更小，因此这属于[适度区间（goldilocks）](../bench/local_lift/RESULTS.md)里*偏弱*
+本地模型体量更小，因此这属于[适度区间（goldilocks）](../../../bench/local_lift/RESULTS.md)里*偏弱*
 的一端——很适合 `chimera solve`（规划 + 验证或回滚能帮到一个较弱的模型），也适合追求离线隐私
 的场景，但不太适合单轮就要求前沿水平推理的任务。你也可以混搭：本地模型作默认，遇到困难的调用
 再走云端的 `CHIMERA_FALLBACK_MODELS`。

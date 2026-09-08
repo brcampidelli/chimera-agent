@@ -35,7 +35,7 @@ Questo sito è orientato ai compiti: scegli cosa vuoi fare.
 
 - **:material-shield-lock: Sicurezza**
   Governance, sandbox, taint tracking — e i loro limiti onesti.
-  [Sicurezza →](security.md) · [Audit dei canali dormienti →](audits/sleeper-channels.md)
+  [Sicurezza →](security.md) · [Audit dei canali dormienti →](../../audits/sleeper-channels.md)
 
 - **:material-sitemap: Capiscilo**
   Come si incastrano il nucleo di fusione, l'evoluzione e i livelli di sicurezza.
@@ -44,7 +44,7 @@ Questo sito è orientato ai compiti: scegli cosa vuoi fare.
 - **:material-console: Ogni comando**
   Tutti e 79, generati dalla CLI stessa — inclusi i 33 che non comparivano in nessuna
   documentazione.
-  [Riferimento dei comandi →](commands.md)
+  [Riferimento dei comandi →](../../commands.md)
 
 </div>
 

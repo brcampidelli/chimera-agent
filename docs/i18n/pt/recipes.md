@@ -27,7 +27,7 @@ Use `ollama_chat/` em vez de `ollama/`: o prefixo `ollama/` passa pelo endpoint 
 Ollama, que não consegue chamar ferramentas.
 
 Modelos locais são menores, então esta é a ponta *fraca* da faixa
-[goldilocks](../bench/local_lift/RESULTS.md) — um bom encaixe para `chimera solve` (plano +
+[goldilocks](../../../bench/local_lift/RESULTS.md) — um bom encaixe para `chimera solve` (plano +
 verificar-ou-reverter ajuda um modelo fraco) e para privacidade offline, menos para raciocínio de
 fronteira em uma única tacada. Misture e combine: um padrão local com
 `CHIMERA_FALLBACK_MODELS` na nuvem para as chamadas difíceis.
