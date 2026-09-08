@@ -58,8 +58,12 @@ def test_editing_the_test_cannot_make_it_pass(tmp_path):
     assert s.reward == 0.0
 
 
-def test_default_pytest_verifier_grades_a_real_fix(tmp_path):
-    # End-to-end with the real subprocess verifier (no network, just pytest).
+def test_default_pytest_verifier_grades_a_real_fix(tmp_path, monkeypatch):
+    # End-to-end with the real subprocess verifier (no network, just pytest). The task's verify
+    # command runs where the shell runs — behind the host-exec gate on a machine with no isolated
+    # sandbox — and this test is about the reward, not the gate: say `allow`, as a bench operator
+    # on such a machine would.
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
     env = TaskEnv({**TASK, "verify": f'"{sys.executable}" -m pytest -q test_mod.py'}, root=tmp_path)
     env.reset()
     s = env.step({"mod.py": "def add(a, b):\n    return a + b\n"})

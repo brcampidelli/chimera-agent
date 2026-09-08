@@ -160,6 +160,7 @@ def lifecycle_crew(
     *,
     workspace: Path,
     verify: str | None = None,
+    verify_source: str = "user",
     model: str | None = None,
     max_steps: int = 8,
     max_build_attempts: int = 2,
@@ -174,6 +175,11 @@ def lifecycle_crew(
     workspace registry, which is right for a terminal — someone running ``chimera lifecycle`` in
     their own shell already has every capability the agent is being given — and wrong for anything
     that answers a request. The HTTP route passes ``assemble_registry``'s output.
+
+    ``verify_source`` names who authored ``verify`` (see
+    :data:`chimera.core.verify.VERIFY_SOURCES`) and decides whether the host-exec gate stands in
+    front of it. The terminal's ``--verify`` is the user's; the HTTP route passes what
+    ``resolve_verify`` found (typed, or inferred from the repository); a workflow step says so.
     """
     from chimera.core import Agent, AgentConfig
     from chimera.core.checkpoint import WorkspaceGuard
@@ -187,7 +193,7 @@ def lifecycle_crew(
     return LifecycleCrew(
         worker,
         backend,
-        verifier=CommandVerifier(verify, workspace) if verify else None,
+        verifier=CommandVerifier(verify, workspace, source=verify_source) if verify else None,
         guard=WorkspaceGuard(workspace),
         model=model,
         max_build_attempts=max_build_attempts,

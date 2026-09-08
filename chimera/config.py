@@ -544,6 +544,13 @@ class Settings(BaseSettings):
     # adoption number ever justifies filtering, the route is an egress proxy in a compose file,
     # never iptables on the host.
     sandbox_network: str = Field(default="none", validation_alias="CHIMERA_SANDBOX_NETWORK")
+    # Should the VERIFY command (tests, a build) get the network? Off by default: the verifier runs
+    # where the agent's shell runs, and that sandbox has no network. When on, a docker sandbox is
+    # given the bridge for the verify step only. The kernel sandboxes cannot be asked for one
+    # (bubblewrap unshares the network, Seatbelt denies it by default), so there a verifier that
+    # needs the network runs on the host, and only when you typed it — a command inferred from the
+    # repository, read from a cron job, a card or a workflow abstains instead.
+    verify_network: bool = Field(default=False, validation_alias="CHIMERA_VERIFY_NETWORK")
     # Container limits. Memory was already a constructor parameter with no way to set it.
     sandbox_memory: str = Field(default="512m", validation_alias="CHIMERA_SANDBOX_MEMORY")
     sandbox_cpus: str = Field(default="2", validation_alias="CHIMERA_SANDBOX_CPUS")

@@ -299,6 +299,10 @@ def test_a_project_with_no_verify_command_says_so_rather_than_staying_quiet(
 def test_a_failing_verification_offers_an_undo_and_does_not_take_it(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
+    # The command below is INFERRED from `tests/`, so it runs where the shell runs: behind the
+    # host-exec gate on a server with no isolated sandbox, where it abstains unless the operator
+    # said `allow`. This test is about the undo, not the gate — say it, so the tests really run.
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
     client, ws = _editing_client(tmp_path, monkeypatch)
     (ws / "tests").mkdir()
     (ws / "tests" / "test_it.py").write_text("def test_it():\n    assert False\n", encoding="utf-8")
@@ -324,6 +328,7 @@ def test_a_passing_verification_still_offers_the_undo(tmp_path: Path, monkeypatc
     The check answers "does this still build". The button answers "do I want this", and only the
     person reading the diff can.
     """
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")  # inferred command; see the test above
     client, ws = _editing_client(tmp_path, monkeypatch)
     (ws / "tests").mkdir()
     (ws / "tests" / "test_it.py").write_text(

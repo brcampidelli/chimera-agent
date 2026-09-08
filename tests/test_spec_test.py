@@ -89,9 +89,12 @@ class _Gen:
 class _Runner:
     passed = True
 
-    def __init__(self, command: str, workspace: Path, *, timeout: int = 120) -> None:
+    def __init__(
+        self, command: str, workspace: Path, *, timeout: int = 120, source: str = ""
+    ) -> None:
         self.command = command
         self.workspace = workspace
+        self.source = source
 
     def verify(self) -> VerificationResult:
         return VerificationResult(_Runner.passed, "pytest output")

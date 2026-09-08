@@ -124,7 +124,9 @@ def make_run_job(
             agent,
             planner=None,
             manager=None,
-            verifier=CommandVerifier(job.verify, job_root) if gated else None,
+            # The string lives in `jobs.json`, written long before this dispatch: `source="job"`
+            # keeps the host-exec gate in front of it on a host without an isolated sandbox.
+            verifier=CommandVerifier(job.verify, job_root, source="job") if gated else None,
             guard=WorkspaceGuard(job_root) if gated else None,
             config=AutonomousConfig(
                 max_attempts=max(1, job.max_attempts),

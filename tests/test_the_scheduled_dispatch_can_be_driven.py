@@ -28,6 +28,15 @@ from chimera.scheduler.job_runner import make_run_job
 from chimera.scheduler.models import CronJob, JobOutcome
 
 
+@pytest.fixture(autouse=True)
+def _the_operator_allowed_host_execution(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A job's verify string comes from `jobs.json`, so it runs where the shell runs: behind the
+    host-exec gate on a machine with no isolated sandbox, where `ask` refuses unattended. These
+    tests are about the dispatch, not the gate — say `allow`, as an operator running a cron with a
+    verify command would, so the `python -c` really runs and its exit code is what gets judged."""
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
+
+
 class _Result:
     """The shape the agent loop reads off a completion."""
 

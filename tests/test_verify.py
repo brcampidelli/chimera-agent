@@ -33,18 +33,18 @@ def _py(code: str) -> str:
 
 
 def test_command_verifier_stores_command_workspace_and_default_timeout(tmp_path: Path) -> None:
-    v = CommandVerifier("pytest -q", tmp_path)
+    v = CommandVerifier("pytest -q", tmp_path, source="user")
     assert v.command == "pytest -q"
     assert v.workspace == tmp_path
     assert v.timeout == 120  # the documented default
 
 
 def test_command_verifier_timeout_is_overridable(tmp_path: Path) -> None:
-    assert CommandVerifier("exit 0", tmp_path, timeout=7).timeout == 7
+    assert CommandVerifier("exit 0", tmp_path, timeout=7, source="user").timeout == 7
 
 
 def test_workspace_is_coerced_to_a_path(tmp_path: Path) -> None:
-    v = CommandVerifier("exit 0", str(tmp_path))  # a str must become a real Path
+    v = CommandVerifier("exit 0", str(tmp_path), source="user")  # a str must become a real Path
     assert isinstance(v.workspace, Path)
     assert v.workspace == tmp_path
 
@@ -53,19 +53,19 @@ def test_workspace_is_coerced_to_a_path(tmp_path: Path) -> None:
 
 
 def test_exit_zero_passes_and_non_zero_fails(tmp_path: Path) -> None:
-    assert CommandVerifier("exit 0", tmp_path).verify().passed is True
-    assert CommandVerifier("exit 1", tmp_path).verify().passed is False
+    assert CommandVerifier("exit 0", tmp_path, source="user").verify().passed is True
+    assert CommandVerifier("exit 1", tmp_path, source="user").verify().passed is False
 
 
 def test_verify_runs_the_command_inside_the_workspace(tmp_path: Path) -> None:
     """The command must run with ``cwd=workspace``: a marker file there is only visible from there."""
     (tmp_path / "marker.txt").write_text("hi", encoding="utf-8")
     code = "import pathlib, sys; sys.exit(0 if pathlib.Path('marker.txt').exists() else 1)"
-    assert CommandVerifier(_py(code), tmp_path).verify().passed is True
+    assert CommandVerifier(_py(code), tmp_path, source="user").verify().passed is True
     # ...and the same command fails from a directory that has no marker (proving cwd is honoured).
     other = tmp_path / "elsewhere"
     other.mkdir()
-    assert CommandVerifier(_py(code), other).verify().passed is False
+    assert CommandVerifier(_py(code), other, source="user").verify().passed is False
 
 
 # --- the captured output ------------------------------------------------------------------
@@ -74,14 +74,14 @@ def test_verify_runs_the_command_inside_the_workspace(tmp_path: Path) -> None:
 def test_verify_captures_both_stdout_and_stderr(tmp_path: Path) -> None:
     """The verifier's output is the concrete evidence the receipt shows — both streams must land."""
     code = "import sys; sys.stdout.write('OUT'); sys.stderr.write('ERR')"
-    result = CommandVerifier(_py(code), tmp_path).verify()
+    result = CommandVerifier(_py(code), tmp_path, source="user").verify()
     assert result.passed is True
     assert "OUT" in result.output
     assert "ERR" in result.output
 
 
 def test_verify_output_is_empty_when_the_command_prints_nothing(tmp_path: Path) -> None:
-    result = CommandVerifier(_py("pass"), tmp_path).verify()
+    result = CommandVerifier(_py("pass"), tmp_path, source="user").verify()
     assert result.passed is True
     assert result.output == ""  # a silent command reports "", never invented filler
 
@@ -92,7 +92,9 @@ def test_verify_output_is_empty_when_the_command_prints_nothing(tmp_path: Path) 
 def test_a_timed_out_verification_fails_and_says_so(tmp_path: Path) -> None:
     """A verification that never finished must FAIL. Reporting a pass here would let the agent keep
     a change that no test ever judged — the exact shape of a false proof."""
-    result = CommandVerifier(_py("import time; time.sleep(10)"), tmp_path, timeout=1).verify()
+    result = CommandVerifier(
+        _py("import time; time.sleep(10)"), tmp_path, timeout=1, source="user"
+    ).verify()
     assert result.passed is False
     assert "verification timed out after 1s" in result.output  # the real timeout, not a constant
 
@@ -100,7 +102,7 @@ def test_a_timed_out_verification_fails_and_says_so(tmp_path: Path) -> None:
 def test_a_verification_that_cannot_run_fails_and_says_so(tmp_path: Path) -> None:
     """A missing workspace (cwd removed mid-run, binary absent) is an UNVERIFIABLE attempt, which is
     reported as a failure rather than propagating and aborting the whole run."""
-    result = CommandVerifier(_py("pass"), tmp_path / "does-not-exist").verify()
+    result = CommandVerifier(_py("pass"), tmp_path / "does-not-exist", source="user").verify()
     assert result.passed is False
     assert "verification could not run" in result.output
 
@@ -133,7 +135,7 @@ def test_a_command_that_does_not_exist_abstains_rather_than_failing(tmp_path: Pa
     This test passed on Linux and failed on Windows for as long as it existed, because nobody ran
     the suite on Windows. `cmd.exe` answers 1, not 127 — see `program_missing`.
     """
-    result = CommandVerifier("definitely-not-a-real-command-xyz", tmp_path).verify()
+    result = CommandVerifier("definitely-not-a-real-command-xyz", tmp_path, source="user").verify()
 
     assert result.abstained is True
     assert result.passed is True  # abstention is not a failure either — it is silence
@@ -233,7 +235,7 @@ def test_the_verifier_asks_about_its_own_workspace(tmp_path: Path) -> None:
     """End to end, without depending on the shell being able to execute anything: a command whose
     program lives in the workspace must never be reported as an abstention for being absent."""
     name = _runner(tmp_path, "check_here")
-    verifier = CommandVerifier(name, tmp_path)
+    verifier = CommandVerifier(name, tmp_path, source="user")
     assert program_missing(verifier.command, verifier.workspace) is False
 
 
@@ -248,7 +250,7 @@ def test_pytest_collecting_nothing_abstains(tmp_path: Path) -> None:
     """Exit 5 is pytest saying it found no tests. A repository whose tests live somewhere the
     inference did not look would otherwise have every change thrown away by a verifier that ran
     nothing at all."""
-    result = CommandVerifier("exit 5", tmp_path).verify()
+    result = CommandVerifier("exit 5", tmp_path, source="user").verify()
 
     assert result.abstained is True
 
@@ -256,6 +258,6 @@ def test_pytest_collecting_nothing_abstains(tmp_path: Path) -> None:
 def test_an_ordinary_failure_is_still_a_failure(tmp_path: Path) -> None:
     """The abstention list is two specific codes, not "any awkward exit". A test suite that fails
     must still revert the work."""
-    result = CommandVerifier("exit 1", tmp_path).verify()
+    result = CommandVerifier("exit 1", tmp_path, source="user").verify()
 
     assert result.passed is False and result.abstained is False

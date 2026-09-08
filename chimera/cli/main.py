@@ -3569,7 +3569,8 @@ def solve(
                 review_model_for(roles) or model,
                 use_rubric=rubric,
             ),
-            verifier=CommandVerifier(verify, ws) if verify else None,
+            # `--verify` was typed in the same breath as the run: authorised by construction.
+            verifier=CommandVerifier(verify, ws, source="user") if verify else None,
             # PROBE (M18-5): record (arm, cheap manager proxy, verified reward) per attempt.
             probe_log=_ProbeLog(settings.home / "probe.jsonl") if probe_log else None,
             guard=WorkspaceGuard(ws),

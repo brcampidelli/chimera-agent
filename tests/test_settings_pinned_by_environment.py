@@ -74,6 +74,12 @@ def test_a_value_written_by_patch_config_is_not_reported_as_pinned(
     file that does not mention it.
     """
     monkeypatch.chdir(tmp_path)
+    # `patch_config` writes `os.environ` for real and nothing undoes it. Setting the variable
+    # through monkeypatch FIRST records that it was absent, so the teardown removes it again
+    # (`delenv(raising=False)` on an absent name records nothing and restores nothing). Leaked,
+    # CHIMERA_SANDBOX=docker sent every later test that resolves a sandbox — the verifier does
+    # now — into a container, where a Windows interpreter path is "sh: 1: ... not found".
+    monkeypatch.setenv("CHIMERA_SANDBOX", "auto")
     patch_config({"CHIMERA_SANDBOX": "docker"}, env_path=tmp_path / ".env")
 
     import os

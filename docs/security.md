@@ -13,7 +13,12 @@ Chimera can run shell commands, edit files, call APIs, and modify its own skills
 - **Governance kernel** — every governed tool call is allow / warn / review / block. A
   cheap first filter of dangerous shell signatures, not the boundary.
 - **Sandbox** — an ephemeral, network-off container (`CHIMERA_SANDBOX=docker`), hardenable
-  with gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
+  with gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`). The **verify command** runs in the same
+  sandbox as the agent's shell, and when that sandbox is not isolated a command that was not
+  typed by you — inferred from the repository, read from a cron job, a card or a workflow — goes
+  through the same `CHIMERA_HOST_EXEC` confirmation; declined, it abstains rather than runs
+  (`CHIMERA_VERIFY_NETWORK=1` gives a docker verifier the network; on the kernel sandboxes it
+  cannot, so a verifier that needs the network runs on the host, and only when you typed it).
 - **Per-session tool allowlist** — grant a run only the tools it needs; the rest are dropped
   from the model's schema entirely.
 - **Taint tracking** (`--taint`) — untrusted content is fenced as data, its provenance

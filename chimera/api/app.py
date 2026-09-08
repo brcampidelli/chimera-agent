@@ -2128,6 +2128,16 @@ def resolve_verify(requested: str | None, workspace: Path) -> tuple[str | None, 
     return found.command, f"inferred:{found.source_file}"
 
 
+def verifier_source(verify_source: str) -> str:
+    """The receipt's ``user`` | ``inferred:<file>`` collapsed to what the verifier's gate reads.
+
+    The receipt keeps the file so the claim can be checked; the gate only needs to know whether a
+    person typed the command in the same breath as the run (``user``) or it came out of the
+    repository (``inferred``) — see :data:`chimera.core.verify.VERIFY_SOURCES`.
+    """
+    return "user" if verify_source == "user" else "inferred"
+
+
 def _build_solve_agent(
     req: RunRequest,
     ws: Path,
@@ -2320,7 +2330,13 @@ def _build_solve_agent(
         # generate-and-verify collapses when both are the same model, because it grades its own
         # work and agrees with itself.
         manager=Manager(manager_backend, review_model_for(roles) or req.model),
-        verifier=CommandVerifier(verify_command, ws) if verify_command else None,
+        # `source` is what the host-exec gate reads: a typed command is authorised by construction,
+        # an inferred one runs only where the shell would (isolated sandbox, or a confirmed host).
+        verifier=(
+            CommandVerifier(verify_command, ws, source=verifier_source(verify_source))
+            if verify_command
+            else None
+        ),
         guard=WorkspaceGuard(ws),
         workspace=ws,
         spine_workspace=ws,

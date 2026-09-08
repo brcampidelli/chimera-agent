@@ -76,7 +76,8 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
         auto = AutonomousAgent(
             worker,
             planner=Planner(gateway, model),
-            verifier=CommandVerifier(str(verify), workspace) if verify else None,
+            # `with.verify` is a string in a YAML file; it runs where the shell step's command runs.
+            verifier=CommandVerifier(str(verify), workspace, source="workflow") if verify else None,
             guard=WorkspaceGuard(workspace),
             **evo.apply_to(),
             config=AutonomousConfig(max_attempts=int(step.with_.get("max_attempts", 2))),
@@ -93,7 +94,11 @@ def build_executors(*, workspace: Path, model: str | None = None) -> dict[str, S
         from chimera.orchestration import lifecycle_crew
 
         crew = lifecycle_crew(
-            gateway, workspace=workspace, verify=step.with_.get("verify"), model=model
+            gateway,
+            workspace=workspace,
+            verify=step.with_.get("verify"),
+            verify_source="workflow",
+            model=model,
         )
         outcome = crew.run(str(step.with_.get("task", "")))
         return StepResult(outcome.success, outcome.answer)

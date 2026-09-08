@@ -1,9 +1,10 @@
 """Letting the agent run commands, for one project rather than for all of them.
 
 The machine this app runs on already executes host commands two ways a caller can reach: the verify
-command goes to `CommandVerifier`, which calls `subprocess.run(shell=True)`, and the Runner panel
-spawns processes with no gate at all. The only thing refused was the AGENT — so this machine would
-run pytest to judge the agent's work and refuse to let the agent run pytest to correct it.
+command goes to `CommandVerifier` (which, at the time, called `subprocess.run(shell=True)` on the
+host; it now runs where the shell runs), and the Runner panel spawns processes with no gate at all.
+The only thing refused was the AGENT — so this machine would run pytest to judge the agent's work
+and refuse to let the agent run pytest to correct it.
 
 That refusal was also invisible in the right way and misleading in another: `host_exec=ask` resolves
 to a refusal here because a server has no terminal to ask at, which the posture screen reports
