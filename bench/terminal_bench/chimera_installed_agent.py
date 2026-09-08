@@ -101,10 +101,25 @@ fi
 if $PY -m pip install $BSP --quiet chimera-agent >>$L 2>&1; then
   echo CHIMERA_INSTALL_OK_NET
 else
-  echo "--- net install failed; falling back to offline wheelhouse ---" >>$L
-  tar xf /installed-agent/wheelhouse.tar -C /chimera/wh 2>>$L \\
-    && $PY -m pip install $BSP --no-index --find-links=/chimera/wh chimera-agent >>$L 2>&1 \\
-    && echo CHIMERA_INSTALL_OK_WH || { echo CHIMERA_INSTALL_FAILED; exit 1; }
+  # ADDED 2026-09-07, after the re-run: `fix-pandas-version` ships Python 3.8.20, chimera-agent needs
+  # >=3.11, so the net install correctly finds no wheel — and the only fallback was a wheelhouse that
+  # (a) is pinned to one ABI and (b) was not staged on this box. Both arms lost the task to
+  # `agent_installation_failed`. The LoopsBench adapter already solves this: bring our own interpreter
+  # with uv from PyPI (astral.sh answers urllib with 403 and these images have no curl), make a venv,
+  # install into it. Tried BEFORE the wheelhouse, which stays as the last, offline-only resort.
+  echo "--- net install failed; trying a private interpreter via uv ---" >>$L
+  if $PY -m pip install $BSP --quiet uv >>$L 2>&1 \\
+     && UV=$($PY -c 'import uv;print(uv.find_uv_bin())' 2>>$L) \\
+     && "$UV" venv --python 3.12 /chimera/venv >>$L 2>&1 \\
+     && "$UV" pip install --python /chimera/venv/bin/python --quiet chimera-agent >>$L 2>&1; then
+    ln -sf /chimera/venv/bin/chimera /usr/local/bin/chimera 2>>$L || true
+    echo CHIMERA_INSTALL_OK_UV
+  else
+    echo "--- uv path failed; falling back to offline wheelhouse ---" >>$L
+    tar xf /installed-agent/wheelhouse.tar -C /chimera/wh 2>>$L \\
+      && $PY -m pip install $BSP --no-index --find-links=/chimera/wh chimera-agent >>$L 2>&1 \\
+      && echo CHIMERA_INSTALL_OK_WH || { echo CHIMERA_INSTALL_FAILED; exit 1; }
+  fi
 fi
 """
 
@@ -125,6 +140,17 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
         return {
             "OPENROUTER_API_KEY": os.environ.get("OPENROUTER_API_KEY", ""),
             "CHIMERA_DEFAULT_MODEL": str(self._model_name),
+            # ADDED 2026-09-07, and the published 7.5% / 2.5% in RESULTS.md was measured WITHOUT it.
+            # `host_exec` defaults to "ask"; TB task images have no bubblewrap, so there is no OS
+            # sandbox, and a container has no TTY to answer with — so Chimera refuses to run the
+            # agent's commands, warns once, and the run continues to a failure that reads as
+            # incapability. Measured on LoopsBench, where the same omission cost 10 of 21 rounds
+            # their shell: `bench/loopsbench/RESULTS.md`. On a benchmark of terminal tasks, an agent
+            # that cannot execute a command is not being measured at all.
+            #
+            # `allow` is correct here and nowhere else: the container IS the sandbox and is destroyed
+            # after grading.
+            "CHIMERA_HOST_EXEC": "allow",
         }
 
     @property
@@ -147,9 +173,25 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
         container = session.container  # type: ignore[attr-defined]
         env = self._env
 
-        session.copy_to_container(  # type: ignore[attr-defined]
-            Path(_TAR), container_dir="/installed-agent", container_filename="wheelhouse.tar"
-        )
+        # The wheelhouse is the OFFLINE FALLBACK, not the install path: `_INSTALL` tries PyPI first
+        # precisely because a prebuilt wheelhouse is pinned to one Python ABI. So a missing or
+        # unreadable tarball must not be fatal — and it was, which turned an unrelated permission
+        # problem into `agent_installation_failed` on every task. Found by validating one task before
+        # the re-run rather than after it: the default path is `/root/tbench/wheelhouse.tar`, and this
+        # re-run is not executing as root.
+        try:
+            session.copy_to_container(  # type: ignore[attr-defined]
+                Path(_TAR), container_dir="/installed-agent", container_filename="wheelhouse.tar"
+            )
+        except Exception as exc:  # noqa: BLE001 — any copy failure means "no offline fallback"
+            _log_note = f"wheelhouse not staged ({exc}); network install must carry this run"
+            if logging_dir is not None:
+                try:
+                    ld = Path(str(logging_dir))
+                    ld.mkdir(parents=True, exist_ok=True)
+                    (ld / "chimera_wheelhouse.log").write_text(_log_note, encoding="utf-8")
+                except Exception:
+                    pass
         install_rc, _ = container.exec_run(["bash", "-lc", _INSTALL], environment=env)
         if install_rc != 0:
             from terminal_bench.agents.failure_mode import FailureMode
@@ -175,9 +217,20 @@ class ChimeraInstalledAgent(AbstractInstalledAgent):
         # — the Terminal-Bench client container's working directory is /app, and the task tests check
         # absolute paths under /app (e.g. hello-world asserts /app/hello.txt). exec_run defaults to the
         # image WORKDIR (often /), so without this the agent writes files where the grader never looks.
+        # ADDED 2026-09-07, and the published 7.5% / 2.5% was measured WITHOUT it. `--keep-workspace`
+        # is Chimera's own flag for exactly this, and its help says so: "On failure, leave the last
+        # attempt's edits on disk FOR AN EXTERNAL GRADER (don't revert)." Terminal-Bench IS the
+        # external grader. Without it, verify-or-revert rolls the tree back and TB then runs the
+        # task's tests against work the loop had just undone. Proved by paired test on LoopsBench —
+        # same task, same model, failure forced: without the flag the file is gone, with it the file
+        # is there (`bench/loopsbench/RESULTS.md`).
+        #
+        # Appended here rather than in `_FLAGS` so BOTH arms of the A/B get it: the arms differ by
+        # `CHIMERA_TB_FLAGS`, and a fix that lives in the default string would reach only one of them.
+        flags = _FLAGS if "--keep-workspace" in _FLAGS else f"{_FLAGS} --keep-workspace"
         solve = (
             f"cd /app 2>/dev/null; timeout {int(_SOLVE_TIMEOUT)} chimera solve {shlex.quote(instruction)} "
-            f"--workspace . --model {self._model_name} {_FLAGS} < /dev/null > /tmp/csolve.log 2>&1"
+            f"--workspace . --model {self._model_name} {flags} < /dev/null > /tmp/csolve.log 2>&1"
         )
         container.exec_run(["bash", "-lc", solve], environment=env)
 

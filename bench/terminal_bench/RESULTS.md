@@ -1,5 +1,64 @@
 # Terminal-Bench A/B — Chimera scaffold vs raw model (same model)
 
+> ## ⚠️ Re-measured 2026-09-07 — the published −5.0% below does not replicate
+>
+> The run below (2026-07-08) was measured with two things missing from the adapter, found on
+> 2026-09-07 while running LoopsBench with the same adapter pattern (`bench/loopsbench/RESULTS.md`):
+>
+> 1. **`CHIMERA_HOST_EXEC` was unset** (default `ask`). Terminal-Bench images have no bubblewrap and a
+>    container has no TTY, so on any task where that path fired Chimera refused to run the agent's
+>    commands, warned once, and continued to a failure that reads as incapability. On LoopsBench the
+>    same omission cost **10 of 21 rounds** their shell. Whether it fired here cannot be recovered —
+>    the July logs did not survive — so the July numbers carry that as an unknown.
+> 2. **`--keep-workspace` was not passed.** Chimera's verify-or-revert rolled the tree back on a failed
+>    attempt, and Terminal-Bench then graded work the loop had just undone. Proved by paired test —
+>    same task, same model, failure forced with `--verify false`: without the flag the file is gone,
+>    with it the file is there.
+>
+> **Same 40 tasks, same model, same arms, same single attempt, both flags on:**
+>
+> | | baseline | chimera | paired Δ | 95% CI | discordant |
+> |---|---|---|---|---|---|
+> | **published 2026-07-08** | 7.5% (3/40) | 2.5% (1/40) | **−5.0%** | [−5.0%, +1.6%] | chimera +0 / baseline +2 |
+> | **re-run 2026-09-07** | 10.0% (4/40) | 10.0% (4/40) | **+0.0%** | [−7.0%, +7.0%] | chimera +2 / baseline +2 |
+>
+> Both pass: `fix-permissions`, `hello-world`. Only baseline: `get-bitcoin-nodes`,
+> `organization-json-generator`. Only chimera: `fix-git`, `path-tracing`. Not significant either way.
+>
+> **What this says.** The July direction — *the scaffold scores lower than the bare agent* — **does not
+> replicate** once the loop is allowed to execute commands and keep its work: the chimera arm went
+> 1 → 4 and the discordant pairs split 2–2. **It does not say the scaffold helps.** Δ = 0 with a
+> ±7-point interval, one seed, n=40, is inside the noise floor this project has since measured
+> (`bench/loopsbench`: 25% of task outcomes flip between identical runs) and inside what six
+> independent papers now report for single-run agent benchmarks. **Neither the old −5% nor the new 0
+> is a measurement of the scaffold; the old one was additionally a measurement of the adapter.**
+> The −5% should not be cited again as evidence the scaffold hurts.
+>
+> **Apparatus, triaged before the number** (the LoopsBench lesson): `refusing to run the agent` **0/78**
+> logs, key errors **0/78** — both fixes reached the container. Two rows are apparatus, named and
+> excluded from the honest denominator (n=38, Δ still 0): `fix-pandas-version` failed to *install* in
+> **both** arms (the image ships **Python 3.8.20**; `chimera-agent` needs ≥3.11 and this adapter had no
+> interpreter fallback — added after the run, not re-run), and `download-youtube` was `parse_error` /
+> ungraded in the baseline arm only. `trabalho revertido` appears in 14 and 20 logs; it is **not** a
+> signal — both arms log it and `--keep-workspace` restores afterwards (measured on 2026-09-07).
+>
+> **Cost is not recoverable per task**: this adapter copies the solve log and pip log out of the
+> container but not Chimera's `runs.jsonl`; **0 of 78** logs carry a price. The LoopsBench adapter
+> does copy it. Named as a gap, not estimated.
+>
+> **One failure read with eyes** — `get-bitcoin-nodes`, chimera arm, `failed after 1 attempt(s)`: the
+> model ended with *"1. Ensure Bitcoin Core is running with RPC enabled … 3. Run: `python
+> bitcoin_service.py`"* — a description of the steps instead of the steps. A genuine miss, of exactly
+> the shape the `insist_on_action` clause exists for, and the grader agreed.
+>
+> **What the re-run cannot show:** anything at one seed. The next honest version of this table has
+> k≥3 runs per arm, `pass^k`, per-task flip rate, and an ICC — the protocol in
+> `bench/PLAN-study16-eight-axes.md` §0 — and until then this row is a replication check of a
+> retracted direction, not a result.
+>
+> Raw results: `~/tbench/runs_ab2/{baseline,chimera}/` on the WSL box; per-task table reproduced by
+> `chimera.eval.paired.compare_paired` with a=2, b=2, c=2, d=34.
+
 **Honest-benchmark discipline:** the prediction below is registered BEFORE the run. The result is
 published regardless of outcome (win, loss, or null). No re-running to chase significance.
 
