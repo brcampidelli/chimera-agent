@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   is empty for two opposite reasons that must not collapse into one blank — nothing was accepted, or
   a leg was unpriced. `chimera solve` prints both lines.
 
+- **Where persisted text re-enters execution, traced to the line.** `docs/audits/sleeper-channels.md` follows every path by which something written earlier runs later with different authority — hooks, cron, skill cards, memory, MCP manifests, project state — and gives each a verdict with the gate cited. Two are open by the trust model: a repository's own `package.json`/`Makefile` chooses the verify command when a run omits it, and `CommandVerifier` runs that string `shell=True` on the host outside the kernel, the taint ledger and the host-exec gate (the shape arXiv 2609.03884 used against seven harnesses); and `AGENTS.md` joins the system prompt unsanitised. Recalling a tainted memory does not re-seed the ledger, so a two-hop launder exists; anti-pattern cards are accepted on recurrence plus a regex with no holdout caller — the Phantom Guardrails shape. Nine open questions; no code changed.
+
 ### Notes
 
 - **`blocked` and `stalled` are deliberately not implemented.** Nothing in the loop can set them

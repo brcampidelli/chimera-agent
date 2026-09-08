@@ -30,7 +30,7 @@ This site is task-oriented: pick what you want to do.
 
 - **:material-shield-lock: Security**
   Governance, sandbox, taint tracking — and their honest limits.
-  [Security →](security.md)
+  [Security →](security.md) · [Sleeper-channel audit →](audits/sleeper-channels.md)
 
 - **:material-sitemap: Understand it**
   How the fusion core, evolution, and safety layers fit together.
