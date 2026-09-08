@@ -43,8 +43,11 @@ about any effect — it is the ruler, and it has to exist before the ruler is po
 **The fact in the code.** After a failed attempt the retry gets *generic* feedback — manager prose
 plus verifier output, joined at `chimera/core/autonomous.py:1263-1264`. Escalation to a stronger
 model is unconditional from attempt 2 onward (`:886-887`): `if index > 1 and self.escalate_worker`.
-There is no classification of *what kind* of failure happened. The one targeted path that exists is
-the build-error route.
+There is no classification of *what kind* of failure happened, and no targeted path at all: the only
+step-targeted feedback is `_fault_hint` (the first tool observation starting with `error:`), and
+`verify.py`'s missing-program detection turns a broken *verify command* into an abstention, not a
+failure. (Corrected 2026-09-08 while building item 1+7 step 1: the earlier text claimed a build-error
+route that does not exist in the file.)
 
 **What the literature measured.** 2606.01416, 100-task fault injection, **matched recovery budget**:
 recovery targeted at the failure class **98.8%** · retry-only **94.5%** · full replanning **93.8%** —
@@ -72,8 +75,8 @@ classify before feeding back. Classes we can already detect from what `Attempt` 
 error (exists), failing test (verifier output), hollow success (`diff_productive is False` — the
 diff gate already computes it), tool-skip / result-ignore / fabrication (2607.04686's taxonomy, all
 visible in `tool_names` + the transcript), timeout. Route each to a *specific* recovery — the failing
-test's assertion, the diff that was reverted (`bench/retry_lift`'s I2, which was never given a clean
-run), a forced-action prompt for hollow success — instead of one generic retry.
+test's assertion, the diff that was reverted (`bench/retry_lift`'s I1, `--diff-feedback` -- I2 is `--stagnation-fuzzy`; neither
+got a clean run), a forced-action prompt for hollow success — instead of one generic retry.
 
 **Step 2 — the matched-budget sweep. Size M, real spend.** Arms: retry-only (today) · replan-on-
 stagnation (today) · class-targeted (step 1), at recovery budget 1, 2, 3. Use 2606.27009's
@@ -273,7 +276,12 @@ rate beside the success rate and say the cost half is unmeasured.
 
 **The scaffold A/B**, as a 2^k factorial over diff gate / stagnation detector / progress ledger /
 escalation (2605.05716: all-in is consistently suboptimal, 56.3% submodularity violations), belongs
-on Harness-Bench — offline, repeatable, and it **dissolves the band problem** instead of solving it.
+on Harness-Bench — repeatable, with a deterministic oracle, and it **dissolves the band problem** instead
+of solving it. **Offline is not free**: the agent's model calls cost the same as anywhere (measured
+2026-09-08: US$ 0.54 per solve), only the grading is. And the factors must act inside one attempt:
+the progress ledger and diff-feedback fire only on a retry, so under `--max-attempts 1` they are inert
+and belong to the recovery sweep (item 1+7 step 2). The pre-registered design
+(`bench/harness_bench/PREREGISTRATION.md`) is repo-map x checklist x planner, 2^3 full, k=3.
 
 ---
 
