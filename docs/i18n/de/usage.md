@@ -60,10 +60,12 @@ ja), sodass ein kritischer kurzer Schritt den Schutz der Fusion erhält, selbst 
 er zu kurz ist, um das Längen-Gate auszulösen.
 
 **Provider, Fallback & selbst gehostet.** Jeder LiteLLM-`provider/model`-Slug
-funktioniert (`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`,
+funktioniert (`openai/…`, `anthropic/…`, `gemini/…`, `ollama_chat/…`, `openrouter/…`,
 …). Für einen selbst gehosteten / OpenAI-kompatiblen Server (Ollama, vLLM)
 `CHIMERA_API_BASE` setzen (z. B. `http://127.0.0.1:11434` mit
-`CHIMERA_DEFAULT_MODEL=ollama/llama3`). `CHIMERA_FALLBACK_MODELS`
+`CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`). `ollama_chat/` statt `ollama/` verwenden:
+das Präfix `ollama/` läuft über Ollamas Generate-Endpunkt, der keine Tools aufrufen kann.
+`CHIMERA_FALLBACK_MODELS`
 (kommagetrennt) setzen, um bei einem Fehler des primären Modells auf ein anderes
 auszuweichen. In `chat`/`tui` wechselt `/model <slug>` das Modell mitten in der
 Sitzung.

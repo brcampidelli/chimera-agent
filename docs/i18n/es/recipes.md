@@ -16,7 +16,7 @@ Instala [Ollama](https://ollama.com), descarga un modelo, y luego apunta Chimera
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
@@ -24,6 +24,9 @@ Eso es todo — sin `OPENROUTER_API_KEY`, sin nube. La barrera de credenciales r
 `ollama/…` (y `ollama_chat/…`) como un runtime local y lo deja pasar. Si Ollama corre en otro
 lugar, configura `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (por defecto
 `http://127.0.0.1:11434`).
+
+Usa `ollama_chat/` en lugar de `ollama/`: el prefijo `ollama/` pasa por el endpoint generate de
+Ollama, que no puede llamar herramientas.
 
 Los modelos locales son más pequeños, así que este es el extremo *débil* del rango
 [goldilocks](../bench/local_lift/RESULTS.md) — un buen ajuste para `chimera solve` (el plan +

@@ -98,10 +98,11 @@ describe("Settings — the models this machine actually has", () => {
     await user.selectOptions(await picker(), "llama3:latest");
 
     await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
-    // `ollama/` prefixed here rather than left to the user: the tag is what `ollama list` prints and
-    // the slug is what LiteLLM routes on, and the gap between them is a support question.
+    // `ollama_chat/` prefixed here rather than left to the user: the tag is what `ollama list` prints
+    // and the slug is what LiteLLM routes on, and the gap between them is a support question. The
+    // chat prefix and not `ollama/`, because only the chat endpoint can call tools.
     expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({
-      CHIMERA_DEFAULT_MODEL: "ollama/llama3:latest",
+      CHIMERA_DEFAULT_MODEL: "ollama_chat/llama3:latest",
     });
   });
 
@@ -138,7 +139,7 @@ describe("Settings — the models this machine actually has", () => {
   it("shows the configured default as selected when it is one of these models", async () => {
     vi.mocked(getConfig).mockResolvedValue({
       ...CONFIG,
-      models: { ...CONFIG.models, default: "ollama/llama3:latest" },
+      models: { ...CONFIG.models, default: "ollama_chat/llama3:latest" },
     } as never);
     vi.mocked(getOllamaModels).mockResolvedValue({
       base_url: "http://localhost:11434",
@@ -154,6 +155,25 @@ describe("Settings — the models this machine actually has", () => {
   it("shows nothing selected when the default is a cloud model", async () => {
     // A cloud default rendered as a local tag would be the picker asserting something about the
     // agent that is not true — and the fix for it would be to change a setting that was already right.
+    vi.mocked(getOllamaModels).mockResolvedValue({
+      base_url: "http://localhost:11434",
+      reachable: true,
+      models: ["llama3:latest"],
+      reason: "",
+    } as never);
+    renderWithProviders(<Settings />);
+
+    expect(await picker()).toHaveValue("");
+  });
+
+  it("shows a legacy ollama/ slug as unchosen, so picking again is what migrates it", async () => {
+    // `ollama/` is Ollama's generate endpoint: local, keyless, and unable to call tools. A default
+    // written by an older picker still names an installed tag, but showing it as chosen would tell
+    // the user their setting is fine when a coding turn on it never receives a tool.
+    vi.mocked(getConfig).mockResolvedValue({
+      ...CONFIG,
+      models: { ...CONFIG.models, default: "ollama/llama3:latest" },
+    } as never);
     vi.mocked(getOllamaModels).mockResolvedValue({
       base_url: "http://localhost:11434",
       reachable: true,

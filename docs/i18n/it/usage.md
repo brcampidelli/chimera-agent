@@ -60,9 +60,11 @@ ottiene la protezione della fusione anche quando è troppo corto per far scattar
 lunghezza.
 
 **Provider, fallback & self-hosted.** Qualsiasi slug `provider/model` di LiteLLM funziona
-(`openai/…`, `anthropic/…`, `gemini/…`, `ollama/…`, `openrouter/…`, …). Per un server
+(`openai/…`, `anthropic/…`, `gemini/…`, `ollama_chat/…`, `openrouter/…`, …). Per un server
 self-hosted / compatibile con OpenAI (Ollama, vLLM) imposta `CHIMERA_API_BASE` (es.
-`http://127.0.0.1:11434` con `CHIMERA_DEFAULT_MODEL=ollama/llama3`). Imposta
+`http://127.0.0.1:11434` con `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`). Usa `ollama_chat/`
+invece di `ollama/`: il prefisso `ollama/` passa dall'endpoint generate di Ollama, che non può
+chiamare strumenti. Imposta
 `CHIMERA_FALLBACK_MODELS` (separati da virgola) per passare a un altro modello se il
 principale dà errore. In `chat`/`tui`, `/model <slug>` cambia il modello a metà sessione.
 

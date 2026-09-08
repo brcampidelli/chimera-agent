@@ -16,13 +16,16 @@ Zainstaluj [Ollama](https://ollama.com), pobierz model, potem skieruj na niego C
 
 ```bash
 ollama pull llama3.1                     # or qwen2.5, mistral, phi3, …
-export CHIMERA_DEFAULT_MODEL=ollama/llama3.1     # the `ollama/` prefix = local, keyless
+export CHIMERA_DEFAULT_MODEL=ollama_chat/llama3.1     # the `ollama_chat/` prefix = local, keyless
 chimera agent "Summarise this file in 3 bullets" -w .
 ```
 
 I to wszystko — bez `OPENROUTER_API_KEY`, bez chmury. Brama poświadczeń rozpoznaje `ollama/…`
 (oraz `ollama_chat/…`) jako lokalny runtime i przepuszcza go. Jeśli Ollama działa gdzie indziej,
 ustaw `CHIMERA_OLLAMA_BASE_URL=http://host:11434` (domyślnie `http://127.0.0.1:11434`).
+
+Używaj `ollama_chat/` zamiast `ollama/`: prefiks `ollama/` przechodzi przez endpoint generate
+Ollamy, który nie potrafi wywoływać narzędzi.
 
 Modele lokalne są mniejsze, więc jest to *słabszy* koniec zakresu
 [goldilocks](../bench/local_lift/RESULTS.md) — dobrze pasuje do `chimera solve` (plan +

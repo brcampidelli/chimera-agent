@@ -53,18 +53,30 @@ _KEY_ENV_VARS = {
 # the user's machine and needs no API key — the credential gate must let it through. Ollama is the
 # common case; LM Studio, vLLM and llamafile are the same situation and were being refused for a key
 # none of them wants.
+#
+# The code reads this as a set (`startswith` takes the whole tuple), so the ORDER here is
+# documentation — and a reader takes it as the recommendation, which is why `ollama_chat/` comes
+# first. That is Ollama's /api/chat, native tool calling. `ollama/` is /api/generate: LiteLLM
+# pastes the tool catalogue into the prompt as a Python repr and, in stream, hands a call back as
+# the assistant's text, so the loop never sees a tool call (pinned in
+# tests/test_the_adapter_returns_the_tool_call_it_was_given.py). It stays listed because it is
+# still local and keyless; `_warn_generate_prefix_with_tools` says the rest when it matters.
 _LOCAL_MODEL_PREFIXES = (
-    "ollama/",
     "ollama_chat/",
+    "ollama/",
     "lm_studio/",
     "hosted_vllm/",
     "vllm/",
     "llamafile/",
 )
 
+#: Ollama's /api/generate route as LiteLLM names it — local and keyless like the rest of the tuple,
+#: and the one prefix in it that has no tool calling.
+_OLLAMA_GENERATE_PREFIX = "ollama/"
+
 
 def _is_local_model(model: str) -> bool:
-    """True when the model routes to a local, keyless runtime (e.g. ``ollama/llama3``)."""
+    """True when the model routes to a local, keyless runtime (e.g. ``ollama_chat/llama3``)."""
     return (model or "").lower().startswith(_LOCAL_MODEL_PREFIXES)
 
 
@@ -292,7 +304,7 @@ def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
         return None
     return CredentialRejectedError(
         f"{what} {fix} — the relevant variables are {list(_KEY_ENV_VARS.values())} "
-        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key)."
+        "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama_chat/llama3, which needs no key)."
         f"{trace_of(exc).as_suffix()} Provider said: {exc}"
     )
 
@@ -343,6 +355,9 @@ class LLMGateway:
         # M15-C2: per-credential cooldown pool — a rate-limited/revoked key is rested, not hammered.
         self._cred_pool = CredentialPool()
         self._cache: CompletionCache | None = None
+        # Per instance, not per process: a bench builds one gateway per arm, and each gets the line.
+        self._warned_generate_prefix = False
+        self._warn_lock = threading.Lock()
         self._export_keys_to_env()
 
     @property
@@ -383,7 +398,7 @@ class LLMGateway:
             if value and not os.environ.get(env_var):
                 os.environ[env_var] = value
         # Point LiteLLM's Ollama provider at the configured local server (default 127.0.0.1:11434), so
-        # `CHIMERA_DEFAULT_MODEL=ollama/llama3` works out of the box — and a remote Ollama is one env var away.
+        # `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3` works out of the box — and a remote Ollama is one env var away.
         ollama_base = getattr(self.settings, "ollama_base_url", "") or ""
         if ollama_base and not os.environ.get("OLLAMA_API_BASE"):
             os.environ["OLLAMA_API_BASE"] = ollama_base
@@ -394,7 +409,7 @@ class LLMGateway:
     def _require_credentials(self, resolved: str) -> None:
         """Raise unless a key is configured — except for local runtimes (Ollama), which need none.
 
-        A local model like ``ollama/llama3`` runs on your machine with no API key, so the credential
+        A local model like ``ollama_chat/llama3`` runs on your machine with no API key, so the credential
         gate must not block it. This is what makes a fully-local, zero-key setup first-class.
 
         The message names the variable for the provider actually being called rather than reciting
@@ -414,7 +429,41 @@ class LLMGateway:
             + (f" for '{head}'. Set {wanted}" if wanted else ". Set a provider key")
             + " in your environment or .env — any provider LiteLLM supports works, "
             f"not only {list(_KEY_ENV_VARS.values())} "
-            "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama/llama3, which needs no key)."
+            "(or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama_chat/llama3, which needs no key)."
+        )
+
+    def _warn_generate_prefix_with_tools(
+        self, resolved: str, tools: list[dict[str, Any]] | None
+    ) -> None:
+        """Say, once per gateway, that ``ollama/`` cannot call the tools this request carries.
+
+        LiteLLM routes ``ollama/`` to Ollama's ``/api/generate``: the catalogue goes into the
+        prompt as a Python repr and a call, when the model makes one, comes back as prose in
+        ``content`` — the agent loop sees no tool call, so every tool number measured through
+        this prefix was about a model that had never been offered a tool. ``ollama_chat/`` is
+        ``/api/chat`` and round-trips; both are measured offline in
+        tests/test_the_adapter_returns_the_tool_call_it_was_given.py.
+
+        A warning and nothing else. The model id is not rewritten — the slug the user typed is
+        the slug that runs — and the request is not refused, because plain text through
+        ``ollama/`` still works. Once per instance: the loop that hits this hits it on every step,
+        and a line per step is a line nobody reads.
+        """
+        if not tools or self._warned_generate_prefix:
+            return
+        if not resolved.lower().startswith(_OLLAMA_GENERATE_PREFIX):
+            return
+        with self._warn_lock:  # the fusion panel calls in from several threads at once
+            if self._warned_generate_prefix:
+                return
+            self._warned_generate_prefix = True
+        _log.warning(
+            "model %s carries %d tool(s), but the ollama/ prefix is Ollama's generate endpoint and "
+            "has no tool calling: the catalogue goes into the prompt as text and the loop sees no "
+            "call. Use the ollama_chat/ prefix instead (ollama_chat/%s).",
+            resolved,
+            len(tools),
+            resolved.split("/", 1)[1],
         )
 
     def _provider_kwargs(self) -> dict[str, Any]:
@@ -476,6 +525,7 @@ class LLMGateway:
 
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
+        self._warn_generate_prefix_with_tools(resolved, tools)
 
         extra = self._provider_kwargs()
         message_dicts = _to_message_dicts(messages)
@@ -621,6 +671,7 @@ class LLMGateway:
 
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
+        self._warn_generate_prefix_with_tools(resolved, tools)
 
         call_kwargs: dict[str, Any] = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
@@ -720,6 +771,7 @@ class LLMGateway:
         """
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
+        self._warn_generate_prefix_with_tools(resolved, tools)
         call_kwargs = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
