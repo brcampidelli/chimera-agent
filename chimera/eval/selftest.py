@@ -17,6 +17,13 @@ code. It was never in the execution path. That is the whole point of this module
 in prose guards nothing, which is the lesson from the Bee pre-training — the assertion was written,
 committed, and never called.
 
+The verify command runs **where the agent's own shell runs** — through the configured sandbox, and
+behind the host-exec gate when that sandbox is not isolated — because the string is the task file's,
+not the developer's: a shell string read from a file, the shape :mod:`chimera.core.verify` gates for
+a cron job, a kanban card or an inferred build command. This was the one such string that still
+reached ``subprocess.run(shell=True)`` on its own. A command the gate declines is *not runnable*: the
+guard could not prove the apparatus, and says so, rather than certifying it or crashing.
+
 Two failures, kept apart on purpose:
 
 * **not discriminating** — the verify command SUCCEEDS on the untouched workspace. The task is
@@ -31,10 +38,13 @@ from __future__ import annotations
 import os
 import shlex
 import shutil
-import subprocess
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from chimera.sandbox.base import Sandbox
 
 __all__ = ["TaskCheck", "Verdict", "check_discriminates", "run_selftest", "assert_discriminating"]
 
@@ -42,6 +52,11 @@ __all__ = ["TaskCheck", "Verdict", "check_discriminates", "run_selftest", "asser
 #: guard whose entire selling point is being cheap. A task that needs longer than this to FAIL is
 #: reporting something worth knowing on its own.
 DEFAULT_TIMEOUT = 120
+
+#: Who authored the verify string, in the vocabulary of :data:`chimera.core.verify.VERIFY_SOURCES`:
+#: a benchmark task definition. The same word the verifier uses for the same file, so the gate's
+#: refusal reads the same whichever of the two was asked to run the command.
+_SOURCE = "eval"
 
 
 @dataclass(frozen=True)
@@ -95,8 +110,30 @@ def _executable_missing(command: str) -> str:
     return "" if shutil.which(program) else program
 
 
-def check_discriminates(check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT) -> Verdict:
-    """Run one task's verify command against its untouched workspace and report what happened."""
+def _declined_on_the_host(sandbox: Sandbox, command: str) -> bool:
+    """Whether the host-exec gate refused ``command`` — ``CommandVerifier._declined``'s rule.
+
+    The string came out of a task file, never off a keyboard, so it is gated the way the verifier
+    gates ``job``, ``card`` and ``inferred``: inside a sandbox that genuinely isolates the question
+    does not arise, and on the host ``CHIMERA_HOST_EXEC`` decides, resolved the way the shell tool
+    resolves it. No is no.
+    """
+    from chimera.sandbox.confirm import resolve_host_exec_confirm, sandbox_is_isolated
+
+    if sandbox_is_isolated(sandbox):
+        return False
+    confirm = resolve_host_exec_confirm()
+    return confirm is not None and not confirm(command)
+
+
+def check_discriminates(
+    check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT, sandbox: Sandbox | None = None
+) -> Verdict:
+    """Run one task's verify command against its untouched workspace and report what happened.
+
+    ``sandbox`` defaults to what the shell tool would resolve (:func:`chimera.sandbox.get_sandbox`)
+    and exists so a test can hand in a fake — the verifier's own seam.
+    """
     try:
         workspace = check.setup()
     except Exception as exc:  # a workspace that cannot be built is not a vacuous task either
@@ -111,24 +148,35 @@ def check_discriminates(check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT) -> 
             detail=f"verify command not found on PATH: {missing}",
         )
 
-    try:
-        done = subprocess.run(
-            check.verify,
-            shell=True,
-            cwd=str(workspace),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+    from chimera.sandbox import get_sandbox
+
+    backend = sandbox if sandbox is not None else get_sandbox()
+    if _declined_on_the_host(backend, check.verify):
+        # An abstention, in the verifier's words: we could not run it, we do not claim we did.
+        # `assert_discriminating` reports it as BROKEN and refuses the run — an apparatus nobody
+        # could execute is not one anybody has proved.
+        return Verdict(
+            check.task_id,
+            discriminates=False,
+            runnable=False,
+            detail=(
+                f"verify command not run: its source is {_SOURCE!r} (the task file), the sandbox "
+                "is not isolated, and the host-exec gate (CHIMERA_HOST_EXEC) declined to run it "
+                "on the host"
+            ),
         )
-    except subprocess.TimeoutExpired:
+
+    try:
+        done = backend.run(check.verify, timeout=timeout, cwd=workspace)
+    except OSError as exc:
+        return Verdict(check.task_id, discriminates=False, runnable=False, detail=str(exc))
+    if done.timed_out:
         return Verdict(
             check.task_id,
             discriminates=False,
             runnable=False,
             detail=f"verify command did not finish in {timeout}s",
         )
-    except OSError as exc:
-        return Verdict(check.task_id, discriminates=False, runnable=False, detail=str(exc))
 
     # A command that never ran exits non-zero too, and non-zero is the answer this guard calls
     # healthy — so an environment with no pytest would otherwise report every task as discriminating
@@ -138,18 +186,18 @@ def check_discriminates(check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT) -> 
     # command with plain exit 1 — indistinguishable from a failing test — and says so in the system
     # language, which is why `_executable_missing` runs first. "No module named" comes from Python
     # itself and is English on every platform, and it is the case that actually happens.
-    if done.returncode in (126, 127) or "No module named" in (done.stderr or ""):
+    if done.exit_code in (126, 127) or "No module named" in (done.stderr or ""):
         return Verdict(
             check.task_id,
             discriminates=False,
             runnable=False,
             detail=(
-                f"verify command could not run (exit {done.returncode}): "
+                f"verify command could not run (exit {done.exit_code}): "
                 f"{(done.stderr or done.stdout or '').strip()[:200]}"
             ),
         )
 
-    if done.returncode == 0:
+    if done.exit_code == 0:
         # The one that matters. Say what was run and where, because the fix is always in the task.
         return Verdict(
             check.task_id,
@@ -161,7 +209,7 @@ def check_discriminates(check: TaskCheck, *, timeout: int = DEFAULT_TIMEOUT) -> 
         )
 
     # A non-zero exit is the healthy case: the test fails, so there is something for the work to fix.
-    return Verdict(check.task_id, discriminates=True, detail=f"exit {done.returncode}")
+    return Verdict(check.task_id, discriminates=True, detail=f"exit {done.exit_code}")
 
 
 def run_selftest(checks: Iterable[TaskCheck], *, timeout: int = DEFAULT_TIMEOUT) -> list[Verdict]:
