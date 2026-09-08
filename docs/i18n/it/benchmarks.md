@@ -65,7 +65,7 @@ il sottoinsieme validato da esseri umani.
 
 Quattro esecuzioni pre-registrate su fette di `django/django`, `deepseek-chat-v3.1`, pass@1,
 valutate **solo** dall'harness ufficiale `swebench` 4.1.0 in Docker. Resoconto completo:
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | run | fetta | baseline | + Chimera | Δ appaiato | IC 95% | |
 |---|---|---|---|---|---|---|

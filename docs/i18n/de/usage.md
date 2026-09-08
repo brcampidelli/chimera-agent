@@ -441,7 +441,7 @@ Nützliche Flags:
 > Einschränkung**, nicht das Modell: SWE-bench-Lauf 1 erreichte eine exakte
 > 0,0 Prozentpunkte bei 8 Schritten gegen ein 250-MB-Checkout, und dieselbe
 > Konfiguration bei **30 Schritten** hob die Patch-Rate der Baseline von 47 %
-> auf 74 % ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)).
+> auf 74 % ([`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)).
 > Wenn der Agent erkundet und dann ohne Bearbeitung fertig wird, das zuerst
 > erhöhen.
 

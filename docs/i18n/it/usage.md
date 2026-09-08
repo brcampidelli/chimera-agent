@@ -410,7 +410,7 @@ Flag utili:
 > **repository grande è il vincolo determinante**, non il modello: la run 1 di SWE-bench ha
 > segnato uno 0,0pp esatto con 8 passi contro un checkout di 250 MB, e la stessa
 > configurazione a **30 passi** ha alzato il tasso di patch della baseline dal 47% al 74%
-> ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)). Se l'agente esplora e
+> ([`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)). Se l'agente esplora e
 > poi finisce senza modificare nulla, alza prima questo.
 
 > **`--require-diff` e `--keep-workspace` sono per la valutazione esterna.** `solve` è

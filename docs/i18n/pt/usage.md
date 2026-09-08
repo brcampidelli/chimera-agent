@@ -406,7 +406,7 @@ Flags úteis:
 > **repositório grande, ele é a restrição vinculante**, não o modelo: a execução 1 do
 > SWE-bench marcou um 0,0pp exato com 8 passos contra um checkout de 250 MB, e a mesma
 > configuração com **30 passos** elevou a taxa de patch da baseline de 47% para 74%
-> ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)). Se o agente explora e
+> ([`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)). Se o agente explora e
 > depois termina sem editar, aumente isto primeiro.
 
 > **`--require-diff` e `--keep-workspace` são para avaliação externa.** O `solve` é

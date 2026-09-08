@@ -34,7 +34,7 @@ Ta strona jest zorientowana zadaniowo: wybierz, co chcesz zrobić.
 
 - **:material-shield-lock: Bezpieczeństwo**
   Governance, sandbox, śledzenie skażenia — i ich uczciwe granice.
-  [Bezpieczeństwo →](security.md) · [Audyt uśpionych kanałów →](audits/sleeper-channels.md)
+  [Bezpieczeństwo →](security.md) · [Audyt uśpionych kanałów →](../../audits/sleeper-channels.md)
 
 - **:material-sitemap: Zrozum to**
   Jak rdzeń fuzji, ewolucja i warstwy bezpieczeństwa łączą się w całość.
@@ -42,7 +42,7 @@ Ta strona jest zorientowana zadaniowo: wybierz, co chcesz zrobić.
 
 - **:material-console: Każda komenda**
   Wszystkie 79, wygenerowane z samego CLI — w tym 33, których nie było w żadnej dokumentacji.
-  [Referencja komend →](commands.md)
+  [Referencja komend →](../../commands.md)
 
 </div>
 

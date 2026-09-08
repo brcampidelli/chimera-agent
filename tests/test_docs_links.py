@@ -6,8 +6,10 @@ governance document is read as "nobody maintains this", not as a typo.
 
 Scope is deliberately narrow: relative links in the root-level `*.md` files, plus the templates a
 contributor is handed. Not `docs/**` (large, and its links are internal cross-references that move
-together), and never external URLs — a test that reaches the network fails for reasons that have
-nothing to do with the commit that ran it.
+together — except in the translations, which copy the English links verbatim into a directory two
+levels deeper, which is why `docs/**` has its own guard in
+`test_a_docs_link_resolves_from_the_file_that_carries_it.py`), and never external URLs — a test
+that reaches the network fails for reasons that have nothing to do with the commit that ran it.
 
 **What this does NOT catch, said plainly.** The bug that prompted it was `GOVERNANCE.md` citing a
 root ``PREREGISTRATION.md`` that has never existed — the real files live per suite, at

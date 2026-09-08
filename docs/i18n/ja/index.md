@@ -32,7 +32,7 @@ source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 
 - **:material-shield-lock: セキュリティ**
   ガバナンス、サンドボックス、汚染追跡 — そしてその正直な限界。
-  [セキュリティ →](security.md) · [スリーパーチャネル監査 →](audits/sleeper-channels.md)
+  [セキュリティ →](security.md) · [スリーパーチャネル監査 →](../../audits/sleeper-channels.md)
 
 - **:material-sitemap: 理解する**
   融合コア、進化、安全層がどう組み合わさっているか。
@@ -40,7 +40,7 @@ source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 
 - **:material-console: すべてのコマンド**
   79個すべて、CLI自身から生成 — どのドキュメントにも載っていなかった33個を含む。
-  [コマンドリファレンス →](commands.md)
+  [コマンドリファレンス →](../../commands.md)
 
 </div>
 

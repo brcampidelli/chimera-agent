@@ -404,7 +404,7 @@ Przydatne flagi:
 > repozytorium to właśnie to jest wiążącym ograniczeniem**, nie model: uruchomienie 1
 > SWE-bench dało dokładne 0,0pp przy 8 krokach wobec checkoutu 250 MB, a ta sama
 > konfiguracja przy **30 krokach** podniosła wskaźnik patchy baseline'u z 47% do 74%
-> ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)). Jeśli agent eksploruje,
+> ([`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)). Jeśli agent eksploruje,
 > a potem kończy bez edycji, podnieś to jako pierwsze.
 
 > **`--require-diff` i `--keep-workspace` są do oceny zewnętrznej.** `solve` to

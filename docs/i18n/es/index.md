@@ -35,7 +35,7 @@ Este sitio está orientado a tareas: elige lo que quieres hacer.
 
 - **:material-shield-lock: Seguridad**
   Gobernanza, sandbox, seguimiento de taint — y sus límites honestos.
-  [Seguridad →](security.md) · [Auditoría de canales durmientes →](audits/sleeper-channels.md)
+  [Seguridad →](security.md) · [Auditoría de canales durmientes →](../../audits/sleeper-channels.md)
 
 - **:material-sitemap: Entiéndelo**
   Cómo encajan el núcleo de fusión, la evolución, y las capas de seguridad.
@@ -44,7 +44,7 @@ Este sitio está orientado a tareas: elige lo que quieres hacer.
 - **:material-console: Cada comando**
   Los 79, generados desde la propia CLI — incluidos los 33 que no aparecían en ninguna
   documentación.
-  [Referencia de comandos →](commands.md)
+  [Referencia de comandos →](../../commands.md)
 
 </div>
 

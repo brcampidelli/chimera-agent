@@ -54,7 +54,7 @@ Terminal-Bench 在 CLI 任务上证明了这一论点；SWE-bench 则在真实�
 
 在来自 `django/django` 的若干切片上，用 `deepseek-chat-v3.1`、pass@1 指标，跑了四次预先登记
 （pre-registered）的实验，全部**仅**由官方 `swebench` 4.1.0 评测工具在 Docker 中评分。完整报告见：
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md)。
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md)。
 
 | 实验轮次 | 切片 | 基线 | + Chimera | 配对 Δ | 95% 置信区间 | |
 |---|---|---|---|---|---|---|

@@ -65,7 +65,7 @@ que haga pasar las pruebas `FAIL_TO_PASS` de la instancia manteniendo en verde l
 
 Cuatro ejecuciones pre-registradas sobre slices de `django/django`, `deepseek-chat-v3.1`, pass@1,
 calificadas **únicamente** por el harness oficial `swebench` 4.1.0 en Docker. Informe completo:
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | ejecución | slice | baseline | + Chimera | Δ pareada | IC 95% | |
 |---|---|---|---|---|---|---|

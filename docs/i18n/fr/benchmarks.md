@@ -65,7 +65,7 @@ produire un patch qui fait passer les tests `FAIL_TO_PASS` de l'instance tout en
 
 Quatre runs pré-enregistrés sur des tranches `django/django`, `deepseek-chat-v3.1`, pass@1,
 notés **uniquement** par le harness officiel `swebench` 4.1.0 dans Docker. Compte-rendu complet :
-[`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
+[`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md).
 
 | run | tranche | référence | + Chimera | Δ apparié | IC 95 % | |
 |---|---|---|---|---|---|---|

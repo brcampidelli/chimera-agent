@@ -28,7 +28,7 @@ Używaj `ollama_chat/` zamiast `ollama/`: prefiks `ollama/` przechodzi przez end
 Ollamy, który nie potrafi wywoływać narzędzi.
 
 Modele lokalne są mniejsze, więc jest to *słabszy* koniec zakresu
-[goldilocks](../bench/local_lift/RESULTS.md) — dobrze pasuje do `chimera solve` (plan +
+[goldilocks](../../../bench/local_lift/RESULTS.md) — dobrze pasuje do `chimera solve` (plan +
 verify-or-revert pomaga słabemu modelowi) i do prywatności offline, gorzej do jednorazowego
 rozumowania na poziomie frontier. Miksuj: lokalny domyślny model z chmurowymi
 `CHIMERA_FALLBACK_MODELS` do trudnych wywołań.

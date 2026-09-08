@@ -402,7 +402,7 @@ uv run chimera solve \
 > **大きなリポジトリでは、それがモデルではなく拘束条件になります**: SWE-benchの実行1は、
 > 250MBのチェックアウトに対して8ステップで正確に0.0ポイントを記録し、同じ設定で
 > **30ステップ**にすると、ベースラインのパッチ率が47%から74%に上がりました
-> ([`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md))。エージェントが探索した
+> ([`bench/swe_bench/RESULTS.md`](../../../bench/swe_bench/RESULTS.md))。エージェントが探索した
 > だけで編集せずに終わる場合は、まずこれを上げてください。
 
 > **`--require-diff` と `--keep-workspace` は外部採点向けです。** `solve` は検証または
