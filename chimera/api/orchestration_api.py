@@ -939,6 +939,7 @@ def register_orchestration_api(
                     registry, _ledger = assemble_registry(
                         req, worker_ws, live, gateway,
                         steps=req.max_steps or 6, surface="api:crew", shared=shared,
+                        instruction=req.task,
                     )
                     return registry
 

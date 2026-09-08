@@ -431,6 +431,7 @@ def assemble_registry(
     surface: str = "api",
     shared: Any = None,
     approval_sink: Any = None,
+    instruction: str | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -446,6 +447,10 @@ def assemble_registry(
     — that is what lets a run know it read untrusted content and is therefore pausable. Building two
     would mean the run that got tainted and the run that gets asked about it are different objects,
     and the pause would never fire.
+
+    ``instruction`` is the person's own words for this run — the task, or the turn's message — so a
+    fetch of a page or a file it names is recorded as the user's request. A caller with no single
+    task (the hierarchy's fixed seams) passes nothing, and every fetch there reads ``unknown``.
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -567,7 +572,9 @@ def assemble_registry(
     # task and merging into a single workspace must, because untrusted content one of them read
     # can reach the others through the merge. It is the same distinction the CLI already draws
     # between `solve-batch` (independent, own ledgers) and `crew-isolated` (shared).
-    ledger = TaintLedger(shared=shared) if shared is not None else TaintLedger()
+    ledger = TaintLedger(shared=shared, authority=settings.taint_authority)
+    if instruction is not None:
+        ledger.set_instruction(instruction, workspace=ws)
     # A UNION, exactly like the denial list twelve lines up, and for the reason that block already
     # gives: a floor is not a default. A default is what a request gets when it sends nothing, so any
     # client can step around it by sending something.
@@ -993,7 +1000,8 @@ def register_code_api(
         gateway = LLMGateway()
         steps = resolve_steps(req.max_steps)
         registry, ledger = assemble_registry(
-            req, ws, live(), gateway, steps=steps, surface="api:turn", approval_sink=approval_sink
+            req, ws, live(), gateway, steps=steps, surface="api:turn", approval_sink=approval_sink,
+            instruction=req.message,
         )
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
         # drops system messages when it stores the transcript, so the recall is refreshed each turn

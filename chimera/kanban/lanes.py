@@ -98,6 +98,8 @@ class SolveLane:
             settings=settings,
             home=settings.home,
             surface="kanban-solve",
+            instruction=card.action,
+            workspace=self.workspace,
         )
         worker = Agent(
             gateway,
@@ -217,6 +219,8 @@ class AgentLane:
             settings=settings,
             home=settings.home,
             surface=f"kanban-agent:{self.agent.id}",
+            instruction=card.action,
+            workspace=self.workspace,
         )
         registry = restrict_registry(registry, allow=role.allowed_tools)
         worker = Agent(

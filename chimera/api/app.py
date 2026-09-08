@@ -2242,7 +2242,9 @@ def _build_solve_agent(
     # be answered rather than only refused) is the follow-up.
     steps = resolve_steps(req.max_steps)
     posture = resolve_posture(req.posture)
-    registry, ledger = assemble_registry(req, ws, settings, gateway, steps=steps, surface="api:run")
+    registry, ledger = assemble_registry(
+        req, ws, settings, gateway, steps=steps, surface="api:run", instruction=req.task
+    )
     # insist_on_action: solve is task completion, so a described-but-unexecuted plan is pushed back
     # to actually run (mirrors the CLI worker config).
     cfg = AgentConfig(

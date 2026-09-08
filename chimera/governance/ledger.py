@@ -18,6 +18,17 @@ problem: a model laundering tainted content (paraphrasing, re-encoding) defeats 
 matching. It is **observability + sequence-aware review**, layered on top of — not a
 replacement for — the sandbox, which is still the real containment boundary. It only ever
 *escalates to review*; it never hard-blocks a benign action.
+
+**Provenance is not authority** (arXiv 2608.29942; `bench/injection/RESULTS.md`, 2026-09-08). Every
+fetch taints, and the coarse narrowing keyed on that bit escalated a write whose value came from a
+page the user asked for exactly as it escalated the attack — 10/10 against 10/10. The ledger now
+records *who asked* for each fetch (:attr:`CapabilityEvent.requested_by`, derived strictly from the
+user's own instruction via :meth:`TaintLedger.set_instruction`), and a mode switch
+(``CHIMERA_TAINT_AUTHORITY=authority``) lets the narrowing ignore a fetch the user named. The mode
+ships **off**, and the same results file records why: with the user having asked to summarise the
+poisoned page, the flow matcher below is all that remains between the page and the sinks, and it
+sees a whole snippet or a source ref — never a fragment. The signal is recorded in every mode, so a
+reviewer can read it off the ledger either way.
 """
 
 from __future__ import annotations
@@ -110,6 +121,75 @@ def _is_self_executing(path: str) -> bool:
 # escalating on a stray shared word); above it, a verbatim reappearance is a real signal.
 _MIN_FLOW_CHARS = 40
 
+# Who asked for a fetch: the user (its target is named in the user's own instruction), the agent
+# (it chose the target itself), or unknown (the ledger was never told the instruction). Recorded on
+# every fetch whatever the mode; only the ``authority`` mode acts on it.
+REQUESTED_BY = ("user", "agent", "unknown")
+# What the coarse narrowing keys on. ``provenance`` — the default, and the shipped behaviour to the
+# byte — arms it on any tainted event. ``authority`` does not arm it on a tainted fetch or read whose
+# target the user named. Measured before it existed: `bench/injection/RESULTS.md` (2026-09-08).
+AUTHORITY_MODES = ("provenance", "authority")
+
+# Characters that continue a URL or a path. A target found in the instruction with one of these on
+# either side is a FRAGMENT of something longer the user wrote, not the thing the user named.
+_TARGET_CHARS = frozenset("abcdefghijklmnopqrstuvwxyz0123456789/._-~%?&=#@+:")
+# ...except that sentences end: "read config.json." or "see https://a/b?" still names the target.
+_SENTENCE_PUNCT = ".?:,;!"
+
+
+def _normalise(text: str) -> str:
+    """Stripped, case-folded, backslashes to slashes — the one form both sides are compared in."""
+    return text.strip().lower().replace("\\", "/")
+
+
+def _target_forms(target: str, workspace: str) -> set[str]:
+    """The exact spellings of ``target`` a user could have written.
+
+    As given; with and without a leading ``./``; and, for a path when the workspace is known, the
+    workspace-relative and the absolute form. Nothing looser — no basename, no parent, no prefix.
+    """
+    given = _normalise(target)
+    if not given:
+        return set()
+    forms = {given}
+    if "://" in given:
+        return forms
+    relative = given[2:] if given.startswith("./") else given
+    absolute = relative.startswith("/") or (len(relative) > 1 and relative[1] == ":")
+    root = workspace.rstrip("/")
+    if absolute:
+        if root and relative.startswith(root + "/"):
+            inside = relative[len(root) + 1 :]
+            forms.update({inside, "./" + inside})
+    else:
+        forms.update({relative, "./" + relative})
+        if root:
+            forms.add(root + "/" + relative)
+    return {form for form in forms if form}
+
+
+def _named_in(instruction: str, target: str) -> bool:
+    """True if ``target`` occurs in ``instruction`` as a whole URL or path, bounded on both sides.
+
+    A match that continues into more URL/path characters is a fragment of something longer the user
+    wrote (``config.json`` inside ``src/config.json``; ``https://docs.example`` inside
+    ``https://docs.example/upgrade``) and is not a match. Sentence punctuation followed by whitespace
+    or the end of the text is a boundary, so ``read config.json.`` still names the file.
+    """
+    start = instruction.find(target)
+    while start != -1:
+        end = start + len(target)
+        before = instruction[start - 1] if start else ""
+        after = instruction[end] if end < len(instruction) else ""
+        ends_cleanly = after not in _TARGET_CHARS or (
+            after in _SENTENCE_PUNCT
+            and (end + 1 >= len(instruction) or instruction[end + 1].isspace())
+        )
+        if before not in _TARGET_CHARS and ends_cleanly:
+            return True
+        start = instruction.find(target, start + 1)
+    return False
+
 
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:12]
@@ -142,6 +222,15 @@ class CapabilityEvent:
     tainted: bool = False
     detail: str = ""
     provenance: list[str] = field(default_factory=list)  # tainted refs this derived from
+    requested_by: str = "unknown"
+    """Who asked for the fetch or read this event records: ``user`` / ``agent`` / ``unknown``.
+
+    Derived by :meth:`TaintLedger.requester_of` from the user's own instruction when a fetch or a
+    read is recorded; ``unknown`` on every other kind, and on every ledger that was never told the
+    instruction. This is the field the 2026-09-08 authorization run found missing: with
+    ``kind / ref / tainted / detail / provenance`` there was nowhere to write "the user asked for
+    this", so no rule downstream could consult it.
+    """
 
 
 @dataclass
@@ -157,20 +246,40 @@ class SequenceAssessment:
 class TaintLedger:
     """Records capability use across a run and tracks tainted artifacts within it."""
 
-    def __init__(self, *, snippet_chars: int = 2000, shared: SharedTaint | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        snippet_chars: int = 2000,
+        shared: SharedTaint | None = None,
+        authority: str = "provenance",
+    ) -> None:
+        if authority not in AUTHORITY_MODES:
+            raise ValueError(
+                f"authority={authority!r}: expected one of {', '.join(AUTHORITY_MODES)} "
+                "(CHIMERA_TAINT_AUTHORITY)"
+            )
         self.events: list[CapabilityEvent] = []
         self.snippet_chars = snippet_chars
+        # Which tainted events arm the coarse narrowing — see `run_tainted(for_narrowing=True)`.
+        # The default is the shipped behaviour; construction sites pass `settings.taint_authority`.
+        self.authority = authority
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
         # Optional cross-agent taint view: siblings in a fan-out share one, so a fetch here arms the
         # tainted-tool narrowing in every worker (not just this one). None = a standalone run.
         self._shared = shared
+        # The user's own words, normalised, once `set_instruction` has been called — None until
+        # then. Only a target that occurs in here, whole, is recorded as requested by the user.
+        self._instruction: str | None = None
+        self._workspace = ""
 
     # --- recording -------------------------------------------------------------------
 
     def _add(self, kind: str, ref: str, *, tainted: bool = False, detail: str = "",
-             provenance: list[str] | None = None) -> CapabilityEvent:
-        event = CapabilityEvent(len(self.events), kind, ref, tainted, detail, provenance or [])
+             provenance: list[str] | None = None, requested_by: str = "unknown") -> CapabilityEvent:
+        event = CapabilityEvent(
+            len(self.events), kind, ref, tainted, detail, provenance or [], requested_by
+        )
         self.events.append(event)
         if tainted and self._shared is not None:
             # Publish to siblings the instant this run consumes untrusted content, so their narrowing
@@ -178,21 +287,50 @@ class TaintLedger:
             self._shared.publish_tainted()
         return event
 
-    def record_fetch(self, source: str, content: str = "") -> str:
-        """Record an external fetch; its source and content become tainted. Returns the hash."""
+    def _label(self, requested_by: str | None, target: str) -> str:
+        """An explicit label, checked; else the one derived from the instruction."""
+        if requested_by is None:
+            return self.requester_of(target)
+        if requested_by not in REQUESTED_BY:
+            raise ValueError(
+                f"requested_by={requested_by!r}: expected one of {', '.join(REQUESTED_BY)}"
+            )
+        return requested_by
+
+    def record_fetch(
+        self, source: str, content: str = "", *, requested_by: str | None = None
+    ) -> str:
+        """Record an external fetch; its source and content become tainted. Returns the hash.
+
+        ``requested_by`` is derived from ``source`` when not given (see :meth:`requester_of`): the
+        one production caller, ``ledger_tool``, passes the URL or the path the tool fetched, so a
+        page or a file the user named in the instruction reads ``user``. Tainted either way —
+        authority is not trust, and the content is still external.
+        """
         digest = _hash(content) if content else ""
         source = (source or "external").strip()
+        who = self._label(requested_by, source)
         self._tainted.add(source)
         if digest:
             self._tainted.add(digest)
         if content:
             self._snippets.append(content[: self.snippet_chars])
-        self._add("fetch", source, tainted=True, detail=f"sha256:{digest}" if digest else "")
+        self._add(
+            "fetch", source, tainted=True, detail=f"sha256:{digest}" if digest else "",
+            requested_by=who,
+        )
         return digest
 
-    def record_read(self, path: str) -> CapabilityEvent:
+    def record_read(self, path: str, *, requested_by: str | None = None) -> CapabilityEvent:
+        """Record a file read; tainted if the path is (a tainted write landed there earlier).
+
+        Labelled like a fetch, because a read is tainted by its path and the ``authority`` mode
+        reads the label on tainted reads too.
+        """
         path = (path or "").strip()
-        return self._add("read", path, tainted=self.is_tainted(path))
+        return self._add(
+            "read", path, tainted=self.is_tainted(path), requested_by=self._label(requested_by, path)
+        )
 
     def record_write(self, path: str, content: str = "") -> CapabilityEvent:
         """Record a file write; the path inherits taint if the content came from a tainted source."""
@@ -222,19 +360,76 @@ class TaintLedger:
             provenance=list(assessment.tainted_refs),
         )
 
+    # --- authority: who asked for a fetch ----------------------------------------------
+
+    def set_instruction(self, text: str, *, workspace: str | Path | None = None) -> None:
+        """Tell the ledger the user's own instruction, so a fetch can be recorded as ``user``.
+
+        Called once where a run starts with the task known — `chimera solve`, the batch and crew
+        commands, the API's run/turn/lifecycle/crew assembly, the cron jobs and the kanban lanes.
+        Replaces an earlier instruction rather than accumulating. ``workspace`` lets a path the
+        agent gives absolutely match the relative form the user wrote, and the other way round. A
+        ledger never told the instruction labels every fetch ``unknown``, which the narrowing treats
+        exactly as it always did.
+        """
+        self._instruction = _normalise(text or "")
+        self._workspace = _normalise(str(workspace)) if workspace is not None else ""
+
+    @property
+    def instruction(self) -> str | None:
+        """The normalised instruction, or None if the ledger was never told one."""
+        return self._instruction
+
+    def requester_of(self, target: str | None) -> str:
+        """``user`` if the user named ``target`` — a URL or a path — whole, in the instruction.
+
+        Strict on purpose, and this docstring says why because the temptation is real: a basename
+        match (``config.json`` for ``src/config.json``) or a prefix match (``https://docs.example``
+        for ``https://docs.example/upgrade``) would label as the user's request exactly the file an
+        attacker plants beside the one the user asked for — and the ``authority`` mode would then
+        switch the narrowing off for it. A miss fails toward ``agent``, which is the previous
+        behaviour. ``unknown`` when no instruction was set; ``agent`` for an empty target, because a
+        search query or a bare tool name is not something the user can have named.
+        """
+        if self._instruction is None:
+            return "unknown"
+        if not target:
+            return "agent"
+        forms = _target_forms(target, self._workspace)
+        return "user" if any(_named_in(self._instruction, form) for form in forms) else "agent"
+
     # --- taint queries ---------------------------------------------------------------
 
-    def run_tainted(self) -> bool:
+    def run_tainted(self, *, for_narrowing: bool = False) -> bool:
         """True if this run has consumed ANY untrusted content (a tainted event exists).
 
         Coarse by design: it gates *provenance* of durable artifacts (memories, learned
         skills) produced during the run — the "Zombie Agents" self-reinforcing-injection
         surface — not per-action policy, which stays with :func:`assess_action`.
 
+        ``for_narrowing`` is the question the taint-adaptive allowlist asks, and it is the ONE
+        place the ``authority`` mode makes a difference: under it, a tainted fetch or read whose
+        target the user named (``requested_by == "user"``) does not arm the narrowing. Without the
+        flag — durable provenance, pause-on-taint, the query-string rule in :func:`assess_action` —
+        the answer is unchanged, because a value the user asked for is still an external value.
+        Under ``provenance`` the flag changes nothing.
+
         Under a shared cross-agent view, this is also True when a *sibling* worker consumed untrusted
         content — so this worker's dangerous-tool narrowing arms against a split flow it never saw.
+        A fetch is published to that view whoever asked for it, and the view is one bit with no
+        label, so in a fan-out the ``authority`` mode changes nothing for anyone — the worker that
+        fetched included. Measured, not designed: the first test of it expected otherwise.
         """
-        if any(event.tainted for event in self.events):
+        overlook_users_own = for_narrowing and self.authority == "authority"
+        for event in self.events:
+            if not event.tainted:
+                continue
+            if (
+                overlook_users_own
+                and event.kind in ("fetch", "read")
+                and event.requested_by == "user"
+            ):
+                continue
             return True
         return self._shared is not None and self._shared.tainted
 
