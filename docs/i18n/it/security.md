@@ -1,5 +1,5 @@
 ---
-source_sha256: cd4ba57b32db6a5d71c9c0c2452c9bdcba3b28ae416f06b2347ac14df0248b89
+source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
 ---
 
 # Sicurezza & salvaguardie
@@ -20,6 +20,13 @@ ogni livello.
   primo filtro economico di firme shell pericolose, non il confine.
 - **Sandbox** — un container effimero, senza rete (`CHIMERA_SANDBOX=docker`), irrobustibile con
   gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
+  Il **comando di verifica** gira nella stessa sandbox della shell dell'agente, e quando quella
+  sandbox non è isolata un comando che non hai digitato tu — dedotto dal repository, letto da un
+  job cron, da una card o da un workflow — passa per la stessa conferma `CHIMERA_HOST_EXEC`; se
+  rifiutato, si astiene invece di eseguire
+  (`CHIMERA_VERIFY_NETWORK=1` dà la rete a un verificatore docker; sulle sandbox del kernel non
+  può, quindi un verificatore che ha bisogno della rete gira sull'host, e solo se l'hai digitato
+  tu).
 - **Allowlist di tool per sessione** — concede a un'esecuzione solo i tool di cui ha bisogno; il
   resto viene rimosso interamente dallo schema del modello.
 - **Taint tracking** (`--taint`) — il contenuto non fidato è recintato come dato, la sua
@@ -65,6 +72,55 @@ chimera redteam
 esegue un corpus di injection attraverso lo stack. Sul corpus integrato, il livello di taint
 taglia il **tasso di successo dell'attacco dal 100% al ~14%** — e il report *nomina* ciò che
 ancora passa (esfiltrazione tramite un tool consentito) invece di dichiarare 100%.
+
+Lo stesso comando stampa il **costo**, cosa che la prima versione di questa pagina non faceva:
+senza nessuno a cui chiedere, il restringimento rifiuta il **100% del lavoro legittimo che ha
+letto prima qualcosa di esterno** — correggi il file che l'issue nomina, applica l'aggiornamento
+che la documentazione descrive — e il gate registrato (over-block ≤ 5%) fallisce. Quel numero non
+è un problema di taratura; il gate era vuoto. La modalità di approvazione di default è `ask`, e sul
+desktop ora chiede davvero: una chiamata di tool ristretta diventa una domanda a schermo con
+allegata la motivazione del ledger, a cui si risponde con un bottone o con `chimera approve`, e che
+il silenzio rifiuta dopo `CHIMERA_APPROVAL_WAIT` secondi. Con la persona che approva il lavoro che
+ha chiesto lei stessa, l'over-block è 0% e il tasso di blocco degli attacchi non si muove —
+misurato, per braccio, in
+[`bench/injection/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/injection/RESULTS.md).
+L'esfiltrazione tramite un tool consentito è chiusa dallo stesso cambiamento: l'`http_get` di
+un'esecuzione contaminata che porta con sé una query string è una review, e i due GET legittimi con
+query string aggiunti al corpus mostrano quanto costa.
+
+### Memoria avvelenata, attraverso le esecuzioni
+
+`redteam` misura una sola esecuzione. L'altra forma è più lenta e non entra in un processo:
+l'esecuzione A legge una pagina avvelenata e memorizza ciò che ha "imparato"; l'esecuzione B fa una
+domanda non correlata giorni dopo e il richiamo consegna al modello il fatto piantato lì.
+
+```bash
+chimera memory-poison
+```
+
+Anche questo offline e gratuito. Esegue l'ablazione dei tre livelli che stanno tra quelle due
+esecuzioni — il flag di provenienza `tainted`, il gate di ammissione del richiamo, e l'etichetta
+`[unverified]` che il fatto indossa entrando nel prompt — perché un numero solo sarebbe compatibile
+con uno qualsiasi di loro che non fa nulla. Il risultato in evidenza è ciò che arriva
+**senza marcatura**, non ciò che viene bloccato: un fatto avvelenato che porta con sé la propria
+origine è un fatto di cui il modello è stato avvertito; uno senza etichetta è indistinguibile da
+qualcosa che l'agente ha verificato da sé.
+
+Due risultati della prima esecuzione meritano di essere detti chiaramente, perché nessuno dei due
+ci fa bella figura:
+
+- **La configurazione così com'è distribuita fallisce il proprio gate — sul costo.** Marca il 100%
+  del veleno e nel farlo distrugge il 25% della memoria onesta. Le vittime hanno un nome: un
+  documento di sicurezza che cita un attacco per spiegarlo, e un ticket di supporto che inoltra un
+  tentativo. Un pattern matcher sul contenuto non sa distinguere una citazione da un comando.
+- **Su questo corpus il gate sul contenuto non aggiunge nulla che l'etichetta di provenienza non
+  copra già.** Tutto il suo effetto misurato è la memoria onesta che rimuove. Quindici righe
+  scritte a mano sono un indizio e non un verdetto, ed è per questo che sulla loro base non è stato
+  cancellato nulla.
+
+Le soglie, il metodo e ciò che i numeri *non* autorizzano a concludere sono in
+[`bench/memory_poison/PREREGISTRATION.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/memory_poison/PREREGISTRATION.md),
+fissati prima della prima esecuzione.
 
 ## Esporre il server HTTP
 

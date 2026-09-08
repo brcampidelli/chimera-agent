@@ -1,5 +1,5 @@
 ---
-source_sha256: cd4ba57b32db6a5d71c9c0c2452c9bdcba3b28ae416f06b2347ac14df0248b89
+source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
 ---
 
 # Segurança & salvaguardas
@@ -20,6 +20,12 @@ cada camada *para*.
   primeiro filtro barato de assinaturas de shell perigosas, não a fronteira.
 - **Sandbox** — um container efêmero, sem rede (`CHIMERA_SANDBOX=docker`), reforçável com gVisor
   (`CHIMERA_SANDBOX_RUNTIME=runsc`).
+  O **comando de verificação** roda no mesmo sandbox que o shell do agente, e quando esse sandbox
+  não é isolado um comando que não foi digitado por você — inferido do repositório, lido de um job
+  de cron, de um cartão ou de um workflow — passa pela mesma confirmação do `CHIMERA_HOST_EXEC`;
+  recusado, ele se abstém em vez de rodar (`CHIMERA_VERIFY_NETWORK=1` dá rede a um verificador em
+  docker; nos sandboxes de kernel isso não é possível, então um verificador que precisa de rede
+  roda no host, e só quando foi você quem o digitou).
 - **Allowlist de tools por sessão** — concede a uma execução só as tools de que ela precisa; o
   resto é removido inteiramente do schema do modelo.
 - **Rastreamento de taint** (`--taint`) — conteúdo não confiável é cercado como dado, sua
@@ -64,6 +70,52 @@ chimera redteam
 roda um corpus de injection através da pilha. No corpus embutido, a camada de taint corta a
 **taxa de sucesso de ataque de 100% para ~14%** — e o relatório *nomeia* o que ainda passa
 (exfiltração via uma tool permitida) em vez de alegar 100%.
+
+O mesmo comando imprime o **custo**, coisa que a primeira versão desta página não fazia: sem
+ninguém a quem perguntar, o estreitamento recusa **100% do trabalho legítimo que leu qualquer
+coisa externa primeiro** — consertar o arquivo que a issue nomeia, aplicar o upgrade que a
+documentação descreve — e o gate registrado (over-block ≤ 5%) reprova. Esse número não é um
+problema de ajuste; o gate estava vazio. O modo de aprovação padrão é `ask`, e no desktop ele
+agora pergunta: uma chamada de tool estreitada vira uma pergunta na tela, com o motivo do ledger
+anexado, respondida por um botão ou por `chimera approve`, recusada pelo silêncio depois de
+`CHIMERA_APPROVAL_WAIT` segundos. Com a pessoa aprovando o trabalho que ela mesma pediu, o
+over-block é 0% e a taxa de bloqueio de ataques não se move — medido, por braço, em
+[`bench/injection/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/injection/RESULTS.md).
+A exfiltração através de uma tool permitida é fechada pela mesma mudança: em uma execução
+contaminada, um `http_get` que carrega uma query string é um review, e os dois GETs legítimos com
+query string acrescentados ao corpus mostram o que isso custa.
+
+### Memória envenenada, entre execuções
+
+`redteam` mede uma execução. O outro formato é mais lento e não cabe dentro de um processo: a
+execução A lê uma página envenenada e guarda o que "aprendeu"; a execução B faz uma pergunta sem
+nenhuma relação dias depois, e a recuperação entrega o fato plantado ao modelo.
+
+```bash
+chimera memory-poison
+```
+
+Também offline e de graça. Ele desliga uma a uma as três camadas que ficam entre essas duas
+execuções — o marcador de proveniência `tainted`, o gate de admissão da recuperação, e o rótulo
+`[unverified]` que o fato veste ao entrar no prompt — porque um número único seria compatível com
+qualquer uma delas não estar fazendo nada. A manchete é o que chega **sem marcação**, não o que é
+bloqueado: um fato envenenado que carrega sua origem é um fato sobre o qual o modelo foi avisado;
+um sem rótulo é indistinguível de algo que o próprio agente verificou.
+
+Dois resultados da primeira execução merecem ser ditos sem rodeio, porque nenhum dos dois nos
+favorece:
+
+- **A configuração que enviamos reprova no próprio gate — no custo.** Ela marca 100% do veneno e
+  destrói 25% da memória honesta ao fazer isso. As baixas estão nomeadas: um documento de segurança
+  que cita um ataque para poder explicá-lo, e um ticket de suporte encaminhando uma tentativa. Um
+  comparador de padrões sobre o conteúdo não distingue uma citação de um comando.
+- **Neste corpus, o gate de conteúdo não acrescenta nada que o rótulo de proveniência já não
+  cubra.** Todo o efeito medido dele é a memória honesta que ele remove. Quinze linhas escritas à
+  mão são um indício e não um veredito, e é por isso que nada foi deletado com base nisso.
+
+Os limiares, o método e o que os números *não* autorizam estão em
+[`bench/memory_poison/PREREGISTRATION.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/memory_poison/PREREGISTRATION.md),
+fixados antes da primeira execução.
 
 ## Expondo o servidor HTTP
 

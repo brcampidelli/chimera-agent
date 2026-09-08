@@ -1,5 +1,5 @@
 ---
-source_sha256: cd4ba57b32db6a5d71c9c0c2452c9bdcba3b28ae416f06b2347ac14df0248b89
+source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
 ---
 
 # Seguridad y salvaguardas
@@ -19,6 +19,12 @@ skills. Viene con **defensa en profundidad**, y — esto importa — la document
   block. Un primer filtro barato de firmas de shell peligrosas, no la frontera.
 - **Sandbox** — un contenedor efímero, sin red (`CHIMERA_SANDBOX=docker`), endurecible con
   gVisor (`CHIMERA_SANDBOX_RUNTIME=runsc`).
+  El **comando verify** corre en el mismo sandbox que la shell del agente, y cuando ese sandbox no
+  está aislado un comando que no escribiste tú — inferido del repositorio, leído de un trabajo
+  cron, de una tarjeta o de un workflow — pasa por la misma confirmación `CHIMERA_HOST_EXEC`; si
+  la rechazas, se abstiene en lugar de correr (`CHIMERA_VERIFY_NETWORK=1` le da red a un
+  verificador docker; en los sandboxes de kernel no puede, así que un verificador que necesita red
+  corre en el host, y solo cuando lo escribiste tú).
 - **Lista blanca de herramientas por sesión** — otorga a una ejecución solo las herramientas que
   necesita; el resto se elimina por completo del esquema del modelo.
 - **Seguimiento de taint** (`--taint`) — el contenido no confiable se cerca como datos, su
@@ -65,6 +71,51 @@ chimera redteam
 ejecuta un corpus de inyección a través del stack. En el corpus incorporado, la capa de taint
 reduce la **tasa de éxito de ataque del 100% al ~14%** — y el informe *nombra* lo que aún se
 filtra (exfiltración vía una herramienta permitida) en lugar de afirmar el 100%.
+
+El mismo comando imprime el **costo**, cosa que la primera versión de esta página no hacía: sin
+nadie a quien preguntar, la restricción rechaza el **100% del trabajo legítimo que primero leyó
+algo externo** — arregla el archivo que nombra el issue, aplica la actualización que describe la
+documentación — y el gate registrado (sobrebloqueo ≤ 5%) falla. Ese número no es un problema de
+ajuste; el gate estaba vacío. El modo de aprobación por defecto es `ask`, y en el escritorio ahora
+sí pregunta: una llamada a herramienta restringida se convierte en una pregunta en pantalla con el
+motivo del ledger adjunto, respondida con un botón o con `chimera approve`, rechazada por el
+silencio después de `CHIMERA_APPROVAL_WAIT` segundos. Con la persona aprobando el trabajo que
+pidió, el sobrebloqueo es 0% y la tasa de bloqueo de ataques no se mueve — medido, por brazo, en
+[`bench/injection/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/injection/RESULTS.md).
+La exfiltración a través de una herramienta permitida se cierra con el mismo cambio: el `http_get`
+de una ejecución contaminada que lleva un query string es una revisión, y los dos GET legítimos con
+query string agregados al corpus muestran lo que eso cuesta.
+
+### Memoria envenenada, entre ejecuciones
+
+`redteam` mide una sola ejecución. La otra forma es más lenta y no cabe en un proceso: la ejecución
+A lee una página envenenada y guarda lo que "aprendió"; la ejecución B hace una pregunta sin
+relación días después y el recall le entrega al modelo el hecho plantado.
+
+```bash
+chimera memory-poison
+```
+
+También offline y gratis. Hace ablación de las tres capas que están entre esas ejecuciones — la
+marca de procedencia `tainted`, la puerta de admisión del recall, y la etiqueta `[unverified]` que
+el hecho lleva puesta al entrar al prompt — porque un solo número sería compatible con que
+cualquiera de ellas no hiciera nada. Lo que cuenta es lo que llega **sin marcar**, no lo que se
+bloquea: un hecho envenenado que trae consigo su origen es un hecho del que el modelo fue
+advertido; uno sin etiqueta es indistinguible de algo que el propio agente verificó.
+
+Dos resultados de la primera ejecución merecen decirse con claridad, porque ninguno nos halaga:
+
+- **La configuración que se entrega no pasa su propio gate — por costo.** Marca el 100% del veneno
+  y destruye el 25% de la memoria honesta al hacerlo. Las bajas están nombradas: un documento de
+  seguridad que cita un ataque para explicarlo, y un ticket de soporte que reenvía un intento. Un
+  comparador de patrones sobre el contenido no puede distinguir una cita de un comando.
+- **En este corpus el gate de contenido no agrega nada que la marca de procedencia no cubra ya.**
+  Todo su efecto medido es la memoria honesta que elimina. Quince filas escritas a mano son una
+  pista y no un veredicto, y por eso no se ha borrado nada sobre esa base.
+
+Los umbrales, el método y lo que los números *no* autorizan están en
+[`bench/memory_poison/PREREGISTRATION.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/memory_poison/PREREGISTRATION.md),
+fijados antes de la primera ejecución.
 
 ## Exponer el servidor HTTP
 
