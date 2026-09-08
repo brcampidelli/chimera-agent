@@ -258,6 +258,7 @@ class IsolatedCrew:
         workspace: Path,
         *,
         verify: str | None = None,
+        verify_source: str = "user",
         timeout: float | None = None,
     ) -> IsolatedCrewResult:
         """Run the workers in parallel-isolated worktrees; merge only the verified ones.
@@ -266,6 +267,12 @@ class IsolatedCrew:
         (exit 0 == pass). A worker whose changes fail verification is *rejected* — its edits
         are discarded, not merged — so a broken change never lands. With no ``verify``, every
         worker that didn't crash merges (subject to conflict detection).
+
+        ``verify_source`` names who authored that string (see
+        :data:`chimera.core.verify.VERIFY_SOURCES`). Both callers today hand over a command a
+        person typed — the CLI's ``--verify`` and the request field — which is what the default
+        says; a caller feeding a string from a card or a job must say so, because that is what
+        decides whether the host-exec gate stands in front of it.
         """
 
         # One meter per worker, built HERE — `make_unit` runs on this thread while the units are
@@ -326,7 +333,7 @@ class IsolatedCrew:
                     return WorkerOutcome(answer=answer, verified=True)
                 from chimera.core.verify import CommandVerifier
 
-                outcome = CommandVerifier(verify, ws).verify()
+                outcome = CommandVerifier(verify, ws, source=verify_source).verify()
                 if outcome.abstained:
                     # The check reached no verdict: pytest collected nothing, or the binary is not
                     # there. `VerificationResult` sets `passed=True` in that case so the work is not

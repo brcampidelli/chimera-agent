@@ -53,7 +53,8 @@ def run_demo(*, verbose: bool = True) -> Receipt:
         ws = tmp / "workspace"
         shutil.copytree(src, ws)
         guard = WorkspaceGuard(ws)
-        verifier = CommandVerifier(_VERIFY_COMMAND, ws)
+        # `source="user"`: the person running this demo chose the command, in this very file.
+        verifier = CommandVerifier(_VERIFY_COMMAND, ws, source="user")
 
         before = verifier.verify()
         snapshot = guard.snapshot()  # checkpoint the last-known-good state

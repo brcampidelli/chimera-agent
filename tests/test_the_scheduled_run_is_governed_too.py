@@ -72,7 +72,7 @@ def test_the_gate_is_armed_only_by_a_job_that_asked_for_one() -> None:
     no verifier arms the diff gate on report jobs — which is the failure this avoids."""
     source = _dispatch_source()
 
-    assert "CommandVerifier(job.verify, job_root) if gated else None" in source
+    assert 'CommandVerifier(job.verify, job_root, source="job") if gated else None' in source
     assert "WorkspaceGuard(job_root) if gated else None" in source
     assert 'gated = bool(job.verify.strip())' in source
 

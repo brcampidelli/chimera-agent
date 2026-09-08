@@ -117,7 +117,7 @@ def register_lifecycle_api(
         # already prints: "no verify command — this build is judged by a model reading its own
         # answer" has always been true whenever the box was empty, and an interface that does not
         # say so lets an approving paragraph pass for a passing test.
-        from chimera.api.app import resolve_verify
+        from chimera.api.app import resolve_verify, verifier_source
 
         verify_cmd, verify_src = resolve_verify(req.verify, ws)
         emit("verify", {"command": verify_cmd or "", "source": verify_src})
@@ -152,6 +152,8 @@ def register_lifecycle_api(
                     gateway,
                     workspace=ws,
                     verify=verify_cmd,
+                    # Typed in the request, or inferred from the repository: the gate reads it.
+                    verify_source=verifier_source(verify_src),
                     model=req.model,
                     max_steps=steps,
                     max_build_attempts=req.max_attempts,

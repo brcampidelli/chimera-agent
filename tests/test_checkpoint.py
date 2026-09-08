@@ -115,8 +115,8 @@ def test_ignored_dirs_are_left_alone(tmp_path: Path) -> None:
 
 
 def test_command_verifier_pass_and_fail(tmp_path: Path) -> None:
-    assert CommandVerifier("exit 0", tmp_path).verify().passed is True
-    failed = CommandVerifier("exit 1", tmp_path).verify()
+    assert CommandVerifier("exit 0", tmp_path, source="user").verify().passed is True
+    failed = CommandVerifier("exit 1", tmp_path, source="user").verify()
     assert failed.passed is False
 
 

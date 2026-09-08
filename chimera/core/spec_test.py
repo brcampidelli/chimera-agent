@@ -147,7 +147,14 @@ class SpecTestVerifier:
             test_path.write_text(code, encoding="utf-8")
         except OSError as exc:
             return VerificationResult(True, f"spec-test: could not write tests ({exc})", abstained=True)
-        runner = CommandVerifier(self.command.format(file=_TEST_FILE), self.workspace, timeout=self.timeout)
+        # The tests it runs are model-written, so the command is not the user's even when the
+        # template is ours: on a host without an isolated sandbox it goes through the host-exec gate.
+        runner = CommandVerifier(
+            self.command.format(file=_TEST_FILE),
+            self.workspace,
+            timeout=self.timeout,
+            source="spec_test",
+        )
         result = runner.verify()
         # `abstained` is carried, not dropped. Every other exit from this method decides carefully
         # between passing and abstaining, and then this line — the one path where a real command

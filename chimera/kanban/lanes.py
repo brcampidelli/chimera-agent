@@ -119,7 +119,10 @@ class SolveLane:
             worker,
             planner=Planner(gateway, self.model),
             manager=Manager(gateway, self.model),
-            verifier=CommandVerifier(card.verify, self.workspace) if card.verify else None,
+            # A card's verify string was written to the board, not typed for this run.
+            verifier=(
+                CommandVerifier(card.verify, self.workspace, source="card") if card.verify else None
+            ),
             guard=WorkspaceGuard(self.workspace),
             spine_workspace=self.workspace,
             **evo.apply_to(),
@@ -246,7 +249,10 @@ class AgentLane:
             worker,
             planner=Planner(gateway, self.model),
             manager=Manager(gateway, self.model),
-            verifier=CommandVerifier(card.verify, self.workspace) if card.verify else None,
+            # A card's verify string was written to the board, not typed for this run.
+            verifier=(
+                CommandVerifier(card.verify, self.workspace, source="card") if card.verify else None
+            ),
             guard=WorkspaceGuard(self.workspace),
             spine_workspace=self.workspace,
             **evo.apply_to(),

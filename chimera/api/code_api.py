@@ -105,8 +105,10 @@ class CodeSeams(BaseModel):
     tool to ungate, and that is asserted by a test rather than left to reading.
 
     **It closes an asymmetry rather than opening a door.** A caller that reaches this API can
-    already run host commands two other ways: `RunRequest.verify` goes to `CommandVerifier`, which
-    calls `subprocess.run(shell=True)`, and the Runner panel spawns processes with no gate at all.
+    already run host commands two other ways: `RunRequest.verify` goes to `CommandVerifier` (a
+    typed command is authorised by construction; since 2026-09-08 it runs where the shell runs, and
+    an INFERRED one on an unsandboxed host consults this same gate), and the Runner panel spawns
+    processes with no gate at all.
     The only thing refused was the AGENT — this machine would run pytest to judge its work and
     refuse to let it run pytest to fix its work, while the screen said "asks" on a server that has
     no terminal to ask at.
@@ -1247,7 +1249,7 @@ def register_code_api(
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
                     if edited:
-                        from chimera.api.app import resolve_verify
+                        from chimera.api.app import resolve_verify, verifier_source
                         from chimera.core.verify import CommandVerifier
 
                         # Minted for every turn that EDITED, not only for one whose verification
@@ -1271,7 +1273,9 @@ def register_code_api(
                                 "revert_token": token,
                             })
                         else:
-                            outcome = CommandVerifier(command, ws).verify()
+                            outcome = CommandVerifier(
+                                command, ws, source=verifier_source(source)
+                            ).verify()
                             state = (
                                 "abstained" if outcome.abstained
                                 else "passed" if outcome.passed

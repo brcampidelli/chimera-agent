@@ -32,6 +32,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 from chimera.core.checklist import Requirement
 from chimera.core.spec_test import SpecTestVerifier
 from chimera.core.verify import CommandVerifier, module_missing
@@ -90,20 +92,20 @@ def test_a_prefix_of_the_module_name_does_not_count() -> None:
 def test_a_missing_module_abstains_instead_of_failing(tmp_path: Path) -> None:
     """Run for real, no mocking: the interpreter is asked for a module that does not exist, and its
     actual exit code and actual message are what the verifier sees."""
-    result = CommandVerifier(f"{sys.executable} -m {ABSENT}", tmp_path).verify()
+    result = CommandVerifier(f"{sys.executable} -m {ABSENT}", tmp_path, source="user").verify()
     assert result.abstained is True
     assert result.passed is True  # abstention keeps the work; the other gates decide
 
 
 def test_a_command_that_really_failed_still_fails(tmp_path: Path) -> None:
     """The control. A verifier that abstained on everything would keep every change ever made."""
-    result = CommandVerifier(f'{sys.executable} -c "import sys; sys.exit(1)"', tmp_path).verify()
+    result = CommandVerifier(f'{sys.executable} -c "import sys; sys.exit(1)"', tmp_path, source="user").verify()
     assert result.abstained is False
     assert result.passed is False
 
 
 def test_a_command_that_passed_still_passes(tmp_path: Path) -> None:
-    result = CommandVerifier(f'{sys.executable} -c "pass"', tmp_path).verify()
+    result = CommandVerifier(f'{sys.executable} -c "pass"', tmp_path, source="user").verify()
     assert result.passed is True
     assert result.abstained is False
 
@@ -126,9 +128,15 @@ def test_the_spec_verifier_carries_the_abstention_out(tmp_path: Path) -> None:
     assert result.abstained is True, "the abstention was swallowed on the way out again"
 
 
-def test_the_spec_verifier_still_reports_a_real_failure(tmp_path: Path) -> None:
+def test_the_spec_verifier_still_reports_a_real_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The control for the wrapper: a generated test that genuinely fails is a true negative the
     gate must heed, and carrying `abstained` must not turn every result into an abstention."""
+    # The spec runner executes model-written tests, so it runs where the shell runs: behind the
+    # host-exec gate on a machine with no isolated sandbox. This test is about the wrapper, not the
+    # gate — say `allow`, as the operator of such a machine would, so the command really runs.
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
     verifier = SpecTestVerifier(
         _Generator("def test_no() -> None:\n    assert False\n"),  # type: ignore[arg-type]
         "build soma.py",

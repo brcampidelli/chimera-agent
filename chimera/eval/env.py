@@ -123,7 +123,8 @@ class TaskEnv:
 
         test = self.task.get("test")
         command = str(self.task.get("verify") or f'"{sys.executable}" -m pytest -q {test}')
-        result = CommandVerifier(command, ws, timeout=self.timeout).verify()
+        # The command comes from the task definition, not from the person running the bench.
+        result = CommandVerifier(command, ws, timeout=self.timeout, source="eval").verify()
         # `abstained` means no verification actually ran — never positive evidence, so no reward.
         return result.passed and not result.abstained
 

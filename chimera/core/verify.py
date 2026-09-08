@@ -3,6 +3,16 @@
 A ``Verifier`` answers one question: did the attempt succeed? The canonical verifier
 runs a command (tests, a build, a linter) and treats exit code 0 as success — the
 "executable evidence" gate that lets the agent keep a change instead of reverting it.
+
+The command runs **where the agent's own shell runs** — through the configured sandbox, and behind
+the host-exec gate when that sandbox is not isolated. It used to run ``subprocess.run(shell=True)``
+on the host, outside the kernel, the taint ledger and the host-exec confirmation, which all wrap
+*tools*. A verify string is not always typed by the person starting the run: it is inferred from a
+repository's own ``package.json`` / ``Makefile`` / ``pyproject.toml``, read from a cron job file, a
+kanban card or a workflow YAML — a shell string bound to a runtime event, which is the exact shape
+arXiv 2609.03884 used to compromise seven harnesses. So every constructor names who authored the
+string (:data:`VERIFY_SOURCES`), and only the one typed in the same breath as the run is authorised
+by construction.
 """
 
 from __future__ import annotations
@@ -11,12 +21,31 @@ import os
 import re
 import shlex
 import shutil
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:
+    from chimera.sandbox.base import Sandbox
+    from chimera.sandbox.confirm import HostExecConfirm
+
+_log = get_logger("core.verify")
 
 _MAX_OUTPUT_CHARS = 20_000
+
+#: Who authored the verify string. One literal per call site, and the gate reads it: ``user`` is a
+#: command typed on the CLI or sent explicitly in the API request — authorised by construction,
+#: because the person asked for the run and the check in the same breath. Every other value names
+#: a string that came back out of a file: inferred from the repository's own build files
+#: (``inferred``), a cron job (``job``), a kanban card (``card``), a workflow YAML (``workflow``),
+#: the spec-test runner over model-written tests (``spec_test``), a crew or lifecycle run whose
+#: check was not typed by the person starting it (``crew``, ``lifecycle``), or a benchmark task
+#: definition (``eval``).
+VERIFY_SOURCES = frozenset(
+    {"user", "inferred", "job", "card", "workflow", "spec_test", "crew", "eval", "lifecycle"}
+)
 
 #: Exit codes that mean "this command reached no verdict", not "the work is bad".
 #:
@@ -173,31 +202,120 @@ class Verifier(Protocol):
 
 
 class CommandVerifier:
-    """Runs a shell command; success == exit code 0."""
+    """Runs a shell command; success == exit code 0.
 
-    def __init__(self, command: str, workspace: Path, *, timeout: int = 120) -> None:
+    The command runs through the sandbox the agent's own ``run_shell`` uses — the kernel sandbox
+    where the platform has one, docker when configured, the host otherwise — and, when that sandbox
+    is not isolated and the string was not typed by the user, behind the same host-exec
+    confirmation (``CHIMERA_HOST_EXEC``). A declined command is an **abstention**: we could not
+    check it, we do not claim we did, and the loop's other gates take over — the same semantics
+    this file already gives a program that is not installed.
+
+    ``source`` is required and keyword-only on purpose. A constructor that could be called without
+    it would be one more site where a string from a file reaches a shell with nobody having said
+    where it came from. ``sandbox`` and ``confirm`` default to what the shell tool would resolve
+    (:func:`chimera.sandbox.get_sandbox`, :func:`chimera.sandbox.confirm.resolve_host_exec_confirm`)
+    and exist so a test can hand in a fake of either.
+    """
+
+    def __init__(
+        self,
+        command: str,
+        workspace: Path,
+        *,
+        timeout: int = 120,
+        source: str,
+        sandbox: Sandbox | None = None,
+        confirm: HostExecConfirm | None = None,
+    ) -> None:
+        if source not in VERIFY_SOURCES:
+            raise ValueError(
+                f"verify source {source!r} is not one of {sorted(VERIFY_SOURCES)}: the gate needs "
+                "to know who authored the command"
+            )
         self.command = command
         self.workspace = Path(workspace)
         self.timeout = timeout
+        self.source = source
+        self._sandbox = sandbox
+        self._confirm = confirm
+
+    def _abstain(self, reason: str) -> VerificationResult:
+        """Say why the command did not run, where the receipt will show it, and stand aside."""
+        _log.warning("verify command not run (%s source): %s", self.source, reason)
+        return VerificationResult(True, f"verify command not run: {reason}", abstained=True)
+
+    def _resolve_sandbox(self) -> Sandbox | VerificationResult:
+        """The backend this command runs in, or the abstention explaining why there is none.
+
+        ``CHIMERA_VERIFY_NETWORK`` is honoured where it can be: a docker sandbox is rebuilt with the
+        network on. The kernel sandboxes deny the network by construction (bubblewrap
+        ``--unshare-net``, Seatbelt ``(deny default)``) and cannot be asked for it, so there the
+        only way to give the verifier a network is the host — which is allowed for a command the
+        user typed, and refused for one that came out of a file.
+        """
+        from chimera.config import get_settings
+        from chimera.sandbox import DockerSandbox, LocalSandbox, get_sandbox
+        from chimera.sandbox.confirm import sandbox_is_isolated
+
+        sandbox: Sandbox = self._sandbox if self._sandbox is not None else get_sandbox()
+        if not get_settings().verify_network:
+            return sandbox
+        if isinstance(sandbox, DockerSandbox):
+            return DockerSandbox(
+                sandbox.image,
+                network=True,
+                memory=sandbox.memory,
+                cpus=sandbox.cpus,
+                pids_limit=sandbox.pids_limit,
+                runtime=sandbox.runtime,
+                fallback=sandbox.fallback,
+            )
+        if not sandbox_is_isolated(sandbox):
+            return sandbox  # the host has the network already
+        if self.source == "user":
+            _log.warning(
+                "CHIMERA_VERIFY_NETWORK is set and the OS sandbox cannot grant a network; the "
+                "verify command you typed runs on the host instead"
+            )
+            return LocalSandbox()
+        return self._abstain(
+            "CHIMERA_VERIFY_NETWORK asks for the network, the OS sandbox cannot grant it, and a "
+            f"command from the {self.source} may not fall back to the host — only one you typed may"
+        )
+
+    def _declined(self, sandbox: Sandbox) -> bool:
+        """Whether the host-exec gate refused this command. Never consulted for ``user`` or inside
+        a genuinely isolated sandbox — the confirmation asks about running on the HOST."""
+        from chimera.sandbox.confirm import resolve_host_exec_confirm, sandbox_is_isolated
+
+        if self.source == "user" or sandbox_is_isolated(sandbox):
+            return False
+        confirm = self._confirm if self._confirm is not None else resolve_host_exec_confirm()
+        return confirm is not None and not confirm(self.command)
 
     def verify(self) -> VerificationResult:
-        try:
-            proc = subprocess.run(
-                self.command,
-                shell=True,
-                cwd=self.workspace,
-                capture_output=True,
-                text=True,
-                timeout=self.timeout,
+        resolved = self._resolve_sandbox()
+        if isinstance(resolved, VerificationResult):
+            return resolved
+        sandbox = resolved
+        if self._declined(sandbox):
+            # Recorded as a log line rather than an audit entry: the verifier is built outside the
+            # tool registry, so no audit hook reaches it. The abstention itself goes on the receipt.
+            return self._abstain(
+                f"its source is {self.source!r}, the sandbox is not isolated, and the host-exec "
+                "gate (CHIMERA_HOST_EXEC) declined to run it on the host"
             )
-        except subprocess.TimeoutExpired:
-            return VerificationResult(False, f"verification timed out after {self.timeout}s")
+        try:
+            result = sandbox.run(self.command, timeout=self.timeout, cwd=self.workspace)
         except OSError as exc:
             # e.g. the cwd was removed, or the command binary is missing — report a failed/unverifiable
             # attempt instead of letting it propagate and abort the whole run.
             return VerificationResult(False, f"verification could not run: {exc}")
-        output = ((proc.stdout or "") + (proc.stderr or ""))[:_MAX_OUTPUT_CHARS]
-        if proc.returncode in _NO_VERDICT:
+        if result.timed_out:
+            return VerificationResult(False, f"verification timed out after {self.timeout}s")
+        output = result.output[:_MAX_OUTPUT_CHARS]
+        if result.exit_code in _NO_VERDICT:
             # The command produced no verdict, which is NOT the same as a verdict of "bad".
             #
             # 127 is the shell saying the command does not exist; 5 is pytest saying it collected no
@@ -213,18 +331,18 @@ class CommandVerifier:
             # correctly stops being "verifier". We could not check it; we do not claim we did, and we
             # do not punish the work for our own inability.
             return VerificationResult(True, output, abstained=True)
-        if proc.returncode != 0 and module_missing(self.command, output):
+        if result.exit_code != 0 and module_missing(self.command, output):
             # `python -m <tool>` where the tool is not installed: the binary exists, the exit code is
             # 1, and only the message distinguishes it from a test that failed. Checked after a
             # non-zero exit for the same reason as the Windows arm below — a command that ran and
             # genuinely failed must never be reinterpreted as an abstention.
             return VerificationResult(True, output, abstained=True)
-        if proc.returncode != 0 and os.name == "nt" and program_missing(self.command, self.workspace):
+        if result.exit_code != 0 and os.name == "nt" and program_missing(self.command, self.workspace):
             # The Windows half of the same abstention. Checked only after a non-zero exit, so a
             # command that exists and genuinely fails is never reinterpreted, and `which` is not
             # paid on the happy path.
             return VerificationResult(True, output, abstained=True)
-        return VerificationResult(proc.returncode == 0, output)
+        return VerificationResult(result.exit_code == 0, output)
 
 
 class NullVerifier:
