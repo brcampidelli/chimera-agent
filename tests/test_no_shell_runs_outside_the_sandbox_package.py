@@ -8,7 +8,7 @@ timeout that kills the whole tree, and the `is_isolated()` claim the host-exec g
 what `CommandVerifier.verify` was for as long as it existed: a shell string from a repository's
 own files, a cron job, a card or a workflow, spawned on the host with none of it.
 
-The two exemptions below are listed, not hidden. The test asserts the offenders are *exactly* that
+The exemptions below are listed, not hidden. The test asserts the offenders are *exactly* that
 set: a new `shell=True` fails the build, and an exemption whose site no longer spawns a shell fails
 it too, so the list cannot go stale in either direction.
 """
@@ -29,13 +29,6 @@ EXEMPT: dict[str, str] = {
         "(`type(...) is`, not isinstance, so a kernel wrapper is never stepped around) and spawns "
         "with that sandbox's own _child_env — the streaming twin of LocalSandbox.run, not a way "
         "around it"
-    ),
-    "chimera/eval/selftest.py": (
-        "a bench self-check a developer runs at a terminal: each task's verify command is run on the "
-        "untouched benchmark workspace to prove the test discriminates. The string is the task "
-        "file's — the same shape the verifier gates — so this is the one remaining shell that a file "
-        "reaches directly; routing it through the sandbox is a follow-up, and until then it stays "
-        "named here rather than silently allowed"
     ),
 }
 

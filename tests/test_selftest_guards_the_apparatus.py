@@ -27,6 +27,17 @@ from chimera.eval.selftest import (
 PY = f'"{sys.executable}"'
 
 
+@pytest.fixture(autouse=True)
+def _host_exec_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The verify command is the task file's, not the developer's, so on a host with no OS sandbox
+    it runs behind the host-exec gate — and a headless pytest cannot answer a prompt. Say ``allow``,
+    as the developer at the terminal would; the one test about the gate itself says ``deny``."""
+    from chimera.config import get_settings
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "allow")
+    get_settings.cache_clear()
+
+
 def _workspace(tmp_path: Path, name: str, files: dict[str, str]) -> Path:
     ws = tmp_path / name
     ws.mkdir(parents=True, exist_ok=True)
@@ -201,3 +212,34 @@ def test_a_clean_suite_says_so_and_returns(tmp_path: Path) -> None:
 
     assert [v.ok for v in verdicts] == [True]
     assert "1 tasks discriminate" in "\n".join(lines)
+
+
+# --- the command is the task file's, and it runs where the agent's shell runs ---------------------
+
+
+def test_a_verify_command_the_host_gate_declines_abstains_and_runs_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The string came out of a task file, never off a keyboard, so on a host with no isolated
+    sandbox it is gated as the verifier gates ``job`` and ``card``. Declined must mean NOTHING
+    executed — only the filesystem can say that, hence the marker — and the verdict is an
+    abstention naming the source: not vacuous, not a crash, a run the guard could not prove."""
+    from chimera.config import get_settings
+    from chimera.sandbox import LocalSandbox
+
+    monkeypatch.setenv("CHIMERA_HOST_EXEC", "deny")
+    get_settings.cache_clear()
+    workspace = _workspace(tmp_path, "declined", {})
+    check = TaskCheck(
+        task_id="declined",
+        setup=lambda: workspace,
+        verify=f"{PY} -c \"import pathlib; pathlib.Path('ran').write_text('ran')\"",
+    )
+
+    # A real host sandbox, pinned: on a machine with bubblewrap or Seatbelt `get_sandbox()` would
+    # isolate, the gate would rightly not be asked, and this test would be about the platform.
+    verdict = check_discriminates(check, sandbox=LocalSandbox())
+
+    assert not (workspace / "ran").exists(), "the declined command reached the host"
+    assert verdict.runnable is False and verdict.discriminates is False
+    assert "'eval'" in verdict.detail and "CHIMERA_HOST_EXEC" in verdict.detail
