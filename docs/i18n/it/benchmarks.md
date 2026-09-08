@@ -1,5 +1,5 @@
 ---
-source_sha256: c43eb27971827466c65af13024113757f691c30d3666c4aa73c60105c08c56ab
+source_sha256: d6a62d29618f1f5cd5c1604bace2215da0688ce486abd1de9aabc19e9910adad
 ---
 
 # Benchmark — dimostrare il vantaggio sui modelli deboli
@@ -63,44 +63,46 @@ il sottoinsieme validato da esseri umani.
 
 ### Risultati
 
-Quattro esecuzioni pre-registrate su fette di `django/django`
-(strato di difficoltà più facile), `deepseek-chat-v3.1`, pass@1, valutate **solo** dall'harness
-ufficiale `swebench` 4.1.0 in Docker. Resoconto completo:
+Quattro esecuzioni pre-registrate su fette di `django/django`, `deepseek-chat-v3.1`, pass@1,
+valutate **solo** dall'harness ufficiale `swebench` 4.1.0 in Docker. Resoconto completo:
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
 
-| run | baseline | + Chimera | Δ appaiato | IC 95% | |
-|---|---|---|---|---|---|
-| 1 (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | non significativo |
-| 2 (`max_steps=30`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] | non significativo |
-| **3 (replicazione)** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | non significativo |
-| **aggregato (secondario)** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
-| 4 (attribuzione) | 34.1% | *solo impalcatura* 39.0% | +4.9% | [−7.6%, +14.2%] | non significativo |
+| run | fetta | baseline | + Chimera | Δ appaiato | IC 95% | |
+|---|---|---|---|---|---|---|
+| 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | non significativo |
+| 2 (`max_steps=30`) | le stesse 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | non significativo |
+| **3 (replicazione)** | **41 mai viste** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | non significativo |
+| **aggregato (secondario)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
+| 4 (attribuzione) | le 41 della run 3 | 34.1% | *solo impalcatura* 39.0% | +4.9% | [−7.6%, +14.2%] | non significativo |
 
 La run 1 è uno **zero esatto** ed è pubblicata invariata. La run 2 ha corretto due difetti che
 erano **nostri** — lo scaffold girava senza il suo meccanismo più forte, e 8 passi di
 tool-calling non bastano per navigare un repository da 250 MB — ed è uscita con **3 istanze
-vinte, 0 perse**. La coppia è il risultato: lo scaffold non vale *nulla* quando l'agente è
-privato di passi, e *tre istanze* quando non lo è, e vince editando **meglio** (69% contro 57% di
-precisione quando edita), non editando di più.
+vinte, 0 perse**.
 
-> ⚠️ **Nessuno di questi è uno score SWE-bench Verified.** La fetta è deliberatamente facile e a
-> singolo repository, scelta perché un A/B appaiato abbia margine di misurazione; uno score
-> Verified vero richiede i 500 completi. E il delta **non è significativo** — con 8 coppie in cui
-> entrambi falliscono, n=19 lascia solo tre coppie informative.
+Quel 3–0 su tre coppie informative è esattamente la forma che produce un campione fortunato, e la
+pre-registrazione gli dava **una possibilità su tre di essere solo quello**. Così l'esecuzione 3 lo
+ha ripetuto su **41 istanze i cui esiti non avevamo mai visto**, senza cambiare nient'altro: gli
+stessi bracci, lo stesso modello, lo stesso budget di passi, lo stesso timeout.
+L'effetto **è riapparso**: +9,8%, dentro la banda registrata da +5 a +20, su una fetta risultata
+*più difficile* di quella dell'esecuzione 2 (baseline 34,1% contro 42,1%). L'esecuzione 4 ha poi
+separato l'impalcatura dal diff-gate sulle stesse 41: **+4,9% ciascuno**, e il meccanismo è la
+precisione, che sale 50% → 59% → 67% mentre il tasso di patch non si muove.
+
+> ⚠️ **Nessuno di questi è uno score SWE-bench Verified.** Le fette sono deliberatamente facili e
+> a singolo repository, scelte perché un A/B appaiato abbia margine di misurazione; uno score
+> Verified vero richiede i 500 completi. Nessuna esecuzione singola è significativa. L'aggregato
+> n=60 lo è — ed è stato pre-registrato come **secondario** proprio perché mescola dati visti e
+> non visti, così da sostenere l'effetto invece di quantificarlo.
+
+Due nostre previsioni sono state ritrattate lungo il percorso, con lo stesso risalto con cui erano
+state formulate: il meccanismo che avevamo tracciato per le patch vuote della run 1 (la correzione
+era il budget di passi, non il diff-gate che avevamo incolpato), e una lettura della run 2 che la
+run 4 ha contraddetto.
 
 La run 2 porta anche una **ritrattazione**: il meccanismo che avevamo tracciato per le patch
 vuote della run 1 era sbagliato (la correzione era il budget di passi, non il diff-gate che
 avevamo incolpato), corretto con lo stesso risalto con cui era stato affermato.
-
-Quel 3–0 su tre coppie informative è esattamente la forma che produce un campione fortunato, e la
-pre-registrazione gli dava **una possibilità su tre di essere solo quello**. Così l'esecuzione 3 lo
-ha ripetuto su **41 istanze i cui esiti non avevamo mai visto**, senza cambiare nient'altro.
-L'effetto **è riapparso**: +9,8%, dentro la banda registrata da +5 a +20, su una fetta risultata
-*più difficile* di quella dell'esecuzione 2 (baseline 34,1% contro 42,1%). L'esecuzione 4 ha poi
-separato l'impalcatura dal diff-gate sulle stesse 41: **+4,9% ciascuno**, e il meccanismo è la
-precisione, che sale 50% → 59% → 67% mentre il tasso di patch non si muove. Nessuna esecuzione
-singola è significativa; l'aggregato n=60 lo è — ed è stato pre-registrato come **secondario**
-proprio perché mescola dati visti e non visti.
 
 ### L'adattatore
 

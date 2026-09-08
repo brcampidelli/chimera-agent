@@ -70,18 +70,18 @@ chimera redteam
 ```
 
 fait passer un corpus d'injection dans la pile. Sur le corpus intégré, la couche de contamination
-réduit le **taux de réussite des attaques de 100 % à ~14 %** — et le rapport *nomme* ce qui passe
-encore (exfiltration via un outil autorisé) plutôt que de prétendre à 100 %.
+réduit le **taux de réussite des attaques de 100 % à ~14 %** — et le rapport *nomme* ce qui passe
+encore (exfiltration via un outil autorisé) plutôt que de prétendre à 100 %.
 
 La même commande imprime le **coût**, ce que la première version de cette page ne faisait pas :
-sans personne à qui demander, la restriction refuse **100 % du travail légitime ayant d'abord lu
+sans personne à qui demander, la restriction refuse **100 % du travail légitime ayant d'abord lu
 quoi que ce soit d'externe** — corriger le fichier que l'issue nomme, appliquer la mise à jour que
-la documentation décrit — et la gate enregistrée (sur-blocage ≤ 5 %) échoue. Ce chiffre n'est pas un
+la documentation décrit — et la gate enregistrée (sur-blocage ≤ 5 %) échoue. Ce chiffre n'est pas un
 problème de réglage ; la gate était vide. Le mode d'approbation par défaut est `ask`, et sur le
 desktop il demande désormais vraiment : un appel d'outil restreint devient une question à
 l'écran, accompagnée de la raison inscrite au registre, à laquelle on répond par un bouton ou
 `chimera approve`, et que le silence refuse après `CHIMERA_APPROVAL_WAIT` secondes. Avec la
-personne qui approuve le travail qu'elle a demandé, le sur-blocage est de 0 % et le taux de blocage
+personne qui approuve le travail qu'elle a demandé, le sur-blocage est de 0 % et le taux de blocage
 des attaques ne bouge pas — mesuré, par bras, dans
 [`bench/injection/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/injection/RESULTS.md).
 L'exfiltration via un outil autorisé est fermée par le même changement : le `http_get` d'un run
@@ -108,8 +108,8 @@ l'agent a vérifié lui-même.
 
 Deux résultats du premier run méritent d'être dits franchement, car aucun ne nous flatte :
 
-- **La configuration livrée échoue à sa propre gate — sur le coût.** Elle marque 100 % du poison et
-  détruit 25 % de la mémoire honnête pour y arriver. Les victimes sont nommées : un document de
+- **La configuration livrée échoue à sa propre gate — sur le coût.** Elle marque 100 % du poison et
+  détruit 25 % de la mémoire honnête pour y arriver. Les victimes sont nommées : un document de
   sécurité qui cite une attaque pour l'expliquer, et un ticket de support qui transmet une
   tentative. Un comparateur de motifs sur le contenu ne sait pas distinguer une citation d'une
   commande.

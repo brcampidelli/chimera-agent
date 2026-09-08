@@ -1,5 +1,5 @@
 ---
-source_sha256: 472844a34ca189775b1f61de23b6ed2a36820a935b8465106a9f283a134caa33
+source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
 ---
 
 # Distribuire Chimera su un server (VPS)
@@ -122,6 +122,41 @@ docker compose exec chimera chimera cron add "morning-brief" "0 8 * * *" "..."
 Il daemon pulsa ogni `--cron-tick` secondi (default 30) e invia l'azione di ogni job attraverso
 l'agente quando è dovuta. Un job che fallisce viene registrato e non ferma mai il daemon.
 
+### Chiedere alla pianificazione quello che non ti sta dicendo
+
+```bash
+chimera cron doctor
+```
+
+Una pianificazione può ammutolire in due modi, e finché non lo chiedi i due sembrano identici — una
+pianificazione senza nulla in scadenza:
+
+- **Non è girato niente.** Il daemon è morto, il container non è mai stato riavviato, l'host ha
+  dormito. Nessuna eccezione, nessuna riga di log, nessun verdetto. Ogni altro meccanismo di onestà
+  qui sta *a valle di un'esecuzione che è avvenuta*, quindi nessuno di essi ha il suo turno.
+- **È girato tutto e ha fallito tutto.** Il daemon è vivo, `last_run` è di un minuto fa, la
+  pianificazione avanza — e ogni invio fallisce da un mese. Questo caso si legge come *più sano* del
+  primo, perché il campo che sembra indicare salute registra il tentativo, non l'esito.
+
+`cron doctor` pone entrambe le domande e dà consigli diversi, perché le riparazioni non hanno nulla
+in comune: in ritardo riguarda il daemon, in fallimento riguarda il job. `chimera cron list` stampa
+una riga quando qualcosa sta fallendo, così non devi sapere che il comando esiste per venirlo a
+sapere.
+
+**Cosa non è.** È una domanda, non un guardiano: finché il processo è a terra qui non se ne accorge
+nessuno, per la stessa ragione per cui un processo andato in crash non può registrare il proprio
+crash. Risponde onestamente nel momento in cui qualcosa chiede — una shell, l'app, il prossimo
+avvio. Un guardiano vero ha bisogno di un proprio orologio e di una propria vitalità, che è una
+decisione a parte ed è
+[tracciata come issue #26](https://github.com/brcampidelli/chimera-agent/issues/26). Se vuoi un
+avviso invece di una risposta, eseguilo dal cron dell'host stesso:
+
+```cron
+*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+```
+
+Funziona perché è sorvegliato da qualcosa che non è Chimera — che è tutto il punto.
+
 ---
 
 ## 4. Salute, backup, sicurezza
@@ -136,7 +171,8 @@ l'agente quando è dovuta. Un job che fallisce viene registrato e non ferma mai 
   sull'API desktop (la UI desktop riceve il token automaticamente solo per i client loopback, così
   un'istanza esposta da remoto resta dietro la propria autenticazione). L'autenticazione è opt-in
   e vuota per default, quindi senza quella variabile non ce n'è nessuna — restringi la porta, o
-  esponi solo il percorso del webhook.
+  esponi solo il percorso del webhook. Per raggiungere questa istanza dall'app desktop, vedi
+  [§5](#5-reaching-this-instance-from-the-desktop-app).
 - **Sandboxing:** imposta `CHIMERA_SANDBOX=docker` per eseguire i tool shell/codice in un
   container usa-e-getta invece che sull'host.
 - **Esecuzione host non presidiata:** dal 2026-07-20 un'esecuzione headless **rifiuta** i comandi
@@ -150,7 +186,85 @@ l'agente quando è dovuta. Un job che fallisce viene registrato e non ferma mai 
 
 ---
 
-## 5. Stato onesto
+## 5. Raggiungere questa istanza dall'app desktop
+
+L'app desktop per default parla con la Chimera che avvia sulla tua macchina. Dalla v0.44 può anche
+puntare a una che gestisci tu — questo VPS — e così l'app diventa una finestra sull'agente che passa
+già la notte a fare i tuoi job cron.
+
+**Leggi questa parte prima di aprire una porta.** Quello che stai esponendo non è una dashboard.
+Ogni schermata di quell'app è una superficie di comando: esegue shell, modifica file, distribuisce
+una bacheca di task autonomi e cambia impostazioni. Un'istanza raggiungibile da internet senza token
+non è "una Chimera che qualcuno potrebbe guardare" — è una macchina su cui chiunque trovi
+l'indirizzo può eseguire comandi, pagati dalle tue chiavi provider.
+
+Devono essere vere tre cose, e senza le prime due l'app si rifiuta di connettersi:
+
+**1 — TLS.** Mettila dietro a un reverse proxy con un certificato vero (Caddy te ne procura uno):
+
+```caddyfile
+chimera.seudominio.com {
+    reverse_proxy 127.0.0.1:8765
+}
+```
+
+L'app rifiuta un indirizzo senza `https` fuori dalla tua macchina, perché il token viaggia in un
+header `Authorization` a **ogni** richiesta — su http semplice quella è una credenziale consegnata a
+ogni salto tra te e il server, e sullo schermo nulla sembrerebbe sbagliato mentre accade.
+
+**2 — Un token.** L'autenticazione è opt-in e vuota per default:
+
+```bash
+CHIMERA_SERVER_TOKEN=$(openssl rand -hex 32)
+```
+
+Mettilo nel `.env`, riavvia e incolla lo stesso valore nell'app. L'app rifiuta un indirizzo remoto
+senza token per la ragione qui sopra: un'istanza che non ne ha è aperta a chiunque la trovi.
+
+Nota cosa il server deliberatamente **non** fa: quando un client remoto chiede la UI, serve la
+pagina *senza* il token. Il token non viene mai consegnato via rete — lo copi nel tuo client, una
+volta sola, fuori banda. È per questo che l'app ha un campo apposta.
+
+**3 — L'origine della tua app.** L'app è servita dal proprio sidecar locale, quindi le sue richieste
+a questa istanza sono cross-origin e un browser scarta le risposte finché questa istanza non nomina
+quell'origine:
+
+```bash
+CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
+```
+
+L'app ti mostra il valore esatto quando una connessione fallisce — è nel messaggio di errore, pronto
+da copiare. La porta è stabile per installazione (viene ricordata tra un avvio e l'altro dalla
+v0.43), quindi si imposta una volta per ogni macchina da cui ti connetti. Più origini si separano
+con virgole.
+
+**Questa impostazione non è un confine di sicurezza e non va letta come tale.** CORS decide quale
+*pagina* può leggere una risposta; non decide nulla su chi può *chiamare*. Il gate è il token.
+Nominare un'origine senza impostare un token non protegge nulla — rende solo un'istanza non protetta
+raggiungibile da un browser oltre che da `curl`.
+
+Vuota per default, così un'istanza che nessuno ha configurato si comporta esattamente come prima.
+
+### Cosa ti dice l'app quando fallisce
+
+- **"Il token è stato rifiutato"** — l'indirizzo e l'origine sono giusti; il valore è sbagliato.
+- **"Non sono riuscito a raggiungerla"** — o l'indirizzo è sbagliato o l'origine non è permessa. Il
+  browser si rifiuta apposta di dire quale dei due, così l'app li nomina entrambi invece di
+  indovinare e ti consegna l'origine da permettere.
+- **Un avviso di versione** — l'app confronta la versione del proprio backend con questa e dice
+  entrambi i numeri. Non rifiuta: un server indietro di una release di solito funziona, e rifiutare
+  ti lascerebbe bloccato proprio sulla schermata che ti servirebbe per sistemarlo. Alcuni endpoint
+  potrebbero non esistere sul lato più vecchio.
+
+### Ancora più sicuro
+
+Salta del tutto la porta pubblica: raggiungi il VPS via WireGuard o una tailnet Tailscale e punta
+l'app all'indirizzo privato. Il token conta comunque — una tailnet è una stanza più piccola, non una
+vuota.
+
+---
+
+## 6. Stato onesto
 
 Chimera è in **alpha**. Questo si distribuisce e gira, e il daemon cron lo rende proattivo — ma
 non ha ancora **chilometraggio di produzione**. Inizia con cron a basso rischio, osserva i `logs`,

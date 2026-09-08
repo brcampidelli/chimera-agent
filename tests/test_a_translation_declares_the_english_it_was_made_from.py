@@ -9,8 +9,8 @@ was written because that sidecar went stale twice — this is the same failure o
 and it was found the same way: by reading files, not by a failing build.
 
 **Measured 2026-09-08, before this file existed: 53 of 99 translated pages were stale**, six pages
-in every one of the nine languages. That is a real backlog, and a test that failed on all of it
-would be red on arrival and switched off within the week — so this is a **ratchet**, not a wall:
+in every one of the nine languages. All of them were refreshed the same day, so `KNOWN_STALE` is
+empty and every page is checked. The ratchet stays, because the backlog is what it is for:
 
 - A page in :data:`KNOWN_STALE` is allowed to be stale. The list is dated, and it may only shrink.
 - **Any other drift fails.** A page that leaves the list can never quietly return to it, and a page
@@ -36,15 +36,13 @@ I18N = DOCS / "i18n"
 #: Pages whose translations were already stale when this guard was written (2026-09-08), with the
 #: number of languages behind at that moment. Entries may be REMOVED as translations are refreshed;
 #: adding one is what this test exists to prevent.
-KNOWN_STALE: frozenset[str] = frozenset(
-    {
-        "benchmarks.md",  # 9 languages behind
-        "deploy.md",  # 8 languages behind (ru was current)
-        "index.md",  # 9
-        "recipes.md",  # 9
-        "usage.md",  # 9
-    }
-)
+KNOWN_STALE: frozenset[str] = frozenset()
+"""Empty since 2026-09-08, and the shape of the list is kept for the day it is needed again.
+
+It held five pages for the length of one afternoon. The backlog it named — 53 of 99 translated
+pages carrying the hash of an English they no longer matched — is gone, so every page is now
+checked without exception, and adding an entry here is a decision someone has to defend in a
+review rather than a default."""
 
 
 def _front_matter_hash(path: pathlib.Path) -> str | None:

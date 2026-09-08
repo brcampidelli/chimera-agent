@@ -1,5 +1,5 @@
 ---
-source_sha256: c43eb27971827466c65af13024113757f691c30d3666c4aa73c60105c08c56ab
+source_sha256: d6a62d29618f1f5cd5c1604bace2215da0688ce486abd1de9aabc19e9910adad
 ---
 
 # Benchmarki — dowód na wzmocnienie słabego modelu
@@ -63,44 +63,47 @@ zielonych `PASS_TO_PASS`. "Verified" to podzbiór zwalidowany przez ludzi.
 
 ### Wyniki
 
-Cztery wcześniej zarejestrowane uruchomienia na wycinkach
-`django/django` (najłatwiejsza warstwa trudności), `deepseek-chat-v3.1`, pass@1, ocenione
-**wyłącznie** przez oficjalny harness `swebench` 4.1.0 w Dockerze. Pełne opracowanie:
+Cztery wcześniej zarejestrowane uruchomienia na wycinkach `django/django`,
+`deepseek-chat-v3.1`, pass@1, ocenione **wyłącznie** przez oficjalny harness `swebench` 4.1.0
+w Dockerze. Pełne opracowanie:
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
 
-| run | baseline | + Chimera | paired Δ | 95% CI | |
-|---|---|---|---|---|---|
-| 1 (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | not significant |
-| 2 (`max_steps=30`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] | not significant |
-| **3 (replikacja)** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | nieistotne |
-| **zbiorczo (drugorzędne)** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **istotne** |
-| 4 (atrybucja) | 34.1% | *samo rusztowanie* 39.0% | +4.9% | [−7.6%, +14.2%] | nieistotne |
+| uruchomienie | wycinek | baseline | + Chimera | sparowana Δ | 95% CI | |
+|---|---|---|---|---|---|---|
+| 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | nieistotne |
+| 2 (`max_steps=30`) | te same 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | nieistotne |
+| **3 (replikacja)** | **41 niewidzianych** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | nieistotne |
+| **zbiorczo (drugorzędne)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **istotne** |
+| 4 (atrybucja) | te 41 z uruchomienia 3 | 34.1% | *samo rusztowanie* 39.0% | +4.9% | [−7.6%, +14.2%] | nieistotne |
 
 Uruchomienie 1 to **dokładne zero** i jest opublikowane bez zmian. Uruchomienie 2 naprawiło dwie
 wady, które były *nasze* — rusztowanie działało bez swojego najsilniejszego mechanizmu, a 8 kroków
 wywołań narzędzi to za mało, by nawigować po 250 MB repozytorium — i wyszło z wynikiem **3
-instancje wygrane, 0 przegranych**. Ta para jest odkryciem: rusztowanie jest warte *nic*, gdy
-agentowi brakuje kroków, i *trzy instancje*, gdy ich nie brakuje, a wygrywa **lepszą** edycją (69%
-vs 57% precyzji, gdy edytuje), a nie edytowaniem więcej.
-
-> ⚠️ **Żaden z tych wyników nie jest wynikiem SWE-bench Verified.** Wycinek jest celowo łatwy i
-> jednorepozytoryjny, wybrany tak, by test A/B miał miejsce do pomiaru; prawdziwy wynik Verified
-> potrzebuje pełnych 500. A delta **nie jest istotna statystycznie** — przy 8 parach, w których
-> obie strony zawodzą, n=19 zostawia tylko trzy informatywne pary.
-
-Uruchomienie 2 przynosi też **retrakcję**: mechanizm, który wytropiliśmy dla pustych patchy z
-uruchomienia 1, był błędny (naprawą był budżet kroków, nie diff-gate, który obwiniliśmy),
-skorygowaną tak samo widocznie, jak było to zgłoszone.
+instancje wygrane, 0 przegranych**.
 
 To 3–0 na trzech informatywnych parach ma dokładnie kształt, jaki daje szczęśliwa próbka, a
 prerejestracja dawała temu **jedną szansę na trzy, że to tylko tyle**. Uruchomienie 3 powtórzyło
 więc wszystko na **41 instancjach, których wyników nigdy nie widzieliśmy**, nie zmieniając nic
-innego. Efekt **pojawił się ponownie**: +9,8%, wewnątrz zarejestrowanego pasma od +5 do +20, na
-wycinku, który okazał się *trudniejszy* niż ten z uruchomienia 2 (baseline 34,1% wobec 42,1%).
-Uruchomienie 4 rozdzieliło potem rusztowanie i diff-gate na tych samych 41: **po +4,9%**, a
-mechanizmem jest precyzja, która rośnie 50% → 59% → 67%, podczas gdy odsetek łatek nie drgnie. Żadne
-pojedyncze uruchomienie nie jest istotne; zbiorcze n=60 jest — i zostało prerejestrowane jako
-**drugorzędne** właśnie dlatego, że miesza dane widziane z niewidzianymi.
+innego: te same ramiona, ten sam model, ten sam budżet kroków, ten sam limit czasu. Efekt
+**pojawił się ponownie**: +9,8%, wewnątrz zarejestrowanego pasma od +5 do +20, na wycinku, który
+okazał się *trudniejszy* niż ten z uruchomienia 2 (baseline 34,1% wobec 42,1%). Uruchomienie 4
+rozdzieliło potem rusztowanie i diff-gate na tych samych 41: **po +4,9%**, a mechanizmem jest
+precyzja, która rośnie 50% → 59% → 67%, podczas gdy odsetek łatek nie drgnie.
+
+> ⚠️ **Żaden z tych wyników nie jest wynikiem SWE-bench Verified.** Wycinki są celowo łatwe i
+> jednorepozytoryjne, wybrane tak, by test A/B miał miejsce do pomiaru; prawdziwy wynik Verified
+> potrzebuje pełnych 500. Żadne pojedyncze uruchomienie nie jest istotne. Zbiorcze n=60 jest — i
+> zostało prerejestrowane jako **drugorzędne** właśnie dlatego, że miesza dane widziane z
+> niewidzianymi, więc wspiera efekt, zamiast go wymierzać.
+
+Dwie nasze własne przewidywania zostały po drodze wycofane, tak samo widocznie, jak zostały
+postawione: mechanizm, który wytropiliśmy dla pustych patchy z uruchomienia 1 (naprawą był budżet
+kroków, nie diff-gate, który obwiniliśmy), oraz odczyt uruchomienia 2, któremu uruchomienie 4
+zaprzeczyło.
+
+Uruchomienie 2 przynosi też **retrakcję**: mechanizm, który wytropiliśmy dla pustych patchy z
+uruchomienia 1, był błędny (naprawą był budżet kroków, nie diff-gate, który obwiniliśmy),
+skorygowaną tak samo widocznie, jak było to zgłoszone.
 
 ### Adapter
 
