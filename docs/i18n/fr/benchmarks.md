@@ -1,5 +1,5 @@
 ---
-source_sha256: c43eb27971827466c65af13024113757f691c30d3666c4aa73c60105c08c56ab
+source_sha256: d6a62d29618f1f5cd5c1604bace2215da0688ce486abd1de9aabc19e9910adad
 ---
 
 # Benchmarks — prouver le gain sur modèle faible
@@ -63,44 +63,46 @@ produire un patch qui fait passer les tests `FAIL_TO_PASS` de l'instance tout en
 
 ### Résultats
 
-Quatre runs pré-enregistrés sur des tranches `django/django` (strate de
-difficulté la plus facile), `deepseek-chat-v3.1`, pass@1, notés **uniquement** par le harness
-officiel `swebench` 4.1.0 dans Docker. Compte-rendu complet :
+Quatre runs pré-enregistrés sur des tranches `django/django`, `deepseek-chat-v3.1`, pass@1,
+notés **uniquement** par le harness officiel `swebench` 4.1.0 dans Docker. Compte-rendu complet :
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
 
-| run | référence | + Chimera | Δ apparié | IC 95 % | |
-|---|---|---|---|---|---|
-| 1 (`max_steps=8`) | 36,8 % (7/19) | 36,8 % (7/19) | +0,0 % | [−8,5 %, +8,5 %] | non significatif |
-| 2 (`max_steps=30`) | 42,1 % (8/19) | **57,9 % (11/19)** | **+15,8 %** | [−1,9 %, +15,8 %] | non significatif |
-| **3 (réplication)** | 34,1 % (14/41) | **43,9 % (18/41)** | **+9,8 %** | [−3,5 %, +16,7 %] | non significatif |
-| **groupé (secondaire)** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | **significatif** |
-| 4 (attribution) | 34,1 % | *échafaudage seul* 39,0 % | +4,9 % | [−7,6 %, +14,2 %] | non significatif |
+| run | tranche | référence | + Chimera | Δ apparié | IC 95 % | |
+|---|---|---|---|---|---|---|
+| 1 (`max_steps=8`) | 19 | 36,8 % (7/19) | 36,8 % (7/19) | +0,0 % | [−8,5 %, +8,5 %] | non significatif |
+| 2 (`max_steps=30`) | les mêmes 19 | 42,1 % (8/19) | 57,9 % (11/19) | +15,8 % | [−1,9 %, +15,8 %] | non significatif |
+| **3 (réplication)** | **41 inédites** | 34,1 % (14/41) | **43,9 % (18/41)** | **+9,8 %** | [−3,5 %, +16,7 %] | non significatif |
+| **groupé (secondaire)** | **60** | 36,7 % (22/60) | 48,3 % (29/60) | **+11,7 %** | **[+0,8 %, +16,4 %]** | **significatif** |
+| 4 (attribution) | les 41 du run 3 | 34,1 % | *échafaudage seul* 39,0 % | +4,9 % | [−7,6 %, +14,2 %] | non significatif |
 
 Le run 1 est un **zéro exact** et est publié sans modification. Le run 2 a corrigé deux défauts
 qui étaient les *nôtres* — le scaffold tournait sans son mécanisme le plus fort, et 8 étapes
 d'appel d'outils ne suffisent pas pour naviguer dans un dépôt de 250 Mo — et est ressorti avec
-**3 instances gagnées, 0 perdue**. La paire est le résultat : le scaffold ne vaut *rien* quand
-l'agent est privé d'étapes et *trois instances* quand il ne l'est pas, et il gagne en éditant
-**mieux** (69 % contre 57 % de précision quand il édite), pas en éditant plus.
+**3 instances gagnées, 0 perdue**.
 
-> ⚠️ **Aucun de ces chiffres n'est un score SWE-bench Verified.** La tranche est délibérément facile et
-> mono-dépôt, choisie pour qu'un A/B apparié ait de la marge pour mesurer ; un vrai score
-> Verified nécessite les 500 complets. Et le delta n'est **pas significatif** — avec 8 paires
-> échec-échec, n=19 ne laisse que trois paires informatives.
+Ce 3–0 sur trois paires informatives est exactement la forme que produit un échantillon chanceux, et
+le pré-enregistrement lui donnait **une chance sur trois de n'être que cela**. Le run 3 l'a donc
+répété sur **41 instances dont nous n'avions jamais vu les résultats**, sans rien changer d'autre :
+les mêmes bras, le même modèle, le même budget d'étapes, le même délai d'expiration.
+L'effet **a réapparu** : +9,8 %, dans la fourchette enregistrée de +5 à +20, sur une tranche qui
+s'est révélée *plus difficile* que celle du run 2 (référence 34,1 % contre 42,1 %). Le run 4 a
+ensuite séparé l'échafaudage du diff-gate sur les mêmes 41 : **+4,9 % chacun**, et le mécanisme est
+la précision, qui monte de 50 % à 59 % puis 67 % alors que le taux de patch ne bouge pas.
+
+> ⚠️ **Aucun de ces chiffres n'est un score SWE-bench Verified.** Les tranches sont délibérément
+> faciles et mono-dépôt, choisies pour qu'un A/B apparié ait de la marge pour mesurer ; un vrai
+> score Verified nécessite les 500 complets. Aucun run isolé n'est significatif. Le groupé n=60
+> l'est — et il a été pré-enregistré comme **secondaire** précisément parce qu'il mélange données
+> vues et non vues, de sorte qu'il étaye l'effet plutôt qu'il n'en mesure l'ampleur.
+
+Deux de nos propres prédictions ont été rétractées en cours de route, aussi ostensiblement
+qu'elles avaient été formulées : le mécanisme que nous avions retracé pour les patchs vides du
+run 1 (le correctif était le budget d'étapes, pas le diff-gate que nous avions blâmé), et une
+lecture du run 2 que le run 4 a contredite.
 
 Le run 2 livre aussi une **rétractation** : le mécanisme que nous avions retracé pour les
 patchs vides du run 1 était erroné (le correctif était le budget d'étapes, pas la porte de diff
 que nous avions blâmée), corrigé aussi ostensiblement qu'il avait été affirmé.
-
-Ce 3–0 sur trois paires informatives est exactement la forme que produit un échantillon chanceux, et
-le pré-enregistrement lui donnait **une chance sur trois de n'être que cela**. Le run 3 l'a donc
-répété sur **41 instances dont nous n'avions jamais vu les résultats**, sans rien changer d'autre.
-L'effet **a réapparu** : +9,8 %, dans la fourchette enregistrée de +5 à +20, sur une tranche qui
-s'est révélée *plus difficile* que celle du run 2 (référence 34,1 % contre 42,1 %). Le run 4 a
-ensuite séparé l'échafaudage du diff-gate sur les mêmes 41 : **+4,9 % chacun**, et le mécanisme est
-la précision, qui monte de 50 % à 59 % puis 67 % alors que le taux de patch ne bouge pas. Aucun run
-isolé n'est significatif ; le groupé n=60 l'est — et il a été pré-enregistré comme **secondaire**
-précisément parce qu'il mélange données vues et non vues.
 
 ### L'adaptateur
 

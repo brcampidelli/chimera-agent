@@ -1,5 +1,5 @@
 ---
-source_sha256: fe1348e242b1851c75bb1525ecf723afe068c499ed372335aca5e281cc72ba04
+source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 ---
 
 # Chimera
@@ -25,17 +25,26 @@ Este sitio está orientado a tareas: elige lo que quieres hacer.
   Conecta cualquier servidor MCP (GitHub, sistema de archivos, …).
   [Servidores MCP →](mcp.md)
 
+- **:material-account-switch: Conduce otro agente**
+  Entrega un turno a Claude Code o Gemini CLI por ACP — y lee qué le hace eso a las garantías.
+  [Agentes externos →](external-agents.md)
+
 - **:material-server: Ponlo a operar**
   Ejecútalo 24/7 en un servidor pequeño; programa trabajos; entrega a chat.
   [Despliegue →](deploy.md)
 
 - **:material-shield-lock: Seguridad**
   Gobernanza, sandbox, seguimiento de taint — y sus límites honestos.
-  [Seguridad →](security.md)
+  [Seguridad →](security.md) · [Auditoría de canales durmientes →](audits/sleeper-channels.md)
 
 - **:material-sitemap: Entiéndelo**
   Cómo encajan el núcleo de fusión, la evolución, y las capas de seguridad.
   [Arquitectura →](architecture.md)
+
+- **:material-console: Cada comando**
+  Los 79, generados desde la propia CLI — incluidos los 33 que no aparecían en ninguna
+  documentación.
+  [Referencia de comandos →](commands.md)
 
 </div>
 

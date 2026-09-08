@@ -1,5 +1,5 @@
 ---
-source_sha256: c43eb27971827466c65af13024113757f691c30d3666c4aa73c60105c08c56ab
+source_sha256: d6a62d29618f1f5cd5c1604bace2215da0688ce486abd1de9aabc19e9910adad
 ---
 
 # Benchmarks — demostrando la mejora del modelo débil
@@ -63,44 +63,46 @@ que haga pasar las pruebas `FAIL_TO_PASS` de la instancia manteniendo en verde l
 
 ### Resultados
 
-Cuatro ejecuciones pre-registradas sobre slices de
-`django/django` (el estrato de dificultad más fácil), `deepseek-chat-v3.1`, pass@1, calificadas
-**únicamente** por el harness oficial `swebench` 4.1.0 en Docker. Informe completo:
+Cuatro ejecuciones pre-registradas sobre slices de `django/django`, `deepseek-chat-v3.1`, pass@1,
+calificadas **únicamente** por el harness oficial `swebench` 4.1.0 en Docker. Informe completo:
 [`bench/swe_bench/RESULTS.md`](../bench/swe_bench/RESULTS.md).
 
-| ejecución | baseline | + Chimera | Δ pareada | IC 95% | |
-|---|---|---|---|---|---|
-| 1 (`max_steps=8`) | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | no significativo |
-| 2 (`max_steps=30`) | 42.1% (8/19) | **57.9% (11/19)** | **+15.8%** | [−1.9%, +15.8%] | no significativo |
-| **3 (replicación)** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | no significativo |
-| **agrupado (secundario)** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
-| 4 (atribución) | 34.1% | *solo el andamiaje* 39.0% | +4.9% | [−7.6%, +14.2%] | no significativo |
+| ejecución | slice | baseline | + Chimera | Δ pareada | IC 95% | |
+|---|---|---|---|---|---|---|
+| 1 (`max_steps=8`) | 19 | 36.8% (7/19) | 36.8% (7/19) | +0.0% | [−8.5%, +8.5%] | no significativo |
+| 2 (`max_steps=30`) | los mismos 19 | 42.1% (8/19) | 57.9% (11/19) | +15.8% | [−1.9%, +15.8%] | no significativo |
+| **3 (replicación)** | **41 no vistas** | 34.1% (14/41) | **43.9% (18/41)** | **+9.8%** | [−3.5%, +16.7%] | no significativo |
+| **agrupado (secundario)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
+| 4 (atribución) | las 41 de la ejecución 3 | 34.1% | *solo el andamiaje* 39.0% | +4.9% | [−7.6%, +14.2%] | no significativo |
 
 La ejecución 1 es un **cero exacto** y se publica sin cambios. La ejecución 2 corrigió dos fallos
 que eran *nuestros* — el scaffold corría sin su mecanismo más fuerte, y 8 pasos de llamada a
 herramientas no bastan para navegar un repositorio de 250 MB — y terminó con **3 instancias
-ganadas, 0 perdidas**. El par es el hallazgo: el scaffold no vale *nada* cuando el agente está
-privado de pasos, y vale *tres instancias* cuando no lo está, y gana editando **mejor** (69% vs.
-57% de precisión cuando edita), no editando más.
+ganadas, 0 perdidas**.
 
-> ⚠️ **Ninguno de estos es una puntuación de SWE-bench Verified.** El slice es deliberadamente fácil y de
-> un solo repo, elegido para que un A/B pareado tenga margen de medición; una puntuación Verified
-> real necesita el conjunto completo de 500. Y la delta **no es significativa** — con 8 pares
-> ambos-fallan, n=19 deja solo tres pares informativos.
+Ese 3–0 sobre tres pares informativos es justo la forma que produce una muestra afortunada, y el
+pre-registro le daba **una posibilidad entre tres de ser solo eso**. Así que la ejecución 3 lo
+repitió sobre **41 instancias cuyos resultados nunca habíamos visto**, sin cambiar nada más: los
+mismos brazos, el mismo modelo, el mismo presupuesto de pasos, el mismo tiempo límite. El
+efecto **reapareció**: +9,8%, dentro de la banda registrada de +5 a +20, en un slice que resultó
+*más difícil* que el de la ejecución 2 (baseline 34,1% vs 42,1%). La ejecución 4 separó luego el
+andamiaje del diff-gate sobre las mismas 41: **+4,9% cada uno**, y el mecanismo es la precisión, que
+sube 50% → 59% → 67% mientras la tasa de parches no se mueve.
+
+> ⚠️ **Ninguno de estos es una puntuación de SWE-bench Verified.** Los slices son deliberadamente
+> fáciles y de un solo repo, elegidos para que un A/B pareado tenga margen de medición; una
+> puntuación Verified real necesita el conjunto completo de 500. Ninguna ejecución individual es
+> significativa. El agrupado n=60 sí lo es — y se pre-registró como **secundario** precisamente
+> porque mezcla datos vistos con no vistos, de modo que respalda el efecto en vez de dimensionarlo.
+
+Dos predicciones nuestras fueron retractadas por el camino, con el mismo protagonismo con que se
+hicieron: el mecanismo que habíamos rastreado para los parches vacíos de la ejecución 1 (la
+corrección fue el presupuesto de pasos, no el diff-gate al que culpamos), y una lectura de la
+ejecución 2 que la ejecución 4 contradijo.
 
 La ejecución 2 también trae una **retractación**: el mecanismo que habíamos rastreado para los
 parches vacíos de la ejecución 1 estaba equivocado (la corrección fue el presupuesto de pasos, no
 el diff-gate al que culpamos), corregido con el mismo protagonismo con que se afirmó.
-
-Ese 3–0 sobre tres pares informativos es justo la forma que produce una muestra afortunada, y el
-pre-registro le daba **una posibilidad entre tres de ser solo eso**. Así que la ejecución 3 lo
-repitió sobre **41 instancias cuyos resultados nunca habíamos visto**, sin cambiar nada más. El
-efecto **reapareció**: +9,8%, dentro de la banda registrada de +5 a +20, en un slice que resultó
-*más difícil* que el de la ejecución 2 (baseline 34,1% vs 42,1%). La ejecución 4 separó luego el
-andamiaje del diff-gate sobre las mismas 41: **+4,9% cada uno**, y el mecanismo es la precisión, que
-sube 50% → 59% → 67% mientras la tasa de parches no se mueve. Ninguna ejecución individual es
-significativa; el agrupado n=60 sí — y se pre-registró como **secundario** precisamente porque
-mezcla datos vistos con no vistos.
 
 ### El adaptador
 

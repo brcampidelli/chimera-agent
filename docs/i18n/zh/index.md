@@ -1,5 +1,5 @@
 ---
-source_sha256: fe1348e242b1851c75bb1525ecf723afe068c499ed372335aca5e281cc72ba04
+source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 ---
 
 # Chimera
@@ -23,17 +23,25 @@ source_sha256: fe1348e242b1851c75bb1525ecf723afe068c499ed372335aca5e281cc72ba04
   接入任意 MCP 服务器（GitHub、文件系统……）。
   [MCP 服务器 →](mcp.md)
 
+- **:material-account-switch: 驱动另一个智能体**
+  通过 ACP 把一个回合交给 Claude Code 或 Gemini CLI——并读一读这对保证意味着什么。
+  [外部智能体 →](external-agents.md)
+
 - **:material-server: 让它运转起来**
   在一台小型服务器上 7×24 运行；安排定时任务；把结果送达到聊天工具。
   [部署 →](deploy.md)
 
 - **:material-shield-lock: 安全**
   治理、沙箱、污点追踪——以及它们诚实的边界。
-  [安全 →](security.md)
+  [安全 →](security.md) · [潜伏通道审计 →](audits/sleeper-channels.md)
 
 - **:material-sitemap: 理解它**
   融合核心、演进机制与安全层是如何拼在一起的。
   [架构 →](architecture.md)
+
+- **:material-console: 每一条命令**
+  全部 79 条，由 CLI 自身生成——包括此前任何文档都没有提到的那 33 条。
+  [命令参考 →](commands.md)
 
 </div>
 

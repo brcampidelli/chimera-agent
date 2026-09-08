@@ -1,5 +1,5 @@
 ---
-source_sha256: 472844a34ca189775b1f61de23b6ed2a36820a935b8465106a9f283a134caa33
+source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
 ---
 
 # Déployer Chimera sur un serveur (VPS)
@@ -124,6 +124,42 @@ Le démon fait un tick toutes les `--cron-tick` secondes (30 par défaut) et dis
 chaque tâche via l'agent quand elle est due. Une tâche en échec est journalisée et n'arrête
 jamais le démon.
 
+### Demander au planning ce qu'il ne dit pas
+
+```bash
+chimera cron doctor
+```
+
+Un planning peut se taire de deux façons, et tant que vous ne demandez pas, les deux se ressemblent
+— comme un planning où rien n'est dû :
+
+- **Rien ne s'est exécuté.** Le démon est mort, le conteneur n'a jamais été redémarré, l'hôte a
+  dormi. Pas d'exception, pas de ligne de log, pas de verdict. Tous les autres mécanismes
+  d'honnêteté d'ici se situent *en aval d'une exécution ayant eu lieu*, donc aucun n'a son tour.
+- **Tout s'est exécuté et tout a échoué.** Le démon est vivant, `last_run` date d'une minute, le
+  planning avance — et chaque distribution échoue depuis un mois. Ce cas se lit comme *plus sain*
+  que le premier, parce que le champ qui ressemble à de la santé enregistre la tentative, pas le
+  résultat.
+
+`cron doctor` pose les deux questions et donne des conseils différents, parce que les correctifs
+n'ont rien en commun : en retard concerne le démon, en échec concerne la tâche. `chimera cron list`
+affiche une ligne dès que quelque chose échoue, pour que vous n'ayez pas besoin de savoir que la
+commande existe pour l'apprendre.
+
+**Ce que ce n'est pas.** C'est une question, pas une sentinelle : tant que le processus est à terre,
+rien ici ne s'en aperçoit, pour la même raison qu'un processus planté ne peut pas journaliser son
+propre plantage. Il répond honnêtement à l'instant où quelque chose demande — un shell,
+l'application, le prochain démarrage. Une vraie sentinelle a besoin de sa propre horloge et de sa
+propre vivacité, ce qui est une décision à part et est
+[suivi comme l'issue #26](https://github.com/brcampidelli/chimera-agent/issues/26). Si vous voulez
+une alerte plutôt qu'une réponse, lancez-le depuis le cron de l'hôte lui-même :
+
+```cron
+*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+```
+
+Cela fonctionne parce que c'est supervisé par autre chose que Chimera — et c'est tout l'intérêt.
+
 ---
 
 ## 4. Santé, sauvegardes, sécurité
@@ -139,7 +175,9 @@ jamais le démon.
   gateway HTTP et l'API desktop (l'interface desktop reçoit automatiquement le jeton uniquement
   pour les clients en loopback, donc une instance exposée à distance reste derrière votre propre
   authentification). L'authentification est opt-in et vide par défaut, donc sans cette variable
-  il n'y en a aucune — restreignez le port, ou n'exposez que le chemin du webhook.
+  il n'y en a aucune — restreignez le port, ou n'exposez que le chemin du webhook. Pour joindre
+  cette instance depuis l'application desktop, voir
+  [§5](#5-reaching-this-instance-from-the-desktop-app).
 - **Sandboxing :** définissez `CHIMERA_SANDBOX=docker` pour exécuter les outils shell/code dans
   un conteneur jetable plutôt que sur l'hôte.
 - **Exécution hôte sans surveillance :** depuis le 2026-07-20, un run headless **refuse** les
@@ -153,7 +191,89 @@ jamais le démon.
 
 ---
 
-## 5. Statut honnête
+## 5. Joindre cette instance depuis l'application desktop
+
+L'application desktop parle par défaut à la Chimera qu'elle démarre sur votre propre machine. Depuis
+la v0.44 elle peut aussi pointer vers une instance que vous exploitez vous-même — ce VPS — si bien
+que l'application devient une fenêtre sur l'agent qui passe déjà la nuit à faire vos tâches cron.
+
+**Lisez cette partie avant d'ouvrir un port.** Ce que vous exposez n'est pas un tableau de bord.
+Chaque écran de cette application est une surface de commande : elle exécute du shell, modifie des
+fichiers, distribue un tableau de tâches autonomes et change des réglages. Une instance joignable
+depuis Internet sans jeton n'est pas « une Chimera que quelqu'un pourrait regarder » — c'est une
+machine sur laquelle quiconque trouve l'adresse peut exécuter des commandes, payées par vos clés de
+fournisseur.
+
+Trois choses doivent être vraies, et sans les deux premières l'application refuse de se connecter :
+
+**1 — TLS.** Placez-la derrière un reverse proxy avec un vrai certificat (Caddy en obtient un pour
+vous) :
+
+```caddyfile
+chimera.seudominio.com {
+    reverse_proxy 127.0.0.1:8765
+}
+```
+
+L'application refuse une adresse sans `https` en dehors de votre propre machine, parce que le jeton
+voyage dans un en-tête `Authorization` à **chaque** requête — en http simple c'est un identifiant
+remis à chaque saut entre vous et le serveur, et rien à l'écran n'aurait l'air anormal pendant ce
+temps.
+
+**2 — Un jeton.** L'authentification est opt-in et vide par défaut :
+
+```bash
+CHIMERA_SERVER_TOKEN=$(openssl rand -hex 32)
+```
+
+Mettez-le dans le `.env`, redémarrez, et collez la même valeur dans l'application. L'application
+refuse une adresse distante sans jeton pour la raison ci-dessus : une instance qui n'en a pas est
+ouverte à qui la trouve.
+
+Notez ce que le serveur ne fait délibérément **pas** : quand un client distant demande l'interface,
+il sert la page *sans* le jeton. Le jeton n'est jamais distribué sur le réseau — vous le copiez dans
+votre propre client, une fois, hors bande. C'est pour cela que l'application a un champ pour lui.
+
+**3 — L'origine de votre application.** L'application est servie par son propre sidecar local, donc
+ses requêtes vers cette instance sont cross-origin et un navigateur jette les réponses tant que
+cette instance ne nomme pas cette origine :
+
+```bash
+CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
+```
+
+L'application vous montre la valeur exacte quand une connexion échoue — elle est dans le message
+d'erreur, prête à copier. Le port est stable par installation (il est mémorisé entre les lancements
+depuis la v0.43), donc cela se règle une fois par machine depuis laquelle vous vous connectez.
+Plusieurs se séparent par des virgules.
+
+**Ce réglage n'est pas une frontière de sécurité et ne doit pas être lu comme telle.** CORS décide
+quelle *page* peut lire une réponse ; il ne décide rien sur qui peut *appeler*. La barrière, c'est le
+jeton. Nommer une origine sans définir de jeton ne protège rien — cela rend seulement une instance
+non protégée joignable depuis un navigateur en plus de `curl`.
+
+Vide par défaut, donc une instance que personne n'a configurée se comporte exactement comme avant.
+
+### Ce que l'application vous dit quand ça échoue
+
+- **« Le jeton a été refusé »** — l'adresse et l'origine sont bonnes ; la valeur est mauvaise.
+- **« Impossible de la joindre »** — soit l'adresse est mauvaise, soit l'origine n'est pas
+  autorisée. Le navigateur refuse exprès de dire laquelle, donc l'application nomme les deux plutôt
+  que de deviner et vous remet l'origine à autoriser.
+- **Un avertissement de version** — l'application compare la version de son propre backend à
+  celle-ci et annonce les deux numéros. Elle ne refuse pas : un serveur en retard d'une version
+  fonctionne en général, et refuser vous laisserait bloqué sur l'écran dont vous auriez besoin pour
+  corriger. Certains endpoints peuvent ne pas exister du côté le plus ancien.
+
+### Encore plus sûr
+
+Sautez complètement le port public : joignez le VPS via WireGuard ou un tailnet Tailscale et pointez
+l'application vers l'adresse privée. Le jeton compte toujours — un tailnet est une pièce plus
+petite, pas une pièce vide.
+
+---
+
+## 6. Statut honnête
 
 Chimera est en **alpha**. Cela se déploie et fonctionne, et le démon cron le rend proactif —
 mais il n'a **aucun vécu en production** pour l'instant. Commencez par des crons à faible enjeu,

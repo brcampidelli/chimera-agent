@@ -70,18 +70,18 @@ chimera redteam
 ```
 
 führt einen Injection-Corpus durch den Stack. Beim eingebauten Corpus senkt die Taint-Schicht
-die **Erfolgsquote von Angriffen von 100 % auf ~14 %** — und der Bericht *benennt*, was
-weiterhin durchkommt (Exfiltration über ein erlaubtes Tool), statt 100 % zu behaupten.
+die **Erfolgsquote von Angriffen von 100 % auf ~14 %** — und der Bericht *benennt*, was
+weiterhin durchkommt (Exfiltration über ein erlaubtes Tool), statt 100 % zu behaupten.
 
 Derselbe Befehl gibt auch die **Kosten** aus, was die erste Fassung dieser Seite nicht tat: Ist
-niemand da, den man fragen könnte, verweigert die Verengung **100 % der legitimen Arbeit, die
+niemand da, den man fragen könnte, verweigert die Verengung **100 % der legitimen Arbeit, die
 zuerst irgendetwas Externes gelesen hat** — die Datei reparieren, die das Issue nennt; das Upgrade
-einspielen, das die Dokumentation beschreibt — und das registrierte Gate (Over-Block ≤ 5 %) fällt
+einspielen, das die Dokumentation beschreibt — und das registrierte Gate (Over-Block ≤ 5 %) fällt
 durch. Diese Zahl ist kein Tuning-Problem; das Gate war unbesetzt. Der Standard-Freigabemodus ist
 `ask`, und auf dem Desktop wird jetzt auch wirklich gefragt: ein verengter Tool-Aufruf wird zu
 einer Frage auf dem Bildschirm, mit dem Grund aus dem Ledger daneben, beantwortet per Knopf oder
 `chimera approve`, nach `CHIMERA_APPROVAL_WAIT` Sekunden durch Schweigen abgelehnt. Gibt die
-Person die Arbeit frei, um die sie gebeten hat, liegt der Over-Block bei 0 % und die Blockrate für
+Person die Arbeit frei, um die sie gebeten hat, liegt der Over-Block bei 0 % und die Blockrate für
 Angriffe bewegt sich nicht — gemessen, pro Arm, in
 [`bench/injection/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/injection/RESULTS.md).
 Die Exfiltration über ein erlaubtes Tool schließt dieselbe Änderung: das `http_get` eines
@@ -110,7 +110,7 @@ Zwei Ergebnisse des ersten Laufs sind es wert, klar ausgesprochen zu werden, den
 schmeichelt uns:
 
 - **Die ausgelieferte Konfiguration fällt bei ihrem eigenen Gate durch — an den Kosten.** Sie
-  markiert 100 % des Gifts und vernichtet dabei 25 % des ehrlichen Gedächtnisses. Die Opfer sind
+  markiert 100 % des Gifts und vernichtet dabei 25 % des ehrlichen Gedächtnisses. Die Opfer sind
   benannt: ein Sicherheitsdokument, das einen Angriff zitiert, um ihn zu erklären, und ein
   Support-Ticket, das einen Versuch weiterleitet. Ein Pattern-Matcher auf Inhalten kann ein Zitat
   nicht von einem Befehl unterscheiden.

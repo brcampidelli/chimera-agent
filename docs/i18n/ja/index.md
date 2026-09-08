@@ -1,5 +1,5 @@
 ---
-source_sha256: fe1348e242b1851c75bb1525ecf723afe068c499ed372335aca5e281cc72ba04
+source_sha256: 16ac522d3f1fdc1a508d268b9f88b22f75c896bd1ae6dd87839afd256e4d745f
 ---
 
 # Chimera
@@ -22,17 +22,25 @@ source_sha256: fe1348e242b1851c75bb1525ecf723afe068c499ed372335aca5e281cc72ba04
   任意のMCPサーバー(GitHub、ファイルシステムなど)を接続する。
   [MCPサーバー →](mcp.md)
 
+- **:material-account-switch: 別のエージェントを動かす**
+  ACP経由でClaude CodeやGemini CLIに1ターンを渡す — そしてそれが保証に何をもたらすかを読む。
+  [外部エージェント →](external-agents.md)
+
 - **:material-server: 運用する**
   小さなサーバーで24時間365日稼働させ、ジョブをスケジュールし、チャットに配信する。
   [デプロイ →](deploy.md)
 
 - **:material-shield-lock: セキュリティ**
   ガバナンス、サンドボックス、汚染追跡 — そしてその正直な限界。
-  [セキュリティ →](security.md)
+  [セキュリティ →](security.md) · [スリーパーチャネル監査 →](audits/sleeper-channels.md)
 
 - **:material-sitemap: 理解する**
   融合コア、進化、安全層がどう組み合わさっているか。
   [アーキテクチャ →](architecture.md)
+
+- **:material-console: すべてのコマンド**
+  79個すべて、CLI自身から生成 — どのドキュメントにも載っていなかった33個を含む。
+  [コマンドリファレンス →](commands.md)
 
 </div>
 
