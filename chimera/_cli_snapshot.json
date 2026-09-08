@@ -5114,6 +5114,17 @@
           "type": "boolean"
         },
         {
+          "default": "'generic'",
+          "help": "How a failed attempt's retry is briefed: generic (manager prose + verifier output) or targeted (a brief aimed at the classified failure).",
+          "kind": "option",
+          "name": "recovery",
+          "opts": [
+            "--recovery"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
           "help": "Match repeated-failure signatures approximately, not byte-identically.",
           "kind": "option",
           "name": "stagnation_fuzzy",

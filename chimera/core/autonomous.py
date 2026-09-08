@@ -43,6 +43,12 @@ from chimera.core.events import result as _ev_result
 from chimera.core.events import status as _ev_status
 from chimera.core.events import todo as _ev_todo
 from chimera.core.events import tool as _ev_tool
+from chimera.core.failure_class import (
+    RECOVERY_MODES,
+    ClassifiedFailure,
+    classify_failure,
+    targeted_feedback,
+)
 from chimera.core.ledger import ProgressLedger, TaskLedger
 from chimera.core.planner import Plan, Planner
 from chimera.core.repomap import build_repo_map
@@ -310,6 +316,15 @@ class Attempt:
     #: something very different once a run has already sent mail, and a reader of the receipt
     #: should be able to see that without re-deriving it from a transcript.
     side_effects: list[str] = field(default_factory=list)
+    #: The class this failure was given before it was fed back — ``failing_test``, ``tool_skip``,
+    #: ``reverted``… (see :mod:`chimera.core.failure_class`) — as the enum's value, because this
+    #: record goes through ``asdict`` → JSON → ``Attempt(**saved)`` on a resume. ``""`` means
+    #: nobody classified it: a success, a cancelled attempt, a row from before the field. That is
+    #: not ``unknown``, which is a classification too — the honest one when every detector
+    #: declined. Recorded in BOTH recovery modes; only the retry's brief depends on the flag.
+    failure_class: str = ""
+    #: The exact field or line the detector fired on, so the receipt says WHY and not only what.
+    failure_evidence: str = ""
 
 
 @dataclass
@@ -437,6 +452,7 @@ class AutonomousAgent:
         diff_feedback: bool = False,
         keep_workspace: bool = False,
         require_diff: bool = False,
+        recovery: str = "generic",
         experience: ExperienceBuffer | None = None,
         trajectories: TrajectoryCollector | None = None,
         memory: SupportsRemember | None = None,
@@ -497,6 +513,15 @@ class AutonomousAgent:
         self.diff_feedback = diff_feedback
         self.keep_workspace = keep_workspace
         self.require_diff = require_diff
+        #: How a failed attempt's retry is briefed. ``generic`` is today's string — manager prose
+        #: plus verifier output, byte for byte. ``targeted`` briefs the retry on the failure's
+        #: CLASS instead (arXiv 2606.01416: recovery aimed at the class beat retry-only at every
+        #: matched budget, and by the most at one attempt). Refused rather than compared loosely
+        #: below: a misspelling that quietly behaves as ``generic`` is a setting that accepts a
+        #: value and ignores it.
+        if recovery not in RECOVERY_MODES:
+            raise ValueError(f"recovery must be one of {sorted(RECOVERY_MODES)}, got {recovery!r}")
+        self.recovery = recovery
         self.experience = experience
         self.trajectories = trajectories
         self.memory = memory
@@ -1264,6 +1289,23 @@ class AutonomousAgent:
             feedback = "\n\n".join(p for p in (fb, _verify_fb) if p) or (
                 "The attempt did not pass verification."
             )
+            # Classified BEFORE it is fed back, in both modes (arXiv 2606.01416). Under `generic`
+            # the string above reaches the retry exactly as it always has; under `targeted` the
+            # retry is briefed on the class — the failing assertion, the diff that was undone, a
+            # forced tool call — and a class with nothing specific to say falls back to it. Only
+            # when a retry will read it, for the reason the diff injection below gives: the last
+            # attempt's feedback feeds the anti-pattern card, which a prompt-shaping flag must
+            # not change.
+            classified = self._classify(attempt, agent_result)
+            if self.recovery == "targeted" and index < self.config.max_attempts:
+                targeted = targeted_feedback(classified, attempt, generic=feedback, task=task)
+                if targeted != feedback:
+                    # Countable, like the two injections below: an arm whose targeting never
+                    # fired measured a plumbing failure, not the idea.
+                    self._emit(_ev_status(
+                        f"targeted recovery {classified.cls.value} (attempt {index})"
+                    ))
+                feedback = targeted
             # Retry-conditioning (--diff-feedback): the agent already captured what this attempt
             # ACTUALLY wrote (above, pre-revert) and every consumer of it is telemetry — it never
             # re-enters a prompt. So the retry is told THAT it failed but never shown the code it
@@ -1452,6 +1494,21 @@ class AutonomousAgent:
             parcial.diffs = unified_diffs(snapshot, depois)
         return parcial
 
+    def _classify(self, attempt: Attempt, agent_result: Any) -> ClassifiedFailure:
+        """Give a failed attempt its class and write it on the attempt — in both recovery modes.
+
+        On the record regardless of the flag because the matched-budget sweep (the plan's item
+        1+7, step 2) needs the class of every failure the generic arm produced, not only of the
+        ones targeting acted on. The worker's ``stopped_reason`` is the one input the attempt
+        does not carry; it is read here, off the result the loop holds at this moment.
+        """
+        classified = classify_failure(
+            attempt, stopped_reason=str(getattr(agent_result, "stopped_reason", "") or "")
+        )
+        attempt.failure_class = classified.cls.value
+        attempt.failure_evidence = classified.evidence
+        return classified
+
     def _finalize_capped(
         self,
         task: str,
@@ -1481,7 +1538,11 @@ class AutonomousAgent:
         # Through the shared helper, which was extracted FROM this block. Leaving the copy here
         # would restore the condition that let the cancel path fall behind: the same bookkeeping
         # written twice, corrected once.
-        attempts = [*attempts, self._partial_attempt(agent_result, index)]
+        parcial = self._partial_attempt(agent_result, index)
+        # Classified like any other failure — `budget` IS the class a cap produces — so the row
+        # that says the money ran out says it in the field the matched-budget sweep reads.
+        self._classify(parcial, agent_result)
+        attempts = [*attempts, parcial]
 
         self._emit(_ev_status("stopped on budget"))
         self._clear_checkpoint(thread_id)
