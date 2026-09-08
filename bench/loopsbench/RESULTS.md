@@ -173,6 +173,30 @@ earliest in both were the same three. The floor is consistent; the ceiling is a 
 pattern says the discriminating middle on this subset is roughly **two tasks wide**, which is the
 real reason n=8 has no power — not the rate, the width of the band.
 
+## The same two runs, read with the replicated protocol
+
+Item 0 of `bench/PLAN-study16-eight-axes.md` now exists: `chimera.eval.replicated` — `pass^k`,
+per-task flip rate, ICC(1), mechanism-active scoring, and the seeds rule said in the report. This
+is p5 + p6 read through it, from the two `results.json` files, not from a hand-typed table:
+
+```
+arm            pass@1   pass^2   flip   ICC(1)   mechanism-active
+chimera        12.5%    0.0%    25%   -0.08    not marked
+```
+
+Three things the single-run table above could not say:
+
+- **`pass^2` is 0.0%.** No task passed both times. `12.5%` is the mean over trials — the number a
+  single run pretends to be — and it is not what a user would experience.
+- **ICC(1) is negative (−0.08).** Within-task spread exceeds between-task spread: *which task
+  passes is not a property of the task.* Any per-task comparison built on this grid — including the
+  A/B this pilot was meant to size — has no signal to read, and the number says so directly instead
+  of leaving it to a paragraph.
+- **k=2 is an alert, not a verdict.** The report prints that line itself. Three runs decide.
+
+The protocol is the ruler every later bench in the plan is read against; this is its first
+measured example, and it is the pilot's own.
+
 ## What is worth doing next, in order
 
 1. **Re-read `bench/terminal_bench` in light of `--keep-workspace`.** Its 7.5% / 2.5% was measured
