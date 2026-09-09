@@ -500,6 +500,17 @@ editing your own repository after reading your own repository is not a tainted r
   ledger were "staged behind `CHIMERA_GOVERNANCE`"; they were not staged there, they were absent.
   Both now build them. `tui` keeps a comment in that position, rewritten to say what is true of it:
   the layer is deliberately absent, with the 123.8 s measurement as the reason.
+- **A sabotage that 109 tests walked straight past.** Every check written for this change — the AST
+  probe, the build gate, the deployment-fence walk, the whole new test file — asks whether the
+  command *calls* the builder. So a `chat` that calls `build_right_hand` and then overwrites
+  `hand.registry` with a bare one was patched in deliberately, and the suite went green: 109 passed.
+  That is the same family as everything in Part 1 — nothing errors, and the number looks right.
+  `test_the_command_hands_the_agent_the_governed_registry` closes it by driving the real command
+  through `CliRunner` with only `ChatSession` faked and asking what the `Agent` was actually handed;
+  it fails on the sabotaged build and passes on the shipped one. The other three sabotages (drop the
+  ledger wrapper: 15 red; make `begin_turn` a no-op: 4 red; an approver that cannot say no: 6 red)
+  were caught by the tests already written, which is what makes this fourth one worth recording
+  rather than quietly fixing.
 
 ## What Part 3 still cannot show
 

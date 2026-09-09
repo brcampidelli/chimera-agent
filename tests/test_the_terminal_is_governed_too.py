@@ -24,10 +24,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from typer.testing import CliRunner
 
-from chimera.cli.main import _apply_tool_allowlist
+from chimera.cli.main import _apply_tool_allowlist, app
 from chimera.cli.right_hand import RightHand, build_right_hand
-from chimera.config import Settings
+from chimera.config import Settings, get_settings
 from chimera.governance.approval import ApprovalLedger
 from chimera.governance.ledger_tool import FENCE_CLOSE, FENCE_OPEN
 from chimera.tools.base import Tool, is_refusal
@@ -450,6 +451,87 @@ def test_the_audit_trail_records_what_the_terminal_narrowed(tmp_path: Path) -> N
 
     entries = (tmp_path / "audit.jsonl").read_text(encoding="utf-8")
     assert "taint_narrowed" in entries
+
+
+# --- what the command actually HANDS the agent ---------------------------------------------------
+
+
+@pytest.fixture
+def _isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Any:
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    monkeypatch.setattr("chimera.sandbox._warned", False)
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
+
+
+def _drive(monkeypatch: pytest.MonkeyPatch, command: str) -> Any:
+    """Run the real command for one turn and hand back the ``Agent`` it built.
+
+    Only ``ChatSession`` is faked, so the registry, the config and the whole assembly are the shipped
+    code — which is the entire point. Every other check in this file goes through
+    ``build_right_hand`` directly, and none of them can see a command that calls the builder and then
+    throws the result away. That sabotage was tried: 109 tests passed through it.
+    """
+    built: list[Any] = []
+
+    class Fake:
+        def __init__(self, agent: Any, **kwargs: Any) -> None:
+            built.append(agent)
+            self.turns: list[Any] = []
+            self.profile = ""
+
+        def send_verbose(self, message: str, **_kw: Any) -> Any:
+            from chimera.interface.session import ChatTurn, TurnReport
+
+            self.turns.append(ChatTurn(user=message, assistant="ok"))
+            return TurnReport(answer="ok", model="fake/model")
+
+        def set_model(self, _slug: str | None) -> bool:
+            return True
+
+        def reset(self) -> None:
+            self.turns.clear()
+
+    monkeypatch.setattr("chimera.interface.ChatSession", Fake)
+    result = CliRunner().invoke(app, [command, "--no-memory"], input="hello\n/exit\n")
+    assert result.exit_code == 0, result.output
+    assert built, "the command never built an agent"
+    return built[0]
+
+
+@pytest.mark.parametrize("command", ["chat", "assist"])
+def test_the_command_hands_the_agent_the_governed_registry(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    """End-to-end, through Typer and the real loop: the tools the agent can reach are ledgered.
+
+    Structural checks answer "does the command call the builder"; this one answers "is the builder's
+    output what the agent got", and only the second survives a command that calls it and discards
+    the result.
+    """
+    agent = _drive(monkeypatch, command)
+
+    tool = agent.tools.get("write_file")
+    assert type(tool).__name__ == "LedgeredTool", "the agent was handed an ungoverned registry"
+    assert "run_shell" in set(agent.tools.names()), "the shell was taken away from the terminal"
+
+
+@pytest.mark.parametrize("command", ["chat", "assist"])
+def test_the_owners_instructions_reach_the_prompt_the_command_sends(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    """`agent.json` is the owner's own voice, and the desktop applied it while the terminal did not
+    — so one configuration produced two agents that answered differently depending on the window."""
+    from chimera.core.instructions import AgentIdentity, save
+
+    save(get_settings().home, AgentIdentity(language="Português (Brasil)", instructions="Be terse."))
+
+    agent = _drive(monkeypatch, command)
+
+    assert "Be terse." in agent.config.instructions
+    assert "Português (Brasil)" in agent.config.instructions
 
 
 def test_the_bench_arm_and_the_shipped_command_build_the_same_thing(tmp_path: Path) -> None:
