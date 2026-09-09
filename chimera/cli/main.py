@@ -513,6 +513,23 @@ def doctor(
         "Configured providers",
         ", ".join(shown) if shown else "[yellow]none[/yellow]",
     )
+    # Where commands run, and why. It lived only in a WARNING logged at the first `get_sandbox()`
+    # of every process — which meant the REPLs opened with a four-line log block above their banner
+    # and this command, the one whose job is to describe the machine, did not mention the sandbox at
+    # all. The banner now says one line and points here; this is the "here".
+    from chimera.sandbox.os_sandbox import unavailable_reason
+
+    # Two separate facts, neither inferred from the other: what is CONFIGURED, and what this
+    # machine can actually provide. `CHIMERA_SANDBOX=docker` with no daemon is a configuration that
+    # falls back to the host, so printing one of these as if it were the other would be the kind of
+    # confident wrong answer a doctor exists to prevent.
+    no_sandbox = unavailable_reason()
+    table.add_row("Sandbox (configured)", settings.sandbox or "auto")
+    table.add_row(
+        "OS sandbox",
+        f"[yellow]unavailable — {no_sandbox}[/yellow]" if no_sandbox else "available",
+    )
+    table.add_row("Host execution", (settings.host_exec or "ask").lower())
     console.print(table)
 
     # Capability by capability, measured HERE. The app ships as an installer, so this is the one
@@ -1187,6 +1204,174 @@ def _resume_or_new(manager: Any, wanted: str | None, force_new: bool) -> tuple[s
     return manager.new(), False
 
 
+def _sandbox_banner() -> None:
+    """Say once, in one line, that commands run on this machine — instead of a WARNING block.
+
+    Claimed BEFORE the tools are built, because ``default_registry`` builds the sandbox and the
+    first call is what logs the four-line notice above the banner.
+    """
+    from chimera.sandbox import claim_unsandboxed_notice
+
+    if claim_unsandboxed_notice():
+        console.print(
+            "[yellow]⚠ no OS sandbox — the agent's commands run on this machine.[/yellow]"
+            "[dim] 'chimera doctor' explains; CHIMERA_SANDBOX=docker isolates them.[/dim]"
+        )
+
+
+def _run_turn(session: Any, message: str) -> tuple[Any, str]:
+    """Run one REPL turn and print whatever went wrong. Returns ``(report | None, outcome)``.
+
+    ``outcome`` is ``"ok"`` (``report`` is a :class:`~chimera.interface.session.TurnReport`),
+    ``"continue"`` (a recoverable error, already printed) or ``"stop"`` (end the REPL).
+
+    ``send_verbose`` rather than ``send``: the refusals, the token count and the price are on the
+    report and were being thrown away by both REPLs.
+    """
+    from chimera.interface import render
+    from chimera.providers import MissingCredentialsError
+
+    try:
+        with console.status("[dim]thinking…[/dim]"):
+            return session.send_verbose(message), "ok"
+    except MissingCredentialsError as exc:
+        console.print(f"[red]{escape(str(exc))}[/red]")
+        return None, "stop"
+    except KeyboardInterrupt:
+        # Ctrl-C is not an `Exception`, so it escaped the handler below and Click aborted the
+        # process: exit 130, no "bye", nothing persisted, no receipt. The turn was paid for either
+        # way; what was lost was every record that it had happened.
+        console.print("\n[dim]interrupted — the turn was dropped[/dim]")
+        return None, "stop"
+    except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
+        console.print(render.error_line(exc))
+        return None, "continue"
+
+
+def _render_turn(report: Any, *, session_id: str, settings: Settings) -> None:
+    """Print a finished turn — reply, refusals, price — and put it in the project's own census.
+
+    Order matters and is the fix: the reply is on screen before anything else can fail. The
+    refusal lines are what stop "the command printed exactly: marker-42" from being the last word
+    about a command that never ran.
+    """
+    from chimera.api.usage import record_turn
+    from chimera.interface import render
+
+    console.print(render.reply_line(report.answer))
+    for line in render.refusal_lines(report):
+        console.print(line)
+    console.print(render.cost_line(report))
+    record_turn(settings.home, session_id, report)
+
+
+def _render_memory_note(report: Any, message: str, settings: Settings) -> None:
+    """Say what happened to an explicit "remember that…" — including when the answer is "nothing".
+
+    The model answers "Got it, I'll remember" whatever the setting says, so the surface has to be
+    the one telling the truth: confirm the fact when one was written, and name the command that
+    writes it when the setting is off.
+    """
+    if report.memory_saved:
+        console.print(f"[dim]remembered:[/dim] [yellow]{escape(report.memory_saved)}[/yellow]")
+        return
+    if settings.remember_from_chat:
+        return
+    from chimera.memory.capture import parse_remember_request
+
+    fact = parse_remember_request(message)
+    if fact:
+        console.print(
+            "[yellow]not remembered[/yellow][dim] — chat does not write memory unless "
+            "CHIMERA_CHAT_MEMORY=1. Store it now with: "
+            f'chimera memory add "{escape(fact)}"[/dim]'
+        )
+
+
+def _emit_memory_nudges(
+    session: Any, memory: MemoryManager | None, already: set[str], hint: str
+) -> None:
+    """Suggest storing a preference the conversation keeps implying (once each)."""
+    if memory is None:
+        return
+    recent = [turn.user for turn in session.turns[-4:]]
+    for fact in memory.nudges(recent):
+        if fact not in already:
+            already.add(fact)
+            console.print(
+                f"[dim]💡 remember this? [/dim][yellow]{escape(fact)}[/yellow]"
+                f"[dim] → {escape(hint.format(fact=fact))}[/dim]"
+            )
+
+
+def _persist_turn(manager: Any, session_id: str) -> None:
+    """Save the thread after a turn — and survive a save that cannot happen.
+
+    This used to run BEFORE the answer was printed and outside any ``try``, so an unwritable home
+    or a full disk threw away a reply that had already been paid for. A conversation you can read
+    but not resume beats one that was correctly filed and never shown.
+    """
+    try:
+        manager.persist(session_id)
+    except Exception as exc:  # noqa: BLE001 — a thread that cannot be saved is not a dead REPL
+        console.print(f"[yellow]not saved:[/yellow] [dim]{escape(str(exc))}[/dim]")
+
+
+def _chat_commands() -> list[Any]:
+    """``chat``'s commands, for BOTH ``/help`` and the unknown-command message.
+
+    One table for the two, so they cannot disagree about what exists. ``/quit`` and ``/q`` are
+    aliases of ``/exit`` and are matched before this table is consulted. Built lazily because the
+    CLI pays for every module it imports at start, on every command.
+    """
+    from chimera.interface.render import SlashCommand
+
+    return [
+        SlashCommand("/help", "", "this list"),
+        SlashCommand("/new", "", "start a fresh thread (the current one stays saved)"),
+        SlashCommand("/reset", "", "same as /new — the transcript is on disk now"),
+        SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        SlashCommand("/exit", "", "quit (also /quit, /q)"),
+    ]
+
+
+def _assist_commands() -> list[Any]:
+    """``assist``'s commands — a different set, which is why each surface owns its own table."""
+    from chimera.interface.render import SlashCommand
+
+    return [
+        SlashCommand("/help", "", "this list"),
+        SlashCommand("/task", "<hard ask>", "full-power fusion route, one shot"),
+        SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
+        SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
+        SlashCommand("/exit", "", "quit (also /quit, /q)"),
+    ]
+
+
+def _handle_unknown_command(head: str, commands: list[Any]) -> bool:
+    """Print "unknown command" for an unrecognised ``/word``. True when it was handled.
+
+    An unrecognised slash used to be sent to the model as an ordinary message: ``/help`` cost 31 s
+    and a capabilities essay, and ``/foo`` got a considered answer about "/foo". A path or a
+    fraction (``/usr/local``, ``/2``) is not command-shaped and still reaches the model.
+    """
+    from chimera.interface import render
+
+    if not render.is_command_like(head):
+        return False
+    for line in render.unknown_command_lines(head, commands):
+        console.print(line)
+    return True
+
+
+def _print_help(commands: list[Any]) -> None:
+    from chimera.interface import render
+
+    for line in render.help_lines(commands):
+        console.print(line)
+
+
 @app.command()
 def chat(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
@@ -1197,7 +1382,7 @@ def chat(
         False, "--cascade", help="Tiered routing: weak -> gate -> mid -> gate -> fusion (cheap by default)."
     ),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
-    session_id: str = typer.Option(
+    session_id: str | None = typer.Option(
         None, "--session", "-s", help="Resume a specific session id (see 'chimera sessions')."
     ),
     new: bool = typer.Option(False, "--new", help="Start a fresh session instead of resuming."),
@@ -1210,8 +1395,8 @@ def chat(
     """
     from chimera.api.sessions import SessionManager, SessionStore
     from chimera.core import Agent, AgentConfig
-    from chimera.interface import ChatSession
-    from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.interface import ChatSession, render
+    from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
     settings = get_settings()
@@ -1219,6 +1404,18 @@ def chat(
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
+    store = SessionStore(settings.home / "sessions")
+    if session_id is not None:
+        # BEFORE the first turn. `chimera chat -s ../escape` was accepted here, ran a whole turn,
+        # and raised on the save — after the answer had been paid for and while it was being
+        # thrown away. The store already knew how to reject the id; nobody asked it in time.
+        try:
+            store.check_id(session_id)
+        except ValueError as exc:
+            console.print(f"[red]{escape(str(exc))}[/red]")
+            raise typer.Exit(code=1) from exc
+
+    _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if cascade or settings.cascade:
@@ -1256,17 +1453,26 @@ def chat(
     # This is that store, not a second one. A parallel CLI-only transcript would have been the
     # easier change and would have made the split permanent.
     manager = SessionManager(
-        lambda: ChatSession(agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)),
-        SessionStore(settings.home / "sessions"),
+        lambda: ChatSession(
+            agent,
+            memory=mem,
+            graph=_recall_graph(mem),
+            profile=_session_profile(mem),
+            # The setting existed and no terminal surface passed it, so "remember that…" was
+            # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
+            remember_from_chat=settings.remember_from_chat,
+        ),
+        store,
     )
     active, resumed = _resume_or_new(manager, session_id, new)
     session = manager.get(active)
     skill_names = _learned_skill_labels(settings)
 
+    commands = _chat_commands()
     console.print(
         "[bold]Chimera chat[/bold] — your terminal right-hand. "
         "[cyan]/model <slug>[/cyan] to switch, [cyan]/new[/cyan] for a fresh thread, "
-        "[cyan]/exit[/cyan] to quit."
+        "[cyan]/help[/cyan] for the rest, [cyan]/exit[/cyan] to quit."
     )
     # Say which thread this is, always. Resuming silently is the same surprise as forgetting.
     if resumed:
@@ -1284,11 +1490,15 @@ def chat(
             break
         if not message:
             continue
-        if message in ("/exit", "/quit", "/q"):
+        head, argument = render.split_command(message)
+        if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
             _maybe_autoconsolidate(mem, settings)
             break
-        if message in ("/new", "/reset"):
+        if head == "/help":
+            _print_help(commands)
+            continue
+        if head in ("/new", "/reset"):
             # `/reset` used to clear an in-memory transcript, which cost nothing. Now that the
             # transcript is on disk, clearing it in place would delete the conversation — a command
             # that says "clear context" must not be the one that loses work. Both start a new thread
@@ -1297,35 +1507,31 @@ def chat(
             session = manager.get(active)
             console.print(f"[dim]new thread {active} — the previous one is saved.[/dim]")
             continue
-        if message.startswith("/model"):
-            slug = message[len("/model") :].strip() or None
+        if head == "/model":
+            slug = argument or None
             ok = session.set_model(slug)
             console.print(
-                f"[dim]model → {slug or 'default'}[/dim]" if ok else "[red]can't switch model[/red]"
+                f"[dim]model → {escape(slug or 'default')}[/dim]"
+                if ok
+                else "[red]can't switch model[/red]"
             )
             continue
-        try:
-            with console.status("[dim]thinking…[/dim]"):
-                reply = session.send(message)
-        except MissingCredentialsError as exc:
-            console.print(f"[red]{exc}[/red]")
-            break
-        except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
-            console.print(f"[red]error: {exc}[/red]")
+        if _handle_unknown_command(head, commands):
             continue
+        report, outcome = _run_turn(session, message)
+        if outcome == "stop":
+            _persist_turn(manager, active)  # whatever the thread already had, before leaving
+            console.print("[dim]bye[/dim]")
+            _maybe_autoconsolidate(mem, settings)
+            break
+        if outcome != "ok":
+            continue
+        _render_turn(report, session_id=active, settings=settings)
+        _render_memory_note(report, message, settings)
         # After the turn, not at exit: Ctrl-C and a closed terminal are how a REPL usually ends,
-        # and neither runs a shutdown hook.
-        manager.persist(active)
-        console.print(f"[bold magenta]chimera ›[/bold magenta] {reply}")
-        if mem is not None:
-            recent = [turn.user for turn in session.turns[-4:]]
-            for fact in mem.nudges(recent):
-                if fact not in nudged:
-                    nudged.add(fact)
-                    console.print(
-                        f"[dim]💡 remember this? [/dim][yellow]{fact}[/yellow]"
-                        f"[dim] → memory add --persona \"{fact}\"[/dim]"
-                    )
+        # and neither runs a shutdown hook. After the PRINT, not before it — see `_persist_turn`.
+        _persist_turn(manager, active)
+        _emit_memory_nudges(session, mem, nudged, 'memory add --persona "{fact}"')
         _emit_skill_nudges(session, skill_names, skill_nudged)
 
 
@@ -1348,11 +1554,12 @@ def assist(
     tier distribution + measured tokens — so 'cheap by default' is a number.
     """
     import time as _time
+    from uuid import uuid4
 
     from chimera.core import Agent, AgentConfig
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
-    from chimera.interface import ChatSession
-    from chimera.providers import LLMGateway, MissingCredentialsError
+    from chimera.interface import ChatSession, render
+    from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
     settings = get_settings()
@@ -1362,6 +1569,10 @@ def assist(
 
     session_start = _time.time()
     routes_path = Path(settings.home) / "routes.jsonl"
+    # `assist` keeps no durable thread, but its turns still cost money, and the Cost screen groups
+    # by session: one id per run puts this run's spending together instead of scattering it.
+    usage_session = uuid4().hex[:12]
+    _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
     backend: SupportsComplete = gateway if no_cascade else _cascade_backend(gateway, settings)
     agent = Agent(
@@ -1383,7 +1594,11 @@ def assist(
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
     mem = None if no_memory else _memory_manager()
     session = ChatSession(
-        agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
+        agent,
+        memory=mem,
+        graph=_recall_graph(mem),
+        profile=_session_profile(mem),
+        remember_from_chat=settings.remember_from_chat,
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -1395,12 +1610,13 @@ def assist(
             )
 
     ladder = settings.tier_ladder()
+    commands = _assist_commands()
     console.print(
         "[bold]Chimera assist[/bold] — your right-hand, cheap by default. "
         f"[dim]tiers: {ladder.weak.split('/')[-1]} → {ladder.mid.split('/')[-1]} → fusion "
         f"(entry: {ladder.entry})[/dim]\n"
         "[cyan]/task <hard ask>[/cyan] full-power route, [cyan]/profile <kind>: <fact>[/cyan] remember, "
-        "[cyan]/reset[/cyan] clear, [cyan]/exit[/cyan] quit."
+        "[cyan]/reset[/cyan] clear, [cyan]/help[/cyan] the rest, [cyan]/exit[/cyan] quit."
     )
     nudged: set[str] = set()
     skill_nudged: set[str] = set()
@@ -1414,21 +1630,24 @@ def assist(
             break
         if not message:
             continue
-        if message in ("/exit", "/quit", "/q"):
+        head, argument = render.split_command(message)
+        if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
             _maybe_autoconsolidate(mem, settings)
             _session_receipt()
             break
-        if message == "/reset":
+        if head == "/help":
+            _print_help(commands)
+            continue
+        if head == "/reset":
             session.reset()
             console.print("[dim]context cleared[/dim]")
             continue
-        if message.startswith("/profile"):
+        if head == "/profile":
             # "/profile preference: answer in PT-BR" (kinds: preference|project|context|name)
             from chimera.interface.profile import load_profile, profile_path, save_profile
 
-            body = message[len("/profile") :].strip()
-            kind, sep, value = body.partition(":")
+            kind, sep, value = argument.partition(":")
             if not sep or not value.strip():
                 console.print("[dim]usage: /profile <preference|project|context|name>: <fact>[/dim]")
                 continue
@@ -1441,13 +1660,15 @@ def assist(
             if changed:
                 save_profile(path, stored)
                 session.profile = _session_profile(mem)  # takes effect next turn
-                console.print(f"[green]stored[/green] {kind.strip()}: {value.strip()}")
+                console.print(
+                    f"[green]stored[/green] {escape(kind.strip())}: {escape(value.strip())}"
+                )
             else:
                 console.print("[yellow]not stored (unknown kind or duplicate)[/yellow]")
             continue
-        if message.startswith("/task"):
+        if head == "/task":
             # Full-power route for a hard ask: fusion-forced, one shot, no cascade climb.
-            task_text = message[len("/task") :].strip()
+            task_text = argument
             if not task_text:
                 console.print("[dim]usage: /task <the hard ask>[/dim]")
                 continue
@@ -1458,36 +1679,34 @@ def assist(
                     fused = FusionEngine(gateway).complete(
                         [{"role": "user", "content": task_text}]
                     )
-                console.print(f"[bold magenta]chimera ›[/bold magenta] {fused.content}")
+                console.print(render.reply_line(fused.content))
+            except KeyboardInterrupt:
+                console.print("\n[dim]interrupted — the turn was dropped[/dim]")
             except Exception as exc:  # noqa: BLE001 — keep the REPL alive
-                console.print(f"[red]error: {exc}[/red]")
+                console.print(render.error_line(exc))
             continue
-        if message.startswith("/model"):
-            slug = message[len("/model") :].strip() or None
+        if head == "/model":
+            slug = argument or None
             ok = session.set_model(slug)
             console.print(
-                f"[dim]model → {slug or 'default'}[/dim]" if ok else "[red]can't switch model[/red]"
+                f"[dim]model → {escape(slug or 'default')}[/dim]"
+                if ok
+                else "[red]can't switch model[/red]"
             )
             continue
-        try:
-            with console.status("[dim]thinking…[/dim]"):
-                reply = session.send(message)
-        except MissingCredentialsError as exc:
-            console.print(f"[red]{exc}[/red]")
-            break
-        except Exception as exc:  # noqa: BLE001 — keep the REPL alive on transient errors
-            console.print(f"[red]error: {exc}[/red]")
+        if _handle_unknown_command(head, commands):
             continue
-        console.print(f"[bold magenta]chimera ›[/bold magenta] {reply}")
-        if mem is not None:
-            recent = [turn.user for turn in session.turns[-4:]]
-            for fact in mem.nudges(recent):
-                if fact not in nudged:
-                    nudged.add(fact)
-                    console.print(
-                        f"[dim]💡 remember this? [/dim][yellow]{fact}[/yellow]"
-                        f"[dim] → /profile preference: {fact}[/dim]"
-                    )
+        report, outcome = _run_turn(session, message)
+        if outcome == "stop":
+            console.print("[dim]bye[/dim]")
+            _maybe_autoconsolidate(mem, settings)
+            _session_receipt()
+            break
+        if outcome != "ok":
+            continue
+        _render_turn(report, session_id=usage_session, settings=settings)
+        _render_memory_note(report, message, settings)
+        _emit_memory_nudges(session, mem, nudged, "/profile preference: {fact}")
         _emit_skill_nudges(session, skill_names, skill_nudged)
 
 
@@ -1515,13 +1734,29 @@ def tui(
             "[yellow]Textual isn't installed — falling back to 'chimera chat'. "
             "Install it with: pip install textual[/yellow]"
         )
-        return chat(model=model, max_steps=max_steps, workspace=workspace, fuse=fuse, no_memory=no_memory)
+        # EVERY argument, explicitly. Calling a Typer command as a plain function hands the
+        # parameters you omit their `typer.OptionInfo` DEFAULT OBJECTS, not their defaults:
+        # `bool(OptionInfo)` is True (so cascade and --new were both forced on) and
+        # `str(OptionInfo)` became the session name, which died on the first save with
+        # "Object of type OptionInfo is not JSON serializable". The documented fallback in
+        # docs/usage.md could not survive one turn.
+        return chat(
+            model=model,
+            max_steps=max_steps,
+            workspace=workspace,
+            fuse=fuse,
+            cascade=False,
+            no_memory=no_memory,
+            session_id=None,
+            new=False,
+        )
 
     settings = get_settings()
     if not settings.has_any_key():
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
+    _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse:
@@ -1546,10 +1781,21 @@ def tui(
     )
     mem = None if no_memory else _memory_manager()
     session = ChatSession(
-        agent, memory=mem, graph=_recall_graph(mem), profile=_session_profile(mem)
+        agent,
+        memory=mem,
+        graph=_recall_graph(mem),
+        profile=_session_profile(mem),
+        remember_from_chat=settings.remember_from_chat,
     )
     ChimeraTUI(
-        session, model_label=model or settings.default_model, stream=stream, fuse=fuse
+        session,
+        model_label=model or settings.default_model,
+        stream=stream,
+        fuse=fuse,
+        # The TUI shows a turn's price and wrote it nowhere: the app's Cost screen and every
+        # self-measurement this project runs were blind to the terminal. One id per run, so a
+        # session's turns group together.
+        usage_home=settings.home,
     ).run()
 
 
@@ -5560,7 +5806,8 @@ def _emit_skill_nudges(session: object, known_skills: list[str], already: set[st
             already.add(nudge.task)
             console.print(
                 f"[dim]🛠️  done this {nudge.count}× — save as a skill? [/dim]"
-                f"[yellow]{nudge.task}[/yellow][dim] → chimera solve reuses it automatically[/dim]"
+                f"[yellow]{escape(nudge.task)}[/yellow]"
+                "[dim] → chimera solve reuses it automatically[/dim]"
             )
 
 

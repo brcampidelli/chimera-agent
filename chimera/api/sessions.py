@@ -58,6 +58,16 @@ class SessionStore:
             raise ValueError(f"invalid session id: {session_id!r}")
         return path
 
+    def check_id(self, session_id: str) -> None:
+        """Raise ``ValueError`` if this id cannot address a file inside the store.
+
+        Public because a caller needs the answer BEFORE the first turn. ``chimera chat -s ../escape``
+        was accepted, ran a whole turn, and raised here on the save — after the answer had been paid
+        for, and while it was being lost. ``load`` swallows the same error and returns ``[]``, so
+        nothing on the read path could reveal it either.
+        """
+        self._path(session_id)
+
     def load(self, session_id: str) -> list[ChatTurn]:
         """Return the stored transcript, or ``[]`` if absent/unreadable (never raises on corruption)."""
         try:

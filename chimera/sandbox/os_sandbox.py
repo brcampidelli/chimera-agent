@@ -232,5 +232,13 @@ class OsSandbox(LocalSandbox):
         # No boundary to apply. Falling through to the host would be the silent degradation this
         # module exists to prevent, so say it and run gated instead — `is_isolated` is already False,
         # which keeps the host-exec confirmation in front of this command.
-        _log.warning("os sandbox unavailable, running on the host: %s", unavailable_reason())
+        #
+        # Once per process, through the same claim `get_sandbox` uses: this line sat on the
+        # per-command path, so a session that ran twenty commands said the same unchanging sentence
+        # twenty times.
+        from chimera.sandbox import claim_unsandboxed_notice
+
+        reason = claim_unsandboxed_notice()
+        if reason:
+            _log.warning("os sandbox unavailable, running on the host: %s", reason)
         return (command, True)

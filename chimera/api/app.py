@@ -110,10 +110,9 @@ from chimera.api.schemas import (
 from chimera.api.sessions import SessionManager, SessionStore
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.usage import (
-    UsageRecord,
     _already_counted,
-    append_usage,
     load_usage,
+    record_turn,
     summarize_usage,
     usage_from_runs,
 )
@@ -2403,26 +2402,13 @@ def _build_solve_agent(
 
 
 def _append_usage(report: Any, session_id: str, settings: Settings) -> None:
-    """Append this turn's usage record to the usage log. Best-effort: usage logging must NEVER break
-    a turn, so any failure (disk, serialization) is swallowed with a debug log."""
-    try:
-        route_kind = report.route_meta.get("kind") if report.route_meta else None
-        record = UsageRecord(
-            ts=datetime.now(UTC).isoformat(),
-            session_id=session_id,
-            model=report.model,
-            prompt_tokens=report.prompt_tokens,
-            completion_tokens=report.completion_tokens,
-            cache_read_tokens=report.cache_read_tokens,
-            cache_write_tokens=report.cache_write_tokens,
-            usd=report.usd,
-            tools=len(report.tool_names),
-            memory_facts=report.memory_facts_used,
-            route_kind=route_kind,
-        )
-        append_usage(settings.home / "usage.jsonl", record)
-    except Exception as exc:  # noqa: BLE001 — usage logging is best-effort, never fatal to a turn
-        _log.debug("usage logging skipped: %s", exc)
+    """Append this turn's usage record to the usage log.
+
+    The body moved to :func:`chimera.api.usage.record_turn` when the terminal started writing rows
+    too: two copies of "what a chat turn costs" would have drifted the moment one of them gained a
+    field, and the field it gained first was the count of refused tool calls.
+    """
+    record_turn(settings.home, session_id, report)
 
 
 def _record_batch_spend(home: Path, batch_id: str, batch: Any) -> None:

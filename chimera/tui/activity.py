@@ -15,7 +15,8 @@ from textual.containers import VerticalScroll
 from textual.widgets import Label, Static
 
 from chimera.core.agent import ToolActivity
-from chimera.interface.session import TurnReport
+from chimera.interface.render import cost_text
+from chimera.interface.session import TurnReport, decline_reason
 
 
 class ActivityPanel(VerticalScroll):
@@ -52,16 +53,17 @@ class ActivityPanel(VerticalScroll):
     def add_tool(self, act: ToolActivity) -> None:
         icon = "[green]✓[/green]" if act.ok else "[red]✗[/red]"
         self._tools.append(f"{icon} {escape(act.name)}")
+        if not act.ok:
+            # The ✗ said a call went wrong and stopped there, so the panel and the reply disagreed
+            # in silence: the model reads the observation and answers around it ("the command
+            # printed exactly: …"), and a mark with no words is easy to read as a retry that
+            # worked. The tool's own sentence is the only thing that settles it.
+            self._tools.append(f"  [dim]{escape(decline_reason(act.observation))}[/dim]")
         self.query_one("#act-tools", Static).update("\n".join(self._tools))
 
     def set_tokens(self, report: TurnReport) -> None:
         has_cache = bool(report.cache_read_tokens or report.cache_write_tokens)
-        if report.usd is None:
-            cost = "cost: unavailable"
-        else:
-            # The price is off prompt+completion at list rate; cache read/write bill differently, so
-            # when cache tokens are present flag that the shown cost excludes them (don't imply exact).
-            cost = f"~ ${report.usd:.4f}" + (" (excl. cache)" if has_cache else "")
+        cost = cost_text(report)  # shared with the REPLs, so the two cannot disagree about a price
         cache = f"\ncache r/w {report.cache_read_tokens}/{report.cache_write_tokens}" if has_cache else ""
         self.query_one("#act-tokens", Static).update(
             f"in {report.prompt_tokens} · out {report.completion_tokens}{cache}\n{cost}"
