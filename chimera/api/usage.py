@@ -33,6 +33,14 @@ class UsageRecord(BaseModel):
     tools: int = 0
     memory_facts: int = 0
     route_kind: str | None = None  # "fusion" | "cascade" | None (single-model turn)
+    #: How many of this turn's tool calls a gate refused or that failed outright.
+    #:
+    #: The census counted `tools` — calls attempted — which is the same number whether the work
+    #: happened or a gate stopped it. A turn that paid for a model, called `run_shell` three times
+    #: and ran nothing reads identically to one that ran three commands, and the difference is the
+    #: only interesting thing about it. Optional with a default, so records written before this
+    #: field existed still load.
+    declined: int = 0
 
 
 def append_usage(path: Path, record: UsageRecord) -> None:
@@ -41,6 +49,42 @@ def append_usage(path: Path, record: UsageRecord) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(record.model_dump_json() + "\n")
+
+
+def record_turn(home: Path, session_id: str, report: Any) -> None:
+    """Append one chat turn's accounting to the usage log, from a ``TurnReport``.
+
+    ``report`` is duck-typed so a caller outside the API package does not have to import the API's
+    models to write a row. This is the one implementation: ``chimera.api.app._append_usage``
+    delegates here, and so does the terminal.
+
+    Best-effort in the same way every other logging call here is — see :func:`record_spend`. The
+    terminal wrote NOTHING to this file until now, on any of its three surfaces, so the Cost screen
+    and every self-measurement this project runs excluded the surface it is used from most.
+    """
+    from datetime import UTC, datetime
+
+    try:
+        route_meta = getattr(report, "route_meta", None)
+        append_usage(
+            Path(home) / "usage.jsonl",
+            UsageRecord(
+                ts=datetime.now(UTC).isoformat(),
+                session_id=session_id,
+                model=getattr(report, "model", "") or "",
+                prompt_tokens=getattr(report, "prompt_tokens", 0) or 0,
+                completion_tokens=getattr(report, "completion_tokens", 0) or 0,
+                cache_read_tokens=getattr(report, "cache_read_tokens", 0) or 0,
+                cache_write_tokens=getattr(report, "cache_write_tokens", 0) or 0,
+                usd=getattr(report, "usd", None),
+                tools=len(getattr(report, "tool_names", None) or []),
+                memory_facts=getattr(report, "memory_facts_used", 0) or 0,
+                route_kind=route_meta.get("kind") if isinstance(route_meta, dict) else None,
+                declined=len(getattr(report, "declined", None) or []),
+            ),
+        )
+    except Exception as exc:  # noqa: BLE001 — see the docstring
+        _log.debug("usage logging skipped: %s", exc)
 
 
 def record_spend(

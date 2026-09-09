@@ -35,12 +35,35 @@ _log = get_logger("sandbox")
 _warned = False
 
 
-def _warn_unsandboxed(reason: str) -> None:
-    """Say it once per process. Repeated per command it becomes noise nobody reads; said once it is
-    the difference between a user who knows the boundary is absent and one who assumes it is there."""
+def claim_unsandboxed_notice() -> str:
+    """Take responsibility for telling this user there is no OS sandbox. Returns the reason, once.
+
+    ``""`` when a sandbox IS available, and ``""`` on every call after the first in a process — so
+    the fact is stated once, by whichever caller can state it best. An interactive surface claims it
+    before building its tools and prints one line in its own banner; everything else lets
+    :func:`get_sandbox` log it as before.
+
+    The reason this is a claim rather than a log call: the sentence is four lines long and was
+    printed as a WARNING block above the ``chat`` banner at every single start, on a machine where
+    the answer can never change (Windows has no OS sandbox at all). A warning that appears every
+    time and never changes is one people learn to scroll past, which costs exactly the readers it
+    was written for.
+    """
     global _warned
-    if not _warned:
-        _warned = True
+    if _warned:
+        return ""
+    from chimera.sandbox.os_sandbox import os_sandbox_available, unavailable_reason
+
+    if os_sandbox_available():
+        return ""
+    _warned = True
+    return unavailable_reason()
+
+
+def _warn_unsandboxed() -> None:
+    """Log the notice, if this process has not already delivered it some other way."""
+    reason = claim_unsandboxed_notice()
+    if reason:
         _log.warning("commands run WITHOUT an OS sandbox: %s", reason)
 
 
@@ -62,11 +85,11 @@ def get_sandbox(settings: Settings | None = None) -> Sandbox:
     settings = settings or get_settings()
     choice = (settings.sandbox or "auto").lower()
     if choice in {"auto", "os"}:
-        from chimera.sandbox.os_sandbox import OsSandbox, os_sandbox_available, unavailable_reason
+        from chimera.sandbox.os_sandbox import OsSandbox, os_sandbox_available
 
         if os_sandbox_available():
             return OsSandbox()
-        _warn_unsandboxed(unavailable_reason())
+        _warn_unsandboxed()
         return LocalSandbox()
     if choice == "docker":
         # Every one of these was a constructor parameter the factory never passed. `network` and
@@ -89,6 +112,7 @@ __all__ = [
     "LocalSandbox",
     "DockerSandbox",
     "OsSandbox",
+    "claim_unsandboxed_notice",
     "get_sandbox",
     "os_sandbox_available",
     "unavailable_cause",

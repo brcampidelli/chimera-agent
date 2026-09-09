@@ -17,7 +17,9 @@ seam is kept and unit-tested without an event loop.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from rich.markdown import Markdown
 from rich.markup import escape
@@ -30,6 +32,7 @@ from textual.widgets import Footer, Header, Input, RichLog, Static
 
 from chimera.core.agent import ToolActivity
 from chimera.interface import ChatSession
+from chimera.interface.render import scrub_provider_ids
 from chimera.interface.session import TurnReport
 from chimera.tui.activity import ActivityPanel
 
@@ -88,7 +91,13 @@ class ChimeraTUI(App[None]):
     ]
 
     def __init__(
-        self, session: ChatSession, *, model_label: str = "", stream: bool = True, fuse: bool = False
+        self,
+        session: ChatSession,
+        *,
+        model_label: str = "",
+        stream: bool = True,
+        fuse: bool = False,
+        usage_home: Path | None = None,
     ) -> None:
         super().__init__()
         self.session = session
@@ -96,6 +105,11 @@ class ChimeraTUI(App[None]):
         self.stream_enabled = stream and not fuse  # never promise a stream fusion can't deliver
         self.fuse = fuse
         self._live = ""
+        #: Where to append this run's usage rows, or None for a TUI nobody is billing (the tests).
+        #: The panel showed a price per turn and recorded it nowhere, so the Cost screen reported
+        #: zero spend for a surface that had been running all day.
+        self.usage_home = usage_home
+        self.usage_session = uuid4().hex[:12]
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -171,9 +185,18 @@ class ChimeraTUI(App[None]):
                 on_tool=self._emit_tool,
             )
         except Exception as exc:  # noqa: BLE001 — keep the TUI alive on transient errors
-            self.post_message(TurnFinished(None, note=f"error: {exc}"))
+            self.post_message(TurnFinished(None, note=f"error: {scrub_provider_ids(str(exc))}"))
             return
+        self._record_usage(report)
         self.post_message(TurnFinished(report))
+
+    def _record_usage(self, report: TurnReport) -> None:
+        """Put this turn in the project's own census. Best-effort, and never fatal to a turn."""
+        if self.usage_home is None:
+            return
+        from chimera.api.usage import record_turn
+
+        record_turn(self.usage_home, self.usage_session, report)
 
     def _emit_token(self, delta: str) -> None:
         self.post_message(TokenDelta(delta))

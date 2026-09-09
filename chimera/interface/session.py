@@ -54,6 +54,26 @@ class ChatTurn:
     assistant: str
 
 
+@dataclass(frozen=True)
+class DeclinedTool:
+    """A tool call that did NOT do what it was asked: a gate refused it, or it errored.
+
+    ``reason`` is the observation the tool itself returned, verbatim (whitespace-normalised and
+    capped) — not a summary written here. The model already saw that string and is free to
+    paraphrase it into "the command printed exactly: marker-42"; the person needs the original
+    beside the reply to see that nothing ran.
+    """
+
+    name: str
+    reason: str
+
+
+def decline_reason(observation: str) -> str:
+    """The tool's own words, on one line, short enough to sit under a reply."""
+    text = " ".join(observation.split())
+    return text[:200] + "…" if len(text) > 200 else text
+
+
 @dataclass
 class TurnReport:
     """A turn's answer plus the activity a UI can surface: tools, tokens, cost, memory recall.
@@ -80,6 +100,14 @@ class TurnReport:
     # The fact this turn saved to durable memory (an explicit "remember that…"), or None. Lets a UI
     # confirm "remembered" honestly — set only when a fact was actually written.
     memory_saved: str | None = None
+    #: Tool calls this turn that a gate refused or that errored, in the order they happened.
+    #:
+    #: Without this a refusal is invisible above the surface: `run_shell` hands back
+    #: "error: host execution declined (CHIMERA_HOST_EXEC). Not run." as an ordinary observation,
+    #: the model reads it and answers "The command printed exactly: marker-42", and nothing in the
+    #: reply says the command never ran. `tool_names` cannot carry it — it records that a tool was
+    #: called, which is the very thing that is true in both cases.
+    declined: list[DeclinedTool] = field(default_factory=list)
 
 
 @dataclass
@@ -103,6 +131,11 @@ class ChatSession:
         """Run one user message through the agent and record the exchange."""
         answer = self.agent.run(self._compose(message)).answer
         self._record(message, answer)
+        # `remember_from_chat` used to mean two different things depending on which method you
+        # called: `send_verbose` honoured it and `send` did not. So every surface built on `send`
+        # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
+        # true in the config and false in the product.
+        self._maybe_remember(message)
         return answer
 
     def send_verbose(
@@ -116,11 +149,26 @@ class ChatSession:
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
         is reused for both the prompt and the report's fact count (no double search)."""
         facts, layer = self._recall(message)
-        result = self.agent.run(self._assemble(message, facts), on_token=on_token, on_tool=on_tool)
+        declined: list[DeclinedTool] = []
+
+        def watch(activity: ToolActivity) -> None:
+            """Collect the refusals on the way past, then hand the activity to the caller.
+
+            Here rather than in each surface, because every surface needs the same answer and the
+            agent only offers it live: `AgentResult` keeps the tool NAMES, which say a tool was
+            called — true of a call that ran and of one a gate stopped.
+            """
+            if not activity.ok:
+                declined.append(DeclinedTool(activity.name, decline_reason(activity.observation)))
+            if on_tool is not None:
+                on_tool(activity)
+
+        result = self.agent.run(self._assemble(message, facts), on_token=on_token, on_tool=watch)
         self._record(message, result.answer)
         saved = self._maybe_remember(message)
         return TurnReport(
             answer=result.answer,
+            declined=declined,
             memory_saved=saved,
             prompt_tokens=result.prompt_tokens,
             completion_tokens=result.completion_tokens,
