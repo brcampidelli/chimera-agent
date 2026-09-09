@@ -181,7 +181,10 @@ def _make_headless_deny() -> HostExecConfirm:
 
 
 def resolve_host_exec_confirm(
-    settings: Settings | None = None, *, interactive: bool | None = None
+    settings: Settings | None = None,
+    *,
+    interactive: bool | None = None,
+    ask: HostExecConfirm | None = None,
 ) -> HostExecConfirm | None:
     """Return the host-exec confirmation callback, or ``None`` when no gate applies.
 
@@ -189,6 +192,20 @@ def resolve_host_exec_confirm(
     decided here (see the NOTE below); the tools skip a non-None callback themselves when
     :func:`sandbox_is_isolated` says the container is genuinely up. Returning False from the callback
     turns into a clean ``error:`` tool result, never a crash.
+
+    ``ask`` lets a surface supply its **own** way of putting the question in front of a person,
+    instead of :func:`_prompt`'s write-to-stdin. It exists for exactly one shape of surface, and the
+    shape was measured rather than imagined: inside ``chimera tui`` Textual's driver owns the
+    terminal, so ``_prompt`` waits 123.8 s for bytes that never arrive and the question is never
+    drawn (`bench/right_hand_governance/RESULTS.md` Part 2). Passing the TUI's modal here rather
+    than replacing this function is what keeps ``deny``, ``allow`` and
+    :func:`_skip_what_only_reads` deciding first, in that order, on every surface alike — a second
+    resolver would be a second policy, and the two would disagree the day one of them is edited.
+
+    It overrides ``interactive`` deliberately. ``interactive`` is an inference from a file
+    descriptor; ``ask`` is a surface stating that it has somewhere to draw. A declaration beats an
+    inference here for the same reason :func:`declare_no_human_here` exists — and this is that rule
+    pointed the other way.
     """
     from chimera.config import get_settings
 
@@ -207,6 +224,8 @@ def resolve_host_exec_confirm(
         return _deny
 
     # posture == "ask" (or anything unrecognised → treat as ask, the safe default)
+    if ask is not None:
+        return _skip_what_only_reads(ask)
     if interactive is None:
         interactive = _human_can_answer()
     return _skip_what_only_reads(_prompt if interactive else _make_headless_deny())

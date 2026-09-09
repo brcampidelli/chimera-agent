@@ -1,5 +1,5 @@
 ---
-source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
+source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
 ---
 
 # Chimera —— 使用指南
@@ -212,10 +212,15 @@ uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
+uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
 ```
 
-参数与两个 REPL 并不相同。`tui` 有 `--stream`/`--no-stream`，而它们没有；`chimera chat` 的
-`--cascade`、`--session`、`--new`、`--max-usd` 与 `--write-region` 在这里没有对应项。
+参数与两个 REPL 并不相同。`tui` 有 `--stream`/`--no-stream`，而它们没有；还有 `--max-usd`，它
+会在这次会话花到那个数目时停下来。这个参数一直在等一个能把它显示出来的地方：活动面板现在带有
+一行 `budget`，写着还剩多少——因为一个没人看得见的上限，会把一轮"因为钱而停下"变成一轮"没有
+任何可见理由就停下"。
+
+`chimera chat` 的 `--cascade`、`--session`、`--new` 与 `--write-region` 在这里没有对应项。
 
 命令：`/model <slug>` · `/reset`（清空上下文） · `/clear`（清屏） · `/stream`（切换实时 token
 流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 重置 · `Ctrl+L` 清屏 ·
@@ -223,21 +228,30 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 
 诚实提示：
 
-- **TUI 是刻意不受管控的。** 它只有部署白名单，别的都没有：没有污点台账，没有
-  `<<external-data>>` 围栏，没有内核，也没有审批器。原因是它的确认框画不出来——终端归 Textual
-  所有，于是主机执行的问询变成了对一个没人够得着的 stdin 提问。在 pty 中实测：这样的一轮在
-  120 秒超时之下阻塞了 123.8 秒，最后以没有任何解释的 `✗ run_shell` 返回
-  （`bench/right_hand_governance/RESULTS.md` 第 2 部分）。在它拥有 Textual 原生模态框之前，
-  `chat` 会阻断的那七次攻击在这里照样执行——当一次拒绝很重要时，请选 `chat` 或 `assist`。
+- **它是受管控的，而它的问题是画出来的，不是敲出来的。** 与两个 REPL 搭起的是同一套：一个被
+  告知你自己那条消息的污点台账、包住不可信工具输出的 `<<external-data>>` 围栏、信任内核、所有
+  者的可达性下限，以及已连接的 MCP 服务器。在 2026-09-09 之前把这个界面挡在外面的不是这套栈，
+  而是那个问题——终端归 Textual 所有，于是写进 stdin 的问询，写在了没人看得见的地方。在 pty
+  中实测：这样的一轮在 120 秒超时之下阻塞了 123.8 秒，最后以没有任何解释的 `✗ run_shell` 返回
+  （`bench/right_hand_governance/RESULTS.md` 第 2 部分）。如今**两道**关卡都改为弹出模态框：
+  主机执行确认与治理审批器。`y` 或 `n`，Escape 表示拒绝，"否"按钮持有焦点，这样回车不会误批，
+  还有一个倒计时告诉你沉默还剩多久——沉默依然是拒绝，而现在它会说出来。在同一份语料、同一套
+  仪器上，被阻断的攻击从 7 中 0 变为 7 中 7，在围栏内返回的外部读取从 15 中 0 变为 15 中 12
+  （留在围栏之外的那三次是你自己的仓库，它并不是外部的）。
+- **被拒绝的调用现在会说明原因，就在回复下方。** 活动面板本来就会在工具的 `✗` 下面显示它自己
+  那句话；对话记录区如今也会显示 `✗ run_shell did not succeed: …`——模型对一条从未执行过的命
+  令编排的说辞，也正在那里。批准同样有自己的一行（`governance: 1 approved this turn`），这样你
+  在一轮当中点下的 `y` 也留有痕迹。
 - 它什么都不持久化：关掉 TUI，对话就结束了。有线程的是 `chat`。
 - token 流式输出只在单模型路径下可用——在 `--fuse`（面板 → 评审者 → 综合器轮次）下没有增量
   token，因此面板会显示"synthesizing"（正在综合）状态，而不是伪造一个光标动画。这个标签跟随
   的是参数而不是路由：与 `chat` 一样，携带工具的一轮不会融合，而 REPL 的每一轮都携带工具。
 - 当某个模型的标价未知时，成本会显示为"unavailable"（不可用，绝不会去猜测）；并且每一轮都会
   像两个 REPL 那样追加到 `<home>/usage.jsonl`。
-- 这里没有 verify/revert（验证/回滚），也没有 MCP。两者都去了 `chat` 与 `assist`——它们会响应
-  `/solve` 并挂载配置好的服务器——因为这两件事都建立在污点台账和审批器之上，而这个界面已经决
-  定不要它们。verify-or-revert 同样运行在 `chimera solve` 与 `chimera project` 中。
+- 这里没有 verify/revert（验证/回滚），也没有 `/solve`：两者都去了 `chat` 与 `assist`。MCP 服
+  务器现在挂载了——以前没有——理由恰恰就是当初把它们扣住的那一条：MCP 的输出按定义就是不可信
+  内容，而如今有地方可以把它围起来。verify-or-revert 同样运行在 `chimera solve` 与
+  `chimera project` 中。
 - 如果没有安装 Textual，`tui` 会退回到普通的 `chat` REPL，并把每一个参数都显式传过去，好让这次
   回退能撑过它的第一轮。流式在那里没有意义，而线程会像任何其他 `chat` 线程一样被保存。
 

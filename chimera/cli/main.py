@@ -2204,15 +2204,34 @@ def tui(
     stream: bool = typer.Option(
         True, "--stream/--no-stream", help="Live token streaming (single-model path only)."
     ),
+    max_usd: float | None = typer.Option(
+        None,
+        "--max-usd",
+        help="Stop once this session has spent this much (the whole session, not one turn). "
+        "The activity panel shows what is left.",
+    ),
 ) -> None:
-    """Launch the full-screen TUI — your right-hand. Requires a key."""
+    """Launch the full-screen TUI — your right-hand. Requires a key.
+
+    Governed like ``chimera chat``: the taint ledger told your own message, the
+    ``<<external-data>>`` fence around untrusted tool output, the trust kernel, the owner's reach
+    floor and the connected MCP servers. What took longer to arrive here is the part that makes any
+    of it usable — a question this surface can **draw**. Textual owns the terminal, so the
+    stdin prompt every other surface uses was never seen: measured in a pty, a ``run_shell`` under
+    the shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout and came back as
+    ``✗ run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now
+    open a modal instead; silence still refuses, and now says so while it is counting down.
+    """
+    from chimera.cli.right_hand import build_right_hand
+    from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
     from chimera.providers import LLMGateway
-    from chimera.tools import default_registry
+    from chimera.sandbox.confirm import declare_no_human_here
 
     try:
         from chimera.tui.app import ChimeraTUI
+        from chimera.tui.confirm import ModalGate
     except ImportError:  # Textual is a base dep, but degrade gracefully if the install was slimmed.
         console.print(
             "[yellow]Textual isn't installed — falling back to 'chimera chat'. "
@@ -2233,13 +2252,13 @@ def tui(
             no_memory=no_memory,
             session_id=None,
             new=False,
-            # Nor a `--max-usd`, for the same reason it has no `--write-region`: this is the
-            # surface whose gates cannot be answered and whose panel would have to show the
-            # ceiling for one to mean anything. `None` says "no ceiling asked for", which is what
-            # omitting the flag on `chimera chat` means — and it cannot be omitted here, or it
-            # would arrive as an `OptionInfo` and `session_budget` would read that object as a
-            # truthy cap. The guard below caught exactly that the day this flag was added.
-            max_usd=None,
+            # The TUI has its own `--max-usd` now, so the fallback forwards it rather than dropping
+            # it: the flag was withheld while this surface had no panel line to show the ceiling on,
+            # and falling back to a `chat` that ignored a ceiling the person typed would be the
+            # worse half of that trade. It still cannot be *omitted* — an omitted parameter arrives
+            # as an `OptionInfo` object and `session_budget` reads that as a truthy cap, which is
+            # what `test_the_tui_fallback_passes_values_not_option_objects` exists to catch.
+            max_usd=max_usd,
             # `tui` has no `--write-region` of its own, so the fallback states the same "no region
             # asked for" that omitting the flag on `chimera chat` means. It cannot be omitted here:
             # the parameter would arrive as an `OptionInfo` object and `.split(",")` would fail on
@@ -2252,6 +2271,18 @@ def tui(
     if not settings.has_any_key():
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
+    _check_max_usd(max_usd)
+
+    # From here on, this process must not put a question on stdin and expect an answer: Textual is
+    # about to take the terminal into raw mode, and anything that writes a prompt there is writing
+    # where nobody can look. `_human_can_answer()` used to say the opposite — stdin genuinely IS a
+    # tty here — and that single wrong bit is what produced the 123.8 s block. The declaration is
+    # what `chimera/api/app.py` does for the server, for exactly the same reason, and it is made
+    # AFTER the fallback above has returned: the fallback runs `chimera chat`, which can prompt.
+    #
+    # Anything with a modal to draw on says so explicitly instead, by passing `ask=` below. So a
+    # stray gate resolved by inference in this process refuses, and the two gates that matter ask.
+    declare_no_human_here("tui")
 
     _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
@@ -2260,34 +2291,29 @@ def tui(
         from chimera.fusion import FusionEngine, RoutedBackend
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
+    # Built before the app that will draw its questions, because the tools that consult it are built
+    # before the session that the app is constructed around. `ChimeraTUI.on_mount` binds it.
+    gate = ModalGate()
+    hand = build_right_hand(Path(workspace), settings=settings, surface="tui", ask=gate)
     agent = Agent(
         backend,
-        # The deployment fence only — the kernel, the taint ledger and the approver that `chat` and
-        # `assist` gained are DELIBERATELY not here, and this is the one surface where that is a
-        # decision rather than an omission. Its gates cannot be answered: measured in a pty, a
-        # `run_shell` under the shipped `CHIMERA_HOST_EXEC=ask` blocks 123.8 s against a 120 s
-        # timeout and comes back as `✗ run_shell` with no reason, because Textual's driver owns the
-        # terminal and the prompt is a `typer.confirm` on raw stdin
-        # (`bench/right_hand_governance/RESULTS.md` Part 2). Adding the taint approver would buy one
-        # such block per narrowed call. It needs a Textual-native modal first; the exemption in
-        # `tests/test_governed_surfaces.py` carries the number.
-        _apply_tool_allowlist(
-            default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
-        ),
+        hand.registry,
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
         AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
     )
     mem = None if no_memory else _memory_manager()
+    budget = session_budget(max_usd)
+    turns: Any = agent if budget is None else BudgetedTurns(agent, budget)
     session = ChatSession(
-        agent,
+        turns,
         memory=mem,
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
     )
-    ChimeraTUI(
+    screen = ChimeraTUI(
         session,
         model_label=model or settings.default_model,
         stream=stream,
@@ -2296,7 +2322,17 @@ def tui(
         # self-measurement this project runs were blind to the terminal. One id per run, so a
         # session's turns group together.
         usage_home=settings.home,
-    ).run()
+        hand=hand,
+        gate=gate,
+        budget=budget,
+    )
+    try:
+        screen.run()
+    finally:
+        # Belt and braces with `on_unmount`. A crash between the last frame and the process exiting
+        # would otherwise leave the gate claiming a screen that is gone, and a question asked in
+        # that window would wait for a modal nothing can draw.
+        gate.release()
 
 
 @app.command()

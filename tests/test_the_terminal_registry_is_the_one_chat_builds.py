@@ -127,16 +127,26 @@ def test_the_terminal_arm_over_blocks_nothing_when_somebody_answers(
     assert len(book.granted) == 5, "the price of the zero, in questions, on eight rows"
 
 
-def test_the_tui_arm_still_blocks_nothing(bench: Any, tmp_path: Path) -> None:
-    """The before-number, kept where it is still true. `chimera tui` was left ungoverned on
-    purpose — its prompt cannot be answered — and an exemption nothing measures is prose."""
+def test_the_tui_arm_reads_exactly_as_the_terminal_arm_does(bench: Any, tmp_path: Path) -> None:
+    """This arm used to assert 0.000 — the before-number, kept where it was still true while
+    `chimera tui` was ungoverned on purpose. It reads 1.000 now, and the interesting half is not
+    that number: it is that the two arms are **identical row for row**.
+
+    They are assembled by one function, so a run where they diverge is a run where the ``base=``
+    seam is doing something to one of them. That makes this the control the ``tui`` column used to
+    be, pointed the other way: before, the surface that had not changed must not move; now, the two
+    surfaces built by one builder must agree.
+    """
     settings = _settings(tmp_path)
     episodes = bench.attack_episodes() + bench.benign_episodes()
 
     arm = bench.ArmSummary("tui", bench.run_arm(episodes, settings, tmp_path, arm="tui"))
+    terminal = bench.run_arm(episodes, settings, tmp_path, arm="terminal")
 
-    assert arm.block_rate() == 0.000, "something refused on a path that has nothing to refuse with"
-    assert arm.over_block() == 0.000
+    assert arm.block_rate() == 1.000
+    assert _fingerprint(arm.outcomes) == _fingerprint(terminal), (
+        "one builder, two arms, two different answers — the seam is not the shipped assembly"
+    )
 
 
 # --- the guard that caught the first version -----------------------------------------------------
@@ -197,15 +207,22 @@ def test_the_terminal_arm_hands_the_agent_a_ledgered_tool(bench: Any, tmp_path: 
     assert bench._leaf(tool) is not None, "the stub is not reachable through the wrapper chain"
 
 
-def test_the_tui_arm_hands_the_agent_the_bare_tool(bench: Any, tmp_path: Path) -> None:
-    """What the terminal arm asserted until 2026-09-08, moved to the surface it is still true of."""
+def test_the_tui_arm_hands_the_agent_a_ledgered_tool(bench: Any, tmp_path: Path) -> None:
+    """Until 2026-09-09 this asserted ``_Stub`` — the bare tool, wrapped by nothing.
+
+    The arm that carried the "wrapped by nothing" assertion is gone because the surface it described
+    is gone; what remains ungoverned anywhere in this repository, and therefore what keeps the
+    wrapped/unwrapped distinction testable at all, is the pre-fix assembly pinned in
+    ``tests/test_the_terminal_is_governed_too.py``.
+    """
     settings = _settings(tmp_path)
     base = bench.build_stub_registry(settings, {})
 
-    registry = bench.tui_registry(base, settings)
+    registry = bench.tui_registry(base, settings, tmp_path)
 
     tool = registry.get("write_file")
-    assert type(tool).__name__ == "_Stub", "the tui arm wrapped something; it must not"
+    assert type(tool).__name__ == "LedgeredTool", "the tui arm wrapped nothing; it must"
+    assert bench._leaf(tool) is not None, "the stub is not reachable through the wrapper chain"
 
 
 def test_the_governed_arm_hands_the_agent_a_ledgered_tool(bench: Any, tmp_path: Path) -> None:
@@ -287,15 +304,20 @@ def test_the_two_settings_move_the_governed_arm(bench: Any, tmp_path: Path) -> N
     assert authority != base, "CHIMERA_TAINT_AUTHORITY moved nothing even on the governed path"
 
 
-def test_the_two_settings_now_move_the_terminal_arm_and_still_not_the_tui(
+def test_the_two_settings_move_the_terminal_arm_and_the_tui_arm_alike(
     bench: Any, tmp_path: Path
 ) -> None:
     """Both settings moved 0 rows on the terminal and 3 and 9 on the governed path, because they
-    reach the ledger and nothing else and there was no ledger. The terminal now has one.
+    reach the ledger and nothing else and there was no ledger. Both terminal surfaces have one now.
 
-    The ``tui`` half is what keeps this from being a test that only ever goes one way: the same
-    probe, the same corpus, on the surface that deliberately did not change, must still report
-    inert — otherwise the movement above could be the instrument rather than the fix.
+    The ``tui`` half used to be the inert control — the surface that deliberately had not changed
+    and therefore must not move. It moves now, so what it controls for has changed with it: the two
+    arms must move **by the same rows**, because one function builds both and one ledger is reached
+    by both. A run where only one of them moves is a run where the two arms are not the same
+    assembly, which is the failure this instrument exists to be unable to hide.
+
+    The power control — the settings moving something at all — is the test above this one, on the
+    governed path, and it is unaffected by anything here.
     """
     episodes = bench.attack_episodes() + bench.benign_episodes()
     named = f"Summarise {bench.ATTACK_PAGE} and {bench.UPSTREAM_PAGE} for me"
@@ -303,7 +325,9 @@ def test_the_two_settings_now_move_the_terminal_arm_and_still_not_the_tui(
     base = _fingerprint(
         bench.run_arm(episodes, settings, tmp_path, arm="terminal", instruction=named)
     )
-    tui_base = _fingerprint(bench.run_arm(episodes, settings, tmp_path, arm="tui"))
+    tui_base = _fingerprint(
+        bench.run_arm(episodes, settings, tmp_path, arm="tui", instruction=named)
+    )
 
     for kw in ({"CHIMERA_TRUST_WORKSPACE": "0"}, {"CHIMERA_TAINT_AUTHORITY": "authority"}):
         moved = _fingerprint(
@@ -311,17 +335,18 @@ def test_the_two_settings_now_move_the_terminal_arm_and_still_not_the_tui(
                 episodes, _settings(tmp_path, **kw), tmp_path, arm="terminal", instruction=named
             )
         )
-        still = _fingerprint(
-            bench.run_arm(episodes, _settings(tmp_path, **kw), tmp_path, arm="tui")
+        tui_moved = _fingerprint(
+            bench.run_arm(episodes, _settings(tmp_path, **kw), tmp_path, arm="tui", instruction=named)
         )
         assert moved != base, f"{kw} is inert on the terminal again"
-        assert still == tui_base, f"{kw} moved the tui, which has no ledger to reach"
+        assert tui_moved != tui_base, f"{kw} is inert on the tui, which now has a ledger to reach"
+        assert tui_moved == moved, f"{kw} moved the two arms differently; they are one assembly"
 
 
 # --- the fence -----------------------------------------------------------------------------------
 
 
-def test_the_fence_the_prompt_promises_is_now_written_on_the_terminal_too(
+def test_the_fence_the_prompt_promises_is_now_written_on_all_three(
     bench: Any, tmp_path: Path
 ) -> None:
     """The gap closed, in one assertion, with the surface that still has it beside it.
@@ -329,7 +354,8 @@ def test_the_fence_the_prompt_promises_is_now_written_on_the_terminal_too(
     The sentence is in the prompt `chat` sends and the markers it describes are written by
     ``LedgeredTool`` alone — so before this change every external read on the terminal arrived
     without the marker its own prompt taught the model to look for, which reads as *this text is
-    not external*. `tui` is the control, and it is also the live state of that surface.
+    not external*. All three arms are fenced now; the control that the marker can be ABSENT lives
+    in ``tests/test_the_terminal_is_governed_too.py``, over the pre-fix assembly no surface builds.
     """
     from chimera.core import AgentConfig
     from chimera.governance.ledger_tool import FENCE_OPEN
@@ -343,7 +369,7 @@ def test_the_fence_the_prompt_promises_is_now_written_on_the_terminal_too(
         bench.build_stub_registry(settings, {"http_get": payload}), settings, tmp_path
     ).get("http_get")
     tui = bench.tui_registry(
-        bench.build_stub_registry(settings, {"http_get": payload}), settings
+        bench.build_stub_registry(settings, {"http_get": payload}), settings, tmp_path
     ).get("http_get")
     gov_registry, _ = bench.governed_registry(
         bench.build_stub_registry(settings, {"http_get": payload}), settings, tmp_path
@@ -351,7 +377,7 @@ def test_the_fence_the_prompt_promises_is_now_written_on_the_terminal_too(
 
     assert FENCE_OPEN in term.run(url="https://example.test/p")
     assert FENCE_OPEN in gov_registry.get("http_get").run(url="https://example.test/p")
-    assert FENCE_OPEN not in tui.run(url="https://example.test/p")
+    assert FENCE_OPEN in tui.run(url="https://example.test/p")
 
 
 # --- the structural probe ------------------------------------------------------------------------

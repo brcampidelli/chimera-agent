@@ -12,13 +12,19 @@ All conversation behaviour lives in ``ChatSession`` (tested separately). The blo
 in a thread worker; token/tool callbacks marshal to the UI with ``post_message`` (thread-safe and
 non-blocking, so a fast stream never stalls the model thread). The pure-dispatch :meth:`reply_to`
 seam is kept and unit-tested without an event loop.
+
+**The governance gates go the other way, and that is the one place this app blocks itself.** A gate
+has to be answered *before* the tool runs, so ``post_message`` — which is fire-and-forget — is the
+wrong direction: the worker calls :class:`~chimera.tui.confirm.ModalGate`, which pushes a screen and
+waits for it. See that module for why it is safe under ``exclusive=True``, and
+`bench/right_hand_governance/RESULTS.md` Part 2 for the 123.8 s hang it replaces.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from rich.markdown import Markdown
@@ -31,10 +37,15 @@ from textual.suggester import SuggestFromList
 from textual.widgets import Footer, Header, Input, RichLog, Static
 
 from chimera.core.agent import ToolActivity
-from chimera.interface import ChatSession
+from chimera.interface import ChatSession, render
 from chimera.interface.render import scrub_provider_ids
 from chimera.interface.session import TurnReport
 from chimera.tui.activity import ActivityPanel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.cli.right_hand import RightHand
+    from chimera.orchestration.budget import SpendBudget
+    from chimera.tui.confirm import ModalGate
 
 _SLASH = ["/model ", "/reset", "/clear", "/stream", "/help", "/exit"]
 _HELP = (
@@ -98,6 +109,9 @@ class ChimeraTUI(App[None]):
         stream: bool = True,
         fuse: bool = False,
         usage_home: Path | None = None,
+        hand: RightHand | None = None,
+        gate: ModalGate | None = None,
+        budget: SpendBudget | None = None,
     ) -> None:
         super().__init__()
         self.session = session
@@ -110,6 +124,16 @@ class ChimeraTUI(App[None]):
         #: zero spend for a surface that had been running all day.
         self.usage_home = usage_home
         self.usage_session = uuid4().hex[:12]
+        #: The governed stack this conversation runs on, or None for a TUI built without one (the
+        #: dispatch tests). Held for `begin_turn` and for the per-turn verdicts, exactly as the
+        #: REPL loop holds it.
+        self.hand = hand
+        #: The thing that makes `hand` answerable here. Bound on mount and released on the way out,
+        #: so a question asked while the app is not on screen refuses instead of waiting.
+        self.gate = gate
+        #: The conversation's dollar ceiling, or None. Shown in the panel, because a ceiling nobody
+        #: can see is indistinguishable from a turn that stopped for its own reasons.
+        self.budget = budget
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -135,7 +159,17 @@ class ChimeraTUI(App[None]):
         self.title = "Chimera"
         self.sub_title = self.model_label or "your right-hand"
         self._append("[bold]Chimera[/bold] — type a message. /help for commands, /exit quits.")
+        # The app is on screen: from here a gate's question can be drawn. Before this line it could
+        # not, and the gate says so rather than waiting for a timeout to say it for it.
+        if self.gate is not None:
+            self.gate.bind(self, note=self._append)
+        self._show_budget()
         self.query_one("#prompt", Input).focus()
+
+    def on_unmount(self) -> None:
+        """Stop claiming a person can be asked, the moment the screen goes away."""
+        if self.gate is not None:
+            self.gate.release()
 
     # -- input + commands --------------------------------------------------
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -161,10 +195,26 @@ class ChimeraTUI(App[None]):
         else:
             # escape() the untrusted text so brackets can't crash Rich's markup parser (e.g. "[/]").
             self._append(f"[bold green]you ›[/bold green] {escape(text)}")
+            if self.budget is not None and self.budget.blocked():
+                # Refused here rather than one layer down, for the reason `chat` gives: the loop
+                # would refuse at zero cost but would first record a turn whose "answer" is the
+                # budget error, and that text is replayed into every later prompt.
+                self._append(render.budget_spent_line(str(self.budget.blocked())))
+                return
+            # Before a single tool runs: the ledger is told whose words this turn is. Without it
+            # every fetch reads `unknown` and `CHIMERA_TAINT_AUTHORITY=authority` cannot tell a page
+            # the person named from one the model went and found.
+            if self.hand is not None:
+                self.hand.begin_turn(text)
             self._activity().start_turn(self._busy_label())
             # Disable input for the duration of the turn. A thread worker can't be preempted, so a
             # second Enter would spin up a CONCURRENT send_verbose on the same (non-thread-safe)
             # ChatSession — interleaving the transcript and the live buffer. Re-enabled on finish.
+            #
+            # It is also what makes the governance modal safe under `exclusive=True`: a second
+            # submission would start a second worker in the same group and cancel the first, which
+            # is the one worker blocked on the question. It cannot, because there is no way to
+            # submit while a turn is running.
             self.query_one("#prompt", Input).disabled = True
             self.run_worker(lambda: self._respond(text), thread=True, exclusive=True)
 
@@ -226,10 +276,28 @@ class ChimeraTUI(App[None]):
         log = self.query_one("#log", RichLog)
         log.write("[bold magenta]chimera ›[/bold magenta]")
         log.write(Markdown(report.answer))  # renders fenced code with syntax highlighting
+        # The reply is on screen first, then what it does not say. `render.refusal_lines` is the
+        # REPL's own sentence — `✗ <tool> did not succeed: <reason>` — reused rather than reworded,
+        # because a person who has read one surface should not have to learn a second vocabulary to
+        # read this one. The activity panel says the same thing in its own column; this is the half
+        # that sits under the answer the model gave, which is where the model's paraphrase of a
+        # refused command is.
+        for line in render.refusal_lines(report):
+            log.write(line)
+        cut = render.cut_short_line(report)
+        if cut:
+            log.write(cut)
+        if self.hand is not None:
+            governance = render.governance_line(
+                *self.hand.turn_verdicts(), attended=self.hand.attended
+            )
+            if governance:
+                log.write(governance)
         panel = self._activity()
         panel.set_tokens(report)
         panel.set_memory(report.memory_facts_used, report.memory_layer)
         panel.set_status("done")
+        self._show_budget()
 
     # -- actions -----------------------------------------------------------
     def action_reset(self) -> None:
@@ -256,6 +324,18 @@ class ChimeraTUI(App[None]):
         if self.fuse:
             return "fusion — synthesizing (no token stream)"
         return "streaming…" if self.stream_enabled else "thinking…"
+
+    def _show_budget(self) -> None:
+        """Put what is left of the ceiling in the panel, or leave the row alone when there is none.
+
+        ``--max-usd`` was withheld from this surface when `chat` and `assist` got it, on the stated
+        grounds that "the TUI's panel would need to show it". This is that condition met rather than
+        waived: a ceiling the person cannot see turns a turn that stopped for money into a turn that
+        stopped for no visible reason, which is the same failure as the cross with no explanation.
+        """
+        if self.budget is None:
+            return
+        self._activity().set_budget(self.budget.remaining, self.budget.max_usd)
 
     def _activity(self) -> ActivityPanel:
         return self.query_one("#activity", ActivityPanel)

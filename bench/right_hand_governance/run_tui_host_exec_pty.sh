@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Part 2: is the host-exec confirmation prompt answerable inside `chimera tui`?
+# Part 2 (2026-09-08): is the host-exec confirmation prompt answerable inside `chimera tui`?
+# Part 4 (2026-09-09): the same question, after the modal. Same script, same prompt, same model.
 #
 # The governance study INFERRED that it is not -- Textual owns the terminal, the prompt is a
 # `typer.confirm` on raw stdin run on a worker thread, `_human_can_answer()` still returns True
 # because stdin really is a tty, and PROMPT_TIMEOUT_SECONDS then refuses after two minutes. Nothing
-# in the repository had run it. This runs it.
+# in the repository had run it. This ran it, and confirmed it: 123.8 s, the question never drawn.
+#
+# It runs UNCHANGED against the fix, which is the point of keeping it. The only thing added is
+# CHIMERA_SRC: the WSL venv is installed against the MAIN checkout, so without it a run on a branch
+# would faithfully measure a tree that does not contain the branch -- and would reproduce the old
+# number, which is the most convincing wrong answer available.
 #
 #   MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' wsl bash bench/right_hand_governance/run_tui_host_exec_pty.sh
 #
@@ -31,6 +37,10 @@ mkdir -p "$OUT"
 
 CHIMERA=/home/brcamp/hb-venv/bin/chimera
 PY=/home/brcamp/hb-venv/bin/python
+# Which source tree the venv should import `chimera` from. Empty = whatever it is installed against
+# (the main checkout). Set it to a worktree to measure a branch. It is echoed into the transcript,
+# because "which code was this" is the first question anybody re-reading a timing will have.
+CHIMERA_SRC="${CHIMERA_SRC:-}"
 MODEL="openrouter/deepseek/deepseek-chat-v3.1"
 # Deliberately does NOT contain the string `run_shell`. The first pass did, and the tool name then
 # had its "first appearance" recorded at t+8s -- the echo of the typed prompt, not the tool call.
@@ -41,6 +51,7 @@ ASK="Execute this on the machine with your shell tool and tell me the exact outp
 eval "$(tr -d '\r' < "/mnt/c/Users/brcam/Desktop/Desenvolvendo Projetos/Agent AI/.env" | grep -E '^[A-Za-z_]+=' | sed 's/^/export /')"
 if [ -z "${OPENROUTER_API_KEY:-}" ]; then echo "no key; aborting"; exit 1; fi
 
+if [ -n "$CHIMERA_SRC" ]; then export PYTHONPATH="$CHIMERA_SRC"; fi
 export CHIMERA_SANDBOX=local
 unset CHIMERA_HOST_EXEC || true      # leave it at its default, `ask` -- that is the subject
 export TERM=xterm-256color
@@ -61,6 +72,7 @@ run_arm() {
   fi
   home="$(mktemp -d)"
   echo "=== arm $label (fresh CHIMERA_HOME) ==="
+  echo "    chimera source: $("$PY" -c 'import chimera, pathlib; print(pathlib.Path(chimera.__file__).resolve().parent)')"
   CHIMERA_HOME="$home" "$PY" "$HERE/pty_drive.py" \
     --label "$label" \
     --cmd "stty rows 40 cols 120 2>/dev/null; $cmd" \
@@ -80,7 +92,10 @@ run_arm() {
 # 300s: the inferred failure is a 120s block INSIDE the turn, so the ceiling has to clear the
 # model latency plus the timeout plus the redraw, or a hang would be indistinguishable from an
 # impatient harness.
-run_arm tui "$CHIMERA tui --model $MODEL --no-memory --no-stream" 300
+# `--reply` answers the modal with `y` the moment the question is on screen. In the 2026-09-08 run
+# that pattern NEVER APPEARED and the reply never fired, which is what makes the same rule a fair
+# test of both states: it does nothing at all if the question is not drawn.
+run_arm tui "$CHIMERA tui --model $MODEL --no-memory --no-stream" 300   --reply "wants to run this on your machine::y"
 
 # --- arm 2: chat, the control --------------------------------------------------------------
 # Answers `y` when the prompt appears. Answering proves two things at once: the question reached

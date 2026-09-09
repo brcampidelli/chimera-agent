@@ -1496,6 +1496,15 @@ chimera transfer-gate TUNED_BASELINE TUNED_TREATMENT
 
 Launch the full-screen TUI — your right-hand. Requires a key.
 
+Governed like ``chimera chat``: the taint ledger told your own message, the
+``<<external-data>>`` fence around untrusted tool output, the trust kernel, the owner's reach
+floor and the connected MCP servers. What took longer to arrive here is the part that makes any
+of it usable — a question this surface can **draw**. Textual owns the terminal, so the
+stdin prompt every other surface uses was never seen: measured in a pty, a ``run_shell`` under
+the shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout and came back as
+``✗ run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now
+open a modal instead; silence still refuses, and now says so while it is counting down.
+
 ```bash
 chimera tui
 ```
@@ -1508,6 +1517,7 @@ chimera tui
 | `--fuse` | Route deep-reasoning turns through fusion. |  |
 | `--no-memory` | Don't recall long-term memory. |  |
 | `--stream` | Live token streaming (single-model path only). | `True` |
+| `--max-usd` | Stop once this session has spent this much (the whole session, not one turn). The activity panel shows what is left. |  |
 
 ## version
 

@@ -226,11 +226,15 @@ uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
+uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
 ```
 
-Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they do not have.
-The `--cascade`, `--session`, `--new`, `--max-usd` and `--write-region` of `chimera chat` have no
-equivalent here.
+Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they do not have, and
+`--max-usd`, which stops the session once it has spent that much. That flag waited for somewhere to
+show it: the activity panel now carries a `budget` row with what is left, because a ceiling nobody
+can see turns a turn that stopped for money into a turn that stopped for no visible reason.
+
+The `--cascade`, `--session`, `--new` and `--write-region` of `chimera chat` have no equivalent here.
 
 Commands: `/model <slug>` · `/reset` (clear context) · `/clear` (clear screen) · `/stream` (toggle
 live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` reset · `Ctrl+L` clear ·
@@ -239,13 +243,22 @@ type.
 
 Honesty notes:
 
-- **The TUI is deliberately not governed.** It has the deployment allowlist and nothing else: no
-  taint ledger, no `<<external-data>>` fence, no kernel, no approver. The reason is that its
-  confirmation cannot be drawn — Textual owns the terminal, so the host-execution prompt is a
-  question on a stdin nobody can reach. Measured in a pty, such a turn blocked for 123.8 s against a
-  120 s timeout and came back as `✗ run_shell` with no explanation
-  (`bench/right_hand_governance/RESULTS.md`, Part 2). Until it has a Textual-native modal, the seven
-  attacks `chat` blocks still execute here — prefer `chat` or `assist` when a refusal matters.
+- **It is governed, and its questions are drawn instead of typed.** Same stack the REPLs build: a
+  taint ledger told your own message, the `<<external-data>>` fence around untrusted tool output, the
+  trust kernel, the owner's reach floor and the connected MCP servers. What kept this surface out
+  until 2026-09-09 was not the stack but the question — Textual owns the terminal, so a prompt
+  written to stdin is written where nobody can look. Measured in a pty, such a turn blocked for
+  123.8 s against a 120 s timeout and came back as `✗ run_shell` with no explanation
+  (`bench/right_hand_governance/RESULTS.md`, Part 2). **Both** gates now open a modal instead: the
+  host-execution confirm and the governance approver. `y` or `n`, Escape refuses, the No button holds
+  the focus so Enter cannot approve by accident, and a countdown says how long silence has left —
+  silence still refuses, and now says so. On the same corpus and the same instrument, attacks blocked
+  went from 0 of 7 to 7 of 7 and external reads returned inside the fence from 0 of 15 to 12 of 15
+  (the three that stay outside it are your own repository, which is not external).
+- **A refused call now says why, under the reply.** The activity panel already showed the tool's own
+  sentence beneath its `✗`; the conversation log shows `✗ run_shell did not succeed: …` as well,
+  which is where the model's account of a command that never ran also is. An approval gets a line
+  too (`governance: 1 approved this turn`), so a `y` you clicked mid-turn leaves a trace.
 - It persists nothing: closing the TUI ends the conversation. `chat` is the surface with threads.
 - Token streaming is the single-model path only — under `--fuse` (a panel→judge→synthesizer turn)
   there are no incremental tokens, so the panel shows a "synthesizing" status rather than a fake
@@ -253,9 +266,10 @@ Honesty notes:
   not fuse, and a REPL turn always carries tools.
 - Cost reads "unavailable" when the model's list price is unknown (never guessed), and each turn is
   appended to `<home>/usage.jsonl` like the REPLs'.
-- There is no verify/revert here, and no MCP. Both went to `chat` and `assist`, which answer `/solve`
-  and mount the configured servers, because both rest on the taint ledger and the approver that this
-  surface has decided not to have. Verify-or-revert also runs in `chimera solve` and `chimera project`.
+- There is no verify/revert here and no `/solve`: those went to `chat` and `assist`. MCP servers are
+  mounted, which they were not before, for exactly the reason they were withheld — MCP output is
+  untrusted content by definition, and there is somewhere to fence it now. Verify-or-revert also runs
+  in `chimera solve` and `chimera project`.
 - If Textual isn't installed, `tui` falls back to the plain `chat` REPL, passing every argument
   explicitly so the fallback survives its first turn. Streaming has no meaning there, and the thread
   is saved like any other `chat` thread.

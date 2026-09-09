@@ -1,10 +1,12 @@
 """The terminal right-hand's tool stack, assembled once for every surface that is one.
 
-``chimera chat`` and ``chimera assist`` used to build ``_apply_tool_allowlist(default_registry(ws))``
-and nothing else, while ``chimera/api/code_api.py:assemble_registry`` built a write region, an
-allowlist, a trust kernel, a taint ledger carrying the run's own instruction, and an approver. The
-gap was not an oversight anybody had to find — it was written down as three exemptions in
-``tests/test_governed_surfaces.py`` whose reason was **"attended"**.
+``chimera chat``, ``chimera assist`` and ``chimera tui`` used to build
+``_apply_tool_allowlist(default_registry(ws))`` and nothing else, while
+``chimera/api/code_api.py:assemble_registry`` built a write region, an allowlist, a trust kernel, a
+taint ledger carrying the run's own instruction, and an approver. The gap was not an oversight
+anybody had to find — it was written down as three exemptions in
+``tests/test_governed_surfaces.py`` whose reason was **"attended"**. All three are gone; the last
+one, the TUI's, needed a modal built before it could go.
 
 It was measured before it was argued about (`bench/right_hand_governance/RESULTS.md`, 2026-09-08,
 US$ 0): the terminal registry executed **7 of 7** attacks the governed one blocked, and **0 of 12**
@@ -33,6 +35,14 @@ the irony the study named. :func:`chimera.governance.approval.approver_for` alre
 behaviour and no ``home`` is passed: a durable question nobody will read is a fifteen-minute pause
 before the same refusal.
 
+**And where stdin is the wrong pipe, the surface brings its own.** ``chimera tui`` was left out of
+all of the above until 2026-09-09, because inside Textual a prompt written to stdin is never read:
+measured at 123.8 s to a 120 s timeout, with the question never drawn. It builds this same stack
+now, and the difference is one argument — ``ask=`` (:class:`TerminalAsk`), a modal the app draws —
+which both gates are routed through. Nothing else about the assembly is per-surface, deliberately:
+the three commands differ in the ``surface`` label and in whether they hand over a question, and in
+nothing that decides what is allowed.
+
 **The ledger lives as long as the conversation, and the instruction is set per turn.** A fresh
 ledger per turn would have been closer to ``assemble_registry`` and would have been wrong here: the
 transcript replays the last six turns, so a page fetched on turn 1 is still in the prompt on turn 4,
@@ -48,12 +58,37 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
     from chimera.governance.approval import ApprovalLedger
     from chimera.governance.ledger import TaintLedger
+
+
+class TerminalAsk(Protocol):
+    """A surface's own way of putting a gate's question in front of the person sitting there.
+
+    Two methods rather than one, because the two gates this stack installs are **different
+    callables with different signatures** and a surface that answers only one of them keeps the
+    other's failure mode intact. That is not hypothetical: it is exactly what `chimera tui` shipped
+    between 2026-09-08 and the modal — a host-exec confirm nobody could see, on a surface whose
+    taint approver had deliberately never been wired for the same reason.
+
+    A REPL passes nothing here: :func:`chimera.sandbox.confirm._prompt` and
+    :func:`chimera.governance.approval.ask` already reach the person through stdin, which is a real
+    answer on that surface and a two-minute block on a full-screen one.
+    """
+
+    @property
+    def attended(self) -> bool:
+        """Whether a question asked right now could actually reach a person."""
+
+    def host_exec(self, command: str) -> bool:
+        """Run this command on the person's machine, or not."""
+
+    def question(self, action: str, reason: str) -> bool:
+        """Allow this governance-flagged action once, or not."""
 
 
 @dataclass
@@ -122,11 +157,14 @@ def _mount_mcp(registry: Any, settings: Settings) -> None:
     this line — the deployment fence, the reach floor, the kernel, the taint ledger — therefore
     covers the MCP tools too, which is the whole reason this surface is a safe place to mount them.
 
-    **Not in the TUI.** That surface is ungoverned by a decision it documents in its own body: no
-    ledger, no fence, no approver, because its gates cannot be answered while Textual owns stdin.
-    MCP output is untrusted content by definition (``mcp_client.py:49``), and mounting it where
-    nothing can fence it would be adding the input without the layer that reads it. The other two
-    have that layer.
+    **In the TUI too, since the modal.** This used to say "not in the TUI", and the reason it gave
+    was a real one: MCP output is untrusted content by definition (``mcp_client.py:49``), that
+    surface had no ledger to fence it with and no answerable approver, so mounting it there would
+    have been adding the input without the layer that reads it. The TUI builds this stack now, so
+    the objection is gone rather than overruled — its MCP output arrives inside the same
+    ``<<external-data>>`` fence, narrows the same run, and asks the same person. Nothing here
+    distinguishes the three surfaces any more, which is the point; the gate is
+    ``CHIMERA_MCP_AUTOLOAD``, off by default, and a stock install still spawns nothing.
     """
     if not settings.mcp_autoload:
         return
@@ -150,6 +188,7 @@ def build_right_hand(
     surface: str,
     write_region: str | None = None,
     base: Any = None,
+    ask: TerminalAsk | None = None,
 ) -> RightHand:
     """Assemble the terminal's governed registry, in the order ``assemble_registry`` uses.
 
@@ -169,6 +208,14 @@ def build_right_hand(
     costs US$ 0 and executes nothing, and without this seam it would have to *re-implement* steps
     1-5 to do it. A bench whose arm is a copy of the code it measures stops measuring the code the
     day the copy drifts. Everything below this line is identical either way, which is the point.
+
+    ``ask`` is how a surface that cannot answer through stdin supplies its own question — see
+    :class:`TerminalAsk`. **Both** gates take it: the host-execution confirm the shell tools consult
+    as they are constructed, and the approver the kernel and the taint ledger consult per call.
+    Passing it to one of the two would leave the other blocking for
+    :data:`~chimera.sandbox.confirm.PROMPT_TIMEOUT_SECONDS`, which is the half-fix that measures as
+    a success — the offline corpus below never touches the host-exec gate, so a bench run would
+    report the governance working while every ``run_shell`` still cost two minutes.
     """
     from chimera.api.posture import deployment_posture
     from chimera.cli.main import _apply_tool_allowlist
@@ -176,6 +223,7 @@ def build_right_hand(
     from chimera.governance.approval import ApprovalLedger, approver_for, nobody_is_at_a_terminal
     from chimera.governance.audit import AuditLog
     from chimera.governance.profile import govern_step
+    from chimera.sandbox.confirm import resolve_host_exec_confirm
     from chimera.tools import default_registry
     from chimera.tools.write_region import WriteRegion
 
@@ -186,10 +234,21 @@ def build_right_hand(
     # — an empty region forbids every write, which is a thing to say on purpose and not to reach
     # through a trailing comma.
     globs = [g.strip() for g in (write_region or "").split(",") if g.strip()]
+    # The host-exec gate is decided HERE, at construction, because that is where the shell and code
+    # tools take it — `RunShellTool(..., confirm=confirm)`. A surface with a modal has to say so
+    # before its tools exist; there is no later moment. Left unpassed, `default_registry` resolves
+    # it from settings exactly as it always has, so `chat` and `assist` are byte-for-byte unchanged.
+    gate = (
+        {}
+        if ask is None
+        else {"host_exec_confirm": resolve_host_exec_confirm(settings, ask=ask.host_exec)}
+    )
     registry = (
         base
         if base is not None
-        else default_registry(ws, write_region=WriteRegion(globs, ws) if globs else None)
+        else default_registry(
+            ws, write_region=WriteRegion(globs, ws) if globs else None, **gate
+        )
     )
     if base is None:
         _mount_mcp(registry, settings)
@@ -208,13 +267,21 @@ def build_right_hand(
     # shows a partial history while claiming to show the whole one.
     audit = AuditLog(Path(settings.home) / "audit.jsonl")
     approvals = ApprovalLedger()
-    attended = not nobody_is_at_a_terminal()
+    # A surface with its own question knows whether it can draw one; a REPL has to infer it from
+    # stdin. Asking the asker is the whole difference between "refused" and "refused because there
+    # was nobody to ask" on a screen where stdin is a tty and unreachable at the same time.
+    attended = ask.attended if ask is not None else not nobody_is_at_a_terminal()
     # `home=None` on purpose. With a home, `approver_for` would write the question to disk and wait
     # `CHIMERA_APPROVAL_WAIT` seconds for somebody to run `chimera approve` — inside a REPL turn,
     # for a person who is sitting right there and was never shown a prompt. Without one it degrades
     # to a recorded deny, which is exactly today's headless behaviour and the thing the task asked
     # to preserve under a pipe.
-    approve = approver_for(settings.approval_mode, approvals, home=None)
+    approve = approver_for(
+        settings.approval_mode,
+        approvals,
+        home=None,
+        ask_with=None if ask is None else ask.question,
+    )
 
     # `attended=True`: unlike every other caller of this, there really is a person at this console,
     # and they are the person who asked. `audit_allows=False` for the reason `assemble_registry`
