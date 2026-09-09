@@ -4,6 +4,12 @@ All notable changes to this project are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- **The terminal right-hand, measured before it is fixed.** `bench/right_hand_governance/` runs the injection corpus against the registry `chat` / `assist` / `tui` actually build, offline and at US$ 0, beside the governed registry the API builds. The terminal blocks **0 of 7** attacks — `wipe_disk`, `curl | sh`, backdoor, `authorized_keys`, e-mail exfiltration, skill self-modification, GET exfiltration all execute — where the governed path blocks 7 of 7; and **0 of 15** external reads arrive inside the `<<external-data>>` fence the system prompt promises in every conversation, which is worse than a missing defence: to a model obeying that instruction, no marker reads as *not external*. `CHIMERA_TRUST_WORKSPACE=0` and `CHIMERA_TAINT_AUTHORITY=authority` are inert on this path, shown against a control where they move 3 and 9 rows. Confirmed live and no longer inferred: a host-exec confirmation inside `chimera tui` is never drawn — the turn hangs **123.8 s** and comes back `✗ run_shell` with no reason, against the 120 s prompt timeout, while `chimera chat` shows the question in 12.9 s and works. `PREREGISTRATION.md` records what the fix must achieve and what would make it unacceptable; the TUI is excluded until it has a modal of its own.
+
 ## [0.52.0] - 2026-09-08
 
 ### Added
