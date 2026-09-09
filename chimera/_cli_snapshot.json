@@ -476,6 +476,16 @@
           ],
           "required": false,
           "type": "boolean"
+        },
+        {
+          "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
+          "kind": "option",
+          "name": "write_region",
+          "opts": [
+            "--write-region"
+          ],
+          "required": false,
+          "type": "str"
         }
       ],
       "path": "assist"
@@ -764,6 +774,16 @@
           ],
           "required": false,
           "type": "boolean"
+        },
+        {
+          "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
+          "kind": "option",
+          "name": "write_region",
+          "opts": [
+            "--write-region"
+          ],
+          "required": false,
+          "type": "str"
         }
       ],
       "path": "chat"

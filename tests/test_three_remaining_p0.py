@@ -38,21 +38,55 @@ MAIN = pathlib.Path(__file__).resolve().parents[1] / "chimera" / "cli" / "main.p
 FENCED_COMMANDS = ("chat", "assist", "tui", "agent")
 
 
+#: Where a command may delegate its assembly to. One hop, and only into functions this test can
+#: read, so "the fence is applied somewhere" never becomes "the fence is applied, probably".
+BUILDERS = (MAIN, MAIN.parent / "right_hand.py")
+
+
+def _applies_fence(node: ast.AST) -> bool:
+    return any(
+        isinstance(inner, ast.Call) and getattr(inner.func, "id", "") == "_apply_tool_allowlist"
+        for inner in ast.walk(node)
+    )
+
+
+def _top_level(name: str) -> ast.AST | None:
+    for path in BUILDERS:
+        for node in ast.parse(path.read_text(encoding="utf-8")).body:
+            if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == name:
+                return node
+    return None
+
+
 def _fence_reaches(command: str) -> bool:
-    """True when ``command`` passes its registry through `_apply_tool_allowlist`.
+    """True when ``command`` passes its registry through `_apply_tool_allowlist` — itself, or in a
+    function it calls.
 
     An AST walk rather than a grep: a grep cannot tell the call from the word appearing in the
     comment that explains it, and this file exists because of a comment nobody read closely.
+
+    The one-hop half arrived with `chimera/cli/right_hand.py`. `chat` and `assist` stopped naming
+    the fence in their own bodies when their whole assembly moved into `build_right_hand` — which
+    applies it in the same position, between `default_registry` and the wrappers. A body-local walk
+    then reported those two as unfenced, which was a true statement about where the call sits and a
+    false one about the guarantee this test exists to hold. Resolution is by NAME against
+    module-level functions only: an attribute call (`obj.method(...)`) is not followed, because a
+    name collision would make this answer yes about a surface that does nothing of the kind.
     """
-    tree = ast.parse(MAIN.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef) and node.name == command:
-            return any(
-                isinstance(inner, ast.Call)
-                and getattr(inner.func, "id", "") == "_apply_tool_allowlist"
-                for inner in ast.walk(node)
-            )
-    raise AssertionError(f"no command named {command!r} — retarget this test")
+    body = _top_level(command)
+    if body is None:
+        raise AssertionError(f"no command named {command!r} — retarget this test")
+    if _applies_fence(body):
+        return True
+    called = {
+        node.func.id
+        for node in ast.walk(body)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    }
+    return any(
+        (helper := _top_level(name)) is not None and _applies_fence(helper)
+        for name in sorted(called - {command})
+    )
 
 
 @pytest.mark.parametrize("command", FENCED_COMMANDS)
@@ -75,10 +109,20 @@ def test_the_check_can_still_see_a_missing_fence() -> None:
     tree = ast.parse("def demo():\n    registry = default_registry(ws)\n")
     node = next(n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef))
 
-    assert not any(
-        isinstance(inner, ast.Call) and getattr(inner.func, "id", "") == "_apply_tool_allowlist"
-        for inner in ast.walk(node)
-    )
+    assert not _applies_fence(node)
+
+
+def test_the_one_hop_does_not_credit_a_command_for_a_call_it_never_makes() -> None:
+    """The looseness the hop introduced, bounded.
+
+    Following a delegate is what keeps this check honest now that `chat` calls `build_right_hand`
+    instead of the fence directly. It is also how such a check goes vacuous: resolve loosely enough
+    and every command "reaches" the fence through something. So the hop is one level, by name, into
+    module-level functions only — and a command that calls something unrelated must still fail.
+    """
+    assert _fence_reaches("chat"), "the delegate is no longer followed"
+    assert _applies_fence(_top_level("build_right_hand")), "the delegate stopped applying the fence"
+    assert not _fence_reaches("pet_status"), "a command that assembles nothing reads as fenced"
 
 
 # --- a truncated file loses one record, not the product -------------------------------------------
