@@ -9,6 +9,11 @@ The live study spent **US$ 0.10** on `openrouter/deepseek/deepseek-chat-v3.1`. N
 `chimera chat` (`chimera/cli/main.py:1190-1329`), `chimera assist` (`:1332-1491`) and `chimera tui`
 (`:1494-1553`, `chimera/tui/`), all over `ChatSession` (`chimera/interface/session.py`).
 
+**Delivered 2026-09-09, in ten PRs (#396-#405), against `main` at `03ac8f6`.** Every step below
+carries what shipped, which PR shipped it, and — where a step's list had an item that did not ship —
+which item and why. The measurement the plan was ranked against is `bench/right_hand_governance/`;
+the numbers repeated here are from `RESULTS.md`, not from the PR descriptions.
+
 ## 1 · The verdict, in one paragraph
 
 Since July the terminal has received only cross-cutting patches that came out of desktop audits.
@@ -148,6 +153,11 @@ bubblewrap line after the first start or move it to `doctor`; drop the OpenRoute
 error text. Tests: one `CliRunner` script per surface that drives the real loop — today the
 `chat` loop has **zero** invocations in the test suite.
 
+**Delivered — #398.** `escape()` on everything the model wrote, print-then-persist inside
+`try`, the `tui`→`chat` fallback passing values rather than `OptionInfo`s, and the first
+`CliRunner` scripts that drive the real loops — the `chat` loop had **zero** invocations in
+the suite when this was written.
+
 ### Step 2 — a refusal is visible, and money is visible (S/M)
 When any tool returns a decline (`host execution declined`, a taint refusal, a permission error),
 the surface prints it under the reply — the TUI's `✗ run_shell` with the reason, the REPL a line —
@@ -156,6 +166,12 @@ success. Print the TUI's cost line in `chat`/`assist`; write `usage.jsonl` from 
 (the app's Cost screen then sees the terminal); write a per-turn trace so the terminal enters the
 project's own census. Registered check: the live script from 2.5 item 1 must now show the decline
 next to the fabricated sentence.
+
+**Delivered — #398.** `TurnReport.declined` carries the refused calls and
+`chimera/interface/render.py:refusal_lines` prints one line per refusal under the reply, so the
+measured case — `run_shell` refused and the model answering *"the command printed exactly:
+marker-42"* — no longer reads as a success. The terminal writes `usage.jsonl`, so the app's
+Cost screen sees it (#403 for `chat`/`assist`, #405 for the TUI).
 
 ### Step 3 — the same governance the API has (L)
 Build the terminal registry through the governed path: taint ledger with `set_instruction(message)`
@@ -168,12 +184,36 @@ block rate 0/7 on this surface; register the prediction that it matches the API 
 The TUI needs its own answer to the host-exec prompt (a modal, not stdin) — confirm first with the
 live pty script whether the 120 s hang the governance study predicted is real.
 
+**Delivered — #400 (`chat`/`assist`) and #405 (`tui`).** Not through
+`guard_chat_registry`, which resolves a posture denying `EXEC_TOOLS`: that would have removed
+`run_shell` and made all seven attacks read BLOCKED *because the tool was gone*. The terminal
+builds its own assembly (`chimera/cli/right_hand.py`). Against #397's published before-table,
+all eight registered predictions held: block rate **0 of 7 → 7 of 7**, external reads fenced
+**0 of 15 → 12 of 15**, over-block **0.000** with the person answering, and the two owner
+settings stopped being inert (`CHIMERA_TRUST_WORKSPACE=0` moves 3 rows,
+`CHIMERA_TAINT_AUTHORITY=authority` moves 9). All three exemptions are gone from
+`tests/test_governed_surfaces.py`, the TUI's last, and the guard is inverted: a test now fails
+if the surface stops being governed.
+
 ### Step 4 — one store, one memory, three surfaces (M)
 `assist` and the TUI persist like `chat`; the persisted turn carries provenance (which tool outputs
 fed it, whether the run was tainted) so a resumed thread is not a laundering channel; resume shows
 the last turns; the 50-turn cap trims the prompt, not the file; do not auto-resume the newest
 thread across surfaces without saying which. Fix the two false docstrings. Memory recall scoped to
 the workspace like the Code tab (`code_api.py:1137-1139`).
+
+**Delivered in part — #401.** A restored turn carries `ChatTurn.provenance` as a sibling
+field and an unknown-provenance reply is replayed inside the `<<external-data>>` fence; a file
+without the field reads `unknown`, never `clean`. The 50-turn cap stopped trimming the *file*.
+Both false docstrings are fixed, with a guard that fails in both directions. Memory recall is
+scoped by `project_key`, which also fixed a defect underneath: `solve` wrote
+`project=str(Path(workspace))` — the literal `.` for a default run — while the
+coding turn read an absolute path, so writer and reader had never met.
+
+**Not delivered:** the TUI still does not persist a session and still does not pass
+`project=project_key(workspace)` to `ChatSession` (`chimera/cli/main.py:2080` against `:2309`),
+so it recalls from every project despite taking a `--workspace`. One line plus a test, left
+out of #405 because that branch's measurements were already taken.
 
 ### Step 5 — a ruler that measures the right-hand (M; cents per run)
 Rebuild `chimera scenarios` as turn scripts routed through `ChatSession` exactly as `chat` builds
@@ -184,6 +224,13 @@ store, not by substring; format checked by equality after normalisation; refusal
 "daily" becomes a series that can show provider drift. Either this, or delete `scenarios` — a
 ruler at the ceiling that nobody runs is worse than none, and `evolve tune` currently trusts it.
 
+**Delivered — #399.** Rebuilt, not deleted, and the reasons are in the PR. The checks are
+functional: the prompt echo scores **0 of 8** where the old suite's shape would have scored
+4 of 7. It then **missed its own pre-registered 40-70% band** (91.7% pass@1) — refutation
+criterion 1, recorded before the run and reported rather than repaired. What it earned is
+criterion 4: 15 of 15 declared mechanisms fired, so the number is about `ChatSession`.
+US$ 0.292 of a US$ 3 cap.
+
 ### Step 6 — parity items, each its own small PR (S each)
 `--max-usd` on the three surfaces; `/solve` from a conversation (hand the thread to the verified
 loop — the two buttons `code_api.py:1215-1221` describes); MCP autoload in the terminal; `todo_write`
@@ -192,11 +239,27 @@ label "fusion off while tools are in play"); `assist --model` honoured or refuse
 `docs/usage.md` §chat/§assist/§tui rewritten from the code, with a guard like the one that keeps
 `commands.md` honest.
 
+**Delivered in part — #402 (docs) and #403 (parity), plus #405 for the TUI.** `--max-usd` on
+all three surfaces, held **per conversation** rather than per turn; `/solve` handing the thread
+to the same verified loop `chimera solve` builds; MCP mounted **before the fence** in
+`chat`/`assist`, which first required closing the `untrusted_output` gap on `mcp_list` and
+`mcp_describe` (`docs/audits/sleeper-channels.md` question 6, now closed); `--model`/`/model`
+honoured under `--cascade` instead of silently dropped; `docs/usage.md` and its nine
+translations rewritten from the code, with the page-vs-CLI guard keeping them honest.
+
+**Not delivered, and not touched by any of these PRs:** `todo_write` drawn-or-removed — it is
+still registered behind `settings.todo_list` (`chimera/tools/builtin.py:118-121`) with no
+surface drawing it — and the `--fuse` honesty label. `chat --fuse` already routes through
+`RoutedBackend`, which predates this plan, and `assist` has no `--fuse` at all; neither was
+re-measured, so neither is claimed here.
+
 ## 4 · What this study cannot show
 
-- The TUI host-exec hang (120 s then refusal) is **inferred** from Textual's driver owning stdin;
-  the live study ran the TUI headless and with `allow`, so it did not exercise `ask` inside the TUI.
-  Step 3 starts by confirming it.
+- ~~The TUI host-exec hang (120 s then refusal) is **inferred**~~ — **measured, and worse than
+  inferred.** The live pty script (`run_tui_host_exec_pty.sh`) put it at **123.8 s** against a
+  120 s timeout, with the question never drawn and the turn ending `✗ run_shell` with no reason;
+  the model then paraphrased the decline as a security policy. It is **4.84 s** now, against a
+  `chat` control of 4.94 s on the same machine and prompt (#405).
 - The three empty replies after `echo` were observed, not explained.
 - Everything ran on one model, one machine, one day; the live counts are samples.
 - `--fuse` with the real frontier panel was not run (budget); the routing finding is by code and
