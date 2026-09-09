@@ -6,6 +6,11 @@ stops the run — the owner's decision, recorded here as behaviour rather than a
 
 The counterpart matters just as much: a LOCAL model is not unpriced, it is free. Getting that wrong
 would make a spend cap refuse the one configuration that cannot overspend.
+
+A dollar ceiling reports ``stopped_reason="spend"``. It used to report ``"budget"``, the token
+ceiling's label, because ``Agent._step`` raised the parent exception while ``SpendCappedBackend``
+raised the subclass for the very same refusal — one event with two names, depending on which
+layer got there first.
 """
 
 from __future__ import annotations
@@ -147,7 +152,7 @@ def test_the_loop_stops_on_the_cap_and_says_so() -> None:
 
     result = agent.run("do something long")
 
-    assert result.stopped_reason == "budget"
+    assert result.stopped_reason == "spend"
     assert "spend cap reached" in result.answer
     # The first call is allowed: the cap is checked before each call, and before the first one
     # nothing has been spent. Refusing at zero spend would make any cap unusable.
@@ -166,7 +171,7 @@ def test_the_loop_stops_when_it_cannot_price_the_model() -> None:
 
     result = agent.run("do something")
 
-    assert result.stopped_reason == "budget"
+    assert result.stopped_reason == "spend"
     assert "brand-new-model-with-no-price" in result.answer
     assert backend.calls == 1, "it paid for a second call it could not price"
 
@@ -197,8 +202,8 @@ def test_two_runs_of_one_agent_get_separate_budgets() -> None:
     first = agent.run("task one")
     second = agent.run("task two")
 
-    assert first.stopped_reason == "budget"
-    assert second.stopped_reason == "budget", "the second run started already over budget"
+    assert first.stopped_reason == "spend"
+    assert second.stopped_reason == "spend", "the second run started already over budget"
 
 
 def test_the_partial_answer_survives_the_stop() -> None:

@@ -4237,9 +4237,11 @@ def solve(
             trace_path=settings.home / "traces.jsonl",
             # The dollar ceiling for the RUN, not the turn. `AutonomousAgent._run_budget` reads this
             # off the worker's config to build one `SpendBudget` spanning every attempt — without it
-            # that method returns None, `SpendCappedBackend` never wraps anything, and the whole
-            # `stopped_reason="spend"` path is unreachable from a terminal. All of it existed and
+            # that method returns None and no ceiling is enforced for the run. All of it existed and
             # none of it could be asked for: `solve` had twenty-nine flags and not one about money.
+            # (The `stopped_reason="spend"` path is no longer terminal-unreachable: `chat` and
+            # `assist` carry a per-conversation budget, and the agent loop names the dollar ceiling
+            # `spend` rather than borrowing the token ceiling's label.)
             max_usd=max_usd,
         )
         worker = Agent(backend, registry, _worker_cfg)

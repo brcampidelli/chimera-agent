@@ -113,16 +113,15 @@ def test_a_second_turn_does_not_get_the_allowance_again() -> None:
 def test_a_turn_over_the_ceiling_says_which_ceiling_it_hit() -> None:
     """The stop is a reason, not an error: the partial answer survives and names the cap.
 
-    ``budget`` and not ``spend``: ``Agent._step`` raises a plain ``BudgetExceeded`` for the dollar
-    ceiling as well as the token one, so the reason is the shared label and the SENTENCE is what
-    says which ceiling. Pinned here because `render.cut_short_line` chose its wording around it —
-    the existing behaviour is asserted by `tests/test_spend_budget.py` and is not this file's to
-    change.
+    ``spend``, and the sentence says which ceiling too. ``Agent._step`` used to raise a plain
+    ``BudgetExceeded`` for the dollar ceiling, so a run stopped by money reported the token
+    ceiling's label through the agent and ``spend`` through ``SpendCappedBackend`` — the same
+    event, two names, depending on which layer refused first.
     """
     session = BudgetedTurns(_agent(_PricedBackend()), SpendBudget(0.001))
     session.run("first")
     result = session.run("second")
-    assert result.stopped_reason == "budget"
+    assert result.stopped_reason == "spend"
     assert "spend cap reached" in result.answer
 
 
