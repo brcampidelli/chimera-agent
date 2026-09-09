@@ -3904,7 +3904,7 @@
     },
     {
       "deprecated": false,
-      "help": "Run the daily right-hand scenario suite (live). Requires a key.",
+      "help": "Run the daily right-hand scenario suite through a real chat session (live). Requires a key.\n\nEach scenario is a script of turns driven through the same ``ChatSession`` ``chimera chat``\nbuilds \u2014 tools, memory, transcript \u2014 in its own workspace and its own home. The checks are\nfunctional, not substring: equality against a value generated *this run* and absent from the\nprompt, a fact read back out of the ``MemoryStore``, a fresh session's recall count, the\ntranscript found in the next turn's assembled prompt, the absence of a fabricated figure.\n\nReported with the denominator beside it: ``pass^k``, the flip rate that *is* this suite's noise\nfloor, ICC(1), and the mechanism-active subset \u2014 where a mechanism that never fired reads NOT\nMEASURED and never 0%. One row per invocation is appended to the series.\nPre-registered in ``bench/scenarios/PREREGISTRATION.md``.",
       "hidden": false,
       "name": "scenarios",
       "params": [
@@ -3915,6 +3915,60 @@
           "opts": [
             "--model",
             "-m"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "3",
+          "help": "Runs per scenario \u2014 one samples, two alert, three decide.",
+          "kind": "option",
+          "name": "k",
+          "opts": [
+            "--k"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "6",
+          "help": "Max tool-calling steps per turn.",
+          "kind": "option",
+          "name": "max_steps",
+          "opts": [
+            "--max-steps"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "default": "3.0",
+          "help": "Hard spend ceiling; the run stops at it.",
+          "kind": "option",
+          "name": "max_usd",
+          "opts": [
+            "--max-usd"
+          ],
+          "required": false,
+          "type": "float"
+        },
+        {
+          "default": "1",
+          "help": "Base seed; run i uses seed+i, so the generated values differ per run.",
+          "kind": "option",
+          "name": "seed",
+          "opts": [
+            "--seed"
+          ],
+          "required": false,
+          "type": "int"
+        },
+        {
+          "help": "Where to append the JSONL row (default <home>/scenarios.jsonl).",
+          "kind": "option",
+          "name": "series",
+          "opts": [
+            "--series"
           ],
           "required": false,
           "type": "str"

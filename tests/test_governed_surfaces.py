@@ -185,7 +185,17 @@ EXEMPT: dict[str, str] = {
     "chimera/cli/main.py:tools": "prints the tool table",
     "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",
-    "chimera/cli/main.py:evolve_tune": "offline tuning over recorded trajectories",
+    # `evolve_tune` no longer builds a registry of its own: it scores candidate specs through
+    # `_right_hand_builder`, the same assembly `chimera scenarios` measures, so its exemption is
+    # gone rather than reworded. What follows is that assembly, and it inherits `chat`'s reason
+    # above with one addition that is the whole point of the suite it serves.
+    "chimera/cli/main.py:_right_hand_builder.build": (
+        "the scenario suite's session, built to be byte-for-byte the one `chat` builds — and `chat` "
+        "is exempt three lines above. Routing THIS through governed_profile would make the ruler "
+        "measure a governed right hand that nobody ships, and the gap between the two is exactly "
+        "what bench/PLAN-right-hand.md 2.2 is about. It runs against a throwaway workspace and a "
+        "throwaway home, never a user's repository"
+    ),
     "chimera/cli/main.py:meta": "designs an agent blueprint; does not run one",
     "chimera/core/agent.py:_default_skill_registry": "internal default, wrapped by whoever built it",
     # The exemption used to say "the caller governs" while no caller did: the only one was the CLI,
