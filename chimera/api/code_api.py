@@ -960,6 +960,7 @@ def register_code_api(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.interface.session import recall_facts
+    from chimera.memory.models import project_key
 
     # What the injected `memory` IS, so a later turn can tell "the owner changed the backend" from
     # "nothing changed". Resolved once, from the same settings the app built that manager with.
@@ -1134,8 +1135,11 @@ def register_code_api(
         # written here too, so an unrelated project's note stops arriving as context — which is
         # what a real store did: a note about one project rode along on ordinary requests in
         # another. Facts with no project belong everywhere and still arrive.
+        # `project_key(ws)` rather than `str(ws)`: identical here (`ws` is already resolved), and
+        # it is the same function the writer and the terminal now call, so one folder cannot end up
+        # with two names again.
         facts, memory_layer = recall_facts(
-            req.message, memory=turn_memory, graph=turn_graph, project=str(ws)
+            req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws)
         )
         # Created before the agent so the approver can hold it, bound to `emit` after `emit`
         # exists. Until then a question announces to nobody — and is still on disk for

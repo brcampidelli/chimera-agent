@@ -7,6 +7,15 @@ manager that hydrates a live ``ChatSession`` from it and persists after each tur
 
 Reuses the repo's persistence convention everywhere: atomic temp-file + ``os.replace`` writes, and a
 tolerant load that skips a corrupt file instead of crashing the whole store.
+
+**This is one of two transcript stores, and the split is on purpose.** This one holds ``ChatTurn``
+prose pairs and backs ``chimera chat``, ``chimera sessions``, ``GET /api/sessions`` and the
+messaging gateway. The desktop's *coding* conversation writes ``<home>/code_sessions`` instead
+(:class:`chimera.core.code_session.CodeSessionStore`), because it has to keep the model's own
+message list — tool calls, tool results, receipts — and the first paragraph of that module is the
+argument for why flattening it into prose pairs would break it. What was wrong was never the split:
+it was ``chat``'s docstring, which promised "the same store the desktop app reads" from the day it
+was written, two days after the app deleted the screens that read it.
 """
 
 from __future__ import annotations
@@ -19,7 +28,7 @@ from typing import Any
 from uuid import uuid4
 
 from chimera.interface import ChatSession
-from chimera.interface.session import ChatTurn
+from chimera.interface.session import ChatTurn, read_provenance
 from chimera.telemetry import get_logger
 
 _log = get_logger("api.sessions")
@@ -69,7 +78,19 @@ class SessionStore:
         self._path(session_id)
 
     def load(self, session_id: str) -> list[ChatTurn]:
-        """Return the stored transcript, or ``[]`` if absent/unreadable (never raises on corruption)."""
+        """Return the stored transcript, or ``[]`` if absent/unreadable (never raises on corruption).
+
+        Every turn that comes back is marked ``restored``. That flag is not in the file and is not
+        about the turn — it is about this session's view of it: the model did not just say this, the
+        run that produced it is over, and its taint ledger is gone. :func:`chimera.interface.session
+        ._replay` is what does something with that; here the only job is to stop the loader handing
+        back something a live turn is indistinguishable from, which is what it did.
+
+        A turn with no ``provenance`` is every turn written before the field existed. It reads as
+        ``unknown``, never ``clean``: ``clean`` is a claim about a measurement, and no measurement
+        was taken. ``unknown`` is replayed inside the data fence, so the safe assumption costs a
+        marker in the prompt and nothing else — nobody's history disappears.
+        """
         try:
             path = self._path(session_id)
         except ValueError:
@@ -85,17 +106,36 @@ class SessionStore:
         turns: list[ChatTurn] = []
         for item in items:
             if isinstance(item, dict) and "user" in item and "assistant" in item:
-                turns.append(ChatTurn(user=str(item["user"]), assistant=str(item["assistant"])))
+                turns.append(
+                    ChatTurn(
+                        user=str(item["user"]),
+                        assistant=str(item["assistant"]),
+                        provenance=read_provenance(item.get("provenance")),
+                        restored=True,
+                    )
+                )
         return turns
 
     def save(self, session_id: str, turns: list[ChatTurn]) -> None:
-        """Atomically persist a session's transcript (temp + os.replace, unique temp name)."""
+        """Atomically persist a session's transcript (temp + os.replace, unique temp name).
+
+        ``provenance`` is written as a sibling field and never into ``assistant``. That text is
+        replayed into every later prompt, so a marker inside it would be read back as the model's
+        own words — and re-saved with the marker in place, one layer deeper on each reopen.
+
+        ``restored`` is deliberately NOT written. It describes how a turn reached the session in
+        memory, not what the turn is, and persisting it would make the second save of a resumed
+        thread claim the turns were restored from a file that had not been read yet.
+        """
         path = self._path(session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {
             "id": session_id,
             "title": _title_from_turns(turns),
-            "turns": [{"user": t.user, "assistant": t.assistant} for t in turns],
+            "turns": [
+                {"user": t.user, "assistant": t.assistant, "provenance": t.provenance}
+                for t in turns
+            ],
         }
         tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid4().hex}.tmp")
         try:

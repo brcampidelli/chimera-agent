@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -17,6 +18,25 @@ MemoryKind = Literal["working", "episodic", "semantic", "persona"]
 #: stored rather than answering inside a folder. One wants the filter: the recall that feeds a turn.
 #: Making no-filter the default is what keeps every existing caller behaving as it did.
 EVERY_PROJECT = "*"
+
+
+def project_key(workspace: str | Path | None) -> str | None:
+    """The one string a folder is filed under in ``project=``: absolute and normalised.
+
+    The writer and the reader have to agree on this and they did not. ``chimera solve`` stored
+    ``project=str(Path(workspace))`` — literally ``"."`` for a run in the current directory — while
+    the coding turn recalled with ``str(Path(req.workspace).expanduser().resolve())``. Two strings
+    for one folder means the scoped read matches nothing the scoped write produced, and the symptom
+    is not an error: it is a memory that is simply never recalled, in the one place it was written
+    for. Scoping recall without fixing this would have moved the defect rather than closed it.
+
+    ``None`` in, ``None`` out — and so is a blank string, because "no workspace" reaches this from a
+    default argument as often as it does from a missing one. ``None`` means a fact that belongs
+    everywhere, which is what every fact written before the field existed is.
+    """
+    if workspace is None or not str(workspace).strip():
+        return None
+    return str(Path(workspace).expanduser().resolve())
 
 
 class MemoryItem(BaseModel):

@@ -37,6 +37,7 @@ from chimera.eval.scenarios import (
     suite_arm,
 )
 from chimera.interface import ChatSession
+from chimera.interface.session import UNKNOWN
 from chimera.memory import MemoryManager, MemoryStore
 
 _WINDOW_RE = re.compile(r"\b(Monday|Tuesday|Wednesday|Thursday|Friday) at (\d{1,2}):00", re.I)
@@ -185,7 +186,7 @@ def _builder(
 class _ForgetfulSession(ChatSession):
     """A session whose transcript never survives the turn — the threading wire, cut."""
 
-    def _record(self, message: str, answer: str) -> None:
+    def _record(self, message: str, answer: str, provenance: str = UNKNOWN) -> None:
         return None
 
 

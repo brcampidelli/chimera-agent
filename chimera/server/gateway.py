@@ -88,16 +88,43 @@ class InboundMessage:
         return f"{self.platform}:{self.chat_id}"
 
 
+#: How many turns a gateway session keeps in memory.
+#:
+#: This is the one surface where an unbounded transcript is a leak with no upside: a session per
+#: chat, alive for as long as the process, and persisted nowhere — there is no file for the older
+#: turns to be the record of. ``ChatSession`` used to apply this bound to everybody, including the
+#: sessions ``SessionManager`` writes to disk, so from turn 51 every save rewrote the file without
+#: turn 1. The bound was not wrong; its home was.
+GATEWAY_MAX_TURNS = 50
+
+
 class MessageGateway:
     """Routes each chat to its own ChatSession, created lazily via a factory."""
 
-    def __init__(self, session_factory: Callable[[], ChatSession]) -> None:
+    def __init__(
+        self,
+        session_factory: Callable[[], ChatSession],
+        *,
+        max_turns: int | None = GATEWAY_MAX_TURNS,
+    ) -> None:
         self._factory = session_factory
         self._sessions: dict[str, ChatSession] = {}
+        self._max_turns = max_turns
 
     def session_for(self, key: str) -> ChatSession:
         if key not in self._sessions:
-            self._sessions[key] = self._factory()
+            session = self._factory()
+            # Applied here rather than asked of every caller's factory: the factories are built in
+            # `serve`, in tests and in three platform adapters, and a bound that has to be
+            # remembered at five call sites is a bound that is missing at one of them.
+            #
+            # Through `getattr`, because what this class actually needs from a session is `send`:
+            # the HTTP transport's own tests drive it with a two-method fake, and a gateway that
+            # crashed on a session without this field would be enforcing a bound by refusing to
+            # route. Only an unset bound is filled in — a session that asked for one keeps it.
+            if getattr(session, "max_turns", self._max_turns) is None:
+                session.max_turns = self._max_turns
+            self._sessions[key] = session
         return self._sessions[key]
 
     def on_message(self, message: InboundMessage) -> str:
