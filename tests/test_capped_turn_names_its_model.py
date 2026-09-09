@@ -82,7 +82,7 @@ def test_a_capped_run_names_the_model_that_answered_when_the_caller_named_none()
     # produced a blank row with real dollars against it.
     result = _capped_run("")
 
-    assert result.stopped_reason == "budget"
+    assert result.stopped_reason == "spend"
     assert result.usd and result.usd > 0, "a run that hit the ceiling must have spent something"
     assert result.model == _Backend.ANSWERS_AS
 
@@ -94,5 +94,5 @@ def test_it_still_prefers_the_model_the_caller_actually_asked_for() -> None:
     # nothing would notice.
     result = _capped_run("openrouter/anthropic/claude-opus-5")
 
-    assert result.stopped_reason == "budget"
+    assert result.stopped_reason == "spend"
     assert result.model == "openrouter/anthropic/claude-opus-5"

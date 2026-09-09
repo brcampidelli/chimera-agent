@@ -828,7 +828,13 @@ class Agent:
         if spend is not None:
             reason = spend.blocked()
             if reason is not None:
-                raise BudgetExceeded(reason)
+                # `SpendExceeded`, not the parent: a `SpendBudget` refusing is always about the
+                # money, so `stopped_reason` reads "spend" and a reader can tell which ceiling was
+                # hit without parsing the sentence. `SpendCappedBackend` has raised the subclass for
+                # the same `blocked()` — including its unpriced-model refusal — since it was written;
+                # this line was the one place the loop disagreed with itself, so a dollar cap
+                # reported "budget" through the agent and "spend" through the backend.
+                raise SpendExceeded(reason)
         result: CompletionResult
         if on_token is not None and hasattr(self.backend, "stream_complete"):
             result = self.backend.stream_complete(  # type: ignore[attr-defined]
