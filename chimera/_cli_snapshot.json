@@ -5567,7 +5567,7 @@
     },
     {
       "deprecated": false,
-      "help": "Launch the full-screen TUI \u2014 your right-hand. Requires a key.",
+      "help": "Launch the full-screen TUI \u2014 your right-hand. Requires a key.\n\nGoverned like ``chimera chat``: the taint ledger told your own message, the\n``<<external-data>>`` fence around untrusted tool output, the trust kernel, the owner's reach\nfloor and the connected MCP servers. What took longer to arrive here is the part that makes any\nof it usable \u2014 a question this surface can **draw**. Textual owns the terminal, so the\nstdin prompt every other surface uses was never seen: measured in a pty, a ``run_shell`` under\nthe shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout and came back as\n``\u2717 run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now\nopen a modal instead; silence still refuses, and now says so while it is counting down.",
       "hidden": false,
       "name": "tui",
       "params": [
@@ -5638,6 +5638,16 @@
             "--no-stream"
           ],
           "type": "boolean"
+        },
+        {
+          "help": "Stop once this session has spent this much (the whole session, not one turn). The activity panel shows what is left.",
+          "kind": "option",
+          "name": "max_usd",
+          "opts": [
+            "--max-usd"
+          ],
+          "required": false,
+          "type": "float"
         }
       ],
       "path": "tui"

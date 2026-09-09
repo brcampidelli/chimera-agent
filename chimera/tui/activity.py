@@ -22,6 +22,14 @@ from chimera.interface.session import TurnReport, decline_reason
 class ActivityPanel(VerticalScroll):
     """Right-hand panel: turn status, tool calls, token/cost, memory recall."""
 
+    #: The budget row starts hidden through a CLASS rather than through ``on_mount``, because a
+    #: widget's ``on_mount`` can fire before its composed children exist — the same race that made
+    #: `ConfirmScreen` focus its default-deny button intermittently. A class applied at construction
+    #: has no such window.
+    DEFAULT_CSS = """
+    ActivityPanel .act-hidden { display: none; }
+    """
+
     def __init__(self, *, id: str | None = None) -> None:
         super().__init__(id=id)
         self._tools: list[str] = []
@@ -33,6 +41,10 @@ class ActivityPanel(VerticalScroll):
         yield Static("[dim](none)[/dim]", id="act-tools", markup=True)
         yield Label("tokens", classes="act-h")
         yield Static("[dim]—[/dim]", id="act-tokens", markup=True)
+        # Hidden until there is a ceiling, rather than shown as "no ceiling": a row that reads "—"
+        # on most runs teaches people to stop reading the row.
+        yield Label("budget", classes="act-h act-hidden", id="act-budget-h")
+        yield Static("", id="act-budget", markup=True, classes="act-hidden")
         yield Label("memory", classes="act-h")
         yield Static("[dim]—[/dim]", id="act-memory", markup=True)
 
@@ -68,6 +80,20 @@ class ActivityPanel(VerticalScroll):
         self.query_one("#act-tokens", Static).update(
             f"in {report.prompt_tokens} · out {report.completion_tokens}{cache}\n{cost}"
         )
+
+    def set_budget(self, remaining: float, ceiling: float) -> None:
+        """What is left of ``--max-usd``, in the panel that already shows what a turn cost.
+
+        Beside the price rather than under the reply, because the ceiling is a property of the
+        conversation and the price is a property of a turn — and the question a person actually has
+        mid-thread ("can I still ask it something?") is answered by the first one.
+        """
+        self.query_one("#act-budget-h", Label).remove_class("act-hidden")
+        row = self.query_one("#act-budget", Static)
+        row.remove_class("act-hidden")
+        spent_out = remaining <= 0
+        colour = "red" if spent_out else "dim"
+        row.update(f"[{colour}]${remaining:.4f} left of ${ceiling:.4f}[/{colour}]")
 
     def set_memory(self, count: int, layer: str | None) -> None:
         if count <= 0:

@@ -1,5 +1,5 @@
 ---
-source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
+source_sha256: 526c672c483707638cf41fadd79070ec382735ca905ac0c6534720fca5c4c3ee
 ---
 
 # Chimera — Guía de uso
@@ -237,11 +237,17 @@ uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
+uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
 ```
 
 No son las mismas flags que las de los REPL. `tui` tiene `--stream`/`--no-stream`, que ellos no
-tienen. Las `--cascade`, `--session`, `--new`, `--max-usd` y `--write-region` de `chimera chat` no
-tienen equivalente aquí.
+tienen, y `--max-usd`, que detiene la sesión en cuanto ha gastado esa cantidad. Esa flag esperaba
+a tener dónde mostrarse: el panel de actividad ahora lleva una fila `budget` con lo que queda,
+porque un techo que nadie puede ver convierte un turno que se detuvo por dinero en un turno que
+se detuvo sin razón visible.
+
+Las `--cascade`, `--session`, `--new` y `--write-region` de `chimera chat` no tienen equivalente
+aquí.
 
 Comandos: `/model <slug>` · `/reset` (limpiar contexto) · `/clear` (limpiar pantalla) ·
 `/stream` (alternar tokens en vivo) · `/help` · `/exit` (también `/quit`, `/q`). Teclas:
@@ -250,14 +256,26 @@ Comandos: `/model <slug>` · `/reset` (limpiar contexto) · `/clear` (limpiar pa
 
 Notas de honestidad:
 
-- **La TUI deliberadamente no está gobernada.** Tiene la allowlist de despliegue y nada más: sin
-  ledger de taint, sin cerco `<<external-data>>`, sin kernel, sin aprobador. La razón es que su
-  confirmación no se puede dibujar — Textual es dueña del terminal, así que la pregunta de
-  ejecución en el host es una pregunta a un stdin que nadie alcanza. Medido en un pty: un turno así
-  se bloqueó 123,8 s contra un timeout de 120 s y volvió como `✗ run_shell` sin explicación
-  (`bench/right_hand_governance/RESULTS.md`, Parte 2). Hasta que tenga un modal nativo de Textual,
-  los siete ataques que `chat` bloquea aquí siguen ejecutándose — prefiere `chat` o `assist` cuando
-  un rechazo importe.
+- **Está gobernada, y sus preguntas se dibujan en vez de escribirse.** El mismo stack que arman
+  los REPL: un ledger de taint al que se le dice tu propio mensaje, el cerco `<<external-data>>`
+  alrededor de la salida no confiable de herramientas, el kernel de confianza, el piso de alcance
+  del dueño y los servidores MCP conectados. Lo que dejó a esta superficie fuera hasta el
+  2026-09-09 no fue el stack sino la pregunta — Textual es dueña del terminal, así que una
+  pregunta escrita a stdin se escribe donde nadie puede mirar. Medido en un pty: un turno así se
+  bloqueó 123,8 s contra un timeout de 120 s y volvió como `✗ run_shell` sin explicación
+  (`bench/right_hand_governance/RESULTS.md`, Parte 2). **Ambos** gates ahora abren un modal en su
+  lugar: la confirmación de ejecución en el host y el aprobador de gobernanza. `y` o `n`, Escape
+  rechaza, el botón No retiene el foco para que Enter no pueda aprobar por accidente, y una cuenta
+  atrás dice cuánto le queda al silencio — el silencio sigue rechazando, y ahora lo dice. Sobre el
+  mismo corpus y el mismo instrumento, los ataques bloqueados pasaron de 0 de 7 a 7 de 7 y las
+  lecturas externas devueltas dentro del cerco de 0 de 15 a 12 de 15 (las tres que quedan fuera
+  son tu propio repositorio, que no es externo).
+- **Una llamada rechazada ahora dice por qué, debajo de la respuesta.** El panel de actividad ya
+  mostraba la frase propia de la herramienta bajo su `✗`; el registro de conversación muestra
+  además `✗ run_shell did not succeed: …`, que es donde también está la narración del modelo
+  sobre un comando que nunca corrió. Una aprobación también recibe su línea
+  (`governance: 1 approved this turn`), para que una `y` que clicaste a mitad del turno deje
+  rastro.
 - No persiste nada: cerrar la TUI termina la conversación. `chat` es la superficie con hilos.
 - El streaming de tokens es solo la ruta de un solo modelo — bajo `--fuse` (un turno
   panel→juez→sintetizador) no hay tokens incrementales, así que el panel muestra un estado
@@ -265,10 +283,10 @@ Notas de honestidad:
   `chat`, un turno que lleva herramientas no fusiona, y un turno de REPL siempre las lleva.
 - El costo muestra "no disponible" cuando el precio de lista del modelo es desconocido (nunca se
   adivina), y cada turno se añade a `<home>/usage.jsonl` como en los REPL.
-- No hay verify/revert aquí, ni MCP. Ambos se fueron a `chat` y `assist`, que responden `/solve` y
-  montan los servidores configurados, porque ambos descansan sobre el ledger de taint y el
-  aprobador que esta superficie decidió no tener. Verify-or-revert también corre en
-  `chimera solve` y `chimera project`.
+- No hay verify/revert aquí ni `/solve`: ambos se fueron a `chat` y `assist`. Los servidores MCP
+  están montados, cosa que antes no ocurría, y por exactamente la razón por la que se los
+  retenía — la salida MCP es contenido no confiable por definición, y ahora hay dónde cercarla.
+  Verify-or-revert también corre en `chimera solve` y `chimera project`.
 - Si Textual no está instalado, `tui` recae en el REPL simple de `chat`, pasando cada argumento de
   forma explícita para que el repliegue sobreviva a su primer turno. El streaming no significa nada
   allí, y el hilo se guarda como cualquier otro hilo de `chat`.

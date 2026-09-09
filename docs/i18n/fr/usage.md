@@ -1,5 +1,5 @@
 ---
-source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
+source_sha256: 526c672c483707638cf41fadd79070ec382735ca905ac0c6534720fca5c4c3ee
 ---
 
 # Chimera — Guide d'utilisation
@@ -251,11 +251,17 @@ uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
+uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
 ```
 
-Pas les mêmes flags que les REPL. `tui` a `--stream`/`--no-stream`, qu'eux n'ont pas. Les
-`--cascade`, `--session`, `--new`, `--max-usd` et `--write-region` de `chimera chat` n'ont
-pas d'équivalent ici.
+Pas les mêmes flags que les REPL. `tui` a `--stream`/`--no-stream`, qu'eux n'ont pas, et
+`--max-usd`, qui arrête la session dès qu'elle a dépensé autant. Ce flag attendait d'avoir où
+s'afficher : le panneau d'activité porte désormais une ligne `budget` avec ce qu'il reste, car
+un plafond que personne ne voit transforme un tour arrêté pour une question d'argent en un
+tour arrêté sans raison visible.
+
+Les `--cascade`, `--session`, `--new` et `--write-region` de `chimera chat` n'ont pas
+d'équivalent ici.
 
 Commandes : `/model <slug>` · `/reset` (effacer le contexte) · `/clear` (effacer l'écran) ·
 `/stream` (basculer les tokens en direct) · `/help` · `/exit` (aussi `/quit`, `/q`). Touches :
@@ -264,15 +270,26 @@ défiler · `Ctrl+C` quitter. Les commandes slash s'autocomplètent pendant la f
 
 Notes d'honnêteté :
 
-- **Le TUI n'est délibérément pas gouverné.** Il a la liste blanche de déploiement et rien
-  d'autre : pas de registre de contamination, pas de clôture `<<external-data>>`, pas de
-  noyau, pas d'approbateur. La raison est que sa confirmation ne peut pas être dessinée —
-  Textual possède le terminal, donc la demande d'exécution sur l'hôte est une question posée à
-  un stdin que personne n'atteint. Mesuré dans un pty : un tel tour a bloqué 123,8 s contre un
-  délai de 120 s et est revenu en `✗ run_shell` sans explication
-  (`bench/right_hand_governance/RESULTS.md`, partie 2). Tant qu'il n'a pas de modale native
-  Textual, les sept attaques que `chat` bloque s'exécutent ici — préférez `chat` ou `assist`
-  quand un refus compte.
+- **C'est gouverné, et ses questions sont dessinées au lieu d'être tapées.** La même pile que
+  montent les REPL : un registre de contamination auquel on dit votre propre message, la
+  clôture `<<external-data>>` autour des sorties d'outils non fiables, le noyau de confiance,
+  le plancher de portée du propriétaire et les serveurs MCP connectés. Ce qui a tenu cette
+  surface à l'écart jusqu'au 2026-09-09 n'était pas la pile mais la question — Textual possède
+  le terminal, donc une demande écrite sur stdin est écrite là où personne ne peut regarder.
+  Mesuré dans un pty : un tel tour a bloqué 123,8 s contre un délai de 120 s et est revenu en
+  `✗ run_shell` sans explication (`bench/right_hand_governance/RESULTS.md`, partie 2).
+  **Les deux** gates ouvrent maintenant une modale à la place : la confirmation d'exécution
+  sur l'hôte et l'approbateur de gouvernance. `y` ou `n`, Escape refuse, le bouton Non garde
+  le focus pour qu'Enter ne puisse pas approuver par accident, et un compte à rebours dit
+  combien de temps il reste au silence — le silence refuse toujours, et le dit désormais. Sur
+  le même corpus et le même instrument, les attaques bloquées sont passées de 0 sur 7 à 7 sur
+  7 et les lectures externes revenues dans la clôture de 0 sur 15 à 12 sur 15 (les trois qui
+  restent en dehors sont votre propre dépôt, qui n'est pas externe).
+- **Un appel refusé dit maintenant pourquoi, sous la réponse.** Le panneau d'activité montrait
+  déjà la phrase propre à l'outil sous son `✗` ; le journal de conversation affiche aussi
+  `✗ run_shell did not succeed: …`, là où se trouve également le récit que le modèle fait
+  d'une commande qui n'a jamais tourné. Une approbation reçoit elle aussi sa ligne
+  (`governance: 1 approved this turn`), pour qu'un `y` cliqué en plein tour laisse une trace.
 - Il ne persiste rien : fermer le TUI met fin à la conversation. `chat` est la surface avec
   des fils.
 - Le streaming de tokens n'est disponible que sur le chemin mono-modèle — sous `--fuse` (un
@@ -282,10 +299,11 @@ Notes d'honnêteté :
   REPL en porte toujours.
 - Le coût affiche « indisponible » quand le prix catalogue du modèle est inconnu (jamais
   deviné), et chaque tour est ajouté à `<home>/usage.jsonl` comme dans les REPL.
-- Il n'y a ici ni verify/revert, ni MCP. Les deux sont allés à `chat` et `assist`, qui
-  répondent `/solve` et montent les serveurs configurés, car les deux reposent sur le registre
-  de contamination et l'approbateur dont cette surface a décidé de se passer.
-  Verify-or-revert tourne aussi dans `chimera solve` et `chimera project`.
+- Il n'y a ici ni verify/revert, ni `/solve` : les deux sont allés à `chat` et `assist`. Les
+  serveurs MCP sont montés, ce qu'ils n'étaient pas auparavant, et pour exactement la raison
+  qui les avait fait retenir — la sortie MCP est du contenu non fiable par définition, et il y
+  a désormais où la clôturer. Verify-or-revert tourne aussi dans `chimera solve` et
+  `chimera project`.
 - Si Textual n'est pas installé, `tui` retombe sur le simple REPL `chat`, en passant chaque
   argument explicitement pour que ce repli survive à son premier tour. Le streaming n'y
   signifie rien, et le fil est enregistré comme n'importe quel fil de `chat`.

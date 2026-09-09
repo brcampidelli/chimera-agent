@@ -152,20 +152,16 @@ EXEMPT: dict[str, str] = {
     # `chimera/cli/right_hand.py:build_right_hand`, and their exemptions are gone rather than
     # reworded.
     #
-    # `tui` keeps one, and its reason is a measurement rather than an argument. In a pty, with the
-    # shipped default `CHIMERA_HOST_EXEC=ask`, a `run_shell` inside `chimera tui` blocks for
-    # **123.8 s** against `PROMPT_TIMEOUT_SECONDS = 120` and returns `✗ run_shell` with no reason:
-    # Textual's driver owns the terminal, so the `typer.confirm` on raw stdin is never seen, while
-    # `_human_can_answer()` still reports a tty (`RESULTS.md` Part 2, 2026-09-08). Shipping the
-    # taint approver there would turn every narrowed call into another two-minute block — five of
-    # them in eight rows of ordinary work on this corpus. It needs a Textual-native modal first;
-    # until then the honest state is ungoverned-and-said-so, not governed-and-unanswerable.
-    "chimera/cli/main.py:tui": (
-        "attended interactive terminal UI — and its stdin prompt is UNANSWERABLE: measured at "
-        "123.8 s to the 120 s timeout in a pty (bench/right_hand_governance/RESULTS.md Part 2). "
-        "Governance here needs a Textual modal, not a stdin callback; shipping the approver first "
-        "would trade 'runs without asking' for 'hangs two minutes per narrowed call'"
-    ),
+    # `tui` kept the third one until 2026-09-09, and its reason was a measurement rather than an
+    # argument: in a pty, with the shipped default `CHIMERA_HOST_EXEC=ask`, a `run_shell` inside
+    # `chimera tui` blocked for **123.8 s** against `PROMPT_TIMEOUT_SECONDS = 120` and returned
+    # `✗ run_shell` with no reason, because Textual's driver owns the terminal and the
+    # `typer.confirm` on raw stdin was never seen (`RESULTS.md` Part 2). The exemption said what
+    # would have to exist before it could go — "a Textual modal, not a stdin callback" — and it is
+    # gone because that modal exists (`chimera/tui/confirm.py`), not because the reason expired.
+    # Both gates route to it, and the exemption was removed by the change that made it false rather
+    # than reworded to survive: `test_every_exemption_still_points_at_real_code` would have failed
+    # on a stale key either way, which is the mechanism doing the deciding.
     # --- assembles an equivalent stack from its own flags ---
     "chimera/cli/right_hand.py:build_right_hand": (
         "the terminal right-hand's own assembly: write region, deployment fence, reach floor, "

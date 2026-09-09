@@ -137,6 +137,35 @@ def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver
     return approve
 
 
+def ask_via(question: Callable[[str, str], bool], ledger: ApprovalLedger | None = None) -> Approver:
+    """Prompt a person through a surface's own question, rather than through stdin.
+
+    :func:`ask` writes to a stream and reads ``input()``, which is the right mechanism for a REPL and
+    the wrong one for a full-screen app: inside ``chimera tui`` Textual holds the terminal in raw
+    mode, so those bytes never arrive and the call blocks until the caller's timeout fires — measured
+    at 123.8 s (`bench/right_hand_governance/RESULTS.md` Part 2). ``question`` is handed
+    ``(action, reason)`` and is free to draw them however its surface can.
+
+    Everything that makes :func:`ask` safe is kept: anything other than an explicit yes is a no
+    (that is now the *surface's* obligation, and the TUI's modal defaults its focus and its Escape
+    key to no), and the verdict is recorded either way, so a run can still be asked how much it was
+    allowed to do.
+    """
+
+    def approve(*args: Any) -> bool:
+        action, reason = _describe(*args)
+        try:
+            approved = bool(question(action, reason))
+        except Exception:  # noqa: BLE001 — a surface that cannot ask has not been answered
+            _log.warning("the surface could not ask; refusing: %s", (reason or action)[:200])
+            approved = False
+        if ledger is not None:
+            ledger.record(action or reason, approved=approved)
+        return approved
+
+    return approve
+
+
 class ApprovalAnnouncer:
     """A late-bound place to announce a pending question to a screen.
 
@@ -196,8 +225,14 @@ def approver_for(
     *,
     home: Any = None,
     deliver: Any = None,
+    ask_with: Callable[[str, str], bool] | None = None,
 ) -> Approver:
     """Build the approver for a configured mode: ``ask`` | ``deny`` | ``allow``.
+
+    ``ask_with`` is a surface's own way of asking somebody who **is** at the keyboard — see
+    :func:`ask_via`. It is consulted after ``allow``/``deny``, so the owner's configured mode still
+    decides first, and before :func:`nobody_is_at_a_terminal`, because that function asks whether
+    *stdin* could reach a person and a surface with a modal is not answering through stdin.
 
     ``ask`` degrades to ``deny`` with no terminal attached, which is what a cron job has. Degrading
     the other way — falling back to allow because nobody could be asked — would turn an unattended
@@ -215,6 +250,8 @@ def approver_for(
         return allow(ledger)
     if mode == "deny":
         return deny(ledger)
+    if ask_with is not None:
+        return ask_via(ask_with, ledger)
     if nobody_is_at_a_terminal():
         if home is not None:
             return ask_elsewhere(home, ledger, deliver=deliver)

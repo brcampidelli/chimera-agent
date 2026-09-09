@@ -1,6 +1,6 @@
-"""``chimera chat`` and ``chimera assist`` get what the API path has — and the TUI deliberately not.
+"""``chimera chat``, ``chimera assist`` and ``chimera tui`` get what the API path has.
 
-The exemption these two surfaces lived under said "attended", and attendance was measured rather
+The exemption all three surfaces lived under said "attended", and attendance was measured rather
 than assumed before it was removed (`bench/right_hand_governance/RESULTS.md`, 2026-09-08): the
 terminal registry executed **7 of 7** attacks the governed one blocked, **0 of 12** external reads
 came back inside the ``<<external-data>>`` fence the system prompt promises in every turn, and both
@@ -11,9 +11,16 @@ Every guard below is asserted twice: once that it fires, and once against the st
 to catch — a fence that is never absent, an approver that always says yes and a taint switch that
 moves rows anyway would each pass a one-sided test while protecting nothing.
 
-The ``tui`` tests are the odd ones out and are not an oversight. Its host-exec prompt is
-unanswerable from inside Textual — 123.8 s to a 120 s timeout, measured in a pty — so it keeps the
-pre-2026-09-08 assembly on purpose, and what is pinned here is that it kept it.
+The ``tui`` was the odd one out until 2026-09-09, on a measured rather than an asserted reason:
+its host-exec prompt was unanswerable from inside Textual — 123.8 s to a 120 s timeout, measured in
+a pty — so governing it would have bought one such block per narrowed call. It builds the same stack
+now, because it brings a modal the gates can be answered on
+(``tests/test_the_tui_can_answer_its_own_question.py``). What is still pinned here is the *shape* of
+that: the surface is governed only in the same breath as the thing that answers it.
+
+The two "the stack the tui still builds" tests below kept their bodies and lost their names. They are
+the sabotage halves — the pre-2026-09 assembly, which no surface builds any more — and they are what
+stops the fence and the refusal tests above from passing against nothing.
 """
 
 from __future__ import annotations
@@ -121,9 +128,12 @@ def test_an_external_read_reaches_the_model_inside_the_fence(tmp_path: Path) -> 
     assert PAYLOAD in seen, "the fence must wrap the content, not replace it"
 
 
-def test_the_stack_the_tui_still_builds_fences_nothing(tmp_path: Path) -> None:
-    """The sabotage half, and also the TUI's live state. Same stub, same payload, the pre-fix
-    assembly — if this ever starts fencing, the test above has stopped proving anything."""
+def test_the_assembly_all_three_surfaces_used_to_build_fences_nothing(tmp_path: Path) -> None:
+    """The sabotage half. Same stub, same payload, the pre-fix assembly — if this ever starts
+    fencing, the test above has stopped proving anything.
+
+    It was also the TUI's live state until 2026-09-09, and is now nobody's: kept because a guard
+    with no failing case is a guard that has never been shown to fire."""
     settings = _settings(tmp_path)
     registry = _apply_tool_allowlist(
         _stubs(settings), allow=None, deny=None, settings=settings
@@ -185,7 +195,7 @@ def test_the_destructive_command_a_fetched_page_asked_for_is_refused(tmp_path: P
     assert _leaf(shell).calls == [], "refused, and yet the tool ran"
 
 
-def test_the_same_command_executes_on_the_stack_the_tui_still_builds(tmp_path: Path) -> None:
+def test_the_same_command_executes_on_the_assembly_they_used_to_build(tmp_path: Path) -> None:
     """The sabotage half: the identical episode, through the pre-fix assembly, runs."""
     settings = _settings(tmp_path)
     registry = _apply_tool_allowlist(_stubs(settings), allow=None, deny=None, settings=settings)
@@ -396,7 +406,7 @@ def _calls_in(function: str) -> set[str]:
     }
 
 
-@pytest.mark.parametrize("command", ["chat", "assist"])
+@pytest.mark.parametrize("command", ["chat", "assist", "tui"])
 def test_the_repls_assemble_their_tools_through_the_governed_builder(command: str) -> None:
     assert "build_right_hand" in _calls_in(command)
     assert "default_registry" not in _calls_in(command), (
@@ -404,16 +414,23 @@ def test_the_repls_assemble_their_tools_through_the_governed_builder(command: st
     )
 
 
-def test_the_tui_is_left_exactly_as_it_was() -> None:
-    """Not an omission: measured at 123.8 s to a 120 s timeout in a pty, because Textual owns the
-    terminal and the confirm is a ``typer.confirm`` on raw stdin. Shipping the taint approver there
-    would buy one such block per narrowed call — five in eight rows of ordinary work on this corpus.
-    This test goes red the day somebody governs it without the modal, which is the point.
+def test_the_tui_is_governed_only_because_it_brings_a_question_it_can_draw() -> None:
+    """The replacement for ``test_the_tui_is_left_exactly_as_it_was``, and the same guard inverted.
+
+    That test existed to go red the day somebody governed this surface **without** the modal, which
+    would have traded "runs without asking" for a 123.8 s block per narrowed call. So the ordering
+    it protected is what is asserted now: the command builds the governed stack *and* constructs the
+    thing that answers it, and it declares that stdin is not that thing. Dropping either half while
+    keeping the other is the half-fix, and it fails here.
     """
     calls = _calls_in("tui")
 
-    assert "build_right_hand" not in calls
-    assert {"_apply_tool_allowlist", "default_registry"} <= calls
+    assert "build_right_hand" in calls
+    assert "ModalGate" in calls, "governed, with no way to answer the gates it just installed"
+    assert "declare_no_human_here" in calls, (
+        "nothing tells the process that stdin cannot be answered here — the bit that made "
+        "`_human_can_answer()` return True inside Textual and produced the 123.8 s block"
+    )
 
 
 def test_the_ruler_still_measures_what_chat_builds() -> None:

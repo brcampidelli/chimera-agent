@@ -1,5 +1,5 @@
 ---
-source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
+source_sha256: 526c672c483707638cf41fadd79070ec382735ca905ac0c6534720fca5c4c3ee
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -239,11 +239,16 @@ uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
+uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
 ```
 
-Nie te same flagi co w REPL-ach. `tui` ma `--stream`/`--no-stream`, których one nie mają.
-`--cascade`, `--session`, `--new`, `--max-usd` i `--write-region` z `chimera chat` nie mają tu
-odpowiednika.
+Nie te same flagi co w REPL-ach. `tui` ma `--stream`/`--no-stream`, których one nie mają, i
+`--max-usd`, które zatrzymuje sesję, gdy wyda już tyle. Ta flaga czekała na miejsce, w którym
+można ją pokazać: panel aktywności niesie teraz wiersz `budget` z tym, co zostało, bo pułap,
+którego nikt nie widzi, zamienia turę zatrzymaną przez pieniądze w turę zatrzymaną bez
+widocznego powodu.
+
+`--cascade`, `--session`, `--new` i `--write-region` z `chimera chat` nie mają tu odpowiednika.
 
 Komendy: `/model <slug>` · `/reset` (wyczyść kontekst) · `/clear` (wyczyść ekran) · `/stream`
 (przełącz na żywo tokeny) · `/help` · `/exit` (także `/quit`, `/q`). Klawisze: `Ctrl+R` reset ·
@@ -252,14 +257,25 @@ Komendy ze slashem autouzupełniają się w trakcie pisania.
 
 Uwagi o uczciwości:
 
-- **TUI celowo nie jest zarządzane.** Ma allowlistę wdrożeniową i nic więcej: żadnego ledgera
-  skażenia, żadnego ogrodzenia `<<external-data>>`, żadnego jądra, żadnego zatwierdzającego.
-  Powód jest taki, że jego potwierdzenia nie da się narysować — Textual jest właścicielem
-  terminala, więc pytanie o wykonanie na hoście jest pytaniem do stdin, do którego nikt nie
-  sięga. Zmierzone w pty: taka tura zablokowała się na 123,8 s przy limicie 120 s i wróciła
-  jako `✗ run_shell` bez wyjaśnienia (`bench/right_hand_governance/RESULTS.md`, część 2).
-  Dopóki nie dostanie natywnego modala Textual, siedem ataków, które `chat` blokuje, tutaj
-  nadal się wykonuje — wybierz `chat` albo `assist`, gdy odmowa ma znaczenie.
+- **Jest zarządzane, a jego pytania są rysowane zamiast wpisywane.** Ten sam stos, który budują
+  REPL-e: ledger skażenia, któremu podaje się twoją własną wiadomość, ogrodzenie
+  `<<external-data>>` wokół niezaufanego wyjścia narzędzi, jądro zaufania, podłoga zasięgu
+  właściciela i podłączone serwery MCP. Tym, co trzymało tę powierzchnię na zewnątrz do
+  2026-09-09, nie był stos, tylko pytanie — Textual jest właścicielem terminala, więc pytanie
+  zapisane na stdin jest zapisane tam, gdzie nikt nie może zajrzeć. Zmierzone w pty: taka tura
+  zablokowała się na 123,8 s przy limicie 120 s i wróciła jako `✗ run_shell` bez wyjaśnienia
+  (`bench/right_hand_governance/RESULTS.md`, część 2). **Obie** bramki otwierają teraz zamiast
+  tego modal: potwierdzenie wykonania na hoście i zatwierdzający governance. `y` albo `n`,
+  Escape odmawia, przycisk No trzyma fokus, więc Enter nie zatwierdzi przez przypadek, a
+  odliczanie mówi, ile czasu zostało milczeniu — milczenie nadal odmawia i teraz to mówi. Na
+  tym samym korpusie i tym samym instrumencie zablokowane ataki poszły z 0 na 7 do 7 na 7, a
+  odczyty zewnętrzne wracające wewnątrz ogrodzenia z 0 na 15 do 12 na 15 (te trzy, które
+  zostają na zewnątrz, to twoje własne repozytorium, które nie jest zewnętrzne).
+- **Odrzucone wywołanie mówi teraz dlaczego, pod odpowiedzią.** Panel aktywności już pokazywał
+  własne zdanie narzędzia pod jego `✗`; dziennik konwersacji pokazuje też
+  `✗ run_shell did not succeed: …`, a to jest miejsce, w którym jest również relacja modelu o
+  komendzie, która nigdy nie ruszyła. Zatwierdzenie też dostaje linię
+  (`governance: 1 approved this turn`), więc `y` kliknięte w środku tury zostawia ślad.
 - Nic nie utrwala: zamknięcie TUI kończy rozmowę. `chat` to powierzchnia z wątkami.
 - Streamowanie tokenów działa tylko na ścieżce pojedynczego modelu — pod `--fuse` (tura
   panel→judge→syntetyzator) nie ma przyrostowych tokenów, więc panel pokazuje status
@@ -267,10 +283,10 @@ Uwagi o uczciwości:
   w `chat`, tura niosąca narzędzia nie fuzjonuje, a tura REPL zawsze je niesie.
 - Koszt pokazuje "niedostępny", gdy cena cennikowa modelu jest nieznana (nigdy nie zgadywana),
   a każda tura jest dopisywana do `<home>/usage.jsonl` tak jak w REPL-ach.
-- Nie ma tu verify/revert ani MCP. Oba trafiły do `chat` i `assist`, które odpowiadają na
-  `/solve` i montują skonfigurowane serwery, bo oba opierają się na ledgerze skażenia i
-  zatwierdzającym, których ta powierzchnia postanowiła nie mieć. Verify-or-revert działa też w
-  `chimera solve` i `chimera project`.
+- Nie ma tu verify/revert ani `/solve`: te trafiły do `chat` i `assist`. Serwery MCP są
+  zamontowane, czego wcześniej nie były, dokładnie z tego powodu, dla którego ich odmawiano —
+  wyjście MCP jest z definicji niezaufaną treścią, a teraz jest gdzie je ogrodzić.
+  Verify-or-revert działa też w `chimera solve` i `chimera project`.
 - Jeśli Textual nie jest zainstalowany, `tui` spada do zwykłego REPL `chat`, przekazując każdy
   argument jawnie, żeby ten odwrót przeżył swoją pierwszą turę. Streamowanie nic tam nie
   znaczy, a wątek jest zapisywany jak każdy inny wątek `chat`.
