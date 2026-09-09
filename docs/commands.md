@@ -67,7 +67,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
 | [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
-| [`sessions`](#sessions) | List the saved conversations — the same ones the desktop app shows. |
+| [`sessions`](#sessions) | List the conversations ``chimera chat`` has saved, under ``<home>/sessions``. |
 | [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
 | [`skills`](#skills) | List the built-in skills. |
 | [`skills-approve`](#skills-approve) | Approve/reactivate a learned skill after review (activates retrieval). |
@@ -314,9 +314,18 @@ chimera cascade-bench
 
 Interactive multi-turn chat — your terminal right-hand. Requires a key.
 
-The conversation is saved after every turn, under ``<home>/sessions``, and picked up again on
-the next run. It is the same store the desktop app reads, so a thread started here can be
-continued there and the other way round.
+The whole conversation is saved after every turn, under ``<home>/sessions``, and picked up again
+on the next run. ``chimera sessions`` lists the threads and ``chimera chat -s <id>`` resumes
+one; ``GET /api/sessions`` serves the same files to any HTTP client.
+
+Coding conversations in the desktop app are a different store — ``<home>/code_sessions``, which
+keeps the model's own message list and its turn receipts rather than prose pairs — so a thread
+does not travel between the two.
+
+A resumed turn is labelled as restored in the next prompt, and one that ran while untrusted
+content was in the conversation comes back inside the data fence; a turn saved before that was
+recorded is treated the same way, because nothing measured it. Memory recall is scoped to
+``--workspace``: that folder's facts, plus the ones stored with no project at all.
 
 ```bash
 chimera chat
@@ -1032,10 +1041,11 @@ chimera serve
 
 ## sessions
 
-List the saved conversations — the same ones the desktop app shows.
+List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.
 
-One store, two front ends. A thread started in the terminal opens in the app, and a thread
-started in the app can be resumed here with ``chimera chat -s <id>``.
+Resume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones
+``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
+(``<home>/code_sessions``) with a different shape, and are not listed here.
 
 ```bash
 chimera sessions

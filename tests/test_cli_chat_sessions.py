@@ -85,11 +85,14 @@ def test_an_id_that_does_not_exist_yet_is_a_name_not_an_error(tmp_path: Path) ->
     assert resumed is False
 
 
-def test_the_cli_and_the_app_read_the_same_directory(tmp_path: Path) -> None:
+def test_the_cli_and_the_api_read_the_same_directory(tmp_path: Path) -> None:
     """The point of the change, stated as a test.
 
-    If these two ever diverge, a thread started in the terminal stops appearing in the app and
-    nothing fails — which is exactly how the split lasted this long.
+    "the API", not "the app": ``GET /api/sessions`` serves these files and no line of app code
+    fetches it — the chat screens were deleted two days before this command learned to save. What
+    this pins is that the CLI and that endpoint keep addressing one directory; the sentence that
+    claimed a desktop *reader* is guarded separately, in
+    ``tests/test_the_two_transcript_stores_say_what_they_are.py``.
     """
     from chimera.config import Settings
 

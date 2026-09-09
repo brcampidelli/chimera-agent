@@ -17,6 +17,18 @@ from chimera.core.agent import AgentResult, ToolActivity
 from chimera.memory.gate import MemoryGate
 from chimera.memory.models import EVERY_PROJECT, MemoryItem
 
+#: What is known about untrusted content in one stored turn.
+#:
+#: Three values and not two, because "nothing untrusted entered" and "nobody was in a position to
+#: say" are different facts, and a store that collapses them publishes the more comforting of the
+#: two. ``UNKNOWN`` is what every turn written before this field existed is, and it is treated the
+#: way ``TAINTED`` is when the turn comes back from disk.
+CLEAN = "clean"
+TAINTED = "tainted"
+UNKNOWN = "unknown"
+
+_PROVENANCE = (CLEAN, TAINTED, UNKNOWN)
+
 
 class SupportsRun(Protocol):
     """The agent loop: turn a task into a result with a final answer.
@@ -48,10 +60,27 @@ class SupportsRelated(Protocol):
 
 @dataclass
 class ChatTurn:
-    """One exchange in the conversation."""
+    """One exchange in the conversation, and what is known about where it came from.
+
+    Two fields, deliberately on different axes.
+
+    ``provenance`` belongs to the turn and travels with the file: ``CLEAN`` when every tool call
+    this turn made was observed and none of them returned external content, ``TAINTED`` when one
+    did, ``UNKNOWN`` when nobody could say. It is stamped once, when the turn is recorded, because
+    that is the only moment the evidence exists — the run's taint ledger does not survive the
+    process, and a reader on Thursday has nothing left to consult about Monday.
+
+    ``restored`` belongs to THIS session's view and is not persisted: it says the turn came off
+    disk rather than out of the model a moment ago. The distinction is what :meth:`ChatSession.
+    _assemble` renders, and it is why the marker is not written into ``assistant``: that text is
+    replayed into every later prompt, so a marker inside it would put words in the model's mouth
+    for the rest of the conversation and be saved back that way, one layer deeper on each reopen.
+    """
 
     user: str
     assistant: str
+    provenance: str = UNKNOWN
+    restored: bool = False
 
 
 @dataclass(frozen=True)
@@ -72,6 +101,103 @@ def decline_reason(observation: str) -> str:
     """The tool's own words, on one line, short enough to sit under a reply."""
     text = " ".join(observation.split())
     return text[:200] + "…" if len(text) > 200 else text
+
+
+def read_provenance(value: Any) -> str:
+    """The stored label, or ``UNKNOWN`` for anything this version does not recognise.
+
+    A missing field is an old file; an unrecognised one is a newer file, a hand edit, or a hostile
+    write. None of the three is evidence that nothing untrusted entered, so all three read the same.
+    """
+    text = str(value)
+    return text if text in _PROVENANCE else UNKNOWN
+
+
+def turn_provenance(
+    reported: list[str], observed: list[ToolActivity] | None, *, already_tainted: bool
+) -> str:
+    """What is known about untrusted content in a finished turn.
+
+    ``reported`` is ``AgentResult.tool_names`` — every tool the loop actually called. ``observed``
+    is the live ``ToolActivity`` stream when the caller subscribed to one (``send_verbose``), or
+    ``None`` when it did not (``send``).
+
+    Three rules, in order:
+
+    * ``already_tainted`` wins. Taint is monotonic within a thread, exactly as
+      :meth:`TaintLedger.run_tainted` is within a run: the fetched text is still in the prompt six
+      turns later, so every answer after it is downstream of it.
+    * a **fetch tool** by name is untrusted content by definition, and this is the half that works
+      on a surface with no taint ledger at all — which is every terminal surface today.
+    * an observation carrying the ``<<external-data>>`` fence is untrusted content that a
+      ``LedgeredTool`` already recognised. This is the accurate half, and it only exists where the
+      governed registry is built.
+
+    The gap, stated rather than hidden: an MCP or OpenAPI tool marked ``untrusted_output`` has a
+    name that is not in ``FETCH_TOOLS`` (it comes from a remote server), so on a surface with no
+    ledger to fence it this returns ``CLEAN`` for a turn that read external content. ``ToolActivity``
+    carries the name and the observation, not the tool object, so the marker cannot be consulted
+    from here. Closing it means giving that surface a ledger.
+    """
+    if already_tainted:
+        return TAINTED
+    from chimera.governance.ledger import FETCH_TOOLS
+
+    if any(name in FETCH_TOOLS for name in reported):
+        return TAINTED
+    if observed is None:
+        # Nothing was watched. With no tool call at all there is nothing to have watched, so this
+        # is `CLEAN` honestly; with one, it is a measurement that was not taken.
+        return CLEAN if not reported else UNKNOWN
+    if len(observed) != len(reported):
+        # The agent ran tools it did not announce. `CLEAN` here would be a guarantee derived from
+        # an instrument that could not have shown the opposite.
+        return UNKNOWN
+    from chimera.governance.ledger_tool import FENCE_OPEN
+
+    if any(FENCE_OPEN in activity.observation for activity in observed):
+        return TAINTED
+    return CLEAN
+
+
+#: How a replayed turn is labelled, by what is known about it. The label sits on the ROLE, never
+#: inside the reply — see :class:`ChatTurn`.
+_RESTORED = {
+    CLEAN: " [restored from the saved transcript]",
+    UNKNOWN: " [restored from the saved transcript; provenance was not recorded]",
+    TAINTED: " [restored from the saved transcript; untrusted content had entered this conversation]",
+}
+
+
+def _replay(turns: list[ChatTurn]) -> str:
+    """Render the recent turns for the prompt, saying which of them the model did not just say.
+
+    A restored turn is fenced unless it is known to be clean. Within one process the surface shows
+    the person each turn as it happens — its refusals, its tools, its price — and, once the taint
+    ledger reaches this surface, narrows the dangerous tools for the rest of the run. Across a
+    restart none of that survives: the ledger is gone, nobody watched, and the reply is replayed
+    into a fresh prompt as if the model had just written it. That gap is the one this closes; a
+    tainted turn replayed inside the SAME run is a real and adjacent risk that the ledger's
+    narrowing covers and this does not.
+    """
+    from chimera.governance.ledger_tool import fence
+
+    lines = ["Conversation so far:"]
+    for turn in turns:
+        lines.append(f"User: {turn.user}")
+        if not turn.restored:
+            lines.append(f"Assistant: {turn.assistant}")
+            continue
+        label = _RESTORED.get(turn.provenance, _RESTORED[UNKNOWN])
+        if turn.provenance == CLEAN:
+            lines.append(f"Assistant{label}: {turn.assistant}")
+        else:
+            # `fence()` and not an f-string: the close marker is a public constant in an open-source
+            # repo, so a reply that quotes it would end the fence early and let its tail read as if
+            # it were outside. `fence` neutralises it; hand-assembly does not.
+            lines.append(f"Assistant{label}:")
+            lines.append(fence(turn.assistant))
+    return "\n".join(lines)
 
 
 @dataclass
@@ -108,6 +234,8 @@ class TurnReport:
     #: reply says the command never ran. `tool_names` cannot carry it — it records that a tool was
     #: called, which is the very thing that is true in both cases.
     declined: list[DeclinedTool] = field(default_factory=list)
+    #: What this turn's own provenance was recorded as — see :func:`turn_provenance`.
+    provenance: str = UNKNOWN
 
 
 @dataclass
@@ -125,18 +253,42 @@ class ChatSession:
     # chatting should not silently persist unless the user asked for it). Off keeps the prior
     # behaviour where the desktop chat never wrote memory.
     remember_from_chat: bool = False
+    #: The folder this conversation is open on, as :func:`chimera.memory.models.project_key` spells
+    #: it — recall then sees that project's facts plus the ones that belong everywhere.
+    #:
+    #: Defaults to :data:`EVERY_PROJECT` (no narrowing) because most callers are not a folder: the
+    #: messaging gateway, the OpenAI-compatible endpoint and the benchmarks are conversations with
+    #: nothing open. The terminal surfaces take a ``--workspace`` and pass it, which is what the
+    #: coding turn has always done and what `chat` said it did and did not.
+    project: str | None = EVERY_PROJECT
+    #: How many turns the transcript keeps, or ``None`` to keep all of them (the default).
+    #:
+    #: This used to be an unconditional 50 and it was in the wrong place. Only ``max_history`` turns
+    #: ever reach a prompt, so bounding the RECORD buys nothing there — and `SessionManager.persist`
+    #: writes this list, so from turn 51 every save rewrote the file without turn 1. A store whose
+    #: command promises "saved as you go" must not quietly become a sliding window.
+    #:
+    #: The surface that does need a bound is the one with no file and no end: the messaging gateway
+    #: holds a live session per chat for as long as the process runs, and sets this.
+    max_turns: int | None = None
     turns: list[ChatTurn] = field(default_factory=list)
 
     def send(self, message: str) -> str:
         """Run one user message through the agent and record the exchange."""
-        answer = self.agent.run(self._compose(message)).answer
-        self._record(message, answer)
+        result = self.agent.run(self._compose(message))
+        self._record(
+            message,
+            result.answer,
+            turn_provenance(
+                list(result.tool_names), None, already_tainted=self._thread_tainted()
+            ),
+        )
         # `remember_from_chat` used to mean two different things depending on which method you
         # called: `send_verbose` honoured it and `send` did not. So every surface built on `send`
         # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
         # true in the config and false in the product.
         self._maybe_remember(message)
-        return answer
+        return result.answer
 
     def send_verbose(
         self,
@@ -150,26 +302,34 @@ class ChatSession:
         is reused for both the prompt and the report's fact count (no double search)."""
         facts, layer = self._recall(message)
         declined: list[DeclinedTool] = []
+        observed: list[ToolActivity] = []
 
         def watch(activity: ToolActivity) -> None:
             """Collect the refusals on the way past, then hand the activity to the caller.
 
             Here rather than in each surface, because every surface needs the same answer and the
             agent only offers it live: `AgentResult` keeps the tool NAMES, which say a tool was
-            called — true of a call that ran and of one a gate stopped.
+            called — true of a call that ran and of one a gate stopped. The same stream is what
+            lets the turn be stamped `clean` rather than `unknown`, so it is kept whole and
+            counted against `tool_names` afterwards.
             """
+            observed.append(activity)
             if not activity.ok:
                 declined.append(DeclinedTool(activity.name, decline_reason(activity.observation)))
             if on_tool is not None:
                 on_tool(activity)
 
         result = self.agent.run(self._assemble(message, facts), on_token=on_token, on_tool=watch)
-        self._record(message, result.answer)
+        provenance = turn_provenance(
+            list(result.tool_names), observed, already_tainted=self._thread_tainted()
+        )
+        self._record(message, result.answer, provenance)
         saved = self._maybe_remember(message)
         return TurnReport(
             answer=result.answer,
             declined=declined,
             memory_saved=saved,
+            provenance=provenance,
             prompt_tokens=result.prompt_tokens,
             completion_tokens=result.completion_tokens,
             cache_read_tokens=result.cache_read_tokens,
@@ -191,6 +351,10 @@ class ChatSession:
         :func:`chimera.memory.capture.parse_remember_request`) — never automatic extraction, which
         would pollute memory. Duck-typed on ``remember`` so a search-only memory backend is simply
         skipped; the write is deduped by the MemoryManager. Returns the fact saved, or None.
+
+        Written with no project on purpose, even when the conversation has one. Recall narrows and
+        must not hide: a fact the user asked for in one folder is theirs everywhere, and filing it
+        under this folder would make it unreachable from the next one with nothing to say so.
         """
         if not self.remember_from_chat or self.memory is None:
             return None
@@ -205,13 +369,18 @@ class ChatSession:
         write(fact, source="chat")  # deduped; clean provenance (the user asked for it directly)
         return fact
 
-    def _record(self, message: str, answer: str) -> None:
-        self.turns.append(ChatTurn(user=message, assistant=answer))
-        # Bound the transcript: only the last ``max_history`` turns ever reach the prompt, so a
-        # long-lived session (TUI / reused gateway) must not grow this list without limit.
-        cap = max(50, self.max_history * 4)
-        if len(self.turns) > cap:
-            del self.turns[:-cap]
+    def _thread_tainted(self) -> bool:
+        """Has untrusted content already entered this conversation?
+
+        Derived from the turns rather than kept in a flag, so a session hydrated from disk inherits
+        the answer for free — which is the case that matters, since the ledger that knew it is gone.
+        """
+        return any(turn.provenance == TAINTED for turn in self.turns)
+
+    def _record(self, message: str, answer: str, provenance: str = UNKNOWN) -> None:
+        self.turns.append(ChatTurn(user=message, assistant=answer, provenance=provenance))
+        if self.max_turns is not None and len(self.turns) > self.max_turns:
+            del self.turns[: -self.max_turns]
 
     def reset(self) -> None:
         """Forget the conversation (long-term memory is untouched)."""
@@ -234,6 +403,11 @@ class ChatSession:
         The logic lives at module level because a second surface needs it — the coding turn reads
         memory too — and the part that must never be reimplemented is the taint labelling. A copy
         that forgot it would let a poisoned memory re-enter a prompt looking clean.
+
+        There used to be a local ``_memory_search`` passed in as ``search=``, which took the graded
+        call away from ``recall_facts`` and reimplemented two thirds of it. The third it dropped was
+        ``project``, so every terminal conversation recalled every folder's facts whatever
+        ``--workspace`` said. Deleting the copy is the fix; there was nothing wrong with the original.
         """
         return recall_facts(
             message,
@@ -241,18 +415,8 @@ class ChatSession:
             graph=self.graph,
             gate=self.gate,
             k=self.memory_k,
-            search=self._memory_search,
+            project=self.project,
         )
-
-    def _memory_search(
-        self, message: str, on_layer: Callable[[str], None]
-    ) -> list[MemoryItem]:
-        """Call ``memory.search`` capturing the winning layer, tolerating a fake without ``on_layer``."""
-        assert self.memory is not None
-        try:
-            return self.memory.search(message, k=self.memory_k, on_layer=on_layer)  # type: ignore[call-arg]
-        except TypeError:  # a minimal SupportsRecall fake that doesn't accept on_layer
-            return self.memory.search(message, k=self.memory_k)
 
     def _compose(self, message: str) -> str:
         facts, _layer = self._recall(message)
@@ -266,9 +430,7 @@ class ChatSession:
         if facts:
             parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
         if self.turns:
-            recent = self.turns[-self.max_history :]
-            convo = "\n".join(f"User: {t.user}\nAssistant: {t.assistant}" for t in recent)
-            parts.append("Conversation so far:\n" + convo)
+            parts.append(_replay(self.turns[-self.max_history :]))
         parts.append(f"User: {message}")
         return "\n\n".join(parts)
 
@@ -302,8 +464,8 @@ def recall_facts(
     recalled. It reflects real hits (never guessed): a layer that returns nothing is not listed.
 
     ``project`` narrows what may be recalled to that folder's facts plus the ones that belong
-    everywhere. It defaults to :data:`EVERY_PROJECT` — no narrowing — because this function is also
-    the chat's recall, and a conversation with no folder open is not a project.
+    everywhere. It defaults to :data:`EVERY_PROJECT` — no narrowing — because a conversation with no
+    folder open is not a project; a surface that has one passes it.
 
     ``gate`` defaults to a real :class:`MemoryGate`. Pass ``None`` to opt out explicitly.
     """

@@ -686,7 +686,7 @@
     },
     {
       "deprecated": false,
-      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.\n\nThe conversation is saved after every turn, under ``<home>/sessions``, and picked up again on\nthe next run. It is the same store the desktop app reads, so a thread started here can be\ncontinued there and the other way round.",
+      "help": "Interactive multi-turn chat \u2014 your terminal right-hand. Requires a key.\n\nThe whole conversation is saved after every turn, under ``<home>/sessions``, and picked up again\non the next run. ``chimera sessions`` lists the threads and ``chimera chat -s <id>`` resumes\none; ``GET /api/sessions`` serves the same files to any HTTP client.\n\nCoding conversations in the desktop app are a different store \u2014 ``<home>/code_sessions``, which\nkeeps the model's own message list and its turn receipts rather than prose pairs \u2014 so a thread\ndoes not travel between the two.\n\nA resumed turn is labelled as restored in the next prompt, and one that ran while untrusted\ncontent was in the conversation comes back inside the data fence; a turn saved before that was\nrecorded is treated the same way, because nothing measured it. Memory recall is scoped to\n``--workspace``: that folder's facts, plus the ones stored with no project at all.",
       "hidden": false,
       "name": "chat",
       "params": [
@@ -4280,7 +4280,7 @@
     },
     {
       "deprecated": false,
-      "help": "List the saved conversations \u2014 the same ones the desktop app shows.\n\nOne store, two front ends. A thread started in the terminal opens in the app, and a thread\nstarted in the app can be resumed here with ``chimera chat -s <id>``.",
+      "help": "List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.",
       "hidden": false,
       "name": "sessions",
       "params": [

@@ -1153,10 +1153,11 @@ def agent(
 def sessions(
     delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
 ) -> None:
-    """List the saved conversations — the same ones the desktop app shows.
+    """List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.
 
-    One store, two front ends. A thread started in the terminal opens in the app, and a thread
-    started in the app can be resumed here with ``chimera chat -s <id>``.
+    Resume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones
+    ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
+    (``<home>/code_sessions``) with a different shape, and are not listed here.
     """
     from chimera.api.sessions import SessionStore
 
@@ -1407,9 +1408,18 @@ def chat(
 ) -> None:
     """Interactive multi-turn chat — your terminal right-hand. Requires a key.
 
-    The conversation is saved after every turn, under ``<home>/sessions``, and picked up again on
-    the next run. It is the same store the desktop app reads, so a thread started here can be
-    continued there and the other way round.
+    The whole conversation is saved after every turn, under ``<home>/sessions``, and picked up again
+    on the next run. ``chimera sessions`` lists the threads and ``chimera chat -s <id>`` resumes
+    one; ``GET /api/sessions`` serves the same files to any HTTP client.
+
+    Coding conversations in the desktop app are a different store — ``<home>/code_sessions``, which
+    keeps the model's own message list and its turn receipts rather than prose pairs — so a thread
+    does not travel between the two.
+
+    A resumed turn is labelled as restored in the next prompt, and one that ran while untrusted
+    content was in the conversation comes back inside the data fence; a turn saved before that was
+    recorded is treated the same way, because nothing measured it. Memory recall is scoped to
+    ``--workspace``: that folder's facts, plus the ones stored with no project at all.
     """
     from chimera.api.sessions import SessionManager, SessionStore
     from chimera.cli.right_hand import build_right_hand
@@ -1417,6 +1427,7 @@ def chat(
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession, render
+    from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
 
     settings = get_settings()
@@ -1424,6 +1435,14 @@ def chat(
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
+    # One of the project's two transcript stores, and the docstring above used to deny it: it
+    # promised "the same store the desktop app reads, so a thread started here can be continued
+    # there and the other way round". That was false the day it was written — the app deleted its
+    # chat screens on 2026-08-07 and this command learned to save on 2026-08-09 — and it was
+    # published three times over, because `docs/commands.md` is generated from it. The split itself
+    # is right: see `chimera/core/code_session.py`, whose first paragraph is the argument, and
+    # `tests/test_the_two_transcript_stores_say_what_they_are.py`, which fails if the sentence
+    # comes back while no line of app code fetches /api/sessions.
     store = SessionStore(settings.home / "sessions")
     if session_id is not None:
         # BEFORE the first turn. `chimera chat -s ../escape` was accepted here, ran a whole turn,
@@ -1490,6 +1509,11 @@ def chat(
             # The setting existed and no terminal surface passed it, so "remember that…" was
             # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
             remember_from_chat=settings.remember_from_chat,
+            # Recall narrowed to the folder this conversation is open on, exactly as the coding
+            # turn does it. `--workspace` decided which files the tools could touch and said
+            # nothing about which project's memory arrived, so a note from one codebase turned up
+            # as context in a chat about another.
+            project=project_key(workspace),
         ),
         store,
     )
@@ -1602,6 +1626,7 @@ def assist(
     from chimera.core.instructions import render as render_identity
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
     from chimera.interface import ChatSession, render
+    from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
 
     settings = get_settings()
@@ -1643,6 +1668,9 @@ def assist(
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
+        # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
+        # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
+        project=project_key(workspace),
     )
     skill_names = _learned_skill_labels(settings)
 

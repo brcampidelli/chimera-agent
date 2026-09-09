@@ -1871,6 +1871,8 @@ class AutonomousAgent:
         # Scoped to the folder the work happened in. "Accomplished: <task>" is about THIS
         # codebase, and a note from one project arriving as context in another is the noise this
         # exists to stop. A run with no workspace has no project and stays global.
+        from chimera.memory.models import project_key
+
         self.memory.remember(
             fact,
             # Keyed on the FULL task, never on the shortened head: two briefs that open the same
@@ -1878,7 +1880,10 @@ class AutonomousAgent:
             # built from the head would fold them into one entry that overwrites itself.
             key=f"solve:{_slug(task)}",
             provenance="tainted" if tainted else "clean",
-            project=str(self.workspace) if self.workspace else None,
+            # `project_key` and not `str(self.workspace)`. `chimera solve` defaults to
+            # `--workspace .`, so this wrote the literal string "." while every scoped reader asks
+            # for an absolute path — the write and the read never met, and nothing said so.
+            project=project_key(self.workspace),
         )
 
     def _review(
