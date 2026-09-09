@@ -1444,6 +1444,11 @@ def chat(
     # `tests/test_the_two_transcript_stores_say_what_they_are.py`, which fails if the sentence
     # comes back while no line of app code fetches /api/sessions.
     store = SessionStore(settings.home / "sessions")
+    # Name the directory this command actually writes to. The line below used to say the thread
+    # was "open in the app", which is the same false claim the docstrings carried: the desktop
+    # reads <home>/code_sessions and never this one. A path a reader can go and look at cannot
+    # drift the way a promise about another program can.
+    store_label = str(settings.home / "sessions")
     if session_id is not None:
         # BEFORE the first turn. `chimera chat -s ../escape` was accepted here, ran a whole turn,
         # and raised on the save — after the answer had been paid for and while it was being
@@ -1531,7 +1536,7 @@ def chat(
     if resumed:
         console.print(f"[dim]resuming {active} — {len(session.turns)} turn(s). /new starts over.[/dim]")
     else:
-        console.print(f"[dim]session {active} — saved as you go, and open in the app.[/dim]")
+        console.print(f"[dim]session {active} — saved as you go, under {store_label}.[/dim]")
     nudged: set[str] = set()  # preferences already suggested this session
     skill_nudged: set[str] = set()  # recurring tasks already suggested as skills
     while True:
