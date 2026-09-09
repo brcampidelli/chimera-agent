@@ -230,6 +230,7 @@ chimera assist
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |
 | `--no-memory` | Don't recall long-term memory. |  |
 | `--no-cascade` | Disable tiered routing (single default model instead). |  |
+| `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
 
 ## bench
 
@@ -331,6 +332,7 @@ chimera chat
 | `--no-memory` | Don't recall long-term memory. |  |
 | `--session`, `-s` | Resume a specific session id (see 'chimera sessions'). |  |
 | `--new` | Start a fresh session instead of resuming. |  |
+| `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
 
 ## context-curve
 

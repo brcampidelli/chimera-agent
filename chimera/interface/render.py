@@ -81,6 +81,28 @@ def refusal_lines(report: TurnReport) -> list[str]:
     ]
 
 
+def governance_line(granted: int, refused: int, *, attended: bool) -> str:
+    """What the governance layer decided this turn, or ``""`` when it decided nothing.
+
+    The sibling of :func:`refusal_lines`, for the case that function cannot see. A refused call
+    comes back as a refusal observation and lands in ``report.declined``; an APPROVED one comes back
+    as an ordinary result and is indistinguishable, afterwards, from a call nothing ever questioned.
+    So the person who typed ``y`` to a prompt mid-turn had no record of it once the reply scrolled.
+
+    ``attended`` is on the refusal half rather than the grant half because it changes what the
+    refusal means: "refused" and "refused because there was nobody to ask" call for different
+    reactions, and this surface is the one place where the second should never happen.
+    """
+    if not granted and not refused:
+        return ""
+    parts = []
+    if granted:
+        parts.append(f"{granted} approved")
+    if refused:
+        parts.append(f"{refused} refused" + ("" if attended else " (nobody could be asked)"))
+    return f"[dim]governance: {', '.join(parts)} this turn[/dim]"
+
+
 def cost_text(report: TurnReport) -> str:
     """The turn's price, or ``cost: unavailable`` — never a guessed zero.
 

@@ -1249,12 +1249,19 @@ def _run_turn(session: Any, message: str) -> tuple[Any, str]:
         return None, "continue"
 
 
-def _render_turn(report: Any, *, session_id: str, settings: Settings) -> None:
-    """Print a finished turn — reply, refusals, price — and put it in the project's own census.
+def _render_turn(
+    report: Any, *, session_id: str, settings: Settings, hand: Any = None
+) -> None:
+    """Print a finished turn — reply, refusals, governance, price — and file it in the census.
 
     Order matters and is the fix: the reply is on screen before anything else can fail. The
     refusal lines are what stop "the command printed exactly: marker-42" from being the last word
     about a command that never ran.
+
+    ``hand`` adds the other half of that sentence. A refusal already had a line; a GRANT had
+    none — so a person who typed ``y`` to a governance prompt mid-turn had, once the reply
+    scrolled, no record that they had allowed anything. An approval nobody can see afterwards is a
+    record and not a decision.
     """
     from chimera.api.usage import record_turn
     from chimera.interface import render
@@ -1262,6 +1269,10 @@ def _render_turn(report: Any, *, session_id: str, settings: Settings) -> None:
     console.print(render.reply_line(report.answer))
     for line in render.refusal_lines(report):
         console.print(line)
+    if hand is not None:
+        line = render.governance_line(*hand.turn_verdicts(), attended=hand.attended)
+        if line:
+            console.print(line)
     console.print(render.cost_line(report))
     record_turn(settings.home, session_id, report)
 
@@ -1387,6 +1398,12 @@ def chat(
         None, "--session", "-s", help="Resume a specific session id (see 'chimera sessions')."
     ),
     new: bool = typer.Option(False, "--new", help="Start a fresh session instead of resuming."),
+    write_region: str | None = typer.Option(
+        None,
+        "--write-region",
+        help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write "
+        "outside is refused — blocks an injected instruction from rewriting an unrelated file.",
+    ),
 ) -> None:
     """Interactive multi-turn chat — your terminal right-hand. Requires a key.
 
@@ -1395,10 +1412,12 @@ def chat(
     continued there and the other way round.
     """
     from chimera.api.sessions import SessionManager, SessionStore
+    from chimera.cli.right_hand import build_right_hand
     from chimera.core import Agent, AgentConfig
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession, render
     from chimera.providers import LLMGateway
-    from chimera.tools import default_registry
 
     settings = get_settings()
     if not settings.has_any_key():
@@ -1425,21 +1444,30 @@ def chat(
         from chimera.fusion import FusionEngine, RoutedBackend
 
         backend = RoutedBackend(gateway, FusionEngine(gateway))
+    # The same stack the API path assembles, and until now the thing this surface had none of: a
+    # write region, the deployment fence, the owner's reach floor, the trust kernel, a taint ledger
+    # and an approver that can actually be answered. Measured before it was argued about — 7 of 7
+    # attacks executed here that the governed registry blocked, and 0 of 12 external reads arrived
+    # inside the `<<external-data>>` fence the system prompt below promises on every single turn
+    # (`bench/right_hand_governance/RESULTS.md`, 2026-09-08).
+    hand = build_right_hand(
+        Path(workspace), settings=settings, surface="chat", write_region=write_region
+    )
     agent = Agent(
         backend,
-        # The deployment fence, exactly as `run` and the desktop app apply it. An explicit
-        # allowlist is an INSTRUCTION, not an inference: `governed_profile`'s kernel and taint
-        # ledger are staged behind CHIMERA_GOVERNANCE because they can refuse legitimate work,
-        # but removing a named tool cannot, so it needs no rollout and no attendance argument.
-        # These three were the only agent surfaces left without it — and the comment below was
-        # added to these very lines a day earlier, for the sibling field, without noticing.
-        _apply_tool_allowlist(
-            default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
-        ),
+        hand.registry,
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+        AgentConfig(
+            model=model,
+            max_steps=max_steps,
+            project_root=Path(workspace),
+            # The owner's own words from `agent.json`. The desktop passes them and no terminal
+            # surface did, so one configuration produced two agents that answered differently
+            # depending on which window you opened.
+            instructions=render_identity(load_identity(settings.home)),
+        ),
     )
     mem = None if no_memory else _memory_manager()
 
@@ -1519,6 +1547,11 @@ def chat(
             continue
         if _handle_unknown_command(head, commands):
             continue
+        # Before a single tool runs: the ledger is told whose words this turn is. Without it every
+        # fetch reads `unknown`, and `CHIMERA_TAINT_AUTHORITY=authority` — the one setting that
+        # spends the person's attention only on pages they did NOT ask for — cannot tell the two
+        # apart. The desktop chat still cannot; see `chimera/cli/right_hand.py`.
+        hand.begin_turn(message)
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
@@ -1527,7 +1560,7 @@ def chat(
             break
         if outcome != "ok":
             continue
-        _render_turn(report, session_id=active, settings=settings)
+        _render_turn(report, session_id=active, settings=settings, hand=hand)
         _render_memory_note(report, message, settings)
         # After the turn, not at exit: Ctrl-C and a closed terminal are how a REPL usually ends,
         # and neither runs a shutdown hook. After the PRINT, not before it — see `_persist_turn`.
@@ -1545,6 +1578,12 @@ def assist(
     no_cascade: bool = typer.Option(
         False, "--no-cascade", help="Disable tiered routing (single default model instead)."
     ),
+    write_region: str | None = typer.Option(
+        None,
+        "--write-region",
+        help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write "
+        "outside is refused — blocks an injected instruction from rewriting an unrelated file.",
+    ),
 ) -> None:
     """Your daily-driver assistant: cheap by default, escalates when it must.
 
@@ -1557,11 +1596,13 @@ def assist(
     import time as _time
     from uuid import uuid4
 
+    from chimera.cli.right_hand import build_right_hand
     from chimera.core import Agent, AgentConfig
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
     from chimera.interface import ChatSession, render
     from chimera.providers import LLMGateway
-    from chimera.tools import default_registry
 
     settings = get_settings()
     if not settings.has_any_key():
@@ -1576,21 +1617,23 @@ def assist(
     _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
     backend: SupportsComplete = gateway if no_cascade else _cascade_backend(gateway, settings)
+    # The same assembly `chat` builds, from the same function, so the two right hands cannot drift
+    # into having different protections — which is how one of them ended up with none.
+    hand = build_right_hand(
+        Path(workspace), settings=settings, surface="assist", write_region=write_region
+    )
     agent = Agent(
         backend,
-        # The deployment fence, exactly as `run` and the desktop app apply it. An explicit
-        # allowlist is an INSTRUCTION, not an inference: `governed_profile`'s kernel and taint
-        # ledger are staged behind CHIMERA_GOVERNANCE because they can refuse legitimate work,
-        # but removing a named tool cannot, so it needs no rollout and no attendance argument.
-        # These three were the only agent surfaces left without it — and the comment below was
-        # added to these very lines a day earlier, for the sibling field, without noticing.
-        _apply_tool_allowlist(
-            default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
-        ),
+        hand.registry,
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+        AgentConfig(
+            model=model,
+            max_steps=max_steps,
+            project_root=Path(workspace),
+            instructions=render_identity(load_identity(settings.home)),
+        ),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
     mem = None if no_memory else _memory_manager()
@@ -1697,6 +1740,7 @@ def assist(
             continue
         if _handle_unknown_command(head, commands):
             continue
+        hand.begin_turn(message)  # the ledger learns whose words this turn is; see `chat`
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
@@ -1705,7 +1749,7 @@ def assist(
             break
         if outcome != "ok":
             continue
-        _render_turn(report, session_id=usage_session, settings=settings)
+        _render_turn(report, session_id=usage_session, settings=settings, hand=hand)
         _render_memory_note(report, message, settings)
         _emit_memory_nudges(session, mem, nudged, "/profile preference: {fact}")
         _emit_skill_nudges(session, skill_names, skill_nudged)
@@ -1750,6 +1794,12 @@ def tui(
             no_memory=no_memory,
             session_id=None,
             new=False,
+            # `tui` has no `--write-region` of its own, so the fallback states the same "no region
+            # asked for" that omitting the flag on `chimera chat` means. It cannot be omitted here:
+            # the parameter would arrive as an `OptionInfo` object and `.split(",")` would fail on
+            # it — which is the defect this whole argument list exists to prevent, caught again by
+            # `test_the_tui_fallback_passes_values_not_option_objects` the day the flag was added.
+            write_region=None,
         )
 
     settings = get_settings()
@@ -1766,12 +1816,15 @@ def tui(
         backend = RoutedBackend(gateway, FusionEngine(gateway))
     agent = Agent(
         backend,
-        # The deployment fence, exactly as `run` and the desktop app apply it. An explicit
-        # allowlist is an INSTRUCTION, not an inference: `governed_profile`'s kernel and taint
-        # ledger are staged behind CHIMERA_GOVERNANCE because they can refuse legitimate work,
-        # but removing a named tool cannot, so it needs no rollout and no attendance argument.
-        # These three were the only agent surfaces left without it — and the comment below was
-        # added to these very lines a day earlier, for the sibling field, without noticing.
+        # The deployment fence only — the kernel, the taint ledger and the approver that `chat` and
+        # `assist` gained are DELIBERATELY not here, and this is the one surface where that is a
+        # decision rather than an omission. Its gates cannot be answered: measured in a pty, a
+        # `run_shell` under the shipped `CHIMERA_HOST_EXEC=ask` blocks 123.8 s against a 120 s
+        # timeout and comes back as `✗ run_shell` with no reason, because Textual's driver owns the
+        # terminal and the prompt is a `typer.confirm` on raw stdin
+        # (`bench/right_hand_governance/RESULTS.md` Part 2). Adding the taint approver would buy one
+        # such block per narrowed call. It needs a Textual-native modal first; the exemption in
+        # `tests/test_governed_surfaces.py` carries the number.
         _apply_tool_allowlist(
             default_registry(Path(workspace)), allow=None, deny=None, settings=get_settings()
         ),
@@ -6850,12 +6903,14 @@ class _SpendCapReached(RuntimeError):
 def _right_hand_builder(
     model: str | None, max_steps: int, *, system_prompt: str | None = None
 ) -> SessionBuilder:
-    """Build :class:`ChatSession`s the way ``chimera chat`` builds one (``main.py:1230-1263``).
+    """Build :class:`ChatSession`s the way ``chimera chat`` builds one.
 
-    Same agent over the same gateway, the same ``_apply_tool_allowlist(default_registry(...))``
-    deployment fence, the same memory manager, recall graph and profile preamble. The scenario
-    suite exists to measure *that* object; a session assembled any other way would measure a
-    right hand nobody ships.
+    Same agent over the same gateway, the same governed registry from
+    :func:`chimera.cli.right_hand.build_right_hand`, the same memory manager, recall graph and
+    profile preamble. The scenario suite exists to measure *that* object; a session assembled any
+    other way would measure a right hand nobody ships — which is exactly what this did between
+    2026-09-08 and the day `chat` was governed, when it kept calling the bare
+    ``_apply_tool_allowlist(default_registry(...))`` that `chat` no longer makes.
 
     The one deliberate difference is isolation, and it is not cosmetic: workspace, home, memory and
     profile all come from the request, so one scenario cannot read another's fixture, a fact one
@@ -6863,12 +6918,12 @@ def _right_hand_builder(
     laptop it ran on — the developer's own profile and memories would otherwise be pasted into
     every prompt and the series would compare two different rulers (§2aa).
     """
+    from chimera.cli.right_hand import build_right_hand
     from chimera.core import Agent, AgentConfig
     from chimera.evolution.wiring import build_memory_manager
     from chimera.interface import ChatSession
     from chimera.interface.profile import load_profile, profile_path, render_profile
     from chimera.providers import LLMGateway
-    from chimera.tools import default_registry
 
     gateway = LLMGateway()
 
@@ -6881,9 +6936,9 @@ def _right_hand_builder(
             config.system_prompt = system_prompt
         agent = Agent(
             gateway,
-            _apply_tool_allowlist(
-                default_registry(request.workspace), allow=None, deny=None, settings=settings
-            ),
+            build_right_hand(
+                request.workspace, settings=settings, surface="scenarios"
+            ).registry,
             config,
         )
         mem = build_memory_manager(settings)

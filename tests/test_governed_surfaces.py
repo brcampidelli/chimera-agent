@@ -142,10 +142,39 @@ def test_enforce_actually_wraps(tmp_path: pathlib.Path) -> None:
 EXEMPT: dict[str, str] = {
     # --- a person is at the terminal, watching the tool calls go by ---
     "chimera/cli/main.py:agent": "attended: one-shot at the terminal",
-    "chimera/cli/main.py:chat": "attended: interactive REPL",
-    "chimera/cli/main.py:assist": "attended: interactive",
-    "chimera/cli/main.py:tui": "attended: interactive terminal UI",
+    # `chat` and `assist` were exempt here on the same "attended" grounds until 2026-09-08, when
+    # the reason was measured instead of asserted: `bench/right_hand_governance/RESULTS.md` found
+    # the terminal registry executing 7 of 7 attacks the governed one blocked, and 0 of 12 external
+    # reads arriving inside the `<<external-data>>` fence that the system prompt `chat` sends
+    # promises on every turn. Attendance is not a control — the person sees the command only after
+    # the model chose it, and #398 measured a turn where they did not see it at all, because the
+    # model narrated a refused command's output as if it had run. Both now go through
+    # `chimera/cli/right_hand.py:build_right_hand`, and their exemptions are gone rather than
+    # reworded.
+    #
+    # `tui` keeps one, and its reason is a measurement rather than an argument. In a pty, with the
+    # shipped default `CHIMERA_HOST_EXEC=ask`, a `run_shell` inside `chimera tui` blocks for
+    # **123.8 s** against `PROMPT_TIMEOUT_SECONDS = 120` and returns `✗ run_shell` with no reason:
+    # Textual's driver owns the terminal, so the `typer.confirm` on raw stdin is never seen, while
+    # `_human_can_answer()` still reports a tty (`RESULTS.md` Part 2, 2026-09-08). Shipping the
+    # taint approver there would turn every narrowed call into another two-minute block — five of
+    # them in eight rows of ordinary work on this corpus. It needs a Textual-native modal first;
+    # until then the honest state is ungoverned-and-said-so, not governed-and-unanswerable.
+    "chimera/cli/main.py:tui": (
+        "attended interactive terminal UI — and its stdin prompt is UNANSWERABLE: measured at "
+        "123.8 s to the 120 s timeout in a pty (bench/right_hand_governance/RESULTS.md Part 2). "
+        "Governance here needs a Textual modal, not a stdin callback; shipping the approver first "
+        "would trade 'runs without asking' for 'hangs two minutes per narrowed call'"
+    ),
     # --- assembles an equivalent stack from its own flags ---
+    "chimera/cli/right_hand.py:build_right_hand": (
+        "the terminal right-hand's own assembly: write region, deployment fence, reach floor, "
+        "trust kernel via govern_step, and a taint ledger it HANDS BACK to the caller so the REPL "
+        "can set the turn's instruction on it. Exactly assemble_registry's reason two entries "
+        "down — the profile would have built a SECOND TaintLedger over that one, and the run that "
+        "got tainted and the run that gets asked about it would be different objects. Pinned by "
+        "tests/test_the_terminal_is_governed_too.py"
+    ),
     "chimera/cli/main.py:solve._run_solve": "own guard/taint/write-region flags + late-bound subagent",
     "chimera/cli/main.py:solve_batch.make_runner.run": "per-worker ledgers + shared cross-agent monitor",
     "chimera/cli/main.py:crew_isolated.make_factory.factory": "per-worker ledgers, shared taint view",
@@ -185,17 +214,11 @@ EXEMPT: dict[str, str] = {
     "chimera/cli/main.py:tools": "prints the tool table",
     "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",
-    # `evolve_tune` no longer builds a registry of its own: it scores candidate specs through
-    # `_right_hand_builder`, the same assembly `chimera scenarios` measures, so its exemption is
-    # gone rather than reworded. What follows is that assembly, and it inherits `chat`'s reason
-    # above with one addition that is the whole point of the suite it serves.
-    "chimera/cli/main.py:_right_hand_builder.build": (
-        "the scenario suite's session, built to be byte-for-byte the one `chat` builds — and `chat` "
-        "is exempt three lines above. Routing THIS through governed_profile would make the ruler "
-        "measure a governed right hand that nobody ships, and the gap between the two is exactly "
-        "what bench/PLAN-right-hand.md 2.2 is about. It runs against a throwaway workspace and a "
-        "throwaway home, never a user's repository"
-    ),
+    # `_right_hand_builder.build` was exempt here for one release, on the grounds that the ruler
+    # must measure the ungoverned right hand `chat` actually shipped. `chat` is governed now, so
+    # the builder calls `build_right_hand` like everything else and the exemption is gone rather
+    # than reworded — the ruler still measures what `chat` builds, which is the whole contract; it
+    # is the thing being measured that moved.
     "chimera/cli/main.py:meta": "designs an agent blueprint; does not run one",
     "chimera/core/agent.py:_default_skill_registry": "internal default, wrapped by whoever built it",
     # The exemption used to say "the caller governs" while no caller did: the only one was the CLI,
