@@ -1,5 +1,5 @@
 ---
-source_sha256: f3b44e7174eb3fa654cb198ae7745fdbb19b5b5d64f0ea32f261ad14abebd87e
+source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -115,17 +115,105 @@ uv run chimera models
 ### `chat` — interaktiver Multi-Turn-Assistent (deine rechte Hand)
 
 Ein interaktives REPL mit Gesprächsgedächtnis und Tool-Nutzung — der tägliche
-Treiber. Es ruft relevantes Langzeitgedächtnis ab und führt das Gespräch über
-Turns hinweg fort.
+Treiber. Es ruft relevantes Langzeitgedächtnis ab, führt das Gespräch über Turns
+hinweg fort und **speichert den Thread nach jedem Turn** unter
+`<home>/sessions`, sodass der nächste Lauf dort weitermacht, wo du aufgehört
+hast. `chimera sessions` listet die gespeicherten Threads;
+`chimera sessions --delete <id>` löscht einen.
 
 ```bash
-uv run chimera chat                 # start chatting; /exit to quit, /reset to clear context
-uv run chimera chat --fuse          # fuse deep-reasoning turns
-uv run chimera chat --no-memory     # don't recall long-term memory
+uv run chimera chat                        # resume the newest thread; /exit to quit
+uv run chimera chat --new                  # start a fresh thread instead of resuming
+uv run chimera chat --session standup      # -s: resume, or name, one thread by id
+uv run chimera chat --no-memory            # don't recall long-term memory
+uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
+uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
-Derselbe Konversationskern treibt das TUI und das (kommende) Messaging-Gateway
-an.
+`--workspace`/`-w` verankert die Tools und ist der Ort, aus dem `AGENTS.md`
+gelesen wird; `--max-steps` begrenzt die Tool-Aufruf-Schritte innerhalb einer
+Nachricht; `--model`/`-m` überschreibt den Modell-Slug — siehe aber den Hinweis
+zum Routing weiter unten.
+
+Befehle: `/help` · `/new` (frischer Thread — der aktuelle bleibt auf der Platte)
+· `/reset` (wie `/new`) · `/model <slug>` (ohne Argument zurück zum Standard) ·
+`/exit` (auch `/quit`, `/q`).
+
+**Es ist kontrolliert, und es fragt dich.** `chat` und `assist` bauen denselben
+Stack wie der API-Pfad: ein Taint-Ledger, dem deine eigene Nachricht mitgeteilt
+wird, den `<<external-data>>`-Zaun um nicht vertrauenswürdige Tool-Ausgaben, den
+Trust-Kernel, die `--write-region`, den Reichweiten-Boden des Betreibers
+(`CHIMERA_REACH`) und dessen Anweisungen aus `agent.json`. Die Freigabe **fragt
+an deinem Terminal** — dies ist die eine Oberfläche, an der garantiert jemand
+sitzt, der antworten kann. Am Injection-Corpus gemessen
+(`bench/right_hand_governance/RESULTS.md`, 2026-09-08): blockierte Angriffe
+gingen von 0 von 7 auf 7 von 7, extern Gelesenes kam von 0 von 12 auf 12 von 12
+innerhalb des Zauns zurück, und der Over-Block liegt bei 0,000, wenn eine Person
+antwortet — zum Preis von fünf Fragen über die acht legitimen Zeilen. Per Pipe
+(`chimera chat < script.txt`) ist niemand da, den man fragen könnte, also wird
+aus einer Frage eine protokollierte Ablehnung statt stillschweigender Zustimmung.
+
+Ehrlichkeitshinweise:
+
+- **Ein abgelehnter Tool-Aufruf wird unter der Antwort ausgegeben** —
+  `✗ run_shell did not succeed: …`. Das Modell erzählt um Ablehnungen herum: der
+  gemessene Fall antwortete *"The command printed exactly: marker-42"* über einen
+  Befehl, den das Host-Ausführungs-Gate abgelehnt hatte. Eine Freigabe bekommt
+  ebenfalls ihre eigene Zeile (`governance: 1 approved this turn`), damit ein
+  `y`, das du mitten im Turn getippt hast, eine Spur hinterlässt, sobald die
+  Antwort weggescrollt ist.
+- **`--fuse` fusioniert keinen Turn, der Tools mitführt, und ein REPL-Turn führt
+  immer Tools mit.** Der Router schickt jeden Turn mit Tools an ein einzelnes
+  Modell, also ist ein `--fuse`-Turn hier in der Praxis ein Einzelmodell-Turn.
+  `--cascade` sticht außerdem `--fuse`, wenn beide angegeben sind, und unter
+  beiden Flags wählt die Tier-Leiter das Modell, was `--model` und `/model`
+  wirkungslos macht, bis du sie weglässt. Die eine Route im Terminal, die
+  wirklich fusioniert, ist `/task` von `assist`.
+- Jeder Turn gibt seine Token und seinen Preis aus — `cost: unavailable`, wenn
+  der Listenpreis des Modells unbekannt ist, nie eine geratene Null — und hängt
+  eine Zeile an `<home>/usage.jsonl` an, die die Kosten-Ansicht der Desktop-App
+  liest.
+- `/reset` **startet einen neuen Thread**; es löscht den aktuellen nicht. Früher
+  leerte es ein Transkript im Speicher, als nichts auf der Platte lag; jetzt, wo
+  der Thread eine Datei ist, würde ein Leeren an Ort und Stelle Arbeit
+  vernichten. (In `assist` und `tui`, die nichts persistieren, leert `/reset`
+  weiterhin den Kontext.)
+- `chimera doctor` sagt, wo die Befehle des Agenten laufen und ob er vorher
+  fragt: die konfigurierte Sandbox, ob eine OS-Sandbox tatsächlich verfügbar ist,
+  und die Host-Ausführungs-Haltung.
+
+### `assist` — dieselbe rechte Hand, standardmäßig günstig
+
+`assist` ist `chat` mit eingeschalteten Second-Brain-Standards: die Tier-Kaskade
+schickt Smalltalk an günstige Modelle und eskaliert die harten Fragen, dein
+dauerhaftes Profil (`chimera profile`) ist die stabile Präambel, und Gedächtnis,
+Hinweise und die Konsolidierung am Sitzungsende sind aktiv. Beim Beenden druckt
+es eine Sitzungsquittung — Tier-Verteilung und gemessene Token —, damit
+"standardmäßig günstig" eine Zahl ist.
+
+```bash
+uv run chimera assist                      # cascade, profile and memory on
+uv run chimera assist --no-cascade         # one default model instead of the ladder
+uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --model MODEL --workspace DIR --max-steps 8
+```
+
+Befehle: `/help` · `/task <harte Frage>` (volle Leistung per Fusion, ein Schuss)
+· `/profile <Art>: <Fakt>` (sich etwas über dich merken — Arten: `preference`,
+`project`, `context`, `name`) · `/model <slug>` · `/reset` (den Gesprächskontext
+leeren; nichts wird gelöscht) · `/exit` (auch `/quit`, `/q`).
+
+Genauso kontrolliert wie `chat` — dieselbe Registry, dieselbe fragende Freigabe,
+dieselben Ablehnungs-, Governance- und Kostenzeilen, dieselbe
+`usage.jsonl`-Zeile. Drei Unterschiede lohnt es sich zu kennen: **`assist` führt
+keinen Thread** (es vergisst beim Beenden — nimm `chat` für ein Gespräch, das du
+zurückhaben willst); unter der Kaskade wählt die Leiter das Modell, `--model` und
+`/model` wirken also nur zusammen mit `--no-cascade`; und `/task` antwortet
+außerhalb des Gesprächs, seine Antwort ist also nicht Teil des Kontexts des
+nächsten Turns.
 
 ### `tui` — Vollbild-Terminal-App
 
@@ -134,27 +222,54 @@ Eine Textual-Vollbild-UI über demselben Konversationskern. Zwei Bereiche: ein
 wird syntaxhervorgehoben), wobei die Token des Modells **live beim Eintreffen
 gestreamt** werden; und ein **Aktivitätspanel**, das zeigt, was der Agent in
 diesem Turn getan hat — die aufgerufenen Tools, Tokenanzahl und Kosten, und
-wie viele Gedächtnisfakten abgerufen wurden. Dieselben Flags wie `chat`.
+wie viele Gedächtnisfakten abgerufen wurden.
 
 ```bash
 uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
+uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
+Nicht dieselben Flags wie die REPLs. `tui` hat `--stream`/`--no-stream`, was
+jene nicht haben. Die `--cascade`, `--session`, `--new` und `--write-region` von
+`chimera chat` haben hier keine Entsprechung.
+
 Befehle: `/model <slug>` · `/reset` (Kontext leeren) · `/clear` (Bildschirm
-leeren) · `/stream` (Live-Token umschalten) · `/help` · `/exit`. Tasten:
-`Ctrl+R` zurücksetzen · `Ctrl+L` leeren · `Ctrl+P` Befehlspalette ·
-`PgUp`/`PgDn` scrollen · `Ctrl+C` beenden. Slash-Befehle werden beim Tippen
+leeren) · `/stream` (Live-Token umschalten) · `/help` · `/exit` (auch `/quit`,
+`/q`). Tasten: `Ctrl+R` zurücksetzen · `Ctrl+L` leeren · `Ctrl+P` Befehlspalette
+· `PgUp`/`PgDn` scrollen · `Ctrl+C` beenden. Slash-Befehle werden beim Tippen
 automatisch vervollständigt.
 
-Ehrlichkeitshinweise: Token-Streaming ist nur der Single-Model-Pfad — unter
-`--fuse` (ein Panel-→Judge-→Synthesizer-Turn) gibt es keine inkrementellen
-Token, daher zeigt das Panel einen "synthesizing"-Status statt eines
-vorgetäuschten Cursors. Die Kosten zeigen "unavailable", wenn der Listenpreis
-des Modells unbekannt ist (nie geraten). Es gibt hier keine Verify-/Revert-
-Anzeige: verify-or-revert läuft in `solve`/`project`, nicht im Chat. Ist
-Textual nicht installiert, fällt `tui` auf das einfache `chat`-REPL zurück.
+Ehrlichkeitshinweise:
+
+- **Das TUI ist absichtlich nicht kontrolliert.** Es hat die
+  Deployment-Allowlist und sonst nichts: kein Taint-Ledger, keinen
+  `<<external-data>>`-Zaun, keinen Kernel, keine Freigabe. Der Grund ist, dass
+  seine Bestätigung nicht gezeichnet werden kann — Textual besitzt das Terminal,
+  also ist die Host-Ausführungs-Abfrage eine Frage an ein stdin, das niemand
+  erreicht. In einem pty gemessen: ein solcher Turn blockierte 123,8 s gegen ein
+  Timeout von 120 s und kam als `✗ run_shell` ohne Erklärung zurück
+  (`bench/right_hand_governance/RESULTS.md`, Teil 2). Bis es ein
+  Textual-eigenes Modal hat, laufen hier die sieben Angriffe, die `chat`
+  blockiert, weiterhin durch — nimm `chat` oder `assist`, wenn eine Ablehnung
+  zählt.
+- Es persistiert nichts: Das Schließen des TUI beendet das Gespräch. `chat` ist
+  die Oberfläche mit Threads.
+- Token-Streaming ist nur der Single-Model-Pfad — unter `--fuse` (ein
+  Panel-→Judge-→Synthesizer-Turn) gibt es keine inkrementellen Token, daher zeigt
+  das Panel einen "synthesizing"-Status statt eines vorgetäuschten Cursors.
+  Dieses Label folgt dem Flag und nicht der Route: wie in `chat` fusioniert ein
+  Turn mit Tools nicht, und ein REPL-Turn führt immer Tools mit.
+- Die Kosten zeigen "unavailable", wenn der Listenpreis des Modells unbekannt ist
+  (nie geraten), und jeder Turn wird wie bei den REPLs an `<home>/usage.jsonl`
+  angehängt.
+- Es gibt hier keine Verify-/Revert-Anzeige: verify-or-revert läuft in
+  `solve`/`project`, nicht im Chat.
+- Ist Textual nicht installiert, fällt `tui` auf das einfache `chat`-REPL zurück
+  und übergibt jedes Argument explizit, damit der Fallback seinen ersten Turn
+  überlebt. Streaming hat dort keine Bedeutung, und der Thread wird wie jeder
+  andere `chat`-Thread gespeichert.
 
 ### `serve` — Messaging-Gateway (HTTP oder Discord)
 

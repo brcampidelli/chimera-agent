@@ -279,6 +279,7 @@ pip install 'chimera-agent[full]'     # 下面所有非 GPU 功能，一条命�
 | 你能得到 | 需要 | 如何使用 |
 |---|---|---|
 | **记住你的聊天** | — | `chimera chat` |
+| **同样的聊天，默认更省钱** | — | `chimera assist` |
 | **问一个问题** | — | `chimera run "用 3 点解释 X"` |
 | **全屏终端应用** | — | `chimera tui` |
 | **桌面应用**（代码 · 编辑器 · 工作 · 知识 · 自动化，十种语言） | `[desktop]` 或直接下载 | `chimera app`，或从 [Releases](https://github.com/brcampidelli/chimera-agent/releases) 下载原生安装包（`.exe`/`.dmg`/`.AppImage`/`.deb`） |
@@ -343,6 +344,7 @@ flowchart TD
 ```bash
 chimera doctor / models / features    # 检查配置、列出模型、查看可选能力
 chimera chat                          # 跨轮次记忆的交互式助手
+chimera assist                        # 同样的聊天，默认更省钱（分层级联）
 chimera tui                           # 全屏终端应用
 chimera run "PROMPT" --image pic.png  # 单次问答（可以读取一张图片）
 chimera fuse "PROMPT" --show-panel    # 融合多个模型：专家组 -> 评审 -> 综合器

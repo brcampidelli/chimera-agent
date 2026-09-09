@@ -311,6 +311,7 @@ vuoi (vedi la colonna "Richiede"). **Usi Docker? L'immagine ufficiale ha già tu
 | Cosa ottieni | Richiede | Come si usa |
 |---|---|---|
 | **Chat che si ricorda di te** | — | `chimera chat` |
+| **La stessa chat, economica di default** | — | `chimera assist` |
 | **Fai una domanda** | — | `chimera run "spiega X in 3 punti"` |
 | **App da terminale a tutto schermo** | — | `chimera tui` |
 | **App desktop** (codice · editor · lavoro · conoscenza · automazione, in 10 lingue) | `[desktop]` o un download | `chimera app`, oppure prendi un installer nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) da [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
@@ -387,6 +388,7 @@ Ogni comando è `chimera <nome>` (o `uv run chimera <nome>` prima di installare)
 ```bash
 chimera doctor / models / features    # verifica il setup, elenca i modelli, mostra le capacità opzionali
 chimera chat                          # assistente interattivo che ricorda tra un turno e l'altro
+chimera assist                        # la stessa chat, economica di default (cascata di tier)
 chimera tui                           # app a tutto schermo nel terminale
 chimera run "PROMPT" --image pic.png  # risposta singola (può leggere un'immagine)
 chimera fuse "PROMPT" --show-panel    # fondi più modelli: panel -> giudice -> sintetizzatore

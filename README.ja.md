@@ -293,6 +293,7 @@ pip install 'chimera-agent[full]'     # 下記の非 GPU 機能すべてを 1 �
 | できること | 必要なもの | 使い方 |
 |---|---|---|
 | **あなたを覚えるチャット** | — | `chimera chat` |
+| **同じチャット、既定で安価** | — | `chimera assist` |
 | **質問を 1 つする** | — | `chimera run "X を 3 点で説明して"` |
 | **フルスクリーンのターミナルアプリ** | — | `chimera tui` |
 | **デスクトップアプリ**（コード · エディター · 作業 · 知識 · 自動化、10 言語） | `[desktop]` またはダウンロード | `chimera app`、または [Releases](https://github.com/brcampidelli/chimera-agent/releases) からネイティブインストーラー（`.exe`/`.dmg`/`.AppImage`/`.deb`）を入手 |
@@ -361,6 +362,7 @@ flowchart TD
 ```bash
 chimera doctor / models / features    # セットアップを確認、モデル一覧、オプション機能を見る
 chimera chat                          # ターンをまたいで覚える対話型アシスタント
+chimera assist                        # 同じチャット、既定で安価(Tierのカスケード)
 chimera tui                           # フルスクリーン端末アプリ
 chimera run "PROMPT" --image pic.png  # 単発の答え（画像を読める）
 chimera fuse "PROMPT" --show-panel    # 複数モデルを混ぜ合わせる：パネル -> ジャッジ -> シンセサイザー

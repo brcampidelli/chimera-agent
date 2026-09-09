@@ -103,39 +103,128 @@ uv run chimera models
 
 ### `chat` — interactive multi-turn assistant (your right-hand)
 
-An interactive REPL with conversation memory and tool use — the daily driver.
-It recalls relevant long-term memory and threads the conversation across turns.
+An interactive REPL with conversation memory and tool use — the daily driver. It recalls relevant
+long-term memory, threads the conversation across turns, and **saves the thread after every turn**
+under `<home>/sessions`, so the next run continues where you stopped. `chimera sessions` lists the
+saved threads; `chimera sessions --delete <id>` removes one.
 
 ```bash
-uv run chimera chat                 # start chatting; /exit to quit, /reset to clear context
-uv run chimera chat --fuse          # fuse deep-reasoning turns
-uv run chimera chat --no-memory     # don't recall long-term memory
+uv run chimera chat                        # resume the newest thread; /exit to quit
+uv run chimera chat --new                  # start a fresh thread instead of resuming
+uv run chimera chat --session standup      # -s: resume, or name, one thread by id
+uv run chimera chat --no-memory            # don't recall long-term memory
+uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
+uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
-The same conversational core powers the TUI and (upcoming) messaging gateway.
+`--workspace`/`-w` roots the tools and is where `AGENTS.md` is read from; `--max-steps` caps the
+tool-calling steps inside one message; `--model`/`-m` overrides the model slug — but see the note on
+routing below.
+
+Commands: `/help` · `/new` (fresh thread — the current one stays on disk) · `/reset` (same as
+`/new`) · `/model <slug>` (no argument goes back to the default) · `/exit` (also `/quit`, `/q`).
+
+**It is governed, and it asks you.** `chat` and `assist` build the same stack the API path builds: a
+taint ledger told your own message, the `<<external-data>>` fence around untrusted tool output, the
+trust kernel, the `--write-region`, the owner's reach floor (`CHIMERA_REACH`) and the owner's
+instructions from `agent.json`. The approver **prompts at your terminal** — this is the one surface
+where somebody is guaranteed to be there to answer. Measured on the injection corpus
+(`bench/right_hand_governance/RESULTS.md`, 2026-09-08): attacks blocked went from 0 of 7 to 7 of 7,
+external reads returned inside the fence from 0 of 12 to 12 of 12, and over-block with a person
+answering is 0.000 — at a cost of five questions across the eight legitimate rows. Piped
+(`chimera chat < script.txt`) there is nobody to ask, so a question becomes a recorded refusal
+rather than silent consent.
+
+Honesty notes:
+
+- **A refused tool call is printed under the reply** — `✗ run_shell did not succeed: …`. The model
+  narrates around refusals: the measured case answered *"The command printed exactly: marker-42"*
+  about a command the host-execution gate had declined. An approval gets its own line too
+  (`governance: 1 approved this turn`), so a `y` you typed mid-turn leaves a trace once the reply
+  scrolls away.
+- **`--fuse` does not fuse a turn that carries tools, and a REPL turn always carries tools.** The
+  router sends any tool-carrying turn to a single model, so in practice a `--fuse` turn here is a
+  single-model turn. `--cascade` also wins over `--fuse` when both are given, and under either flag
+  the tier ladder picks the model, which makes `--model` and `/model` no-ops until you drop them.
+  The one route in the terminal that really fuses is `assist`'s `/task`.
+- Every turn prints its tokens and price — `cost: unavailable` when the model's list price is
+  unknown, never a guessed zero — and appends a row to `<home>/usage.jsonl`, which is what the
+  desktop app's Cost screen reads.
+- `/reset` **starts a new thread**; it does not erase the current one. It cleared an in-memory
+  transcript back when nothing was on disk; now that the thread is a file, clearing it in place
+  would destroy work. (In `assist` and `tui`, which persist nothing, `/reset` still clears context.)
+- `chimera doctor` reports where the agent's commands run and whether it asks first: the configured
+  sandbox, whether an OS sandbox is actually available, and the host-execution posture.
+
+### `assist` — the same right-hand, cheap by default
+
+`assist` is `chat` with the second-brain defaults on: the tier cascade routes chit-chat to cheap
+models and escalates the hard asks, your persistent profile (`chimera profile`) is the stable
+preamble, and memory, nudges and end-of-session consolidation are active. On exit it prints a
+session receipt — tier distribution and measured tokens — so "cheap by default" is a number.
+
+```bash
+uv run chimera assist                      # cascade, profile and memory on
+uv run chimera assist --no-cascade         # one default model instead of the ladder
+uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --model MODEL --workspace DIR --max-steps 8
+```
+
+Commands: `/help` · `/task <hard ask>` (full-power fusion, one shot) · `/profile <kind>: <fact>`
+(remember something about you — kinds: `preference`, `project`, `context`, `name`) · `/model <slug>`
+· `/reset` (clear the conversation context; nothing is deleted) · `/exit` (also `/quit`, `/q`).
+
+Governed exactly as `chat` is — same registry, same prompting approver, same refusal, governance and
+cost lines, same `usage.jsonl` row. Three differences worth knowing: **`assist` keeps no thread**
+(it forgets on exit — use `chat` for a conversation you want back); under the cascade the ladder
+picks the model, so `--model` and `/model` only take effect together with `--no-cascade`; and
+`/task` answers outside the conversation, so its reply is not part of the next turn's context.
 
 ### `tui` — full-screen terminal app
 
 A Textual full-screen UI over the same conversational core. Two panes: a **conversation log** that
 renders replies as Markdown (fenced code is syntax-highlighted), with the model's tokens **streaming
 in live** as they arrive; and an **activity panel** showing what the agent did this turn — the tools
-it called, the token count and cost, and how many memory facts were recalled. Same flags as `chat`.
+it called, the token count and cost, and how many memory facts were recalled.
 
 ```bash
 uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
+uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
-Commands: `/model <slug>` · `/reset` (clear context) · `/clear` (clear screen) · `/stream` (toggle
-live tokens) · `/help` · `/exit`. Keys: `Ctrl+R` reset · `Ctrl+L` clear · `Ctrl+P` command palette ·
-`PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash commands autocomplete as you type.
+Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they do not have.
+The `--cascade`, `--session`, `--new` and `--write-region` of `chimera chat` have no equivalent here.
 
-Honesty notes: token streaming is the single-model path only — under `--fuse` (a panel→judge→
-synthesizer turn) there are no incremental tokens, so the panel shows a "synthesizing" status rather
-than a fake cursor. Cost reads "unavailable" when the model's list price is unknown (never guessed).
-There is no verify/revert indicator here: verify-or-revert runs in `solve`/`project`, not in chat.
-If Textual isn't installed, `tui` falls back to the plain `chat` REPL.
+Commands: `/model <slug>` · `/reset` (clear context) · `/clear` (clear screen) · `/stream` (toggle
+live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` reset · `Ctrl+L` clear ·
+`Ctrl+P` command palette · `PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash commands autocomplete as you
+type.
+
+Honesty notes:
+
+- **The TUI is deliberately not governed.** It has the deployment allowlist and nothing else: no
+  taint ledger, no `<<external-data>>` fence, no kernel, no approver. The reason is that its
+  confirmation cannot be drawn — Textual owns the terminal, so the host-execution prompt is a
+  question on a stdin nobody can reach. Measured in a pty, such a turn blocked for 123.8 s against a
+  120 s timeout and came back as `✗ run_shell` with no explanation
+  (`bench/right_hand_governance/RESULTS.md`, Part 2). Until it has a Textual-native modal, the seven
+  attacks `chat` blocks still execute here — prefer `chat` or `assist` when a refusal matters.
+- It persists nothing: closing the TUI ends the conversation. `chat` is the surface with threads.
+- Token streaming is the single-model path only — under `--fuse` (a panel→judge→synthesizer turn)
+  there are no incremental tokens, so the panel shows a "synthesizing" status rather than a fake
+  cursor. That label follows the flag and not the route: as in `chat`, a turn carrying tools does
+  not fuse, and a REPL turn always carries tools.
+- Cost reads "unavailable" when the model's list price is unknown (never guessed), and each turn is
+  appended to `<home>/usage.jsonl` like the REPLs'.
+- There is no verify/revert indicator here: verify-or-revert runs in `solve`/`project`, not in chat.
+- If Textual isn't installed, `tui` falls back to the plain `chat` REPL, passing every argument
+  explicitly so the fallback survives its first turn. Streaming has no meaning there, and the thread
+  is saved like any other `chat` thread.
 
 ### `serve` — messaging gateway (HTTP or Discord)
 
