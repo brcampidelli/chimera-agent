@@ -219,6 +219,11 @@ chit-chat to cheap models and escalates hard asks; your persistent profile
 consolidation are active. On exit it prints the session cost receipt —
 tier distribution + measured tokens — so 'cheap by default' is a number.
 
+``--max-usd`` bounds the whole run rather than one turn. Naming a model — ``--model`` or
+``/model`` — pins it and turns the ladder off for as long as it is pinned, because the ladder
+is what chooses a model; it used to accept the slug and ignore it. ``/solve`` hands a task to
+the verified loop, inside the same ceiling.
+
 ```bash
 chimera assist
 ```
@@ -230,6 +235,7 @@ chimera assist
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |
 | `--no-memory` | Don't recall long-term memory. |  |
 | `--no-cascade` | Disable tiered routing (single default model instead). |  |
+| `--max-usd` | Stop once this conversation has spent this much (the whole run, not one turn). |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
 
 ## bench
@@ -324,8 +330,12 @@ does not travel between the two.
 
 A resumed turn is labelled as restored in the next prompt, and one that ran while untrusted
 content was in the conversation comes back inside the data fence; a turn saved before that was
-recorded is treated the same way, because nothing measured it. Memory recall is scoped to
-``--workspace``: that folder's facts, plus the ones stored with no project at all.
+recorded is treated the same way, because nothing measured it — and a dim line under each reply
+now says so on screen. Memory recall is scoped to ``--workspace``: that folder's facts, plus
+the ones stored with no project at all.
+
+``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the
+conversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.
 
 ```bash
 chimera chat
@@ -341,6 +351,7 @@ chimera chat
 | `--no-memory` | Don't recall long-term memory. |  |
 | `--session`, `-s` | Resume a specific session id (see 'chimera sessions'). |  |
 | `--new` | Start a fresh session instead of resuming. |  |
+| `--max-usd` | Stop once this conversation has spent this much (the whole thread, not one turn). |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
 
 ## context-curve
@@ -1326,6 +1337,11 @@ chimera skills-uninstall NAME
 ## solve
 
 Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key.
+
+In the shell nothing about this has changed: a run that fails still exits 1. Inside the process
+it now hands its run back — returned on success, carried on the ``SolveFailed`` exit otherwise —
+so ``/solve`` in a REPL can put the loop's own answer into the conversation instead of writing
+a sentence of its own.
 
 ```bash
 chimera solve [TASK]

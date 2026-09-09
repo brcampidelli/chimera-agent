@@ -107,6 +107,42 @@ class RightHand:
         return granted, refused
 
 
+def _mount_mcp(registry: Any, settings: Settings) -> None:
+    """Pour the connected MCP servers into the terminal's registry, as the other callers do.
+
+    ``mcp_pool.connectors(settings)`` is called at ``code_api.py:498`` and ``main.py:2206`` and
+    **nowhere in the ``chat``/``assist``/``tui`` bodies** — so a server the user connected in the
+    app, and watched the Test button prove live, did not exist for the terminal even with
+    ``CHIMERA_MCP_AUTOLOAD=1``. The pool is idempotent per process, so whichever surface asks first
+    pays for the connect and the rest reuse it; with autoload off — the default — nothing here
+    spawns anything and a stock install behaves exactly as it did.
+
+    **Before the allowlist, deliberately**, exactly where ``assemble_registry`` and ``chimera run``
+    put it: "a denylist that covers only the tools we wrote is not a denylist". Everything after
+    this line — the deployment fence, the reach floor, the kernel, the taint ledger — therefore
+    covers the MCP tools too, which is the whole reason this surface is a safe place to mount them.
+
+    **Not in the TUI.** That surface is ungoverned by a decision it documents in its own body: no
+    ledger, no fence, no approver, because its gates cannot be answered while Textual owns stdin.
+    MCP output is untrusted content by definition (``mcp_client.py:49``), and mounting it where
+    nothing can fence it would be adding the input without the layer that reads it. The other two
+    have that layer.
+    """
+    if not settings.mcp_autoload:
+        return
+    from chimera.integrations import mcp_pool
+
+    pool = mcp_pool.connectors(settings)
+    if pool is None:
+        return
+    if settings.mcp_defer:
+        from chimera.integrations.mcp_defer import register_deferred_mcp
+
+        register_deferred_mcp(pool, registry)
+    else:
+        pool.into_tool_registry(registry)
+
+
 def build_right_hand(
     workspace: Path,
     *,
@@ -155,6 +191,8 @@ def build_right_hand(
         if base is not None
         else default_registry(ws, write_region=WriteRegion(globs, ws) if globs else None)
     )
+    if base is None:
+        _mount_mcp(registry, settings)
     # The fence these surfaces already applied, unchanged and in the same place: an explicit
     # allowlist is an instruction, and it must run before the wrappers so they wrap what survives.
     registry = _apply_tool_allowlist(registry, allow=None, deny=None, settings=settings)

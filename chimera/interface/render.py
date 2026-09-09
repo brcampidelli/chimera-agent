@@ -103,6 +103,99 @@ def governance_line(granted: int, refused: int, *, attended: bool) -> str:
     return f"[dim]governance: {', '.join(parts)} this turn[/dim]"
 
 
+#: What each ``AgentResult.stopped_reason`` means to the person reading the reply above it.
+#:
+#: ``final`` is absent on purpose — it is the only value that means the model was done, and a line
+#: printed after every ordinary turn is a line nobody reads by the third one.
+#: ``budget`` is deliberately vague about WHICH ceiling. ``Agent._step`` raises a plain
+#: ``BudgetExceeded`` for the dollar cap as well as the token one, so this reason covers both — and
+#: the ceiling's own sentence ("spend cap reached: $x of $y") is already the reply above this line,
+#: which is where the specific answer honestly lives. Naming "money" here would be a guess that is
+#: wrong half the time.
+_CUT_SHORT = {
+    "spend": "the spend ceiling was reached — the answer stops here",
+    "budget": "a ceiling was reached — the answer stops here, and the reply above says which",
+    "max_steps": "the tool loop hit --max-steps, so this is as far as it got",
+    "tool_loop": "the same tool call kept repeating, so the loop was stopped",
+    "context_stuck": "the prompt no longer fits the model's window — start a new thread",
+    "cancelled": "the turn was cancelled",
+}
+
+
+def cut_short_line(report: TurnReport) -> str:
+    """Why this reply is not a finished one, or ``""`` when it is.
+
+    The sibling of :func:`refusal_lines` for the ceilings rather than the gates. A turn that used
+    up its steps, its tokens or its money returns the work done so far as an ordinary answer, and
+    nothing about that answer says it was cut off — so a truncated reply reads exactly like a
+    complete one, which is the same failure mode as a refused command reading like a successful one.
+    """
+    reason = (report.stopped_reason or "").strip()
+    if not reason or reason == "final":
+        return ""
+    note = _CUT_SHORT.get(reason)
+    if note is None:
+        # A reason this module has not been taught still gets said. Silence would be the safer-
+        # looking option and is the wrong one: an unknown stop is exactly the case where the person
+        # needs to know that something stopped.
+        return f"[yellow]⚠ the turn stopped early:[/yellow] [dim]{escape(reason)}[/dim]"
+    return f"[yellow]⚠ {note}[/yellow] [dim]({escape(reason)})[/dim]"
+
+
+def budget_spent_line(reason: str) -> str:
+    """A turn that was not sent at all, because the conversation has no money left.
+
+    ``reason`` is :meth:`~chimera.orchestration.budget.SpendBudget.blocked`'s own sentence, which
+    names the amount and the cap. Refusing here rather than letting the loop refuse costs nothing
+    and keeps the transcript honest: a turn recorded with the budget error as its "answer" would be
+    replayed into every later prompt as if the model had said it.
+    """
+    return (
+        f"[yellow]not sent — {escape(reason)}.[/yellow]"
+        "[dim] Start a new run with a higher --max-usd, or /exit.[/dim]"
+    )
+
+
+def provenance_line(report: TurnReport, *, restored: list[str]) -> str:
+    """Where this turn's context came from, in one dim line, or ``""`` when there is nothing to say.
+
+    ``restored`` is the provenance label of each turn that came off disk and was replayed into this
+    prompt. :class:`~chimera.interface.session.ChatTurn` has carried that label since the store
+    learned to record it, ``_replay`` already fences a restored turn that is not known clean — and
+    none of it reached the screen, so the one fact the fence exists to represent was invisible to
+    the person it protects.
+
+    Deliberately not inside the reply: the reply text is replayed into every later prompt, so a
+    marker written into it would put words in the model's mouth for the rest of the conversation
+    and be saved back that way, one layer deeper on each reopen.
+    """
+    from chimera.interface.session import CLEAN, TAINTED, UNKNOWN
+
+    parts: list[str] = []
+    if restored:
+        unknown = sum(1 for label in restored if label == UNKNOWN)
+        tainted = sum(1 for label in restored if label == TAINTED)
+        clean = sum(1 for label in restored if label == CLEAN)
+        detail = [
+            text
+            for text, count in (
+                (f"{unknown} never measured", unknown),
+                (f"{tainted} tainted", tainted),
+                (f"{clean} recorded clean", clean),
+            )
+            if count
+        ]
+        fenced = "" if unknown + tainted == 0 else ", replayed inside the data fence"
+        parts.append(
+            f"context: {len(restored)} restored turn(s) — {', '.join(detail)}{fenced}"
+        )
+    if report.provenance == TAINTED:
+        parts.append("this turn read external content — the rest of the thread is downstream of it")
+    if not parts:
+        return ""
+    return f"[dim]{escape(' · '.join(parts))}[/dim]"
+
+
 def cost_text(report: TurnReport) -> str:
     """The turn's price, or ``cost: unavailable`` — never a guessed zero.
 

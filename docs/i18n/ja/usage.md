@@ -1,5 +1,5 @@
 ---
-source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
+source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
 ---
 
 # Chimera — 利用ガイド
@@ -118,6 +118,7 @@ uv run chimera chat --session standup      # -s: resume, or name, one thread by 
 uv run chimera chat --no-memory            # don't recall long-term memory
 uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
@@ -127,8 +128,8 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 モデルのslugを上書きしますが、後述のルーティングの注記も読んでください。
 
 コマンド: `/help` · `/new`(新しいスレッド — 現在のものはディスクに残ります) ·
-`/reset`(`/new` と同じ) · `/model <slug>`(引数なしでデフォルトに戻る) · `/exit`(`/quit`、
-`/q` も可)。
+`/reset`(`/new` と同じ) · `/model <slug>`(引数なしでデフォルトに戻る) ·
+`/solve <タスク>`(検証付きループに渡す) · `/exit`(`/quit`、`/q` も可)。
 
 **これはガバナンス下にあり、あなたに尋ねます。** `chat` と `assist` は、APIの経路が組み立てる
 のと同じスタックを組み立てます: あなた自身のメッセージを伝えられた汚染台帳、信頼できない
@@ -150,12 +151,33 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
   いったあとも痕跡として残ります。
 - **`--fuse` はツールを伴うターンを融合しません。そしてREPLのターンは常にツールを伴います。**
   ルーターはツールを伴うターンをすべて単一モデルへ送るので、ここでの `--fuse` のターンは実際
-  には単一モデルのターンです。さらに両方を指定した場合は `--cascade` が `--fuse` に勝ち、
-  どちらの下でもモデルを選ぶのはTierのはしごなので、外すまで `--model` と `/model` は効果が
-  ありません。ターミナルで本当に融合する唯一の経路は `assist` の `/task` です。
+  には単一モデルのターンです。さらに両方を指定した場合は `--cascade` が `--fuse` に勝ちます。
+  ターミナルで本当に融合する唯一の経路は `assist` の `/task` です。
+- **モデルを名指しするとそれに固定され、Tierのはしごは脇へ退きます。** `--cascade` の下では
+  ターンごとにモデルを選ぶのははしごであり、以前はあなたが名指ししたslugを何も言わずに飲み
+  込んでいました。今はどちらかが名指しされているあいだ `--model` と `/model <slug>` が勝ち —
+  はしごが切れていることを1行が伝えます — そして引数なしの `/model` が仕事をはしごへ返します。
 - 各ターンはトークン数と価格を表示し(モデルのリスト価格が不明なときは `cost: unavailable`。
   推測したゼロは決して出しません)、`<home>/usage.jsonl` に1行を追記します。デスクトップアプリ
   のコスト画面が読むのはこのファイルです。
+- **`--max-usd` が縛るのはスレッドであって、ターンではありません。** 最初のメッセージから
+  `/exit` まで1つのメーターが走ります。`/solve` も同じ財布から引き出します。そして使い切ると、
+  残りがないと知るために1回の呼び出しを払うのではなく、次のメッセージは送られる前に拒否され
+  ます。途中で切られた返信は — 上限によって、`--max-steps` によって、あるいは収まらなくなった
+  コンテキストによって — そのことを自分の行で伝えます。切られた答えは、そうでなければ完結した
+  答えとまったく同じに読めてしまうからです。
+- **復元されたターンはそう告げます。** スレッドがディスクから戻ってくると、返信の下の淡い1行
+  が、復元された再生ターンの数と、そのうち来歴が一度も記録されなかったものの数を数えます。
+  それらはモデル自身の言葉としてではなくデータのフェンスの内側で再生されますが、これまで
+  フェンスは、それが守る当人からは見えていませんでした。
+- **`/solve <タスク>` は会話を検証付きループへ渡します** — 計画し、編集し、検証し、失敗したら
+  その試みを差し戻します。デスクトップのコード画面にある2つのボタンのうちの2つめです。自分
+  から始まることは決してなく、走る前にタスクと上限を表示し、ループ自身の答えはスレッドに
+  記録されます。引数なしなら、あなたが最後に尋ねたことを取ります。
+- **MCPサーバーがターミナルに届きます。** `CHIMERA_MCP_AUTOLOAD=1` を使うと `mcp.json` の
+  サーバーがフェンスの手前でマウントされるので、拒否リスト、カーネル、汚染台帳がそれらを覆い、
+  サーバーの出力は他の外部読み取りと同じくデータのフェンスの内側に届きます。プロセスごとに
+  一度だけ接続してアプリと共有するので、二重に起動されるものはありません。
 - `/reset` は**新しいスレッドを開始**します。現在のスレッドを消しはしません。ディスクに何も
   なかった頃はメモリ上の記録を消していましたが、スレッドがファイルになった今、その場で消すのは
   作業を破棄することになります。(何も永続化しない `assist` と `tui` では、`/reset` は今も
@@ -175,20 +197,28 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 uv run chimera assist                      # cascade, profile and memory on
 uv run chimera assist --no-cascade         # one default model instead of the ladder
 uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 コマンド: `/help` · `/task <難しい依頼>`(フルパワーの融合、一発勝負) ·
-`/profile <種類>: <事実>`(あなたについて覚える — 種類: `preference`、`project`、`context`、
-`name`) · `/model <slug>` · `/reset`(会話のコンテキストをクリア。何も削除されません) ·
-`/exit`(`/quit`、`/q` も可)。
+`/solve <タスク>`(検証付きループに渡す) · `/profile <種類>: <事実>`(あなたについて覚える —
+種類: `preference`、`project`、`context`、`name`) · `/model <slug>` ·
+`/reset`(会話のコンテキストをクリア。何も削除されません) · `/exit`(`/quit`、`/q` も可)。
 
 ガバナンスは `chat` とまったく同じです — 同じレジストリ、同じ尋ねる承認者、同じ拒否・ガバナンス
-・コストの行、同じ `usage.jsonl` の行。知っておくべき違いは3つあります: **`assist` はスレッドを
-持ちません**(終了時に忘れます — 取り戻したい会話には `chat` を使ってください)。カスケードの下
-ではモデルをはしごが選ぶため、`--model` と `/model` は `--no-cascade` と一緒のときだけ効きます。
-そして `/task` は会話の外で答えるので、その返答は次のターンのコンテキストには入りません。
+・コストの行、同じ `usage.jsonl` の行、同じMCPサーバー、実行全体にかかる同じ `--max-usd` の
+メーター、そして同じ `/solve`。知っておくべき違いは2つあります: **`assist` はスレッドを
+持ちません**(終了時に忘れます — 取り戻したい会話には `chat` を使ってください)。そしてモデルを
+名指しするとそれに固定され、固定されているあいだTierのはしごは切れます — モデルを選ぶのは
+はしごであり、以前はslugを受け取っては無視していました。
+
+`/task` は依頼だけに対して1回の強制融合を走らせます: 会話はパネルへ送られません。これは意図的
+で、スレッドをパネルとジャッジとシンセサイザーに食わせると、控えめに使うために存在する経路の
+コストが何倍にもなるからです。その答えは今や次のターンのコンテキストに*入ります*。そして他の
+どのターンとも同じく価格を表示し、`usage.jsonl` に1行を書きます — ターミナルで最も高価な経路が、
+コスト画面には見えない唯一の経路だったのです。
 
 ### `tui` — フルスクリーンのターミナルアプリ
 
@@ -206,8 +236,8 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
 REPLと同じフラグではありません。`tui` には `--stream`/`--no-stream` があり、REPLにはありません。
-`chimera chat` の `--cascade`、`--session`、`--new`、`--write-region` に相当するものはここには
-ありません。
+`chimera chat` の `--cascade`、`--session`、`--new`、`--max-usd`、`--write-region` に相当する
+ものはここにはありません。
 
 コマンド: `/model <slug>` · `/reset`(コンテキストをクリア) · `/clear`(画面をクリア) ·
 `/stream`(ライブトークンの切り替え) · `/help` · `/exit`(`/quit`、`/q` も可)。キー:
@@ -231,8 +261,10 @@ REPLと同じフラグではありません。`tui` には `--stream`/`--no-stre
   ターンは融合せず、REPLのターンは常にツールを伴います。
 - モデルのリスト価格が不明な場合、コストは「unavailable」と表示されます(決して推測しません)。
   そして各ターンはREPLと同じく `<home>/usage.jsonl` に追記されます。
-- ここには検証/差し戻しのインジケーターはありません: 検証または差し戻しは `solve`/`project` で
-  実行され、`chat` では実行されません。
+- ここには検証/差し戻しはなく、MCPもありません。どちらも `chat` と `assist` へ行きました。
+  この2つは `/solve` に応え、設定されたサーバーをマウントします。どちらも汚染台帳と、この面が
+  持たないと決めた承認者の上に成り立っているからです。検証または差し戻しは `chimera solve` と
+  `chimera project` でも実行されます。
 - Textualがインストールされていない場合、`tui` はプレーンな `chat` REPLにフォールバックします。
   引数はすべて明示的に渡されるため、そのフォールバックは最初のターンを生き延びます。そこでは
   ストリーミングに意味はなく、スレッドは他の `chat` のスレッドと同じように保存されます。

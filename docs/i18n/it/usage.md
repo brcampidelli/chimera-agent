@@ -1,5 +1,5 @@
 ---
-source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
+source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
 ---
 
 # Chimera — Guida all'uso
@@ -124,6 +124,7 @@ uv run chimera chat --session standup      # -s: resume, or name, one thread by 
 uv run chimera chat --no-memory            # don't recall long-term memory
 uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
@@ -133,8 +134,8 @@ limita i passi di chiamata ai tool dentro un messaggio; `--model`/`-m` sovrascri
 modello — ma leggi la nota sul routing più sotto.
 
 Comandi: `/help` · `/new` (thread nuovo — quello attuale resta su disco) · `/reset` (come
-`/new`) · `/model <slug>` (senza argomento torna al predefinito) · `/exit` (anche `/quit`,
-`/q`).
+`/new`) · `/model <slug>` (senza argomento torna al predefinito) · `/solve <compito>` (lo passa
+al ciclo verificato) · `/exit` (anche `/quit`, `/q`).
 
 **È governato, e te lo chiede.** `chat` e `assist` costruiscono lo stesso stack del percorso
 API: un ledger di taint a cui viene detto il tuo stesso messaggio, il recinto
@@ -158,13 +159,36 @@ Note di onestà:
   una volta che la risposta è scorsa via.
 - **`--fuse` non fonde un turno che porta tool, e un turno di REPL ne porta sempre.** Il router
   manda a un modello singolo qualsiasi turno con tool, quindi in pratica un turno `--fuse` qui
-  è un turno a modello singolo. `--cascade` inoltre vince su `--fuse` quando ci sono entrambi,
-  e sotto l'uno o l'altro è la scala dei tier a scegliere il modello, il che rende `--model` e
-  `/model` inefficaci finché non li togli. L'unica rotta del terminale che fonde davvero è
-  `/task` di `assist`.
+  è un turno a modello singolo. `--cascade` inoltre vince su `--fuse` quando ci sono entrambi.
+  L'unica rotta del terminale che fonde davvero è `/task` di `assist`.
+- **Nominare un modello lo fissa, e la scala dei tier si fa da parte.** Sotto `--cascade` è la
+  scala a scegliere un modello a ogni turno, e prima si inghiottiva senza una parola lo slug
+  che avevi nominato. Ora `--model` e `/model <slug>` vincono finché uno dei due è nominato —
+  una riga dice che la scala è spenta — e `/model` senza argomento le restituisce il lavoro.
 - Ogni turno stampa i suoi token e il suo prezzo — `cost: unavailable` quando il prezzo di
   listino del modello è sconosciuto, mai uno zero indovinato — e aggiunge una riga a
   `<home>/usage.jsonl`, che è ciò che legge la schermata Costo dell'app desktop.
+- **`--max-usd` limita il thread, non il turno.** Un solo contatore corre dal primo messaggio
+  fino a `/exit`; `/solve` attinge agli stessi soldi; e una volta esaurito, il messaggio
+  successivo viene rifiutato prima di partire, invece di pagare una chiamata per scoprire che
+  non era rimasto niente. Una risposta tagliata corta — dal tetto, da `--max-steps` o da un
+  contesto che ha smesso di starci — lo dice su una riga sua, perché altrimenti una risposta
+  troncata si legge esattamente come una finita.
+- **Un turno ripristinato lo dice.** Quando un thread torna dal disco, una riga smorzata sotto
+  la risposta conta i turni riprodotti che sono stati ripristinati e quanti di quelli non
+  avevano mai avuto la provenienza registrata. Quelli vengono riprodotti dentro il recinto dei
+  dati invece che come parole del modello, e finora il recinto era invisibile alla persona che
+  protegge.
+- **`/solve <compito>` passa la conversazione al ciclo verificato** — pianifica, modifica,
+  verifica e ripristina il tentativo quando fallisce, che è il secondo dei due pulsanti della
+  schermata di codice del desktop. Non parte mai da solo, stampa il task e il tetto prima di
+  girare, e la risposta del ciclo viene registrata nel thread. Senza argomento prende l'ultima
+  cosa che hai chiesto.
+- **I server MCP arrivano al terminale.** Con `CHIMERA_MCP_AUTOLOAD=1` i server di `mcp.json`
+  vengono montati prima del recinto, così la denylist, il kernel e il ledger di taint li
+  coprono e l'output di un server arriva dentro il recinto dei dati come qualunque altra
+  lettura esterna. Sono connessi una volta per processo e condivisi con l'app, quindi niente
+  viene lanciato due volte.
 - `/reset` **avvia un thread nuovo**; non cancella quello corrente. Puliva una trascrizione in
   memoria quando niente stava su disco; ora che il thread è un file, pulirlo sul posto
   distruggerebbe lavoro. (In `assist` e `tui`, che non persistono nulla, `/reset` pulisce
@@ -185,21 +209,30 @@ token misurati — perché "economico di default" sia un numero.
 uv run chimera assist                      # cascade, profile and memory on
 uv run chimera assist --no-cascade         # one default model instead of the ladder
 uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Comandi: `/help` · `/task <richiesta difficile>` (fusione a piena potenza, un colpo solo) ·
-`/profile <tipo>: <fatto>` (ricordare qualcosa su di te — tipi: `preference`, `project`,
-`context`, `name`) · `/model <slug>` · `/reset` (pulisce il contesto della conversazione;
-niente viene cancellato) · `/exit` (anche `/quit`, `/q`).
+`/solve <compito>` (lo passa al ciclo verificato) · `/profile <tipo>: <fatto>` (ricordare
+qualcosa su di te — tipi: `preference`, `project`, `context`, `name`) · `/model <slug>` ·
+`/reset` (pulisce il contesto della conversazione; niente viene cancellato) · `/exit` (anche
+`/quit`, `/q`).
 
 Governato esattamente come `chat` — stesso registry, stesso approvatore che chiede, stesse
-righe di rifiuto, governance e costo, stessa riga in `usage.jsonl`. Tre differenze da sapere:
+righe di rifiuto, governance e costo, stessa riga in `usage.jsonl`, stessi server MCP, stesso
+contatore `--max-usd` su tutta l'esecuzione e lo stesso `/solve`. Due differenze da sapere:
 **`assist` non tiene thread** (dimentica all'uscita — usa `chat` per una conversazione che
-vuoi indietro); sotto la cascata è la scala a scegliere il modello, quindi `--model` e
-`/model` hanno effetto solo insieme a `--no-cascade`; e `/task` risponde fuori dalla
-conversazione, quindi la sua risposta non fa parte del contesto del turno successivo.
+vuoi indietro); e nominare un modello lo fissa, il che spegne la scala dei tier finché resta
+fissato — è la scala a scegliere il modello, e prima accettava lo slug e lo ignorava.
+
+`/task` fa una sola fusione forzata sulla sola richiesta: la conversazione non viene mandata
+al panel, di proposito, perché dare in pasto il thread a un panel più un giudice più un
+sintetizzatore moltiplica il costo della rotta che esiste per essere usata con parsimonia. Ora
+la sua risposta *fa* parte del contesto del turno successivo, e stampa un prezzo e scrive una
+riga in `usage.jsonl` come ogni altro turno — la rotta più cara del terminale era quella che
+la schermata Costo non poteva vedere.
 
 ### `tui` — app da terminale a schermo intero
 
@@ -218,8 +251,8 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
 Non gli stessi flag dei REPL. `tui` ha `--stream`/`--no-stream`, che loro non hanno. I
-`--cascade`, `--session`, `--new` e `--write-region` di `chimera chat` non hanno equivalente
-qui.
+`--cascade`, `--session`, `--new`, `--max-usd` e `--write-region` di `chimera chat` non hanno
+equivalente qui.
 
 Comandi: `/model <slug>` · `/reset` (pulisce il contesto) · `/clear` (pulisce lo schermo) ·
 `/stream` (attiva/disattiva i token dal vivo) · `/help` · `/exit` (anche `/quit`, `/q`).
@@ -246,8 +279,10 @@ Note di onestà:
   sempre.
 - Il costo appare come "non disponibile" quando il prezzo di listino del modello è sconosciuto
   (mai indovinato), e ogni turno viene aggiunto a `<home>/usage.jsonl` come nei REPL.
-- Non c'è un indicatore verifica/ripristino qui: verifica-o-ripristina gira in
-  `solve`/`project`, non in chat.
+- Qui non c'è verifica/ripristino, e non c'è MCP. Entrambi sono andati a `chat` e `assist`,
+  che rispondono a `/solve` e montano i server configurati, perché entrambi poggiano sul
+  ledger di taint e sull'approvatore che questa superficie ha deciso di non avere.
+  Verifica-o-ripristina gira anche in `chimera solve` e `chimera project`.
 - Se Textual non è installato, `tui` ricade sul semplice REPL `chat`, passando ogni argomento
   esplicitamente perché quel ripiego sopravviva al primo turno. Lì la trasmissione non
   significa niente, e il thread viene salvato come qualunque altro thread di `chat`.

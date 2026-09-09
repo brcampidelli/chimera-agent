@@ -64,6 +64,11 @@ def install_session(monkeypatch: pytest.MonkeyPatch, **script: Any) -> list[Any]
     made: list[Any] = []
 
     class Fake:
+        #: The real session has one, and the REPL reads it to know which turns this prompt
+        #: replayed (`_replayed_provenance`). Without it the command dies of `AttributeError`
+        #: inside Typer, which arrives here as a non-zero exit and an empty screen.
+        max_history = 6
+
         def __init__(self, *_args: Any, **kwargs: Any) -> None:
             self.turns: list[ChatTurn] = []
             self.profile = ""

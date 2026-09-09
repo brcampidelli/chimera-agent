@@ -1,5 +1,5 @@
 ---
-source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
+source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -122,6 +122,7 @@ uv run chimera chat --session standup      # -s: resume, or name, one thread by 
 uv run chimera chat --no-memory            # don't recall long-term memory
 uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
@@ -131,7 +132,8 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 nadpisuje slug modelu — ale przeczytaj niżej uwagę o routingu.
 
 Komendy: `/help` · `/new` (świeży wątek — bieżący zostaje na dysku) · `/reset` (to samo co
-`/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/exit` (także `/quit`, `/q`).
+`/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/solve <zadanie>` (przekazuje to
+pętli z weryfikacją) · `/exit` (także `/quit`, `/q`).
 
 **Jest zarządzany i pyta ciebie.** `chat` i `assist` budują ten sam stos co ścieżka API:
 ledger skażenia, któremu podaje się twoją własną wiadomość, ogrodzenie `<<external-data>>`
@@ -154,13 +156,33 @@ Uwagi o uczciwości:
   odpowiedź już przewinie się w górę.
 - **`--fuse` nie fuzjonuje tury, która niesie narzędzia, a tura REPL zawsze je niesie.** Router
   wysyła do pojedynczego modelu każdą turę z narzędziami, więc w praktyce tura z `--fuse` jest
-  tu turą pojedynczego modelu. `--cascade` dodatkowo wygrywa z `--fuse`, gdy podano obie, a pod
-  którąkolwiek z nich to drabina tierów wybiera model, co czyni `--model` i `/model`
-  bezskutecznymi, dopóki ich nie zdejmiesz. Jedyna trasa w terminalu, która naprawdę
-  fuzjonuje, to `/task` w `assist`.
+  tu turą pojedynczego modelu. `--cascade` dodatkowo wygrywa z `--fuse`, gdy podano obie.
+  Jedyna trasa w terminalu, która naprawdę fuzjonuje, to `/task` w `assist`.
+- **Nazwanie modelu przypina go, a drabina tierów schodzi na bok.** Pod `--cascade` to drabina
+  wybiera model w każdej turze i dotąd połykała bez słowa slug, który podałeś. Teraz `--model`
+  i `/model <slug>` wygrywają tak długo, jak długo któryś jest podany — osobna linia mówi, że
+  drabina jest wyłączona — a `/model` bez argumentu oddaje jej tę robotę.
 - Każda tura drukuje swoje tokeny i cenę — `cost: unavailable`, gdy cena cennikowa modelu jest
   nieznana, nigdy zgadnięte zero — i dopisuje wiersz do `<home>/usage.jsonl`, który czyta ekran
   Kosztów aplikacji desktopowej.
+- **`--max-usd` ogranicza wątek, a nie turę.** Jeden licznik biegnie od pierwszej wiadomości do
+  `/exit`; `/solve` czerpie z tych samych pieniędzy; a gdy się skończą, następna wiadomość jest
+  odrzucana, zanim zostanie wysłana, zamiast płacić za wywołanie, żeby odkryć, że nic nie
+  zostało. Odpowiedź ucięta — przez pułap, przez `--max-steps` albo przez kontekst, który
+  przestał się mieścić — mówi o tym w osobnej linii, bo w przeciwnym razie ucięta odpowiedź
+  czyta się dokładnie tak samo jak skończona.
+- **Przywrócona tura mówi o tym.** Gdy wątek wraca z dysku, przygaszona linia pod odpowiedzią
+  liczy odtworzone tury, które zostały przywrócone, i ile z nich nigdy nie miało zapisanego
+  pochodzenia. Są odtwarzane wewnątrz ogrodzenia danych, a nie jako własne słowa modelu, a do
+  tej pory ogrodzenie było niewidoczne dla osoby, którą chroni.
+- **`/solve <zadanie>` przekazuje konwersację pętli z weryfikacją** — planuje, edytuje, weryfikuje
+  i cofa próbę, gdy ta zawiedzie, co jest drugim z dwóch przycisków ekranu kodu w aplikacji
+  desktopowej. Nigdy nie startuje sam, drukuje zadanie i pułap, zanim ruszy, a własna odpowiedź
+  pętli jest zapisywana w wątku. Bez argumentu bierze ostatnią rzecz, o którą pytałeś.
+- **Serwery MCP docierają do terminala.** Z `CHIMERA_MCP_AUTOLOAD=1` serwery z `mcp.json` są
+  montowane przed ogrodzeniem, więc denylista, jądro i ledger skażenia je obejmują, a wyjście
+  serwera trafia do wnętrza ogrodzenia danych jak każdy inny odczyt zewnętrzny. Są łączone raz
+  na proces i współdzielone z aplikacją, więc nic nie jest uruchamiane dwa razy.
 - `/reset` **zaczyna nowy wątek**; nie kasuje bieżącego. Czyścił transkrypt w pamięci, gdy nic
   nie leżało na dysku; teraz, gdy wątek jest plikiem, czyszczenie go w miejscu zniszczyłoby
   pracę. (W `assist` i `tui`, które nic nie utrwalają, `/reset` nadal czyści kontekst.)
@@ -180,21 +202,29 @@ było liczbą.
 uv run chimera assist                      # cascade, profile and memory on
 uv run chimera assist --no-cascade         # one default model instead of the ladder
 uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
 Komendy: `/help` · `/task <trudna prośba>` (pełna moc przez fuzję, jeden strzał) ·
-`/profile <rodzaj>: <fakt>` (zapamiętaj coś o tobie — rodzaje: `preference`, `project`,
-`context`, `name`) · `/model <slug>` · `/reset` (czyści kontekst konwersacji; nic nie jest
-kasowane) · `/exit` (także `/quit`, `/q`).
+`/solve <zadanie>` (przekazuje to pętli z weryfikacją) · `/profile <rodzaj>: <fakt>` (zapamiętaj
+coś o tobie — rodzaje: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/reset`
+(czyści kontekst konwersacji; nic nie jest kasowane) · `/exit` (także `/quit`, `/q`).
 
 Zarządzany dokładnie tak jak `chat` — ten sam rejestr, ten sam pytający zatwierdzający, te
-same linie odmowy, zarządzania i kosztu, ten sam wiersz w `usage.jsonl`. Trzy różnice warte
+same linie odmowy, zarządzania i kosztu, ten sam wiersz w `usage.jsonl`, te same serwery MCP,
+ten sam licznik `--max-usd` na całe uruchomienie i to samo `/solve`. Dwie różnice warte
 poznania: **`assist` nie trzyma wątku** (zapomina przy wyjściu — użyj `chat` do rozmowy, którą
-chcesz odzyskać); pod kaskadą to drabina wybiera model, więc `--model` i `/model` działają
-tylko razem z `--no-cascade`; a `/task` odpowiada poza konwersacją, więc jego odpowiedź nie
-jest częścią kontekstu następnej tury.
+chcesz odzyskać); oraz nazwanie modelu przypina go, co wyłącza drabinę tierów na tak długo, jak
+długo pozostaje przypięty — to drabina wybiera model, a dotąd przyjmowała slug i go ignorowała.
+
+`/task` uruchamia jedną wymuszoną fuzję na samej prośbie: konwersacja nie jest wysyłana do
+panelu, i to celowo, bo karmienie panelu plus sędziego plus syntetyzatora całym wątkiem
+zwielokrotnia koszt trasy, która istnieje po to, by używać jej oszczędnie. Jego odpowiedź
+*jest* teraz częścią kontekstu następnej tury, drukuje też cenę i zapisuje wiersz w
+`usage.jsonl` jak każda inna tura — najdroższa trasa w terminalu była tą, której ekran Kosztów
+nie mógł zobaczyć.
 
 ### `tui` — pełnoekranowa aplikacja terminalowa
 
@@ -212,7 +242,7 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
 Nie te same flagi co w REPL-ach. `tui` ma `--stream`/`--no-stream`, których one nie mają.
-`--cascade`, `--session`, `--new` i `--write-region` z `chimera chat` nie mają tu
+`--cascade`, `--session`, `--new`, `--max-usd` i `--write-region` z `chimera chat` nie mają tu
 odpowiednika.
 
 Komendy: `/model <slug>` · `/reset` (wyczyść kontekst) · `/clear` (wyczyść ekran) · `/stream`
@@ -237,8 +267,10 @@ Uwagi o uczciwości:
   w `chat`, tura niosąca narzędzia nie fuzjonuje, a tura REPL zawsze je niesie.
 - Koszt pokazuje "niedostępny", gdy cena cennikowa modelu jest nieznana (nigdy nie zgadywana),
   a każda tura jest dopisywana do `<home>/usage.jsonl` tak jak w REPL-ach.
-- Nie ma tu wskaźnika verify/revert: verify-or-revert działa w `solve`/`project`, nie w
-  chacie.
+- Nie ma tu verify/revert ani MCP. Oba trafiły do `chat` i `assist`, które odpowiadają na
+  `/solve` i montują skonfigurowane serwery, bo oba opierają się na ledgerze skażenia i
+  zatwierdzającym, których ta powierzchnia postanowiła nie mieć. Verify-or-revert działa też w
+  `chimera solve` i `chimera project`.
 - Jeśli Textual nie jest zainstalowany, `tui` spada do zwykłego REPL `chat`, przekazując każdy
   argument jawnie, żeby ten odwrót przeżył swoją pierwszą turę. Streamowanie nic tam nie
   znaczy, a wątek jest zapisywany jak każdy inny wątek `chat`.

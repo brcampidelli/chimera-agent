@@ -41,7 +41,7 @@ exists".
 | 7 | Learned skill cards → system prompt | **GATED** | `SkillValidator` (`chimera/governance/validator.py:23-80`); a tainted-run card is held `pending` (`chimera/evolution/auto_evolve.py:163-183`); the read wire is off by default (`chimera/config.py:391`; `chimera/evolution/context.py:122-143`). | Acceptance is recurrence + the regex + a non-empty smoke test (`auto_evolve.py:298-329`, check at `318-319`); the black-box holdout has no production caller; anti-pattern cards are accepted on recurrence alone and are not suppression-independent (`auto_evolve.py:250-296`; `chimera/evolution/card_retrieval.py:173-182`). |
 | 8 | ACE playbook → planner/worker context | **GATED** | An op whitelist on the model's deltas (`chimera/evolution/playbook.py:211-237`) and `sanitize_untrusted` on read (`autonomous.py:762`). | No validator, no provenance field (`playbook.py:45-51`); curated after every `chimera solve`, tainted or not (`main.py:3654-3668`). |
 | 9 | Experience buffer → "lessons" and the minting thresholds | **GATED** | `sanitize_untrusted` on read (`autonomous.py:760`). | No provenance field (`chimera/evolution/experience.py:50-56`); `detail` is verifier or reviewer output (`autonomous.py:1207-1208`); the same buffer decides when a skill or anti-pattern card may be minted (`autonomous.py:1776-1784`). |
-| 10 | MCP: `mcp.json` → subprocess; server descriptions; deferred proxies | **GATED** | Autoload off by default (`config.py:316`); the file is operator-written; argv is never a shell string (`chimera/proc/stdio.py:235`); results are `untrusted_output` and fenced when the ledger is present (`chimera/integrations/mcp_client.py:49`; `ledger_tool.py:171-174, 185-191`). | A server's descriptions ride inside the tool schema, where nothing can fence them (`mcp_client.py:59`; `chimera/tools/base.py:44-53`); the `mcp_list` / `mcp_describe` proxies return them as observations without the `untrusted_output` flag (`chimera/integrations/mcp_defer.py:71-131` against `149`). |
+| 10 | MCP: `mcp.json` → subprocess; server descriptions; deferred proxies | **GATED** | Autoload off by default (`config.py:316`); the file is operator-written; argv is never a shell string (`chimera/proc/stdio.py:235`); results are `untrusted_output` and fenced when the ledger is present (`chimera/integrations/mcp_client.py:49`; `ledger_tool.py:171-174, 185-191`). | A server's descriptions ride inside the tool schema, where nothing can fence them (`mcp_client.py:59`; `chimera/tools/base.py:44-53`) — structural to the protocol. *(The `mcp_list` / `mcp_describe` half of this row was closed on 2026-09-09, when `chimera chat`/`assist` gained MCP: all three deferred proxies declare `untrusted_output` now.)* |
 | 11 | Skill bundles (`SKILL.md` + `scripts/`) | **GATED** | Catalogue-only, https-to-GitHub-only, installed `pending`, one line per *active* bundle, read through a tool that is `untrusted_output` (`chimera/skills/bundles.py:17-33, 226, 401, 481-500`; `chimera/skills/aliases.py:185`). | — |
 | 12 | Other home-directory state: approvals, checkpoints, sessions, `agents.json`, `agent.json` | **GATED** | Home lies outside the workspace root the file tools enforce (`chimera/tools/workspace.py:17-26`); shell runs sandboxed or behind the host-exec gate (`chimera/sandbox/confirm.py:203-212`; `chimera/sandbox/os_sandbox.py:11-12`; `chimera/sandbox/docker.py:74`); HTTP mutations sit behind the guard (`app.py:1254-1264, 714`). | An approval answer is `{"approved": true}` in a file named by an id that is readable from the sibling question file (`chimera/governance/pending.py:115-124, 150, 181-190`). |
 | 13 | Hooks, callbacks, plugins | **CLOSED** | Typed callables and hard-coded tables only (`chimera/core/events.py:21`; `agent.py:437-448`; `chimera/core/__init__.py:118-136`). | — |
@@ -460,13 +460,17 @@ operator's hand: the same trust level as `.env`.
   the ledger is present: always on the API surface (`code_api.py:443-448, 482-493`), and on the
   other surfaces only under `observe`/`enforce` (`profile.py:327-333`).
 - *Deferred path* (`CHIMERA_MCP_DEFER=1`, default off, `config.py:325`). `mcp_list` returns the
-  first 160 characters of every description as a tool *observation* (`mcp_defer.py:71-104`);
-  `mcp_describe` returns the full description and parameter schema as JSON (`:106-131`). Only
-  `mcp_call` declares `untrusted_output = True` (`:147-149`); the two catalogue tools do not, so
-  their observations are returned unfenced and do not taint the run — `_is_fetch` keys on
-  `FETCH_TOOLS` or the flag (`ledger_tool.py:177-185`), and `mcp_list` / `mcp_describe` are in
-  neither. The module docstring argues the flag on `mcp_call` at length (`mcp_defer.py:29-33`); the
-  same argument applies one tool over and was not extended.
+  first 160 characters of every description as a tool *observation*; `mcp_describe` returns the
+  full description and parameter schema as JSON. **All three proxies now declare
+  `untrusted_output = True`**, so a catalogue answer is fenced and taints the run exactly as a
+  call's result does — `_is_fetch` keys on `FETCH_TOOLS` or the flag (`ledger_tool.py:177-185`).
+  Until 2026-09-09 only `mcp_call` carried it and the two catalogue tools returned server-authored
+  text unfenced; the module docstring argued the flag for `mcp_call` at length and the same
+  argument had simply not been extended one tool over. It was closed when `chimera chat` and
+  `chimera assist` gained MCP (`chimera/cli/right_hand.py:_mount_mcp`): the gap was unreachable
+  while only fenced surfaces mounted servers, and mounting them on the surface a person sits at is
+  what made it reachable. Guarded by
+  `tests/test_the_terminal_reaches_the_servers_the_app_reaches.py`.
 
 **The catalogue that offers servers** is a hard-coded tuple in code (`mcp_catalog.py:219`), so
 nothing fetched can add a command to it. The builtin `tool_describe` proxy is fine — builtin
@@ -474,8 +478,9 @@ descriptions are code (`tools/defer.py:141-165`).
 
 **Verdict: GATED.** **What to test:** with `CHIMERA_MCP_DEFER=1` under `--taint`, point at a stub
 server whose tool description contains an instruction; call `mcp_describe` and confirm the
-observation arrives without fence markers and `run_tainted()` stays false — then compare with the
-declared path, where the same server's *result* is fenced.
+observation now arrives **inside** the fence and `run_tainted()` is true, the same as the declared
+path's *result*. What remains untestable this way is the schema itself: a description sent as part
+of the tool list cannot be fenced, which is structural to the protocol.
 
 ---
 
@@ -641,8 +646,10 @@ verifier (`code_api.py:107-109` says so). Both are interactive, not persisted.
    row.
 5. **Should the webhook payload be fenced** (`fence(sanitize_untrusted(json))`) where it is appended
    (`main.py:2350-2352`)? It is external input by definition and it enters as prose.
-6. **Should `mcp_list` / `mcp_describe` set `untrusted_output = True`** (`mcp_defer.py:71-131`)? The
-   module's own argument for the flag on `mcp_call` (`:29-33`) applies to the descriptions.
+6. ~~**Should `mcp_list` / `mcp_describe` set `untrusted_output = True`**~~ — **closed 2026-09-09,
+   yes.** The module's own argument for the flag on `mcp_call` applied to the descriptions word for
+   word. Done in the change that mounted MCP on `chimera chat`/`assist`, because that is what made
+   the gap reachable from a surface with a person in front of it.
 7. **Should `AGENTS.md` pass through `sanitize_untrusted`** before it joins the system prompt
    (`agent.py:432`)? It is repository content, it is the highest-authority slot any external text
    reaches, and the four other recalled texts already get it.
