@@ -63,7 +63,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`rubric-grade`](#rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
 | [`run`](#run) | Run a single-shot Tier-1 completion (no fusion). Requires a provider key. |
 | [`sandbox-bench`](#sandbox-bench) | State-based bench: grade the final workspace state + count harmful side effects. |
-| [`scenarios`](#scenarios) | Run the daily right-hand scenario suite (live). Requires a key. |
+| [`scenarios`](#scenarios) | Run the daily right-hand scenario suite through a real chat session (live). Requires a key. |
 | [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
 | [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
@@ -948,7 +948,18 @@ chimera sandbox-bench
 
 ## scenarios
 
-Run the daily right-hand scenario suite (live). Requires a key.
+Run the daily right-hand scenario suite through a real chat session (live). Requires a key.
+
+Each scenario is a script of turns driven through the same ``ChatSession`` ``chimera chat``
+builds — tools, memory, transcript — in its own workspace and its own home. The checks are
+functional, not substring: equality against a value generated *this run* and absent from the
+prompt, a fact read back out of the ``MemoryStore``, a fresh session's recall count, the
+transcript found in the next turn's assembled prompt, the absence of a fabricated figure.
+
+Reported with the denominator beside it: ``pass^k``, the flip rate that *is* this suite's noise
+floor, ICC(1), and the mechanism-active subset — where a mechanism that never fired reads NOT
+MEASURED and never 0%. One row per invocation is appended to the series.
+Pre-registered in ``bench/scenarios/PREREGISTRATION.md``.
 
 ```bash
 chimera scenarios
@@ -957,6 +968,11 @@ chimera scenarios
 | Option | | Default |
 | --- | --- | --- |
 | `--model`, `-m` | Override the model slug. |  |
+| `--k` | Runs per scenario — one samples, two alert, three decide. | `3` |
+| `--max-steps` | Max tool-calling steps per turn. | `6` |
+| `--max-usd` | Hard spend ceiling; the run stops at it. | `3.0` |
+| `--seed` | Base seed; run i uses seed+i, so the generated values differ per run. | `1` |
+| `--series` | Where to append the JSONL row (default <home>/scenarios.jsonl). |  |
 
 ## schema-bench
 

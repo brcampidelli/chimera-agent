@@ -31,6 +31,7 @@ from chimera.eval.scenarios import (
     daily_scenarios,
     mechanism_arm,
     normalised_equals,
+    repo_sha,
     run_suite,
     series_record,
     suite_arm,
@@ -160,18 +161,20 @@ def _builder(
     *,
     remember: bool | None = None,
     forgetful: bool = False,
+    tools: tuple[str, ...] = ("read_file",),
 ) -> Any:
     """A SessionBuilder over a fake agent and a real memory store rooted in the request's home.
 
     ``remember`` overrides what the scenario asked for (used to sabotage the memory wire);
-    ``forgetful`` drops the transcript (used to sabotage threading).
+    ``forgetful`` drops the transcript (used to sabotage threading); ``tools`` empty means no tool
+    ever fired.
     """
 
     def build(request: SessionRequest) -> ChatSession:
         memory = MemoryManager(MemoryStore(request.home / "memory.json"))
         session_class = _ForgetfulSession if forgetful else ChatSession
         return session_class(
-            agent_class(request.workspace),
+            agent_class(request.workspace, tools=tools),
             memory=memory,
             remember_from_chat=(request.remember_from_chat if remember is None else remember),
         )
@@ -407,3 +410,113 @@ def test_a_crashing_scenario_is_a_failure_and_never_aborts_the_pass(tmp_path: Pa
     report = _run(_builder(OracleAgent), tmp_path, [broken, good])
     assert [o.passed for o in report.outcomes] == [False, True]
     assert "RuntimeError: boom" in report.outcomes[0].error
+
+
+# --------------------------------------------------------------------------------------------
+# Provenance — the commit a series row can be traced back to
+
+
+def _repo(root: Path, head: str) -> Path:
+    (root / ".git").mkdir(parents=True)
+    (root / ".git" / "HEAD").write_text(head, encoding="utf-8")
+    (root / "sub").mkdir()
+    return root
+
+
+def test_the_sha_is_read_off_the_repository_when_the_probe_cannot_answer(tmp_path: Path) -> None:
+    """The measured case: a probe that exits non-zero must not silently become `unknown`."""
+    root = _repo(tmp_path / "one", "ref: refs/heads/main\n")
+    heads = root / ".git" / "refs" / "heads"
+    heads.mkdir(parents=True)
+    (heads / "main").write_text("0123456789abcdef0123456789abcdef01234567\n", encoding="utf-8")
+    assert repo_sha(root / "sub", probe=lambda _: "") == "0123456"
+
+
+def test_a_detached_head_and_a_packed_ref_both_resolve(tmp_path: Path) -> None:
+    detached = _repo(tmp_path / "two", "89abcdef0123456789abcdef0123456789abcdef\n")
+    assert repo_sha(detached, probe=lambda _: "") == "89abcde"
+
+    packed = _repo(tmp_path / "three", "ref: refs/heads/main\n")
+    (packed / ".git" / "packed-refs").write_text(
+        "# pack-refs with: peeled\nfedcba9876543210fedcba9876543210fedcba98 refs/heads/main\n",
+        encoding="utf-8",
+    )
+    assert repo_sha(packed, probe=lambda _: "") == "fedcba9"
+
+
+def test_a_worktree_pointer_is_followed_to_the_shared_directory(tmp_path: Path) -> None:
+    """The shape this bench actually runs from: the marker is a FILE and the refs live elsewhere."""
+    shared = tmp_path / "main-repo" / ".git"
+    (shared / "refs" / "heads").mkdir(parents=True)
+    (shared / "refs" / "heads" / "work").write_text("a" * 40 + "\n", encoding="utf-8")
+    private = shared / "worktrees" / "w"
+    private.mkdir(parents=True)
+    (private / "HEAD").write_text("ref: refs/heads/work\n", encoding="utf-8")
+    (private / "commondir").write_text("../..\n", encoding="utf-8")
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / ".git").write_text(f"gitdir: {private}\n", encoding="utf-8")
+    assert repo_sha(tree, probe=lambda _: "") == "aaaaaaa"
+
+
+def test_a_repository_that_cannot_be_read_says_unknown_rather_than_guessing(tmp_path: Path) -> None:
+    assert repo_sha(tmp_path, probe=lambda _: "") == "unknown"
+
+
+def test_a_working_probe_is_still_preferred(tmp_path: Path) -> None:
+    root = _repo(tmp_path / "four", "ref: refs/heads/main\n")  # no ref file to fall back to
+    assert repo_sha(root, probe=lambda _: "beefcaf") == "beefcaf"
+
+
+# --------------------------------------------------------------------------------------------
+# The command — what a reader of the terminal actually sees
+
+
+def test_the_command_prints_not_measured_when_no_mechanism_ever_fires(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sabotage that matters most: a suite measuring nothing must SAY it measured nothing.
+
+    Every wire is cut at once — no tool is ever called, the durable write is off, the transcript is
+    dropped — so all five declared mechanisms are inactive. `replicated.py`'s rule is that this
+    reads NOT MEASURED and never 0%, and the rule is worth nothing if the command that renders it
+    prints a percentage anyway.
+    """
+    from typer.testing import CliRunner
+
+    from chimera.cli import main as cli
+    from chimera.config import Settings
+
+    monkeypatch.setattr(Settings, "has_any_key", lambda self: True)
+    monkeypatch.setattr(
+        cli,
+        "_right_hand_builder",
+        lambda *a, **kw: _builder(PlausibleAgent, remember=False, forgetful=True, tools=()),
+    )
+    series = tmp_path / "series.jsonl"
+    result = CliRunner().invoke(cli.app, ["scenarios", "--k", "1", "--series", str(series)])
+
+    assert result.exit_code == 0, result.output
+    assert "NOT MEASURED" in result.output
+    assert "never fired" in result.output
+    assert "0.0%" not in result.output.split("mechanism-active")[1][:60]
+    assert series.exists()
+
+
+def test_the_command_names_a_ceiling_and_a_floor_as_the_failures_they_are(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from chimera.cli import main as cli
+    from chimera.config import Settings
+
+    monkeypatch.setattr(Settings, "has_any_key", lambda self: True)
+    for agent, expected in ((OracleAgent, "CEILING"), (EchoAgent, "FLOOR")):
+        monkeypatch.setattr(cli, "_right_hand_builder", lambda *a, **kw: _builder(agent))  # noqa: B023
+        result = CliRunner().invoke(
+            cli.app,
+            ["scenarios", "--k", "1", "--series", str(tmp_path / f"{expected}.jsonl")],
+        )
+        assert result.exit_code == 0, result.output
+        assert expected in result.output, result.output

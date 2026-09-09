@@ -63,6 +63,7 @@ __all__ = [
     "daily_scenarios",
     "mechanism_arm",
     "normalised_equals",
+    "repo_sha",
     "run_suite",
     "series_record",
     "suite_arm",
@@ -392,6 +393,103 @@ def mechanism_arm(
 
 # ---------------------------------------------------------------------------------------------
 # The series
+
+
+def _sha_from_git(start: Path) -> str:
+    import subprocess
+
+    try:
+        done = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
+            cwd=start,
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
+
+
+def _as_local_path(text: str) -> Path:
+    """A path out of a `gitdir:` pointer, translating a Windows drive letter when we are on POSIX.
+
+    A worktree's ``.git`` is a file, and the pointer inside it is written by whichever git created
+    the worktree. Created from Windows, it reads ``C:/…``; read from WSL, that is not a path at all.
+    """
+    raw = text.strip().replace("\\", "/")
+    candidate = Path(raw)
+    if candidate.exists():
+        return candidate
+    if len(raw) > 2 and raw[1] == ":" and raw[2] == "/":
+        mounted = Path(f"/mnt/{raw[0].lower()}/{raw[3:]}")
+        if mounted.exists():
+            return mounted
+    return candidate
+
+
+def _resolve_ref(gitdir: Path, ref: str) -> str:
+    """A ref's sha from a loose ref file or ``packed-refs``, in the gitdir or its common dir."""
+    roots = [gitdir]
+    common = gitdir / "commondir"
+    if common.is_file():
+        # Relative to the GITDIR, never to the process's working directory. Reading `../..` against
+        # the cwd is a path that exists almost everywhere and points at the wrong repository, which
+        # is worse than not resolving at all — it would put another commit's sha on the row.
+        text = common.read_text(encoding="utf-8", errors="replace").strip()
+        if text:
+            pointed = _as_local_path(text)
+            roots.append(pointed if pointed.is_absolute() else gitdir / text)
+    for root in roots:
+        loose = root / ref
+        if loose.is_file():
+            return loose.read_text(encoding="utf-8", errors="replace").strip()
+        packed = root / "packed-refs"
+        if packed.is_file():
+            for line in packed.read_text(encoding="utf-8", errors="replace").splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == ref:
+                    return parts[0]
+    return ""
+
+
+def _sha_from_files(start: Path) -> str:
+    """HEAD read straight off the repository, for when no usable ``git`` can answer."""
+    for folder in [start, *start.parents]:
+        marker = folder / ".git"
+        if marker.is_dir():
+            gitdir = marker
+        elif marker.is_file():
+            pointer = marker.read_text(encoding="utf-8", errors="replace")
+            _, _, rest = pointer.partition("gitdir:")
+            if not rest.strip():
+                continue
+            gitdir = _as_local_path(rest)
+            if not gitdir.is_absolute():
+                gitdir = folder / gitdir
+        else:
+            continue
+        head = gitdir / "HEAD"
+        if not head.is_file():
+            continue
+        text = head.read_text(encoding="utf-8", errors="replace").strip()
+        sha = _resolve_ref(gitdir, text[5:].strip()) if text.startswith("ref:") else text
+        return sha[:7] if sha else ""
+    return ""
+
+
+def repo_sha(start: Path, *, probe: Callable[[Path], str] = _sha_from_git) -> str:
+    """The commit a series row was produced by, or ``unknown``.
+
+    The file fallback is not belt-and-braces. Measured on the suite's first live run: this bench
+    runs from a git **worktree**, whose ``.git`` is a file holding a Windows-style ``gitdir:``
+    pointer, and the WSL ``git`` that reads it resolves that pointer against its own working
+    directory and exits 128. Every row would have carried ``unknown`` — honest, and useless, in
+    precisely the environment the benches are run in. A dated row nobody can trace to a commit is a
+    pass rate that moved with no way to ask what moved it.
+    """
+    return probe(start) or _sha_from_files(start) or "unknown"
 
 
 def series_record(

@@ -6847,28 +6847,6 @@ class _SpendCapReached(RuntimeError):
     """Raised from the per-scenario callback when the registered cost ceiling is passed."""
 
 
-def _repo_sha() -> str:
-    """Short sha of the repository this ran from, or ``unknown``.
-
-    A dated series row with no sha is a row nobody can go back to: the pass rate moved and there is
-    no way to ask which commit moved it.
-    """
-    import subprocess
-
-    try:
-        done = subprocess.run(  # noqa: S603 — fixed argv, no shell
-            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
-            cwd=Path(__file__).resolve().parents[2],
-            capture_output=True,
-            text=True,
-            timeout=15,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return "unknown"
-    return done.stdout.strip() or "unknown"
-
-
 def _right_hand_builder(
     model: str | None, max_steps: int, *, system_prompt: str | None = None
 ) -> SessionBuilder:
@@ -6951,6 +6929,7 @@ def scenarios(
         append_series,
         daily_scenarios,
         mechanism_arm,
+        repo_sha,
         run_suite,
         series_record,
         suite_arm,
@@ -7078,7 +7057,7 @@ def scenarios(
     record = series_record(
         reports,
         model=observed,
-        sha=_repo_sha(),
+        sha=repo_sha(Path(__file__).resolve().parents[2]),
         date=datetime.now(UTC).isoformat(timespec="seconds"),
         arm=arm,
     )
