@@ -313,6 +313,7 @@ Spalte „Braucht"). **Docker? Das offizielle Image enthält bereits alles unten
 | Was du bekommst | Braucht | So benutzt du es |
 |---|---|---|
 | **Chat, der sich an dich erinnert** | — | `chimera chat` |
+| **Derselbe Chat, standardmäßig günstig** | — | `chimera assist` |
 | **Eine Frage stellen** | — | `chimera run "erkläre X in 3 Punkten"` |
 | **Vollbild-Terminal-App** | — | `chimera tui` |
 | **Desktop-App** (Code · Editor · Arbeit · Wissen · Automatisierung, in 10 Sprachen) | `[desktop]` oder ein Download | `chimera app`, oder einen nativen Installer (`.exe`/`.dmg`/`.AppImage`/`.deb`) von [Releases](https://github.com/brcampidelli/chimera-agent/releases) holen |
@@ -383,6 +384,7 @@ Jeder Befehl lautet `chimera <name>` (oder `uv run chimera <name>` vor der Insta
 ```bash
 chimera doctor / models / features    # Einrichtung prüfen, Modelle auflisten, optionale Fähigkeiten sehen
 chimera chat                          # interaktiver Assistent, der sich über Runden hinweg merkt
+chimera assist                        # derselbe Chat, standardmäßig günstig (Tier-Kaskade)
 chimera tui                           # Vollbild-Terminal-App
 chimera run "PROMPT" --image pic.png  # Einmal-Antwort (kann ein Bild lesen)
 chimera fuse "PROMPT" --show-panel    # mehrere Modelle verschmelzen: Panel -> Richter -> Synthesizer

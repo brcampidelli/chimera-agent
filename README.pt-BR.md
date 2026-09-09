@@ -303,6 +303,7 @@ Prefere instalação enxuta? Mantenha `pip install chimera-agent` e adicione só
 | O que você ganha | Precisa | Como usar |
 |---|---|---|
 | **Chat que lembra de você** | — | `chimera chat` |
+| **O mesmo chat, barato por padrão** | — | `chimera assist` |
 | **Fazer uma pergunta** | — | `chimera run "explique X em 3 tópicos"` |
 | **App de terminal em tela cheia** | — | `chimera tui` |
 | **App de desktop** (código · editor · trabalho · conhecimento · automação, em 10 idiomas) | `[desktop]` ou um download | `chimera app`, ou baixe um instalador nativo (`.exe`/`.dmg`/`.AppImage`/`.deb`) em [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
@@ -372,6 +373,7 @@ Todo comando é `chimera <nome>` (ou `uv run chimera <nome>` antes de instalar).
 ```bash
 chimera doctor / models / features    # verifica setup, lista modelos, vê capacidades opcionais
 chimera chat                          # assistente interativo que lembra entre turnos
+chimera assist                        # o mesmo chat, barato por padrão (cascata de tiers)
 chimera tui                           # app full-screen no terminal
 chimera run "PROMPT" --image pic.png  # resposta única (pode ler uma imagem)
 chimera fuse "PROMPT" --show-panel    # combina vários modelos: painel -> juiz -> sintetizador

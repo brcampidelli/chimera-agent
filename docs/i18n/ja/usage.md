@@ -1,5 +1,5 @@
 ---
-source_sha256: f3b44e7174eb3fa654cb198ae7745fdbb19b5b5d64f0ea32f261ad14abebd87e
+source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
 ---
 
 # Chimera — 利用ガイド
@@ -107,15 +107,88 @@ uv run chimera models
 ### `chat` — インタラクティブなマルチターンアシスタント(あなたの右腕)
 
 会話メモリとツール利用を備えたインタラクティブなREPL — 日常の主力です。関連する長期記憶を
-呼び出し、ターンをまたいで会話をつなげます。
+呼び出し、ターンをまたいで会話をつなげ、**毎ターンのあとにスレッドを** `<home>/sessions`
+**へ保存**するので、次回の実行は中断したところから続きます。`chimera sessions` は保存された
+スレッドを一覧し、`chimera sessions --delete <id>` は1つを削除します。
 
 ```bash
-uv run chimera chat                 # start chatting; /exit to quit, /reset to clear context
-uv run chimera chat --fuse          # fuse deep-reasoning turns
-uv run chimera chat --no-memory     # don't recall long-term memory
+uv run chimera chat                        # resume the newest thread; /exit to quit
+uv run chimera chat --new                  # start a fresh thread instead of resuming
+uv run chimera chat --session standup      # -s: resume, or name, one thread by id
+uv run chimera chat --no-memory            # don't recall long-term memory
+uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
+uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
-同じ会話コアが、TUIと(近日公開の)メッセージングゲートウェイを支えます。
+`--workspace`/`-w` はツールの起点であり、`AGENTS.md` が読まれる場所でもあります。
+`--max-steps` は1つのメッセージ内でのツール呼び出しステップ数を制限します。`--model`/`-m` は
+モデルのslugを上書きしますが、後述のルーティングの注記も読んでください。
+
+コマンド: `/help` · `/new`(新しいスレッド — 現在のものはディスクに残ります) ·
+`/reset`(`/new` と同じ) · `/model <slug>`(引数なしでデフォルトに戻る) · `/exit`(`/quit`、
+`/q` も可)。
+
+**これはガバナンス下にあり、あなたに尋ねます。** `chat` と `assist` は、APIの経路が組み立てる
+のと同じスタックを組み立てます: あなた自身のメッセージを伝えられた汚染台帳、信頼できない
+ツール出力を囲む `<<external-data>>` のフェンス、トラストカーネル、`--write-region`、所有者の
+リーチの下限(`CHIMERA_REACH`)、そして `agent.json` にある所有者の指示です。承認者は
+**あなたのターミナルで尋ねます** — 答えられる人がいることが保証されている唯一の面だからです。
+インジェクションのコーパスで計測しました(`bench/right_hand_governance/RESULTS.md`、
+2026-09-08): ブロックした攻撃は7件中0件から7件中7件へ、フェンスの内側で返ってきた外部読み取り
+は12件中0件から12件中12件へ、そして人が答える場合の過剰ブロック(over-block)は0.000 —
+その代償は、8件の正当な行に対する5つの質問です。パイプ経由(`chimera chat < script.txt`)では
+尋ねる相手がいないため、質問は黙認ではなく記録された拒否になります。
+
+正直な注記:
+
+- **拒否されたツール呼び出しは返信の下に表示されます** — `✗ run_shell did not succeed: …`。
+  モデルは拒否の周りを取り繕って語ります: 計測された事例では、ホスト実行のゲートが拒否した
+  コマンドについて *"The command printed exactly: marker-42"* と答えていました。承認にも独自の
+  行があり(`governance: 1 approved this turn`)、ターンの途中で打った `y` は、返信が流れて
+  いったあとも痕跡として残ります。
+- **`--fuse` はツールを伴うターンを融合しません。そしてREPLのターンは常にツールを伴います。**
+  ルーターはツールを伴うターンをすべて単一モデルへ送るので、ここでの `--fuse` のターンは実際
+  には単一モデルのターンです。さらに両方を指定した場合は `--cascade` が `--fuse` に勝ち、
+  どちらの下でもモデルを選ぶのはTierのはしごなので、外すまで `--model` と `/model` は効果が
+  ありません。ターミナルで本当に融合する唯一の経路は `assist` の `/task` です。
+- 各ターンはトークン数と価格を表示し(モデルのリスト価格が不明なときは `cost: unavailable`。
+  推測したゼロは決して出しません)、`<home>/usage.jsonl` に1行を追記します。デスクトップアプリ
+  のコスト画面が読むのはこのファイルです。
+- `/reset` は**新しいスレッドを開始**します。現在のスレッドを消しはしません。ディスクに何も
+  なかった頃はメモリ上の記録を消していましたが、スレッドがファイルになった今、その場で消すのは
+  作業を破棄することになります。(何も永続化しない `assist` と `tui` では、`/reset` は今も
+  コンテキストをクリアします。)
+- `chimera doctor` は、エージェントのコマンドがどこで実行されるか、そして先に尋ねるかどうかを
+  報告します: 設定されたサンドボックス、OSのサンドボックスが実際に利用できるか、そしてホスト
+  実行の姿勢です。
+
+### `assist` — 同じ右腕、既定で安価
+
+`assist` はセカンドブレインの既定値をオンにした `chat` です: Tierのカスケードが雑談を安価な
+モデルへ回し、難しい依頼を上位へエスカレートします。永続的なプロフィール(`chimera profile`)が
+安定した前置きになり、メモリ、提案、セッション終了時の統合が有効です。終了時にはセッションの
+レシート — Tierの分布と実測トークン — を表示するので、「既定で安価」が数字になります。
+
+```bash
+uv run chimera assist                      # cascade, profile and memory on
+uv run chimera assist --no-cascade         # one default model instead of the ladder
+uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --model MODEL --workspace DIR --max-steps 8
+```
+
+コマンド: `/help` · `/task <難しい依頼>`(フルパワーの融合、一発勝負) ·
+`/profile <種類>: <事実>`(あなたについて覚える — 種類: `preference`、`project`、`context`、
+`name`) · `/model <slug>` · `/reset`(会話のコンテキストをクリア。何も削除されません) ·
+`/exit`(`/quit`、`/q` も可)。
+
+ガバナンスは `chat` とまったく同じです — 同じレジストリ、同じ尋ねる承認者、同じ拒否・ガバナンス
+・コストの行、同じ `usage.jsonl` の行。知っておくべき違いは3つあります: **`assist` はスレッドを
+持ちません**(終了時に忘れます — 取り戻したい会話には `chat` を使ってください)。カスケードの下
+ではモデルをはしごが選ぶため、`--model` と `/model` は `--no-cascade` と一緒のときだけ効きます。
+そして `/task` は会話の外で答えるので、その返答は次のターンのコンテキストには入りません。
 
 ### `tui` — フルスクリーンのターミナルアプリ
 
@@ -123,26 +196,46 @@ uv run chimera chat --no-memory     # don't recall long-term memory
 ペイン: 返信をMarkdownとしてレンダリングする(フェンス付きコードはシンタックスハイライトされる)
 **会話ログ**で、モデルのトークンは届いた端から**ライブでストリーミング**されます。もう1つは、
 このターンでエージェントが何をしたか — 呼び出したツール、トークン数とコスト、何件のメモリの
-事実が想起されたか — を示す**アクティビティパネル**です。`chat` と同じフラグを使えます。
+事実が想起されたか — を示す**アクティビティパネル**です。
 
 ```bash
 uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
+uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
-コマンド: `/model <slug>` · `/reset`(コンテキストをクリア) · `/clear`(画面をクリア) ·
-`/stream`(ライブトークンの切り替え) · `/help` · `/exit`。キー: `Ctrl+R` リセット ·
-`Ctrl+L` クリア · `Ctrl+P` コマンドパレット · `PgUp`/`PgDn` スクロール · `Ctrl+C` 終了。
-スラッシュコマンドは入力中にオートコンプリートされます。
+REPLと同じフラグではありません。`tui` には `--stream`/`--no-stream` があり、REPLにはありません。
+`chimera chat` の `--cascade`、`--session`、`--new`、`--write-region` に相当するものはここには
+ありません。
 
-正直な注記: トークンストリーミングは単一モデルの経路のみです — `--fuse`
-(パネル→ジャッジ→シンセサイザーのターン)の下では逐次トークンはないため、パネルは偽の
-カーソルではなく「合成中」というステータスを表示します。モデルのリスト価格が不明な場合、
-コストは「unavailable」と表示されます(決して推測しません)。ここには検証/差し戻しの
-インジケーターはありません: 検証または差し戻しは `solve`/`project` で実行され、`chat` では
-実行されません。Textualがインストールされていない場合、`tui` はプレーンな `chat` REPLに
-フォールバックします。
+コマンド: `/model <slug>` · `/reset`(コンテキストをクリア) · `/clear`(画面をクリア) ·
+`/stream`(ライブトークンの切り替え) · `/help` · `/exit`(`/quit`、`/q` も可)。キー:
+`Ctrl+R` リセット · `Ctrl+L` クリア · `Ctrl+P` コマンドパレット · `PgUp`/`PgDn` スクロール ·
+`Ctrl+C` 終了。スラッシュコマンドは入力中にオートコンプリートされます。
+
+正直な注記:
+
+- **TUIは意図的にガバナンス下に置かれていません。** デプロイの許可リストがあるだけで、他は
+  ありません: 汚染台帳も、`<<external-data>>` のフェンスも、カーネルも、承認者もありません。
+  理由は、その確認を描画できないからです — ターミナルはTextualが所有しているため、ホスト実行の
+  問いかけは誰も届かないstdinへの質問になります。ptyで計測: そうしたターンは120秒のタイムアウト
+  に対して123.8秒ブロックし、説明のない `✗ run_shell` として返ってきました
+  (`bench/right_hand_governance/RESULTS.md` パート2)。Textualネイティブのモーダルができるまで、
+  `chat` がブロックする7件の攻撃はここでは実行されます — 拒否が重要な場面では `chat` か
+  `assist` を選んでください。
+- 何も永続化しません: TUIを閉じると会話は終わります。スレッドがあるのは `chat` です。
+- トークンストリーミングは単一モデルの経路のみです — `--fuse`(パネル→ジャッジ→シンセサイザー
+  のターン)の下では逐次トークンはないため、パネルは偽のカーソルではなく「合成中」というステー
+  タスを表示します。このラベルは経路ではなくフラグに従います: `chat` と同じく、ツールを伴う
+  ターンは融合せず、REPLのターンは常にツールを伴います。
+- モデルのリスト価格が不明な場合、コストは「unavailable」と表示されます(決して推測しません)。
+  そして各ターンはREPLと同じく `<home>/usage.jsonl` に追記されます。
+- ここには検証/差し戻しのインジケーターはありません: 検証または差し戻しは `solve`/`project` で
+  実行され、`chat` では実行されません。
+- Textualがインストールされていない場合、`tui` はプレーンな `chat` REPLにフォールバックします。
+  引数はすべて明示的に渡されるため、そのフォールバックは最初のターンを生き延びます。そこでは
+  ストリーミングに意味はなく、スレッドは他の `chat` のスレッドと同じように保存されます。
 
 ### `serve` — メッセージングゲートウェイ(HTTPまたはDiscord)
 

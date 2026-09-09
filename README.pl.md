@@ -306,6 +306,7 @@ chcesz (zobacz kolumnę „Wymaga"). **Używasz Dockera? Oficjalny obraz ma już
 | Co dostajesz | Wymaga | Jak użyć |
 |---|---|---|
 | **Czat, który cię pamięta** | — | `chimera chat` |
+| **Ten sam czat, domyślnie tani** | — | `chimera assist` |
 | **Zadaj jedno pytanie** | — | `chimera run "wyjaśnij X w 3 punktach"` |
 | **Pełnoekranowa aplikacja terminalowa** | — | `chimera tui` |
 | **Aplikacja desktopowa** (kod · edytor · praca · wiedza · automatyzacja, w 10 językach) | `[desktop]` albo pobranie | `chimera app`, albo weź natywny instalator (`.exe`/`.dmg`/`.AppImage`/`.deb`) z [Releases](https://github.com/brcampidelli/chimera-agent/releases) |
@@ -382,6 +383,7 @@ Każde polecenie to `chimera <nazwa>` (albo `uv run chimera <nazwa>` przed insta
 ```bash
 chimera doctor / models / features    # sprawdź konfigurację, wypisz modele, zobacz opcjonalne możliwości
 chimera chat                          # interaktywny asystent, który pamięta między turami
+chimera assist                        # ten sam czat, domyślnie tani (kaskada tierów)
 chimera tui                           # pełnoekranowa aplikacja terminalowa
 chimera run "PROMPT" --image pic.png  # jednorazowa odpowiedź (może przeczytać obraz)
 chimera fuse "PROMPT" --show-panel    # połącz kilka modeli: panel -> sędzia -> syntetyzator

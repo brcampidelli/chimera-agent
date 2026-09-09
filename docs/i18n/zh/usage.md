@@ -1,5 +1,5 @@
 ---
-source_sha256: f3b44e7174eb3fa654cb198ae7745fdbb19b5b5d64f0ea32f261ad14abebd87e
+source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
 ---
 
 # Chimera —— 使用指南
@@ -103,39 +103,116 @@ uv run chimera models
 
 ### `chat` —— 交互式多轮助手（你的得力助手）
 
-一个带对话记忆和工具调用能力的交互式 REPL——日常主力工具。它会回忆起相关的长期记忆，并把
-对话内容串联在各轮之间。
+一个带对话记忆和工具调用能力的交互式 REPL——日常主力工具。它会回忆起相关的长期记忆，把
+对话内容串联在各轮之间，并在**每一轮之后把线程保存**到 `<home>/sessions`，所以下一次运行会从
+你停下的地方继续。`chimera sessions` 列出已保存的线程，`chimera sessions --delete <id>` 删除
+其中一个。
 
 ```bash
-uv run chimera chat                 # start chatting; /exit to quit, /reset to clear context
-uv run chimera chat --fuse          # fuse deep-reasoning turns
-uv run chimera chat --no-memory     # don't recall long-term memory
+uv run chimera chat                        # resume the newest thread; /exit to quit
+uv run chimera chat --new                  # start a fresh thread instead of resuming
+uv run chimera chat --session standup      # -s: resume, or name, one thread by id
+uv run chimera chat --no-memory            # don't recall long-term memory
+uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
+uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
+uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
 
-同一套对话内核也驱动着 TUI 以及（即将上线的）消息网关。
+`--workspace`/`-w` 是工具的根目录，也是读取 `AGENTS.md` 的地方；`--max-steps` 限制一条消息内
+的工具调用步数；`--model`/`-m` 覆盖模型 slug——但请看下面关于路由的提示。
+
+命令：`/help` · `/new`（新线程——当前这条仍留在磁盘上） · `/reset`（等同于 `/new`） ·
+`/model <slug>`（不带参数则回到默认） · `/exit`（也可用 `/quit`、`/q`）。
+
+**它是受管控的，而且会问你。** `chat` 和 `assist` 会搭起与 API 路径相同的那一套：一个被告知
+你自己那条消息的污点台账、包住不可信工具输出的 `<<external-data>>` 围栏、信任内核、
+`--write-region`、所有者的可达性下限（`CHIMERA_REACH`），以及来自 `agent.json` 的所有者指令。
+审批器**在你的终端里发问**——这是唯一一个必定有人在场作答的界面。在注入语料上测量
+（`bench/right_hand_governance/RESULTS.md`，2026-09-08）：被阻断的攻击从 7 中 0 变为 7 中 7，
+在围栏内返回的外部读取从 12 中 0 变为 12 中 12，而有人作答时的过度阻断为 0.000——代价是在八条
+正当记录上问了五个问题。走管道时（`chimera chat < script.txt`）无人可问，于是一个问题会变成
+被记录的拒绝，而不是默许。
+
+诚实提示：
+
+- **被拒绝的工具调用会打印在回复下方**——`✗ run_shell did not succeed: …`。模型惯于绕着拒绝
+  编排说辞：实测的那一次，对一条已被主机执行关卡拒绝的命令，它回答的是 *"The command printed
+  exactly: marker-42"*。批准同样有自己的一行（`governance: 1 approved this turn`），这样你在
+  一轮当中敲下的 `y`，在回复滚走之后仍留有痕迹。
+- **`--fuse` 不会融合携带工具的一轮，而 REPL 的每一轮都携带工具。** 路由器会把任何带工具的
+  轮次发给单个模型，所以这里带 `--fuse` 的一轮实际上就是单模型的一轮。同时给出两者时
+  `--cascade` 还会压过 `--fuse`；在这两者之下都由分层阶梯来选模型，于是在你把它们去掉之前，
+  `--model` 与 `/model` 都不起作用。终端里真正会融合的唯一路径是 `assist` 的 `/task`。
+- 每一轮都会打印它的 token 与价格——当模型标价未知时显示 `cost: unavailable`，绝不会给出一个
+  猜来的零——并向 `<home>/usage.jsonl` 追加一行，桌面应用的成本页读的正是这个文件。
+- `/reset` **会开一条新线程**，它不会抹掉当前这条。当年磁盘上什么都没有时它清的是内存里的
+  记录；如今线程已经是一个文件，就地清空等于毁掉工作。（在什么都不持久化的 `assist` 和 `tui`
+  里，`/reset` 依然是清空上下文。）
+- `chimera doctor` 会说明 agent 的命令在哪里运行、是否会先问一句：配置的沙箱、操作系统沙箱是否
+  真的可用，以及主机执行的姿态。
+
+### `assist` —— 同一只得力右手，默认更省钱
+
+`assist` 就是打开了「第二大脑」默认设置的 `chat`：分层级联把闲聊送给便宜的模型，把难题往上
+升级；你的持久档案（`chimera profile`）是稳定的开场白；记忆、提示与会话结束时的整合都处于
+开启状态。退出时它会打印一张会话收据——分层分布与实测 token——好让"默认省钱"成为一个数字。
+
+```bash
+uv run chimera assist                      # cascade, profile and memory on
+uv run chimera assist --no-cascade         # one default model instead of the ladder
+uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
+uv run chimera assist --model MODEL --workspace DIR --max-steps 8
+```
+
+命令：`/help` · `/task <难题>`（全功率融合，一次成型） · `/profile <种类>: <事实>`（记住关于你
+的一件事——种类：`preference`、`project`、`context`、`name`） · `/model <slug>` ·
+`/reset`（清空对话上下文；不会删除任何东西） · `/exit`（也可用 `/quit`、`/q`）。
+
+管控方式与 `chat` 完全一致——同一套注册表、同一个会发问的审批器、同样的拒绝行、治理行与成本
+行，以及同样的 `usage.jsonl` 记录。有三点差别值得知道：**`assist` 不保留线程**（退出即忘——
+想要能找回的对话请用 `chat`）；在级联之下由阶梯来选模型，因此 `--model` 与 `/model` 只有配合
+`--no-cascade` 才生效；而 `/task` 是在对话之外作答的，它的回答不会进入下一轮的上下文。
 
 ### `tui` —— 全屏终端应用
 
 一个基于 Textual、构建在同一套对话内核之上的全屏 UI。两个面板：一个**对话记录区**，把回复渲染
 为 Markdown（代码块带语法高亮），模型的 token 会**实时流式**呈现；以及一个**活动面板**，展示
-agent 这一轮做了什么——调用了哪些工具、token 数量与成本，以及召回了多少条记忆事实。参数与
-`chat` 相同。
+agent 这一轮做了什么——调用了哪些工具、token 数量与成本，以及召回了多少条记忆事实。
 
 ```bash
 uv run chimera tui
 uv run chimera tui --no-stream        # answers render at the end instead of streaming
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
+uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
-命令：`/model <slug>` · `/reset`（清空上下文） · `/clear`（清屏） · `/stream`（切换实时 token
-流） · `/help` · `/exit`。快捷键：`Ctrl+R` 重置 · `Ctrl+L` 清屏 · `Ctrl+P` 命令面板 ·
-`PgUp`/`PgDn` 滚动 · `Ctrl+C` 退出。斜杠命令会随输入自动补全。
+参数与两个 REPL 并不相同。`tui` 有 `--stream`/`--no-stream`，而它们没有；`chimera chat` 的
+`--cascade`、`--session`、`--new` 与 `--write-region` 在这里没有对应项。
 
-诚实提示：token 流式输出只在单模型路径下可用——在 `--fuse`（面板 → 评审者 → 综合器轮次）
-下没有增量 token，因此面板会显示"synthesizing"（正在综合）状态，而不是伪造一个光标动画。当
-某个模型的标价未知时，成本会显示为"unavailable"（不可用，绝不会去猜测）。这里没有
-verify/revert（验证/回滚）指示器：verify-or-revert 只运行在 `solve`/`project` 中，不运行在
-chat 里。如果没有安装 Textual，`tui` 会退回到普通的 `chat` REPL。
+命令：`/model <slug>` · `/reset`（清空上下文） · `/clear`（清屏） · `/stream`（切换实时 token
+流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 重置 · `Ctrl+L` 清屏 ·
+`Ctrl+P` 命令面板 · `PgUp`/`PgDn` 滚动 · `Ctrl+C` 退出。斜杠命令会随输入自动补全。
+
+诚实提示：
+
+- **TUI 是刻意不受管控的。** 它只有部署白名单，别的都没有：没有污点台账，没有
+  `<<external-data>>` 围栏，没有内核，也没有审批器。原因是它的确认框画不出来——终端归 Textual
+  所有，于是主机执行的问询变成了对一个没人够得着的 stdin 提问。在 pty 中实测：这样的一轮在
+  120 秒超时之下阻塞了 123.8 秒，最后以没有任何解释的 `✗ run_shell` 返回
+  （`bench/right_hand_governance/RESULTS.md` 第 2 部分）。在它拥有 Textual 原生模态框之前，
+  `chat` 会阻断的那七次攻击在这里照样执行——当一次拒绝很重要时，请选 `chat` 或 `assist`。
+- 它什么都不持久化：关掉 TUI，对话就结束了。有线程的是 `chat`。
+- token 流式输出只在单模型路径下可用——在 `--fuse`（面板 → 评审者 → 综合器轮次）下没有增量
+  token，因此面板会显示"synthesizing"（正在综合）状态，而不是伪造一个光标动画。这个标签跟随
+  的是参数而不是路由：与 `chat` 一样，携带工具的一轮不会融合，而 REPL 的每一轮都携带工具。
+- 当某个模型的标价未知时，成本会显示为"unavailable"（不可用，绝不会去猜测）；并且每一轮都会
+  像两个 REPL 那样追加到 `<home>/usage.jsonl`。
+- 这里没有 verify/revert（验证/回滚）指示器：verify-or-revert 只运行在 `solve`/`project` 中，
+  不运行在 chat 里。
+- 如果没有安装 Textual，`tui` 会退回到普通的 `chat` REPL，并把每一个参数都显式传过去，好让这次
+  回退能撑过它的第一轮。流式在那里没有意义，而线程会像任何其他 `chat` 线程一样被保存。
 
 ### `serve` —— 消息网关（HTTP 或 Discord）
 
