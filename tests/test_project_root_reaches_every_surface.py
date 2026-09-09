@@ -48,7 +48,10 @@ EXEMPT: dict[str, str] = {
     # It sets `project_root` now, which is why the entry is gone rather than reworded — and this
     # gate is what noticed, on the same commit that gave the crew an HTTP surface.
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, not a user's repository",
-    "chimera/cli/main.py:evolve_tune.__init__": "offline tuning over recorded trajectories",
+    # `evolve_tune` built its own `Agent` over `default_registry(Path("."))` with no project root,
+    # so the specs it scored were tuned against an agent that could not read the repository's own
+    # AGENTS.md. It now scores through `_right_hand_builder`, which sets `project_root` to the
+    # scenario's workspace — the entry is gone because the code stopped needing it.
 }
 
 

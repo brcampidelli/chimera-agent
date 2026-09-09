@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from chimera.core import AgentEvent
     from chimera.core.autonomous import AutonomousResult
     from chimera.ecosystem import TrajectoryCollector
+    from chimera.eval.scenarios import ScenarioOutcome, SessionBuilder, SessionRequest, SuiteReport
     from chimera.evolution import Playbook
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
@@ -6235,11 +6236,10 @@ def evolve_tune(
     Each round a model proposes a coordinated edit to the spec; the candidate is scored on
     the daily scenarios and kept only on non-regression. Uses real model calls.
     """
-    from chimera.core.agent import DEFAULT_SYSTEM_PROMPT, Agent, AgentConfig
+    from chimera.core.agent import DEFAULT_SYSTEM_PROMPT
     from chimera.ecosystem import AgentSpec, model_proposer, search_spec
     from chimera.eval import daily_scenarios, scenario_scorer
     from chimera.providers import LLMGateway, MissingCredentialsError
-    from chimera.tools import default_registry
 
     settings = get_settings()
     if not settings.has_any_key():
@@ -6247,24 +6247,18 @@ def evolve_tune(
         raise typer.Exit(code=1)
 
     gateway = LLMGateway()
-    registry = default_registry(Path("."))
 
-    class _SpecSolver:
-        def __init__(self, spec: AgentSpec) -> None:
-            self._agent = Agent(
-                gateway,
-                registry,
-                AgentConfig(
-                    model=spec.model,
-                    max_steps=spec.max_steps,
-                    system_prompt=spec.system_prompt or DEFAULT_SYSTEM_PROMPT,
-                ),
-            )
+    # Scored through the SAME builder `chimera scenarios` uses. This command and that one used to
+    # run different solvers over the same seven prompts — two rulers under one name — and since the
+    # suite sat at 7/7 the non-regression criterion here could only ever tie.
+    def _spec_builder(spec: AgentSpec) -> SessionBuilder:
+        return _right_hand_builder(
+            spec.model or model,
+            spec.max_steps,
+            system_prompt=spec.system_prompt or DEFAULT_SYSTEM_PROMPT,
+        )
 
-        def solve(self, prompt: str) -> str:
-            return self._agent.run(prompt).answer
-
-    scorer = scenario_scorer(_SpecSolver, daily_scenarios())
+    scorer = scenario_scorer(_spec_builder, daily_scenarios())
     initial = AgentSpec(model=model, max_steps=max_steps)
     try:
         result = search_spec(initial, scorer, model_proposer(gateway, model), rounds=rounds)
@@ -6849,35 +6843,252 @@ def evoclaw(
     )
 
 
+class _SpendCapReached(RuntimeError):
+    """Raised from the per-scenario callback when the registered cost ceiling is passed."""
+
+
+def _repo_sha() -> str:
+    """Short sha of the repository this ran from, or ``unknown``.
+
+    A dated series row with no sha is a row nobody can go back to: the pass rate moved and there is
+    no way to ask which commit moved it.
+    """
+    import subprocess
+
+    try:
+        done = subprocess.run(  # noqa: S603 — fixed argv, no shell
+            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return done.stdout.strip() or "unknown"
+
+
+def _right_hand_builder(
+    model: str | None, max_steps: int, *, system_prompt: str | None = None
+) -> SessionBuilder:
+    """Build :class:`ChatSession`s the way ``chimera chat`` builds one (``main.py:1230-1263``).
+
+    Same agent over the same gateway, the same ``_apply_tool_allowlist(default_registry(...))``
+    deployment fence, the same memory manager, recall graph and profile preamble. The scenario
+    suite exists to measure *that* object; a session assembled any other way would measure a
+    right hand nobody ships.
+
+    The one deliberate difference is isolation, and it is not cosmetic: workspace, home, memory and
+    profile all come from the request, so one scenario cannot read another's fixture, a fact one
+    scenario remembers cannot enter another's recall, and the number does not depend on whose
+    laptop it ran on — the developer's own profile and memories would otherwise be pasted into
+    every prompt and the series would compare two different rulers (§2aa).
+    """
+    from chimera.core import Agent, AgentConfig
+    from chimera.evolution.wiring import build_memory_manager
+    from chimera.interface import ChatSession
+    from chimera.interface.profile import load_profile, profile_path, render_profile
+    from chimera.providers import LLMGateway
+    from chimera.tools import default_registry
+
+    gateway = LLMGateway()
+
+    def build(request: SessionRequest) -> ChatSession:
+        settings = get_settings().model_copy(update={"home": request.home})
+        config = AgentConfig(
+            model=model, max_steps=max_steps, project_root=request.workspace
+        )
+        if system_prompt is not None:
+            config.system_prompt = system_prompt
+        agent = Agent(
+            gateway,
+            _apply_tool_allowlist(
+                default_registry(request.workspace), allow=None, deny=None, settings=settings
+            ),
+            config,
+        )
+        mem = build_memory_manager(settings)
+        return ChatSession(
+            agent,
+            memory=mem,
+            graph=_recall_graph(mem),
+            profile=render_profile(load_profile(profile_path(settings.home)), mem.profile()),
+            remember_from_chat=request.remember_from_chat,
+        )
+
+    return build
+
+
 @app.command()
 def scenarios(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
+    k: int = typer.Option(3, "--k", help="Runs per scenario — one samples, two alert, three decide."),
+    max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per turn."),
+    max_usd: float = typer.Option(3.0, "--max-usd", help="Hard spend ceiling; the run stops at it."),
+    seed: int = typer.Option(1, "--seed", help="Base seed; run i uses seed+i, so the generated values differ per run."),
+    series: str = typer.Option(None, "--series", help="Where to append the JSONL row (default <home>/scenarios.jsonl)."),
 ) -> None:
-    """Run the daily right-hand scenario suite (live). Requires a key."""
-    from chimera.eval import SingleModelSolver, daily_scenarios, run_scenarios
-    from chimera.providers import LLMGateway, MissingCredentialsError
+    """Run the daily right-hand scenario suite through a real chat session (live). Requires a key.
+
+    Each scenario is a script of turns driven through the same ``ChatSession`` ``chimera chat``
+    builds — tools, memory, transcript — in its own workspace and its own home. The checks are
+    functional, not substring: equality against a value generated *this run* and absent from the
+    prompt, a fact read back out of the ``MemoryStore``, a fresh session's recall count, the
+    transcript found in the next turn's assembled prompt, the absence of a fabricated figure.
+
+    Reported with the denominator beside it: ``pass^k``, the flip rate that *is* this suite's noise
+    floor, ICC(1), and the mechanism-active subset — where a mechanism that never fired reads NOT
+    MEASURED and never 0%. One row per invocation is appended to the series.
+    Pre-registered in ``bench/scenarios/PREREGISTRATION.md``.
+    """
+    import tempfile
+    from datetime import datetime
+
+    from chimera.eval.replicated import seeds_verdict
+    from chimera.eval.scenarios import (
+        SUITE_VERSION,
+        append_series,
+        daily_scenarios,
+        mechanism_arm,
+        run_suite,
+        series_record,
+        suite_arm,
+    )
 
     settings = get_settings()
     if not settings.has_any_key():
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
-    gateway = LLMGateway()
-    try:
-        report = run_scenarios(
-            SingleModelSolver(gateway, model),
-            daily_scenarios(),
-            on_result=lambda o: console.print(
-                f"  {'[green]PASS[/green]' if o.passed else '[red]FAIL[/red]'} {o.id}"
-            ),
-        )
-    except MissingCredentialsError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
+    suite = daily_scenarios()
+    builder = _right_hand_builder(model, max_steps)
+    reports: list[SuiteReport] = []
+    spent = 0.0
 
+    def watch(outcome: ScenarioOutcome) -> None:
+        nonlocal spent
+        spent += outcome.usd or 0.0
+        mark = "[green]PASS[/green]" if outcome.passed else "[red]FAIL[/red]"
+        if outcome.mechanism_active is None:
+            mech = ""
+        elif outcome.mechanism_active:
+            mech = " [dim](mechanism fired)[/dim]"
+        else:
+            mech = " [yellow](mechanism did NOT fire)[/yellow]"
+        console.print(
+            f"  {mark} {outcome.id}{mech} [dim]{outcome.tokens} tok · ${spent:.4f} so far[/dim]"
+        )
+        if outcome.error:
+            console.print(f"    [yellow]{escape(outcome.error)}[/yellow]")
+        if spent > max_usd:
+            raise _SpendCapReached(f"spend cap reached: ${spent:.4f} > ${max_usd:.2f}")
+
+    with tempfile.TemporaryDirectory(prefix="chimera-scenarios-") as tmp:
+        for index in range(k):
+            console.print(f"[bold]run {index + 1}/{k}[/bold] [dim]seed {seed + index}[/dim]")
+            try:
+                reports.append(
+                    run_suite(
+                        builder,
+                        suite,
+                        root=Path(tmp) / f"run{index}",
+                        seed=seed + index,
+                        on_result=watch,
+                    )
+                )
+            except _SpendCapReached as exc:
+                # The partial run is discarded rather than padded: pass^k over a run that did not
+                # cover every scenario would compare unlike rows.
+                console.print(f"[yellow]{exc} — this run is discarded.[/yellow]")
+                break
+
+    if not reports:
+        console.print("[red]No complete run — nothing to report.[/red]")
+        raise typer.Exit(code=1)
+    if all(o.error for o in reports[0].outcomes):
+        console.print(
+            "[red]Every scenario raised. That is an apparatus failure, not a measurement — "
+            "no row is written.[/red]"
+        )
+        console.print(f"[dim]{escape(reports[0].outcomes[0].error)}[/dim]")
+        raise typer.Exit(code=1)
+
+    arm = suite_arm(reports)
+    mech_arm = mechanism_arm(reports)
+    table = Table(
+        title=f"right-hand suite v{SUITE_VERSION} — {len(reports)} run(s) of {arm.n} scenarios",
+        show_header=True,
+    )
+    table.add_column("scenario")
+    table.add_column("runs")
+    table.add_column(f"pass^{arm.k}")
+    table.add_column("mechanism")
+    table.add_column("asserts", overflow="fold")
+    for position, scenario in enumerate(suite):
+        row = [report.outcomes[position] for report in reports]
+        marks = " ".join("[green]o[/green]" if o.passed else "[red]x[/red]" for o in row)
+        if row[0].mechanism_active is None:
+            cell = "[dim]none declared[/dim]"
+        else:
+            fired = sum(1 for o in row if o.mechanism_active)
+            cell = f"{fired}/{len(row)}" if fired else "[yellow]never fired[/yellow]"
+        table.add_row(
+            scenario.id,
+            marks,
+            "[green]yes[/green]" if all(o.passed for o in row) else "no",
+            cell,
+            scenario.asserts,
+        )
+    console.print(table)
+
+    icc = "n/a" if arm.icc is None else f"{arm.icc:+.2f}"
     console.print(
-        f"[bold]{report.passed}/{report.total} passed[/bold] "
-        f"(pass_rate {report.summary()['pass_rate']})"
+        f"[bold]pass@1 {arm.pass_at_1:.1%}[/bold]   pass^{arm.k} {arm.pass_pow_k:.1%}   "
+        f"flip {arm.flip_rate:.1%} [dim](the noise floor)[/dim]   ICC(1) {icc}"
+        + (f" [dim]({arm.icc_reason})[/dim]" if arm.icc is None else "")
+    )
+    console.print(f"[dim]k={arm.k}: {seeds_verdict(arm.k)}[/dim]")
+    if mech_arm is None:
+        console.print("[dim]mechanism-active: no scenario declares one[/dim]")
+    elif not mech_arm.active_trials:
+        console.print(
+            "[yellow]mechanism-active: 0 trials — NOT MEASURED (nothing ever fired; the suite is "
+            "measuring the model through a session-shaped hole)[/yellow]"
+        )
+    else:
+        assert mech_arm.active_pass_rate is not None
+        console.print(
+            f"mechanism-active: {mech_arm.active_pass_rate:.1%} over {mech_arm.active_trials} "
+            f"active trials of {mech_arm.n * mech_arm.k}"
+        )
+    if arm.pass_at_1 >= 0.85:
+        band = "[red]at the CEILING — the exact failure of the suite this replaced[/red]"
+    elif arm.pass_at_1 <= 0.20:
+        band = "[red]at the FLOOR — as uninformative as a ceiling[/red]"
+    elif 0.40 <= arm.pass_at_1 <= 0.70:
+        band = "[green]inside the registered 40-70% band[/green]"
+    else:
+        band = "[yellow]outside the registered 40-70% band[/yellow]"
+    console.print(f"band: {band}")
+
+    observed = next(
+        (o.model for report in reports for o in report.outcomes if o.model), model or "unknown"
+    )
+    record = series_record(
+        reports,
+        model=observed,
+        sha=_repo_sha(),
+        date=datetime.now(UTC).isoformat(timespec="seconds"),
+        arm=arm,
+    )
+    path = Path(series) if series else settings.home / "scenarios.jsonl"
+    append_series(path, record)
+    total = record["usd"]
+    console.print(
+        f"[dim]cost ${total if total is not None else 'unpriced'} · "
+        f"{record['prompt_tokens']}+{record['completion_tokens']} tok · "
+        f"{record['seconds']}s · series → {path}[/dim]"
     )
 
 
