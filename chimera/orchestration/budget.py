@@ -93,6 +93,27 @@ class SpendBudget:
             return f"spend cap reached: ${self._spent:.4f} of ${self.max_usd:.4f}"
         return None
 
+    def charge(self, usd: float | None, *, label: str = "") -> None:
+        """Charge work whose price is already in dollars — or record that it has none.
+
+        The door for a NESTED run that kept its own meter: ``chimera solve`` prices every attempt
+        itself, and a conversation that hands a task to that loop has one number to subtract, not a
+        list of calls to re-price. Without this the money spent inside the nested run would be
+        invisible to the ceiling above it, and a REPL command that can be typed twice would have a
+        ceiling that resets — which is not a ceiling.
+
+        ``None`` means the nested work could not be priced, and it is treated exactly as an
+        unpriced call is: sticky, and every later total is unknown. ``label`` names what could not
+        be priced, so :meth:`blocked` can say which thing to go and price.
+        """
+        if usd is None:
+            if self._unpriced_model is None:
+                self._unpriced_model = label or "(unpriced work)"
+            return
+        # Clamped at zero: a refund is not a thing that happens here, and a negative would let one
+        # mis-priced leg buy back a ceiling the run had already reached.
+        self._spent += max(0.0, usd)
+
     def record(self, model: str, prompt_tokens: int | None, completion_tokens: int | None) -> None:
         """Charge one completed call at its own model's rate.
 
@@ -103,11 +124,7 @@ class SpendBudget:
         from chimera.orchestration.receipts import price_delegation
 
         usd = price_delegation(model, prompt_tokens, completion_tokens) if model else None
-        if usd is None:
-            if self._unpriced_model is None:
-                self._unpriced_model = model or "(unnamed model)"
-            return
-        self._spent += usd
+        self.charge(usd, label=model or "(unnamed model)")
 
     def record_result(self, result: object) -> None:
         """Charge one completed call by its STAGES when it has them, else by the model that answered.

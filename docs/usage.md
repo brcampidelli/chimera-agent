@@ -115,6 +115,7 @@ uv run chimera chat --session standup      # -s: resume, or name, one thread by 
 uv run chimera chat --no-memory            # don't recall long-term memory
 uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
@@ -124,7 +125,8 @@ tool-calling steps inside one message; `--model`/`-m` overrides the model slug �
 routing below.
 
 Commands: `/help` · `/new` (fresh thread — the current one stays on disk) · `/reset` (same as
-`/new`) · `/model <slug>` (no argument goes back to the default) · `/exit` (also `/quit`, `/q`).
+`/new`) · `/model <slug>` (no argument goes back to the default) · `/solve <task>` (hand it to the
+verified loop) · `/exit` (also `/quit`, `/q`).
 
 **It is governed, and it asks you.** `chat` and `assist` build the same stack the API path builds: a
 taint ledger told your own message, the `<<external-data>>` fence around untrusted tool output, the
@@ -146,12 +148,32 @@ Honesty notes:
   scrolls away.
 - **`--fuse` does not fuse a turn that carries tools, and a REPL turn always carries tools.** The
   router sends any tool-carrying turn to a single model, so in practice a `--fuse` turn here is a
-  single-model turn. `--cascade` also wins over `--fuse` when both are given, and under either flag
-  the tier ladder picks the model, which makes `--model` and `/model` no-ops until you drop them.
-  The one route in the terminal that really fuses is `assist`'s `/task`.
+  single-model turn. `--cascade` also wins over `--fuse` when both are given. The one route in the
+  terminal that really fuses is `assist`'s `/task`.
+- **Naming a model pins it, and the tier ladder steps aside.** Under `--cascade` the ladder is what
+  chooses a model per turn, and it used to swallow the slug you named without a word. Now `--model`
+  and `/model <slug>` win for as long as one is named — a line says the ladder is off — and
+  `/model` with no argument hands the job back to it.
 - Every turn prints its tokens and price — `cost: unavailable` when the model's list price is
   unknown, never a guessed zero — and appends a row to `<home>/usage.jsonl`, which is what the
   desktop app's Cost screen reads.
+- **`--max-usd` bounds the thread, not the turn.** One meter runs from the first message to
+  `/exit`; `/solve` draws on the same money; and once it is spent the next message is refused
+  before it is sent, rather than paying a call to discover there was nothing left. A reply that
+  was cut short — by the ceiling, by `--max-steps`, or by a context that stopped fitting — says so
+  on its own line, because a truncated answer otherwise reads exactly like a finished one.
+- **A restored turn says so.** When a thread comes back off disk, a dim line under the reply counts
+  the replayed turns that were restored and how many of those had their provenance never recorded.
+  Those are replayed inside the data fence rather than as the model's own words, and until now the
+  fence was invisible to the person it protects.
+- **`/solve <task>` hands the conversation to the verified loop** — plan, edit, verify, and revert
+  the attempt when it fails, which is the second of the two buttons the desktop's code screen has.
+  It never starts by itself, it prints the task and the ceiling before it runs, and the loop's own
+  answer is recorded in the thread. With no argument it takes the last thing you asked.
+- **MCP servers reach the terminal.** With `CHIMERA_MCP_AUTOLOAD=1` the servers in `mcp.json` are
+  mounted before the fence, so the denylist, the kernel and the taint ledger cover them and a
+  server's output arrives inside the data fence like any other external read. They are connected
+  once per process and shared with the app, so nothing is spawned twice.
 - `/reset` **starts a new thread**; it does not erase the current one. It cleared an in-memory
   transcript back when nothing was on disk; now that the thread is a file, clearing it in place
   would destroy work. (In `assist` and `tui`, which persist nothing, `/reset` still clears context.)
@@ -169,19 +191,28 @@ session receipt — tier distribution and measured tokens — so "cheap by defau
 uv run chimera assist                      # cascade, profile and memory on
 uv run chimera assist --no-cascade         # one default model instead of the ladder
 uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
-Commands: `/help` · `/task <hard ask>` (full-power fusion, one shot) · `/profile <kind>: <fact>`
-(remember something about you — kinds: `preference`, `project`, `context`, `name`) · `/model <slug>`
-· `/reset` (clear the conversation context; nothing is deleted) · `/exit` (also `/quit`, `/q`).
+Commands: `/help` · `/task <hard ask>` (full-power fusion, one shot) · `/solve <task>` (hand it to
+the verified loop) · `/profile <kind>: <fact>` (remember something about you — kinds: `preference`,
+`project`, `context`, `name`) · `/model <slug>` · `/reset` (clear the conversation context; nothing
+is deleted) · `/exit` (also `/quit`, `/q`).
 
 Governed exactly as `chat` is — same registry, same prompting approver, same refusal, governance and
-cost lines, same `usage.jsonl` row. Three differences worth knowing: **`assist` keeps no thread**
-(it forgets on exit — use `chat` for a conversation you want back); under the cascade the ladder
-picks the model, so `--model` and `/model` only take effect together with `--no-cascade`; and
-`/task` answers outside the conversation, so its reply is not part of the next turn's context.
+cost lines, same `usage.jsonl` row, same MCP servers, same `--max-usd` meter over the whole run, and
+the same `/solve`. Two differences worth knowing: **`assist` keeps no thread** (it forgets on exit —
+use `chat` for a conversation you want back); and naming a model pins it, which turns the tier
+ladder off for as long as it is pinned — the ladder is what chooses a model, and it used to accept
+the slug and ignore it.
+
+`/task` runs one forced fusion on the ask alone: the conversation is not sent to the panel, on
+purpose, because feeding the thread to a panel plus a judge plus a synthesizer multiplies the cost
+of the route that exists to be used sparingly. Its answer *is* part of the next turn's context now,
+and it prints a price and writes a `usage.jsonl` row like every other turn — the most expensive
+route in the terminal was the one the Cost screen could not see.
 
 ### `tui` — full-screen terminal app
 
@@ -198,7 +229,8 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
 Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they do not have.
-The `--cascade`, `--session`, `--new` and `--write-region` of `chimera chat` have no equivalent here.
+The `--cascade`, `--session`, `--new`, `--max-usd` and `--write-region` of `chimera chat` have no
+equivalent here.
 
 Commands: `/model <slug>` · `/reset` (clear context) · `/clear` (clear screen) · `/stream` (toggle
 live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` reset · `Ctrl+L` clear ·
@@ -221,7 +253,9 @@ Honesty notes:
   not fuse, and a REPL turn always carries tools.
 - Cost reads "unavailable" when the model's list price is unknown (never guessed), and each turn is
   appended to `<home>/usage.jsonl` like the REPLs'.
-- There is no verify/revert indicator here: verify-or-revert runs in `solve`/`project`, not in chat.
+- There is no verify/revert here, and no MCP. Both went to `chat` and `assist`, which answer `/solve`
+  and mount the configured servers, because both rest on the taint ledger and the approver that this
+  surface has decided not to have. Verify-or-revert also runs in `chimera solve` and `chimera project`.
 - If Textual isn't installed, `tui` falls back to the plain `chat` REPL, passing every argument
   explicitly so the fallback survives its first turn. Streaming has no meaning there, and the thread
   is saved like any other `chat` thread.

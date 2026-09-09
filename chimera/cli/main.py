@@ -1250,10 +1250,25 @@ def _run_turn(session: Any, message: str) -> tuple[Any, str]:
         return None, "continue"
 
 
+def _replayed_provenance(session: Any) -> list[str]:
+    """The provenance of every RESTORED turn that this prompt replayed.
+
+    ``_replay`` renders ``turns[-max_history:]`` and fences the restored ones that are not known
+    clean; this is the same window, read for the same reason one line further out. Read BEFORE the
+    turn runs, because ``send_verbose`` appends the new exchange and would shift the window by one.
+    """
+    return [turn.provenance for turn in session.turns[-session.max_history :] if turn.restored]
+
+
 def _render_turn(
-    report: Any, *, session_id: str, settings: Settings, hand: Any = None
+    report: Any,
+    *,
+    session_id: str,
+    settings: Settings,
+    hand: Any = None,
+    restored: list[str] | None = None,
 ) -> None:
-    """Print a finished turn — reply, refusals, governance, price — and file it in the census.
+    """Print a finished turn — reply, refusals, governance, provenance, price — and file it.
 
     Order matters and is the fix: the reply is on screen before anything else can fail. The
     refusal lines are what stop "the command printed exactly: marker-42" from being the last word
@@ -1263,6 +1278,11 @@ def _render_turn(
     none — so a person who typed ``y`` to a governance prompt mid-turn had, once the reply
     scrolled, no record that they had allowed anything. An approval nobody can see afterwards is a
     record and not a decision.
+
+    ``restored`` is what :func:`_replayed_provenance` read before the turn ran. The store has
+    recorded a turn's provenance since the transcript learned to persist, and the fence around a
+    restored turn is built from it on every prompt — and until now nothing showed it, so the
+    person could not tell a thread that came off disk from one the model had just said.
     """
     from chimera.api.usage import record_turn
     from chimera.interface import render
@@ -1270,10 +1290,16 @@ def _render_turn(
     console.print(render.reply_line(report.answer))
     for line in render.refusal_lines(report):
         console.print(line)
+    cut = render.cut_short_line(report)
+    if cut:
+        console.print(cut)
     if hand is not None:
         line = render.governance_line(*hand.turn_verdicts(), attended=hand.attended)
         if line:
             console.print(line)
+    provenance = render.provenance_line(report, restored=restored or [])
+    if provenance:
+        console.print(provenance)
     console.print(render.cost_line(report))
     record_turn(settings.home, session_id, report)
 
@@ -1344,6 +1370,9 @@ def _chat_commands() -> list[Any]:
         SlashCommand("/new", "", "start a fresh thread (the current one stays saved)"),
         SlashCommand("/reset", "", "same as /new — the transcript is on disk now"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
+        SlashCommand(
+            "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
+        ),
         SlashCommand("/exit", "", "quit (also /quit, /q)"),
     ]
 
@@ -1355,6 +1384,9 @@ def _assist_commands() -> list[Any]:
     return [
         SlashCommand("/help", "", "this list"),
         SlashCommand("/task", "<hard ask>", "full-power fusion route, one shot"),
+        SlashCommand(
+            "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
+        ),
         SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
         SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
@@ -1385,6 +1417,310 @@ def _print_help(commands: list[Any]) -> None:
         console.print(line)
 
 
+def _switch_model(
+    session: Any, agent: Any, slug: str | None, *, routed: Any = None, plain: Any = None
+) -> None:
+    """``/model`` for both REPLs — and what naming a model means when a router is picking them.
+
+    Under the tier cascade the slug was **dropped in silence**: ``CascadeBackend._route`` calls the
+    gateway with ``config.mid`` or ``config.weak`` and never with the ``model`` it was handed
+    (`chimera/fusion/cascade.py:144-151, 169, 189`). A live check measured all eight routes landing
+    on the ladder's mid model while ``--model deepseek-chat-v3.1`` was on the command line. That is
+    a setting that accepts a value and ignores it — the defect ``recovery``'s validation was written
+    against, one command over.
+
+    It is HONOURED rather than refused, and honoured by swapping the BACKEND rather than by
+    teaching the cascade to obey. The ladder is a way of *choosing* a model, so naming one says the
+    choice is already made; and doing it here keeps the blast radius at the two REPLs, where a
+    person is reading the line that says what happened. Changing ``CascadeBackend`` would also
+    change ``solve --cascade --profile economy``, where the role models and the ladder are two
+    deliberate mechanisms and which of them should win is a separate question nobody has asked.
+
+    ``routed`` is the cascade backend when one is active, ``plain`` the single-model gateway
+    underneath it. With ``routed`` None (no cascade) this is the old behaviour exactly.
+    """
+    if not session.set_model(slug):
+        console.print("[red]can't switch model[/red]")
+        return
+    if routed is None:
+        console.print(f"[dim]model → {escape(slug or 'default')}[/dim]")
+        return
+    if slug:
+        agent.backend = plain
+        console.print(
+            f"[dim]model → {escape(slug)} — pinned, so the tier cascade is off "
+            "until /model with no argument.[/dim]"
+        )
+    else:
+        agent.backend = routed
+        console.print("[dim]model → default — the tier cascade picks it per turn again.[/dim]")
+
+
+def _pinned_notice(slug: str) -> None:
+    """Say, once at start, what ``--model`` did to the routing — because it used to do nothing."""
+    console.print(
+        f"[dim]model pinned to {escape(slug)} — the tier cascade is off for this run "
+        "(it is what chooses a model, so naming one replaces it).[/dim]"
+    )
+
+
+def _check_max_usd(max_usd: float | None) -> None:
+    """Refuse a ceiling that is not one, before the first prompt is drawn.
+
+    Zero is the value that fails in the dangerous direction, and it is the same argument
+    ``code_api``'s ``gt=0`` makes about its own field: everything downstream reads a dollar cap for
+    truthiness, so ``0`` says "spend nothing" and means "spend anything". A negative reaches
+    ``SpendBudget`` and raises — from inside the REPL's first turn, after the greeting.
+    """
+    if max_usd is not None and max_usd <= 0:
+        raise typer.BadParameter(
+            f"--max-usd must be greater than zero; {max_usd} would read as 'no ceiling'."
+        )
+
+
+def _solve_defaults() -> dict[str, Any]:
+    """Every parameter ``chimera solve`` takes, with its REAL default value.
+
+    Read off ``solve``'s own signature rather than typed out again. A Typer command called as a
+    plain function hands the parameters you omit their ``typer.OptionInfo`` *default objects* — not
+    their defaults — and ``bool(OptionInfo)`` is True, which is how the documented ``tui`` fallback
+    died on its first turn (`#398`). Listing all fifty-two by hand would have re-created that trap
+    the day somebody adds the fifty-third; unwrapping ``.default`` here cannot go stale.
+
+    Read from ``_SOLVE_COMMAND`` and not from the module name ``solve``: the parameter list must
+    come from the shipped command even when the name has been substituted, or a substitute would
+    silently redefine what it is called with.
+    """
+    import inspect
+
+    values: dict[str, Any] = {}
+    for name, param in inspect.signature(_SOLVE_COMMAND).parameters.items():
+        if param.kind in (param.VAR_POSITIONAL, param.VAR_KEYWORD):
+            continue  # `*args`/`**kwargs` are not names anything can be passed under
+        default = param.default
+        values[name] = getattr(default, "default", default)
+    return values
+
+
+class SolveFailed(typer.Exit):
+    """``chimera solve`` finished without success — exit 1, and the run it produced.
+
+    A plain ``typer.Exit(code=1)`` is what the command has always raised and what the shell still
+    sees; this subclass changes nothing about that and adds the one thing an in-process caller
+    needs. ``/solve`` in a REPL has to put the loop's own answer into the conversation, and a
+    failed run has an answer too — the alternative was the surface writing a sentence of its own
+    into the ``assistant`` slot, which ``ChatTurn`` documents against precisely because that text
+    is replayed into every later prompt as if the model had said it.
+    """
+
+    def __init__(self, result: Any) -> None:
+        super().__init__(code=1)
+        self.result = result
+
+
+def _solve_from_conversation(
+    task: str,
+    *,
+    workspace: str,
+    model: str | None,
+    write_region: str | None,
+    budget: Any = None,
+) -> Any:
+    """Hand one task to the verified loop and come back. Returns the run, or None if it never ran.
+
+    The Code screen has two buttons and `chimera/api/code_api.py:1215-1221` states the difference:
+    Send edits your files and keeps whatever it wrote, "Run with verification" plans, verifies and
+    can undo. The terminal had only the first, on every surface. This is the second.
+
+    It calls ``solve`` — the command, with every one of its parameters — rather than assembling a
+    second ``AutonomousAgent``. The construction is three hundred lines of closure binding fifty
+    flags; a copy of it in this file would be a weaker product wearing the same name the day the
+    two drift, and there is no factory to share because ``solve``'s worker, planner, manager,
+    verifier, checkpointer and six learning seams are all built inside one closure over those
+    flags. What is shared instead is the command itself.
+
+    Never automatic: it runs only when a person types ``/solve``. It says what it is about to do
+    before it does it, because unlike a chat turn this one edits files and can spend several
+    attempts' worth of money.
+    """
+    from chimera.api.runs import total_usd
+
+    if budget is not None:
+        blocked = budget.blocked()
+        if blocked:
+            from chimera.interface import render
+
+            console.print(render.budget_spent_line(blocked))
+            return None
+    args = _solve_defaults()
+    args.update(
+        task=task,
+        workspace=workspace,
+        model=model,
+        write_region=write_region,
+        # What is left of the conversation's ceiling, not a fresh one. `AutonomousAgent._run_budget`
+        # reads `max_usd` off the worker's config to build ONE budget spanning every attempt, so
+        # this bounds the whole nested run — and the spend is charged back below, or a `/solve`
+        # typed twice would get the full allowance twice and the ceiling would not be one.
+        max_usd=(budget.remaining if budget is not None else None),
+    )
+    attempts = args["max_attempts"]
+    console.print(
+        f"[yellow]→ handing this to the verified loop[/yellow] [dim](the same one "
+        f"`chimera solve` runs): plan → edit → verify-or-revert in {escape(workspace)}, up to "
+        f"{attempts} attempt(s). It CAN change files; a failed attempt is reverted."
+        + (f" Ceiling: ${args['max_usd']:.4f}." if args["max_usd"] else "")
+        + "[/dim]"
+    )
+    console.print(f"[dim]task: {escape(task)}[/dim]")
+    result: Any = None
+    try:
+        result = solve(**args)
+    except SolveFailed as failed:
+        result = failed.result
+    except typer.Exit:
+        # `solve` refuses before running for reasons of its own — no key, a bad flag combination.
+        # It has already said which; the REPL stays open.
+        return None
+    except KeyboardInterrupt:
+        console.print("\n[dim]interrupted — the run was stopped[/dim]")
+        return None
+    if budget is not None and result is not None:
+        # Priced from the attempts, which is the same number `solve` just printed. `total_usd`
+        # answers None when a leg had no price, and `charge` treats that the way an unpriced call is
+        # treated everywhere else: sticky, and the ceiling refuses the next turn rather than
+        # pretending the run was free.
+        budget.charge(total_usd(result.attempts), label="the /solve run")
+    return result
+
+
+def _run_solve_command(
+    session: Any,
+    argument: str,
+    *,
+    workspace: str,
+    agent: Any,
+    write_region: str | None,
+    budget: Any = None,
+) -> None:
+    """``/solve`` in a REPL: pick the task, run the verified loop, put its answer in the thread.
+
+    With no argument the task is the last thing the person asked — "the conversation's current
+    task" — and the surface prints it back before running, because a command that spends several
+    attempts' worth of money on a guess about what you meant must show the guess first.
+
+    The run's own answer is recorded as an ordinary exchange, which is what makes ``/solve``
+    different from ``/task`` before it was fixed: the next turn is aware of what the loop did.
+    ``provenance`` is ``UNKNOWN`` and not ``CLEAN`` — the loop ran its own tools in its own
+    process with its own ledger, and nothing in this session watched them, so "clean" here would
+    be a guarantee derived from an instrument that could not have shown the opposite.
+
+    The model comes off ``agent.config`` rather than from the command line, because ``/model``
+    writes there: a person who pinned a model mid-conversation and then typed ``/solve`` meant the
+    model they had just named, not the one they launched with.
+    """
+    from chimera.interface.session import UNKNOWN, ChatTurn
+
+    task = argument.strip() or _last_user_message(session)
+    if not task:
+        console.print("[dim]usage: /solve <task> — or ask something first and type /solve[/dim]")
+        return
+    result = _solve_from_conversation(
+        task,
+        workspace=workspace,
+        model=agent.config.model,
+        write_region=write_region,
+        budget=budget,
+    )
+    if result is None:
+        return
+    session.turns.append(
+        ChatTurn(user=f"/solve {task}", assistant=str(result.answer), provenance=UNKNOWN)
+    )
+
+
+def _run_task_command(
+    session: Any,
+    argument: str,
+    *,
+    gateway: Any,
+    settings: Settings,
+    usage_session: str,
+    budget: Any = None,
+) -> None:
+    """``/task`` in ``assist``: one forced fusion — now inside the conversation and on the receipt.
+
+    Two things were wrong with it and both were about what happens AFTER the answer.
+
+    It **answered outside the thread**: nothing was appended to the session, so the reply the person
+    had just paid a three-model panel for was not in the next turn's context and the follow-up
+    question was answered by a model that had never seen it. The exchange is recorded now, and
+    recording it is honest in a way ``/solve``'s would not be — this text is the model's own words.
+
+    And it **bypassed** ``send_verbose``, so it wrote no ``usage.jsonl`` row and printed no price:
+    the single most expensive route in the terminal was the one route the Cost screen could not
+    see. It goes through ``_render_turn`` now, like every other turn.
+
+    What it still does NOT do is send the conversation to the panel — the ask goes alone. That is
+    the command's whole shape ("full-power route, one shot"): feeding six turns of history to a
+    panel plus a judge plus a synthesizer multiplies the cost of the thing that exists to be used
+    sparingly, and the person who wants context asks normally.
+    """
+    from chimera.fusion import FusionEngine
+    from chimera.interface import render
+    from chimera.interface.session import CLEAN, ChatTurn, TurnReport
+    from chimera.orchestration.receipts import price_completion
+
+    task_text = argument.strip()
+    if not task_text:
+        console.print("[dim]usage: /task <the hard ask>[/dim]")
+        return
+    if budget is not None and budget.blocked():
+        console.print(render.budget_spent_line(str(budget.blocked())))
+        return
+    try:
+        with console.status("[dim]full-power (fusion)…[/dim]"):
+            fused = FusionEngine(gateway).complete([{"role": "user", "content": task_text}])
+    except KeyboardInterrupt:
+        console.print("\n[dim]interrupted — the turn was dropped[/dim]")
+        return
+    except Exception as exc:  # noqa: BLE001 — keep the REPL alive
+        console.print(render.error_line(exc))
+        return
+    if budget is not None:
+        # By STAGES. A fused turn answers as `model="fusion"`, which no price table resolves, so
+        # charging it by that name would bill the most expensive call in the product at zero.
+        budget.record_result(fused)
+    cost = price_completion(fused)
+    report = TurnReport(
+        answer=fused.content,
+        model=fused.model,
+        prompt_tokens=fused.prompt_tokens or 0,
+        completion_tokens=fused.completion_tokens or 0,
+        cache_read_tokens=fused.cache_read_tokens or 0,
+        cache_write_tokens=fused.cache_write_tokens or 0,
+        # None when any stage could not be priced: `cost_text` then says "unavailable" rather than
+        # showing a floor as if it were the bill.
+        usd=None if cost.unpriced is not None else cost.usd,
+        route_meta=fused.route_meta,
+        # No tool ran on this route, so nothing external could have entered it.
+        provenance=CLEAN,
+        stopped_reason="final",
+    )
+    _render_turn(report, session_id=usage_session, settings=settings)
+    session.turns.append(
+        ChatTurn(user=task_text, assistant=str(fused.content), provenance=CLEAN)
+    )
+
+
+def _last_user_message(session: Any) -> str:
+    """The last thing the person typed in this thread, or ``""`` when they have not yet."""
+    for turn in reversed(session.turns):
+        if turn.user.strip():
+            return str(turn.user).strip()
+    return ""
+
+
 @app.command()
 def chat(
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
@@ -1399,6 +1735,11 @@ def chat(
         None, "--session", "-s", help="Resume a specific session id (see 'chimera sessions')."
     ),
     new: bool = typer.Option(False, "--new", help="Start a fresh session instead of resuming."),
+    max_usd: float | None = typer.Option(
+        None,
+        "--max-usd",
+        help="Stop once this conversation has spent this much (the whole thread, not one turn).",
+    ),
     write_region: str | None = typer.Option(
         None,
         "--write-region",
@@ -1418,11 +1759,16 @@ def chat(
 
     A resumed turn is labelled as restored in the next prompt, and one that ran while untrusted
     content was in the conversation comes back inside the data fence; a turn saved before that was
-    recorded is treated the same way, because nothing measured it. Memory recall is scoped to
-    ``--workspace``: that folder's facts, plus the ones stored with no project at all.
+    recorded is treated the same way, because nothing measured it — and a dim line under each reply
+    now says so on screen. Memory recall is scoped to ``--workspace``: that folder's facts, plus
+    the ones stored with no project at all.
+
+    ``--max-usd`` bounds the whole thread rather than one turn, and ``/solve`` hands the
+    conversation's task to the same verified loop ``chimera solve`` runs, inside that same ceiling.
     """
     from chimera.api.sessions import SessionManager, SessionStore
     from chimera.cli.right_hand import build_right_hand
+    from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
@@ -1434,6 +1780,7 @@ def chat(
     if not settings.has_any_key():
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
+    _check_max_usd(max_usd)
 
     # One of the project's two transcript stores, and the docstring above used to deny it: it
     # promised "the same store the desktop app reads, so a thread started here can be continued
@@ -1462,8 +1809,15 @@ def chat(
     _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
+    # The cascade, when there is one, is kept by name: `/model <slug>` swaps it out for the plain
+    # gateway and `/model` with no argument swaps it back. Under the ladder the slug was dropped in
+    # silence — see `_switch_model`.
+    routed: SupportsComplete | None = None
     if cascade or settings.cascade:
-        backend = _cascade_backend(gateway, settings)
+        routed = backend = _cascade_backend(gateway, settings)
+        if model:
+            backend = gateway
+            _pinned_notice(model)
     elif fuse:
         from chimera.fusion import FusionEngine, RoutedBackend
 
@@ -1505,9 +1859,16 @@ def chat(
     #
     # This is that store, not a second one. A parallel CLI-only transcript would have been the
     # easier change and would have made the split permanent.
+    # One meter for the thread, or None. `AgentConfig.max_usd` would have been one line and would
+    # have built a FRESH budget inside every `Agent.run` — a cap on one answer, not on the evening.
+    # See `chimera.cli.spend`.
+    budget = session_budget(max_usd)
+    turns: Any = agent if budget is None else BudgetedTurns(agent, budget)
+    if budget is not None:
+        console.print(f"[dim]spend ceiling: ${budget.max_usd:.4f} for this whole thread.[/dim]")
     manager = SessionManager(
         lambda: ChatSession(
-            agent,
+            turns,
             memory=mem,
             graph=_recall_graph(mem),
             profile=_session_profile(mem),
@@ -1566,21 +1927,38 @@ def chat(
             console.print(f"[dim]new thread {active} — the previous one is saved.[/dim]")
             continue
         if head == "/model":
-            slug = argument or None
-            ok = session.set_model(slug)
-            console.print(
-                f"[dim]model → {escape(slug or 'default')}[/dim]"
-                if ok
-                else "[red]can't switch model[/red]"
+            _switch_model(session, agent, argument or None, routed=routed, plain=gateway)
+            continue
+        if head == "/solve":
+            # Never automatic, and the one command here that can change files. `_run_solve_command`
+            # says what it is about to do before it does it, and records the loop's own answer in
+            # this thread so the next turn knows what happened.
+            _run_solve_command(
+                session,
+                argument,
+                workspace=workspace,
+                agent=agent,
+                write_region=write_region,
+                budget=budget,
             )
+            _persist_turn(manager, active)
             continue
         if _handle_unknown_command(head, commands):
+            continue
+        if budget is not None and budget.blocked():
+            # Refused here rather than one layer down: the loop would refuse too, at zero cost, but
+            # it would first record a turn whose "answer" is the budget error — and that text is
+            # replayed into every later prompt as if the model had written it.
+            console.print(render.budget_spent_line(str(budget.blocked())))
             continue
         # Before a single tool runs: the ledger is told whose words this turn is. Without it every
         # fetch reads `unknown`, and `CHIMERA_TAINT_AUTHORITY=authority` — the one setting that
         # spends the person's attention only on pages they did NOT ask for — cannot tell the two
         # apart. The desktop chat still cannot; see `chimera/cli/right_hand.py`.
         hand.begin_turn(message)
+        # Read BEFORE the turn: `send_verbose` appends the new exchange, which would shift the
+        # window this reads by one and drop the oldest restored turn out of the count.
+        restored = _replayed_provenance(session)
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
@@ -1589,7 +1967,9 @@ def chat(
             break
         if outcome != "ok":
             continue
-        _render_turn(report, session_id=active, settings=settings, hand=hand)
+        _render_turn(
+            report, session_id=active, settings=settings, hand=hand, restored=restored
+        )
         _render_memory_note(report, message, settings)
         # After the turn, not at exit: Ctrl-C and a closed terminal are how a REPL usually ends,
         # and neither runs a shutdown hook. After the PRINT, not before it — see `_persist_turn`.
@@ -1607,6 +1987,11 @@ def assist(
     no_cascade: bool = typer.Option(
         False, "--no-cascade", help="Disable tiered routing (single default model instead)."
     ),
+    max_usd: float | None = typer.Option(
+        None,
+        "--max-usd",
+        help="Stop once this conversation has spent this much (the whole run, not one turn).",
+    ),
     write_region: str | None = typer.Option(
         None,
         "--write-region",
@@ -1621,11 +2006,17 @@ def assist(
     (chimera profile) is the stable preamble; memory, nudges and end-of-session
     consolidation are active. On exit it prints the session cost receipt —
     tier distribution + measured tokens — so 'cheap by default' is a number.
+
+    ``--max-usd`` bounds the whole run rather than one turn. Naming a model — ``--model`` or
+    ``/model`` — pins it and turns the ladder off for as long as it is pinned, because the ladder
+    is what chooses a model; it used to accept the slug and ignore it. ``/solve`` hands a task to
+    the verified loop, inside the same ceiling.
     """
     import time as _time
     from uuid import uuid4
 
     from chimera.cli.right_hand import build_right_hand
+    from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
@@ -1639,6 +2030,7 @@ def assist(
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
+    _check_max_usd(max_usd)
     session_start = _time.time()
     routes_path = Path(settings.home) / "routes.jsonl"
     # `assist` keeps no durable thread, but its turns still cost money, and the Cost screen groups
@@ -1646,7 +2038,13 @@ def assist(
     usage_session = uuid4().hex[:12]
     _sandbox_banner()  # before the registry builds the sandbox, which is what logs the long notice
     gateway = LLMGateway()
-    backend: SupportsComplete = gateway if no_cascade else _cascade_backend(gateway, settings)
+    routed: SupportsComplete | None = None if no_cascade else _cascade_backend(gateway, settings)
+    backend: SupportsComplete = gateway if routed is None else routed
+    # `--model` under the ladder was a value accepted and dropped — see `_switch_model`. Naming one
+    # pins it, and the ladder steps aside for as long as it is named.
+    if model and routed is not None:
+        backend = gateway
+        _pinned_notice(model)
     # The same assembly `chat` builds, from the same function, so the two right hands cannot drift
     # into having different protections — which is how one of them ended up with none.
     hand = build_right_hand(
@@ -1667,8 +2065,12 @@ def assist(
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
     mem = None if no_memory else _memory_manager()
+    # One meter for the run, exactly as `chat` builds one — see `chimera.cli.spend` for why it is
+    # not `AgentConfig.max_usd`.
+    budget = session_budget(max_usd)
+    turns: Any = agent if budget is None else BudgetedTurns(agent, budget)
     session = ChatSession(
-        agent,
+        turns,
         memory=mem,
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
@@ -1695,6 +2097,8 @@ def assist(
         "[cyan]/task <hard ask>[/cyan] full-power route, [cyan]/profile <kind>: <fact>[/cyan] remember, "
         "[cyan]/reset[/cyan] clear, [cyan]/help[/cyan] the rest, [cyan]/exit[/cyan] quit."
     )
+    if budget is not None:
+        console.print(f"[dim]spend ceiling: ${budget.max_usd:.4f} for this whole run.[/dim]")
     nudged: set[str] = set()
     skill_nudged: set[str] = set()
     while True:
@@ -1745,35 +2149,35 @@ def assist(
             continue
         if head == "/task":
             # Full-power route for a hard ask: fusion-forced, one shot, no cascade climb.
-            task_text = argument
-            if not task_text:
-                console.print("[dim]usage: /task <the hard ask>[/dim]")
-                continue
-            from chimera.fusion import FusionEngine
-
-            try:
-                with console.status("[dim]full-power (fusion)…[/dim]"):
-                    fused = FusionEngine(gateway).complete(
-                        [{"role": "user", "content": task_text}]
-                    )
-                console.print(render.reply_line(fused.content))
-            except KeyboardInterrupt:
-                console.print("\n[dim]interrupted — the turn was dropped[/dim]")
-            except Exception as exc:  # noqa: BLE001 — keep the REPL alive
-                console.print(render.error_line(exc))
+            _run_task_command(
+                session,
+                argument,
+                gateway=gateway,
+                settings=settings,
+                usage_session=usage_session,
+                budget=budget,
+            )
+            continue
+        if head == "/solve":
+            _run_solve_command(
+                session,
+                argument,
+                workspace=workspace,
+                agent=agent,
+                write_region=write_region,
+                budget=budget,
+            )
             continue
         if head == "/model":
-            slug = argument or None
-            ok = session.set_model(slug)
-            console.print(
-                f"[dim]model → {escape(slug or 'default')}[/dim]"
-                if ok
-                else "[red]can't switch model[/red]"
-            )
+            _switch_model(session, agent, argument or None, routed=routed, plain=gateway)
             continue
         if _handle_unknown_command(head, commands):
             continue
+        if budget is not None and budget.blocked():
+            console.print(render.budget_spent_line(str(budget.blocked())))
+            continue
         hand.begin_turn(message)  # the ledger learns whose words this turn is; see `chat`
+        restored = _replayed_provenance(session)
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
@@ -1782,7 +2186,9 @@ def assist(
             break
         if outcome != "ok":
             continue
-        _render_turn(report, session_id=usage_session, settings=settings, hand=hand)
+        _render_turn(
+            report, session_id=usage_session, settings=settings, hand=hand, restored=restored
+        )
         _render_memory_note(report, message, settings)
         _emit_memory_nudges(session, mem, nudged, "/profile preference: {fact}")
         _emit_skill_nudges(session, skill_names, skill_nudged)
@@ -1827,6 +2233,13 @@ def tui(
             no_memory=no_memory,
             session_id=None,
             new=False,
+            # Nor a `--max-usd`, for the same reason it has no `--write-region`: this is the
+            # surface whose gates cannot be answered and whose panel would have to show the
+            # ceiling for one to mean anything. `None` says "no ceiling asked for", which is what
+            # omitting the flag on `chimera chat` means — and it cannot be omitted here, or it
+            # would arrive as an `OptionInfo` and `session_budget` would read that object as a
+            # truthy cap. The guard below caught exactly that the day this flag was added.
+            max_usd=None,
             # `tui` has no `--write-region` of its own, so the fallback states the same "no region
             # asked for" that omitting the flag on `chimera chat` means. It cannot be omitted here:
             # the parameter would arrive as an `OptionInfo` object and `.split(",")` would fail on
@@ -3601,8 +4014,14 @@ def solve(
     answer_text: str = typer.Option(
         None, "--answer", help="The human-corrected answer for --edit."
     ),
-) -> None:
-    """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key."""
+) -> Any:
+    """Tier-2: autonomously solve a task with plan + verify-or-revert. Requires a key.
+
+    In the shell nothing about this has changed: a run that fails still exits 1. Inside the process
+    it now hands its run back — returned on success, carried on the ``SolveFailed`` exit otherwise —
+    so ``/solve`` in a REPL can put the loop's own answer into the conversation instead of writing
+    a sentence of its own.
+    """
     from chimera.core import (
         Agent,
         AgentConfig,
@@ -4020,7 +4439,19 @@ def solve(
         )
 
     if not result.success:
-        raise typer.Exit(code=1)
+        # Still exit 1, still a `typer.Exit`: the shell sees exactly what it saw before. The
+        # subclass carries the run so a caller inside this process — `/solve` in a REPL — can put
+        # the loop's own answer into the conversation instead of writing one for it.
+        raise SolveFailed(result)
+    return result
+
+
+#: The shipped ``solve``, held by reference so :func:`_solve_defaults` reads ITS parameters.
+#:
+#: By reference and not by name. Something that stands in for ``solve`` — a test recorder, a future
+#: wrapper — must not also get to redefine the list of parameters it is called with; that would
+#: make the anti-``OptionInfo`` guard agree with whatever is in front of it.
+_SOLVE_COMMAND: Any = solve
 
 
 def _report_collusion(ledgers: dict[str, Any]) -> bool:

@@ -1,5 +1,5 @@
 ---
-source_sha256: 2d9c0780fb8035a4f4d902633153e8a60eaae25cab795178adf8cbf4b10b5deb
+source_sha256: ae2985faac110bf7fd749eda9643902f2e92b64ad775c999d3217dacf3b6bdf4
 ---
 
 # Chimera —— 使用指南
@@ -115,6 +115,7 @@ uv run chimera chat --session standup      # -s: resume, or name, one thread by 
 uv run chimera chat --no-memory            # don't recall long-term memory
 uv run chimera chat --cascade              # tiered routing: weak -> gate -> mid -> gate -> fusion
 uv run chimera chat --fuse                 # fusion routing for tool-free turns (read the note)
+uv run chimera chat --max-usd 0.50         # ceiling for the WHOLE thread, not for one turn
 uv run chimera chat --write-region 'src/**,*.py'   # the only paths the file-writers may touch
 uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 ```
@@ -123,7 +124,8 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 的工具调用步数；`--model`/`-m` 覆盖模型 slug——但请看下面关于路由的提示。
 
 命令：`/help` · `/new`（新线程——当前这条仍留在磁盘上） · `/reset`（等同于 `/new`） ·
-`/model <slug>`（不带参数则回到默认） · `/exit`（也可用 `/quit`、`/q`）。
+`/model <slug>`（不带参数则回到默认） · `/solve <任务>`（交给带验证的循环） ·
+`/exit`（也可用 `/quit`、`/q`）。
 
 **它是受管控的，而且会问你。** `chat` 和 `assist` 会搭起与 API 路径相同的那一套：一个被告知
 你自己那条消息的污点台账、包住不可信工具输出的 `<<external-data>>` 围栏、信任内核、
@@ -142,10 +144,26 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
   一轮当中敲下的 `y`，在回复滚走之后仍留有痕迹。
 - **`--fuse` 不会融合携带工具的一轮，而 REPL 的每一轮都携带工具。** 路由器会把任何带工具的
   轮次发给单个模型，所以这里带 `--fuse` 的一轮实际上就是单模型的一轮。同时给出两者时
-  `--cascade` 还会压过 `--fuse`；在这两者之下都由分层阶梯来选模型，于是在你把它们去掉之前，
-  `--model` 与 `/model` 都不起作用。终端里真正会融合的唯一路径是 `assist` 的 `/task`。
+  `--cascade` 还会压过 `--fuse`。终端里真正会融合的唯一路径是 `assist` 的 `/task`。
+- **点名一个模型就会把它钉住，分层阶梯随之让位。** 在 `--cascade` 之下，是阶梯在为每一轮挑
+  模型，而它过去会一声不吭地把你点名的 slug 吞掉。如今只要有一个被点名，`--model` 与
+  `/model <slug>` 就说了算——会有一行告诉你阶梯已关闭——而 `/model` 不带参数就把这份差事还
+  给它。
 - 每一轮都会打印它的 token 与价格——当模型标价未知时显示 `cost: unavailable`，绝不会给出一个
   猜来的零——并向 `<home>/usage.jsonl` 追加一行，桌面应用的成本页读的正是这个文件。
+- **`--max-usd` 框住的是整条线程，不是一轮。** 一只计量器从第一条消息一直走到 `/exit`；
+  `/solve` 花的是同一笔钱；一旦花光，下一条消息在发出之前就会被拒绝，而不是先付一次调用、再
+  发现已经什么都不剩。被截短的回复——因为上限、因为 `--max-steps`，或者因为上下文已经
+  装不下——会用单独一行说明这件事，否则一个被截断的答案读起来和一个完成的答案一模一样。
+- **被恢复的一轮会自报家门。** 当一条线程从磁盘回来时，回复下方会有一行浅色文字，数出被恢复
+  的重放轮次，以及其中有多少从未记录过来源。这些内容是在数据围栏之内重放的，而不是当作模型
+  自己的话；而在此之前，这道围栏对它所保护的那个人来说是看不见的。
+- **`/solve <任务>` 把对话交给带验证的循环**——规划、编辑、验证，并在失败时回滚这次尝试，这
+  正是桌面端代码页那两个按钮里的第二个。它从不自行启动，运行前会先打印任务和上限，而循环自
+  己的回答会记进线程。不带参数时，它取你最后问的那件事。
+- **MCP 服务器也进得了终端。** 设置 `CHIMERA_MCP_AUTOLOAD=1` 后，`mcp.json` 里的服务器会挂在
+  围栏之前，于是黑名单、内核与污点台账都覆盖得到它们，而某个服务器的输出会像任何别的外部读
+  取一样落在数据围栏之内。它们每个进程只连接一次，并与应用共享，因此不会被重复启动。
 - `/reset` **会开一条新线程**，它不会抹掉当前这条。当年磁盘上什么都没有时它清的是内存里的
   记录；如今线程已经是一个文件，就地清空等于毁掉工作。（在什么都不持久化的 `assist` 和 `tui`
   里，`/reset` 依然是清空上下文。）
@@ -162,18 +180,26 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 uv run chimera assist                      # cascade, profile and memory on
 uv run chimera assist --no-cascade         # one default model instead of the ladder
 uv run chimera assist --no-memory          # don't recall long-term memory
+uv run chimera assist --max-usd 0.25       # ceiling for the WHOLE run, not for one turn
 uv run chimera assist --write-region 'src/**'      # the only paths the file-writers may touch
 uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 ```
 
-命令：`/help` · `/task <难题>`（全功率融合，一次成型） · `/profile <种类>: <事实>`（记住关于你
-的一件事——种类：`preference`、`project`、`context`、`name`） · `/model <slug>` ·
-`/reset`（清空对话上下文；不会删除任何东西） · `/exit`（也可用 `/quit`、`/q`）。
+命令：`/help` · `/task <难题>`（全功率融合，一次成型） · `/solve <任务>`（交给带验证的循环） ·
+`/profile <种类>: <事实>`（记住关于你的一件事——种类：`preference`、`project`、`context`、
+`name`） · `/model <slug>` · `/reset`（清空对话上下文；不会删除任何东西） ·
+`/exit`（也可用 `/quit`、`/q`）。
 
 管控方式与 `chat` 完全一致——同一套注册表、同一个会发问的审批器、同样的拒绝行、治理行与成本
-行，以及同样的 `usage.jsonl` 记录。有三点差别值得知道：**`assist` 不保留线程**（退出即忘——
-想要能找回的对话请用 `chat`）；在级联之下由阶梯来选模型，因此 `--model` 与 `/model` 只有配合
-`--no-cascade` 才生效；而 `/task` 是在对话之外作答的，它的回答不会进入下一轮的上下文。
+行、同样的 `usage.jsonl` 记录、同样的 MCP 服务器、同样一只贯穿整次运行的 `--max-usd` 计量器，
+以及同样的 `/solve`。有两点差别值得知道：**`assist` 不保留线程**（退出即忘——想要能找回的对
+话请用 `chat`）；以及点名一个模型就会把它钉住，只要它还被钉着，分层阶梯就处于关闭状态——选模
+型的正是阶梯，而它过去只是收下那个 slug 然后不予理会。
+
+`/task` 只对这个提问本身跑一次强制融合：对话不会被送进面板，这是有意为之，因为把线程喂给一个
+面板加一个评审者加一个综合器，会把这条本就该省着用的路径的成本成倍放大。它的回答如今*会*进入
+下一轮的上下文，并且和其他每一轮一样打印价格、写入一行 `usage.jsonl`——终端里最贵的那条路径，
+恰恰是成本页看不见的那一条。
 
 ### `tui` —— 全屏终端应用
 
@@ -189,7 +215,7 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 ```
 
 参数与两个 REPL 并不相同。`tui` 有 `--stream`/`--no-stream`，而它们没有；`chimera chat` 的
-`--cascade`、`--session`、`--new` 与 `--write-region` 在这里没有对应项。
+`--cascade`、`--session`、`--new`、`--max-usd` 与 `--write-region` 在这里没有对应项。
 
 命令：`/model <slug>` · `/reset`（清空上下文） · `/clear`（清屏） · `/stream`（切换实时 token
 流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 重置 · `Ctrl+L` 清屏 ·
@@ -209,8 +235,9 @@ uv run chimera tui --model MODEL --workspace DIR --max-steps 8
   的是参数而不是路由：与 `chat` 一样，携带工具的一轮不会融合，而 REPL 的每一轮都携带工具。
 - 当某个模型的标价未知时，成本会显示为"unavailable"（不可用，绝不会去猜测）；并且每一轮都会
   像两个 REPL 那样追加到 `<home>/usage.jsonl`。
-- 这里没有 verify/revert（验证/回滚）指示器：verify-or-revert 只运行在 `solve`/`project` 中，
-  不运行在 chat 里。
+- 这里没有 verify/revert（验证/回滚），也没有 MCP。两者都去了 `chat` 与 `assist`——它们会响应
+  `/solve` 并挂载配置好的服务器——因为这两件事都建立在污点台账和审批器之上，而这个界面已经决
+  定不要它们。verify-or-revert 同样运行在 `chimera solve` 与 `chimera project` 中。
 - 如果没有安装 Textual，`tui` 会退回到普通的 `chat` REPL，并把每一个参数都显式传过去，好让这次
   回退能撑过它的第一轮。流式在那里没有意义，而线程会像任何其他 `chat` 线程一样被保存。
 

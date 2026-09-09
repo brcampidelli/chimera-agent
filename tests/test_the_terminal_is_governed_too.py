@@ -477,6 +477,11 @@ def _drive(monkeypatch: pytest.MonkeyPatch, command: str) -> Any:
     built: list[Any] = []
 
     class Fake:
+        #: The real session has one, and the REPL reads it to know which turns this prompt
+        #: replayed (`_replayed_provenance`). A fake without it raised `AttributeError` inside
+        #: Typer, which `CliRunner` reports as a non-zero exit and nothing else.
+        max_history = 6
+
         def __init__(self, agent: Any, **kwargs: Any) -> None:
             built.append(agent)
             self.turns: list[Any] = []

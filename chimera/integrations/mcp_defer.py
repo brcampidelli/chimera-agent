@@ -26,10 +26,18 @@ while `mcp_call` could still reach it. That is the same hole `ExploreRepositoryT
 itself for being registered after the filter, and it is worse here because one proxy reaches
 everything.
 
-And ``untrusted_output`` is True on the proxy, unconditionally. MCP output is external content; the
-taint layer keys fencing and run-tainting off that flag, and it is read before anyone knows which
-tool the proxy will call. Mirroring the target's flag would be more precise and would resolve, at
-the moment it matters, to "unknown".
+And ``untrusted_output`` is True on **all three** proxies, unconditionally. MCP output is external
+content; the taint layer keys fencing and run-tainting off that flag, and it is read before anyone
+knows which tool the proxy will call. Mirroring the target's flag would be more precise and would
+resolve, at the moment it matters, to "unknown".
+
+The flag was on ``mcp_call`` alone until ``chimera chat``/``assist`` gained MCP, and
+``docs/audits/sleeper-channels.md`` had already written down why that was wrong (channel 10, open
+question 6): what ``mcp_list`` and ``mcp_describe`` return is a **server-authored description**,
+which is external text arriving as an observation, and the argument three paragraphs up applies to
+it word for word. It stayed unfenced because the only surfaces that mounted MCP were fenced
+elsewhere; mounting it on the surface a person sits at is what made the gap reachable, so it was
+closed in the same change rather than inherited.
 """
 
 from __future__ import annotations
@@ -83,6 +91,10 @@ class McpListTool(Tool):
             }
         },
     }
+    #: Every line of this answer is a name and a description the SERVER wrote. See the module
+    #: docstring: the argument for the flag on `mcp_call` is an argument about external text
+    #: arriving as an observation, and a catalogue is exactly that.
+    untrusted_output = True
 
     def __init__(self, catalogue: _McpTools) -> None:
         self.catalogue = catalogue
@@ -114,6 +126,9 @@ class McpDescribeTool(Tool):
         "properties": {"tool": {"type": "string", "description": "Exact tool name from mcp_list."}},
         "required": ["tool"],
     }
+    #: The whole answer is the server's own description and its own JSON schema — the longest,
+    #: least-summarised piece of server-authored text any of these three returns.
+    untrusted_output = True
 
     def __init__(self, catalogue: _McpTools) -> None:
         self.catalogue = catalogue
