@@ -413,6 +413,11 @@ treats exactly as it treats `agent`. The desktop chat factory still does not cal
 (`chimera/api/posture.py`: *"the mode travels; the instruction cannot"*), so that setting remains
 inert there — measured here, not fixed here.
 
+> **2026-09-10 — fixed, and the sentence above is now history.** The app's chat has an arm of its
+> own (Part 4 below) and the wire it was missing. What that arm found on the way is worth more than
+> the fix: its first version reported the expected answer for a reason that had nothing to do with
+> the surface.
+
 ## The structural probe, and one probe defect found and thrown away
 
 ```
@@ -813,3 +818,75 @@ caught it looped until the row filled, which is exactly how a test agrees with a
   a wrong "yes" any less wrong. `over_block=0.000` in the answered arm belongs to a person who
   answered five questions in eight rows of work they had asked for, and it stays an arm rather than a
   property of the defence.
+
+---
+
+# Part 4 — the app chat's taint lever (2026-09-10)
+
+Pre-registered in `PREREGISTRATION-app-chat.md`, written before the arm existed and before a line of
+the fix. Offline, stub tools, US$ 0.
+
+## The claim under test
+
+`guard_chat_registry` — what `chimera/cli/main.py:desktop_app` calls to protect the app's chat —
+builds a `TaintLedger` under the deployment's authority mode and nothing ever tells it an
+instruction. `requester_of` answers `unknown` for such a ledger, the narrowing treats `unknown`
+exactly as it treats `agent`, so `CHIMERA_TAINT_AUTHORITY` has nothing to be a mode about.
+
+## The result
+
+| setting | terminal | tui | governed | **app_chat** | **app_chat_untold** |
+|---|---|---|---|---|---|
+| `CHIMERA_TRUST_WORKSPACE=0` | CHANGED, 3 rows | CHANGED, 3 | CHANGED, 3 | CHANGED, 2 | CHANGED, 2 |
+| `CHIMERA_TAINT_AUTHORITY=authority` | CHANGED, 9 rows | CHANGED, 9 | CHANGED, 9 | **CHANGED, 6** | **identical, 0** |
+
+`app_chat_untold` is the surface as it shipped: the same registry, the same ledger, the same mode,
+and nothing telling it the turn's words. `app_chat` is the same arm told the message. **The
+difference between those two columns is the entire change**, on one instrument in one run, and the
+untold column stays permanently — the day the wire is removed again, the two converge and say so.
+
+**Six and not nine, and this was registered before the arm ran** (prediction 4): `guard_chat_registry`
+resolves `Posture(reach=DEFAULT_REACH)`, which denies `code_interpreter`, `execute_code` and
+`run_shell` outright. Three of the terminal's nine rows act through `run_shell`, so on this arm they
+read `absent` — a tool that is not there refused nothing, and this table says nothing about block
+rate.
+
+## The arm's first version reported the right answer for the wrong reason
+
+The first run of this arm read `CHIMERA_TAINT_AUTHORITY=authority → identical (0 rows moved)` on
+**both** app columns, including the one that had just been handed the instruction. That is exactly
+the finding this section exists to show, and it was an artefact.
+
+`guard_chat_registry` takes no `settings` argument: it reads the process-wide `get_settings()`. That
+is right in the app — `PATCH /api/config` clears that `lru_cache`, so the factory's
+`live = get_settings()` really does read fresh — and it means a bench holding a `Settings` object is
+holding something the function never consults. The arm was measuring its own inability to configure
+the code under test.
+
+**What exposed it was the control passing for the wrong reason.** `CHIMERA_TRUST_WORKSPACE` did move
+rows on the app arm, which read as "the arm works, the lever is dead". It reaches the ledger through
+`build_stub_registry(settings, …)` — the bench's own object — and never touches the function under
+test. Two settings, two routes, and only one of them connected to the arm at all. A control is only a
+control for the path it actually travels (`bee-pretreino-licoes` §2q).
+
+Fixed with `_as_process_settings`, which exports the arm's settings and clears the cache for the
+length of one build. With it, the numbers above.
+
+## And a dead branch in the harness, alive for the first time
+
+`run_arm` has always had an `if action is None` branch that records an episode as `absent`.
+`ToolRegistry.get` **raises** for an unknown name, so that branch had never been reachable: every arm
+until now kept every tool the corpus names. The `app_chat` arm is the first that does not, and it
+arrived as a traceback rather than as a row. `_maybe` is the lookup that makes an absent tool a
+result.
+
+## What this part cannot show
+
+The arm builds the registry the app's chat builds; it is not the app. No SSE, no session manager, no
+messaging gateway — that half is `tests/test_the_app_chat_tells_its_ledger_whose_turn_it_is.py`,
+which drives the real command and asks the ledger the session is actually using what it now answers.
+Splitting it that way is not tidiness: #400 shipped four checks that asked whether a command *called*
+its builder, and a sabotage that called the builder and then discarded the result passed 0 of 109.
+
+It also says nothing about whether `authority` is a mode anyone should turn on. It measures that the
+lever is connected, not that pulling it is wise.
