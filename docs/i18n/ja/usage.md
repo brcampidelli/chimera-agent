@@ -1,5 +1,5 @@
 ---
-source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
+source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
 ---
 
 # Chimera — 利用ガイド
@@ -180,8 +180,8 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
   一度だけ接続してアプリと共有するので、二重に起動されるものはありません。
 - `/reset` は**新しいスレッドを開始**します。現在のスレッドを消しはしません。ディスクに何も
   なかった頃はメモリ上の記録を消していましたが、スレッドがファイルになった今、その場で消すのは
-  作業を破棄することになります。(何も永続化しない `assist` と `tui` では、`/reset` は今も
-  コンテキストをクリアします。)
+  作業を破棄することになります。(何も永続化しない `assist` では、`/reset` は今もコンテキスト
+  をクリアします。`tui` はこれと同じストアに書き込み、`/reset` を同じように再定義しました。)
 - `chimera doctor` は、エージェントのコマンドがどこで実行されるか、そして先に尋ねるかどうかを
   報告します: 設定されたサンドボックス、OSのサンドボックスが実際に利用できるか、そしてホスト
   実行の姿勢です。
@@ -234,6 +234,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 REPLと同じフラグではありません。`tui` には `--stream`/`--no-stream` があり、REPLにはありません。
@@ -241,12 +243,12 @@ REPLと同じフラグではありません。`tui` には `--stream`/`--no-stre
 所を待っていました: アクティビティパネルは今、残りを示す `budget` の行を備えています。誰にも見
 えない上限は、お金で止まったターンを、目に見える理由もなく止まったターンに変えてしまうからです。
 
-`chimera chat` の `--cascade`、`--session`、`--new`、`--write-region` に相当するものはここに
-はありません。
+`--session`、`--new`、`--write-region` は `chimera chat` と同じように、同じセッションストア上で
+動きます。ここに相当するものがないのは `--cascade` だけです。
 
-コマンド: `/model <slug>` · `/reset`(コンテキストをクリア) · `/clear`(画面をクリア) ·
+コマンド: `/model <slug>` · `/new`(新しいスレッド。`/reset` は別名) · `/clear`(画面をクリア) ·
 `/stream`(ライブトークンの切り替え) · `/help` · `/exit`(`/quit`、`/q` も可)。キー:
-`Ctrl+R` リセット · `Ctrl+L` クリア · `Ctrl+P` コマンドパレット · `PgUp`/`PgDn` スクロール ·
+`Ctrl+R` 新しいスレッド · `Ctrl+L` クリア · `Ctrl+P` コマンドパレット · `PgUp`/`PgDn` スクロール ·
 `Ctrl+C` 終了。スラッシュコマンドは入力中にオートコンプリートされます。
 
 正直な注記:
@@ -268,7 +270,13 @@ REPLと同じフラグではありません。`tui` には `--stream`/`--no-stre
   の下にツール自身の一文を示していました。会話ログも `✗ run_shell did not succeed: …` を示しま
   す。そこは、走らなかったコマンドについてのモデルの説明があるのと同じ場所です。承認にも1行があ
   り(`governance: 1 approved this turn`)、ターンの途中で押した `y` は痕跡を残します。
-- 何も永続化しません: TUIを閉じると会話は終わります。スレッドがあるのは `chat` です。
+- **会話はウィンドウより長く残ります。** すべてのターンが `<home>/sessions` に保存されます —
+  `chat` が書き込み `chimera sessions` が一覧するのと同じストアなので、片方のサーフェスで
+  始めたスレッドはもう片方で続きます — そして既定では最新のスレッドが再開されます。だから
+  `/reset` はこのスレッドをクリアするのではなく、新しいスレッドを始めます: すでにファイル
+  になっているスレッドをその場でクリアすることは、それを破壊するコマンドだからです。再開時
+  にスクロールバックは描き直されません。バナーの下の行が、画面には出ていないがモデルには
+  見えているターン数を伝えます。残りは `chimera tui --help` にあります。
 - トークンストリーミングは単一モデルの経路のみです — `--fuse`(パネル→ジャッジ→シンセサイザー
   のターン)の下では逐次トークンはないため、パネルは偽のカーソルではなく「合成中」というステー
   タスを表示します。このラベルは経路ではなくフラグに従います: `chat` と同じく、ツールを伴う

@@ -1,5 +1,5 @@
 ---
-source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
+source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -207,8 +207,9 @@ Ehrlichkeitshinweise:
 - `/reset` **startet einen neuen Thread**; es löscht den aktuellen nicht. Früher
   leerte es ein Transkript im Speicher, als nichts auf der Platte lag; jetzt, wo
   der Thread eine Datei ist, würde ein Leeren an Ort und Stelle Arbeit
-  vernichten. (In `assist` und `tui`, die nichts persistieren, leert `/reset`
-  weiterhin den Kontext.)
+  vernichten. (In `assist`, das nichts persistiert, leert `/reset` weiterhin
+  den Kontext. `tui` schreibt in denselben Speicher und hat `/reset` genauso
+  umdefiniert.)
 - `chimera doctor` sagt, wo die Befehle des Agenten laufen und ob er vorher
   fragt: die konfigurierte Sandbox, ob eine OS-Sandbox tatsächlich verfügbar ist,
   und die Host-Ausführungs-Haltung.
@@ -269,6 +270,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 Nicht dieselben Flags wie die REPLs. `tui` hat `--stream`/`--no-stream`, was
@@ -278,12 +281,12 @@ werden kann: Das Aktivitätspanel führt jetzt eine `budget`-Zeile mit dem Rest,
 denn eine Obergrenze, die niemand sehen kann, macht aus einem Turn, der wegen
 des Geldes stoppte, einen Turn, der ohne sichtbaren Grund stoppte.
 
-Die `--cascade`, `--session`, `--new` und `--write-region` von `chimera chat`
-haben hier keine Entsprechung.
+`--session`, `--new` und `--write-region` verhalten sich wie in `chimera chat`,
+auf demselben Sitzungsspeicher. Nur `--cascade` hat hier keine Entsprechung.
 
-Befehle: `/model <slug>` · `/reset` (Kontext leeren) · `/clear` (Bildschirm
+Befehle: `/model <slug>` · `/new` (neuer Thread; `/reset` ist ein Alias) · `/clear` (Bildschirm
 leeren) · `/stream` (Live-Token umschalten) · `/help` · `/exit` (auch `/quit`,
-`/q`). Tasten: `Ctrl+R` zurücksetzen · `Ctrl+L` leeren · `Ctrl+P` Befehlspalette
+`/q`). Tasten: `Ctrl+R` neuer Thread · `Ctrl+L` leeren · `Ctrl+P` Befehlspalette
 · `PgUp`/`PgDn` scrollen · `Ctrl+C` beenden. Slash-Befehle werden beim Tippen
 automatisch vervollständigt.
 
@@ -313,8 +316,15 @@ Ehrlichkeitshinweise:
   steht auch die Erzählung des Modells über einen Befehl, der nie lief. Eine
   Freigabe bekommt ebenfalls eine Zeile (`governance: 1 approved this turn`),
   damit ein `y`, das du mitten im Turn angeklickt hast, eine Spur hinterlässt.
-- Es persistiert nichts: Das Schließen des TUI beendet das Gespräch. `chat` ist
-  die Oberfläche mit Threads.
+- **Das Gespräch überlebt das Fenster.** Jeder Turn wird unter `<home>/sessions`
+  gespeichert — derselbe Speicher, den `chat` schreibt und `chimera sessions`
+  auflistet, sodass ein auf einer Oberfläche begonnener Thread auf der anderen
+  weitergeht — und der neueste Thread wird standardmäßig fortgesetzt. Deshalb
+  startet `/reset` einen NEUEN Thread, statt diesen zu leeren: Einen Thread, der
+  jetzt eine Datei ist, an Ort und Stelle zu leeren, wäre der Befehl, der ihn
+  vernichtet. Der Verlauf wird beim Fortsetzen nicht neu gezeichnet, und die Zeile
+  unter dem Banner sagt, wie viele Turns das Modell sieht, die der Bildschirm nicht
+  zeigt. `chimera tui --help` hat den Rest.
 - Token-Streaming ist nur der Single-Model-Pfad — unter `--fuse` (ein
   Panel-→Judge-→Synthesizer-Turn) gibt es keine inkrementellen Token, daher zeigt
   das Panel einen "synthesizing"-Status statt eines vorgetäuschten Cursors.

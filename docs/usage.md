@@ -176,7 +176,8 @@ Honesty notes:
   once per process and shared with the app, so nothing is spawned twice.
 - `/reset` **starts a new thread**; it does not erase the current one. It cleared an in-memory
   transcript back when nothing was on disk; now that the thread is a file, clearing it in place
-  would destroy work. (In `assist` and `tui`, which persist nothing, `/reset` still clears context.)
+  would destroy work. (In `assist`, which persists nothing, `/reset` still clears context.
+  `tui` writes to this same store and redefined `/reset` the same way.)
 - `chimera doctor` reports where the agent's commands run and whether it asks first: the configured
   sandbox, whether an OS sandbox is actually available, and the host-execution posture.
 
@@ -227,6 +228,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they do not have, and
@@ -234,10 +237,12 @@ Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they 
 show it: the activity panel now carries a `budget` row with what is left, because a ceiling nobody
 can see turns a turn that stopped for money into a turn that stopped for no visible reason.
 
-The `--cascade`, `--session`, `--new` and `--write-region` of `chimera chat` have no equivalent here.
+`--session`, `--new` and `--write-region` behave as they do in `chimera chat`, on the same session
+store. Only `--cascade` has no equivalent here.
 
-Commands: `/model <slug>` · `/reset` (clear context) · `/clear` (clear screen) · `/stream` (toggle
-live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` reset · `Ctrl+L` clear ·
+Commands: `/model <slug>` · `/new` (fresh thread; `/reset` is an alias) · `/clear` (clear screen) ·
+`/stream` (toggle live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` new thread ·
+`Ctrl+L` clear ·
 `Ctrl+P` command palette · `PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash commands autocomplete as you
 type.
 
@@ -259,7 +264,12 @@ Honesty notes:
   sentence beneath its `✗`; the conversation log shows `✗ run_shell did not succeed: …` as well,
   which is where the model's account of a command that never ran also is. An approval gets a line
   too (`governance: 1 approved this turn`), so a `y` you clicked mid-turn leaves a trace.
-- It persists nothing: closing the TUI ends the conversation. `chat` is the surface with threads.
+- **The conversation outlives the window.** Every turn is saved under `<home>/sessions` — the same
+  store `chat` writes and `chimera sessions` lists, so a thread started on one surface continues on
+  the other — and the newest thread resumes by default. That is why `/reset` starts a NEW thread
+  instead of clearing this one: clearing a thread that is now a file would be the command that
+  destroys it. The scrollback is not redrawn on resume, and the line under the banner says how many
+  turns the model can see that the screen has not. `chimera tui --help` has the rest.
 - Token streaming is the single-model path only — under `--fuse` (a panel→judge→synthesizer turn)
   there are no incremental tokens, so the panel shows a "synthesizing" status rather than a fake
   cursor. That label follows the flag and not the route: as in `chat`, a turn carrying tools does
