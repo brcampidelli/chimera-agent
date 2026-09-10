@@ -127,6 +127,18 @@ that path no longer exists in the suite.
 (`openrouter/deepseek/deepseek-chat-v3.1`). Above ~85% it is another ceiling and carries no
 information about a change; below ~20% it is a floor and carries just as little.
 
+> **⚠️ 2026-09-10 — the warning in the next paragraph rests on a false premise. The registered text
+> below is left exactly as written**, because a registration amended after its measurement is worth
+> nothing; this note records what was later found to be wrong with it.
+>
+> "Every attempt in the learning-lift series came out at 84–92%" is not true. The first attempt's
+> control landed at **50.0%** and, on its re-run, **45.0%** on the registered first-half criterion —
+> inside the 40–60% band, twice. The claim also pools two models. See the correction at the top of
+> `bench/learning_lift/RESULTS.md`, and the committed result directories it now cites.
+>
+> This does not change what this file registered or how its run should be read. It changes the
+> reason given for the expectation.
+
 This expectation is registered with a warning attached to it. The project's memory records that
 **no synthetic suite this project has authored has landed in that band in three tries** — every
 attempt in the learning-lift series came out at 84–92%. If this one does the same, that is what

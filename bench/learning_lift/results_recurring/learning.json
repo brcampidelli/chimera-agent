@@ -1,0 +1,903 @@
+{
+  "suite": "recurring",
+  "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+  "learn_use_connected": true,
+  "semantic_recall": true,
+  "seeds": 3,
+  "tasks": [
+    "guard_mean",
+    "guard_first_word",
+    "guard_longest",
+    "guard_last",
+    "guard_first_positive",
+    "copy_sorted",
+    "copy_reversed",
+    "copy_dedup",
+    "copy_merge",
+    "copy_scale",
+    "incl_range_sum",
+    "incl_countdown",
+    "incl_count_between",
+    "incl_char_span",
+    "incl_pages",
+    "case_contains",
+    "case_dedup",
+    "case_count",
+    "case_group",
+    "case_index",
+    "reset_run_lengths",
+    "reset_group_sums",
+    "reset_chunks",
+    "reset_word_counts",
+    "reset_max_per_line"
+  ],
+  "half": 12,
+  "paired": {
+    "n": 75,
+    "baseline_rate": 0.9067,
+    "treatment_rate": 0.96,
+    "delta": 0.0533,
+    "discordant": {
+      "baseline_only": 1,
+      "treatment_only": 5
+    },
+    "diff_ci": [
+      -0.0102,
+      0.0752
+    ],
+    "significant": false
+  },
+  "family_transfer": {
+    "first_member": {
+      "n": 15,
+      "baseline_rate": 0.9333,
+      "treatment_rate": 0.9333,
+      "delta": 0.0,
+      "discordant": {
+        "baseline_only": 1,
+        "treatment_only": 1
+      },
+      "diff_ci": [
+        -0.1081,
+        0.1081
+      ],
+      "significant": false
+    },
+    "later_member": {
+      "n": 60,
+      "baseline_rate": 0.9,
+      "treatment_rate": 0.9667,
+      "delta": 0.0667,
+      "discordant": {
+        "baseline_only": 0,
+        "treatment_only": 4
+      },
+      "diff_ci": [
+        0.0013,
+        0.0667
+      ],
+      "significant": true
+    },
+    "transfer_gap": 0.0667
+  },
+  "mean_did": 0.10256410256410257,
+  "per_seed": [
+    {
+      "seed": 1,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false
+      ],
+      "did": 0.07692307692307687,
+      "skills_learned": 11
+    },
+    {
+      "seed": 2,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "did": 0.07692307692307698,
+      "skills_learned": 11
+    },
+    {
+      "seed": 3,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "did": 0.15384615384615385,
+      "skills_learned": 12
+    }
+  ],
+  "skill_card_uses": 42,
+  "skill_stats_last_seed": [
+    {
+      "name": "fix_longest_string_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 2,
+      "successes": 2,
+      "rate": 1.0
+    },
+    {
+      "name": "fix_first_positive_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 3,
+      "successes": 3,
+      "rate": 1.0
+    },
+    {
+      "name": "dict_merge_without_modification",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_scale_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_inclusive_range_sum",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 3,
+      "successes": 3,
+      "rate": 1.0
+    },
+    {
+      "name": "fix_inclusive_substring_extraction",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_page_number_list",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_case_insensitive_membership_check",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 5,
+      "successes": 5,
+      "rate": 1.0
+    },
+    {
+      "name": "fix_chunk_buffer_reset",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "reset_buffer_after_chunk",
+      "kind": "anti_pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_reset_max_per_line",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "reset_max_per_line",
+      "kind": "anti_pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    }
+  ],
+  "accumulation": [
+    {
+      "seed": 1,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 1,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 1,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 1,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 1,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 1,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 1,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 1,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 1,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 1,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 1,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 16,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 1,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 1,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 1,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 1,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 1,
+      "i": 21,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 1,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 13
+    },
+    {
+      "seed": 1,
+      "i": 23,
+      "pass": false,
+      "skills_retrievable": 8,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 1,
+      "i": 24,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 15
+    },
+    {
+      "seed": 1,
+      "i": 25,
+      "pass": false,
+      "skills_retrievable": 11,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 2,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 2,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 2,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 2,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 2,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 2,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 2,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 2,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 2,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 2,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 2,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 6,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 2,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 2,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 2,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 2,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 2,
+      "i": 16,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 2,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 2,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 2,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 13
+    },
+    {
+      "seed": 2,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 13
+    },
+    {
+      "seed": 2,
+      "i": 21,
+      "pass": false,
+      "skills_retrievable": 9,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 2,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 2,
+      "i": 23,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 15
+    },
+    {
+      "seed": 2,
+      "i": 24,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 15
+    },
+    {
+      "seed": 2,
+      "i": 25,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 3,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 3,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 3,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 3,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 3,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 3,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 3,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 3,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 3,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 3,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 3,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 6,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 3,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 3,
+      "i": 16,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 21,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 3,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 3,
+      "i": 23,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 3,
+      "i": 24,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 3,
+      "i": 25,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 9
+    }
+  ],
+  "graded_against_pristine_test": true,
+  "tests_modified_by_solve": []
+}

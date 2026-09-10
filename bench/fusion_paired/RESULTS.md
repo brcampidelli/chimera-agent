@@ -26,6 +26,11 @@ Twenty-five single-model solves, twenty-five passes. `local_lift` was authored t
 arm sits at 100% cannot show a lift or a loss in either direction — the instrument cannot exhibit
 the effect, which is the `§2q` condition for a result that says nothing while looking like one.
 
+> **⚠️ 2026-09-10 — "84–92% every time" is wrong.** The learning-lift series' first attempt landed
+> at 50.0% and 45.0% on the registered first-half criterion, inside the band. The ceiling this file
+> hit is real and its own numbers are unaffected; the precedent cited for it was not three suites at
+> the ceiling but two. See the correction at the top of `bench/learning_lift/RESULTS.md`.
+
 This is the **third** time this project has run into an authored suite's ceiling. The learning-lift
 series tried three times to land a control arm in a 40–60% band and got 84–92% every time, and
 closed with the sentence that applies here word for word: *"we cannot build a synthetic suite that
