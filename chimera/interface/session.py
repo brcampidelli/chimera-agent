@@ -284,6 +284,19 @@ class ChatSession:
     #: ``None`` by default, and the default has to stay byte-identical: this class serves the
     #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which asked for a hook.
     on_turn_start: Callable[[str], None] | None = None
+    #: Where this session's pending approval questions are announced, for a surface that can draw
+    #: one. Held rather than called: it is a :class:`chimera.governance.approval.ApprovalAnnouncer`,
+    #: built with the tool registry and bound to a screen a moment later.
+    #:
+    #: It lives here for the same reason ``on_turn_start`` does — a mismatch of lifetimes. The
+    #: registry, and therefore the approver holding this announcer, is built once per SESSION; the
+    #: stream that can render the question exists once per TURN. The session object is the only
+    #: thing both halves can see, so it is where the two are introduced.
+    #:
+    #: ``None`` by default, and that default has to stay byte-identical: this class also serves the
+    #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which has a screen. An
+    #: announcer with nothing bound announces to nobody, which is exactly what those want.
+    approval_sink: Any = None
     turns: list[ChatTurn] = field(default_factory=list)
 
     def _begin_turn(self, message: str) -> None:

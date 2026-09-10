@@ -69,11 +69,16 @@ class MCPTool(Tool):
         and did not audit.
 
         It was fenced only inside ``LedgeredTool``, which is reached only when ``guard_chat`` is on,
-        and ``guard_chat`` defaults to False. So in every default configuration the output of a
-        remote MCP server reached the model raw: no fence, no defanging of chat-template tokens,
+        and ``guard_chat`` then defaulted to False. So in every default configuration the output of
+        a remote MCP server reached the model raw: no fence, no defanging of chat-template tokens,
         while the MCP screen stated the opposite as a property of the app. The ``untrusted_output``
         marker was doing half its job — the half that needs a ledger — and nothing at all on the
         surfaces that have no ledger, which is the surfaces MCP tools actually live on.
+
+        That default flipped on 2026-09-10 and this fence stays exactly where it is. The surfaces
+        with no ledger did not go away — ``/v1/chat/completions``, ``chimera serve`` under the
+        shipped governance mode, every bench — and a fence that lived in the guard would be a fence
+        those surfaces still did not have.
 
         The defanging runs BEFORE the fence, same order and same reason as the ledger's: content
         that can emit a chat-template token could otherwise spoof a system turn and step out of the

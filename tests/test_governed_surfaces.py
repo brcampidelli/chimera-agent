@@ -174,10 +174,15 @@ EXEMPT: dict[str, str] = {
     "chimera/cli/main.py:solve._run_solve": "own guard/taint/write-region flags + late-bound subagent",
     "chimera/cli/main.py:solve_batch.make_runner.run": "per-worker ledgers + shared cross-agent monitor",
     "chimera/cli/main.py:crew_isolated.make_factory.factory": "per-worker ledgers, shared taint view",
-    "chimera/cli/main.py:desktop_app.factory": (
-        "applies _apply_tool_allowlist and the optional chat guard itself. A SECOND implementation "
-        "of what this profile does, kept because it also carries MCP connectors the profile does "
-        "not model — consolidating the two is open work, not a settled answer"
+    "chimera/cli/main.py:desktop_app._chat_session": (
+        "applies _apply_tool_allowlist and the chat guard itself — guard_chat_registry, which "
+        "resolves its own posture and hands back the live TaintLedger the session's turn hook and "
+        "approval announcer both need; the profile would have built a SECOND ledger over it. A "
+        "SECOND implementation of what this profile does, kept because it also carries MCP "
+        "connectors the profile does not model — consolidating the two is open work, not a settled "
+        "answer. Was `desktop_app.factory` until 2026-09-10: the body became one builder with a "
+        "`guarded` flag, so the app's chat and /v1/chat/completions could be told apart. Pinned by "
+        "tests/test_the_app_chat_can_ask.py, which drives both factories rather than reading this"
     ),
     "chimera/api/code_api.py:assemble_registry": (
         "resolves its own posture floor + taint narrowing, and installs the deployment's "

@@ -659,20 +659,37 @@ class Settings(BaseSettings):
     # real boundary for hostile code — see SECURITY.md.)
     trust_workspace: bool = Field(default=True, validation_alias="CHIMERA_TRUST_WORKSPACE")
 
-    # Should the CHAT agent be assembled with the same protections the coding turn gets — a write
-    # region, a posture denylist, and the taint ledger wrapped around every tool?
+    # Should the CHAT agent be assembled with the same protections the coding turn gets — a posture
+    # denylist and the taint ledger wrapped around every tool?
     #
-    # Default False, and that default is a real exposure, chosen deliberately. The chat registry is
-    # shared with the messaging gateway and the OpenAI-compatible endpoint, so turning this on by
-    # default would silently take shell away from agents people already run in Discord. Off, the chat
-    # keeps the tools it has always had — and keeps the hole they come with: ask it to read a web page
-    # that carries a planted instruction, and nothing stops it from writing the file that instruction
-    # names. The coding turn refuses, because its ledger marks the run tainted.
+    # **Default True since 2026-09-10.** It shipped False for its whole life, and the reason was
+    # real: the chat registry was shared with the OpenAI-compatible endpoint, so arming it for the
+    # screen armed it for every benchmark harness too. Two things had to change first, and both
+    # did. `chimera app` now builds `/v1/chat/completions` from its own factory
+    # (`openai_factory`), so this setting reaches the screen and stops there. And
+    # `guard_chat_registry` now takes an `approve=`, which it was the one `ledger_registry` caller
+    # never to pass — so the narrowing had nobody to ask, and `LedgeredTool` reads nobody as refuse.
     #
-    # Because the default is the permissive one, the app STATES it: the posture line says, in a chat
-    # without a ledger, that this conversation can write after reading untrusted content. A silent
-    # permissive default is the one version of this decision that cannot be defended.
-    guard_chat: bool = Field(default=False, validation_alias="CHIMERA_GUARD_CHAT")
+    # Measured on the shipped bench, one corpus, three assemblies
+    # (`bench/right_hand_governance/RESULTS.md` §5b):
+    #
+    #     guard off (what shipped)      0 of 7 attacks blocked   over-block 0.000
+    #     guard on, nobody answers      7 of 7                   over-block 0.750
+    #     guard on, a person answers    7 of 7                   over-block 0.250
+    #
+    # Two thirds of the apparent price of this guard was the silence behind it, not the guard.
+    # What the default buys: ask the chat to read a page carrying a planted instruction and it can
+    # no longer write the file that instruction names without a person saying yes on the screen.
+    # What it costs: the exec tools leave the chat's registry (the posture denies them, as it always
+    # has on the coding turn), and a legitimate write after reading a page now draws a question.
+    #
+    # The messaging gateway was NEVER in this setting's blast radius, whatever the comment here used
+    # to say: `MessagingManager` builds its own sessions through `governed_profile`.
+    #
+    # Set it to `0` to get the old assembly back — and note that the app STATES which one it has:
+    # the posture line says, in a chat without a ledger, that the conversation can write after
+    # reading untrusted content.
+    guard_chat: bool = Field(default=True, validation_alias="CHIMERA_GUARD_CHAT")
 
     # Base URL for a local Ollama server. A model like `ollama_chat/llama3` runs on your machine
     # with no API key — set this only if Ollama listens somewhere other than the default. Reinforces

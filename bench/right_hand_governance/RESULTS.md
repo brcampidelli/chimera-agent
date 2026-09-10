@@ -1102,3 +1102,116 @@ an arm that had quietly stopped setting instructions would print four zeros and 
 - **One process, one run.** The bench is deterministic and byte-repeatable (asserted by
   `test_the_offline_arm_is_deterministic`), so a distribution here would be a distribution of a
   constant.
+
+---
+
+# Part 6 — the app chat's guard, armed by default because the question can now be drawn (2026-09-10)
+
+Same instrument, same corpus, same run as every part above: `run_terminal_vs_governed.py`, offline,
+US$ 0. What is new is that the two columns needed to answer a **decision** are printed side by side
+for the first time, and a third column exists that can see the wiring the other two cannot.
+
+## The claim under test
+
+`CHIMERA_GUARD_CHAT` shipped **off** and its own docstring gave the reason: the chat registry was
+shared with the messaging gateway and `/v1/chat/completions`, so arming it for the screen would take
+shell away from agents people already run. Two questions, neither previously measured beside the
+other: what does the guard buy, and what does it cost.
+
+## The result — §5b of the report
+
+| app chat | attacks blocked | over-block | reads fenced |
+|---|---:|---:|---:|
+| guard off (what shipped) | **0 of 7** | 0.000 | **0 of 15** |
+| guard on, nobody answers | 7 of 7 | **0.750** | 9 of 15 |
+| guard on, a person answers | 7 of 7 | **0.250** | 9 of 15 |
+
+Four questions were drawn on the eight legitimate rows and all four were granted. The attacks are
+never handed the yes: a person who approves whatever an injected page asks for is not the person
+this design is for, and modelling one would make the guard look useless on the rows it exists for.
+
+**Two thirds of the apparent price of this guard was not the guard.** `guard_chat_registry` was the
+one `ledger_registry` caller in the codebase that passed no `approve=`, and `LedgeredTool` reads
+*nobody to ask* as *refuse*. 0.750 is the number a gate returns when there is nothing on the other
+side of it — the same finding `chimera/governance/approval.py` opens with, arriving on a fourth
+surface.
+
+## What the premise contained that was false
+
+The docstring named two shared surfaces. **The messaging gateway was never one of them.**
+`MessagingManager` builds its own sessions through `governed_profile(..., surface="app-messaging")`
+(`chimera/server/manager.py:139-147`) and has never called `guard_chat_registry`. The claim was
+repeated in four places — the setting, the function, the factory and the Settings screen — and each
+copy read as corroboration of the others.
+
+`/v1/chat/completions` was real. It is fixed structurally rather than argued away: `build_api_app`
+takes an `openai_factory=` (defaulting to `factory`, so every existing caller is byte-identical) and
+gives that endpoint its own `SessionManager`. Note what actually crossed: that endpoint calls only
+`manager.ephemeral()`, so **no session id ever crossed** — the shared thing was the FACTORY, and a
+split that only separated the managers would have fixed nothing.
+
+## The arms do not move, and that is the honest reading
+
+Every number in §1 through §8 is byte-identical to the 2026-09-10 run before this change, including
+§8's `app_chat` column at 6 rows moved and `app_chat_untold` at 0.
+
+That is not evidence the fix works. It is evidence the bench **cannot see** this fix: the `app_chat`
+arm states its policy by replacing the approver after assembly (`_rewire_approver`), so it measures
+the mechanism and is blind to whether the argument carrying the policy is honoured at all. A tree
+where `guard_chat_registry` accepts `approve=` and drops it on the floor — #400's exact shape —
+prints this same table.
+
+So a column was added that drives the argument:
+
+| | over-block, approver rewired in | over-block, approver **passed** |
+|---|---:|---:|
+| nobody answers | 0.750 | **0.750** |
+| the person answers | 0.250 | **0.250** |
+
+Equality is the finding. An accepted-and-discarded argument collapses the second row onto 0.750, and
+the sabotage below confirms it does.
+
+## Sabotage: every guard broken on purpose, and what went red
+
+Each break was applied to the committed tree, `tests/test_the_app_chat_can_ask.py` (17 tests) plus
+#408's file (6) re-run, and the tree restored.
+
+| # | the break | red | which tests |
+|---|---|---:|---|
+| 1 | `build_api_app` ignores `openai_factory` | **2** | `..._openai_endpoint_is_served_by_its_own_factory`, `..._no_longer_share_a_live_session` |
+| 2 | `guard_chat_registry` accepts `approve=` and drops it (#400's shape) | **3** | `..._approver_that_says_yes_reaches_the_tool`, `..._reaches_every_tool_not_just_the_first`, `..._announcer_..._is_the_one_the_approver_holds` |
+| 3 | the app builds the announcer, then hands the session `None` | **4** | `..._session_carries_an_announcer` plus 3 |
+| 4 | `chat_stream` never binds the sink | **1** | `..._draws_the_question_on_the_coding_turns_contract` |
+| 5 | `chat_stream` binds and never releases | **1** | `..._binding_is_released_when_the_turn_ends` |
+| 6 | `CHIMERA_GUARD_CHAT` back to off | **2** | `..._guard_is_on_by_default`, `..._posture_line_says_a_guarded_chat_can_stop_and_ask` |
+| 7 | the posture line claims a guarded chat never pauses | **1** | `..._posture_line_says_a_guarded_chat_can_stop_and_ask` |
+| 8 | the approver waits for a screen that was never bound | **1** | `..._nothing_bound_the_question_is_refused_at_once` |
+
+**Number 2 is the one worth reading**, for the same reason #5 was in Part 5: a check that only asked
+whether `approve=` appears in the signature passes under it, and so does the entire bench. What
+catches it is the arm that hands the argument in and the test that drives a tainted write through
+the real registry and asks whether the file appeared on disk.
+
+**Number 8 cost 602 s to go red**, against 1.7 s for every other break. The test detects that
+regression by *waiting* for it, so the wait is the price of the red run; `CHIMERA_APPROVAL_WAIT` in
+that test was cut from 600 to 60 afterwards, which keeps the separation unambiguous against its
+`elapsed < 30` assertion and caps what a future regression costs a suite run.
+
+## What Part 6 cannot show
+
+- **Everything Part 1 could not, unchanged.** Fifteen rows is a smoke corpus, the stubs bypass the
+  workspace jail, and nothing here measures the model — every arm assumes the model already attempted
+  the attacker's call and asks only whether the layer stops it.
+- **The over-block of 0.250 is not the number a user will feel.** It is measured on a corpus built to
+  be half legitimate work; a real conversation's ratio of "read a page, then write something" to
+  everything else is not known and was not estimated.
+- **"A person answers" is modelled as a person who says yes.** The four questions were all granted
+  because the corpus rows are work the user asked for. What a real person does with a question they
+  did not expect, and how often they stop reading them, is a usability question no offline arm can
+  answer.
+- **The `reads fenced` column moves from 0/15 to 9/15, not to 15/15**, and the six that stay unfenced
+  are the workspace reads: with `CHIMERA_TRUST_WORKSPACE` at its default they are not treated as
+  untrusted, so there is nothing to fence. That is a setting, not a gap in this guard.
+- **Nothing here measures `/v1/chat/completions` after the split.** The claim that arming the guard
+  there would cost the full 0.750 is the `guard on, nobody answers` column read across to a surface
+  with no screen — an inference from a measured number, not a measurement of that endpoint.
