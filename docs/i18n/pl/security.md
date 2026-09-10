@@ -1,5 +1,5 @@
 ---
-source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
+source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -60,6 +60,27 @@ Zawsze tylko **eskaluje do przeglądu** — nigdy nie blokuje przebiegu — i je
 obserwowalnością (rejestrowanie, żadna zmiana zachowania). Dodaj `--taint` na wierzchu, by
 dodatkowo uzbroić adaptacyjną allowlistę każdego workera (narzędzia niebezpieczne-gdy-zeskażone
 wymagają wtedy zatwierdzenia).
+
+**Zatwierdzanie i jak wygląda odrzucony worker.** Każdy worker ma własnego zatwierdzającego i
+własny zapis tego, na co mu pozwolono, więc odrzucone zadanie mówi to wprost, zamiast
+raportować `ok`:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+`ok` w nawiasie to werdykt samej pętli, a to, że oba się nie zgadzają, jest tu sednem:
+odrzucone wywołanie wraca jako zwykła linia obserwacji, więc worker czyta ją jak każdy wynik
+narzędzia, idzie dalej i kończy prozą. Kogo można zapytać, decyduje `CHIMERA_APPROVAL_MODE` —
+`deny` odmawia od razu, `ask` pyta na terminalu, a poza nim zapisuje pytanie dla
+`chimera approve` i czeka `CHIMERA_APPROVAL_WAIT` sekund, na pytanie i na workera. Milczenie
+zawsze odmawia.
 
 ## Mierzone, nie deklarowane
 

@@ -1,5 +1,5 @@
 ---
-source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
+source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -62,6 +62,27 @@ Er **eskaliert immer nur zur Review** — er blockiert einen Lauf nie — und is
 Beobachtbarkeit (zeichnet Änderungen auf, ohne Verhalten zu beeinflussen). `--taint` zusätzlich
 setzen, um auch die adaptive Allowlist jedes Workers zu aktivieren (bei Kontamination
 gefährliche Tools brauchen dann Freigabe).
+
+**Freigabe, und wie ein abgelehnter Worker aussieht.** Jeder Worker trägt seinen eigenen
+Freigeber und seine eigene Aufzeichnung dessen, was er tun durfte — eine abgelehnte Aufgabe
+sagt das, statt `ok` zu melden:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+Das `ok` in Klammern ist das Urteil der Schleife selbst, und dass die beiden sich
+widersprechen, ist der Punkt: ein abgelehnter Aufruf kommt als gewöhnliche Beobachtungszeile
+zurück, der Worker liest sie wie jedes andere Tool-Ergebnis, macht weiter und endet in Prosa.
+Wen man fragen kann, folgt `CHIMERA_APPROVAL_MODE` — `deny` lehnt sofort ab, `ask` fragt an
+einem Terminal nach und schreibt die Frage sonst für `chimera approve` auf und wartet
+`CHIMERA_APPROVAL_WAIT` Sekunden, pro Frage und pro Worker. Schweigen lehnt immer ab.
 
 ## Gemessen, nicht behauptet
 

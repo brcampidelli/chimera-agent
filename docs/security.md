@@ -53,6 +53,25 @@ It only ever **escalates to review** — it never blocks a run — and it is pur
 (recording changes no behaviour). Add `--taint` on top to also arm each worker's adaptive
 allowlist (dangerous-when-tainted tools then require approval).
 
+**Approval, and what a refused worker looks like.** Each worker carries its own approver and its own
+record of what it was allowed to do, so a task that was refused says so rather than reporting `ok`:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+`ok` in parentheses is the loop's own verdict, and the two disagreeing is the point: a refused call
+comes back as an ordinary observation string, so the worker reads it like any tool result, carries
+on, and finishes in prose. Who can be asked follows `CHIMERA_APPROVAL_MODE` — `deny` refuses at
+once, `ask` prompts on a terminal and otherwise writes the question down for `chimera approve` and
+waits `CHIMERA_APPROVAL_WAIT` seconds per question, per worker. Silence always refuses.
+
 ## Measured, not asserted
 
 ```bash

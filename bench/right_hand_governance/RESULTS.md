@@ -1215,3 +1215,132 @@ that test was cut from 600 to 60 afterwards, which keeps the separation unambigu
 - **Nothing here measures `/v1/chat/completions` after the split.** The claim that arming the guard
   there would cost the full 0.750 is the `guard on, nobody answers` column read across to a surface
   with no screen — an inference from a measured number, not a measurement of that endpoint.
+
+---
+
+# Part 7 — `solve-batch` had a gate with nobody behind it (2026-09-10)
+
+**Not pre-registered, and that is stated first.** §11 of the runner was written and run in one
+sitting, against a defect found by reading `chimera/cli/main.py`. Two things bound what that costs.
+The arm is deterministic and byte-repeatable — same stubs, no model, asserted by
+`test_the_offline_arm_is_deterministic` — so re-running cannot select a favourable draw. And the
+table below is the **full cross**: two shipped assemblies (`--taint` and default) × three answer
+conditions (no approver, an approver that says no, an approver that says yes). Nothing was measured
+and left out.
+
+## The claim under test
+
+`chimera solve-batch` builds each worker's registry with
+
+```python
+ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
+```
+
+and passes **no `approve=`**. `LedgeredTool` reads a missing approver as *refuse*
+(`ledger_tool.py:130` and `:154`, both `if self.approve else False`). The command's own comment,
+fifteen lines above that call, says `--taint` "arms each worker's adaptive allowlist
+(**dangerous-when-tainted tools require approval**)".
+
+So: is "requires approval" a gate, or is it a refusal wearing the word?
+
+## The numbers
+
+Same corpus as every other part — the seven attacks and eight legitimate rows of
+`chimera.eval.injection`, unchanged. Stub tools, no model, **US$ 0**.
+
+| assembly | attacks blocked | legitimate refused | reads fenced | questions drawn |
+|---|---:|---:|---:|---|
+| `--taint`, as shipped (no approver) | 7/7 = 1.000 | **5/8 = 0.625** | 12/15 | — |
+| `--taint`, an approver, nobody answers | 7/7 = 1.000 | 5/8 = 0.625 | 12/15 | 0 yes / 12 no |
+| `--taint`, an approver, somebody answers | 7/7 = 1.000 | **0/8 = 0.000** | 12/15 | 5 yes / 0 no |
+| default, as shipped (no approver) | 1/7 = 0.143 | **2/8 = 0.250** | 12/15 | — |
+| default, an approver, nobody answers | 1/7 = 0.143 | 2/8 = 0.250 | 12/15 | 0 yes / 3 no |
+| default, an approver, somebody answers | 1/7 = 0.143 | **0/8 = 0.000** | 12/15 | 2 yes / 0 no |
+
+Three readings, and the second is the one that changed the shape of the fix.
+
+**The approver buys back false refusals, not defence.** The attack column is identical down each
+half of the table. Nothing an owner can answer makes an attack more or less blocked, because the
+attacks never get handed the yes — that would model a person who approves whatever an injected page
+asks for. What moves is the legitimate column: 0.625 → 0.000 under `--taint`, 0.250 → 0.000 on the
+default. **Five of eight legitimate rows were refused by nobody having been asked.**
+
+**This is not an opt-in change.** The `--taint` half alone would have supported the sentence "the
+approver only matters under a flag", and the default half refutes it: three questions are drawn with
+the flag off. `LedgeredTool` consults the approver on **two** paths and only one of them is behind
+`narrow_on_taint` — step 0 is the taint-adaptive allowlist, step 1 is the sequence-aware pre-check,
+which asks whenever an assessment escalates. The default rows exist in the table because that
+distinction was found by reading the tool before the arm was written; measuring only the flagged
+half would have produced a true table and a false sentence about it.
+
+**The fenced column does not move, on purpose.** Fencing happens on the READ, which no approver
+touches. A column that moved here would mean the arms differ in something other than the approver —
+it is the control that says this is one assembly measured six times.
+
+## What this arm is structurally blind to
+
+The arm hands the approver **straight to `ledger_registry`**. It therefore cannot see whether the
+*command* passes one: a `solve_batch` that accepts an approver and drops it prints exactly this
+table. This is the same blindness the `app_chat` arm had in Part 4, found the same way, and the same
+answer applies — the claim about the command lives in
+`tests/test_an_unattended_batch_says_it_was_not_allowed.py`, which drives the command's own
+`make_runner`, lets a fake worker fetch and then reach for a dangerous tool, and reads the verdict
+off the report the command prints.
+
+## The second defect, which the first one hid
+
+A refused call returns an ordinary observation string. The worker reads it like any tool result and
+carries on; the task ends in prose and its result can still be `ok`. The batch printed:
+
+```
+task2: ok
+```
+
+for a worker that was not allowed to do its work. `solve` beside it has printed the loud line since
+its approver was wired (`main.py:4609`); the batch never had one to print. It now reads:
+
+```
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+```
+
+The `ok` in parentheses is the loop's own verdict, kept rather than overwritten, because the two
+disagreeing is the finding.
+
+## Three things wiring an approver into a fan-out command arms, and what each cost
+
+**One terminal, N workers.** `ask` writes the question to stderr and reads the answer from stdin.
+`solve-batch` runs four workers by default, each with its own approver — two prompts interleave into
+a question nobody can answer correctly, and whichever thread wins `input()` takes the answer for
+both. `crew-isolated` solved this with `SharedApprovals`, which also reuses one answer across
+workers; that is right when workers share a task and wrong when they do not. The half that is always
+right — a lock — now lives in `ask` itself, which is the only approver that touches the terminal.
+
+**One book per worker, not one per run.** These tasks are independent, so "task1 was not allowed" is
+the sentence that is true; a run-wide flag would drag a clean task down with its neighbour.
+
+**The durable wait.** `ask` with no terminal writes the question down for `chimera approve` and waits
+`pending.WAIT_SECONDS` = **900 s, per question, per worker**. Four workers asking a dozen times is an
+afternoon. This was not reasoned out — the first draft of the test suite **hung**, and that is what
+found it. `approver_for` now forwards `wait_seconds`, and the batch passes
+`CHIMERA_APPROVAL_WAIT` (300 s by default), which is the number this deployment already chose for
+the same question on the API path.
+
+## What Part 7 cannot show
+
+- **Everything Part 1 could not, unchanged.** Fifteen rows is a smoke corpus, the stubs bypass the
+  workspace jail, and nothing here measures the model — every arm assumes the model already
+  attempted the call and asks only whether the layer stops it.
+- **The `questions drawn` column is a count of prompts, not a cost to a person.** Twelve questions
+  under `--taint` is twelve interruptions if somebody is at a keyboard and twelve durable waits if
+  nobody is. Which of those an owner gets is `CHIMERA_APPROVAL_MODE`, and this table does not say
+  which is more common in the field, because nobody measured that.
+- **Nothing here says the default assembly defends anything.** 1 of 7 attacks blocked without
+  `--taint` is the number, and the approver does not move it. The default rows are here to show that
+  the approver is *reached*, not to suggest the flag is optional.
+- **`deliver=` is wired and not measured.** The batch now passes `deliverer_for(settings)`, so a
+  deployment with `CHIMERA_APPROVAL_WEBHOOK` set has its question sent somewhere. Whether that
+  changes how often a question is answered is a field question and this corpus cannot touch it.
+- **One process, one run**, as everywhere else in this document: the bench is deterministic, so a
+  distribution here would be a distribution of a constant.

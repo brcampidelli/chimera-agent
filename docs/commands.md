@@ -1422,6 +1422,14 @@ Every task runs against an isolated checkout, so parallel edits never collide. O
 merge-back, a file two tasks both changed is reported as a conflict and left for you
 to resolve rather than silently overwritten. Needs a git repo to isolate.
 
+A worker whose actions were refused for review is reported as **not allowed** rather than
+``ok``, and the refusals are listed under it. Whether anyone can be asked follows
+``CHIMERA_APPROVAL_MODE``: ``allow`` and ``deny`` answer immediately, ``ask`` prompts if this
+process has a terminal and otherwise writes the question down for ``chimera approve`` and waits
+``CHIMERA_APPROVAL_WAIT`` seconds for it — per refused call, per worker. Set
+``CHIMERA_APPROVAL_WEBHOOK`` so the question reaches somebody, or ``CHIMERA_APPROVAL_MODE=deny``
+for a batch that should never wait.
+
 ```bash
 chimera solve-batch TASKS
 ```
