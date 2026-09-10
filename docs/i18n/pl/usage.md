@@ -1,5 +1,5 @@
 ---
-source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
+source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
 ---
 
 # Chimera — Przewodnik użytkowania

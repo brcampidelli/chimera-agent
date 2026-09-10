@@ -242,11 +242,10 @@ can see turns a turn that stopped for money into a turn that stopped for no visi
 mean one section up, on the same session store. Only the `--cascade` of `chimera chat` has no
 equivalent here.
 
-Commands: `/model <slug>` · `/new` (fresh thread; `/reset` is an alias) · `/clear` (clear screen) ·
-`/stream` (toggle live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` new thread ·
-`Ctrl+L` clear ·
-`Ctrl+P` command palette · `PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash commands autocomplete as you
-type.
+Commands: `/model <slug>` · `/new` (fresh thread; `/reset` is an alias) · `/clear` (clear screen)
+· `/stream` (toggle live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` new
+thread · `Ctrl+L` clear · `Ctrl+P` command palette · `PgUp`/`PgDn` scroll · `Ctrl+C` quit. Slash
+commands autocomplete as you type.
 
 Honesty notes:
 
