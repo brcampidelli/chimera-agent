@@ -183,7 +183,10 @@ def _captured_session(
     captured: dict[str, Any] = {}
 
     def fake_gateway(factory: Any, *args: Any, **kwargs: Any) -> Any:
+        # TWO calls, because `MessageGateway` builds one session per `chat_id` and the isolation
+        # between them is a property this fix could break. `_captured_session` returns the first.
         captured["session"] = factory()
+        captured["second"] = factory()
         raise SystemExit(0)  # nothing past this point is this test's business
 
     # Patched where it is DEFINED: both command bodies do `from chimera.server import
@@ -196,7 +199,13 @@ def _captured_session(
     get_settings.cache_clear()
     session = captured.get("session")
     assert isinstance(session, ChatSession), "the command never built a chat session"
+    _SECOND[:] = [captured["second"]]
     return session
+
+
+#: The second session the last `_captured_session` built, for the isolation test below. A module
+#: global rather than a changed return type, so the twelve tests above keep reading as they did.
+_SECOND: list[Any] = []
 
 
 class _FakeAdapter:
@@ -317,6 +326,33 @@ def test_a_turn_through_send_tells_the_ledger(
     assert ledger.requester_of(PAGE) == "unknown"
     assert session.send(f"please summarise {PAGE}") == "ok"
     assert ledger.requester_of(PAGE) == "user"
+
+
+@pytest.mark.parametrize("argv", SURFACES)
+def test_two_chats_do_not_share_a_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> None:
+    """One session per `chat_id`, one ledger per session — and one turn hook per ledger.
+
+    This is the property a naive version of the fix loses. Hoisting `turn_ledger` out of `factory()`
+    to save four lines would compile, pass every test above, and give every chat on a Discord server
+    the last-built ledger: person A's message would decide what counts as person B's own request,
+    which is the `authority` mode pointed at the wrong person. `nonlocal` inside the closure is what
+    keeps each call's cell its own, and nothing else in the file would notice if it stopped.
+    """
+    first = _captured_session(tmp_path, monkeypatch, argv, governance="enforce")
+    second = _SECOND[0]
+
+    first_ledger, second_ledger = _ledger_behind(first), _ledger_behind(second)
+    assert first_ledger is not second_ledger, "two chats were handed one taint ledger"
+
+    assert first.on_turn_start is not None
+    first.on_turn_start(f"read {PAGE}")
+    assert first_ledger.requester_of(PAGE) == "user"
+    assert second_ledger.requester_of(PAGE) == "unknown", (
+        "one chat's message reached another chat's ledger — under authority that decides what "
+        "counts as somebody else's own request"
+    )
 
 
 @pytest.mark.parametrize("argv", SURFACES)

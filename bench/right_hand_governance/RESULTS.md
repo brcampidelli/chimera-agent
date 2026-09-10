@@ -1038,7 +1038,7 @@ the honest state and byte-identical to what that class received before this chan
 ## Sabotage: every guard broken on purpose, and what went red
 
 Each break was applied to the committed tree, the file re-run, and the tree restored. Counts are out
-of the file's 16 tests.
+of the file's 18 tests.
 
 | # | the break | red | which tests |
 |---|---|---:|---|
@@ -1051,6 +1051,7 @@ of the file's 16 tests.
 | 7 | `ChatSession._begin_turn` moved **after** `agent.run` | **2** | `test_a_turn_through_send_tells_the_ledger[serve, platform]` (and 1 in #408's file) |
 | 8 | the bench arm silently drops its `instruction` | **1** | `test_the_gateway_arm_moves_when_it_is_told_and_not_when_it_is_not` |
 | 9 | the `_untold` arms are quietly told after all | **1** | the same test |
+| 10 | `turn_ledger` hoisted out of `factory()` (every chat shares one) | **3** | `test_two_chats_do_not_share_a_ledger[serve]` and 2 others |
 
 **Number 5 is the one worth reading.** `test_the_gateway_hands_its_session_a_hook` **passed** under
 it — the hook exists, it is callable, it sets an instruction on a real `TaintLedger`, and none of
@@ -1061,6 +1062,12 @@ be handed.
 **Numbers 3 and 4 are the check that a defect found in one cell was asked about in the other.**
 Fixing one closure and not the other is caught, in the specific direction, by name. Both were wired
 for that reason rather than one.
+
+**Number 10 is the shortcut this fix invites.** Hoisting the cell out of the closure saves four
+lines, compiles, and hands every chat on a Discord server the last-built ledger — so one person's
+message would decide what counts as another person's own request, which is `authority` pointed at
+the wrong human. `MessageGateway` builds one session per `chat_id`, so the harness builds two and
+asks whether telling one told the other.
 
 **Numbers 8 and 9 are the instrument's own power half.** `serve_untold` reading zero is the finding;
 an arm that had quietly stopped setting instructions would print four zeros and the table would read
