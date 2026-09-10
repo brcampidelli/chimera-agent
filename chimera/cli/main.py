@@ -2225,6 +2225,8 @@ def tui(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
@@ -2302,7 +2304,17 @@ def tui(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+        AgentConfig(
+            model=model,
+            max_steps=max_steps,
+            project_root=Path(workspace),
+            # The owner's own words from `agent.json`. `chat`, `assist` and the desktop app all
+            # apply them; this surface did not, so one configuration produced two agents that
+            # answered in different languages and different voices depending on which window you
+            # opened. Nothing failed and nothing said so — the only symptom is a reply that reads
+            # like a stranger's.
+            instructions=render_identity(load_identity(settings.home)),
+        ),
     )
     mem = None if no_memory else _memory_manager()
     budget = session_budget(max_usd)

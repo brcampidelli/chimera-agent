@@ -150,3 +150,26 @@ def test_scoping_the_app_did_not_hide_the_facts_that_belong_everywhere(
     session.send("any rule about imports?")
 
     assert "absolute imports" in session.agent.prompts[0]
+
+
+# --- 3. the app answers as the agent the owner configured ----------------------------------------
+
+
+def test_the_owners_identity_reaches_the_full_screen_app(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """`agent.json` is the owner's own voice. `chat`, `assist` and the desktop app all apply it and
+    this surface did not, so one configuration produced two agents that answered in different
+    languages depending on which window you opened -- with nothing failing and nothing saying so.
+
+    Read off the config the command handed the agent. That `config.instructions` reaches the system
+    prompt, last and appended rather than substituted, is pinned by `tests/test_instructions.py`.
+    """
+    from chimera.core.instructions import AgentIdentity, save
+
+    save(get_settings().home, AgentIdentity(language="Português (Brasil)", instructions="Be terse."))
+
+    agent = _drive(monkeypatch, "--no-memory", "--workspace", str(tmp_path))["session"].agent
+
+    assert "Be terse." in agent.config.instructions
+    assert "Português (Brasil)" in agent.config.instructions
