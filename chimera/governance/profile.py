@@ -279,8 +279,9 @@ def governed_profile(
     ``instruction`` is the person's own words for this run — a cron job's action, a card's action,
     the task handed to the MCP or A2A server — so a fetch of a page or a file it names is recorded
     as the user's request (``CapabilityEvent.requested_by``). A surface with no single task (a chat
-    session, the ACP editor) passes nothing, and every fetch there reads ``unknown``. ``workspace``
-    lets a path the agent gives absolutely match the relative form the person wrote.
+    session, the ACP editor) passes nothing — and read on before concluding that every fetch there
+    is therefore ``unknown``, because for two of those surfaces it no longer is. ``workspace`` lets a
+    path the agent gives absolutely match the relative form the person wrote.
 
     ``on_ledger`` is handed the :class:`~chimera.governance.ledger.TaintLedger` this call built, for
     the surfaces where the instruction is not known once per RUN but once per TURN. ``chimera

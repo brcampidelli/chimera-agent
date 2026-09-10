@@ -49,9 +49,13 @@ transcript replays the last six turns, so a page fetched on turn 1 is still in t
 and a ledger that forgot it would narrow nothing while the poisoned text was still on screen. What
 IS per turn is :meth:`TaintLedger.set_instruction` — the user's own words — and that is what makes
 ``CHIMERA_TAINT_AUTHORITY=authority`` mean something here: a page the person named themselves stops
-arming the narrowing, so the cost of this layer falls on fetches nobody asked for. The desktop chat
-factory never set it (`chimera/api/posture.py` says so in its own comment: "the mode travels; the
-instruction cannot"), which is why that setting is inert there too.
+arming the narrowing, so the cost of this layer falls on fetches nobody asked for.
+
+This paragraph used to end *"the desktop chat factory never set it, which is why that setting is
+inert there too"*, and that sentence is now history in both halves: the app's chat sets it through
+``ChatSession.on_turn_start`` (#408) and ``chimera serve`` and the platform bots set it the same way
+through ``governed_profile(on_ledger=…)``. A corrected apparatus obliges a re-read of the sentences
+written beside it, not only of the numbers, so the correction is recorded here rather than deleted.
 """
 
 from __future__ import annotations
