@@ -6,9 +6,9 @@ and hands to every surface except this one — which is the shape that survives 
 nobody has to disable a guard that was never wired in.
 
 Every check below drives the **real command** through ``CliRunner`` and then asks the object what it
-was handed. That distinction is not stylistic. #400 shipped four structural checks — "does the
-command call the builder" — and a sabotage that called the builder and threw the result away passed
-0 of 109 of them. So `project` is read off the session the command constructed, `instructions` off
+was handed. That distinction is not stylistic. #400 shipped structural checks — "does the command
+call the builder" — and a sabotage that called the builder and threw the result away went straight
+through 109 tests. So `project` is read off the session the command constructed, `instructions` off
 the agent's own config, and the write region is proven by the file that does not appear on disk.
 
 The one place a structural check is still the right instrument is the import-time fallback, and it
