@@ -287,9 +287,20 @@ def guard_chat_registry(registry: Any, *, audit: Any = None) -> tuple[Any, Any]:
     resolved = resolve(Posture(reach=DEFAULT_REACH, approval=DEFAULT_APPROVAL))
     if resolved.deny_tools:
         registry = restrict_registry(registry, allow=None, deny=resolved.deny_tools)
-    # The mode travels; the instruction cannot. This registry serves a whole chat, and no single
-    # message is "the task", so every fetch here is recorded as `unknown` — which the narrowing
-    # treats exactly as it always did, in either mode.
+    # This used to read "the mode travels; the instruction cannot", and that sentence is why
+    # `CHIMERA_TAINT_AUTHORITY` did nothing on this surface for as long as it existed: a ledger
+    # nobody tells an instruction answers `unknown` for every fetch, and the narrowing treats
+    # `unknown` exactly as it treats `agent`, so the mode had nothing to be a mode ABOUT.
+    #
+    # It was true of this function and false of the surface. The registry does serve a whole chat —
+    # but the ledger it returns is a live object, and the caller sees every turn. `chimera chat`
+    # proved it by doing exactly that (`RightHand.begin_turn`), and `desktop_app` now hands
+    # `ChatSession.on_turn_start` a callback into the ledger below. Measured, same instrument as the
+    # terminal's: 0 rows moved under `authority` before, 6 after
+    # (`bench/right_hand_governance/RESULTS.md`, the `app_chat` columns).
+    #
+    # A caller that does NOT tell it keeps the old behaviour exactly, which is what makes this safe
+    # for the messaging gateway and `/v1/chat/completions` sharing this registry.
     ledger = TaintLedger(authority=get_settings().taint_authority)
     # The audit log, which this was the ONE `ledger_registry` caller not passing. Both siblings do
     # — `code_api` and `governed_profile` — and every write inside `LedgeredTool` is guarded by

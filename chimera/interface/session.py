@@ -271,10 +271,35 @@ class ChatSession:
     #: The surface that does need a bound is the one with no file and no end: the messaging gateway
     #: holds a live session per chat for as long as the process runs, and sets this.
     max_turns: int | None = None
+    #: Called with the user's message at the top of every turn, before a single tool runs.
+    #:
+    #: It exists for one thing and the name stays general anyway: a surface whose governance ledger
+    #: is built once per *session* has no other moment at which the turn's own words are known.
+    #: ``guard_chat_registry`` builds such a ledger and said so in its own docstring — *"the mode
+    #: travels; the instruction cannot"* — which was true until the terminal showed otherwise, and
+    #: is why ``CHIMERA_TAINT_AUTHORITY`` did nothing in the app: ``requester_of`` answers
+    #: ``unknown`` for a ledger nobody told an instruction, and the narrowing treats ``unknown``
+    #: exactly as it treats ``agent``.
+    #:
+    #: ``None`` by default, and the default has to stay byte-identical: this class serves the
+    #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which asked for a hook.
+    on_turn_start: Callable[[str], None] | None = None
     turns: list[ChatTurn] = field(default_factory=list)
+
+    def _begin_turn(self, message: str) -> None:
+        """Announce the turn, in the one place both entry points can share.
+
+        Called from ``send`` AND ``send_verbose``. Not a stylistic preference — the comment in
+        ``send`` records that ``remember_from_chat`` once meant two different things depending on
+        which of the two you called, so a hook added to only one of them would be that same bug with
+        a different field name.
+        """
+        if self.on_turn_start is not None:
+            self.on_turn_start(message)
 
     def send(self, message: str) -> str:
         """Run one user message through the agent and record the exchange."""
+        self._begin_turn(message)
         result = self.agent.run(self._compose(message))
         self._record(
             message,
@@ -300,6 +325,7 @@ class ChatSession:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
         is reused for both the prompt and the report's fact count (no double search)."""
+        self._begin_turn(message)
         facts, layer = self._recall(message)
         declined: list[DeclinedTool] = []
         observed: list[ToolActivity] = []
