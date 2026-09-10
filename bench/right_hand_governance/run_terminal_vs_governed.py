@@ -409,6 +409,11 @@ def gateway_registry(
     """
     from chimera.governance.profile import governed_profile
 
+    # `home=settings.home` because that is literally what both shipped calls pass. The `home`
+    # PARAMETER above is accepted for `run_arm`'s uniform call shape and deliberately not used: in
+    # this bench the two are the same directory, and `home` only decides where `audit.jsonl` is
+    # written, which no measured row reads. Said out loud so the next reader does not have to work
+    # out whether an unused argument is an oversight.
     guarded, _approvals = governed_profile(
         registry, settings=settings, home=settings.home, surface=surface
     )
