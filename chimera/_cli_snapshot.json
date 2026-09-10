@@ -1926,6 +1926,17 @@
               ],
               "required": false,
               "type": "int"
+            },
+            {
+              "default": "3",
+              "help": "Suite runs per candidate \u2014 one samples, two alert, three decide. Multiplies cost.",
+              "kind": "option",
+              "name": "k",
+              "opts": [
+                "--k"
+              ],
+              "required": false,
+              "type": "int"
             }
           ],
           "path": "evolve tune"

@@ -6801,6 +6801,11 @@ def evolve_tune(
     rounds: int = typer.Option(2, "--rounds", help="Meta-search rounds."),
     model: str = typer.Option(None, "--model", help="Base model for the spec."),
     max_steps: int = typer.Option(8, "--max-steps", help="Initial runtime step budget."),
+    k: int = typer.Option(
+        3,
+        "--k",
+        help="Suite runs per candidate — one samples, two alert, three decide. Multiplies cost.",
+    ),
 ) -> None:
     """Self-optimize the agent spec (OpenJarvis meta-search) against the daily scenarios.
 
@@ -6829,10 +6834,20 @@ def evolve_tune(
             system_prompt=spec.system_prompt or DEFAULT_SYSTEM_PROMPT,
         )
 
-    scorer = scenario_scorer(_spec_builder, daily_scenarios())
+    scenarios = daily_scenarios()
+    scorer = scenario_scorer(_spec_builder, scenarios, k=k)
     initial = AgentSpec(model=model, max_steps=max_steps)
     try:
-        result = search_spec(initial, scorer, model_proposer(gateway, model), rounds=rounds)
+        result = search_spec(
+            initial,
+            scorer,
+            model_proposer(gateway, model),
+            rounds=rounds,
+            # The number the gate needs to be a decision instead of a comparison. Without it the
+            # promotion rule is `>` on a fraction quantised in steps of 1/len(scenarios), and a
+            # candidate identical to the incumbent cleared that 29.6% of the time.
+            trials=len(scenarios) * max(1, k),
+        )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -6840,11 +6855,23 @@ def evolve_tune(
     table = Table(title="Spec meta-search", show_header=True)
     table.add_column("round")
     table.add_column("score")
+    table.add_column("no regression")
     table.add_column("kept")
     for index, step in enumerate(result.history):
-        table.add_row(str(index), f"{step.score:.3f}", "✓" if step.accepted else "·")
+        # Two columns because they are two facts, and printing the first under the second's heading
+        # is what let a TIE — the most common outcome against a saturated ruler — read as "kept".
+        table.add_row(
+            str(index),
+            f"{step.score:.3f}",
+            "✓" if step.accepted else "·",
+            "✓" if step.advanced else "·",
+        )
     console.print(table)
     console.print(f"[green]best score[/green] {result.best_score:.3f}")
+    if result.undecidable:
+        # Loud, because "nothing was promoted" and "nothing could have been promoted" look identical
+        # in the table above and call for opposite responses.
+        console.print(f"[yellow]the gate could not decide:[/yellow] {result.undecidable}")
     console.print(f"[dim]best spec:[/dim] {result.best.to_dict()}")
 
 
