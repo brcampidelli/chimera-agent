@@ -43,15 +43,16 @@ from chimera.interface.session import TurnReport
 from chimera.tui.activity import ActivityPanel
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.api.sessions import SessionManager
     from chimera.cli.right_hand import RightHand
     from chimera.orchestration.budget import SpendBudget
     from chimera.tui.confirm import ModalGate
 
-_SLASH = ["/model ", "/reset", "/clear", "/stream", "/help", "/exit"]
+_SLASH = ["/model ", "/new", "/reset", "/clear", "/stream", "/help", "/exit"]
 _HELP = (
-    "[b]commands[/b]  /model <slug> · /reset (clear context) · /clear (clear screen) · "
-    "/stream (toggle live tokens) · /exit\n"
-    "[b]keys[/b]  ^R reset · ^L clear · ^P palette · PgUp/PgDn scroll · ^C quit"
+    "[b]commands[/b]  /model <slug> · /new (fresh thread) · /reset (same) · "
+    "/clear (clear screen) · /stream (toggle live tokens) · /exit\n"
+    "[b]keys[/b]  ^R new thread · ^L clear · ^P palette · PgUp/PgDn scroll · ^C quit"
 )
 
 
@@ -95,7 +96,7 @@ class ChimeraTUI(App[None]):
     """
     BINDINGS = [
         ("ctrl+c", "quit", "Quit"),
-        ("ctrl+r", "reset", "Reset"),
+        ("ctrl+r", "reset", "New thread"),
         ("ctrl+l", "clear_log", "Clear"),
         ("pageup", "scroll_log('up')", "Scroll"),
         ("pagedown", "scroll_log('down')", ""),
@@ -112,6 +113,9 @@ class ChimeraTUI(App[None]):
         hand: RightHand | None = None,
         gate: ModalGate | None = None,
         budget: SpendBudget | None = None,
+        sessions: SessionManager | None = None,
+        session_id: str = "",
+        resumed: bool = False,
     ) -> None:
         super().__init__()
         self.session = session
@@ -134,6 +138,21 @@ class ChimeraTUI(App[None]):
         #: The conversation's dollar ceiling, or None. Shown in the panel, because a ceiling nobody
         #: can see is indistinguishable from a turn that stopped for its own reasons.
         self.budget = budget
+        #: The store this thread is saved to, or None for a TUI nobody is persisting (the tests,
+        #: and every construction of this class that predates the store arriving here).
+        #:
+        #: It is the one `chimera chat` writes — ``<home>/sessions`` — and not a second one. A
+        #: TUI-only transcript would have been the easier change and would have made a split
+        #: permanent between two surfaces that are the same conversation. (The *coding* store,
+        #: ``<home>/code_sessions``, stays separate for the reason its own module argues: it keeps
+        #: the model's message list and its receipts, which do not survive being flattened into
+        #: prose pairs.)
+        self.sessions = sessions
+        #: Which thread of that store is open. Swapped by :meth:`action_reset`.
+        self.session_id = session_id
+        #: Whether this run picked up an existing thread. Said out loud on mount, because resuming
+        #: in silence is the same surprise as forgetting.
+        self.resumed = resumed
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -159,6 +178,7 @@ class ChimeraTUI(App[None]):
         self.title = "Chimera"
         self.sub_title = self.model_label or "your right-hand"
         self._append("[bold]Chimera[/bold] — type a message. /help for commands, /exit quits.")
+        self._say_which_thread()
         # The app is on screen: from here a gate's question can be drawn. Before this line it could
         # not, and the gate says so rather than waiting for a timeout to say it for it.
         if self.gate is not None:
@@ -183,7 +203,10 @@ class ChimeraTUI(App[None]):
             self._append(_HELP)
         elif text == "/clear":
             self.action_clear_log()
-        elif text == "/reset":
+        elif text in ("/reset", "/new"):
+            # Two names for one action, exactly as `chimera chat` spells it. `/reset` kept its name
+            # because it is what people type and the surprise would be a command that vanished;
+            # what it DOES changed the moment the thread became a file.
             self.action_reset()
         elif text == "/stream":
             self._toggle_stream()
@@ -298,11 +321,29 @@ class ChimeraTUI(App[None]):
         panel.set_memory(report.memory_facts_used, report.memory_layer)
         panel.set_status("done")
         self._show_budget()
+        # After the turn and AFTER the reply is on screen. Both halves are `_persist_turn`'s
+        # reasons, which this reuses rather than rediscovers: a Ctrl-C and a closed window are how
+        # this app usually ends and neither runs a shutdown hook, and a save that raises must not
+        # take down a reply that has already been paid for.
+        self._persist()
 
     # -- actions -----------------------------------------------------------
     def action_reset(self) -> None:
-        self.session.reset()
-        self._append("[dim]context cleared[/dim]")
+        """Start a fresh thread — and, once there is a file, do NOT clear this one in place.
+
+        Clearing in place cost nothing while the transcript lived only in memory. Now that the
+        thread is a file, `self.session.reset()` followed by the next `_persist()` would rewrite it
+        empty: a command labelled "clear context" would be the one that destroys the conversation.
+        `chimera chat` made exactly this move for exactly this reason when it learned to save.
+        """
+        if self.sessions is None:
+            self.session.reset()
+            self._append("[dim]context cleared[/dim]")
+            self._activity().set_status("idle")
+            return
+        self.session_id = self.sessions.new()
+        self.session = self.sessions.get(self.session_id)
+        self._append(f"[dim]new thread {escape(self.session_id)} — the previous one is saved.[/dim]")
         self._activity().set_status("idle")
 
     def action_clear_log(self) -> None:
@@ -336,6 +377,39 @@ class ChimeraTUI(App[None]):
         if self.budget is None:
             return
         self._activity().set_budget(self.budget.remaining, self.budget.max_usd)
+
+    def _persist(self) -> None:
+        """Save this thread, and survive a save that cannot happen.
+
+        Same shape as ``chimera.cli.main._persist_turn``, and for the same reason it was moved
+        there: an unwritable home or a full disk must cost the resume, never the reply. A
+        conversation you can read but not reopen beats one that was correctly filed and never shown.
+        """
+        if self.sessions is None:
+            return
+        try:
+            self.sessions.persist(self.session_id)
+        except Exception as exc:  # noqa: BLE001 — a thread that cannot be saved is not a dead app
+            self._append(f"[yellow]not saved:[/yellow] [dim]{escape(str(exc))}[/dim]")
+
+    def _say_which_thread(self) -> None:
+        """Name the thread on the way in, whichever one it is.
+
+        The scrollback starts empty either way — this app redraws nothing it did not render — so
+        without this line a resumed conversation and a fresh one are indistinguishable on screen
+        while the model can see the difference. Resuming in silence is the same surprise as
+        forgetting, one direction over.
+        """
+        if self.sessions is None:
+            return
+        if self.resumed:
+            turns = len(self.session.turns)
+            self._append(
+                f"[dim]resuming {escape(self.session_id)} — {turns} turn(s) the model can see "
+                "but this screen has not drawn. ^R starts over.[/dim]"
+            )
+        else:
+            self._append(f"[dim]session {escape(self.session_id)} — saved as you go.[/dim]")
 
     def _activity(self) -> ActivityPanel:
         return self.query_one("#activity", ActivityPanel)

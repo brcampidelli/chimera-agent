@@ -242,3 +242,176 @@ def test_the_fallback_carries_the_region_rather_than_dropping_it(
 
     assert result.exit_code == 0, result.output
     assert seen.get("write_region") == "src/**", "the fallback dropped the declared region"
+
+
+# --- 2. the conversation outlives the window -----------------------------------------------------
+
+
+def _store_and_manager(tmp_path: Path) -> tuple[Any, Any]:
+    """A real store and manager over ``tmp_path``, with a real ``ChatSession`` behind a recorder."""
+    from chimera.api.sessions import SessionManager, SessionStore
+    from chimera.interface import ChatSession
+
+    store = SessionStore(tmp_path / "sessions")
+    return store, SessionManager(lambda: ChatSession(_Recorder(), gate=None), store)
+
+
+def _saved(tmp_path: Path, session_id: str) -> dict[str, Any]:
+    import json
+
+    return dict(
+        json.loads((tmp_path / "sessions" / f"{session_id}.json").read_text(encoding="utf-8"))
+    )
+
+
+async def _turn(app: Any, pilot: Any, text: str) -> None:
+    """Type a message, submit it, and wait for the thread worker to finish the turn."""
+    from textual.widgets import Input
+
+    app.query_one("#prompt", Input).value = text
+    await pilot.press("enter")
+    await app.workers.wait_for_complete()
+    await pilot.pause()
+
+
+async def test_a_turn_is_on_disk_before_the_window_closes(tmp_path: Path) -> None:
+    """The whole defect: this app built a session in memory and dropped it on exit, so a
+    conversation died with the window while ``chat`` -- the same conversation, one surface over --
+    had been saving since #401.
+
+    Saved after the turn rather than at exit, because Ctrl-C and a closed terminal are how this app
+    usually ends and neither runs a shutdown hook.
+    """
+    from chimera.tui.app import ChimeraTUI
+
+    store, manager = _store_and_manager(tmp_path)
+    active = manager.new()
+    app = ChimeraTUI(manager.get(active), sessions=manager, session_id=active, stream=False)
+
+    async with app.run_test() as pilot:
+        await _turn(app, pilot, "what is the retry cap?")
+
+    assert _saved(tmp_path, active)["turns"][0]["user"] == "what is the retry cap?"
+    assert [m.id for m in store.list()] == [active], "not the thread `chimera sessions` would list"
+
+
+async def test_the_next_run_picks_the_thread_up(tmp_path: Path) -> None:
+    """Saving is only half of it. A store nothing resumes from is a log file."""
+    from chimera.cli.main import _resume_or_new
+    from chimera.tui.app import ChimeraTUI
+
+    _, manager = _store_and_manager(tmp_path)
+    active = manager.new()
+    app = ChimeraTUI(manager.get(active), sessions=manager, session_id=active, stream=False)
+    async with app.run_test() as pilot:
+        await _turn(app, pilot, "remember the cap is six")
+
+    # A second run of the command, over the same store: no `--session`, no `--new`.
+    _, second = _store_and_manager(tmp_path)
+    picked, resumed = _resume_or_new(second, None, False)
+
+    assert (picked, resumed) == (active, True)
+    assert second.get(picked).turns[0].user == "remember the cap is six"
+    assert second.get(picked).turns[0].restored is True, "a replayed turn must say it is replayed"
+
+
+async def test_starting_a_new_thread_does_not_destroy_the_open_one(tmp_path: Path) -> None:
+    """The trap this feature sets for itself, and the reason ``chat`` changed what ``/reset`` means.
+
+    ``action_reset`` used to call ``session.reset()``, which cost nothing while the transcript lived
+    only in memory. With a file behind it, that clear followed by the next save rewrites the thread
+    empty -- so the command labelled "clear context" becomes the one that destroys the conversation,
+    and it destroys it silently.
+    """
+    from chimera.tui.app import ChimeraTUI
+
+    _, manager = _store_and_manager(tmp_path)
+    first = manager.new()
+    app = ChimeraTUI(manager.get(first), sessions=manager, session_id=first, stream=False)
+
+    async with app.run_test() as pilot:
+        await _turn(app, pilot, "the first thing I said")
+
+        await pilot.press("ctrl+r")
+        await pilot.pause()
+        second = app.session_id
+
+        await _turn(app, pilot, "the second thing I said")
+
+    assert second != first, "^R stayed on the same thread, so the next save overwrote it"
+    assert _saved(tmp_path, first)["turns"][0]["user"] == "the first thing I said"
+    assert _saved(tmp_path, second)["turns"][0]["user"] == "the second thing I said"
+    assert len(_saved(tmp_path, first)["turns"]) == 1, "the old thread kept growing"
+
+
+async def test_an_app_with_no_store_still_just_clears_its_context(tmp_path: Path) -> None:
+    """The control. ``ChimeraTUI`` is constructed without a store by every dispatch test and by the
+    bench arms, and for those ^R must go on meaning what it meant -- there is no file to protect."""
+    from chimera.tui.app import ChimeraTUI
+
+    class Cleared:
+        reset_called = False
+
+        def reset(self) -> None:
+            self.reset_called = True
+
+    session = Cleared()
+    app = ChimeraTUI(session, stream=False)
+
+    async with app.run_test() as pilot:
+        await pilot.press("ctrl+r")
+        await pilot.pause()
+
+    assert session.reset_called is True
+
+
+def test_the_command_opens_the_thread_it_was_asked_for(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Through Typer: ``-s`` names the thread, and the store is the one ``chat`` writes."""
+    seen = _drive(monkeypatch, "--no-memory", "--workspace", str(tmp_path), "-s", "standup")
+
+    assert seen["session_id"] == "standup"
+    assert seen["sessions"] is not None
+    # Reaching for the private store on purpose: the claim being pinned is *which directory*, and
+    # a second transcript store beside `chat`'s is exactly the mistake this wiring exists to avoid.
+    assert seen["sessions"]._store.root == get_settings().home / "sessions"
+
+
+def test_an_escaping_session_id_is_refused_before_the_screen_opens(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """``chat`` learned this the expensive way: the store rejected the id on the SAVE, after a turn
+    had been paid for. Here it would arrive with Textual holding the terminal."""
+    built: list[Any] = []
+
+    class FakeTUI:
+        def __init__(self, *a: Any, **kw: Any) -> None:
+            built.append(kw)
+
+        def run(self) -> None: ...
+
+    monkeypatch.setattr("chimera.tui.app.ChimeraTUI", FakeTUI)
+    result = CliRunner().invoke(cli, ["tui", "--no-memory", "-s", "../escape"])
+
+    assert result.exit_code == 1
+    assert "invalid session id" in result.output
+    assert built == [], "the screen opened on an id that can never be saved"
+
+
+def test_the_fallback_carries_the_thread_rather_than_minting_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``chimera tui -s standup`` and ``chimera chat -s standup`` are one conversation now, so a
+    fallback that hardcoded ``session_id=None`` would answer a different question than the one
+    asked -- and would say only "falling back to chimera chat"."""
+    import sys
+
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr("chimera.cli.main.chat", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setitem(sys.modules, "chimera.tui.app", None)
+
+    result = CliRunner().invoke(cli, ["tui", "-s", "standup", "--new"])
+
+    assert result.exit_code == 0, result.output
+    assert (seen.get("session_id"), seen.get("new")) == ("standup", True)
