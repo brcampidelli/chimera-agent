@@ -1,5 +1,5 @@
 ---
-source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
+source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -281,8 +281,11 @@ werden kann: Das Aktivitätspanel führt jetzt eine `budget`-Zeile mit dem Rest,
 denn eine Obergrenze, die niemand sehen kann, macht aus einem Turn, der wegen
 des Geldes stoppte, einen Turn, der ohne sichtbaren Grund stoppte.
 
-`--session`, `--new` und `--write-region` verhalten sich wie in `chimera chat`,
-auf demselben Sitzungsspeicher. Nur `--cascade` hat hier keine Entsprechung.
+`chimera tui --session standup` setzt einen benannten Thread fort, `--new` startet
+stattdessen einen frischen, und `--write-region` verengt, was die Datei-Schreiber
+anfassen dürfen. Alle drei bedeuten hier genau das, was sie einen Abschnitt weiter
+oben bedeuten, auf demselben Sitzungsspeicher. Nur das `--cascade` von `chimera chat`
+hat hier keine Entsprechung.
 
 Befehle: `/model <slug>` · `/new` (neuer Thread; `/reset` ist ein Alias) · `/clear` (Bildschirm
 leeren) · `/stream` (Live-Token umschalten) · `/help` · `/exit` (auch `/quit`,
@@ -324,7 +327,7 @@ Ehrlichkeitshinweise:
   jetzt eine Datei ist, an Ort und Stelle zu leeren, wäre der Befehl, der ihn
   vernichtet. Der Verlauf wird beim Fortsetzen nicht neu gezeichnet, und die Zeile
   unter dem Banner sagt, wie viele Turns das Modell sieht, die der Bildschirm nicht
-  zeigt. `chimera tui --help` hat den Rest.
+  zeigt. `docs/commands.md` hat den Rest.
 - Token-Streaming ist nur der Single-Model-Pfad — unter `--fuse` (ein
   Panel-→Judge-→Synthesizer-Turn) gibt es keine inkrementellen Token, daher zeigt
   das Panel einen "synthesizing"-Status statt eines vorgetäuschten Cursors.

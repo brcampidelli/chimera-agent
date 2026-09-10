@@ -237,8 +237,10 @@ Not the same flags as the REPLs. `tui` has `--stream`/`--no-stream`, which they 
 show it: the activity panel now carries a `budget` row with what is left, because a ceiling nobody
 can see turns a turn that stopped for money into a turn that stopped for no visible reason.
 
-`--session`, `--new` and `--write-region` behave as they do in `chimera chat`, on the same session
-store. Only `--cascade` has no equivalent here.
+`chimera tui --session standup` resumes a named thread and `--new` starts a fresh one instead;
+`--write-region` narrows what the file-writers may touch. All three mean here exactly what they
+mean one section up, on the same session store. Only the `--cascade` of `chimera chat` has no
+equivalent here.
 
 Commands: `/model <slug>` · `/new` (fresh thread; `/reset` is an alias) · `/clear` (clear screen) ·
 `/stream` (toggle live tokens) · `/help` · `/exit` (also `/quit`, `/q`). Keys: `Ctrl+R` new thread ·
@@ -269,7 +271,7 @@ Honesty notes:
   the other — and the newest thread resumes by default. That is why `/reset` starts a NEW thread
   instead of clearing this one: clearing a thread that is now a file would be the command that
   destroys it. The scrollback is not redrawn on resume, and the line under the banner says how many
-  turns the model can see that the screen has not. `chimera tui --help` has the rest.
+  turns the model can see that the screen has not. `docs/commands.md` has the rest.
 - Token streaming is the single-model path only — under `--fuse` (a panel→judge→synthesizer turn)
   there are no incremental tokens, so the panel shows a "synthesizing" status rather than a fake
   cursor. That label follows the flag and not the route: as in `chat`, a turn carrying tools does

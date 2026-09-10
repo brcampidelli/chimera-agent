@@ -1,5 +1,5 @@
 ---
-source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
+source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -251,8 +251,10 @@ można ją pokazać: panel aktywności niesie teraz wiersz `budget` z tym, co zo
 którego nikt nie widzi, zamienia turę zatrzymaną przez pieniądze w turę zatrzymaną bez
 widocznego powodu.
 
-`--session`, `--new` i `--write-region` działają tak jak w `chimera chat`, na tym samym
-magazynie sesji. Tylko `--cascade` nie ma tu odpowiednika.
+`chimera tui --session standup` wznawia nazwany wątek, `--new` zaczyna zamiast tego świeży, a
+`--write-region` zawęża to, czego mogą dotknąć narzędzia zapisujące pliki. Wszystkie trzy znaczą
+tu dokładnie to, co sekcję wyżej, na tym samym magazynie sesji. Tylko `--cascade` z
+`chimera chat` nie ma tu odpowiednika.
 
 Komendy: `/model <slug>` · `/new` (nowy wątek; `/reset` to alias) · `/clear` (wyczyść ekran) · `/stream`
 (przełącz na żywo tokeny) · `/help` · `/exit` (także `/quit`, `/q`). Klawisze: `Ctrl+R` nowy wątek ·
@@ -286,7 +288,7 @@ Uwagi o uczciwości:
   Dlatego `/reset` zaczyna NOWY wątek zamiast czyścić ten: wyczyszczenie w miejscu wątku,
   który jest teraz plikiem, byłoby komendą, która go niszczy. Przy wznowieniu historia na
   ekranie nie jest rysowana od nowa, a wiersz pod banerem mówi, ile tur widzi model, a ekran
-  nie. Resztę ma `chimera tui --help`.
+  nie. Resztę ma `docs/commands.md`.
 - Streamowanie tokenów działa tylko na ścieżce pojedynczego modelu — pod `--fuse` (tura
   panel→judge→syntetyzator) nie ma przyrostowych tokenów, więc panel pokazuje status
   "syntetyzowanie" zamiast fałszywego kursora. Ta etykieta idzie za flagą, a nie za trasą: jak

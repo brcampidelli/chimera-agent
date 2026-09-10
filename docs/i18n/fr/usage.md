@@ -1,5 +1,5 @@
 ---
-source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
+source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
 ---
 
 # Chimera — Guide d'utilisation
@@ -263,8 +263,10 @@ s'afficher : le panneau d'activité porte désormais une ligne `budget` avec ce 
 un plafond que personne ne voit transforme un tour arrêté pour une question d'argent en un
 tour arrêté sans raison visible.
 
-`--session`, `--new` et `--write-region` se comportent comme dans `chimera chat`, sur le
-même magasin de sessions. Seul `--cascade` n'a pas d'équivalent ici.
+`chimera tui --session standup` reprend un fil nommé, `--new` en démarre un neuf à la place, et
+`--write-region` restreint ce que les écrivains de fichiers peuvent toucher. Les trois signifient
+ici exactement ce qu'elles signifient une section plus haut, sur le même magasin de sessions.
+Seul le `--cascade` de `chimera chat` n'a pas d'équivalent ici.
 
 Commandes : `/model <slug>` · `/new` (nouveau fil ; `/reset` est un alias) · `/clear` (effacer l'écran) ·
 `/stream` (basculer les tokens en direct) · `/help` · `/exit` (aussi `/quit`, `/q`). Touches :
@@ -299,7 +301,7 @@ Notes d'honnêteté :
   pourquoi `/reset` démarre un NOUVEAU fil au lieu de vider celui-ci : vider sur place un fil
   qui est désormais un fichier serait la commande qui le détruit. L'historique n'est pas
   redessiné à la reprise, et la ligne sous la bannière dit combien de tours le modèle voit que
-  l'écran ne montre pas. `chimera tui --help` a le reste.
+  l'écran ne montre pas. `docs/commands.md` a le reste.
 - Le streaming de tokens n'est disponible que sur le chemin mono-modèle — sous `--fuse` (un
   tour panel→juge→synthétiseur) il n'y a pas de tokens incrémentaux, donc le panneau affiche
   un statut « en cours de synthèse » plutôt qu'un faux curseur. Cette étiquette suit le flag

@@ -1,5 +1,5 @@
 ---
-source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
+source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
 ---
 
 # Chimera — Guida all'uso
@@ -259,8 +259,10 @@ dove mostrarsi: il pannello di attività ora porta una riga `budget` con quel ch
 un tetto che nessuno vede trasforma un turno fermato dai soldi in un turno fermato senza un
 motivo visibile.
 
-`--session`, `--new` e `--write-region` si comportano come in `chimera chat`, sullo stesso
-archivio di sessioni. Solo `--cascade` non ha equivalente qui.
+`chimera tui --session standup` riprende un thread con un nome, `--new` ne avvia uno nuovo al suo
+posto, e `--write-region` restringe ciò che gli scrittori di file possono toccare. Tutte e tre qui
+significano esattamente quello che significano una sezione più sopra, sullo stesso archivio di
+sessioni. Solo il `--cascade` di `chimera chat` non ha equivalente qui.
 
 Comandi: `/model <slug>` · `/new` (thread nuovo; `/reset` è un alias) · `/clear` (pulisce lo schermo) ·
 `/stream` (attiva/disattiva i token dal vivo) · `/help` · `/exit` (anche `/quit`, `/q`).
@@ -295,7 +297,7 @@ Note di onestà:
   thread più recente. Per questo `/reset` avvia un thread NUOVO invece di pulire questo:
   pulire sul posto un thread che ora è un file sarebbe il comando che lo distrugge. Lo storico
   non viene ridisegnato alla ripresa, e la riga sotto il banner dice quanti turni il modello
-  vede che lo schermo non mostra. `chimera tui --help` ha il resto.
+  vede che lo schermo non mostra. `docs/commands.md` ha il resto.
 - La trasmissione dei token esiste solo nel percorso a modello singolo — sotto `--fuse` (un
   turno panel→giudice→sintetizzatore) non ci sono token incrementali, quindi il pannello
   mostra uno stato "sintetizzando" invece di un cursore finto. Quell'etichetta segue il flag e

@@ -1,5 +1,5 @@
 ---
-source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
+source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
 ---
 
 # Chimera — Guía de uso
@@ -249,8 +249,10 @@ a tener dónde mostrarse: el panel de actividad ahora lleva una fila `budget` co
 porque un techo que nadie puede ver convierte un turno que se detuvo por dinero en un turno que
 se detuvo sin razón visible.
 
-`--session`, `--new` y `--write-region` se comportan como en `chimera chat`, sobre el mismo
-almacén de sesiones. Solo `--cascade` no tiene equivalente aquí.
+`chimera tui --session standup` reanuda un hilo con nombre, `--new` empieza uno nuevo en su
+lugar y `--write-region` acota lo que los escritores de archivos pueden tocar. Las tres
+significan aquí exactamente lo que significan una sección más arriba, sobre el mismo almacén de
+sesiones. Solo el `--cascade` de `chimera chat` no tiene equivalente aquí.
 
 Comandos: `/model <slug>` · `/new` (hilo nuevo; `/reset` es un alias) · `/clear` (limpiar pantalla) ·
 `/stream` (alternar tokens en vivo) · `/help` · `/exit` (también `/quit`, `/q`). Teclas:
@@ -285,7 +287,7 @@ Notas de honestidad:
   `/reset` empieza un hilo NUEVO en vez de limpiar este: limpiar en el sitio un hilo que ahora
   es un archivo sería el comando que lo destruye. El historial en pantalla no se vuelve a
   dibujar al reanudar, y la línea bajo el banner dice cuántos turnos ve el modelo que la
-  pantalla no muestra. `chimera tui --help` tiene el resto.
+  pantalla no muestra. `docs/commands.md` tiene el resto.
 - El streaming de tokens es solo la ruta de un solo modelo — bajo `--fuse` (un turno
   panel→juez→sintetizador) no hay tokens incrementales, así que el panel muestra un estado
   "sintetizando" en lugar de un cursor falso. Esa etiqueta sigue a la flag y no a la ruta: como en

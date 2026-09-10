@@ -1,5 +1,5 @@
 ---
-source_sha256: d912d653550d212e963b96d0827f8c172fe2905637afaf182005afacd4e3fc51
+source_sha256: 160765e9d8e332d06086c746bf003bbd6051b59bb30e57f37bbfbb49a1affe3b
 ---
 
 # Chimera —— 使用指南
@@ -222,8 +222,9 @@ uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing
 一行 `budget`，写着还剩多少——因为一个没人看得见的上限，会把一轮"因为钱而停下"变成一轮"没有
 任何可见理由就停下"。
 
-`--session`、`--new` 与 `--write-region` 的行为和 `chimera chat` 一致，写入同一个会话存储。
-在这里没有对应项的只有 `--cascade`。
+`chimera tui --session standup` 会恢复一条命名的线程，`--new` 则改为开一条新的，而
+`--write-region` 会收窄写文件的工具可以触碰的范围。这三个在这里的含义与上一节完全相同，写入
+同一个会话存储。在这里没有对应项的只有 `chimera chat` 的 `--cascade`。
 
 命令：`/model <slug>` · `/new`（新线程；`/reset` 是别名） · `/clear`（清屏） · `/stream`（切换实时 token
 流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 新线程 · `Ctrl+L` 清屏 ·
@@ -249,7 +250,7 @@ uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing
   列出的是同一个存储，因此在一个界面开始的线程可以在另一个界面继续 —— 并且默认恢复最新的
   线程。所以 `/reset` 会开一条新线程，而不是清空当前这条：线程如今已经是一个文件，就地清空
   就是毁掉它的那条命令。恢复时不会重绘屏幕上已有的记录，横幅下方那行会说明模型看得到、
-  而屏幕没有显示的轮数。其余的在 `chimera tui --help` 里。
+  而屏幕没有显示的轮数。其余的在 `docs/commands.md` 里。
 - token 流式输出只在单模型路径下可用——在 `--fuse`（面板 → 评审者 → 综合器轮次）下没有增量
   token，因此面板会显示"synthesizing"（正在综合）状态，而不是伪造一个光标动画。这个标签跟随
   的是参数而不是路由：与 `chat` 一样，携带工具的一轮不会融合，而 REPL 的每一轮都携带工具。
