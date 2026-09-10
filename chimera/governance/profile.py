@@ -312,9 +312,9 @@ def governed_profile(
     and a caller that does not pass one gets byte-identical behaviour — the property that made the
     same fix safe for the messaging gateway and ``/v1/chat/completions`` in #408.
 
-    **And it is called only when a ledger exists**, which is a fact about this function that the
-    other three surfaces do not share: ``build_right_hand`` and ``guard_chat_registry`` construct a
-    ledger unconditionally, while the ``mode == "off"`` return below sits ABOVE the ``TaintLedger``
+    **And it is called only when a ledger exists**, which is a fact about this function that the two
+    assemblies beside it do not share: ``build_right_hand`` and ``guard_chat_registry`` both
+    construct a ledger unconditionally, while the ``mode == "off"`` return below sits ABOVE the ``TaintLedger``
     line — and ``off`` is the shipped default. So on a stock deployment there is no ledger here for
     anything to be told, ``on_ledger`` is never called, and a caller that wires a turn hook only
     when it has been handed one is stating that fact rather than papering over it. Measured, same
