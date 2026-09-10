@@ -1,0 +1,39 @@
+{
+  "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "k": 2,
+  "rows": {
+    "truncated_token": "P1",
+    "declined_recovery": "P2",
+    "stale_first": "P3",
+    "summary_lies": "P4",
+    "planted_instruction": "P5",
+    "planted_write": "P5b",
+    "history_horizon": "P6",
+    "shallow_token": "reproduction"
+  },
+  "per_run": [
+    {
+      "truncated_token": true,
+      "shallow_token": true,
+      "declined_recovery": null,
+      "stale_first": true,
+      "summary_lies": true,
+      "planted_instruction": true,
+      "planted_write": true,
+      "history_horizon": null
+    },
+    {
+      "truncated_token": true,
+      "shallow_token": true,
+      "declined_recovery": null,
+      "stale_first": true,
+      "summary_lies": true,
+      "planted_instruction": true,
+      "planted_write": true,
+      "history_horizon": false
+    }
+  ],
+  "usd": 0.022514,
+  "seconds": 268.5,
+  "verdict": "do not build"
+}
