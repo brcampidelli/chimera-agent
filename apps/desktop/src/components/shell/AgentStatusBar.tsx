@@ -1,6 +1,7 @@
 import { Square } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
+import { PendingApprovals } from "@/components/shell/PendingApprovals";
 import { ServerBadge } from "@/components/ServerBadge";
 import { VersionBadge } from "@/components/VersionBadge";
 import { focusRing } from "@/components/ui/focus";
@@ -108,6 +109,11 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
       )}
 
       <div className="flex-1" />
+
+      {/* First in the right-hand cluster, beside Stop, because it is the same kind of thing: the
+          agent is waiting on YOU, from whichever screen you happen to be on. Renders nothing at
+          all while no question is parked — see PendingApprovals. */}
+      <PendingApprovals />
 
       {(busy || run.running) && (
         <button

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -7,9 +7,17 @@ import { AgentStatusBar } from "@/components/shell/AgentStatusBar";
 import { AppShell } from "@/components/shell/AppShell";
 import { AgentProvider, type AgentState } from "@/lib/agent-context";
 import { I18nProvider } from "@/lib/i18n";
+import { renderWithProviders } from "@/test/utils";
 import type { TurnReport } from "@/lib/types";
 
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
+// The bar now carries the pending-question chip, which reads `GET /api/approvals`. Answering with
+// an empty list keeps that chip out of the way of tests that are not about it — and keeps this file
+// off the network, which it has always been by not touching the api module at all.
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
+  getApprovals: vi.fn(async () => []),
+}));
 
 type Seed = Partial<Omit<AgentState, "publish">>;
 
@@ -35,7 +43,7 @@ function report(): TurnReport {
 }
 
 function renderBar(state: Seed, onOpenUsage?: () => void) {
-  return render(
+  return renderWithProviders(
     <I18nProvider>
       <AgentProvider value={state}>
         <AgentStatusBar onOpenUsage={onOpenUsage} />
@@ -113,7 +121,7 @@ describe("AppShell", () => {
 
   it("keeps the agent visible after navigating away from chat", async () => {
     const user = userEvent.setup();
-    render(<Harness />);
+    renderWithProviders(<Harness />);
     expect(screen.getByText("Sessions")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Go to settings" }));
@@ -130,7 +138,7 @@ describe("AppShell", () => {
 
   it("moves focus into the new screen when the view changes", async () => {
     const user = userEvent.setup();
-    render(<Harness />);
+    renderWithProviders(<Harness />);
     await user.click(screen.getByRole("button", { name: "Go to settings" }));
     // Focus used to stay on the rail button, so a keyboard user re-tabbed from the top of the app
     // on every navigation.
@@ -138,13 +146,13 @@ describe("AppShell", () => {
   });
 
   it("does not steal focus on first paint", () => {
-    render(<Harness />);
+    renderWithProviders(<Harness />);
     // Grabbing focus on load would fight a screen reader's own start-of-document announcement.
     expect(screen.getByRole("main")).not.toHaveFocus();
   });
 
   it("puts a skip link ahead of the rail", () => {
-    render(<Harness />);
+    renderWithProviders(<Harness />);
     const link = screen.getByRole("link", { name: /skip to content/i });
     expect(link).toHaveAttribute("href", "#main");
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
