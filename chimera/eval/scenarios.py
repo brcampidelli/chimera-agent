@@ -398,18 +398,19 @@ def mechanism_arm(
 def _sha_from_git(start: Path) -> str:
     import subprocess
 
+    from chimera.proc.decode import console_text
+
     try:
         done = subprocess.run(  # noqa: S603 — fixed argv, no shell
             ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
             cwd=start,
             capture_output=True,
-            text=True,
             timeout=15,
             check=False,
         )
     except (OSError, subprocess.SubprocessError):
         return ""
-    return done.stdout.strip() if done.returncode == 0 else ""
+    return console_text(done.stdout).strip() if done.returncode == 0 else ""
 
 
 def _as_local_path(text: str) -> Path:

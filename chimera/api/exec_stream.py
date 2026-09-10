@@ -29,6 +29,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.proc.decode import console_line
 from chimera.proc.stdio import kill_tree
 
 if TYPE_CHECKING:
@@ -144,6 +145,15 @@ def run_streamed(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,  # MERGE stderr into stdout: a command-runner shows combined output
         text=True,
+        # Named, and named this way for a reason particular to streaming. `text=True` alone reads
+        # with the ANSI code page while a console program writes the OEM one (`chimera/proc/decode`).
+        # The obvious fix — read bytes and decode — cannot be used here: `bufsize=1` is line
+        # buffering, which Python only honours in TEXT mode, so binary would take the default buffer
+        # and the output would arrive in blocks instead of lines. That is the whole feature.
+        # `surrogateescape` is the way to keep both: undecodable bytes survive as lone surrogates
+        # and `console_line` recovers them exactly, so each line is still judged on its own bytes.
+        encoding="utf-8",
+        errors="surrogateescape",
         bufsize=1,
         stdin=subprocess.DEVNULL,
         env=_child_env(),
@@ -168,9 +178,12 @@ def run_streamed(
     truncated = False
     try:
         assert proc.stdout is not None
-        for line in proc.stdout:  # blocks per line; the watchdog kill closes the pipe → loop ends
+        for raw_line in proc.stdout:  # blocks per line; the watchdog kill closes the pipe → loop ends
             if truncated:
                 continue  # keep draining so the child never blocks on a full pipe, but stop emitting
+            line = console_line(raw_line)
+            # Decoded before counting, so `_MAX_STREAM_CHARS` keeps meaning characters. Counting the
+            # bytes instead would truncate a CJK or emoji-heavy log at a third of the stated budget.
             total += len(line)
             if total > _MAX_STREAM_CHARS:
                 truncated = True
