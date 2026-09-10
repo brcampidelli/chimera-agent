@@ -2210,6 +2210,12 @@ def tui(
         help="Stop once this session has spent this much (the whole session, not one turn). "
         "The activity panel shows what is left.",
     ),
+    write_region: str | None = typer.Option(
+        None,
+        "--write-region",
+        help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write "
+        "outside is refused — blocks an injected instruction from rewriting an unrelated file.",
+    ),
 ) -> None:
     """Launch the full-screen TUI — your right-hand. Requires a key.
 
@@ -2262,12 +2268,15 @@ def tui(
             # as an `OptionInfo` object and `session_budget` reads that as a truthy cap, which is
             # what `test_the_tui_fallback_passes_values_not_option_objects` exists to catch.
             max_usd=max_usd,
-            # `tui` has no `--write-region` of its own, so the fallback states the same "no region
-            # asked for" that omitting the flag on `chimera chat` means. It cannot be omitted here:
-            # the parameter would arrive as an `OptionInfo` object and `.split(",")` would fail on
-            # it — which is the defect this whole argument list exists to prevent, caught again by
-            # `test_the_tui_fallback_passes_values_not_option_objects` the day the flag was added.
-            write_region=None,
+            # Forwarded, not dropped. This read `write_region=None` while `tui` had no flag of its
+            # own, and that was the honest spelling of "no region was asked for" — but the day the
+            # flag arrived it became a fence the person typed and this branch silently removed.
+            # Falling back to a `chat` that writes anywhere is the worse half of that trade, and it
+            # is invisible: the fallback prints "falling back to chimera chat" and nothing about a
+            # narrowing it just dropped. It still cannot be *omitted* — an omitted parameter arrives
+            # as an `OptionInfo` object and `.split(",")` would fail on it, which is the defect this
+            # whole argument list exists to prevent.
+            write_region=write_region,
         )
 
     settings = get_settings()
@@ -2297,7 +2306,13 @@ def tui(
     # Built before the app that will draw its questions, because the tools that consult it are built
     # before the session that the app is constructed around. `ChimeraTUI.on_mount` binds it.
     gate = ModalGate()
-    hand = build_right_hand(Path(workspace), settings=settings, surface="tui", ask=gate)
+    hand = build_right_hand(
+        Path(workspace),
+        settings=settings,
+        surface="tui",
+        ask=gate,
+        write_region=write_region,
+    )
     agent = Agent(
         backend,
         hand.registry,

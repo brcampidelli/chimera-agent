@@ -9,7 +9,7 @@ Every check below drives the **real command** through ``CliRunner`` and then ask
 was handed. That distinction is not stylistic. #400 shipped four structural checks — "does the
 command call the builder" — and a sabotage that called the builder and threw the result away passed
 0 of 109 of them. So `project` is read off the session the command constructed, `instructions` off
-the agent's own config, and the write region is proven by making a real writer refuse.
+the agent's own config, and the write region is proven by the file that does not appear on disk.
 
 The one place a structural check is still the right instrument is the import-time fallback, and it
 already has one (``test_the_tui_fallback_passes_values_not_option_objects``).
@@ -173,3 +173,72 @@ def test_the_owners_identity_reaches_the_full_screen_app(
 
     assert "Be terse." in agent.config.instructions
     assert "Português (Brasil)" in agent.config.instructions
+
+
+# --- 4. the declared write region reaches this surface's writers ---------------------------------
+
+
+def _write(hand: Any, path: str) -> str:
+    return str(hand.registry.get("write_file").run(path=path, content="x"))
+
+
+def test_a_write_outside_the_declared_region_is_refused_here_too(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The injection-to-arbitrary-write case, on the surface that had no fence for it.
+
+    Driven through the real writer rather than through the flag: a command can parse
+    ``--write-region``, hand it to the builder, and be handed back a registry it then replaces --
+    which is the sabotage 109 tests missed in #400. So the tool the agent would actually call is
+    made to refuse.
+    """
+    (tmp_path / "src").mkdir()
+    hand = _drive(
+        monkeypatch, "--no-memory", "--workspace", str(tmp_path), "--write-region", "src/**"
+    )["hand"]
+
+    inside = _write(hand, "src/ok.py")
+    outside = _write(hand, "config/secrets.py")
+
+    assert (tmp_path / "src" / "ok.py").exists(), f"the region refused its own file: {inside!r}"
+    # The file, not the sentence. `refuse_write` returns a plain ``error:`` string rather than a
+    # `refusal()`-marked one, so a check on the wording alone would pass against a gate that
+    # explained itself and wrote the file anyway.
+    assert not (tmp_path / "config" / "secrets.py").exists(), "the write happened"
+    assert "write-region" in outside, f"refused for some other reason: {outside!r}"
+
+
+def test_declaring_no_region_still_writes_anywhere_in_the_workspace(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The control, and the half a one-sided test would miss. The region is opt-in: a writer that
+    refused ``config/secrets.py`` with no flag would pass the test above while proving nothing about
+    the flag, and would have broken every existing run."""
+    hand = _drive(monkeypatch, "--no-memory", "--workspace", str(tmp_path))["hand"]
+
+    wrote = _write(hand, "config/secrets.py")
+
+    assert (tmp_path / "config" / "secrets.py").exists(), wrote
+
+
+def test_the_fallback_carries_the_region_rather_than_dropping_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without Textual installed, ``tui`` runs ``chat`` instead -- and that branch passed a literal
+    ``None`` here for as long as this surface had no flag. Leaving it would turn a fence the person
+    typed into a fence silently removed, announced by nothing: the fallback says "falling back to
+    chimera chat" and not a word about the narrowing it just dropped.
+
+    ``test_the_tui_fallback_passes_values_not_option_objects`` proves every parameter is *passed*;
+    this proves this one is passed the value it was given.
+    """
+    import sys
+
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr("chimera.cli.main.chat", lambda **kwargs: seen.update(kwargs))
+    monkeypatch.setitem(sys.modules, "chimera.tui.app", None)  # force the ImportError branch
+
+    result = CliRunner().invoke(cli, ["tui", "--write-region", "src/**"])
+
+    assert result.exit_code == 0, result.output
+    assert seen.get("write_region") == "src/**", "the fallback dropped the declared region"

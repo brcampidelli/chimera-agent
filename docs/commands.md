@@ -1526,6 +1526,7 @@ chimera tui
 | `--no-memory` | Don't recall long-term memory. |  |
 | `--stream` | Live token streaming (single-model path only). | `True` |
 | `--max-usd` | Stop once this session has spent this much (the whole session, not one turn). The activity panel shows what is left. |  |
+| `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
 
 ## version
 
