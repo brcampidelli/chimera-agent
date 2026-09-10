@@ -2683,6 +2683,7 @@ def desktop_app(
         # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
         # got no fence on this surface — the one a Discord bot and /v1/chat/completions run on.
         registry = _apply_tool_allowlist(registry, allow=None, deny=None, settings=live)
+        chat_ledger: Any = None
         if live.guard_chat:
             # AFTER the MCP tools, so the denylist and the ledger reach those too — a guard that
             # covers only the tools we wrote is not a guard. Off by default: this registry is shared
@@ -2693,7 +2694,7 @@ def desktop_app(
 
             # The same file the coding turn writes and the Governance screen reads. One log, or the
             # screen shows a partial history while claiming to show the whole one.
-            registry, _chat_ledger = guard_chat_registry(
+            registry, chat_ledger = guard_chat_registry(
                 registry, audit=AuditLog(live.home / "audit.jsonl")
             )
         runner = Agent(
@@ -2716,6 +2717,21 @@ def desktop_app(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=live.remember_from_chat,
+            # The ledger is built once per conversation and the instruction is known once per TURN,
+            # which is the whole reason `CHIMERA_TAINT_AUTHORITY` did nothing here: a ledger nobody
+            # tells answers `unknown` for every fetch, and the narrowing treats that exactly as it
+            # treats `agent`. Measured on the same instrument as the terminal's — 0 rows moved
+            # before, 6 after (`bench/right_hand_governance/RESULTS.md`, the `app_chat` columns).
+            #
+            # `workspace=` so a path the model gives absolutely matches the relative form the person
+            # wrote, which is what `set_instruction` documents the argument for.
+            on_turn_start=(
+                None
+                if chat_ledger is None
+                else lambda message: chat_ledger.set_instruction(
+                    message, workspace=workspace_path
+                )
+            ),
         )
 
     # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).
