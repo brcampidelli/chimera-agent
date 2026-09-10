@@ -84,43 +84,41 @@ describe("the approval frame on a coding turn", () => {
     expect(h.onError).not.toHaveBeenCalled();
   });
 
-  it("survives the replay path, and is not delivered twice", async () => {
-    // A dropped connection is exactly when a question is easiest to lose: the frame was sent, the
-    // client never read it, and the turn is still blocked on an answer nobody can see. The resume
-    // carries the same frame with its `seq`, and the `seen` guard is what stops a client that DID
-    // read it drawing a second card for one question.
+  /** A stream that hands over `live`, then dies — and a replay endpoint holding `rest`. */
+  function cutThenReplay(live: string[], rest: unknown[], seq: number) {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string | URL) => {
         if (String(url).includes("/api/code/turns/")) {
-          return new Response(
-            JSON.stringify({
-              turn_id: "t1",
-              frames: [
-                { event: "token", text: "Let me write that down.", seq: 2 },
-                { event: "approval", ...ASKED, seq: 3 },
-              ],
-              seq: 3,
-            }),
-            { status: 200, headers: { "content-type": "application/json" } },
-          );
+          return new Response(JSON.stringify({ turn_id: "t1", frames: rest, seq }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
         }
         const enc = new TextEncoder();
-        let sent = false;
+        let i = 0;
         const body = new ReadableStream<Uint8Array>({
           pull(controller) {
-            if (!sent) {
-              sent = true;
-              controller.enqueue(
-                enc.encode(frame("session", { session_id: "s1", turn_id: "t1", seq: 1 })),
-              );
-              return;
-            }
-            controller.error(new Error("network error"));
+            if (i < live.length) controller.enqueue(enc.encode(live[i++]));
+            else controller.error(new Error("network error"));
           },
         });
         return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
       }),
+    );
+  }
+
+  it("is recovered when the connection dropped before the client read it", async () => {
+    // The worst moment to lose a question: it was sent, nobody saw it, and the turn is still blocked
+    // on an answer that now cannot come. The resume is the only thing between that and a refusal
+    // with no explanation.
+    cutThenReplay(
+      [frame("session", { session_id: "s1", turn_id: "t1", seq: 1 })],
+      [
+        { event: "token", text: "Let me write that down.", seq: 2 },
+        { event: "approval", ...ASKED, seq: 3 },
+      ],
+      3,
     );
     const h = handlers();
 
@@ -128,5 +126,28 @@ describe("the approval frame on a coding turn", () => {
 
     expect(h.onApproval).toHaveBeenCalledTimes(1);
     expect((h.onApproval.mock.calls[0][0] as CodeApprovalEvent).id).toBe(ASKED.id);
+  });
+
+  it("is not drawn twice when the client had already read it", async () => {
+    // The other half of the same recovery: the resume hands back frames this client applied before
+    // the cut, and one question must not become two cards — a second card for a question that no
+    // longer exists is answered into nothing, and the person is told it went through.
+    cutThenReplay(
+      [
+        frame("session", { session_id: "s1", turn_id: "t1", seq: 1 }),
+        frame("approval", { ...ASKED, seq: 2 }),
+      ],
+      [
+        { event: "approval", ...ASKED, seq: 2 },
+        { event: "done", answer: "written", seq: 3 },
+      ],
+      3,
+    );
+    const h = handlers();
+
+    await streamCodeTurn({ message: "write it to notes.md" }, h);
+
+    expect(h.onApproval).toHaveBeenCalledTimes(1);
+    expect(h.onDone).toHaveBeenCalledTimes(1);
   });
 });
