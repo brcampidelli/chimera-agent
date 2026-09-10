@@ -243,9 +243,20 @@ class ChimeraTUI(App[None]):
 
     # -- testable dispatch (no event loop) ---------------------------------
     def reply_to(self, text: str) -> str | None:
-        """Produce a reply for one message, or ``None`` for the /reset command."""
-        if text == "/reset":
-            self.session.reset()
+        """Produce a reply for one message, or ``None`` for ``/reset`` and ``/new``.
+
+        A seam, and therefore a second place the meaning of ``/reset`` is written down. It said
+        "clear this conversation" while :meth:`action_reset` was starting a new thread, which is a
+        duplicate that has already drifted rather than one that might: whichever of the two the next
+        reader trusts, one of them is wrong about what the shipped app does. So it makes the same
+        decision on the same condition, minus the widgets it has no event loop for.
+        """
+        if text in ("/reset", "/new"):
+            if self.sessions is None:
+                self.session.reset()
+            else:
+                self.session_id = self.sessions.new()
+                self.session = self.sessions.get(self.session_id)
             return None
         return self.session.send(text)
 

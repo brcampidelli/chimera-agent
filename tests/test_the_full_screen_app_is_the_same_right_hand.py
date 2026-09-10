@@ -415,3 +415,24 @@ def test_the_fallback_carries_the_thread_rather_than_minting_one(
 
     assert result.exit_code == 0, result.output
     assert (seen.get("session_id"), seen.get("new")) == ("standup", True)
+
+
+def test_the_dispatch_seam_agrees_with_the_key_binding_about_what_reset_means(
+    tmp_path: Path,
+) -> None:
+    """``reply_to`` is a second place the meaning of ``/reset`` is written down, and it had already
+    drifted: it cleared the conversation while ``action_reset`` started a new thread. Whichever of
+    the two the next reader trusts, one of them would be wrong about the shipped app."""
+    from chimera.tui.app import ChimeraTUI
+
+    _, manager = _store_and_manager(tmp_path)
+    first = manager.new()
+    app = ChimeraTUI(manager.get(first), sessions=manager, session_id=first)
+    app.session.send("something worth keeping")
+    manager.persist(first)
+
+    assert app.reply_to("/reset") is None
+
+    assert app.session_id != first
+    assert app.session.turns == []
+    assert _saved(tmp_path, first)["turns"][0]["user"] == "something worth keeping"
