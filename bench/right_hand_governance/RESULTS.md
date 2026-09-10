@@ -1081,10 +1081,13 @@ an arm that had quietly stopped setting instructions would print four zeros and 
   layer at all, so those numbers would describe a configuration rather than a defence — and under
   `enforce` they would describe an owner's setting rather than the product. §8b answers one question
   (is the lever connected) and stays inside it.
-- **Nothing here says `authority` is a mode anyone should turn on.** It measures that the lever is
-  connected, not that pulling it is wise. The mode makes a page the person named in their own message
-  stop arming the narrowing; on a Discord bot, "the person" is whoever is typing into the channel,
-  and a session is shared by everyone in it.
+- **Nothing here says `authority` is a mode anyone should turn on, and the project's own measurement
+  says the opposite.** `SECURITY.md` records that on `bench/injection` this mode lets **six of the
+  seven attacks through** when the user asked to summarise the poisoned page, and tells owners to
+  leave it at `provenance`. This part measures that the lever is connected on two more surfaces, not
+  that pulling it is wise — and on a Discord bot "the person who named the page" is whoever typed
+  into a channel everybody shares, which is a worse fit for the mode than any surface it already
+  reached.
 - **`CHIMERA_GOVERNANCE=off` is the shipped default and is not changed here.** This part measures
   what an owner who turned governance on now gets. What fraction of deployments that is, nobody
   measured — and the honest reading of the top table is that for everyone else this fix is worth
