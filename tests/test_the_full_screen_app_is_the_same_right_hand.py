@@ -436,3 +436,53 @@ def test_the_dispatch_seam_agrees_with_the_key_binding_about_what_reset_means(
     assert app.session_id != first
     assert app.session.turns == []
     assert _saved(tmp_path, first)["turns"][0]["user"] == "something worth keeping"
+
+
+async def test_a_turns_cost_is_filed_under_the_thread_it_belongs_to(tmp_path: Path) -> None:
+    """A conversation resumed across three evenings should be one group on the Cost screen.
+
+    This app filed every turn under a fresh id minted per run, which was the same thing while a run
+    WAS the conversation and stopped being it the moment the thread outlived the window. `chat`
+    files under the thread id; a resumed TUI thread would otherwise have scattered across as many
+    usage sessions as it had runs, and nothing would have reported the difference.
+    """
+    import json
+
+    from chimera.tui.app import ChimeraTUI
+
+    _, manager = _store_and_manager(tmp_path)
+    first = manager.new()
+    app = ChimeraTUI(
+        manager.get(first), sessions=manager, session_id=first, stream=False, usage_home=tmp_path
+    )
+
+    async with app.run_test() as pilot:
+        await _turn(app, pilot, "first")
+        await pilot.press("ctrl+r")
+        await pilot.pause()
+        second = app.session_id
+        await _turn(app, pilot, "second")
+
+    rows = [json.loads(line) for line in (tmp_path / "usage.jsonl").read_text().splitlines() if line]
+
+    assert [r["session_id"] for r in rows] == [first, second]
+    assert app.run_id not in {r["session_id"] for r in rows}, "filed under the run, not the thread"
+
+
+async def test_an_app_with_no_thread_still_files_under_one_id_per_run(tmp_path: Path) -> None:
+    """The control: with no store there is no thread to file under, and grouping a run's turns
+    together is still the right answer. Removing that would scatter every bench arm."""
+    import json
+
+    from chimera.interface import ChatSession
+    from chimera.tui.app import ChimeraTUI
+
+    app = ChimeraTUI(ChatSession(_Recorder(), gate=None), stream=False, usage_home=tmp_path)
+
+    async with app.run_test() as pilot:
+        await _turn(app, pilot, "one")
+        await _turn(app, pilot, "two")
+
+    rows = [json.loads(line) for line in (tmp_path / "usage.jsonl").read_text().splitlines() if line]
+
+    assert [r["session_id"] for r in rows] == [app.run_id, app.run_id]

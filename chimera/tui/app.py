@@ -127,7 +127,10 @@ class ChimeraTUI(App[None]):
         #: The panel showed a price per turn and recorded it nowhere, so the Cost screen reported
         #: zero spend for a surface that had been running all day.
         self.usage_home = usage_home
-        self.usage_session = uuid4().hex[:12]
+        #: What a usage row is filed under when this app has no thread of its own. One id per run,
+        #: so a session's turns group together — which was the whole answer while the conversation
+        #: died with the window, and is the wrong one now that it does not. See :meth:`_usage_id`.
+        self.run_id = uuid4().hex[:12]
         #: The governed stack this conversation runs on, or None for a TUI built without one (the
         #: dispatch tests). Held for `begin_turn` and for the per-turn verdicts, exactly as the
         #: REPL loop holds it.
@@ -280,7 +283,18 @@ class ChimeraTUI(App[None]):
             return
         from chimera.api.usage import record_turn
 
-        record_turn(self.usage_home, self.usage_session, report)
+        record_turn(self.usage_home, self._usage_id(), report)
+
+    def _usage_id(self) -> str:
+        """What a turn's cost is filed under: the thread, when there is one.
+
+        `chimera chat` files under its thread id, so a conversation resumed across three evenings
+        is one row group on the Cost screen. This app filed under a fresh id per run, which was the
+        same thing while a run WAS the conversation — and stopped being it the moment the thread
+        outlived the window. Read rather than stored, so it follows a `/reset` without a second
+        place to remember to update.
+        """
+        return self.session_id if self.sessions is not None and self.session_id else self.run_id
 
     def _emit_token(self, delta: str) -> None:
         self.post_message(TokenDelta(delta))
