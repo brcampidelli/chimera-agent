@@ -335,3 +335,109 @@ def test_the_stock_deployment_is_left_exactly_as_it_was(
     registry = session.agent.tools  # type: ignore[attr-defined]
     assert all(getattr(t, "ledger", None) is None for t in registry.tools())
     assert session.send is not None  # the session is usable; nothing was half-built
+
+
+# --------------------------------------------------------------------------- the instrument
+
+_BENCH = (
+    Path(__file__).resolve().parents[1]
+    / "bench"
+    / "right_hand_governance"
+    / "run_terminal_vs_governed.py"
+)
+
+
+@pytest.fixture(scope="module")
+def bench() -> Any:
+    import importlib.util
+    import sys
+
+    spec = importlib.util.spec_from_file_location("run_terminal_vs_governed", _BENCH)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    # Registered BEFORE execution: the bench declares dataclasses, and `@dataclass` resolves its
+    # annotations through `sys.modules[cls.__module__]`.
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def _fingerprint(outcomes: list[Any]) -> str:
+    return "\n".join(f"{o.id}|{o.ran}|{o.mechanism}|{o.read_fenced}" for o in outcomes)
+
+
+def test_the_gateway_arm_moves_when_it_is_told_and_not_when_it_is_not(
+    bench: Any, tmp_path: Path
+) -> None:
+    """The power half of §8b's zero, without which that column is a blind instrument.
+
+    ``serve_untold`` reading ``identical, 0 rows moved`` under ``CHIMERA_TAINT_AUTHORITY=authority``
+    is the finding. It is only a finding if the same probe, on the same corpus, registers the change
+    on the arm that IS told — otherwise the zero is what an instrument prints when it cannot see.
+    A ``gateway_registry`` that silently dropped its ``instruction`` argument would make all four
+    columns read zero and the table would say the lever is dead, which is exactly the shape this
+    project keeps paying for.
+    """
+    episodes = bench.attack_episodes() + bench.benign_episodes()
+    named = f"Summarise {bench.ATTACK_PAGE} and {bench.UPSTREAM_PAGE} for me"
+    on = _settings(tmp_path, CHIMERA_GOVERNANCE="enforce")
+    authority = _settings(
+        tmp_path, CHIMERA_GOVERNANCE="enforce", CHIMERA_TAINT_AUTHORITY="authority"
+    )
+
+    for told, untold in (("serve", "serve_untold"), ("platform", "platform_untold")):
+        base = _fingerprint(bench.run_arm(episodes, on, tmp_path, arm=told, instruction=named))
+        moved = _fingerprint(
+            bench.run_arm(episodes, authority, tmp_path, arm=told, instruction=named)
+        )
+        untold_base = _fingerprint(
+            bench.run_arm(episodes, on, tmp_path, arm=untold, instruction=named)
+        )
+        untold_moved = _fingerprint(
+            bench.run_arm(episodes, authority, tmp_path, arm=untold, instruction=named)
+        )
+        assert moved != base, f"CHIMERA_TAINT_AUTHORITY is inert on the {told} arm that WAS told"
+        assert untold_moved == untold_base, (
+            f"the {untold} arm moved under authority — it is supposed to model the surface with no "
+            "instruction, so either it is being told one or the fingerprint is unstable"
+        )
+
+
+def test_the_gateway_arms_agree_with_each_other(bench: Any, tmp_path: Path) -> None:
+    """One function builds both, so a run where they diverge is a run where the seam is lying.
+
+    The two arms differ in the ``surface=`` label and in nothing that decides what is allowed —
+    which is exactly what the two shipped call sites differ in. Keeping both is how a future
+    divergence gets to show up as a failure instead of as a table nobody reads twice.
+    """
+    episodes = bench.attack_episodes() + bench.benign_episodes()
+    named = f"Summarise {bench.ATTACK_PAGE} and {bench.UPSTREAM_PAGE} for me"
+    settings = _settings(tmp_path, CHIMERA_GOVERNANCE="enforce")
+    serve = _fingerprint(bench.run_arm(episodes, settings, tmp_path, arm="serve", instruction=named))
+    platform = _fingerprint(
+        bench.run_arm(episodes, settings, tmp_path, arm="platform", instruction=named)
+    )
+    assert serve == platform
+
+
+def test_the_gateway_arm_has_no_ledger_under_the_shipped_default(bench: Any, tmp_path: Path) -> None:
+    """The reason §8b has a governance axis at all, asserted rather than described in prose.
+
+    Every other arm in that file builds a ledger unconditionally. This one does not, and a table
+    measured only at the default would print four zeros before AND after the fix.
+    """
+    registry = bench.gateway_registry(
+        bench.build_stub_registry(_settings(tmp_path), {}),
+        _settings(tmp_path),
+        tmp_path,
+        surface="serve",
+    )
+    assert bench._ledger_in(registry) is None
+
+    governed = bench.gateway_registry(
+        bench.build_stub_registry(_settings(tmp_path), {}),
+        _settings(tmp_path, CHIMERA_GOVERNANCE="enforce"),
+        tmp_path,
+        surface="serve",
+    )
+    assert bench._ledger_in(governed) is not None
