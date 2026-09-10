@@ -350,8 +350,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
             # and whoever holds it can post into that channel. Same shape as `server.token_set`.
             "approval_webhook_set": bool(settings.approval_webhook.strip()),
         },
-        # Off by default and that is a real exposure — see Settings.guard_chat. Exposed here because
-        # the posture line points at this switch by name when it reports a conversation as unguarded.
+        # ON by default since 2026-09-10 — see Settings.guard_chat. Exposed here because the posture
+        # line points at this switch by name when it reports a conversation as unguarded, which is
+        # now the state an owner has to have chosen rather than the one they were given.
         "guard": {"chat": settings.guard_chat},
         "server": {"token_set": bool(settings.server_token)},
         "mcp": {"autoload": settings.mcp_autoload},

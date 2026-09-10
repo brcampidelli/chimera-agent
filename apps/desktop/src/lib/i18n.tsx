@@ -350,7 +350,7 @@ const en: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Guard the chat",
   "settings.hint.guardChat":
-    "Assemble the chat agent like the coding turn: no shell, and a taint ledger so it stops writing after reading untrusted content. Off by default, which is a real exposure — the conversation's posture line says so while it is off. The messaging bots assemble their own governed session, so this switch does not reach them either way.",
+    "Assemble the chat agent like the coding turn: no shell, and a taint ledger so it stops writing after reading untrusted content. On by default; turning it off is a real exposure, and the conversation's posture line says so while it is off. The messaging bots assemble their own governed session, so this switch does not reach them either way.",
   "settings.row.bearer": "API bearer token",
   "settings.hint.bearer": "required for write endpoints when set",
   "settings.isSet": "set",
@@ -1673,7 +1673,7 @@ const pt: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Proteger o chat",
   "settings.hint.guardChat":
-    "Monta o agente do chat como o turno de código: sem shell, e com um registro de contaminação para ele parar de escrever depois de ler conteúdo não confiável. Desligado por padrão, e isso é uma exposição real — a linha de postura da conversa diz isso enquanto está desligado. Os bots de mensageria montam a própria sessão governada, então esta chave não os alcança.",
+    "Monta o agente do chat como o turno de código: sem shell, e com um registro de contaminação para ele parar de escrever depois de ler conteúdo não confiável. Ligado por padrão; desligá-lo é uma exposição real, e a linha de postura da conversa diz isso enquanto está desligado. Os bots de mensageria montam a própria sessão governada, então esta chave não os alcança.",
   "settings.row.bearer": "Token bearer da API",
   "settings.hint.bearer": "exigido nos endpoints de escrita quando definido",
   "settings.isSet": "definida",
@@ -3030,7 +3030,7 @@ const es: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Proteger el chat",
   "settings.hint.guardChat":
-    "Monta el agente del chat como el turno de código: sin shell y con registro de contaminación para que deje de escribir tras leer contenido no confiable. Desactivado por defecto, y eso es una exposición real: la línea de postura de la conversación lo dice mientras está desactivado. Los bots de mensajería montan su propia sesión gobernada, así que este interruptor no les llega.",
+    "Monta el agente del chat como el turno de código: sin shell y con registro de contaminación para que deje de escribir tras leer contenido no confiable. Activado por defecto; desactivarlo es una exposición real, y la línea de postura de la conversación lo dice mientras está desactivado. Los bots de mensajería montan su propia sesión gobernada, así que este interruptor no les llega.",
   "settings.row.bearer": "Token bearer de la API",
   "settings.hint.bearer":
     "requerido en endpoints de escritura cuando se define",
@@ -4378,7 +4378,7 @@ const fr: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Protéger le chat",
   "settings.hint.guardChat":
-    "Assemble l'agent du chat comme le tour de code : pas de shell, et un registre de contamination pour qu'il cesse d'écrire après avoir lu du contenu non fiable. Désactivé par défaut, ce qui est une vraie exposition — la ligne de posture de la conversation le dit tant que c'est désactivé. Les bots de messagerie assemblent leur propre session gouvernée ; ce réglage ne les atteint pas.",
+    "Assemble l'agent du chat comme le tour de code : pas de shell, et un registre de contamination pour qu'il cesse d'écrire après avoir lu du contenu non fiable. Activé par défaut ; le désactiver est une vraie exposition, et la ligne de posture de la conversation le dit tant que c'est désactivé. Les bots de messagerie assemblent leur propre session gouvernée ; ce réglage ne les atteint pas.",
   "settings.row.bearer": "Token bearer de l'API",
   "settings.hint.bearer": "requis sur les endpoints d'écriture s'il est défini",
   "settings.isSet": "définie",
@@ -5734,7 +5734,7 @@ const de: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Chat schützen",
   "settings.hint.guardChat":
-    "Baut den Chat-Agenten wie den Coding-Zug: keine Shell, und ein Taint-Ledger, damit er nach dem Lesen nicht vertrauenswürdiger Inhalte nichts mehr schreibt. Standardmäßig aus, und das ist ein echtes Risiko — die Haltungszeile der Unterhaltung sagt das, solange es aus ist. Die Messaging-Bots bauen ihre eigene regulierte Sitzung; dieser Schalter erreicht sie nicht.",
+    "Baut den Chat-Agenten wie den Coding-Zug: keine Shell, und ein Taint-Ledger, damit er nach dem Lesen nicht vertrauenswürdiger Inhalte nichts mehr schreibt. Standardmäßig an; es auszuschalten ist ein echtes Risiko, und die Haltungszeile der Unterhaltung sagt das, solange es aus ist. Die Messaging-Bots bauen ihre eigene regulierte Sitzung; dieser Schalter erreicht sie nicht.",
   "settings.row.bearer": "API-Bearer-Token",
   "settings.hint.bearer": "für Schreib-Endpunkte erforderlich, wenn gesetzt",
   "settings.isSet": "gesetzt",
@@ -7060,7 +7060,7 @@ const zh: Dict = {
   "settings.row.sandbox": "沙箱",
   "settings.row.guardChat": "保护聊天",
   "settings.hint.guardChat":
-    "把聊天的智能体按写代码那一套来装配：不给 shell，并加上污点记录，读了不可信内容之后就不再写文件。默认关闭，而这是一处真实的暴露——关着的时候，对话的姿态提示会明说。消息机器人会自己装配受管的会话，所以这个开关碰不到它们。",
+    "把聊天的智能体按写代码那一套来装配：不给 shell，并加上污点记录，读了不可信内容之后就不再写文件。默认开启；关掉它是一处真实的暴露，而关着的时候，对话的姿态提示会明说。消息机器人会自己装配受管的会话，所以这个开关碰不到它们。",
   "settings.row.bearer": "API Bearer 令牌",
   "settings.hint.bearer": "设置后写入接口需要它",
   "settings.isSet": "已设置",
@@ -8360,7 +8360,7 @@ const ja: Dict = {
   "settings.row.sandbox": "サンドボックス",
   "settings.row.guardChat": "チャットを保護",
   "settings.hint.guardChat":
-    "チャットのエージェントをコーディングのターンと同じように組み立てます：シェルなし、そして信頼できない内容を読んだあとは書き込みを止める汚染台帳付き。既定はオフで、それは実際のリスクです——オフの間は会話の姿勢行がそう告げます。メッセージングのボットは独自の管理されたセッションを組むため、この設定は届きません。",
+    "チャットのエージェントをコーディングのターンと同じように組み立てます：シェルなし、そして信頼できない内容を読んだあとは書き込みを止める汚染台帳付き。既定はオンで、オフにすることは実際のリスクです——オフの間は会話の姿勢行がそう告げます。メッセージングのボットは独自の管理されたセッションを組むため、この設定は届きません。",
   "settings.row.bearer": "API ベアラートークン",
   "settings.hint.bearer": "設定時は書き込みエンドポイントで必須",
   "settings.isSet": "設定済み",
@@ -9677,7 +9677,7 @@ const it: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Proteggi la chat",
   "settings.hint.guardChat":
-    "Assembla l'agente della chat come il turno di codice: niente shell e un registro di contaminazione perché smetta di scrivere dopo aver letto contenuti non attendibili. Disattivato di default, ed è un'esposizione reale: la riga di postura della conversazione lo dice finché resta spento. I bot di messaggistica assemblano una propria sessione governata, quindi questo interruttore non li raggiunge.",
+    "Assembla l'agente della chat come il turno di codice: niente shell e un registro di contaminazione perché smetta di scrivere dopo aver letto contenuti non attendibili. Attivo di default; disattivarlo è un'esposizione reale, e la riga di postura della conversazione lo dice finché resta spento. I bot di messaggistica assemblano una propria sessione governata, quindi questo interruttore non li raggiunge.",
   "settings.row.bearer": "Token bearer dell'API",
   "settings.hint.bearer":
     "richiesto per gli endpoint di scrittura, quando impostato",
@@ -11025,7 +11025,7 @@ const pl: Dict = {
   "settings.row.sandbox": "Sandbox",
   "settings.row.guardChat": "Chroń czat",
   "settings.hint.guardChat":
-    "Składa agenta czatu tak jak turę kodu: bez powłoki i z rejestrem skażenia, żeby przestał zapisywać po przeczytaniu niezaufanej treści. Domyślnie wyłączone i jest to realne odsłonięcie — linia postawy rozmowy mówi o tym, dopóki jest wyłączone. Boty wiadomości składają własną nadzorowaną sesję, więc ten przełącznik ich nie dotyczy.",
+    "Składa agenta czatu tak jak turę kodu: bez powłoki i z rejestrem skażenia, żeby przestał zapisywać po przeczytaniu niezaufanej treści. Domyślnie włączone; wyłączenie go jest realnym odsłonięciem, a linia postawy rozmowy mówi o tym, dopóki jest wyłączone. Boty wiadomości składają własną nadzorowaną sesję, więc ten przełącznik ich nie dotyczy.",
   "settings.row.bearer": "Token bearer API",
   "settings.hint.bearer": "wymagany dla endpointów zapisu, gdy ustawiony",
   "settings.isSet": "ustawiony",
@@ -12368,7 +12368,7 @@ const ru: Dict = {
   "settings.row.sandbox": "Песочница",
   "settings.row.guardChat": "Защищать чат",
   "settings.hint.guardChat":
-    "Собирать агента чата так же, как ход написания кода: без оболочки и с журналом заражения, чтобы он переставал писать после чтения недоверенного содержимого. По умолчанию выключено, и это реальный риск — пока выключено, об этом говорит строка позиции беседы. Боты мессенджеров собирают свою управляемую сессию, поэтому этот переключатель их не касается.",
+    "Собирать агента чата так же, как ход написания кода: без оболочки и с журналом заражения, чтобы он переставал писать после чтения недоверенного содержимого. По умолчанию включено; выключить его — реальный риск, и пока выключено, об этом говорит строка позиции беседы. Боты мессенджеров собирают свою управляемую сессию, поэтому этот переключатель их не касается.",
   "settings.row.bearer": "Токен доступа к API",
   "settings.hint.bearer": "если задан, обязателен для конечных точек записи",
   "settings.isSet": "задан",
