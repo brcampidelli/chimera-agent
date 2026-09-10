@@ -276,9 +276,12 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     nothing stops it from writing the file that instruction names.
 
     ``approve`` is who says yes when the narrowing wants a person, and it is the argument this
-    function spent its whole life without. Every other `ledger_registry` caller passes one;
-    omitting it here meant `LedgeredTool` had nobody to ask, and `LedgeredTool` reads *nobody* as
-    *refuse*. Measured on the shipped bench, the same corpus as every other arm: the guard blocks
+    function spent its whole life without. Of the seven `ledger_registry` call sites in the
+    package, five passed one and two did not: this, and `solve_batch`
+    (`chimera/cli/main.py:4716`) — where nobody is at an unattended batch, so the refusal is the
+    answer. Here somebody IS at a screen, and omitting it meant `LedgeredTool` had nobody to ask;
+    `LedgeredTool` reads *nobody* as *refuse*. Measured on the shipped bench, the same corpus as
+    every other arm: the guard blocks
     7 of 7 attacks either way, and the over-block on legitimate work is **0.750 with no approver
     against 0.250 with one** — four questions, all four granted
     (`bench/right_hand_governance/RESULTS.md`, §5b). Two thirds of the price of turning this
