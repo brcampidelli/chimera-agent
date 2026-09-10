@@ -1,13 +1,19 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AgentStatusBar } from "@/components/shell/AgentStatusBar";
 import { cancelRun, streamRun, type RunStreamHandlers } from "@/lib/api";
-import { RunSessionProvider, useRunSession } from "@/lib/run-session";
-import { I18nProvider } from "@/lib/i18n";
+import { useRunSession } from "@/lib/run-session";
+import { renderWithProviders } from "@/test/utils";
 
-vi.mock("@/lib/api", () => ({ streamRun: vi.fn(), cancelRun: vi.fn() }));
+// `getApprovals` joined the list because the bar now carries the pending-question chip. An empty
+// answer is what "no question is parked" looks like, which is the state every test here assumes.
+vi.mock("@/lib/api", () => ({
+  streamRun: vi.fn(),
+  cancelRun: vi.fn(),
+  getApprovals: vi.fn(async () => []),
+}));
 vi.mock("@/components/VersionBadge", () => ({ VersionBadge: () => null }));
 
 /**
@@ -37,13 +43,11 @@ async function startHangingRun(runId: string | null = "run_42") {
     if (runId) handlers.onRunId?.(runId);
     return new Promise<void>(() => {}); // never settles: the run is in flight
   });
-  render(
-    <I18nProvider>
-      <RunSessionProvider>
-        <Launcher />
-        <AgentStatusBar />
-      </RunSessionProvider>
-    </I18nProvider>,
+  renderWithProviders(
+    <>
+      <Launcher />
+      <AgentStatusBar />
+    </>,
   );
   await user.click(screen.getByText("go"));
   return { user, handlers: () => captured };
@@ -56,13 +60,7 @@ describe("AgentStatusBar — stopping a run", () => {
   });
 
   it("offers no Stop until a run is in flight", () => {
-    render(
-      <I18nProvider>
-        <RunSessionProvider>
-          <AgentStatusBar />
-        </RunSessionProvider>
-      </I18nProvider>,
-    );
+    renderWithProviders(<AgentStatusBar />);
 
     expect(screen.queryByRole("button", { name: /Stop/ })).not.toBeInTheDocument();
   });

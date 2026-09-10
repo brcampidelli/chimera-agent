@@ -24,6 +24,10 @@ import type {
 export function makeCodeApiMock() {
   return {
     cancelRun: vi.fn(),
+    // The status bar carries the pending-question chip now, so every suite that mounts the bar
+    // beside the Code screen asks this. Empty by default — "no question is parked" is the state
+    // these suites assume, and a bare `vi.fn()` would hand react-query an undefined list.
+    getApprovals: vi.fn(async () => []),
     getFsFile: vi.fn(),
     // Rejected by default rather than left bare: the viewer only calls this for a path that LOOKS
     // like an image, so a suite that is not about previews never reaches it — and a `vi.fn()`

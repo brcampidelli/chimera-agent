@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Lock, ShieldCheck, ShieldOff } from "lucide-react";
 import {
-  getApprovals,
   getConfig,
   getGovernanceAudit,
   getGovernanceInjection,
@@ -11,6 +10,7 @@ import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
+import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import type { GovernanceAudit, InjectionReport, SandboxState } from "@/lib/types";
 
 type CategoryRow = InjectionReport["by_category"][number];
@@ -309,10 +309,14 @@ export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
   // The questions a turn is parked on right now. Polled, because the turn that asked may be in
   // another window or may have asked before this screen was opened — the stream frame reaches only
   // the window that started the turn, and a question nobody can see is the old refusal with extra
-  // steps. Two seconds matches the poll on the other side of the file.
-  const approvals = useQuery({
-    queryKey: ["approvals"], queryFn: getApprovals, refetchInterval: 2000, staleTime: 0,
-  });
+  // steps.
+  //
+  // `poll: false` is not this screen giving up the refresh: the same list now sits in the status
+  // bar, which is mounted on every screen including this one, and that component owns the two-second
+  // timer for the whole app. Both read one query key, so the list here still updates on every tick
+  // and `refetch()` below still updates both. A second `refetchInterval` on the same endpoint would
+  // simply be a second timer.
+  const approvals = usePendingApprovals({ poll: false });
   // Probed on every open rather than cached: a Docker daemon that died since the last look has to
   // change the answer, not be served from a cache — the same rule the posture endpoint follows.
   const sandbox = useQuery({

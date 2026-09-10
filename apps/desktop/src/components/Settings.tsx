@@ -1333,9 +1333,17 @@ export function Settings() {
                       }
                     />
                   </Row>
-                  {/* The switch the posture line names when it reports a conversation as unguarded. Off by
-              default because this registry is shared with the messaging gateway: arming it silently
-              would take shell away from agents someone already runs in Discord. */}
+                  {/* The switch the posture line names when it reports a conversation as unguarded. Off
+              by default (`chimera/config.py`: `guard_chat: bool = Field(default=False)`), which is
+              a real exposure and the reason the posture line has to say so.
+
+              It used to read "off by default because this registry is shared with the messaging
+              gateway: arming it silently would take shell away from agents someone already runs in
+              Discord." That was never true. `MessagingManager._gateway_on_message`
+              (`chimera/server/manager.py:139-166`) builds its OWN registry through
+              `governed_profile(..., surface="app-messaging")`, its own Agent and its own
+              ChatSession — nothing about a Discord bot changes when this switch moves. A false
+              justification is worse than none: it makes a permissive default look considered. */}
                   <Row
                     label={t("settings.row.guardChat")}
                     hint={t("settings.hint.guardChat")}
