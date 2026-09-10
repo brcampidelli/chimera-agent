@@ -9,7 +9,7 @@ OpenAI client too. Measured on the shipped bench, one corpus, three assemblies
     guard on, nobody answers      7 of 7                   over-block 0.750   reads fenced 9/15
     guard on, a person answers    7 of 7                   over-block 0.250   reads fenced 9/15
 
-Three quarters of the price of the guard was never the guard: it was ``guard_chat_registry`` being
+Two thirds of the price of the guard was never the guard: it was ``guard_chat_registry`` being
 the one ``ledger_registry`` caller that passed no ``approve=``, and ``LedgeredTool`` reading *nobody*
 as *refuse*. So this file pins both halves — that the surfaces can be told apart, and that the
 question reaches a screen and can be answered from it.
@@ -325,7 +325,12 @@ def test_with_nothing_bound_the_question_is_refused_at_once(
         monkeypatch,
         CHIMERA_GUARD_CHAT="1",
         CHIMERA_APPROVAL_MODE="ask",
-        CHIMERA_APPROVAL_WAIT="600",
+        # 60 rather than the 300 s default, and the number is chosen for how this test FAILS. It
+        # detects the regression by waiting for it, so the wait is the cost of a red run: breaking
+        # `wait_for_the_screen` on purpose made this file take 602 s at `600`. Sixty still separates
+        # cleanly from the assertion below — a bound screen would be waited for, and nothing here is
+        # bound — while capping the damage a future regression does to a suite run.
+        CHIMERA_APPROVAL_WAIT="60",
     )["factory"]()
     assert session.approval_sink.emit is None  # nothing bound: no screen
 

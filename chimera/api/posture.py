@@ -281,7 +281,7 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     *refuse*. Measured on the shipped bench, the same corpus as every other arm: the guard blocks
     7 of 7 attacks either way, and the over-block on legitimate work is **0.750 with no approver
     against 0.250 with one** — four questions, all four granted
-    (`bench/right_hand_governance/RESULTS.md`, §5b). Three quarters of the price of turning this
+    (`bench/right_hand_governance/RESULTS.md`, §5b). Two thirds of the price of turning this
     guard on was never the guard. It was the silence behind it.
 
     ``None`` keeps the old behaviour exactly, so a caller that has nobody to ask — a batch, a test,

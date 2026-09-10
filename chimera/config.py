@@ -677,7 +677,7 @@ class Settings(BaseSettings):
     #     guard on, nobody answers      7 of 7                   over-block 0.750
     #     guard on, a person answers    7 of 7                   over-block 0.250
     #
-    # Three quarters of the apparent price of this guard was the silence behind it, not the guard.
+    # Two thirds of the apparent price of this guard was the silence behind it, not the guard.
     # What the default buys: ask the chat to read a page carrying a planted instruction and it can
     # no longer write the file that instruction names without a person saying yes on the screen.
     # What it costs: the exec tools leave the chat's registry (the posture denies them, as it always
