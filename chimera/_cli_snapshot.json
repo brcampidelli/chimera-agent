@@ -5344,7 +5344,7 @@
     },
     {
       "deprecated": false,
-      "help": "Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation).\n\nEvery task runs against an isolated checkout, so parallel edits never collide. On\nmerge-back, a file two tasks both changed is reported as a conflict and left for you\nto resolve rather than silently overwritten. Needs a git repo to isolate.",
+      "help": "Solve several tasks concurrently, each in its own git worktree (Tier-3 isolation).\n\nEvery task runs against an isolated checkout, so parallel edits never collide. On\nmerge-back, a file two tasks both changed is reported as a conflict and left for you\nto resolve rather than silently overwritten. Needs a git repo to isolate.\n\nA worker whose actions were refused for review is reported as **not allowed** rather than\n``ok``, and the refusals are listed under it. Whether anyone can be asked follows\n``CHIMERA_APPROVAL_MODE``: ``allow`` and ``deny`` answer immediately, ``ask`` prompts if this\nprocess has a terminal and otherwise writes the question down for ``chimera approve`` and waits\n``CHIMERA_APPROVAL_WAIT`` seconds for it \u2014 per refused call, per worker. Set\n``CHIMERA_APPROVAL_WEBHOOK`` so the question reaches somebody, or ``CHIMERA_APPROVAL_MODE=deny``\nfor a batch that should never wait.",
       "hidden": false,
       "name": "solve-batch",
       "params": [

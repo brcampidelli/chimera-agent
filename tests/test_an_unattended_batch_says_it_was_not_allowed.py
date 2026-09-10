@@ -111,6 +111,11 @@ class _FakeAutonomous:
         self.registry: ToolRegistry = agent.registry
 
     def run(self, task: str) -> AutonomousResult:
+        # Keyed on the task, so a batch can contain one worker that gets into trouble and one that
+        # does not. Without that, every test here would run a batch whose workers are
+        # indistinguishable, and no assertion could tell a per-worker book from a shared one.
+        if "fetch" not in task:
+            return AutonomousResult(answer="nothing to do", success=True, ending="success")
         self.registry.get("http_get").run(url="https://example.invalid/page")
         out = self.registry.get("run_shell").run(command="npm test")
         return AutonomousResult(answer=out, success=True, ending="success")
@@ -194,16 +199,27 @@ def test_every_worker_is_given_somebody_to_ask(batch_harness: Any, taint: bool) 
         assert _approver_of(registry) is not None, "a worker was handed no approver"
 
 
-def test_each_worker_gets_its_OWN_approver(batch_harness: Any) -> None:
-    """Two tasks, two books — the same argument the taint view makes one comment up.
+def test_a_refusal_belongs_to_the_worker_that_earned_it(
+    batch_harness: Any, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """One book per worker, asserted through the report rather than through object identity.
 
-    These tasks are independent, so "task3 was not allowed" is the sentence that is true and
-    "somebody wasn't" is the one a shared ledger could produce. Sabotage: build the ``ApprovalLedger``
-    (or the approver) outside ``run`` so every worker shares one. Red.
+    These tasks are independent, so "task1 was not allowed" is the sentence that is true and
+    "somebody wasn't" is the one a shared ledger could produce. Task 1 fetches and is refused; task 2
+    does nothing dangerous and must still read ``ok``.
+
+    Sabotage: hoist the ``ApprovalLedger`` out of ``run`` so every worker shares one. Red.
+
+    **A first version of this test asserted ``_approver_of(a) is not _approver_of(b)`` and stayed
+    GREEN under exactly that sabotage** — the approver is still constructed per worker even when the
+    book behind it is shared, so the assertion was about a different object than the one it named.
+    An instrument that cannot exhibit the effect produces no evidence about it.
     """
-    _run(["a", "b"])
-    a, b = _FakeAgent.seen
-    assert _approver_of(a) is not _approver_of(b)
+    _run(["fetch a page then run the tests", "answer a question about the code"])
+    lines = [ln for ln in _flat(capsys.readouterr().out).split("task") if ln.strip()]
+    report = " ".join(lines)
+    assert "1: not allowed" in report
+    assert "2: ok" in report
 
 
 def test_a_worker_that_was_refused_is_not_reported_ok(

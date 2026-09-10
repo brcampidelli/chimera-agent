@@ -1,5 +1,5 @@
 ---
-source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
+source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
 ---
 
 # Sicurezza & salvaguardie
@@ -62,6 +62,27 @@ Fa sempre e solo **escalation a review** — non blocca mai un'esecuzione — ed
 osservabilità (la registrazione non cambia il comportamento). Aggiungi `--taint` sopra per armare
 anche l'allowlist adattiva di ogni worker (i tool pericolosi-se-contaminati richiedono allora
 l'approvazione).
+
+**L'approvazione, e come si presenta un worker rifiutato.** Ogni worker porta il proprio
+approvatore e il proprio registro di ciò che gli è stato permesso fare, quindi un task
+rifiutato lo dice invece di riportare `ok`:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+L'`ok` fra parentesi è il verdetto del loop stesso, e il fatto che i due non concordino è
+proprio il punto: una chiamata rifiutata torna come una normale riga di osservazione, il
+worker la legge come qualunque risultato di tool, prosegue e finisce in prosa. Chi si può
+interrogare lo decide `CHIMERA_APPROVAL_MODE` — `deny` rifiuta subito, `ask` chiede su un
+terminale e altrimenti annota la domanda per `chimera approve` e aspetta
+`CHIMERA_APPROVAL_WAIT` secondi, per domanda e per worker. Il silenzio rifiuta sempre.
 
 ## Misurato, non affermato
 

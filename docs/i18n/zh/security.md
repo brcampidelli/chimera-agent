@@ -1,5 +1,5 @@
 ---
-source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
+source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
 ---
 
 # 安全与防护措施
@@ -54,6 +54,24 @@ merged 2 file(s) across 2 task(s)
 它永远只会**升级为复核**——绝不会阻断一次运行——而且纯粹只做可观测性记录（只记录变化，不改变
 任何行为）。在此基础上再加上 `--taint`，还能进一步启用每个 worker 的自适应白名单（这样"带污点
 时视为危险"的工具就需要经过批准）。
+
+**批准，以及一个被拒绝的 worker 长什么样。** 每个 worker 都带着自己的批准者和自己「被允许做了
+什么」的记录，所以一个被拒绝的任务会照实说出来，而不是报告 `ok`：
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+括号里的 `ok` 是循环自己的判定，两者不一致正是重点：一次被拒绝的调用会以一条普通的观察文本返回，
+worker 把它当作任何工具结果来读，继续往下走，最后以散文收尾。能问谁由 `CHIMERA_APPROVAL_MODE`
+决定——`deny` 当场拒绝，`ask` 在终端上提问，否则把问题写下来交给 `chimera approve`，并按每个问
+题、每个 worker 等待 `CHIMERA_APPROVAL_WAIT` 秒。沉默永远是拒绝。
 
 ## 经过测量，而非凭空断言
 

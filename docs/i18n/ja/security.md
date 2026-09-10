@@ -1,5 +1,5 @@
 ---
-source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
+source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
 ---
 
 # セキュリティとセーフガード
@@ -34,6 +34,20 @@ merged 2 file(s) across 2 task(s)
 ```
 
 これは常に**レビューへのエスカレート**のみを行います — 実行をブロックすることは決してなく、純粋な可観測性です(挙動を変えずに記録するだけ)。その上に `--taint` を加えると、各ワーカーの適応型許可リストも武装されます(汚染時に危険となるツールは承認が必要になります)。
+
+**承認と、拒否されたワーカーの見え方。** 各ワーカーは自分の承認者と「何を許されたか」の記録を持つので、拒否されたタスクは `ok` と報告する代わりにそう言います:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+括弧の中の `ok` はループ自身の判定で、この二つが食い違うことこそが要点です: 拒否された呼び出しはただの観察行として返るため、ワーカーはそれを他のツール結果と同じように読み、そのまま進み、文章で終わります。誰に訊けるかは `CHIMERA_APPROVAL_MODE` に従います — `deny` はその場で拒否し、`ask` は端末があれば尋ね、なければ質問を書き留めて `chimera approve` を待ち、質問ごと・ワーカーごとに `CHIMERA_APPROVAL_WAIT` 秒待ちます。沈黙は常に拒否です。
 
 ## 主張ではなく計測
 

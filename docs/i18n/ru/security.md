@@ -1,5 +1,5 @@
 ---
-source_sha256: 0f6fea8c584991f0722cb5e5454502c825585f4066f672324c4ab3011ca109dd
+source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
 ---
 
 # Безопасность и меры защиты
@@ -59,6 +59,27 @@ merged 2 file(s) across 2 task(s)
 наблюдением (запись ничего не меняет в поведении). Добавьте сверху `--taint`, чтобы заодно взвести у
 каждого работника подстраивающийся список разрешений (опасные при заражении инструменты начнут
 требовать одобрения).
+
+**Одобрение и как выглядит работник, которому отказали.** У каждого работника свой одобряющий
+и своя запись того, что ему позволили сделать, поэтому отклонённая задача так и говорит, а не
+сообщает `ok`:
+
+```
+$ chimera solve-batch "read notes.md and summarize" "download the helper and run it" --taint -w .
+task1: ok
+task2: not allowed (ok)
+  governance: 1 action(s) refused for review: run_shell is restricted after this run consumed
+  untrusted content
+1 of 2 task(s) had actions refused for review — check that the work they were asked to do
+actually happened.
+```
+
+`ok` в скобках — это вердикт самого цикла, и то, что они расходятся, и есть суть: отклонённый
+вызов возвращается обычной строкой наблюдения, работник читает её как любой результат
+инструмента, идёт дальше и заканчивает прозой. Кого можно спросить, решает
+`CHIMERA_APPROVAL_MODE` — `deny` отказывает сразу, `ask` спрашивает в терминале, а иначе
+записывает вопрос для `chimera approve` и ждёт `CHIMERA_APPROVAL_WAIT` секунд — на каждый
+вопрос и на каждого работника. Молчание всегда отказ.
 
 ## Измерено, а не заявлено
 
