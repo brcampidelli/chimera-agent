@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import type {
+  CodeApprovalEvent,
   CodeTurnDone,
   CodeTurnHandlers,
   CodeVerified,
@@ -48,6 +49,11 @@ export function makeCodeApiMock() {
     streamRun: vi.fn(),
     streamCodeTurn: vi.fn(),
     revertCodeTurn: vi.fn(),
+    // Resolved by default rather than bare: a turn can park on a question, and the card that draws
+    // it awaits this before clearing itself. A `vi.fn()` resolving `undefined` works right up until
+    // a suite presses one of the two buttons, and then fails inside the card rather than at the
+    // thing the suite is about.
+    answerApproval: vi.fn(async () => ({ ok: true })),
     uploadAttachment: vi.fn(),
     transcribe: vi.fn(),
     // Resolved by default so a suite that is not about vision never renders the caveat: the warning
@@ -244,11 +250,20 @@ export function scriptTurn(
     done?: Partial<CodeTurnDone>;
     error?: boolean;
     todos?: { task: string; status: string }[][];
+    /** A question the turn parks on. `parked: true` leaves the stream open after it, which is what
+     *  the server does — the tool call is blocked on a worker thread waiting for the answer, so a
+     *  script that sent `done` straight after would be testing a turn that never actually paused. */
+    approval?: CodeApprovalEvent;
+    parked?: boolean;
   } = {},
 ) {
   return async (_req: unknown, h: CodeTurnHandlers) => {
     h.onSession?.(script.session ?? "s1");
     for (const token of script.tokens ?? []) h.onToken?.(token);
+    if (script.approval) {
+      h.onApproval?.(script.approval);
+      if (script.parked) return new Promise<void>(() => {}); // the turn is waiting on a person
+    }
     for (const tool of script.tools ?? []) h.onTool?.(tool);
     for (const edit of script.edits ?? []) h.onEdit?.(edit.path, edit.patch);
     // Each frame is the WHOLE list, so a script sends snapshots, not additions.
