@@ -3116,8 +3116,10 @@ def _serve_platform(
     def factory() -> ChatSession:
         # See `serve`, which has the same closure and the same reason: one registry per chat, one
         # instruction per turn, so the ledger is told through `ChatSession.on_turn_start` and not
-        # through `instruction=`. Both surfaces are wired rather than one, because a defect found in
-        # one cell and not asked about in the others is how the last one of these was half-fixed.
+        # through `instruction=`. Both are wired in one change rather than one of them, because this
+        # exact defect has now been found on five surfaces and repaired on four separate occasions
+        # (#400 chat/assist, #405 tui, #408 the app, this) — each time by somebody looking at one
+        # surface and not asking the same question of its neighbour.
         turn_ledger: Any = None
 
         def _hold(ledger: Any) -> None:
