@@ -497,6 +497,7 @@ def _persist_crashed_run(
 def build_api_app(
     factory: Callable[[], ChatSession],
     *,
+    openai_factory: Callable[[], ChatSession] | None = None,
     settings: Settings | None = None,
     static_dir: Path | None = None,
     fuse_backend: SupportsComplete | None = None,
@@ -507,6 +508,16 @@ def build_api_app(
     graph: Any = None,
 ) -> FastAPI:
     """Build the desktop API app over a session ``factory`` (the real agent stack).
+
+    ``openai_factory`` builds the sessions ``/v1/chat/completions`` serves, and defaults to
+    ``factory`` — so every caller that passes one factory gets exactly the app it got before.
+
+    **Why the second seam exists.** The app's chat has a person in front of it and
+    ``/v1/chat/completions`` has a benchmark harness. That difference decides whether a governed
+    assembly is a gate somebody can open or a refusal nobody hears, and until now the two surfaces
+    could not be given different answers: one ``factory``, so arming ``CHIMERA_GUARD_CHAT`` for the
+    screen armed it for every OpenAI client too, which is the reason that setting shipped off. The
+    argument is the whole of the fix; the guard itself was already written.
 
     ``static_dir`` (the built SPA, ``apps/desktop/dist``) is served same-origin at ``/`` with SPA
     fallback, so the frontend needs no CORS. ``settings`` defaults to the process settings.
@@ -551,6 +562,21 @@ def build_api_app(
 
     store = SessionStore(settings.home / "sessions")
     manager = SessionManager(factory, store)
+    # A SECOND manager over a SECOND factory for `/v1/chat/completions`, so the two surfaces stop
+    # being one. `SessionManager` holds the live-session cache and the per-session locks, so sharing
+    # it is what made "the app's chat" and "whatever OpenAI client is pointed at this port" the same
+    # thing to every layer above.
+    #
+    # What actually crossed today is the FACTORY, not a session id: `register_openai_compat` calls
+    # only `manager.ephemeral()` (`chimera/api/openai_compat.py:237`), which builds a session and
+    # neither caches nor persists it. So this split changes nothing observable until the two
+    # factories differ — and it is precisely so they CAN differ that it exists. The manager splits
+    # with them rather than being shared: a stateful route added to that endpoint later must not
+    # land in the app's own conversations by inheritance.
+    #
+    # The `store` IS shared, deliberately: nothing on the OpenAI path reads or writes it, so a
+    # second directory would be one nothing ever puts a file in.
+    openai_manager = SessionManager(openai_factory or factory, store)
     guard = Depends(_require_token())
 
     app = FastAPI(
@@ -1873,6 +1899,31 @@ def build_api_app(
         def on_tool(activity: ToolActivity) -> None:
             emit("tool", {"name": activity.name, "ok": activity.ok})
 
+        def announce(question: Any) -> None:
+            """A pending approval question, on the turn's own stream.
+
+            **The same event name and the same payload the coding turn emits**
+            (`chimera/api/code_api.py`), because the client renders one card for both. A second
+            shape here would be a second card, and the difference between them would be this
+            function rather than anything a user did.
+
+            `wait_seconds` is what the screen counts down. It is read live, while the approver
+            holding the announcer captured this conversation's settings when the conversation was
+            built — the same "next conversation" scope every toggle in that factory has. So
+            changing `CHIMERA_APPROVAL_WAIT` mid-conversation moves the countdown before it moves
+            the wait, and opening a new chat makes them agree again.
+            """
+            emit(
+                "approval",
+                {
+                    "id": question.id,
+                    "action": question.action,
+                    "reason": question.reason,
+                    "asked_at": question.asked_at,
+                    "wait_seconds": float(live_settings().approval_wait),
+                },
+            )
+
         def work() -> None:
             try:
                 # Serialize turns per session: a second concurrent turn on the same session waits here
@@ -1886,6 +1937,26 @@ def build_api_app(
                     original = agent.backend if swap else None
                     if swap:
                         agent.backend = fuse_backend
+                    # Bind this TURN's screen to the session's announcer, and put it back after.
+                    #
+                    # The two have different lifetimes and that is the whole reason for the dance:
+                    # the approver holding this announcer was built with the registry, once per
+                    # CONVERSATION, while `emit` reaches a queue that only exists while this
+                    # request's stream is open. Leaving a dead binding in place would send the next
+                    # turn's question to a queue nobody is reading — the question would still be on
+                    # disk and still answerable from `GET /api/approvals`, but the card would never
+                    # be drawn, which is #397's failure exactly: a 123.8 s block against a 120 s
+                    # timeout with the question never shown.
+                    #
+                    # Inside the per-session lock, so two turns on one conversation cannot each
+                    # think they are the bound one. `None` when this session has no announcer (the
+                    # guard is off, or this is the messaging gateway's session) — then the
+                    # `wait_for_the_screen` in `_owner_allows` reads nothing bound, waits 0, and
+                    # refuses at once, which is the unattended behaviour it always had.
+                    sink: Any = getattr(session, "approval_sink", None)
+                    restore = getattr(sink, "emit", None) if sink is not None else None
+                    if sink is not None:
+                        sink.emit = announce
                     try:
                         report = session.send_verbose(
                             req.message,
@@ -1895,6 +1966,8 @@ def build_api_app(
                     finally:
                         if swap:
                             agent.backend = original
+                        if sink is not None:
+                            sink.emit = restore
                     manager.persist(session_id)  # durable transcript now includes this turn
                     _append_usage(report, session_id, settings)
                 emit("done", _report_dict(report, session_id, fused=swap))
@@ -1954,7 +2027,9 @@ def build_api_app(
 
     register_lifecycle_api(app, guard, workspace, settings, live_settings=live_settings)
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
-    register_openai_compat(app, guard, manager)
+    # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
+    # stops to ask would be an assembly that refuses, and the app's screen must not be held to that.
+    register_openai_compat(app, guard, openai_manager)
 
     if static_dir is not None:
         _mount_spa(app, static_dir)

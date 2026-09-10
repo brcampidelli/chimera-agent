@@ -725,10 +725,10 @@ class PostureQuery(BaseModel):
 
     The same posture means different things on each, and only one of them was ever reported. A
     conversational turn is built without a checkpointer, so it cannot stop and ask — whatever the
-    approval axis says. A CHAT is built without the ledger too unless ``CHIMERA_GUARD_CHAT`` is on,
-    which means nothing marks it after it reads untrusted content and the tools that would start
-    refusing keep working. Defaulting to ``"run"`` keeps every existing caller reading exactly what
-    it read before."""
+    approval axis says. A CHAT is built with the ledger unless ``CHIMERA_GUARD_CHAT`` was turned
+    OFF; without it nothing marks the conversation after it reads untrusted content and the tools
+    that would start refusing keep working. Defaulting to ``"run"`` keeps every existing caller
+    reading exactly what it read before."""
 
     provider: str | None = None
     """The external agent this posture would apply to, if any.
@@ -1501,15 +1501,26 @@ def register_code_api(
         died since the last call must change the answer, not be served from a cache.
         """
         ws = Path(req.workspace).expanduser().resolve() if req.workspace else workspace
+        # The coding turn is always assembled with a ledger. A chat is assembled with one unless the
+        # user turned the guard off — and when they have, the sentence has to say so, because the
+        # whole product rests on stating what is true on this machine rather than what reads better.
+        chat_guarded = live().guard_chat
         return describe(
             Posture(reach=req.reach, approval=req.approval),
             ws,
             settings,
-            can_pause=req.surface == "run",
-            # The coding turn is always assembled with a ledger. A chat only is when the user armed
-            # it — and when they have not, the sentence has to say so, because the whole product
-            # rests on stating what is true on this machine rather than what reads better.
-            guarded=req.surface != "chat" or live().guard_chat,
+            # A guarded chat CAN now stop and ask: its ledger narrows on taint and its approver
+            # writes a durable question that `POST /api/chat/stream` draws on the turn's own stream
+            # (`chimera/api/app.py`). Saying "never" here was true for as long as the chat had
+            # nobody to ask, and became a false statement about the shipped default on 2026-09-10 —
+            # the exact direction of error this module's docstring exists to prevent, since a user
+            # who reads "never pauses" and then meets a modal has been told the wrong thing about
+            # what their agent may do.
+            #
+            # Still "never" for a conversational CODING turn (`"turn"`), which is built with no
+            # checkpointer at all and cannot stop whatever the approval axis says.
+            can_pause=req.surface == "run" or (req.surface == "chat" and chat_guarded),
+            guarded=req.surface != "chat" or chat_guarded,
             external_agent=(req.provider or "").strip().lower(),
         )
 

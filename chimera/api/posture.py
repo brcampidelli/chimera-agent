@@ -171,10 +171,13 @@ class PostureFacts(BaseModel):
     #: which reached the right conclusion by the wrong reason and sent people to fix the wrong thing.
     fell_back_reason: FellBackReason = ""
     #: True when this surface has NO taint ledger — nothing marks the run after it reads untrusted
-    #: content, so the tools that would otherwise start refusing keep working. Reported because the
-    #: default is the permissive one (``CHIMERA_GUARD_CHAT`` is off), and a permissive default that
-    #: says nothing is the one version of that choice which cannot be defended. The coding turn is
-    #: always guarded; a chat is guarded only if the user turned it on.
+    #: content, so the tools that would otherwise start refusing keep working.
+    #:
+    #: This was written when the permissive assembly was the DEFAULT, and it said so: a permissive
+    #: default that says nothing is the one version of that choice which cannot be defended. Since
+    #: 2026-09-10 ``CHIMERA_GUARD_CHAT`` defaults to on, so the field now reports the opposite
+    #: direction — a user who turned the guard OFF, and who is owed the same honesty for the same
+    #: reason. The coding turn is always guarded; a chat is guarded unless it was disarmed.
     unguarded: bool = False
     #: The external agent doing the work, or "" for Chimera's own loop.
     #:
@@ -262,7 +265,7 @@ def describe(
     )
 
 
-def guard_chat_registry(registry: Any, *, audit: Any = None) -> tuple[Any, Any]:
+def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None) -> tuple[Any, Any]:
     """Apply the coding turn's protections to the CHAT registry — deny by posture, then the ledger.
 
     The chat and the coding turn talk to the same agent over the same base tools, and until this
@@ -272,10 +275,25 @@ def guard_chat_registry(registry: Any, *, audit: Any = None) -> tuple[Any, Any]:
     read untrusted content. Ask the chat to summarise a page carrying a planted instruction and
     nothing stops it from writing the file that instruction names.
 
-    Off by default (``CHIMERA_GUARD_CHAT``), because this registry is shared with the messaging
-    gateway and ``/v1/chat/completions``: turning it on by default would silently take shell away
-    from agents people already run. Off, the exposure stays — and the posture line says so, which is
-    the only thing that makes a permissive default defensible.
+    ``approve`` is who says yes when the narrowing wants a person, and it is the argument this
+    function spent its whole life without. Every other `ledger_registry` caller passes one;
+    omitting it here meant `LedgeredTool` had nobody to ask, and `LedgeredTool` reads *nobody* as
+    *refuse*. Measured on the shipped bench, the same corpus as every other arm: the guard blocks
+    7 of 7 attacks either way, and the over-block on legitimate work is **0.750 with no approver
+    against 0.250 with one** — four questions, all four granted
+    (`bench/right_hand_governance/RESULTS.md`, §5b). Three quarters of the price of turning this
+    guard on was never the guard. It was the silence behind it.
+
+    ``None`` keeps the old behaviour exactly, so a caller that has nobody to ask — a batch, a test,
+    a harness — is unchanged.
+
+    **This used to say the registry is shared "with the messaging gateway and
+    ``/v1/chat/completions``", and the messaging half was false.** `MessagingManager` builds its own
+    sessions through `governed_profile(..., surface="app-messaging")`
+    (`chimera/server/manager.py:139-147`) and has never seen this function. The OpenAI half was
+    true and is no longer: `build_api_app` takes a second factory for that endpoint, so the two
+    surfaces can be assembled differently — which is what let ``CHIMERA_GUARD_CHAT`` default to on
+    for the screen a person is sitting at without arming a benchmark harness that cannot answer.
 
     Deliberately takes an ALREADY-BUILT registry rather than building one: the chat's registry
     carries MCP tools that a from-scratch build would drop, and applying the denylist here means it
@@ -315,5 +333,5 @@ def guard_chat_registry(registry: Any, *, audit: Any = None) -> tuple[Any, Any]:
     # same spot: the posture excludes the exec tools on every turn, so that would append an
     # identical entry per turn and bury the rare events someone opens this log to find.
     return ledger_registry(
-        registry, ledger, narrow_on_taint=resolved.narrow_on_taint, audit=audit
+        registry, ledger, narrow_on_taint=resolved.narrow_on_taint, audit=audit, approve=approve
     ), ledger

@@ -206,13 +206,17 @@ def test_mcp_tool_output_is_fenced_and_taints_the_run() -> None:
 
 
 def test_mcp_output_is_fenced_with_no_governance_at_all() -> None:
-    """The configuration the app actually ships in.
+    """A surface with no governance at all — and there are still several.
 
     Fencing used to live only inside `LedgeredTool`, which is reached only when `guard_chat` is on,
-    and `guard_chat` defaults to False. So in every default configuration a remote MCP server's
+    and `guard_chat` defaulted to False, so in EVERY default configuration a remote MCP server's
     output reached the model raw — while the MCP screen stated, unconditionally, that it was
     "fenced and taint-tracked by governance". Governance is what taint-tracks it; the fence is the
     tool's own job, exactly as it is for scrape, crawl and extract.
+
+    The app's chat is guarded by default since 2026-09-10, which changes the blast radius of that
+    old defect and not this test: `/v1/chat/completions`, `chimera serve` under the shipped
+    governance mode and every bench still assemble no ledger, and this pins the fence for them.
     """
     from chimera.governance import FENCE_CLOSE, FENCE_OPEN
 

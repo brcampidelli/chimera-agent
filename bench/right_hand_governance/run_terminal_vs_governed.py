@@ -345,6 +345,45 @@ def app_chat_off_registry(
     return out
 
 
+def app_chat_passed_registry(
+    registry: ToolRegistry,
+    settings: Settings,
+    home: Path,
+    *,
+    approve: Any = None,
+    instruction: str | None = None,
+) -> ToolRegistry:
+    """The same assembly as ``app_chat``, with the approver PASSED IN rather than rewired after.
+
+    Every other arm in this file states its policy by replacing the approver once the registry is
+    built (:func:`_rewire_approver`), which is right for measuring a MECHANISM and blind to one
+    thing: whether the argument that carries the policy is honoured at all. ``guard_chat_registry``
+    took no ``approve=`` until 2026-09-10 — it was the one ``ledger_registry`` caller that passed
+    none — so the arm above would read exactly the same on a tree where the new argument is
+    accepted and dropped on the floor. That is #400's sabotage shape: a call that happens and a
+    result that is discarded.
+
+    So this column drives the argument. Nothing is rewired; if ``approve=`` does not reach
+    ``LedgeredTool``, the benign rows refuse and this arm collapses onto ``app_chat``'s
+    nobody-answers number.
+
+    Kept BESIDE ``app_chat`` rather than replacing it. The two must agree wherever the policy is
+    the same, and a comparison whose ruler changed is a comparison about the ruler.
+    """
+    from chimera.api.posture import guard_chat_registry
+
+    with _as_process_settings(settings):
+        guarded, ledger = guard_chat_registry(
+            registry,
+            audit=AuditLog(home / "audit.jsonl"),
+            approve=approve if approve is not None else deny(),
+        )
+    if instruction is not None:
+        ledger.set_instruction(instruction)
+    out: ToolRegistry = guarded
+    return out
+
+
 def app_chat_registry(
     registry: ToolRegistry,
     settings: Settings,
@@ -617,6 +656,10 @@ ARMS = (
     "tui",
     "app_chat",
     "app_chat_untold",
+    #: `app_chat` with the approver handed to `guard_chat_registry` instead of rewired in after
+    #: it — the one column that can see whether the `approve=` argument is honoured (see the
+    #: function). It must agree with `app_chat` under the same policy, and does.
+    "app_chat_passed",
     #: What the desktop app ships **today**: `CHIMERA_GUARD_CHAT` is off by default, so the factory
     #: never reaches `guard_chat_registry` and hands the agent `_apply_tool_allowlist(...)` — a
     #: documented no-op under the shipped empty allow/deny lists. It is the baseline the question
@@ -678,6 +721,10 @@ def run_arm(
             registry = app_chat_registry(base, settings, home, approve=approve, instruction=None)
         elif arm == "app_chat_off":
             registry = app_chat_off_registry(base, settings, home, approve=approve)
+        elif arm == "app_chat_passed":
+            registry = app_chat_passed_registry(
+                base, settings, home, approve=approve, instruction=instruction
+            )
         elif arm in ("serve", "serve_untold", "platform", "platform_untold"):
             # The `surface=` string the shipped call passes, which is the only thing that differs
             # between the two gateway factories. `_untold` is `instruction=None` always — the
@@ -1369,13 +1416,36 @@ def main() -> int:
                 benign_episodes(), settings, home, arm="app_chat", approve=allow(app_book)
             ),
         )
+        # The same two policies again, with the approver PASSED to `guard_chat_registry` instead of
+        # rewired in after it — the only column that can see whether the new `approve=` argument is
+        # honoured. It has to land on the two numbers above, cell for cell.
+        passed_book = ApprovalLedger()
+        app_passed_nobody = ArmSummary(
+            "app chat, guard on, approver passed in, nobody answers",
+            run_arm(episodes, settings, home, arm="app_chat_passed"),
+        )
+        app_passed_person = ArmSummary(
+            "app chat, guard on, approver passed in, the person answers",
+            run_arm(attack_episodes(), settings, home, arm="app_chat_passed")
+            + run_arm(
+                benign_episodes(), settings, home, arm="app_chat_passed",
+                approve=allow(passed_book),
+            ),
+        )
         section(
             "5b. the desktop app's chat: what the guard blocks, and what it costs",
             render_app_chat_decision(
                 app_off, app_nobody, app_person,
                 granted=len(app_book.granted),
                 refused=len(app_book.refused),
-            ),
+            )
+            + "\n\n  Does `guard_chat_registry(approve=...)` actually reach the tools? Same two\n"
+            "  policies, handed to the function instead of rewired in afterwards. Equality is the\n"
+            "  finding: an argument accepted and dropped would collapse both onto 0.750.\n"
+            f"    approver passed, nobody answers  over-block="
+            f"{app_passed_nobody.over_block():.3f}  (rewired: {app_nobody.over_block():.3f})\n"
+            f"    approver passed, person answers  over-block="
+            f"{app_passed_person.over_block():.3f}  (rewired: {app_person.over_block():.3f})",
         )
         section("6. side by side, per row -- terminal against governed(nobody)",
                 render_side_by_side(terminal, governed_nobody))

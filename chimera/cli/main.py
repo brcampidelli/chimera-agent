@@ -2774,7 +2774,15 @@ def desktop_app(
         loaded = len(mcp_connectors.names()) if mcp_connectors is not None else 0
         console.print(f"[dim]MCP autoload: {loaded} server(s) connected[/dim]")
 
-    def factory() -> ChatSession:
+    def _chat_session(*, guarded: bool) -> ChatSession:
+        """One assembly, two surfaces, and ``guarded`` is the only thing that differs.
+
+        Written as one function on purpose: the app's chat and ``/v1/chat/completions`` must keep
+        the same model, the same identity, the same MCP tools and the same memory, or the product
+        answers as two agents from one configuration. What they cannot share is the governance,
+        because governance that stops to ask is only governance where somebody can answer — see
+        ``guarded``.
+        """
         # Read fresh: `settings` above is the boot snapshot, and a conversation built from it would
         # ignore every toggle flipped since launch. These cost nothing to re-read and are decided
         # per conversation anyway, so "next conversation" is the honest scope — a relaunch was never
@@ -2794,21 +2802,48 @@ def desktop_app(
         # AFTER the MCP tools, for the same reason the guard below is: a denylist that covers only
         # the tools we wrote is not a denylist. CHIMERA_TOOL_ALLOWLIST/_DENYLIST reached `chimera
         # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
-        # got no fence on this surface — the one a Discord bot and /v1/chat/completions run on.
+        # got no fence on this surface — the one `/v1/chat/completions` runs on, and the ONLY
+        # control that still reaches that endpoint now that the chat guard does not. (The Discord
+        # bot was named here too and never ran on this registry: `MessagingManager` builds its own
+        # sessions through `governed_profile`, `chimera/server/manager.py`.)
         registry = _apply_tool_allowlist(registry, allow=None, deny=None, settings=live)
         chat_ledger: Any = None
-        if live.guard_chat:
+        announcer: Any = None
+        if guarded and live.guard_chat:
             # AFTER the MCP tools, so the denylist and the ledger reach those too — a guard that
-            # covers only the tools we wrote is not a guard. Off by default: this registry is shared
-            # with the messaging gateway and /v1/chat/completions, so arming it by default would take
-            # shell away from agents that already run.
+            # covers only the tools we wrote is not a guard.
+            #
+            # ON by default since 2026-09-10, and the two things that had to be true first are both
+            # in this block. This registry is no longer shared with `/v1/chat/completions` — that
+            # endpoint has its own factory below — so arming it here cannot reach an OpenAI client.
+            # And the narrowing now has somebody to ask: `_owner_allows` writes the question, the
+            # announcer puts it on the turn's own stream, and `POST /api/approvals/{id}` answers it.
+            # Measured on the shipped bench, same corpus as every other arm: 7 of 7 attacks blocked
+            # either way, over-block 0.750 with nobody to ask and 0.250 with somebody
+            # (`bench/right_hand_governance/RESULTS.md` §5b).
+            #
+            # The messaging gateway was never in this registry's blast radius, whatever this comment
+            # used to say: `MessagingManager` builds its own sessions through `governed_profile`.
+            from chimera.api.code_api import _owner_allows
             from chimera.api.posture import guard_chat_registry
+            from chimera.governance.approval import ApprovalAnnouncer
             from chimera.governance.audit import AuditLog
 
+            # One announcer per CONVERSATION, because that is the lifetime of the registry holding
+            # it — `chat_stream` binds its `emit` per TURN and puts it back, which is the same
+            # mismatch `on_turn_start` closes for the ledger below.
+            announcer = ApprovalAnnouncer()
             # The same file the coding turn writes and the Governance screen reads. One log, or the
             # screen shows a partial history while claiming to show the whole one.
             registry, chat_ledger = guard_chat_registry(
-                registry, audit=AuditLog(live.home / "audit.jsonl")
+                registry,
+                audit=AuditLog(live.home / "audit.jsonl"),
+                # The deployment's own `CHIMERA_APPROVAL_MODE`, resolved exactly as the coding turn
+                # resolves it — one function, so `allow` means the same thing on both surfaces and
+                # `ask` reaches the same durable question. Under `ask` with no screen bound, the
+                # wait resolves to 0 and the question is refused at once, which is what every
+                # non-desktop caller of this session wants.
+                approve=_owner_allows(live, announcer),
             )
         runner = Agent(
             session_backend(),
@@ -2845,7 +2880,34 @@ def desktop_app(
                     message, workspace=workspace_path
                 )
             ),
+            # The other end of the same lifetime problem. The approver above closed over this
+            # announcer when the registry was built; `chat_stream` needs to reach it when a turn
+            # starts, and the session is the only object both of them hold.
+            approval_sink=announcer,
         )
+
+    def factory() -> ChatSession:
+        """The app's own chat — the screen a person is sitting in front of, so it is governed."""
+        return _chat_session(guarded=True)
+
+    def openai_factory() -> ChatSession:
+        """``/v1/chat/completions`` — the assembly this endpoint has always had.
+
+        **Not** governed by ``CHIMERA_GUARD_CHAT``, and that is the point of splitting the factory
+        rather than an oversight. The guard's cost is paid in QUESTIONS: on the shipped bench it
+        blocks 7 of 7 attacks with an over-block of 0.750 when nobody answers and 0.250 when
+        somebody does (`bench/right_hand_governance/RESULTS.md` §5b). Nobody is ever at this
+        endpoint — it exists for OpenAI clients and benchmark harnesses — so arming it here buys the
+        blocking and pays the full 0.750, on a surface that cannot say why it refused. That is the
+        exposure the off-by-default was really protecting, and it is why the default could not be
+        flipped until the two surfaces could be told apart.
+        `chimera/api/app.py:build_api_app` takes this as ``openai_factory=``.
+
+        Fencing this endpoint is still available and is a different control: ``CHIMERA_TOOL_DENYLIST``
+        is applied by ``_apply_tool_allowlist`` above, on this path, and it refuses without asking
+        anyone — which is the right shape for a surface with no person in it.
+        """
+        return _chat_session(guarded=False)
 
     # The built SPA, if present, is served same-origin (no CORS). Absent = API-only (dev uses Vite).
     # Prefer a source-checkout build (live `npm run build` output); fall back to the copy bundled in the
@@ -2856,6 +2918,8 @@ def desktop_app(
     static_dir = dist if (dist / "index.html").exists() else None
     api = build_api_app(
         factory,
+        # The one surface that must NOT inherit the app chat's governance — see `openai_factory`.
+        openai_factory=openai_factory,
         # NOT `settings=settings`. Passing one means "use THIS, frozen" — which is what a test or a
         # bench comparing two configurations asks for, and the opposite of what the app needs. The
         # object here IS `get_settings()`, so passing it changed nothing except to freeze
