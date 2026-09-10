@@ -4311,7 +4311,7 @@
     },
     {
       "deprecated": false,
-      "help": "List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.",
+      "help": "List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` \u2014 one store, so a thread\nstarted on either surface continues on the other. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.",
       "hidden": false,
       "name": "sessions",
       "params": [

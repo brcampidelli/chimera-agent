@@ -1153,9 +1153,10 @@ def agent(
 def sessions(
     delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
 ) -> None:
-    """List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.
+    """List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
 
-    Resume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones
+    Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
+    started on either surface continues on the other. These are the terminal's threads, and the ones
     ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
     (``<home>/code_sessions``) with a different shape, and are not listed here.
     """

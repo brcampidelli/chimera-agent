@@ -67,7 +67,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
 | [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
-| [`sessions`](#sessions) | List the conversations ``chimera chat`` has saved, under ``<home>/sessions``. |
+| [`sessions`](#sessions) | List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``. |
 | [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
 | [`skills`](#skills) | List the built-in skills. |
 | [`skills-approve`](#skills-approve) | Approve/reactivate a learned skill after review (activates retrieval). |
@@ -1060,9 +1060,10 @@ chimera serve
 
 ## sessions
 
-List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.
+List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
 
-Resume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones
+Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
+started on either surface continues on the other. These are the terminal's threads, and the ones
 ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
 (``<home>/code_sessions``) with a different shape, and are not listed here.
 
