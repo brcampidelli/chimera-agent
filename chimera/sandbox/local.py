@@ -17,6 +17,7 @@ from pathlib import Path
 # imported here because this file has always been where it was read. It used to be the other way
 # round, which made the redaction module drag in this whole subsystem.
 from chimera.core.redact import _SECRET_MARKERS
+from chimera.proc.decode import console_text
 from chimera.proc.stdio import kill_tree
 from chimera.sandbox.base import SandboxResult
 
@@ -75,13 +76,19 @@ class LocalSandbox:
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            # Bytes, decoded by `console_text` rather than by `text=True`. The command here is
+            # whatever a person or the model typed, so the child is not known to write UTF-8 —
+            # and `text=True` decodes with the ANSI code page, which on Windows is not the one
+            # a console program writes. Worse than mangling: bytes the ANSI page leaves
+            # undefined raise on subprocess's reader thread, and `communicate` then returns a
+            # *successful* process whose stdout is `None` (`chimera/proc/decode.py`).
             stdin=subprocess.DEVNULL,
             env=_child_env(),
             start_new_session=posix,
         )
         try:
-            out, err = proc.communicate(timeout=timeout)
+            raw_out, raw_err = proc.communicate(timeout=timeout)
+            out, err = console_text(raw_out), console_text(raw_err)
         except subprocess.TimeoutExpired:
             # `kill_tree` rather than a second copy of the same logic. This branch reimplemented the
             # POSIX half and stopped there: on Windows it was a bare `proc.kill()`, which kills the
@@ -95,4 +102,4 @@ class LocalSandbox:
             return SandboxResult(
                 exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True
             )
-        return SandboxResult(exit_code=proc.returncode, stdout=out or "", stderr=err or "")
+        return SandboxResult(exit_code=proc.returncode, stdout=out, stderr=err)

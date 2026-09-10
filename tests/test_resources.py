@@ -143,11 +143,15 @@ def test_a_machine_without_nvidia_smi_says_unavailable_rather_than_zero(monkeypa
 
 
 def test_nvidia_output_is_parsed(monkeypatch: Any) -> None:
+    # `stdout` is BYTES in every double below, because that is what the call it stands in for
+    # returns: `_read_nvidia_smi` reads its output through `console_text` rather than `text=True`,
+    # so the machine's ANSI code page cannot decide what a GPU is called (`chimera/proc/decode.py`).
+    # A double still handing back `str` would be standing in for a call that no longer exists.
     monkeypatch.setattr("chimera.core.resources.shutil.which", lambda _n: "/usr/bin/nvidia-smi")
     monkeypatch.setattr(
         "chimera.core.resources.subprocess.run",
         lambda *_a, **_k: subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="NVIDIA GeForce RTX 5070, 8188, 5312, 43\n", stderr=""
+            args=[], returncode=0, stdout=b"NVIDIA GeForce RTX 5070, 8188, 5312, 43\n", stderr=b""
         ),
     )
 
@@ -164,7 +168,7 @@ def test_a_value_the_driver_cannot_read_stays_absent(monkeypatch: Any) -> None:
     monkeypatch.setattr(
         "chimera.core.resources.subprocess.run",
         lambda *_a, **_k: subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="Quadro P1000, 4096, [N/A], [N/A]\n", stderr=""
+            args=[], returncode=0, stdout=b"Quadro P1000, 4096, [N/A], [N/A]\n", stderr=b""
         ),
     )
 
@@ -180,7 +184,7 @@ def test_two_cards_are_two_entries(monkeypatch: Any) -> None:
     monkeypatch.setattr(
         "chimera.core.resources.subprocess.run",
         lambda *_a, **_k: subprocess.CompletedProcess(
-            args=[], returncode=0, stdout="A, 1, 2, 3\nB, 4, 5, 6\n", stderr=""
+            args=[], returncode=0, stdout=b"A, 1, 2, 3\nB, 4, 5, 6\n", stderr=b""
         ),
     )
     assert [g.name for g in snapshot().gpus] == ["A", "B"]
@@ -193,7 +197,7 @@ def test_a_driver_that_errors_is_reported_and_not_silently_empty(monkeypatch: An
     monkeypatch.setattr(
         "chimera.core.resources.subprocess.run",
         lambda *_a, **_k: subprocess.CompletedProcess(
-            args=[], returncode=9, stdout="", stderr="couldn't communicate with the driver\n"
+            args=[], returncode=9, stdout=b"", stderr=b"couldn't communicate with the driver\n"
         ),
     )
 

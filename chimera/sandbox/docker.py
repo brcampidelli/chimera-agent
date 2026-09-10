@@ -19,6 +19,7 @@ import subprocess
 from contextlib import suppress
 from pathlib import Path
 
+from chimera.proc.decode import console_text
 from chimera.sandbox.base import Sandbox, SandboxResult
 from chimera.sandbox.local import _NONINTERACTIVE_ENV, LocalSandbox
 from chimera.telemetry import get_logger
@@ -114,7 +115,12 @@ class DockerSandbox:
         argv = self._argv(name, command, workdir, env_args)
         try:
             proc = subprocess.run(
-                argv, capture_output=True, text=True, timeout=timeout + 15, stdin=subprocess.DEVNULL
+                # Named: the container writes UTF-8, but the `docker` CLI on the host writes its
+                # own errors in the console's page, and `text=True` reads with the ANSI one.
+                argv,
+                capture_output=True,
+                timeout=timeout + 15,
+                stdin=subprocess.DEVNULL,
             )
         except subprocess.TimeoutExpired:
             with suppress(OSError, subprocess.SubprocessError):
@@ -123,5 +129,7 @@ class DockerSandbox:
                 exit_code=124, stderr=f"command timed out after {timeout}s", timed_out=True
             )
         return SandboxResult(
-            exit_code=proc.returncode, stdout=proc.stdout or "", stderr=proc.stderr or ""
+            exit_code=proc.returncode,
+            stdout=console_text(proc.stdout),
+            stderr=console_text(proc.stderr),
         )

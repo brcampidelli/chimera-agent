@@ -94,7 +94,9 @@ def test_docker_builds_isolated_run_command(monkeypatch: pytest.MonkeyPatch) -> 
 
     def fake_run(argv: list[str], **kwargs: Any) -> SimpleNamespace:
         captured["argv"] = argv
-        return SimpleNamespace(returncode=0, stdout="out", stderr="")
+        # Bytes: the docker path reads its output through `console_text`, so a double returning
+        # `str` would stand in for a call that no longer exists (`chimera/proc/decode.py`).
+        return SimpleNamespace(returncode=0, stdout=b"out", stderr=b"")
 
     monkeypatch.setattr(docker_mod.subprocess, "run", fake_run)
     result = sandbox.run("echo hi", cwd=Path("scratch"))
@@ -115,7 +117,7 @@ def _capture_docker_argv(sandbox: DockerSandbox, monkeypatch: pytest.MonkeyPatch
 
     def fake_run(argv: list[str], **kwargs: Any) -> SimpleNamespace:
         captured["argv"] = argv
-        return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout=b"", stderr=b"")
 
     monkeypatch.setattr(docker_mod.subprocess, "run", fake_run)
     sandbox.run("echo hi")

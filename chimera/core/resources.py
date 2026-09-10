@@ -20,6 +20,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from chimera.proc.decode import console_text
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.resources")
@@ -131,17 +132,16 @@ def _nvidia_gpus() -> tuple[list[Gpu], str]:
                 "--format=csv,noheader,nounits",
             ],
             capture_output=True,
-            text=True,
             timeout=_SMI_TIMEOUT,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) if os.name == "nt" else 0,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:
         return [], f"nvidia-smi did not answer ({type(exc).__name__})"
     if proc.returncode != 0:
-        return [], (proc.stderr or "").strip()[:200] or "nvidia-smi reported an error"
+        return [], console_text(proc.stderr).strip()[:200] or "nvidia-smi reported an error"
 
     gpus: list[Gpu] = []
-    for line in proc.stdout.splitlines():
+    for line in console_text(proc.stdout).splitlines():
         parts = [p.strip() for p in line.split(",")]
         if len(parts) < 4:
             continue

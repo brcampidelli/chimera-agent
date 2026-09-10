@@ -42,6 +42,18 @@ from chimera.core.verify import CommandVerifier, module_missing
 #: message rather than us pretending it did.
 ABSENT = "chimera_module_that_does_not_exist"
 
+#: The interpreter, quoted, because every command built from it here goes through a shell.
+#: Unquoted, a checkout under a path with a space — this project's own lives under
+#: "Desenvolvendo Projetos" — makes cmd.exe read the first word as the program and answer
+#: "'C:\\Users\\...\\Desenvolvendo' is not recognized as an internal or external command".
+#:
+#: The damage is worse than a red test, and worse in the direction that hides itself: that message
+#: is what `module_missing` and the exit code turn into an ABSTENTION, so the abstention cases
+#: below pass for entirely the wrong reason while their controls — the ones asserting a real
+#: failure still fails — are what goes red. Measured 2026-09-09: four failures across this file and
+#: `test_the_kernel_holds_the_boundary.py` on such a path, none on a path without the space.
+PYTHON = f'"{sys.executable}"'
+
 
 class _Generator:
     """Stands in for the LLM: returns whatever test source the case needs."""
@@ -92,20 +104,21 @@ def test_a_prefix_of_the_module_name_does_not_count() -> None:
 def test_a_missing_module_abstains_instead_of_failing(tmp_path: Path) -> None:
     """Run for real, no mocking: the interpreter is asked for a module that does not exist, and its
     actual exit code and actual message are what the verifier sees."""
-    result = CommandVerifier(f"{sys.executable} -m {ABSENT}", tmp_path, source="user").verify()
+    result = CommandVerifier(f"{PYTHON} -m {ABSENT}", tmp_path, source="user").verify()
     assert result.abstained is True
     assert result.passed is True  # abstention keeps the work; the other gates decide
 
 
 def test_a_command_that_really_failed_still_fails(tmp_path: Path) -> None:
     """The control. A verifier that abstained on everything would keep every change ever made."""
-    result = CommandVerifier(f'{sys.executable} -c "import sys; sys.exit(1)"', tmp_path, source="user").verify()
+    command = f'{PYTHON} -c "import sys; sys.exit(1)"'
+    result = CommandVerifier(command, tmp_path, source="user").verify()
     assert result.abstained is False
     assert result.passed is False
 
 
 def test_a_command_that_passed_still_passes(tmp_path: Path) -> None:
-    result = CommandVerifier(f'{sys.executable} -c "pass"', tmp_path, source="user").verify()
+    result = CommandVerifier(f'{PYTHON} -c "pass"', tmp_path, source="user").verify()
     assert result.passed is True
     assert result.abstained is False
 
@@ -122,7 +135,7 @@ def test_the_spec_verifier_carries_the_abstention_out(tmp_path: Path) -> None:
         "build soma.py",
         [Requirement(text="soma(a, b) returns a + b")],
         tmp_path,
-        command=f"{sys.executable} -m {ABSENT} " + "{file}",
+        command=f"{PYTHON} -m {ABSENT} " + "{file}",
     )
     result = verifier.verify()
     assert result.abstained is True, "the abstention was swallowed on the way out again"
@@ -142,7 +155,7 @@ def test_the_spec_verifier_still_reports_a_real_failure(
         "build soma.py",
         [Requirement(text="soma(a, b) returns a + b")],
         tmp_path,
-        command=f"{sys.executable} -m pytest -q " + "{file}",
+        command=f"{PYTHON} -m pytest -q " + "{file}",
     )
     result = verifier.verify()
     assert result.abstained is False
