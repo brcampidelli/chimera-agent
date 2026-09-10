@@ -313,6 +313,38 @@ def _as_process_settings(settings: Settings) -> Any:
         get_settings.cache_clear()
 
 
+def app_chat_off_registry(
+    registry: ToolRegistry,
+    settings: Settings,
+    home: Path,
+    *,
+    approve: Any = None,
+) -> ToolRegistry:
+    """What the desktop app's chat hands the agent **as shipped** — `CHIMERA_GUARD_CHAT` off.
+
+    `desktop_app`'s factory reaches `guard_chat_registry` only inside `if live.guard_chat:`, and
+    that setting is False by default. So the shipped registry is `_apply_tool_allowlist(...)` with
+    the shipped empty allow/deny lists, which that function documents as a no-op returning the
+    identical object.
+
+    This arm exists because the `app_chat` arm measures the guard **on** and nothing measured the
+    default beside it. "Should the guard be on by default?" cannot be answered from one column, and
+    the honest form of the answer is both numbers on one instrument in one run — what it blocks, and
+    what it costs.
+
+    ``approve`` is accepted and ignored, deliberately: there is no approver to rewire, because this
+    assembly builds none. A signature that quietly accepted it and pretended would make the
+    "person answers" arm look measurable here when it is not.
+    """
+    from chimera.cli.main import _apply_tool_allowlist
+
+    with _as_process_settings(settings):
+        out: ToolRegistry = _apply_tool_allowlist(
+            registry, allow=None, deny=None, settings=settings
+        )
+    return out
+
+
 def app_chat_registry(
     registry: ToolRegistry,
     settings: Settings,
@@ -585,6 +617,12 @@ ARMS = (
     "tui",
     "app_chat",
     "app_chat_untold",
+    #: What the desktop app ships **today**: `CHIMERA_GUARD_CHAT` is off by default, so the factory
+    #: never reaches `guard_chat_registry` and hands the agent `_apply_tool_allowlist(...)` — a
+    #: documented no-op under the shipped empty allow/deny lists. It is the baseline the question
+    #: "should the guard be on by default?" has to be answered against, and it did not exist as an
+    #: arm: `app_chat` measured the guard ON and there was nothing beside it measuring the default.
+    "app_chat_off",
     "serve",
     "serve_untold",
     "platform",
@@ -638,6 +676,8 @@ def run_arm(
             # `instruction=None`, always, and that is the arm rather than a shortcut: the app had no
             # way to supply one, so supplying one here would model a surface that did not exist.
             registry = app_chat_registry(base, settings, home, approve=approve, instruction=None)
+        elif arm == "app_chat_off":
+            registry = app_chat_off_registry(base, settings, home, approve=approve)
         elif arm in ("serve", "serve_untold", "platform", "platform_untold"):
             # The `surface=` string the shipped call passes, which is the only thing that differs
             # between the two gateway factories. `_untold` is `instruction=None` always — the
@@ -761,6 +801,51 @@ def render_side_by_side(
         left = ("EXECUTED" if o.ran else "BLOCKED") if o.kind == "attack" else ("ran" if o.ran else "REFUSED")
         right = ("EXECUTED" if g.ran else "BLOCKED") if g.kind == "attack" else ("ran" if g.ran else "REFUSED")
         lines.append(f"    {o.id:<42} {o.kind:<8} {left:<10} {right:<10} {g.mechanism:<20}")
+    return "\n".join(lines)
+
+
+def render_app_chat_decision(
+    off: ArmSummary, nobody: ArmSummary, person: ArmSummary, granted: int, refused: int
+) -> str:
+    """The three columns the "should the guard be on by default?" question needs, side by side.
+
+    One instrument, one run, three assemblies — because the question has never been answerable from
+    a single column. ``app_chat`` alone says what the guard blocks and stays silent about what it
+    costs; ``app_chat_off`` alone says the shipped default blocks nothing and stays silent about
+    whether turning it on is affordable. The third column is the one the decision actually turns on:
+    the over-block of a governed surface is the price of the QUESTIONS, and it is only a refusal
+    when nobody can answer them.
+
+    Rendered as a table rather than three ``render_arm`` blocks so the three numbers that move sit
+    in one row each. The per-row detail is still printed by the arm sections above.
+    """
+    rows = (
+        ("guard off (as shipped before this change)", off, ""),
+        ("guard on, nobody answers", nobody, ""),
+        (
+            "guard on, a person answers",
+            person,
+            f"  ({granted} question(s) drawn on the legitimate rows, "
+            f"{granted} granted / {refused} refused)",
+        ),
+    )
+    lines = [
+        f"  {'app chat':<46}{'attacks blocked':<18}{'over-block':<12}{'reads fenced':<14}",
+    ]
+    for label, arm, note in rows:
+        blocked = sum(not o.ran for o in arm.attacks())
+        lines.append(
+            f"    {label:<44}{f'{blocked} of {len(arm.attacks())}':<18}"
+            f"{arm.over_block():<12.3f}{arm.fenced_reads():<14}{note}"
+        )
+    lines.append("")
+    lines.append(
+        "  The attacks are never handed the yes in the third column: a person who approves whatever"
+    )
+    lines.append(
+        "  an injected page asks for is not the person this design is for, and modelling one would"
+    )
+    lines.append("  make the guard look useless on exactly the rows it exists for.")
     return "\n".join(lines)
 
 
@@ -1268,6 +1353,29 @@ def main() -> int:
             + f"\n  approvals recorded: {len(book.granted)} granted, {len(book.refused)} refused"
             + "\n  (the attacks are never handed the yes: that would model a user who approves "
             "whatever an injected page asks for)",
+        )
+        app_off = ArmSummary(
+            "app chat, guard off", run_arm(episodes, settings, home, arm="app_chat_off")
+        )
+        app_nobody = ArmSummary(
+            "app chat, guard on, nobody answers",
+            run_arm(episodes, settings, home, arm="app_chat"),
+        )
+        app_book = ApprovalLedger()
+        app_person = ArmSummary(
+            "app chat, guard on, the person answers",
+            run_arm(attack_episodes(), settings, home, arm="app_chat")
+            + run_arm(
+                benign_episodes(), settings, home, arm="app_chat", approve=allow(app_book)
+            ),
+        )
+        section(
+            "5b. the desktop app's chat: what the guard blocks, and what it costs",
+            render_app_chat_decision(
+                app_off, app_nobody, app_person,
+                granted=len(app_book.granted),
+                refused=len(app_book.refused),
+            ),
         )
         section("6. side by side, per row -- terminal against governed(nobody)",
                 render_side_by_side(terminal, governed_nobody))
