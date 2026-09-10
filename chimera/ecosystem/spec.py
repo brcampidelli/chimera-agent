@@ -47,6 +47,14 @@ class SearchStep:
     spec: AgentSpec
     score: float
     accepted: bool
+    """Did not regress (``>=``). A report about the candidate, not about what the search did."""
+    advanced: bool = False
+    """The search replaced its incumbent with this candidate.
+
+    Separate from ``accepted`` because the two are not the same and were being printed as if they
+    were: the column headed "kept" showed ``accepted``, so a **tie** — the most common outcome
+    against a saturated ruler — printed ✓ over an incumbent that had not moved.
+    """
 
 
 @dataclass
@@ -54,23 +62,93 @@ class SpecSearchResult:
     best: AgentSpec
     best_score: float
     history: list[SearchStep]
+    undecidable: str = ""
+    """Why no candidate could have been promoted, or ``""`` when some could.
+
+    Empty is not "the gate works" — it is "the gate is answerable". A gate whose ceiling sits below
+    the bar it has to clear will refuse everything forever and look exactly like a search that found
+    nothing worth keeping, which is the failure this field exists to make impossible to mistake.
+    """
 
 
 def search_spec(
-    initial: AgentSpec, scorer: Scorer, proposer: Proposer, *, rounds: int = 3
+    initial: AgentSpec,
+    scorer: Scorer,
+    proposer: Proposer,
+    *,
+    rounds: int = 3,
+    trials: int | None = None,
+    z: float = 1.959963984540054,
 ) -> SpecSearchResult:
-    """Propose → evaluate → keep-on-non-regression, for ``rounds`` rounds."""
+    """Propose → evaluate → keep-on-improvement, for ``rounds`` rounds.
+
+    ``trials`` is the number of independent trials each score is a rate over, and supplying it is
+    what turns the comparison into a decision. Without it the gate is ``score > best_score`` on a
+    bare fraction, which is what shipped: against the scenario suite that fraction is quantised in
+    steps of 1/8 and six of its eight scenarios are saturated, so one scenario of difference — one
+    coin — promoted a candidate. A candidate **identical to the incumbent** cleared that gate 29.6%
+    of the time.
+
+    With ``trials``, a candidate is promoted only when the Newcombe interval for the difference in
+    pass rates excludes zero (:func:`chimera.eval.anytime.proportion_diff_ci`, already the gate in
+    ``bench_ab``, ``continuous``, ``paired`` and ``auto_evolve``). That module's own docstring
+    measured this exact failure — *"best-of-3 accepted a candidate whose true pass rate was 0.3
+    51.8% of the time"* — and this is the one selection gate it had never been pointed at.
+
+    **This does not make the gate work; it makes it say that it does not decide.** On the published
+    numbers no achievable candidate clears it, and that is reported in ``undecidable`` rather than
+    left to look like an unlucky search.
+    """
+    from chimera.eval.anytime import proportion_diff_ci
+
     best = initial
     best_score = scorer(initial)
-    history = [SearchStep(initial, best_score, True)]
+    history = [SearchStep(initial, best_score, True, True)]
+
+    def beats(score: float, incumbent: float) -> bool:
+        if trials is None or trials <= 0:
+            return score > incumbent
+        lower, _ = proportion_diff_ci(
+            round(score * trials), trials, round(incumbent * trials), trials, z
+        )
+        return lower > 0.0
+
     for _ in range(max(0, rounds)):
         candidate = proposer(best, best_score)
         score = scorer(candidate)
-        accepted = score >= best_score  # non-regression acceptance gate
-        history.append(SearchStep(candidate, score, accepted))
-        if score > best_score:  # advance only on a strict improvement
+        accepted = score >= best_score  # non-regression: a report, not a decision
+        advanced = beats(score, best_score)
+        history.append(SearchStep(candidate, score, accepted, advanced))
+        if advanced:
             best, best_score = candidate, score
-    return SpecSearchResult(best=best, best_score=best_score, history=history)
+    return SpecSearchResult(
+        best=best,
+        best_score=best_score,
+        history=history,
+        undecidable=_undecidable_reason(best_score, trials, z),
+    )
+
+
+def _undecidable_reason(incumbent: float, trials: int | None, z: float) -> str:
+    """Whether a **perfect** candidate could clear the gate against ``incumbent``, and why not.
+
+    Asked of the best case rather than of the run that happened: "nothing was promoted" and "nothing
+    could have been promoted" are different sentences, and only one of them is about the candidates.
+    Mirrors what ``auto_evolve`` does with :func:`chimera.eval.anytime.best_possible_wilson`, in the
+    shape a two-proportion gate needs.
+    """
+    if trials is None or trials <= 0:
+        return ""
+    from chimera.eval.anytime import proportion_diff_ci
+
+    lower, _ = proportion_diff_ci(trials, trials, round(incumbent * trials), trials, z)
+    if lower > 0.0:
+        return ""
+    return (
+        f"no candidate can clear this gate: a perfect {trials}/{trials} against an incumbent at "
+        f"{incumbent:.3f} still leaves the difference interval touching zero (lower={lower:+.3f}). "
+        f"Raise the trial count or use a ruler the incumbent has not already saturated."
+    )
 
 
 def model_proposer(backend: object, model: str | None = None) -> Proposer:
