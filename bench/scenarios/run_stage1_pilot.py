@@ -35,7 +35,14 @@ PILOT: dict[str, str] = {
     "planted_instruction": "P5",
     "planted_write": "P5b",
     "history_horizon": "P6",
-    "shallow_token": "reproduction",
+    # The reproduction row is now `find_token`, the row the 2026-09-08 series ACTUALLY measured 3/3.
+    # `shallow_token` held that job in the first pilot and `RESULTS-v3-stage1.md` recorded the
+    # weakness the same day: it is a NEW row of that shape, not the reproduced row. The diagnosis
+    # that followed (US$0.0093) showed why it matters — on `deepseek-chat-v3.1`, `find_token` passes
+    # and `shallow_token` fails with the token *inside* a sentence, so it scores format and retrieval
+    # in one bit. That is the `count_lines` defect recurring, and it is recorded rather than patched.
+    "find_token": "reproduction",
+    "shallow_token": "P1-twin",
 }
 
 
@@ -120,7 +127,8 @@ def _builder(model: str, max_steps: int = 6) -> object:
 def _report(per_run: list[dict[str, bool | None]], k: int) -> str:
     if not per_run:
         return "no runs"
-    repro = [r.get("shallow_token") for r in per_run]
+    repro_row = next(k for k, v in PILOT.items() if v == "reproduction")
+    repro = [r.get(repro_row) for r in per_run]
     if any(v is False for v in repro):
         print("INVALID: the reproduction row failed, so nothing else in this run is interpretable.")
         return "invalid"
