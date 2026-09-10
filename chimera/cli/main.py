@@ -1153,9 +1153,10 @@ def agent(
 def sessions(
     delete: str = typer.Option(None, "--delete", help="Delete a session by id."),
 ) -> None:
-    """List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.
+    """List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
 
-    Resume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones
+    Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
+    started on either surface continues on the other. These are the terminal's threads, and the ones
     ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
     (``<home>/code_sessions``) with a different shape, and are not listed here.
     """
@@ -2201,6 +2202,10 @@ def tui(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Workspace root for tools."),
     fuse: bool = typer.Option(False, "--fuse", help="Route deep-reasoning turns through fusion."),
     no_memory: bool = typer.Option(False, "--no-memory", help="Don't recall long-term memory."),
+    session_id: str | None = typer.Option(
+        None, "--session", "-s", help="Resume a specific session id (see 'chimera sessions')."
+    ),
+    new: bool = typer.Option(False, "--new", help="Start a fresh session instead of resuming."),
     stream: bool = typer.Option(
         True, "--stream/--no-stream", help="Live token streaming (single-model path only)."
     ),
@@ -2209,6 +2214,12 @@ def tui(
         "--max-usd",
         help="Stop once this session has spent this much (the whole session, not one turn). "
         "The activity panel shows what is left.",
+    ),
+    write_region: str | None = typer.Option(
+        None,
+        "--write-region",
+        help="Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write "
+        "outside is refused — blocks an injected instruction from rewriting an unrelated file.",
     ),
 ) -> None:
     """Launch the full-screen TUI — your right-hand. Requires a key.
@@ -2221,11 +2232,26 @@ def tui(
     the shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout and came back as
     ``✗ run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now
     open a modal instead; silence still refuses, and now says so while it is counting down.
+
+    The conversation outlives the window. Every turn is saved under ``<home>/sessions`` — the same
+    store ``chimera chat`` writes and ``chimera sessions`` lists, so a thread started in one can be
+    picked up in the other — and the newest thread is resumed by default. ``--session`` opens a
+    named one and ``--new`` starts fresh; on screen, ``/new`` (or ``Ctrl+R``, or ``/reset``) starts
+    another and leaves the current one where it is. That last part is a change of meaning rather
+    than of wording: ``/reset`` cleared an in-memory transcript back when nothing was on disk, and
+    clearing a thread that is now a file in place would be the command that destroys it.
+
+    Note that the scrollback is not redrawn on resume: a resumed turn is in the model's context and
+    not on your screen, and the line under the banner says how many.
     """
+    from chimera.api.sessions import SessionManager, SessionStore
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.instructions import load as load_identity
+    from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession
+    from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
     from chimera.sandbox.confirm import declare_no_human_here
 
@@ -2250,8 +2276,12 @@ def tui(
             fuse=fuse,
             cascade=False,
             no_memory=no_memory,
-            session_id=None,
-            new=False,
+            # Forwarded now that this surface has threads of its own, and onto the SAME store:
+            # `chimera tui -s standup` and `chimera chat -s standup` open one conversation, so a
+            # fallback that minted a fresh thread would silently answer a different question than
+            # the one the person asked for.
+            session_id=session_id,
+            new=new,
             # The TUI has its own `--max-usd` now, so the fallback forwards it rather than dropping
             # it: the flag was withheld while this surface had no panel line to show the ceiling on,
             # and falling back to a `chat` that ignored a ceiling the person typed would be the
@@ -2259,12 +2289,15 @@ def tui(
             # as an `OptionInfo` object and `session_budget` reads that as a truthy cap, which is
             # what `test_the_tui_fallback_passes_values_not_option_objects` exists to catch.
             max_usd=max_usd,
-            # `tui` has no `--write-region` of its own, so the fallback states the same "no region
-            # asked for" that omitting the flag on `chimera chat` means. It cannot be omitted here:
-            # the parameter would arrive as an `OptionInfo` object and `.split(",")` would fail on
-            # it — which is the defect this whole argument list exists to prevent, caught again by
-            # `test_the_tui_fallback_passes_values_not_option_objects` the day the flag was added.
-            write_region=None,
+            # Forwarded, not dropped. This read `write_region=None` while `tui` had no flag of its
+            # own, and that was the honest spelling of "no region was asked for" — but the day the
+            # flag arrived it became a fence the person typed and this branch silently removed.
+            # Falling back to a `chat` that writes anywhere is the worse half of that trade, and it
+            # is invisible: the fallback prints "falling back to chimera chat" and nothing about a
+            # narrowing it just dropped. It still cannot be *omitted* — an omitted parameter arrives
+            # as an `OptionInfo` object and `.split(",")` would fail on it, which is the defect this
+            # whole argument list exists to prevent.
+            write_region=write_region,
         )
 
     settings = get_settings()
@@ -2272,6 +2305,22 @@ def tui(
         console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     _check_max_usd(max_usd)
+
+    # The same store `chimera chat` writes, and deliberately not a second one. A TUI-only transcript
+    # would have been the easier change and would have made permanent a split between two surfaces
+    # that are the same conversation. (`<home>/code_sessions` — the app's *coding* thread — stays
+    # separate for the reason `chimera/core/code_session.py` argues in its first paragraph.)
+    store = SessionStore(settings.home / "sessions")
+    if session_id is not None:
+        # BEFORE the screen opens, for `chat`'s reason: an id that cannot address a file inside the
+        # store was accepted there, ran a whole turn, and raised on the save — after the answer had
+        # been paid for and while it was being thrown away. Here it would be worse, because the
+        # exception would arrive with Textual holding the terminal.
+        try:
+            store.check_id(session_id)
+        except ValueError as exc:
+            console.print(f"[red]{escape(str(exc))}[/red]")
+            raise typer.Exit(code=1) from exc
 
     # From here on, this process must not put a question on stdin and expect an answer: Textual is
     # about to take the terminal into raw mode, and anything that writes a prompt there is writing
@@ -2294,27 +2343,62 @@ def tui(
     # Built before the app that will draw its questions, because the tools that consult it are built
     # before the session that the app is constructed around. `ChimeraTUI.on_mount` binds it.
     gate = ModalGate()
-    hand = build_right_hand(Path(workspace), settings=settings, surface="tui", ask=gate)
+    hand = build_right_hand(
+        Path(workspace),
+        settings=settings,
+        surface="tui",
+        ask=gate,
+        write_region=write_region,
+    )
     agent = Agent(
         backend,
         hand.registry,
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+        AgentConfig(
+            model=model,
+            max_steps=max_steps,
+            project_root=Path(workspace),
+            # The owner's own words from `agent.json`. `chat`, `assist` and the desktop app all
+            # apply them; this surface did not, so one configuration produced two agents that
+            # answered in different languages and different voices depending on which window you
+            # opened. Nothing failed and nothing said so — the only symptom is a reply that reads
+            # like a stranger's.
+            instructions=render_identity(load_identity(settings.home)),
+        ),
     )
     mem = None if no_memory else _memory_manager()
     budget = session_budget(max_usd)
     turns: Any = agent if budget is None else BudgetedTurns(agent, budget)
-    session = ChatSession(
-        turns,
-        memory=mem,
-        graph=_recall_graph(mem),
-        profile=_session_profile(mem),
-        remember_from_chat=settings.remember_from_chat,
+    # The conversation outlives the window.
+    #
+    # This app built a `ChatSession` in memory and dropped it on exit — a right hand that forgets
+    # the moment you close the terminal. The store that fixes it was already here, already tested
+    # and already what `chat` uses; nothing needed writing, only wiring. The factory shape is
+    # `SessionManager`'s, so a thread is hydrated from disk on first touch.
+    manager = SessionManager(
+        lambda: ChatSession(
+            turns,
+            memory=mem,
+            graph=_recall_graph(mem),
+            profile=_session_profile(mem),
+            remember_from_chat=settings.remember_from_chat,
+            # Recall narrowed to the folder this app was opened on, exactly as `chat` and `assist`
+            # do it. This surface takes a `--workspace` too, and until now that argument decided
+            # which files the tools could touch and said nothing about which project's memory
+            # arrived — so a note a `solve` wrote in one codebase turned up as context in a
+            # full-screen conversation about another. `project_key` and not `str(workspace)`:
+            # writer and reader have to spell a folder the same way or the scoped read matches
+            # nothing the scoped write produced, which is the defect underneath #401 and shows up
+            # as memory that is simply never recalled.
+            project=project_key(workspace),
+        ),
+        store,
     )
+    active, resumed = _resume_or_new(manager, session_id, new)
     screen = ChimeraTUI(
-        session,
+        manager.get(active),
         model_label=model or settings.default_model,
         stream=stream,
         fuse=fuse,
@@ -2325,6 +2409,9 @@ def tui(
         hand=hand,
         gate=gate,
         budget=budget,
+        sessions=manager,
+        session_id=active,
+        resumed=resumed,
     )
     try:
         screen.run()

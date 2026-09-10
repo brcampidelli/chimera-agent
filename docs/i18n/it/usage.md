@@ -1,5 +1,5 @@
 ---
-source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
+source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
 ---
 
 # Chimera — Guida all'uso
@@ -191,8 +191,8 @@ Note di onestà:
   viene lanciato due volte.
 - `/reset` **avvia un thread nuovo**; non cancella quello corrente. Puliva una trascrizione in
   memoria quando niente stava su disco; ora che il thread è un file, pulirlo sul posto
-  distruggerebbe lavoro. (In `assist` e `tui`, che non persistono nulla, `/reset` pulisce
-  ancora il contesto.)
+  distruggerebbe lavoro. (In `assist`, che non persiste nulla, `/reset` pulisce ancora il
+  contesto. `tui` scrive in questo stesso archivio e ha ridefinito `/reset` allo stesso modo.)
 - `chimera doctor` riporta dove girano i comandi dell'agente e se chiede prima: la sandbox
   configurata, se una sandbox del sistema operativo è davvero disponibile, e la postura di
   esecuzione sull'host.
@@ -249,6 +249,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 Non gli stessi flag dei REPL. `tui` ha `--stream`/`--no-stream`, che loro non hanno, e
@@ -257,12 +259,14 @@ dove mostrarsi: il pannello di attività ora porta una riga `budget` con quel ch
 un tetto che nessuno vede trasforma un turno fermato dai soldi in un turno fermato senza un
 motivo visibile.
 
-I `--cascade`, `--session`, `--new` e `--write-region` di `chimera chat` non hanno
-equivalente qui.
+`chimera tui --session standup` riprende un thread con un nome, `--new` ne avvia uno nuovo al suo
+posto, e `--write-region` restringe ciò che gli scrittori di file possono toccare. Tutte e tre qui
+significano esattamente quello che significano una sezione più sopra, sullo stesso archivio di
+sessioni. Solo il `--cascade` di `chimera chat` non ha equivalente qui.
 
-Comandi: `/model <slug>` · `/reset` (pulisce il contesto) · `/clear` (pulisce lo schermo) ·
+Comandi: `/model <slug>` · `/new` (thread nuovo; `/reset` è un alias) · `/clear` (pulisce lo schermo) ·
 `/stream` (attiva/disattiva i token dal vivo) · `/help` · `/exit` (anche `/quit`, `/q`).
-Tasti: `Ctrl+R` reset · `Ctrl+L` pulisci · `Ctrl+P` palette dei comandi · `PgUp`/`PgDn`
+Tasti: `Ctrl+R` thread nuovo · `Ctrl+L` pulisci · `Ctrl+P` palette dei comandi · `PgUp`/`PgDn`
 scorri · `Ctrl+C` esci. I comandi con slash si autocompletano mentre digiti.
 
 Note di onestà:
@@ -287,8 +291,13 @@ Note di onestà:
   `✗ run_shell did not succeed: …`, che è dove sta pure il racconto del modello su un comando
   che non è mai girato. Anche un'approvazione ha una riga
   (`governance: 1 approved this turn`), così una `y` cliccata a metà turno lascia una traccia.
-- Non persiste nulla: chiudere la TUI finisce la conversazione. `chat` è la superficie con i
-  thread.
+- **La conversazione sopravvive alla finestra.** Ogni turno viene salvato sotto
+  `<home>/sessions` — lo stesso archivio che `chat` scrive e che `chimera sessions` elenca,
+  così un thread iniziato su una superficie prosegue sull'altra — e per default riprende il
+  thread più recente. Per questo `/reset` avvia un thread NUOVO invece di pulire questo:
+  pulire sul posto un thread che ora è un file sarebbe il comando che lo distrugge. Lo storico
+  non viene ridisegnato alla ripresa, e la riga sotto il banner dice quanti turni il modello
+  vede che lo schermo non mostra. `docs/commands.md` ha il resto.
 - La trasmissione dei token esiste solo nel percorso a modello singolo — sotto `--fuse` (un
   turno panel→giudice→sintetizzatore) non ci sono token incrementali, quindi il pannello
   mostra uno stato "sintetizzando" invece di un cursore finto. Quell'etichetta segue il flag e

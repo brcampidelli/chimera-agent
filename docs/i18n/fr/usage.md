@@ -1,5 +1,5 @@
 ---
-source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
+source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
 ---
 
 # Chimera — Guide d'utilisation
@@ -193,8 +193,9 @@ Notes d'honnêteté :
   fois par processus et partagés avec l'application, donc rien n'est lancé deux fois.
 - `/reset` **démarre un nouveau fil** ; il n'efface pas le fil courant. Il vidait une
   transcription en mémoire quand rien n'était sur le disque ; maintenant que le fil est un
-  fichier, le vider sur place détruirait du travail. (Dans `assist` et `tui`, qui ne
-  persistent rien, `/reset` efface toujours le contexte.)
+  fichier, le vider sur place détruirait du travail. (Dans `assist`, qui ne persiste
+  rien, `/reset` efface toujours le contexte. `tui` écrit dans ce même magasin et a
+  redéfini `/reset` de la même façon.)
 - `chimera doctor` indique où tournent les commandes de l'agent et s'il demande d'abord : le
   sandbox configuré, si un sandbox de l'OS est réellement disponible, et la posture
   d'exécution sur l'hôte.
@@ -252,6 +253,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 Pas les mêmes flags que les REPL. `tui` a `--stream`/`--no-stream`, qu'eux n'ont pas, et
@@ -260,12 +263,14 @@ s'afficher : le panneau d'activité porte désormais une ligne `budget` avec ce 
 un plafond que personne ne voit transforme un tour arrêté pour une question d'argent en un
 tour arrêté sans raison visible.
 
-Les `--cascade`, `--session`, `--new` et `--write-region` de `chimera chat` n'ont pas
-d'équivalent ici.
+`chimera tui --session standup` reprend un fil nommé, `--new` en démarre un neuf à la place, et
+`--write-region` restreint ce que les écrivains de fichiers peuvent toucher. Les trois signifient
+ici exactement ce qu'elles signifient une section plus haut, sur le même magasin de sessions.
+Seul le `--cascade` de `chimera chat` n'a pas d'équivalent ici.
 
-Commandes : `/model <slug>` · `/reset` (effacer le contexte) · `/clear` (effacer l'écran) ·
+Commandes : `/model <slug>` · `/new` (nouveau fil ; `/reset` est un alias) · `/clear` (effacer l'écran) ·
 `/stream` (basculer les tokens en direct) · `/help` · `/exit` (aussi `/quit`, `/q`). Touches :
-`Ctrl+R` réinitialiser · `Ctrl+L` effacer · `Ctrl+P` palette de commandes · `PgUp`/`PgDn`
+`Ctrl+R` nouveau fil · `Ctrl+L` effacer · `Ctrl+P` palette de commandes · `PgUp`/`PgDn`
 défiler · `Ctrl+C` quitter. Les commandes slash s'autocomplètent pendant la frappe.
 
 Notes d'honnêteté :
@@ -290,8 +295,13 @@ Notes d'honnêteté :
   `✗ run_shell did not succeed: …`, là où se trouve également le récit que le modèle fait
   d'une commande qui n'a jamais tourné. Une approbation reçoit elle aussi sa ligne
   (`governance: 1 approved this turn`), pour qu'un `y` cliqué en plein tour laisse une trace.
-- Il ne persiste rien : fermer le TUI met fin à la conversation. `chat` est la surface avec
-  des fils.
+- **La conversation survit à la fenêtre.** Chaque tour est enregistré sous `<home>/sessions` —
+  le magasin que `chat` écrit et que `chimera sessions` liste, si bien qu'un fil commencé sur
+  une surface continue sur l'autre — et le fil le plus récent reprend par défaut. C'est
+  pourquoi `/reset` démarre un NOUVEAU fil au lieu de vider celui-ci : vider sur place un fil
+  qui est désormais un fichier serait la commande qui le détruit. L'historique n'est pas
+  redessiné à la reprise, et la ligne sous la bannière dit combien de tours le modèle voit que
+  l'écran ne montre pas. `docs/commands.md` a le reste.
 - Le streaming de tokens n'est disponible que sur le chemin mono-modèle — sous `--fuse` (un
   tour panel→juge→synthétiseur) il n'y a pas de tokens incrémentaux, donc le panneau affiche
   un statut « en cours de synthèse » plutôt qu'un faux curseur. Cette étiquette suit le flag

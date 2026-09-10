@@ -1,5 +1,5 @@
 ---
-source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
+source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
 ---
 
 # Chimera —— 使用指南
@@ -165,8 +165,8 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
   围栏之前，于是黑名单、内核与污点台账都覆盖得到它们，而某个服务器的输出会像任何别的外部读
   取一样落在数据围栏之内。它们每个进程只连接一次，并与应用共享，因此不会被重复启动。
 - `/reset` **会开一条新线程**，它不会抹掉当前这条。当年磁盘上什么都没有时它清的是内存里的
-  记录；如今线程已经是一个文件，就地清空等于毁掉工作。（在什么都不持久化的 `assist` 和 `tui`
-  里，`/reset` 依然是清空上下文。）
+  记录；如今线程已经是一个文件，就地清空等于毁掉工作。（在什么都不持久化的 `assist` 里，
+  `/reset` 依然是清空上下文。`tui` 写入的是同一个存储，并以同样的方式重新定义了 `/reset`。）
 - `chimera doctor` 会说明 agent 的命令在哪里运行、是否会先问一句：配置的沙箱、操作系统沙箱是否
   真的可用，以及主机执行的姿态。
 
@@ -213,6 +213,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 参数与两个 REPL 并不相同。`tui` 有 `--stream`/`--no-stream`，而它们没有；还有 `--max-usd`，它
@@ -220,10 +222,12 @@ uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown i
 一行 `budget`，写着还剩多少——因为一个没人看得见的上限，会把一轮"因为钱而停下"变成一轮"没有
 任何可见理由就停下"。
 
-`chimera chat` 的 `--cascade`、`--session`、`--new` 与 `--write-region` 在这里没有对应项。
+`chimera tui --session standup` 会恢复一条命名的线程，`--new` 则改为开一条新的，而
+`--write-region` 会收窄写文件的工具可以触碰的范围。这三个在这里的含义与上一节完全相同，写入
+同一个会话存储。在这里没有对应项的只有 `chimera chat` 的 `--cascade`。
 
-命令：`/model <slug>` · `/reset`（清空上下文） · `/clear`（清屏） · `/stream`（切换实时 token
-流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 重置 · `Ctrl+L` 清屏 ·
+命令：`/model <slug>` · `/new`（新线程；`/reset` 是别名） · `/clear`（清屏） · `/stream`（切换实时 token
+流） · `/help` · `/exit`（也可用 `/quit`、`/q`）。快捷键：`Ctrl+R` 新线程 · `Ctrl+L` 清屏 ·
 `Ctrl+P` 命令面板 · `PgUp`/`PgDn` 滚动 · `Ctrl+C` 退出。斜杠命令会随输入自动补全。
 
 诚实提示：
@@ -242,7 +246,11 @@ uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown i
   那句话；对话记录区如今也会显示 `✗ run_shell did not succeed: …`——模型对一条从未执行过的命
   令编排的说辞，也正在那里。批准同样有自己的一行（`governance: 1 approved this turn`），这样你
   在一轮当中点下的 `y` 也留有痕迹。
-- 它什么都不持久化：关掉 TUI，对话就结束了。有线程的是 `chat`。
+- **对话比窗口活得久。** 每一轮都保存在 `<home>/sessions` —— 与 `chat` 写入、`chimera sessions`
+  列出的是同一个存储，因此在一个界面开始的线程可以在另一个界面继续 —— 并且默认恢复最新的
+  线程。所以 `/reset` 会开一条新线程，而不是清空当前这条：线程如今已经是一个文件，就地清空
+  就是毁掉它的那条命令。恢复时不会重绘屏幕上已有的记录，横幅下方那行会说明模型看得到、
+  而屏幕没有显示的轮数。其余的在 `docs/commands.md` 里。
 - token 流式输出只在单模型路径下可用——在 `--fuse`（面板 → 评审者 → 综合器轮次）下没有增量
   token，因此面板会显示"synthesizing"（正在综合）状态，而不是伪造一个光标动画。这个标签跟随
   的是参数而不是路由：与 `chat` 一样，携带工具的一轮不会融合，而 REPL 的每一轮都携带工具。

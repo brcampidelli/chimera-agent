@@ -1,5 +1,5 @@
 ---
-source_sha256: 40b7ad97d68edecbc9f0e1d5e3f1d5d4fb1408042bed0bb939ab5a9f2b83bb30
+source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
 ---
 
 # Chimera — Guia de Uso
@@ -187,8 +187,8 @@ Notas de honestidade:
   iniciado duas vezes.
 - `/reset` **começa uma thread nova**; ele não apaga a atual. Ele limpava uma transcrição em
   memória quando nada estava em disco; agora que a thread é um arquivo, limpá-la no lugar
-  destruiria trabalho. (Em `assist` e `tui`, que não persistem nada, `/reset` ainda limpa o
-  contexto.)
+  destruiria trabalho. (Em `assist`, que não persiste nada, `/reset` ainda limpa o contexto.
+  `tui` grava neste mesmo armazenamento e redefiniu `/reset` do mesmo jeito.)
 - `chimera doctor` diz onde os comandos do agente rodam e se ele pergunta antes: a sandbox
   configurada, se existe mesmo uma sandbox do sistema operacional disponível, e a postura de
   execução no host.
@@ -244,6 +244,8 @@ uv run chimera tui --no-stream        # answers render at the end instead of str
 uv run chimera tui --fuse --no-memory # fusion routing (no token stream — the panel says so)
 uv run chimera tui --model MODEL --workspace DIR --max-steps 8
 uv run chimera tui --max-usd 2.00     # a ceiling for the whole session, shown in the panel
+uv run chimera tui -s standup         # resume a named thread (--new starts a fresh one)
+uv run chimera tui --write-region 'src/**'  # the file-writers may touch nothing else
 ```
 
 Não são as mesmas flags dos REPLs. `tui` tem `--stream`/`--no-stream`, que eles não têm, e
@@ -252,12 +254,14 @@ aparecer: o painel de atividade agora leva uma linha `budget` com o que sobrou, 
 que ninguém vê transforma um turno que parou por dinheiro num turno que parou sem motivo
 visível.
 
-As `--cascade`, `--session`, `--new` e `--write-region` do `chimera chat` não têm equivalente
-aqui.
+`chimera tui --session standup` retoma uma thread com nome, `--new` começa uma nova no lugar, e
+`--write-region` estreita o que os escritores de arquivo podem tocar. As três significam aqui
+exatamente o que significam uma seção acima, no mesmo armazenamento de sessões. Só o `--cascade`
+do `chimera chat` não tem equivalente aqui.
 
-Comandos: `/model <slug>` · `/reset` (limpa o contexto) · `/clear` (limpa a tela) ·
+Comandos: `/model <slug>` · `/new` (thread nova; `/reset` é um apelido) · `/clear` (limpa a tela) ·
 `/stream` (alterna tokens ao vivo) · `/help` · `/exit` (também `/quit`, `/q`). Teclas:
-`Ctrl+R` reset · `Ctrl+L` limpar · `Ctrl+P` paleta de comandos · `PgUp`/`PgDn` rolar ·
+`Ctrl+R` thread nova · `Ctrl+L` limpar · `Ctrl+P` paleta de comandos · `PgUp`/`PgDn` rolar ·
 `Ctrl+C` sair. Os comandos de barra se autocompletam enquanto você digita.
 
 Notas de honestidade:
@@ -282,7 +286,13 @@ Notas de honestidade:
   comando que nunca rodou. Uma aprovação também ganha uma linha
   (`governance: 1 approved this turn`), então um `y` que você clicou no meio do turno deixa
   rastro.
-- Ela não persiste nada: fechar a TUI encerra a conversa. `chat` é a superfície com threads.
+- **A conversa sobrevive à janela.** Cada turno é salvo em `<home>/sessions` — o mesmo
+  armazenamento que `chat` grava e que `chimera sessions` lista, então uma thread começada em
+  uma superfície continua na outra — e a thread mais recente é retomada por padrão. É por isso
+  que `/reset` começa uma thread NOVA em vez de limpar esta: limpar no lugar uma thread que
+  agora é um arquivo seria o comando que a destrói. O histórico na tela não é redesenhado ao
+  retomar, e a linha abaixo do banner diz quantos turnos o modelo enxerga que a tela não
+  mostra. `docs/commands.md` tem o resto.
 - A transmissão de tokens só existe no caminho de modelo único — sob `--fuse` (um turno
   painel→juiz→sintetizador) não há tokens incrementais, então o painel mostra um status
   "sintetizando" em vez de um cursor falso. Esse rótulo segue a flag e não a rota: como no

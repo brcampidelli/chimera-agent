@@ -67,7 +67,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
 | [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
-| [`sessions`](#sessions) | List the conversations ``chimera chat`` has saved, under ``<home>/sessions``. |
+| [`sessions`](#sessions) | List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``. |
 | [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
 | [`skills`](#skills) | List the built-in skills. |
 | [`skills-approve`](#skills-approve) | Approve/reactivate a learned skill after review (activates retrieval). |
@@ -1060,9 +1060,10 @@ chimera serve
 
 ## sessions
 
-List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.
+List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.
 
-Resume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones
+Resume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` — one store, so a thread
+started on either surface continues on the other. These are the terminal's threads, and the ones
 ``GET /api/sessions`` serves; coding conversations in the desktop app are a different store
 (``<home>/code_sessions``) with a different shape, and are not listed here.
 
@@ -1513,6 +1514,17 @@ the shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout an
 ``✗ run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now
 open a modal instead; silence still refuses, and now says so while it is counting down.
 
+The conversation outlives the window. Every turn is saved under ``<home>/sessions`` — the same
+store ``chimera chat`` writes and ``chimera sessions`` lists, so a thread started in one can be
+picked up in the other — and the newest thread is resumed by default. ``--session`` opens a
+named one and ``--new`` starts fresh; on screen, ``/new`` (or ``Ctrl+R``, or ``/reset``) starts
+another and leaves the current one where it is. That last part is a change of meaning rather
+than of wording: ``/reset`` cleared an in-memory transcript back when nothing was on disk, and
+clearing a thread that is now a file in place would be the command that destroys it.
+
+Note that the scrollback is not redrawn on resume: a resumed turn is in the model's context and
+not on your screen, and the line under the banner says how many.
+
 ```bash
 chimera tui
 ```
@@ -1524,8 +1536,11 @@ chimera tui
 | `--workspace`, `-w` | Workspace root for tools. | `'.'` |
 | `--fuse` | Route deep-reasoning turns through fusion. |  |
 | `--no-memory` | Don't recall long-term memory. |  |
+| `--session`, `-s` | Resume a specific session id (see 'chimera sessions'). |  |
+| `--new` | Start a fresh session instead of resuming. |  |
 | `--stream` | Live token streaming (single-model path only). | `True` |
 | `--max-usd` | Stop once this session has spent this much (the whole session, not one turn). The activity panel shows what is left. |  |
+| `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
 
 ## version
 

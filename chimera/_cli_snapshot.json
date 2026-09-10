@@ -4311,7 +4311,7 @@
     },
     {
       "deprecated": false,
-      "help": "List the conversations ``chimera chat`` has saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>``. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.",
+      "help": "List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``.\n\nResume one with ``chimera chat -s <id>`` or ``chimera tui -s <id>`` \u2014 one store, so a thread\nstarted on either surface continues on the other. These are the terminal's threads, and the ones\n``GET /api/sessions`` serves; coding conversations in the desktop app are a different store\n(``<home>/code_sessions``) with a different shape, and are not listed here.",
       "hidden": false,
       "name": "sessions",
       "params": [
@@ -5578,7 +5578,7 @@
     },
     {
       "deprecated": false,
-      "help": "Launch the full-screen TUI \u2014 your right-hand. Requires a key.\n\nGoverned like ``chimera chat``: the taint ledger told your own message, the\n``<<external-data>>`` fence around untrusted tool output, the trust kernel, the owner's reach\nfloor and the connected MCP servers. What took longer to arrive here is the part that makes any\nof it usable \u2014 a question this surface can **draw**. Textual owns the terminal, so the\nstdin prompt every other surface uses was never seen: measured in a pty, a ``run_shell`` under\nthe shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout and came back as\n``\u2717 run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now\nopen a modal instead; silence still refuses, and now says so while it is counting down.",
+      "help": "Launch the full-screen TUI \u2014 your right-hand. Requires a key.\n\nGoverned like ``chimera chat``: the taint ledger told your own message, the\n``<<external-data>>`` fence around untrusted tool output, the trust kernel, the owner's reach\nfloor and the connected MCP servers. What took longer to arrive here is the part that makes any\nof it usable \u2014 a question this surface can **draw**. Textual owns the terminal, so the\nstdin prompt every other surface uses was never seen: measured in a pty, a ``run_shell`` under\nthe shipped ``CHIMERA_HOST_EXEC=ask`` blocked 123.8 s against a 120 s timeout and came back as\n``\u2717 run_shell`` with no reason (`bench/right_hand_governance/RESULTS.md` Part 2). Both gates now\nopen a modal instead; silence still refuses, and now says so while it is counting down.\n\nThe conversation outlives the window. Every turn is saved under ``<home>/sessions`` \u2014 the same\nstore ``chimera chat`` writes and ``chimera sessions`` lists, so a thread started in one can be\npicked up in the other \u2014 and the newest thread is resumed by default. ``--session`` opens a\nnamed one and ``--new`` starts fresh; on screen, ``/new`` (or ``Ctrl+R``, or ``/reset``) starts\nanother and leaves the current one where it is. That last part is a change of meaning rather\nthan of wording: ``/reset`` cleared an in-memory transcript back when nothing was on disk, and\nclearing a thread that is now a file in place would be the command that destroys it.\n\nNote that the scrollback is not redrawn on resume: a resumed turn is in the model's context and\nnot on your screen, and the line under the banner says how many.",
       "hidden": false,
       "name": "tui",
       "params": [
@@ -5637,6 +5637,27 @@
           "type": "boolean"
         },
         {
+          "help": "Resume a specific session id (see 'chimera sessions').",
+          "kind": "option",
+          "name": "session_id",
+          "opts": [
+            "--session",
+            "-s"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Start a fresh session instead of resuming.",
+          "kind": "option",
+          "name": "new",
+          "opts": [
+            "--new"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
           "default": "True",
           "help": "Live token streaming (single-model path only).",
           "kind": "option",
@@ -5659,6 +5680,16 @@
           ],
           "required": false,
           "type": "float"
+        },
+        {
+          "help": "Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused \u2014 blocks an injected instruction from rewriting an unrelated file.",
+          "kind": "option",
+          "name": "write_region",
+          "opts": [
+            "--write-region"
+          ],
+          "required": false,
+          "type": "str"
         }
       ],
       "path": "tui"
