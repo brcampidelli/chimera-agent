@@ -42,6 +42,11 @@ from chimera.sandbox.os_sandbox import (
     unavailable_reason,
 )
 
+#: The interpreter, quoted — the streaming test below runs it through a shell, and a checkout under
+#: a path with a space would otherwise have cmd.exe answer "not recognized" and the assertion read
+#: as a streaming failure. See the same constant in `test_the_tool_that_was_not_installed.py`.
+PYTHON = f'"{sys.executable}"'
+
 
 @pytest.fixture(autouse=True)
 def _clean_probe_cache() -> Any:
@@ -266,7 +271,7 @@ def test_streaming_still_streams_on_an_unsandboxed_host(
 
     lines: list[str] = []
     code = run_streamed(
-        f'{sys.executable} -c "print(1); print(2)"',
+        f'{PYTHON} -c "print(1); print(2)"',
         workspace=tmp_path,
         cwd=None,
         timeout=30,
