@@ -2226,6 +2226,7 @@ def tui(
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
     from chimera.interface import ChatSession
+    from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
     from chimera.sandbox.confirm import declare_no_human_here
 
@@ -2312,6 +2313,14 @@ def tui(
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
+        # Recall narrowed to the folder this app was opened on, exactly as `chat` and `assist` do
+        # it. This surface takes a `--workspace` too, and until now that argument decided which
+        # files the tools could touch and said nothing about which project's memory arrived — so a
+        # note a `solve` wrote in one codebase turned up as context in a full-screen conversation
+        # about another. `project_key` and not `str(workspace)`: writer and reader have to spell a
+        # folder the same way or the scoped read matches nothing the scoped write produced, which
+        # is the defect underneath #401 and shows up as memory that is simply never recalled.
+        project=project_key(workspace),
     )
     screen = ChimeraTUI(
         session,
