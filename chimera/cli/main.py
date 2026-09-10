@@ -6866,6 +6866,8 @@ def evolve_tune(
     from chimera.core.agent import DEFAULT_SYSTEM_PROMPT
     from chimera.ecosystem import AgentSpec, model_proposer, search_spec
     from chimera.eval import daily_scenarios, scenario_scorer
+    from chimera.eval.scenarios import CONTROL
+    from chimera.eval.spec_tuning import DEFAULT_HOLDOUT, ControlRowFailed, SplitScore
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
@@ -6886,7 +6888,13 @@ def evolve_tune(
         )
 
     scenarios = daily_scenarios()
-    scorer = scenario_scorer(_spec_builder, scenarios, k=k)
+    splits: list[SplitScore] = []
+    scorer = scenario_scorer(_spec_builder, scenarios, k=k, on_split=splits.append)
+    # The rows the objective is actually computed over: control rows are a validity gate and the
+    # holdout is withheld, so neither belongs in the trial count the significance gate uses.
+    graded_rows = len(scenarios) - len(DEFAULT_HOLDOUT) - sum(
+        1 for s in scenarios if getattr(s, "block", "") == CONTROL
+    )
     initial = AgentSpec(model=model, max_steps=max_steps)
     try:
         result = search_spec(
@@ -6897,28 +6905,45 @@ def evolve_tune(
             # The number the gate needs to be a decision instead of a comparison. Without it the
             # promotion rule is `>` on a fraction quantised in steps of 1/len(scenarios), and a
             # candidate identical to the incumbent cleared that 29.6% of the time.
-            trials=len(scenarios) * max(1, k),
+            trials=graded_rows * max(1, k),
         )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    except ControlRowFailed as exc:
+        # Not a bad round — no round. The control rows are the validity gate, and a run whose ruler
+        # failed has no score to report rather than a low one.
+        console.print(f"[red]invalid run:[/red] {exc}")
         raise typer.Exit(code=1) from exc
 
     table = Table(title="Spec meta-search", show_header=True)
     table.add_column("round")
     table.add_column("score")
+    table.add_column("holdout")
     table.add_column("no regression")
     table.add_column("kept")
     for index, step in enumerate(result.history):
         # Two columns because they are two facts, and printing the first under the second's heading
         # is what let a TIE — the most common outcome against a saturated ruler — read as "kept".
+        # The holdout beside the objective, never folded into it. A holdout that tracks the score is
+        # a tuner generalising; one that stays flat while the score climbs is a tuner learning the
+        # rows, and the objective alone cannot tell those apart.
+        away = splits[index].holdout if index < len(splits) else None
         table.add_row(
             str(index),
             f"{step.score:.3f}",
+            "—" if away is None else f"{away:.3f}",
             "✓" if step.accepted else "·",
             "✓" if step.advanced else "·",
         )
     console.print(table)
     console.print(f"[green]best score[/green] {result.best_score:.3f}")
+    if splits:
+        console.print(
+            f"[dim]scored on {splits[0].graded_rows} rows; "
+            f"{splits[0].holdout_rows} held out and never optimised against; "
+            f"control rows are a gate, not points.[/dim]"
+        )
     if result.undecidable:
         # Loud, because "nothing was promoted" and "nothing could have been promoted" look identical
         # in the table above and call for opposite responses.
