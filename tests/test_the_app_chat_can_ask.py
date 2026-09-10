@@ -366,6 +366,69 @@ def test_the_guard_is_on_by_default(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert isinstance(session.approval_sink, ApprovalAnnouncer)
 
 
+# ------------------------------------------------- 3b. and the posture line stops contradicting it
+
+
+def _posture(client: TestClient, surface: str) -> dict[str, Any]:
+    resp = client.post(
+        "/api/code/posture",
+        json={"surface": surface, "reach": "workspace", "approval": "suspicious"},
+    )
+    assert resp.status_code == 200
+    return dict(resp.json())
+
+
+def test_the_posture_line_says_a_guarded_chat_can_stop_and_ask(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A guarded chat pauses, so the sentence the user reads has to say it pauses.
+
+    `can_pause` was `surface == "run"`, which was true for as long as a chat had nobody to ask and
+    became a false statement about the shipped default the moment the guard was armed. This module
+    is about a user meeting a modal; a user who was told "never pauses" and then meets one has been
+    told the wrong thing about what their agent may do — the exact direction of error
+    `chimera/api/posture.py` opens by warning against.
+    """
+    from chimera.api import build_api_app
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("CHIMERA_GUARD_CHAT", raising=False)
+    from chimera.config import get_settings
+
+    get_settings.cache_clear()
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent())))
+
+    chat = _posture(client, "chat")
+    assert chat["unguarded"] is False
+    assert chat["pauses"] == "tainted"
+
+    # The control, and it is what keeps the line above from being a rubber stamp: a conversational
+    # CODING turn is built with no checkpointer at all and still cannot stop, whatever is selected.
+    assert _posture(client, "turn")["pauses"] == "never"
+
+    get_settings.cache_clear()
+
+
+def test_the_posture_line_still_admits_an_unguarded_chat(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Turning the guard off has to change the sentence, or the sentence is decoration."""
+    from chimera.api import build_api_app
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CHIMERA_GUARD_CHAT", "0")
+    from chimera.config import get_settings
+
+    get_settings.cache_clear()
+    client = TestClient(build_api_app(lambda: ChatSession(_FakeAgent())))
+
+    chat = _posture(client, "chat")
+    assert chat["unguarded"] is True
+    assert chat["pauses"] == "never"
+
+    get_settings.cache_clear()
+
+
 # ------------------------------------------------------- 4. the stream draws it, on the one contract
 
 #: Exactly the keys `chimera/api/code_api.py` emits for an `approval` frame. The client renders ONE
