@@ -110,6 +110,30 @@ def test_the_app_recalls_the_folder_it_was_opened_on(
     assert "nine" not in session.agent.prompts[0], "another project's fact reached the prompt"
 
 
+def test_the_default_workspace_is_filed_under_the_name_the_writer_used(
+    _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The instrument above cannot show the defect underneath #401, so this one exists.
+
+    Both tests were run against ``project=str(workspace)`` -- the spelling ``chimera solve`` used to
+    write -- and both PASSED, because they hand the command an already-absolute path, where the two
+    spellings are the same string. A guard that cannot exhibit the failure it is named after is not
+    evidence about the failure.
+
+    ``--workspace .`` is the default and the case that breaks: ``str(workspace)`` is the literal
+    ``"."`` while the writer files an absolute path, so a scoped read matches nothing a scoped write
+    produced -- with no error, just memory that is never recalled again.
+    """
+    folder = tmp_path / "repo"
+    folder.mkdir()
+    monkeypatch.chdir(folder)
+
+    session = _drive(monkeypatch, "--workspace", ".")["session"]
+
+    assert session.project == project_key(folder)
+    assert Path(str(session.project)).is_absolute(), "the app filed this folder under '.'"
+
+
 def test_scoping_the_app_did_not_hide_the_facts_that_belong_everywhere(
     _isolated: Any, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
