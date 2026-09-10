@@ -10,7 +10,7 @@ from one side or the other:
 
 | suite | outcome | the problem |
 |---|---|---|
-| `bench/learning_lift` | 84-92% across **three** attempts to build a 40-60% band | ceiling — everything passes |
+| `bench/learning_lift` | 84-92% across **three** attempts to build a 40-60% band ⚠️ **corrected 2026-09-10: two of the three, not all — the first landed at 50.0% and 45.0%, inside the band. The row's conclusion is unchanged for the other two.** | ceiling — everything passes |
 | `bench/terminal_bench` | 7.5% / 2.5%, **37 of 40 failing both arms** | floor — nothing passes |
 
 A ruler with no middle cannot say whether the loop helps, in either direction. LoopsBench

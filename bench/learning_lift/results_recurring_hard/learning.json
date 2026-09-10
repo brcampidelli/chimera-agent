@@ -1,0 +1,3364 @@
+{
+  "suite": "recurring_hard",
+  "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+  "learn_use_connected": true,
+  "semantic_recall": true,
+  "seeds": 5,
+  "tasks": [
+    "hguard_trimmed_mean",
+    "hguard_max_gap",
+    "hguard_shortest_word",
+    "hguard_avg_positive",
+    "hguard_top_score",
+    "hcopy_add_tag",
+    "hcopy_increment_cell",
+    "hcopy_push",
+    "hcopy_merge_lists",
+    "hcopy_set_flag",
+    "hincl_grid_points",
+    "hincl_region_sum",
+    "hincl_count_in_band",
+    "hincl_count_pairs",
+    "hincl_overlap",
+    "hcase_tally",
+    "hcase_distinct",
+    "hcase_lookup",
+    "hcase_group_words",
+    "hcase_count_prefix",
+    "hreset_run_totals",
+    "hreset_run_lengths",
+    "hreset_group_sizes",
+    "hreset_segment_sums",
+    "hreset_segment_averages"
+  ],
+  "half": 12,
+  "paired": {
+    "n": 125,
+    "baseline_rate": 0.888,
+    "treatment_rate": 0.904,
+    "delta": 0.016,
+    "discordant": {
+      "baseline_only": 9,
+      "treatment_only": 11
+    },
+    "diff_ci": [
+      -0.0505,
+      0.0774
+    ],
+    "significant": false
+  },
+  "family_transfer": {
+    "first_member": {
+      "n": 25,
+      "baseline_rate": 0.84,
+      "treatment_rate": 0.84,
+      "delta": 0.0,
+      "discordant": {
+        "baseline_only": 3,
+        "treatment_only": 3
+      },
+      "diff_ci": [
+        -0.1499,
+        0.1499
+      ],
+      "significant": false
+    },
+    "later_member": {
+      "n": 100,
+      "baseline_rate": 0.9,
+      "treatment_rate": 0.92,
+      "delta": 0.02,
+      "discordant": {
+        "baseline_only": 6,
+        "treatment_only": 8
+      },
+      "diff_ci": [
+        -0.0487,
+        0.0801
+      ],
+      "significant": false
+    },
+    "transfer_gap": 0.02
+  },
+  "mean_did": -0.0653846153846154,
+  "per_seed": [
+    {
+      "seed": 1,
+      "cold": [
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true
+      ],
+      "did": -0.08333333333333337,
+      "skills_learned": 14
+    },
+    {
+      "seed": 2,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "did": 0.23076923076923084,
+      "skills_learned": 14
+    },
+    {
+      "seed": 3,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true
+      ],
+      "did": -0.07692307692307687,
+      "skills_learned": 17
+    },
+    {
+      "seed": 4,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false
+      ],
+      "did": -0.23717948717948723,
+      "skills_learned": 12
+    },
+    {
+      "seed": 5,
+      "cold": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true
+      ],
+      "learning": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true
+      ],
+      "did": -0.16025641025641035,
+      "skills_learned": 11
+    }
+  ],
+  "timings": [
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 1,
+      "secs": 29.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 2,
+      "secs": 59.5,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 3,
+      "secs": 26.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 4,
+      "secs": 16.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 5,
+      "secs": 25.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 6,
+      "secs": 34.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 7,
+      "secs": 17.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 8,
+      "secs": 17.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 9,
+      "secs": 19.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 10,
+      "secs": 10.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 11,
+      "secs": 15.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 12,
+      "secs": 23.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 13,
+      "secs": 15.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 14,
+      "secs": 36.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 15,
+      "secs": 11.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 16,
+      "secs": 14.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 17,
+      "secs": 33.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 18,
+      "secs": 9.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 19,
+      "secs": 45.6,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 20,
+      "secs": 18.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 21,
+      "secs": 10.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 22,
+      "secs": 23.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 23,
+      "secs": 12.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 24,
+      "secs": 11.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "cold",
+      "i": 25,
+      "secs": 22.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 1,
+      "secs": 16.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 2,
+      "secs": 12.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 3,
+      "secs": 23.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 4,
+      "secs": 22.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 5,
+      "secs": 28.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 6,
+      "secs": 21.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 7,
+      "secs": 22.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 8,
+      "secs": 25.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 9,
+      "secs": 24.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 10,
+      "secs": 33.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 11,
+      "secs": 23.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 12,
+      "secs": 21.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 13,
+      "secs": 20.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 14,
+      "secs": 36.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 15,
+      "secs": 25.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 16,
+      "secs": 53.0,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 17,
+      "secs": 26.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 18,
+      "secs": 26.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 19,
+      "secs": 69.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 20,
+      "secs": 21.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 21,
+      "secs": 24.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 22,
+      "secs": 52.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 23,
+      "secs": 48.3,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 24,
+      "secs": 32.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 1,
+      "arm": "learning",
+      "i": 25,
+      "secs": 26.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 1,
+      "secs": 30.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 2,
+      "secs": 16.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 3,
+      "secs": 13.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 4,
+      "secs": 10.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 5,
+      "secs": 11.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 6,
+      "secs": 17.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 7,
+      "secs": 13.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 8,
+      "secs": 18.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 9,
+      "secs": 15.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 10,
+      "secs": 11.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 11,
+      "secs": 12.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 12,
+      "secs": 16.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 13,
+      "secs": 9.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 14,
+      "secs": 20.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 15,
+      "secs": 16.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 16,
+      "secs": 30.4,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 17,
+      "secs": 14.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 18,
+      "secs": 23.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 19,
+      "secs": 10.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 20,
+      "secs": 48.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 21,
+      "secs": 47.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 22,
+      "secs": 39.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 23,
+      "secs": 33.4,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 24,
+      "secs": 72.6,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 2,
+      "arm": "cold",
+      "i": 25,
+      "secs": 65.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 1,
+      "secs": 47.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 2,
+      "secs": 107.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 3,
+      "secs": 148.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 4,
+      "secs": 73.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 5,
+      "secs": 20.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 6,
+      "secs": 88.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 7,
+      "secs": 35.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 8,
+      "secs": 39.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 9,
+      "secs": 178.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 10,
+      "secs": 64.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 11,
+      "secs": 71.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 12,
+      "secs": 95.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 13,
+      "secs": 20.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 14,
+      "secs": 31.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 15,
+      "secs": 20.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 16,
+      "secs": 28.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 17,
+      "secs": 19.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 18,
+      "secs": 38.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 19,
+      "secs": 18.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 20,
+      "secs": 21.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 21,
+      "secs": 39.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 22,
+      "secs": 27.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 23,
+      "secs": 25.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 24,
+      "secs": 30.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 2,
+      "arm": "learning",
+      "i": 25,
+      "secs": 35.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 1,
+      "secs": 15.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 2,
+      "secs": 14.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 3,
+      "secs": 17.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 4,
+      "secs": 21.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 5,
+      "secs": 14.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 6,
+      "secs": 52.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 7,
+      "secs": 15.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 8,
+      "secs": 21.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 9,
+      "secs": 60.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 10,
+      "secs": 19.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 11,
+      "secs": 18.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 12,
+      "secs": 13.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 13,
+      "secs": 13.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 14,
+      "secs": 20.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 15,
+      "secs": 13.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 16,
+      "secs": 36.7,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 17,
+      "secs": 10.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 18,
+      "secs": 12.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 19,
+      "secs": 54.6,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 20,
+      "secs": 12.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 21,
+      "secs": 17.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 22,
+      "secs": 14.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 23,
+      "secs": 21.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 24,
+      "secs": 22.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "cold",
+      "i": 25,
+      "secs": 29.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 1,
+      "secs": 48.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 2,
+      "secs": 35.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 3,
+      "secs": 26.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 4,
+      "secs": 27.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 5,
+      "secs": 23.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 6,
+      "secs": 38.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 7,
+      "secs": 28.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 8,
+      "secs": 19.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 9,
+      "secs": 20.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 10,
+      "secs": 44.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 11,
+      "secs": 22.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 12,
+      "secs": 32.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 13,
+      "secs": 17.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 14,
+      "secs": 25.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 15,
+      "secs": 41.7,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 16,
+      "secs": 32.9,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 17,
+      "secs": 34.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 18,
+      "secs": 34.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 19,
+      "secs": 21.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 20,
+      "secs": 37.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 21,
+      "secs": 46.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 22,
+      "secs": 33.8,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 23,
+      "secs": 40.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 24,
+      "secs": 64.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 3,
+      "arm": "learning",
+      "i": 25,
+      "secs": 32.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 1,
+      "secs": 34.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 2,
+      "secs": 13.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 3,
+      "secs": 27.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 4,
+      "secs": 12.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 5,
+      "secs": 11.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 6,
+      "secs": 23.0,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 7,
+      "secs": 8.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 8,
+      "secs": 24.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 9,
+      "secs": 30.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 10,
+      "secs": 12.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 11,
+      "secs": 12.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 12,
+      "secs": 11.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 13,
+      "secs": 21.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 14,
+      "secs": 12.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 15,
+      "secs": 37.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 16,
+      "secs": 26.9,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 17,
+      "secs": 12.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 18,
+      "secs": 16.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 19,
+      "secs": 46.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 20,
+      "secs": 9.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 21,
+      "secs": 13.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 22,
+      "secs": 10.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 23,
+      "secs": 18.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 24,
+      "secs": 25.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "cold",
+      "i": 25,
+      "secs": 48.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 1,
+      "secs": 15.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 2,
+      "secs": 28.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 3,
+      "secs": 31.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 4,
+      "secs": 16.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 5,
+      "secs": 21.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 6,
+      "secs": 37.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 7,
+      "secs": 27.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 8,
+      "secs": 20.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 9,
+      "secs": 26.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 10,
+      "secs": 70.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 11,
+      "secs": 31.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 12,
+      "secs": 27.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 13,
+      "secs": 21.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 14,
+      "secs": 30.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 15,
+      "secs": 30.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 16,
+      "secs": 34.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 17,
+      "secs": 26.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 18,
+      "secs": 29.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 19,
+      "secs": 23.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 20,
+      "secs": 24.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 21,
+      "secs": 43.5,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 22,
+      "secs": 31.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 23,
+      "secs": 45.4,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 24,
+      "secs": 31.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 4,
+      "arm": "learning",
+      "i": 25,
+      "secs": 52.6,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 1,
+      "secs": 20.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 2,
+      "secs": 32.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 3,
+      "secs": 16.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 4,
+      "secs": 10.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 5,
+      "secs": 13.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 6,
+      "secs": 26.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 7,
+      "secs": 11.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 8,
+      "secs": 10.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 9,
+      "secs": 59.4,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 10,
+      "secs": 11.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 11,
+      "secs": 11.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 12,
+      "secs": 11.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 13,
+      "secs": 11.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 14,
+      "secs": 12.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 15,
+      "secs": 10.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 16,
+      "secs": 9.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 17,
+      "secs": 9.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 18,
+      "secs": 11.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 19,
+      "secs": 20.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 20,
+      "secs": 10.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 21,
+      "secs": 22.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 22,
+      "secs": 13.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 23,
+      "secs": 46.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 24,
+      "secs": 30.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 5,
+      "arm": "cold",
+      "i": 25,
+      "secs": 20.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 1,
+      "secs": 16.5,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 2,
+      "secs": 22.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 3,
+      "secs": 22.1,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 4,
+      "secs": 24.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 5,
+      "secs": 21.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 6,
+      "secs": 40.8,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 7,
+      "secs": 18.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 8,
+      "secs": 16.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 9,
+      "secs": 35.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 10,
+      "secs": 18.4,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 11,
+      "secs": 21.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 12,
+      "secs": 32.7,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 13,
+      "secs": 29.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 14,
+      "secs": 32.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 15,
+      "secs": 39.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 16,
+      "secs": 55.5,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 17,
+      "secs": 31.6,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 18,
+      "secs": 56.0,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 19,
+      "secs": 24.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 20,
+      "secs": 25.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 21,
+      "secs": 40.3,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 22,
+      "secs": 37.9,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 23,
+      "secs": 39.2,
+      "timeout": false,
+      "pass": true
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 24,
+      "secs": 42.2,
+      "timeout": false,
+      "pass": false
+    },
+    {
+      "seed": 5,
+      "arm": "learning",
+      "i": 25,
+      "secs": 49.1,
+      "timeout": false,
+      "pass": true
+    }
+  ],
+  "skill_card_uses": 68,
+  "skill_stats_last_seed": [
+    {
+      "name": "fix_shortest_word_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 1,
+      "successes": 1,
+      "rate": 1.0
+    },
+    {
+      "name": "fix_avg_positive_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 5,
+      "successes": 4,
+      "rate": 0.8
+    },
+    {
+      "name": "fix_add_tag_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 2,
+      "successes": 2,
+      "rate": 1.0
+    },
+    {
+      "name": "deep_copy_for_immutability",
+      "kind": "anti_pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_increment_matrix_function",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "ensure_immutable_config_update",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_grid_points_bounds",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "fix_count_pairs_bug",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 7,
+      "successes": 6,
+      "rate": 0.857
+    },
+    {
+      "name": "incorrect_loop_boundary",
+      "kind": "anti_pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "case_insensitive_lookup",
+      "kind": "pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    },
+    {
+      "name": "case_insensitive_comparison",
+      "kind": "anti_pattern",
+      "status": "active",
+      "provenance": "clean",
+      "uses": 0,
+      "successes": 0,
+      "rate": null
+    }
+  ],
+  "accumulation": [
+    {
+      "seed": 1,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 1,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 1,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 1,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 1,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 1,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 1,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 1,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 1,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 1,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 1,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 1,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 1,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 1,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 1,
+      "i": 16,
+      "pass": false,
+      "skills_retrievable": 12,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 1,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 1,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 1,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 1,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 1,
+      "i": 21,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 13
+    },
+    {
+      "seed": 1,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 1,
+      "i": 23,
+      "pass": false,
+      "skills_retrievable": 13,
+      "playbook_bullets": 15
+    },
+    {
+      "seed": 1,
+      "i": 24,
+      "pass": false,
+      "skills_retrievable": 14,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 1,
+      "i": 25,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 2,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 2,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 2,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 2,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 2,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 2,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 2,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 6,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 2,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 2,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 2,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 2,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 2,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 2,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 2,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 2,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 13
+    },
+    {
+      "seed": 2,
+      "i": 16,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 2,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 2,
+      "i": 18,
+      "pass": false,
+      "skills_retrievable": 14,
+      "playbook_bullets": 15
+    },
+    {
+      "seed": 2,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 2,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 17
+    },
+    {
+      "seed": 2,
+      "i": 21,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 18
+    },
+    {
+      "seed": 2,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 18
+    },
+    {
+      "seed": 2,
+      "i": 23,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 19
+    },
+    {
+      "seed": 2,
+      "i": 24,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 20
+    },
+    {
+      "seed": 2,
+      "i": 25,
+      "pass": true,
+      "skills_retrievable": 14,
+      "playbook_bullets": 21
+    },
+    {
+      "seed": 3,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 3,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 3,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 3,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 3,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 3,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 3,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 3,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 3,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 3,
+      "i": 15,
+      "pass": false,
+      "skills_retrievable": 13,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 3,
+      "i": 16,
+      "pass": false,
+      "skills_retrievable": 13,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 3,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 13,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 3,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 15,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 3,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 15,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 3,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 15,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 3,
+      "i": 21,
+      "pass": true,
+      "skills_retrievable": 15,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 3,
+      "i": 22,
+      "pass": false,
+      "skills_retrievable": 15,
+      "playbook_bullets": 14
+    },
+    {
+      "seed": 3,
+      "i": 23,
+      "pass": true,
+      "skills_retrievable": 15,
+      "playbook_bullets": 15
+    },
+    {
+      "seed": 3,
+      "i": 24,
+      "pass": true,
+      "skills_retrievable": 17,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 3,
+      "i": 25,
+      "pass": true,
+      "skills_retrievable": 17,
+      "playbook_bullets": 16
+    },
+    {
+      "seed": 4,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 4,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 4,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 3,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 4,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 4,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 4,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 6,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 4,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 4,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 4,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 8,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 4,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 4,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 4,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 4,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 4,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 4,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 4,
+      "i": 16,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 4,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 10,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 4,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 4,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 4,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 4,
+      "i": 21,
+      "pass": false,
+      "skills_retrievable": 12,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 4,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 4,
+      "i": 23,
+      "pass": false,
+      "skills_retrievable": 12,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 4,
+      "i": 24,
+      "pass": true,
+      "skills_retrievable": 12,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 4,
+      "i": 25,
+      "pass": false,
+      "skills_retrievable": 12,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 5,
+      "i": 1,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 5,
+      "i": 2,
+      "pass": true,
+      "skills_retrievable": 0,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 5,
+      "i": 3,
+      "pass": true,
+      "skills_retrievable": 1,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 5,
+      "i": 4,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 5,
+      "i": 5,
+      "pass": true,
+      "skills_retrievable": 2,
+      "playbook_bullets": 2
+    },
+    {
+      "seed": 5,
+      "i": 6,
+      "pass": true,
+      "skills_retrievable": 4,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 5,
+      "i": 7,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 5,
+      "i": 8,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 3
+    },
+    {
+      "seed": 5,
+      "i": 9,
+      "pass": true,
+      "skills_retrievable": 5,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 5,
+      "i": 10,
+      "pass": true,
+      "skills_retrievable": 6,
+      "playbook_bullets": 4
+    },
+    {
+      "seed": 5,
+      "i": 11,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 5,
+      "i": 12,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 5,
+      "i": 13,
+      "pass": true,
+      "skills_retrievable": 7,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 5,
+      "i": 14,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 5
+    },
+    {
+      "seed": 5,
+      "i": 15,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 6
+    },
+    {
+      "seed": 5,
+      "i": 16,
+      "pass": false,
+      "skills_retrievable": 9,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 5,
+      "i": 17,
+      "pass": true,
+      "skills_retrievable": 9,
+      "playbook_bullets": 7
+    },
+    {
+      "seed": 5,
+      "i": 18,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 8
+    },
+    {
+      "seed": 5,
+      "i": 19,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 5,
+      "i": 20,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 9
+    },
+    {
+      "seed": 5,
+      "i": 21,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 5,
+      "i": 22,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 10
+    },
+    {
+      "seed": 5,
+      "i": 23,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 11
+    },
+    {
+      "seed": 5,
+      "i": 24,
+      "pass": false,
+      "skills_retrievable": 11,
+      "playbook_bullets": 12
+    },
+    {
+      "seed": 5,
+      "i": 25,
+      "pass": true,
+      "skills_retrievable": 11,
+      "playbook_bullets": 13
+    }
+  ],
+  "graded_against_pristine_test": true,
+  "tests_modified_by_solve": []
+}

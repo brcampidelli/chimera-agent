@@ -40,6 +40,13 @@ Criteria 2 and 4 did **not** fire, and the second of them is the part of this wo
 
 ### The registered expectation, and the fourth failure
 
+> **⚠️ 2026-09-10 — the "three tries" this paragraph leans on is wrong.** The first of them landed
+> at **50.0%** and **45.0%** on the registered first-half criterion, inside the target band; the
+> claim it came from also pools two different models. The measurement below — 91.7% for THIS suite —
+> is unaffected and stands. What does not stand is the consistency argument in the next sentence:
+> there were not three prior suites at the ceiling, there were two, and the third is the
+> counterexample. See the correction at the top of `bench/learning_lift/RESULTS.md`.
+
 The registration predicted 40–70% and recorded, in advance, that no synthetic suite this project has
 authored has landed in that band in three tries (84–92% every time). **This is the fourth, at
 91.7%**, and it lands inside the same 84–92% band as the other three. That consistency is worth more

@@ -285,9 +285,48 @@ transfer-possible suite did not replicate in run 7. The direction has been weakl
 recurring runs and never significant. And the series is narrow throughout — authored synthetic suites,
 one weak 24B model.
 
+> ### ⚠️ Correction, 2026-09-10 — the sentence below is false, and this file already contained the
+> ### number that refutes it
+>
+> **"Every suite we can author lands the control at 84–92%" is wrong**, and so is "all three landed
+> at 84–92%" further down. Line 64 of this same file says the opposite about the first attempt:
+> *"the control landed at 50% (dead in the target band, no ceiling)"*. Read off the JSON rather than
+> the prose, all on one model (`openrouter/mistralai/mistral-small-3.2-24b-instruct`):
+>
+> | attempt | control, **first half** — the registered criterion | whole suite |
+> |---|---:|---:|
+> | 1 — `hfix_*` (`results_hard/`) | **50.0%** | 62.5% |
+> | 1 — `hfix_*` re-run (`results_hard_connected/`) | **45.0%** | 60.0% |
+> | 2 — `recurring` (`results_recurring/`) | — | 90.7% |
+> | 3 — `recurring_hard` (`results_recurring_hard/`) | 95.0% | 88.8% (111/125) |
+>
+> The registered validity criterion is *"control first-half in 40–60%"*. **The first attempt met it
+> twice.** What was generalised into "every suite" was two of the three attempts, and the
+> counterexample was the only suite that worked.
+>
+> This is the failure this project has a rule for: the apparatus was corrected, the numbers were
+> recalculated, and **the sentence stayed where it was, reading well**. It then propagated — into
+> `bench/scenarios/PREREGISTRATION.md`, `bench/scenarios/RESULTS.md`,
+> `bench/fusion_paired/RESULTS.md` and `bench/loopsbench/PREREGISTRATION.md` — and became the
+> premise of later work.
+>
+> The claim also pools two models: `bench/scenarios` is `deepseek-chat-v3.1`, the runs above are
+> Mistral. That comparison is the one this project's own rules forbid.
+>
+> **The six result directories are committed in this change**, because until now the numbers that
+> refute the published sentence existed only on one machine. Anything above can be recomputed.
+>
+> What survives the correction, narrower and testable: inside `tasks_hard_fix.py` — one file, one
+> model, one grader — the seven tasks whose contract needs a mechanism absent from the module pass
+> at **3.6%** and the other 33 at **74.6%**, with prompt, source, test length and assert count
+> differing between the groups by factors of 1.0–1.25. The lever is whether a fix can be edited in
+> or must be invented, and it was in no difficulty specification. See
+> `bench/scenarios/PREREGISTRATION-v3.md`.
+
 **The honest diagnosis is now about the instrument, not the hypothesis.** Runs 4→5 ruled out retrieval
 quality as the blocker, isolating transfer-poverty; runs 6→7 tried to exploit that and hit a different
-wall. Every suite we can author lands the control at **84–92%** — ceiling-limited — whether the tasks
+wall. ~~Every suite we can author lands the control at **84–92%** — ceiling-limited~~ (**false — see
+the correction above**) — whether the tasks
 are disjoint or recurring, easy or deliberately inverted. Difficulty calibrated on one suite does not
 carry to another. So the hypothesis "accumulated learning helps when transfer is possible" remains
 **untested at power**, not refuted: we have not built a measuring device capable of answering it. That
@@ -318,7 +357,9 @@ work with.
 ## Next — and why there will be no run 8 on a synthetic suite
 
 **Authoring another synthetic suite is not the answer, and this is the run that proves it.** Run 7 was
-the third attempt to hit a 40–60% control band by construction; all three landed at 84–92%. Difficulty
+the third attempt to hit a 40–60% control band by construction; ~~all three landed at 84–92%~~ — **false;
+the first attempt landed at 50.0% and 45.0% on the registered first-half criterion, see the correction
+above**. Run 7 itself did land at 88.8%. Difficulty
 calibrated against one suite does not carry to another, so each attempt costs a full run to discover
 that the instrument is still blunt. A hypothetical run 8 would be the fourth roll of the same die, and
 would carry the growing suspicion — correctly — that we are re-rolling until a suite is kind to us.
