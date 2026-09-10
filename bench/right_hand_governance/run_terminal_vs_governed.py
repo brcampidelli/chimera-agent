@@ -351,6 +351,80 @@ def app_chat_registry(
     return out
 
 
+def _ledger_in(registry: ToolRegistry) -> Any:
+    """The taint ledger the wrapped tools are actually using, or ``None`` when there is none.
+
+    Asked of the registry rather than taken from a return value, and that is the point rather than
+    a convenience: it is the same question ``_ledger_behind`` asks in
+    ``tests/test_the_app_chat_tells_its_ledger_whose_turn_it_is.py``, and it works identically on a
+    tree that has the fix and a tree that does not. So the before-number and the after-number come
+    off one instrument, and an arm that reached for a ledger the FUNCTION handed back would have
+    been measuring the wiring it is deliberately not measuring.
+
+    ``None`` is a real answer here and not a failure. ``governed_profile`` returns before it builds
+    a ledger when the mode is ``off`` — the shipped default — so on a stock deployment the gateway
+    has no ledger for anything to be told.
+    """
+    for tool in registry.tools():
+        ledger = getattr(tool, "ledger", None)
+        if ledger is not None:
+            return ledger
+    return None
+
+
+def gateway_registry(
+    registry: ToolRegistry,
+    settings: Settings,
+    home: Path,
+    *,
+    surface: str,
+    approve: Any = None,
+    instruction: str | None = None,
+) -> ToolRegistry:
+    """What ``chimera serve`` and ``_serve_platform`` hand the agent, from the function that builds it.
+
+    ``governed_profile`` is what both ``factory()`` closures call, and it is the shipped function
+    rather than a copy — ``registry`` is the seam, exactly as it is for the other arms, because that
+    function takes an already-built registry as its first argument.
+
+    **No ``_as_process_settings`` here, and that was verified rather than assumed.** The ``app_chat``
+    arm needs it because ``guard_chat_registry`` reads the process-wide ``get_settings()``.
+    ``governed_profile`` takes ``settings=`` explicitly and neither it nor ``govern_step`` calls
+    ``get_settings()`` anywhere in ``chimera/governance/`` — checked, and pinned by
+    ``tests/test_the_gateway_tells_its_ledger_whose_turn_it_is.py`` so it cannot drift into needing
+    one without this arm noticing.
+
+    **This arm measures the mechanism, not the wiring**, the way ``app_chat_registry`` does: it
+    calls ``set_instruction`` itself, on the ledger the registry is using. Whether the *factory*
+    calls it is a different question and no corpus can answer it — the sabotage in #400 that nothing
+    caught was a command that called its builder and threw the result away. That half is
+    ``tests/test_the_gateway_tells_its_ledger_whose_turn_it_is.py``, which drives both real
+    surfaces.
+
+    ``surface`` is the only thing that differs between the two gateway arms, because it is the only
+    thing that differs between the two shipped calls. They are therefore the same measurement twice,
+    and they are both kept anyway: this project has published a case (§2z of the pré-treino notes)
+    where a defect was found in one cell and nobody asked whether it held in the others. Two cells
+    that must agree are how a future divergence gets to show up as one.
+    """
+    from chimera.governance.profile import governed_profile
+
+    # `home=settings.home` because that is literally what both shipped calls pass. The `home`
+    # PARAMETER above is accepted for `run_arm`'s uniform call shape and deliberately not used: in
+    # this bench the two are the same directory, and `home` only decides where `audit.jsonl` is
+    # written, which no measured row reads. Said out loud so the next reader does not have to work
+    # out whether an unused argument is an oversight.
+    guarded, _approvals = governed_profile(
+        registry, settings=settings, home=settings.home, surface=surface
+    )
+    ledger = _ledger_in(guarded)
+    if instruction is not None and ledger is not None:
+        ledger.set_instruction(instruction)
+    _rewire_approver(guarded, approve if approve is not None else deny())
+    out: ToolRegistry = guarded
+    return out
+
+
 def governed_registry(
     registry: ToolRegistry,
     settings: Settings,
@@ -501,7 +575,21 @@ def check_invariant(row_id: str, observation: str, ran: bool) -> None:
 #: answers `unknown` for every fetch and `CHIMERA_TAINT_AUTHORITY` has nothing to act on. It stays
 #: as a permanent column rather than being deleted with the fix, because it is what keeps the
 #: finding a finding: the day the wire is removed again, the two app columns converge and say so.
-ARMS = ("terminal", "governed", "tui", "app_chat", "app_chat_untold")
+#: ``serve``/``platform`` are the two messaging-gateway factories, and their ``_untold`` twins are
+#: what those surfaces shipped until 2026-09-10 — the same registry, the same ledger, the same mode,
+#: and nothing ever telling it the turn's words. Same pairing as the app's, same reason for keeping
+#: the untold column after the fix.
+ARMS = (
+    "terminal",
+    "governed",
+    "tui",
+    "app_chat",
+    "app_chat_untold",
+    "serve",
+    "serve_untold",
+    "platform",
+    "platform_untold",
+)
 
 
 def _maybe(registry: ToolRegistry, name: str) -> Any:
@@ -550,6 +638,18 @@ def run_arm(
             # `instruction=None`, always, and that is the arm rather than a shortcut: the app had no
             # way to supply one, so supplying one here would model a surface that did not exist.
             registry = app_chat_registry(base, settings, home, approve=approve, instruction=None)
+        elif arm in ("serve", "serve_untold", "platform", "platform_untold"):
+            # The `surface=` string the shipped call passes, which is the only thing that differs
+            # between the two gateway factories. `_untold` is `instruction=None` always — the
+            # surface as it shipped, with no way to supply one.
+            registry = gateway_registry(
+                base,
+                settings,
+                home,
+                surface="serve" if arm.startswith("serve") else "platform",
+                approve=approve,
+                instruction=None if arm.endswith("_untold") else instruction,
+            )
         else:
             registry = terminal_registry(
                 base, settings, home, approve=approve, instruction=instruction
@@ -784,10 +884,10 @@ def probe_terminal_surfaces(main_py: Path) -> str:
         "  which parts of the governed stack each terminal command builds, by AST over its body",
         "  (`direct` = named in the command itself; `via` = named in a function it calls, one hop):",
     ]
-    for name in ("chat", "assist", "tui"):
+    for name in ("chat", "assist", "tui", "serve", "_serve_platform"):
         direct, indirect = governance_names_reachable(source, name, table)
-        lines.append(f"    {name:<8} direct: {', '.join(direct) if direct else '(none)'}")
-        lines.append(f"    {'':<8} via   : {', '.join(indirect) if indirect else '(none)'}")
+        lines.append(f"    {name:<16} direct: {', '.join(direct) if direct else '(none)'}")
+        lines.append(f"    {'':<16} via   : {', '.join(indirect) if indirect else '(none)'}")
     lines.append(
         "    api/code_api.py:assemble_registry  "
         + ", ".join(
@@ -809,7 +909,10 @@ def probe_terminal_surfaces(main_py: Path) -> str:
     lines.append(
         "    note: `set_instruction` is called per TURN, from the REPL loop through "
         "RightHand.begin_turn, so it is not in any of the rows above. §8 is the evidence it "
-        "happens -- an instruction nobody set cannot move a row under CHIMERA_TAINT_AUTHORITY."
+        "happens -- an instruction nobody set cannot move a row under CHIMERA_TAINT_AUTHORITY.\n"
+        "    note: `serve` and `_serve_platform` name `governed_profile` and have done since long "
+        "before their ledger was told anything, which is the limit of what a name walk can say. "
+        "A hit here is weak evidence; §8b is the behavioural half."
     )
     return "\n".join(lines)
 
@@ -985,6 +1088,95 @@ def section_env_switches(home: Path) -> str:
     return "\n".join(lines)
 
 
+#: The governance modes the gateway table is measured under, and why there are three of them.
+#:
+#: Every other arm in this file builds its ledger unconditionally: ``build_right_hand`` constructs
+#: one after ``govern_step`` whatever the mode, and ``guard_chat_registry`` never looks at the mode
+#: at all. ``governed_profile`` is the one that does — ``if step.mode == "off": return`` sits ABOVE
+#: the ``TaintLedger`` line — and ``off`` is the shipped default (``CHIMERA_GOVERNANCE`` unset).
+#:
+#: So a gateway table measured only at the default would read ``identical, 0 rows moved`` in every
+#: cell, before AND after the fix, and that zero would say nothing about the instruction: it is the
+#: number an instrument returns when the component under test was never built. That is this
+#: project's most expensive recurring shape (§2q/§2r) and the reason the mode is an axis here.
+GATEWAY_MODES = ("off", "observe", "enforce")
+
+
+def section_gateway_switches(home: Path) -> str:
+    """Is ``CHIMERA_TAINT_AUTHORITY`` inert on ``chimera serve`` and the platform bots?
+
+    Same probe as §8 and a second axis, because on this surface the answer depends on a setting
+    §8 never varies. The ``_untold`` columns are the surfaces as they shipped; the told columns are
+    the same arms handed the turn's own message. **The difference between the two is the whole
+    change**, and the untold columns stay permanently: the day the wire is removed again, each pair
+    converges and says so.
+
+    The first line of each block is the finding the pairing cannot express on its own — whether a
+    ledger was built at all.
+    """
+    episodes = attack_episodes() + benign_episodes()
+    instruction = f"Summarise {ATTACK_PAGE} and {UPSTREAM_PAGE} for me"
+    columns = ("serve", "serve_untold", "platform", "platform_untold")
+    lines = [
+        f"  the instruction handed to the ledger: {instruction!r}",
+        "  `governed_profile` returns BEFORE it builds a TaintLedger when the mode is `off`, which",
+        "  is the shipped default -- so the mode is an axis here and is not in section 8.",
+    ]
+    for mode in GATEWAY_MODES:
+        env: dict[str, str] = {"CHIMERA_HOME": str(home)}
+        if mode != "off":
+            env["CHIMERA_GOVERNANCE"] = mode
+        base_settings = Settings(**env)  # type: ignore[arg-type]
+        probe = gateway_registry(
+            build_stub_registry(base_settings, {}), base_settings, home, surface="serve"
+        )
+        has_ledger = _ledger_in(probe) is not None
+        label = f"CHIMERA_GOVERNANCE={mode}" + (" (the shipped default)" if mode == "off" else "")
+        lines.append("")
+        lines.append(
+            f"  {label}: a taint ledger is "
+            + ("BUILT" if has_ledger else "NOT BUILT -- nothing here has one to be told")
+        )
+        lines.append(
+            "  " + f"{'setting':<36}" + "".join(f"{arm + ' arm':<26}" for arm in columns)
+        )
+        variants = {
+            "default": base_settings,
+            "CHIMERA_TRUST_WORKSPACE=0": Settings(  # type: ignore[arg-type]
+                **{**env, "CHIMERA_TRUST_WORKSPACE": "0"}
+            ),
+            "CHIMERA_TAINT_AUTHORITY=authority": Settings(  # type: ignore[arg-type]
+                **{**env, "CHIMERA_TAINT_AUTHORITY": "authority"}
+            ),
+        }
+        baseline: dict[str, str] = {}
+        for variant, settings in variants.items():
+            marks = {
+                arm: _arm_fingerprint(
+                    run_arm(episodes, settings, home, arm=arm, instruction=instruction)
+                )
+                for arm in columns
+            }
+            if variant == "default":
+                baseline = marks
+                lines.append(
+                    f"    {variant:<36}" + "".join(f"{'(baseline)':<26}" for _ in columns)
+                )
+                continue
+            cells = []
+            for arm in columns:
+                word = "identical" if marks[arm] == baseline[arm] else "CHANGED"
+                moved = sum(
+                    a != b
+                    for a, b in zip(
+                        marks[arm].splitlines(), baseline[arm].splitlines(), strict=True
+                    )
+                )
+                cells.append(f"{word + f' ({moved} rows moved)':<26}")
+            lines.append(f"    {variant:<36}" + "".join(cells))
+    return "\n".join(lines)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default="")
@@ -1084,6 +1276,8 @@ def main() -> int:
         section("7. the data fence the system prompt promises", section_fence(settings, home))
         section("8. are CHIMERA_TRUST_WORKSPACE and CHIMERA_TAINT_AUTHORITY inert on the terminal?",
                 section_env_switches(home))
+        section("8b. the same two settings on `chimera serve` and the platform bots",
+                section_gateway_switches(home))
         section("9. structural probe -- what each command's body actually builds",
                 probe_terminal_surfaces(REPO / "chimera" / "cli" / "main.py"))
         section("10. the approver the shipped assembly wires in THIS process",

@@ -890,3 +890,215 @@ its builder, and a sabotage that called the builder and then discarded the resul
 
 It also says nothing about whether `authority` is a mode anyone should turn on. It measures that the
 lever is connected, not that pulling it is wise.
+
+---
+
+# Part 5 — the messaging gateway's taint lever, and the layer that was not there to have one
+
+Written 2026-09-10, extending Part 4's app-chat section (the second of the two headed *Part 4* in
+this file — that collision is #408's and is left as it stands rather than renumbered under a link
+somebody may already hold). Offline, stub tools, **US$ 0.00**.
+
+Reproduce:
+
+```
+python bench/right_hand_governance/run_terminal_vs_governed.py \
+    --out-dir bench/right_hand_governance/results --tag 2026-09-10-after
+```
+
+Raw arms:
+[`results/2026-09-10-before-terminal-vs-governed.txt`](results/2026-09-10-before-terminal-vs-governed.txt) and
+[`results/2026-09-10-after-terminal-vs-governed.txt`](results/2026-09-10-after-terminal-vs-governed.txt).
+
+## The claim under test
+
+`chimera serve` and `_serve_platform` — the HTTP gateway and the Discord/Telegram/Slack/Signal bots —
+each build one registry per conversation inside a `factory()` closure that calls `governed_profile(...)`
+**without** `instruction=`. That function sets the ledger's instruction only when the argument is
+given, so `requester_of` answers `unknown` for every fetch and the narrowing treats `unknown` exactly
+as it treats `agent`. `CHIMERA_TAINT_AUTHORITY` has nothing to be a mode about. Same defect as
+`chimera chat`'s before #400 and the desktop app's before #408, through a third door.
+
+## What the premise did not contain, found before the fix was written
+
+**`governed_profile` is the only one of the four assemblies that does not build a ledger at all under
+the shipped default.** Its `if step.mode == "off": return step.registry, step.approvals` sits
+**above** the `TaintLedger` line, and `governance_mode` defaults to `"off"` (`config.py:761`).
+`build_right_hand` and `guard_chat_registry` both construct one unconditionally; this one does not.
+
+So on a stock deployment the gateway's `CHIMERA_TAINT_AUTHORITY` is inert one layer deeper than the
+missing instruction: there is no ledger for an instruction to be set on, and no `LedgeredTool`
+either — no fence on external reads, no narrowing, nothing. The missing `instruction=` only becomes
+the operative cause once an owner has set `CHIMERA_GOVERNANCE`.
+
+This is why §8b of the bench has a **governance axis** and §8 does not. A gateway table measured only
+at the default would have printed `identical, 0 rows moved` in every cell, before and after, and that
+zero would have said nothing about the instruction — it is the number an instrument returns when the
+component under test was never built (`bee-pretreino-licoes` §2q/§2r, the same family that produced a
+false refutation and a false all-clear on two earlier occasions in this repository).
+
+## The numbers
+
+Same fifteen rows, same corpus, same instrument as every other part. `serve`/`platform` are the arms
+told the turn's own message; `_untold` is each surface exactly as it shipped — the same registry, the
+same ledger, the same mode, and nothing telling it the words. **The difference between a pair is the
+entire change**, and the untold columns stay permanently: the day either wire is removed, its pair
+converges and says so.
+
+| `CHIMERA_TAINT_AUTHORITY=authority` | serve | serve_untold | platform | platform_untold |
+|---|---|---|---|---|
+| `CHIMERA_GOVERNANCE` unset (**the shipped default**) | identical, **0** | identical, **0** | identical, **0** | identical, **0** |
+| `CHIMERA_GOVERNANCE=observe` | **CHANGED, 9** | identical, **0** | **CHANGED, 9** | identical, **0** |
+| `CHIMERA_GOVERNANCE=enforce` | **CHANGED, 9** | identical, **0** | **CHANGED, 9** | identical, **0** |
+
+And the control switch beside it, which reaches the ledger by a different route (the
+`untrusted_output` marker `LedgeredTool._is_fetch` reads) and must therefore move whether or not
+anybody was told anything:
+
+| `CHIMERA_TRUST_WORKSPACE=0` | serve | serve_untold | platform | platform_untold |
+|---|---|---|---|---|
+| unset (default) | identical, 0 | identical, 0 | identical, 0 | identical, 0 |
+| `observe` / `enforce` | CHANGED, 3 | **CHANGED, 3** | CHANGED, 3 | **CHANGED, 3** |
+
+That second table is what makes the first one readable. Under governance, `trust_workspace` moves the
+untold arm — so the untold arm is not a dead instrument; it is an arm with a live ledger that
+`authority` cannot act on because nobody told it whose turn it is. Under the default, *neither*
+switch moves *anything*, which is the "no layer at all" finding stated by the instrument rather than
+by this paragraph.
+
+**Nine, not the app's six.** `guard_chat_registry` resolves `Posture(reach=DEFAULT_REACH)` and denies
+the exec tools outright, so three of the nine rows read `absent` on that surface. `governed_profile`
+applies no such posture, so the gateway keeps `run_shell` and all nine rows are live. Nothing in
+either number is a governance win; it is which tools exist.
+
+## Before and after the production change: the arm does not move, and that is the point
+
+The two raw files above bracket the fix. Every behavioural row is **byte-identical**, and the whole
+diff between them is four lines of the structural probe:
+
+```
+-    serve            direct: governed_profile
+-                     via   : AuditLog, TaintLedger, govern_step, ledger_registry, set_instruction
++    serve            direct: governed_profile, set_instruction
++                     via   : AuditLog, TaintLedger, govern_step, ledger_registry
+```
+
+That identity is a control, not a disappointment. This arm measures the **mechanism** — what a ledger
+that was told does against one that was not — and it calls `set_instruction` itself, exactly as
+`app_chat_registry` does. It never touches the wiring, so a run where it moved because the wiring
+moved would be a run where the arm is reading something it has no business reading.
+
+**The before/after of the wiring is the test file**, and it is a different kind of evidence:
+
+| | before the fix | after |
+|---|---|---|
+| `test_the_gateway_hands_its_session_a_hook[serve]` | red | green |
+| `test_the_gateway_hands_its_session_a_hook[platform]` | red | green |
+| `test_the_hook_reaches_the_ledger_the_registry_is_using[serve]` | red | green |
+| `test_the_hook_reaches_the_ledger_the_registry_is_using[platform]` | red | green |
+| `test_a_turn_through_send_tells_the_ledger[serve, platform]` | red | green |
+
+`tests/test_the_gateway_tells_its_ledger_whose_turn_it_is.py` drives both real commands through
+`CliRunner` and asks **the ledger the session's own tools are wrapped in** what `requester_of`
+answers. Splitting it this way is not tidiness: #400 shipped four checks that asked whether a command
+*called* its builder, and a sabotage that called the builder and threw the result away passed 0 of
+109 of them.
+
+## The seam: why a callback and not a third return value
+
+`governed_profile` returns `(registry, approvals)` and has **ten** callers — six in
+`chimera/cli/main.py`, two in `chimera/kanban/lanes.py`, one each in `chimera/scheduler/job_runner.py`
+and `chimera/server/manager.py` — every one of which unpacks a 2-tuple. The ledger it builds was not
+exposed at all. Three shapes were considered:
+
+- **A third element.** Breaks all ten.
+- **A returned object that still unpacks as two** (a `tuple` subclass carrying `.ledger`). Keeps the
+  ten working, and was rejected anyway: it changes the type every caller receives in order to serve
+  two of them, and this package's convention for a rich result is a plain dataclass (`GovernanceStep`,
+  `RightHand`) rather than a tuple wearing extra attributes.
+- **A second entry point** returning the richer object, with `governed_profile` as a thin wrapper.
+  This looked cleanest until the guard was read.
+  `tests/test_governed_surfaces.py::test_no_surface_builds_a_registry_outside_the_profile_unless_it_says_why`
+  decides a surface is governed by finding `default_registry(...)` as an argument to a call named
+  **exactly** `governed_profile`. A second name is a second door past that gate — and the gate exists
+  because five surfaces once lost their governance by nobody noticing, which is the whole reason
+  `chimera/governance/profile.py` was written.
+
+What shipped is a keyword-only `on_ledger: Callable[[TaintLedger], None] | None = None`. It changes
+neither the function's name nor its return shape, so the ten callers are untouched and a caller that
+does not pass one gets byte-identical behaviour — the property that made the same fix safe for the
+messaging gateway and `/v1/chat/completions` in #408, kept here and asserted
+(`test_a_caller_that_does_not_ask_is_unaffected`).
+
+**And it is called only when a ledger exists.** Under the default mode nothing is handed over, the
+factories' `turn_ledger` stays `None`, and `ChatSession.on_turn_start` stays `None` — which is both
+the honest state and byte-identical to what that class received before this change
+(`test_the_stock_deployment_is_left_exactly_as_it_was`).
+
+## Sabotage: every guard broken on purpose, and what went red
+
+Each break was applied to the committed tree, the file re-run, and the tree restored. Counts are out
+of the file's 18 tests.
+
+| # | the break | red | which tests |
+|---|---|---:|---|
+| 1 | `governed_profile` never calls `on_ledger` | **7** | the seam test plus all six wiring cases |
+| 2 | `on_ledger` handed a **fresh** ledger, not the wrapped one | **5** | the seam test plus 4 wiring cases |
+| 3 | `serve` loses its hook, `platform` keeps it | **3** | every `[serve]` case |
+| 4 | `platform` loses its hook, `serve` keeps it | **3** | every `[platform]` case |
+| 5 | `serve` asks for the ledger, then hooks a **different** one (#400's shape) | **2** | `..._reaches_the_ledger_the_registry_is_using[serve]`, `..._turn_through_send[serve]` |
+| 6 | the hook is wired even with no ledger | **2** | `test_the_stock_deployment_is_left_exactly_as_it_was[serve, platform]` |
+| 7 | `ChatSession._begin_turn` moved **after** `agent.run` | **2** | `test_a_turn_through_send_tells_the_ledger[serve, platform]` (and 1 in #408's file) |
+| 8 | the bench arm silently drops its `instruction` | **1** | `test_the_gateway_arm_moves_when_it_is_told_and_not_when_it_is_not` |
+| 9 | the `_untold` arms are quietly told after all | **1** | the same test |
+| 10 | `turn_ledger` hoisted out of `factory()` (every chat shares one) | **3** | `test_two_chats_do_not_share_a_ledger[serve]` and 2 others |
+
+**Number 5 is the one worth reading.** `test_the_gateway_hands_its_session_a_hook` **passed** under
+it — the hook exists, it is callable, it sets an instruction on a real `TaintLedger`, and none of
+that reaches the tools. That is precisely the blindness #400 measured, and it is why every wiring
+assertion here goes through `_ledger_behind(session)` rather than through anything the test asked to
+be handed.
+
+**Numbers 3 and 4 are the check that a defect found in one cell was asked about in the other.**
+Fixing one closure and not the other is caught, in the specific direction, by name. Both were wired
+for that reason rather than one.
+
+**Number 10 is the shortcut this fix invites.** Hoisting the cell out of the closure saves four
+lines, compiles, and hands every chat on a Discord server the last-built ledger — so one person's
+message would decide what counts as another person's own request, which is `authority` pointed at
+the wrong human. `MessageGateway` builds one session per `chat_id`, so the harness builds two and
+asks whether telling one told the other.
+
+**Numbers 8 and 9 are the instrument's own power half.** `serve_untold` reading zero is the finding;
+an arm that had quietly stopped setting instructions would print four zeros and the table would read
+*the lever is dead*.
+
+## What Part 5 cannot show
+
+- **Everything Part 1 could not, unchanged.** Fifteen rows is a smoke corpus. The stubs bypass the
+  workspace jail. **Nothing here measures the model** — every arm assumes the model already attempted
+  the attacker's call and asks only whether the layer stops it.
+- **The two gateway arms are one measurement taken twice.** They differ in the `surface=` label and
+  in nothing that decides what is allowed, because that is the only thing the two shipped calls
+  differ in. No corpus can tell them apart; what distinguishes the two surfaces is whether each
+  *factory* is wired, and only the test file can see that. Both columns are kept so a future
+  divergence has somewhere to appear.
+- **No block rate, no `asr_*`, no fence count is reported for these arms.** They exist in the arm and
+  were deliberately left out of the write-up: under the shipped default the gateway has no governance
+  layer at all, so those numbers would describe a configuration rather than a defence — and under
+  `enforce` they would describe an owner's setting rather than the product. §8b answers one question
+  (is the lever connected) and stays inside it.
+- **Nothing here says `authority` is a mode anyone should turn on, and the project's own measurement
+  says the opposite.** `SECURITY.md` records that on `bench/injection` this mode lets **six of the
+  seven attacks through** when the user asked to summarise the poisoned page, and tells owners to
+  leave it at `provenance`. This part measures that the lever is connected on two more surfaces, not
+  that pulling it is wise — and on a Discord bot "the person who named the page" is whoever typed
+  into a channel everybody shares, which is a worse fit for the mode than any surface it already
+  reached.
+- **`CHIMERA_GOVERNANCE=off` is the shipped default and is not changed here.** This part measures
+  what an owner who turned governance on now gets. What fraction of deployments that is, nobody
+  measured — and the honest reading of the top table is that for everyone else this fix is worth
+  exactly zero rows, because the layer it repairs is not installed.
+- **One process, one run.** The bench is deterministic and byte-repeatable (asserted by
+  `test_the_offline_arm_is_deterministic`), so a distribution here would be a distribution of a
+  constant.

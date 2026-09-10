@@ -62,10 +62,12 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    from collections.abc import Callable
     from pathlib import Path
 
     from chimera.config import Settings
     from chimera.governance.audit import AuditLog
+    from chimera.governance.ledger import TaintLedger
 
 _log = get_logger("governance.profile")
 
@@ -262,6 +264,7 @@ def governed_profile(
     surface: str = "",
     instruction: str | None = None,
     workspace: Path | None = None,
+    on_ledger: Callable[[TaintLedger], None] | None = None,
 ) -> tuple[Any, Any]:
     """Wrap ``registry`` in the deployment's governance. Returns ``(registry, approvals)``.
 
@@ -276,8 +279,48 @@ def governed_profile(
     ``instruction`` is the person's own words for this run — a cron job's action, a card's action,
     the task handed to the MCP or A2A server — so a fetch of a page or a file it names is recorded
     as the user's request (``CapabilityEvent.requested_by``). A surface with no single task (a chat
-    session, the ACP editor) passes nothing, and every fetch there reads ``unknown``. ``workspace``
-    lets a path the agent gives absolutely match the relative form the person wrote.
+    session, the ACP editor) passes nothing — and read on before concluding that every fetch there
+    is therefore ``unknown``, because for two of those surfaces it no longer is. ``workspace`` lets a
+    path the agent gives absolutely match the relative form the person wrote.
+
+    ``on_ledger`` is handed the :class:`~chimera.governance.ledger.TaintLedger` this call built, for
+    the surfaces where the instruction is not known once per RUN but once per TURN. ``chimera
+    serve`` and the platform bots are both of those: their ``factory()`` builds one registry per
+    conversation and then sees every message, so passing ``instruction=`` was never possible and the
+    ledger they got answered ``unknown`` for every fetch — which the narrowing treats exactly as it
+    treats ``agent``, so ``CHIMERA_TAINT_AUTHORITY`` had nothing to be a mode about. It is the same
+    defect ``chimera chat`` fixed with :meth:`~chimera.cli.right_hand.RightHand.begin_turn` and the
+    desktop app fixed with ``ChatSession.on_turn_start``; this is the door those two did not use.
+
+    **Why a callback and not a third return value.** Three shapes were considered and two were
+    rejected for reasons specific to this codebase rather than to taste:
+
+    * A third element breaks all ten callers, every one of which unpacks a 2-tuple.
+    * A returned object that still unpacks as two (a ``tuple`` subclass carrying ``.ledger``) keeps
+      those ten working, and was rejected anyway: it changes the type every caller receives in order
+      to serve two of them, and this package's convention for a rich result is a plain dataclass
+      (:class:`GovernanceStep`, :class:`~chimera.cli.right_hand.RightHand`) rather than a tuple
+      wearing extra attributes.
+    * A second entry point returning the richer object — ``governed_profile`` staying a thin wrapper
+      over it — looked cleanest until the guard was read.
+      ``tests/test_governed_surfaces.py::test_no_surface_builds_a_registry_outside_the_profile_unless_it_says_why``
+      decides a surface is governed by finding ``default_registry(...)`` as an argument to a call
+      named **exactly** ``governed_profile``. A second name is a second door past that gate, and the
+      gate exists because five surfaces once lost their governance by nobody noticing.
+
+    A keyword-only callback changes neither the name nor the shape, so all ten callers are untouched
+    and a caller that does not pass one gets byte-identical behaviour — the property that made the
+    same fix safe for the messaging gateway and ``/v1/chat/completions`` in #408.
+
+    **And it is called only when a ledger exists**, which is a fact about this function that the two
+    assemblies beside it do not share: ``build_right_hand`` and ``guard_chat_registry`` both
+    construct a ledger unconditionally, while the ``mode == "off"`` return below sits ABOVE the ``TaintLedger``
+    line — and ``off`` is the shipped default. So on a stock deployment there is no ledger here for
+    anything to be told, ``on_ledger`` is never called, and a caller that wires a turn hook only
+    when it has been handed one is stating that fact rather than papering over it. Measured, same
+    instrument as the terminal's: ``CHIMERA_TAINT_AUTHORITY=authority`` moves **0 rows** with
+    governance off no matter what anyone is told, 0 on the ledger nobody tells, and **9** on the
+    ledger told the turn's message (``bench/right_hand_governance/RESULTS.md``, §8b and Part 5).
     """
     from chimera.governance import TaintLedger, restrict_registry
     from chimera.governance.audit import AuditLog
@@ -338,6 +381,11 @@ def governed_profile(
     ledger = TaintLedger(authority=settings.taint_authority)
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=workspace)
+    # Handed over BEFORE the wrap and unconditionally, so a caller that asked for it holds the same
+    # object the tools below are about to be wrapped around. Not after the return, and not only when
+    # `instruction is None`: a surface can legitimately have both a run-level instruction and turns.
+    if on_ledger is not None:
+        on_ledger(ledger)
     registry = ledger_registry(
         step.registry, ledger, audit=audit, narrow_on_taint=True, approve=step.approve
     )

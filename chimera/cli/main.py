@@ -2412,11 +2412,23 @@ def serve(
     http_send_tool = SendMessageTool(push_senders) if push_senders.platforms() else None
 
     def factory() -> ChatSession:
+        # One registry per conversation, and the instruction is known once per TURN — so
+        # `instruction=` was never a thing this surface could pass, and its ledger answered
+        # `unknown` for every fetch. `unknown` is what the narrowing treats exactly as `agent`,
+        # which is why `CHIMERA_TAINT_AUTHORITY` did nothing here. `on_ledger` is the seam;
+        # `ChatSession.on_turn_start` is the moment. Same fix as #408's, other door.
+        turn_ledger: Any = None
+
+        def _hold(ledger: Any) -> None:
+            nonlocal turn_ledger
+            turn_ledger = ledger
+
         registry, _ = governed_profile(
             default_registry(workspace_path),
             settings=settings,
             home=settings.home,
             surface="serve",
+            on_ledger=_hold,
         )
         if http_send_tool is not None:
             registry.register(http_send_tool)
@@ -2435,6 +2447,20 @@ def serve(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=settings.remember_from_chat,
+            # `None` when governance is off — the shipped default, under which `governed_profile`
+            # returns before it builds a ledger and never calls `_hold`. A hook wired to nothing
+            # would be a lie about what this surface has; no hook is the truth, and it also keeps
+            # `ChatSession` byte-identical for the stock deployment.
+            #
+            # `workspace=` so a path the model gives absolutely matches the relative form the person
+            # wrote, which is what `set_instruction` documents the argument for.
+            on_turn_start=(
+                None
+                if turn_ledger is None
+                else lambda message: turn_ledger.set_instruction(
+                    message, workspace=workspace_path
+                )
+            ),
         )
 
     # Before anything binds. A gateway that starts and then 401s has already told the internet
@@ -3088,19 +3114,44 @@ def _serve_platform(
     send_tool = SendMessageTool(senders)
 
     def factory() -> ChatSession:
+        # See `serve`, which has the same closure and the same reason: one registry per chat, one
+        # instruction per turn, so the ledger is told through `ChatSession.on_turn_start` and not
+        # through `instruction=`. Both are wired in one change rather than one of them, because this
+        # exact defect has now been found on five surfaces and repaired on four separate occasions
+        # (#400 chat/assist, #405 tui, #408 the app, this) — each time by somebody looking at one
+        # surface and not asking the same question of its neighbour.
+        turn_ledger: Any = None
+
+        def _hold(ledger: Any) -> None:
+            nonlocal turn_ledger
+            turn_ledger = ledger
+
         registry, _ = governed_profile(
 
             default_registry(workspace_path),
             settings=get_settings(),
             home=get_settings().home,
             surface="platform",
+            on_ledger=_hold,
         )
         registry.register(send_tool)
         runner = Agent(
             backend, registry,
             AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
         )
-        return ChatSession(runner, memory=memory, graph=graph)
+        return ChatSession(
+            runner,
+            memory=memory,
+            graph=graph,
+            # `None` under the shipped `CHIMERA_GOVERNANCE=off`, where no ledger is built at all.
+            on_turn_start=(
+                None
+                if turn_ledger is None
+                else lambda message: turn_ledger.set_instruction(
+                    message, workspace=workspace_path
+                )
+            ),
+        )
 
     gateway = MessageGateway(factory)
     console.print(

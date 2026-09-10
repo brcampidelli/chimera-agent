@@ -159,8 +159,13 @@ def test_the_ledger_is_told_the_users_own_words_before_the_turn_runs(tmp_path: P
 
 
 def test_a_ledger_nobody_told_answers_unknown(tmp_path: Path) -> None:
-    """The sabotage half. Without ``begin_turn`` every fetch is ``unknown``, which is what the
-    desktop chat still records — and it is why ``CHIMERA_TAINT_AUTHORITY`` is inert there."""
+    """The sabotage half. Without ``begin_turn`` every fetch is ``unknown``, which the narrowing
+    treats exactly as it treats ``agent``.
+
+    This used to add "which is what the desktop chat still records, and why
+    ``CHIMERA_TAINT_AUTHORITY`` is inert there". That is no longer true of any surface: the app's
+    chat was wired in #408 and ``chimera serve`` and the platform bots after it. The claim about
+    THIS class is unaffected, which is why only the sentence moved."""
     hand = _hand(tmp_path)
 
     assert hand.ledger.instruction is None
