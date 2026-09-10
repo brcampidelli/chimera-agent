@@ -978,10 +978,18 @@ functional, not substring: equality against a value generated *this run* and abs
 prompt, a fact read back out of the ``MemoryStore``, a fresh session's recall count, the
 transcript found in the next turn's assembled prompt, the absence of a fabricated figure.
 
+Twenty-six rows in two blocks. **Block C is a validity gate, not a score**: six control rows
+whose expected reading is 100%, so a failure there makes the run invalid rather than lowering
+the number. **Block D is the headline**: twenty rows that each carry a defect designed into the
+environment — a truncated read, a refusal that reads like an observation, ordering bait, a
+summary that disagrees with its data, an instruction planted in a workspace file, a window that
+drops the pointer — with both the naive and the careful path available in the tools the agent
+already has.
+
 Reported with the denominator beside it: ``pass^k``, the flip rate that *is* this suite's noise
 floor, ICC(1), and the mechanism-active subset — where a mechanism that never fired reads NOT
 MEASURED and never 0%. One row per invocation is appended to the series.
-Pre-registered in ``bench/scenarios/PREREGISTRATION.md``.
+Pre-registered in ``bench/scenarios/PREREGISTRATION-v3.md``.
 
 ```bash
 chimera scenarios
