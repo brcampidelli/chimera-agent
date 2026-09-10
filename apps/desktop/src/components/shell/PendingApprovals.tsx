@@ -39,6 +39,19 @@ import { cn } from "@/lib/utils";
  * component, so `answerApproval(id, approved)` stays the one and only answering path, the reason
  * line stays the ledger's own sentence, and a stale click keeps behaving the way it already does.
  *
+ * **What the card cannot show from here, and why it stays dark.** `ApprovalCard` counts its
+ * deadline down and at zero drops the buttons and says silence answered (#416) — from
+ * `wait_seconds`, which `ApprovalOut` does not carry. A question read off `GET /api/approvals`
+ * knows when it was ASKED and not how long its turn will wait, so the card falls back to showing no
+ * deadline line, which is its own documented answer to a number it does not have. Deriving one from
+ * `WAIT_SECONDS` would be arithmetic on a default that `ask_durably` takes an override for,
+ * presented as a fact, on the surface whose whole job is not doing that. The fix is a field on
+ * `ApprovalOut`; it is not this component inventing one.
+ *
+ * What DOES stay honest without it is disappearance: the waiting thread deletes the request file
+ * once the question is answered or refused, so the poll below is what retires a question — and it
+ * retires it here and on Governance at the same moment, because both read one query.
+ *
  * **Nothing at zero.** Not an empty chip, not a `0`. An indicator that is always on screen is one
  * people learn to stop seeing, and this one has to be worth looking at the ten minutes a year it
  * appears.

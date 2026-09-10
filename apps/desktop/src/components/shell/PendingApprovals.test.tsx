@@ -20,14 +20,14 @@ vi.mock("@/lib/api", () => ({
   getSandboxState: vi.fn(),
 }));
 
-/** What `GET /api/approvals` returns per parked question: no deadline, only how long it has been
- *  waiting. See `ApprovalOut` in the generated schema. */
+/** What `GET /api/approvals` returns per parked question. `ApprovalOut` carries `asked_at` and
+ *  `age_seconds` and NO `wait_seconds` — the list does not say how long the turn will wait. */
 function question(id = "q1") {
   return {
     id,
     action: "write_file(path='report.md')",
     reason: "write_file is restricted after this run consumed untrusted content",
-    asked_at: 1_700_000_000,
+    asked_at: Math.floor(Date.now() / 1000) - 12,
     age_seconds: 12,
   };
 }
@@ -82,6 +82,30 @@ describe("PendingApprovals — the question follows you", () => {
     await user.click(await screen.findByRole("button", { name: /allow this once/i }));
 
     await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("q-abc", true));
+  });
+
+  it("shows no deadline for a listed question, because the list does not carry one", async () => {
+    // `ApprovalCard` counts a deadline down and, at zero, drops the buttons and says silence
+    // answered (#416). It can only do that from `wait_seconds`, and `ApprovalOut` has no such
+    // field: the list endpoint says when a question was ASKED, never how long its turn will wait.
+    //
+    // So the card's own fallback applies here — no line rather than a number it does not have —
+    // and this test exists to keep it that way. The 900-second default lives in
+    // `chimera/governance/pending.py` as a module constant that `ask_durably` accepts an override
+    // for, so a countdown rendered from it would be arithmetic on an assumption, presented as a
+    // fact, on the one surface whose entire job is to not do that. Fixing this belongs in
+    // `ApprovalOut`, not here.
+    vi.mocked(getApprovals).mockResolvedValue([question()]);
+    const user = userEvent.setup();
+    renderWithProviders(<PendingApprovals />);
+
+    await user.click(await screen.findByRole("button", { name: /waiting on you/i }));
+
+    expect(await screen.findByText(question().reason)).toBeInTheDocument();
+    expect(screen.queryByText(/silence refuses/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/silence refused/i)).not.toBeInTheDocument();
+    // And the two answers are still offered, which is the correct reading of "no deadline known".
+    expect(screen.getByRole("button", { name: /allow this once/i })).toBeInTheDocument();
   });
 
   it("refusing answers with false — a refusal is a decision, not the absence of one", async () => {
