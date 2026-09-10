@@ -384,6 +384,37 @@ def app_chat_passed_registry(
     return out
 
 
+def solve_batch_registry(
+    registry: ToolRegistry,
+    settings: Settings,
+    home: Path,
+    *,
+    approve: Any = None,
+    instruction: str | None = None,
+    narrow: bool = True,
+) -> ToolRegistry:
+    """What `solve-batch` hands each worker, from the two lines the command runs.
+
+    `chimera/cli/main.py` builds `ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)`
+    and passes **no approver**. `LedgeredTool` reads a missing approver as *refuse*, so this arm is
+    what an unattended batch actually does once any worker's run has read something external.
+
+    ``approve`` is honoured so the arm can also show what the same assembly does WITH an approver —
+    the two columns are the whole finding.
+
+    ``narrow`` is the ``--taint`` flag. It is a parameter and not a constant because the approver is
+    consulted on TWO paths and only one of them is behind the flag: step 0 of `LedgeredTool.run` is
+    the taint-adaptive allowlist (`narrow_on_taint`), but step 1 — the sequence-aware pre-check —
+    asks whenever an assessment escalates, flag or no flag. Measuring only the ``--taint`` column
+    would have said the change is opt-in when it is not.
+    """
+    ledger = TaintLedger(authority=settings.taint_authority)
+    if instruction is not None:
+        ledger.set_instruction(instruction)
+    out: ToolRegistry = ledger_registry(registry, ledger, narrow_on_taint=narrow, approve=approve)
+    return out
+
+
 def app_chat_registry(
     registry: ToolRegistry,
     settings: Settings,
@@ -666,6 +697,13 @@ ARMS = (
     #: "should the guard be on by default?" has to be answered against, and it did not exist as an
     #: arm: `app_chat` measured the guard ON and there was nothing beside it measuring the default.
     "app_chat_off",
+    #: `solve-batch`, whose workers had no approver at all until 2026-09-10. Four columns because
+    #: the approver is consulted on two paths and only step 0 is behind `--taint`; the `_default`
+    #: pair is what says the change is not opt-in. See Part 6 of RESULTS.md.
+    "solve_batch",
+    "solve_batch_asked",
+    "solve_batch_default",
+    "solve_batch_default_asked",
     "serve",
     "serve_untold",
     "platform",
@@ -714,6 +752,22 @@ def run_arm(
         elif arm == "app_chat":
             registry = app_chat_registry(
                 base, settings, home, approve=approve, instruction=instruction
+            )
+        elif arm == "solve_batch":
+            registry = solve_batch_registry(base, settings, home, instruction=instruction)
+        elif arm == "solve_batch_asked":
+            registry = solve_batch_registry(
+                base, settings, home, approve=approve or deny(), instruction=instruction
+            )
+        elif arm == "solve_batch_default":
+            # No `--taint`. Step 0 is off; step 1 still asks, which is why this column exists.
+            registry = solve_batch_registry(
+                base, settings, home, instruction=instruction, narrow=False
+            )
+        elif arm == "solve_batch_default_asked":
+            registry = solve_batch_registry(
+                base, settings, home, approve=approve or deny(), instruction=instruction,
+                narrow=False,
             )
         elif arm == "app_chat_untold":
             # `instruction=None`, always, and that is the arm rather than a shortcut: the app had no
@@ -1157,6 +1211,79 @@ def section_approver(settings: Settings, home: Path) -> str:
     )
 
 
+def section_solve_batch(settings: Settings, home: Path) -> str:
+    """`chimera solve-batch`: what each worker's registry does with and without somebody to ask.
+
+    Four columns rather than two, because the approver is consulted on TWO paths inside
+    `LedgeredTool.run` and only one of them is behind a flag:
+
+    * step 0 — the taint-adaptive allowlist, gated on ``narrow_on_taint`` = ``--taint``;
+    * step 1 — the sequence-aware pre-check, which asks whenever an assessment escalates, **flag or
+      no flag**.
+
+    So the ``--taint`` pair alone would have supported the sentence "this change is opt-in", and the
+    default pair is what shows it is not. `deny()` is the stand-in for *an approver exists and the
+    answer is no*, which is what an unattended batch gets; `allow()` is *somebody answered yes*, and
+    the attacks are never handed it — that would model a person who approves whatever an injected
+    page asks for.
+    """
+    attacks = attack_episodes()
+    benign = benign_episodes()
+    rows: list[tuple[str, ArmSummary, ApprovalLedger | None]] = []
+
+    for label, arm in (
+        ("--taint, as shipped (no approver)", "solve_batch"),
+        ("default, as shipped (no approver)", "solve_batch_default"),
+    ):
+        rows.append((label, ArmSummary(label, run_arm(attacks + benign, settings, home, arm=arm)), None))
+
+    for label, arm in (
+        ("--taint, an approver, nobody answers", "solve_batch_asked"),
+        ("default, an approver, nobody answers", "solve_batch_default_asked"),
+    ):
+        book = ApprovalLedger()
+        rows.append((
+            label,
+            ArmSummary(label, run_arm(attacks + benign, settings, home, arm=arm, approve=deny(book))),
+            book,
+        ))
+
+    for label, arm in (
+        ("--taint, an approver, somebody answers", "solve_batch_asked"),
+        ("default, an approver, somebody answers", "solve_batch_default_asked"),
+    ):
+        book = ApprovalLedger()
+        rows.append((
+            label,
+            ArmSummary(
+                label,
+                run_arm(attacks, settings, home, arm=arm, approve=deny())
+                + run_arm(benign, settings, home, arm=arm, approve=allow(book)),
+            ),
+            book,
+        ))
+
+    lines = [
+        f"  {'assembly':<42} {'attacks blocked':<16} {'legit refused':<15} {'fenced':<8} questions",
+    ]
+    for label, arm, book in rows:
+        blocked = sum(not o.ran for o in arm.attacks())
+        refused = sum(not o.ran for o in arm.benign())
+        asked = "-" if book is None else f"{len(book.granted)} yes / {len(book.refused)} no"
+        lines.append(
+            f"    {label:<42} {blocked}/{len(arm.attacks())} = {arm.block_rate():<7.3f} "
+            f"{refused}/{len(arm.benign())} = {arm.over_block():<5.3f} {arm.fenced_reads():<8} {asked}"
+        )
+    lines.append(
+        "  (the fenced column is identical in every row on purpose: fencing happens on the READ,"
+    )
+    lines.append(
+        "   which no approver touches. A column that moved here would mean the arms differ in"
+    )
+    lines.append("   something other than the approver.)")
+    return "\n".join(lines)
+
+
 def _arm_fingerprint(outcomes: list[Outcome]) -> str:
     """A byte-comparable rendering of an arm, for the env-switch question."""
     return "\n".join(f"{o.id}|{o.ran}|{o.mechanism}|{o.read_fenced}" for o in outcomes)
@@ -1460,6 +1587,8 @@ def main() -> int:
                 probe_terminal_surfaces(REPO / "chimera" / "cli" / "main.py"))
         section("10. the approver the shipped assembly wires in THIS process",
                 section_approver(settings, home))
+        section("11. `solve-batch`: the worker registry with and without somebody to ask",
+                section_solve_batch(settings, home))
 
     if args.out_dir:
         out_dir = Path(args.out_dir)

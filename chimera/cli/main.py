@@ -4734,6 +4734,36 @@ def _report_collusion(ledgers: dict[str, Any]) -> bool:
     return True
 
 
+def _report_batch_outcomes(
+    units: list[Any], results: list[Any], worker_approvals: dict[str, Any]
+) -> None:
+    """One line per task, and the loud half beneath it.
+
+    The loud half is the reason the approver exists at all. A refused call comes back as an ordinary
+    observation string, so the worker reads it like any tool result and carries on: the task ends in
+    prose and its result can still be ``ok``. Single-task `solve` has said this since its approver
+    was wired; the batch printed a bare ``ok`` for a task that was not allowed to do its work, which
+    is the one line this command must not print.
+
+    Read PER TASK, never aggregated. These tasks are independent, so "task3 was not allowed" is the
+    sentence that is true; a run-wide flag would drag a clean task down with its neighbour.
+    """
+    refused = [name for name, _ in units if getattr(worker_approvals.get(name), "blocked", False)]
+    for (name, _), result in zip(units, results, strict=True):
+        status = "[green]ok[/green]" if result.ok else f"[red]failed[/red] ({result.error or 'unsolved'})"
+        if name in refused:
+            status = f"[yellow]not allowed[/yellow] ({status})"
+        console.print(f"[bold]{name}[/bold]: {status}")
+        book = worker_approvals.get(name)
+        if book is not None and book.blocked:
+            console.print(f"  [yellow]governance: {book.summary()}[/yellow]")
+    if refused:
+        console.print(
+            f"[yellow]{len(refused)} of {len(units)} task(s) had actions refused for review — "
+            "check that the work they were asked to do actually happened.[/yellow]"
+        )
+
+
 @app.command(name="solve-batch")
 def solve_batch(
     tasks: list[str] = _BATCH_TASKS_ARG,
@@ -4755,6 +4785,14 @@ def solve_batch(
     Every task runs against an isolated checkout, so parallel edits never collide. On
     merge-back, a file two tasks both changed is reported as a conflict and left for you
     to resolve rather than silently overwritten. Needs a git repo to isolate.
+
+    A worker whose actions were refused for review is reported as **not allowed** rather than
+    ``ok``, and the refusals are listed under it. Whether anyone can be asked follows
+    ``CHIMERA_APPROVAL_MODE``: ``allow`` and ``deny`` answer immediately, ``ask`` prompts if this
+    process has a terminal and otherwise writes the question down for ``chimera approve`` and waits
+    ``CHIMERA_APPROVAL_WAIT`` seconds for it — per refused call, per worker. Set
+    ``CHIMERA_APPROVAL_WEBHOOK`` so the question reaches somebody, or ``CHIMERA_APPROVAL_MODE=deny``
+    for a batch that should never wait.
     """
     from chimera.core import (
         Agent,
@@ -4765,7 +4803,8 @@ def solve_batch(
         Planner,
         WorkspaceGuard,
     )
-    from chimera.governance import TaintLedger, ledger_registry
+    from chimera.governance import ApprovalLedger, TaintLedger, approver_for, ledger_registry
+    from chimera.governance.approval import deliverer_for
     from chimera.orchestration import run_isolated
     from chimera.providers import LLMGateway, MissingCredentialsError
 
@@ -4792,6 +4831,12 @@ def solve_batch(
     # content would block B's legitimate work for zero security benefit. Each worker's ledger is its
     # own; the AggregateMonitor still runs post-hoc for observability + the non-zero exit below. (The
     # live cross-worker gate is for crew-isolated, where workers collaborate on ONE task + workspace.)
+    #
+    # One approval ledger PER WORKER, and per-worker for the same reason the taint view is: these
+    # tasks are independent, so "task3 was not allowed to do its work" is the sentence that is true,
+    # and a shared ledger could only say "somebody wasn't". `crew-isolated` shares one because its
+    # workers share a task.
+    worker_approvals: dict[str, ApprovalLedger] = {}
 
     def make_runner(name: str, one_task: str) -> Callable[[Path], AutonomousResult]:
         def run(ws: Path) -> AutonomousResult:
@@ -4800,7 +4845,41 @@ def solve_batch(
             ledger = TaintLedger(authority=settings.taint_authority)
             ledger.set_instruction(one_task, workspace=ws)
             ledgers[name] = ledger
-            registry = ledger_registry(default_registry(ws), ledger, narrow_on_taint=taint)
+            # An approver, because the comment above promises one: `--taint` "arms each worker's
+            # adaptive allowlist (dangerous-when-tainted tools require approval)". It did not — this
+            # was the last `ledger_registry` call site in the package passing none, and
+            # `LedgeredTool` reads a missing approver as *refuse*. So "requires approval" was
+            # "always refused", and an owner who set `CHIMERA_APPROVAL_MODE=allow` had that setting
+            # ignored on this surface alone.
+            #
+            # Measured offline on the injection corpus, one instrument: with no approver a tainted
+            # worker has **5 of 8** legitimate rows refused; with one and somebody answering, 0 of 8.
+            # Attacks stay 7 of 7 blocked either way — the approver buys back the false refusals, not
+            # the defence. `crew_isolated` already had this (`approver_for(..., home=…)` below); this
+            # is the same line, per worker rather than shared, because these tasks are independent.
+            approvals = ApprovalLedger()
+            worker_approvals[name] = approvals
+            registry = ledger_registry(
+                default_registry(ws),
+                ledger,
+                narrow_on_taint=taint,
+                approve=approver_for(
+                    settings.approval_mode,
+                    approvals,
+                    home=settings.home,
+                    # Where the question is SENT. `home` alone makes it durable — written to disk,
+                    # answerable by `chimera approve` — but a durable question nobody is told about
+                    # is a 900 s wait ending in the same refusal, N workers deep. `deliverer_for`
+                    # returns None when this deployment has configured no webhook, in which case
+                    # that is exactly what happens; see the note in the command's docstring.
+                    deliver=deliverer_for(settings),
+                    # And how long it waits for the answer. The durable default is fifteen minutes
+                    # PER QUESTION, which is a reasonable pause for one `solve` and an afternoon for
+                    # four workers asking a dozen times each. `CHIMERA_APPROVAL_WAIT` is the number
+                    # this deployment already chose for the same question on the API path.
+                    wait_seconds=settings.approval_wait,
+                ),
+            )
             worker = Agent(
                 backend,
                 registry,
@@ -4835,9 +4914,7 @@ def solve_batch(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    for (name, _), result in zip(units, batch.results, strict=True):
-        status = "[green]ok[/green]" if result.ok else f"[red]failed[/red] ({result.error or 'unsolved'})"
-        console.print(f"[bold]{name}[/bold]: {status}")
+    _report_batch_outcomes(units, batch.results, worker_approvals)
     console.print(
         f"[dim]merged {batch.merged} file(s) across {len(units)} task(s)[/dim]"
     )

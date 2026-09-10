@@ -19,6 +19,7 @@ policy decision; an approver that denies invisibly is a bug with a configuration
 from __future__ import annotations
 
 import sys
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -110,17 +111,35 @@ def allow(ledger: ApprovalLedger | None = None) -> Approver:
     return approve
 
 
+#: One terminal, one question at a time.
+#:
+#: Process-wide and not per-approver, because what it protects is process-wide: there is one stdin
+#: and one stderr, and :func:`ask` writes a question to the second and reads the answer from the
+#: first. Under fan-out — `solve-batch` runs four workers by default, each with its own approver and
+#: its own ledger — two of these interleave into a prompt nobody can answer correctly: the person
+#: sees two reasons and one ``[y/N]``, and whichever thread wins ``input()`` takes the answer.
+#:
+#: `SharedApprovals` solves the same problem for `crew-isolated`, and solves more besides — it
+#: reuses one answer across workers, which is right when they share a task and wrong when they do
+#: not. This is the half that is always right, so it lives with the only approver that touches the
+#: terminal rather than with whichever caller happens to fan out.
+_TERMINAL = threading.Lock()
+
+
 def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver:
     """Prompt a person. Anything other than an explicit yes is a no.
 
     Default-deny on EOF, on a closed pipe, and on an unreadable answer — a prompt that treats
     silence as consent is worse than no prompt, because it produces a record of an approval nobody
     gave.
+
+    Serialized on :data:`_TERMINAL`, so concurrent callers queue rather than overlap.
     """
 
     def approve(*args: Any) -> bool:
         action, reason = _describe(*args)
         out = stream or sys.stderr
+        _TERMINAL.acquire()
         try:
             print(f"\n[governance] {reason or 'review required'}", file=out)
             if action:
@@ -129,6 +148,8 @@ def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver
             answer = input().strip().lower()
         except (EOFError, OSError, KeyboardInterrupt):
             answer = ""
+        finally:
+            _TERMINAL.release()
         approved = answer in ("y", "yes")
         if ledger is not None:
             ledger.record(action or reason, approved=approved)
@@ -226,6 +247,7 @@ def approver_for(
     home: Any = None,
     deliver: Any = None,
     ask_with: Callable[[str, str], bool] | None = None,
+    wait_seconds: float | Callable[[], float] | None = None,
 ) -> Approver:
     """Build the approver for a configured mode: ``ask`` | ``deny`` | ``allow``.
 
@@ -233,6 +255,11 @@ def approver_for(
     :func:`ask_via`. It is consulted after ``allow``/``deny``, so the owner's configured mode still
     decides first, and before :func:`nobody_is_at_a_terminal`, because that function asks whether
     *stdin* could reach a person and a surface with a modal is not answering through stdin.
+
+    ``wait_seconds`` bounds the durable wait, and matters most where a caller fans out: the default
+    is fifteen minutes PER QUESTION, which is a reasonable pause for one run and an afternoon for
+    four workers asking a dozen times. ``None`` keeps :data:`pending.WAIT_SECONDS`; it is ignored on
+    every branch but the durable one, because that is the only branch that waits.
 
     ``ask`` degrades to ``deny`` with no terminal attached, which is what a cron job has. Degrading
     the other way — falling back to allow because nobody could be asked — would turn an unattended
@@ -254,7 +281,7 @@ def approver_for(
         return ask_via(ask_with, ledger)
     if nobody_is_at_a_terminal():
         if home is not None:
-            return ask_elsewhere(home, ledger, deliver=deliver)
+            return ask_elsewhere(home, ledger, deliver=deliver, wait_seconds=wait_seconds)
         _log.info("approval mode 'ask' with no terminal: denying and recording")
         return deny(ledger)
     return ask(ledger)
