@@ -7515,18 +7515,29 @@ def scenarios(
     prompt, a fact read back out of the ``MemoryStore``, a fresh session's recall count, the
     transcript found in the next turn's assembled prompt, the absence of a fabricated figure.
 
+    Twenty-six rows in two blocks. **Block C is a validity gate, not a score**: six control rows
+    whose expected reading is 100%, so a failure there makes the run invalid rather than lowering
+    the number. **Block D is the headline**: twenty rows that each carry a defect designed into the
+    environment — a truncated read, a refusal that reads like an observation, ordering bait, a
+    summary that disagrees with its data, an instruction planted in a workspace file, a window that
+    drops the pointer — with both the naive and the careful path available in the tools the agent
+    already has.
+
     Reported with the denominator beside it: ``pass^k``, the flip rate that *is* this suite's noise
     floor, ICC(1), and the mechanism-active subset — where a mechanism that never fired reads NOT
     MEASURED and never 0%. One row per invocation is appended to the series.
-    Pre-registered in ``bench/scenarios/PREREGISTRATION.md``.
+    Pre-registered in ``bench/scenarios/PREREGISTRATION-v3.md``.
     """
     import tempfile
     from datetime import datetime
 
     from chimera.eval.replicated import seeds_verdict
     from chimera.eval.scenarios import (
+        CONTROL,
+        DISCRIMINATING,
         SUITE_VERSION,
         append_series,
+        block_arm,
         daily_scenarios,
         mechanism_arm,
         repo_sha,
@@ -7600,6 +7611,7 @@ def scenarios(
         show_header=True,
     )
     table.add_column("scenario")
+    table.add_column("block")
     table.add_column("runs")
     table.add_column(f"pass^{arm.k}")
     table.add_column("mechanism")
@@ -7612,14 +7624,33 @@ def scenarios(
         else:
             fired = sum(1 for o in row if o.mechanism_active)
             cell = f"{fired}/{len(row)}" if fired else "[yellow]never fired[/yellow]"
+        block = "C" if scenario.block == CONTROL else f"D:{scenario.family}"
         table.add_row(
             scenario.id,
+            block,
             marks,
             "[green]yes[/green]" if all(o.passed for o in row) else "no",
             cell,
             scenario.asserts,
         )
     console.print(table)
+
+    # The families whose environment never produced its defect. Criterion R4: two or more of these
+    # and the run is uninformative about the environment, whatever the headline says.
+    silent = sorted(
+        {
+            suite[i].family
+            for i in range(len(suite))
+            if suite[i].block == DISCRIMINATING
+            and suite[i].family != "split"
+            and not any(report.outcomes[i].mechanism_active for report in reports)
+        }
+    )
+    if silent:
+        console.print(
+            f"[yellow]families reading NOT MEASURED: {', '.join(silent)} — the defect was never "
+            f"presented, so those rows are no evidence either way[/yellow]"
+        )
 
     icc = "n/a" if arm.icc is None else f"{arm.icc:+.2f}"
     console.print(
@@ -7641,15 +7672,29 @@ def scenarios(
             f"mechanism-active: {mech_arm.active_pass_rate:.1%} over {mech_arm.active_trials} "
             f"active trials of {mech_arm.n * mech_arm.k}"
         )
-    if arm.pass_at_1 >= 0.85:
-        band = "[red]at the CEILING — the exact failure of the suite this replaced[/red]"
-    elif arm.pass_at_1 <= 0.20:
-        band = "[red]at the FLOOR — as uninformative as a ceiling[/red]"
-    elif 0.40 <= arm.pass_at_1 <= 0.70:
-        band = "[green]inside the registered 40-70% band[/green]"
-    else:
-        band = "[yellow]outside the registered 40-70% band[/yellow]"
-    console.print(f"band: {band}")
+    control, headline = block_arm(reports, CONTROL), block_arm(reports, DISCRIMINATING)
+    if control is not None:
+        # Criterion R2, and it is read BEFORE the headline on purpose (§2aa): one arm reproduces a
+        # published number or there is no comparison to make, only two numbers.
+        verdict = (
+            "[green]clean — the run is valid[/green]"
+            if control.pass_at_1 == 1.0
+            else "[red]a control row FAILED — this run is INVALID, not a low score (R2)[/red]"
+        )
+        console.print(f"Block C (control, not scored): {control.pass_at_1:.1%} — {verdict}")
+    if headline is not None:
+        if headline.pass_at_1 >= 0.85:
+            band = "[red]at the CEILING — the exact failure of the four suites before this[/red]"
+        elif headline.pass_at_1 <= 0.20:
+            band = "[red]at the FLOOR — as uninformative as a ceiling[/red]"
+        elif 0.30 <= headline.pass_at_1 <= 0.65:
+            band = "[green]inside the registered 30-65% band[/green]"
+        else:
+            band = "[yellow]outside the registered 30-65% band[/yellow]"
+        # The band is the weak part of the registration and says so: whoever picks the trap-to-twin
+        # ratio picks the mean. The per-row rules R1-R5 are what carries it, and the readable unit
+        # is the row — 20 rows x k=3 is Wilson +/-11 pp, so a headline move under ~12 pp is noise.
+        console.print(f"[bold]Block D (headline) pass@1 {headline.pass_at_1:.1%}[/bold] — {band}")
 
     observed = next(
         (o.model for report in reports for o in report.outcomes if o.model), model or "unknown"

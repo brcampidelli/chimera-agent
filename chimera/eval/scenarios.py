@@ -171,6 +171,11 @@ class ScenarioContext:
     #: one. It is the session's own ``on_tool`` stream — the same one ``send_verbose`` fences and
     #: counts declines from (:mod:`chimera.interface.session`) — not a second instrument.
     activities: list[ToolActivity] = field(default_factory=list)
+    #: Where each turn's slice of ``activities`` begins. A check that asks "did it look *this*
+    #: turn" needs the boundary: an eight-turn row where the file was read on turn 2 and the
+    #: question comes on turn 8 is precisely the case where a whole-run answer says yes and means
+    #: no.
+    turn_starts: list[int] = field(default_factory=list)
 
     @property
     def session(self) -> ChatSession:
@@ -194,6 +199,11 @@ class ScenarioContext:
         """What the named tools handed back this run, in order (every tool when none is named)."""
         wanted = frozenset(names)
         return [a.observation for a in self.activities if not wanted or a.name in wanted]
+
+    @property
+    def last_turn_activities(self) -> list[ToolActivity]:
+        """Only the tool calls the turn that produced the final answer made."""
+        return self.activities[self.turn_starts[-1] :] if self.turn_starts else []
 
 
 @dataclass(frozen=True)
@@ -411,6 +421,7 @@ def _run_one(
         for turn in scenario.turns:
             if turn.fresh_session:
                 _attach_session(ctx, builder(request))
+            ctx.turn_starts.append(len(ctx.activities))
             ctx.reports.append(
                 ctx.session.send_verbose(turn.text(ctx), on_tool=ctx.activities.append)
             )
