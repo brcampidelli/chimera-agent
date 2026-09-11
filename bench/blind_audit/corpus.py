@@ -33,8 +33,16 @@ DOCS = 10
 """Documents per task. Six produced ~6,400-character reports from the mid model — under the cap, so
 nothing was distilled and nothing could be dropped; ten puts the report past the cap with margin."""
 
-MIN_RAW_CHARS = 9_000
-"""Below this the region `_distill` cuts is too short to hold a planted paragraph with margin."""
+MIN_RAW_CHARS = 8_300
+"""Below this the region `_distill` cuts (about 1,700 characters at this length) is too short to
+hold a planted paragraph with margin. The instrument check still decides per item."""
+
+WORKER_MAX_TOKENS = 32_000
+"""Generous on purpose. The production mid model is a reasoning model and the production delegation
+budget is 8,000 tokens; measured 2026-09-11, that budget was consumed by reasoning on four of five
+probe tasks and the worker returned EMPTY content (finish_reason=length). This corpus needs the
+outputs to exist; what the budget does to production workers is a separate finding, recorded in
+RESULTS.md, not this bench's question."""
 
 # --- document generators: seeded, templated, DOCS documents per task -------------------------------
 
@@ -296,7 +304,8 @@ def build_spec(domain: Domain, seed: int) -> tuple[TaskSpec, str]:
         objective=domain.objective,
         output_format=domain.output_format,
         boundaries="Do not invent documents that are not in the context. Be thorough: every document "
-                   "gets its own section with every item the objective asks for.",
+                   "gets its own section with every item the objective asks for, in full sentences — "
+                   "the reader will not open the documents, so nothing may be left to them.",
         context=context,
     )
     return spec, plant
@@ -307,7 +316,8 @@ def _generate(spec: TaskSpec, *, model: str, temperature: float, nudge: str = ""
 
     prompt = spec.render() + (f"\n\n{nudge}" if nudge else "")
     return LLMGateway().complete(
-        [{"role": "user", "content": prompt}], model=model, temperature=temperature, max_tokens=8_000,
+        [{"role": "user", "content": prompt}], model=model, temperature=temperature,
+        max_tokens=WORKER_MAX_TOKENS,
     )
 
 
@@ -330,6 +340,7 @@ def generate_item(domain: Domain, seed: int, *, model: str, temperature: float) 
         ctok += result.completion_tokens or 0
         raw = (result.content or "").strip()
         if len(raw) < MIN_RAW_CHARS:
+            print(f"    {spec.task_id}: {len(raw)} chars after the nudge (finish={result.finish_reason})", flush=True)
             return None
     return CorpusItem(
         item_id=spec.task_id, domain=domain.key, seed=seed, objective=spec.objective,
