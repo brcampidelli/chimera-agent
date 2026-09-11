@@ -37,7 +37,7 @@ from chimera.eval.replicated import (  # noqa: E402
 )
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
-BACKBONE = "openrouter/meta-llama/llama-3.1-8b-instruct"
+BACKBONE = "openrouter/meta-llama/llama-3.1-8b-instruct"  # overridden by --backbone; see PREREGISTRATION amendment 2
 ARMS = ("single_1", "single_equal", "hierarchy", "hierarchy_no_synth")
 TEMPERATURE = 0.3
 REFINE = (
@@ -121,6 +121,7 @@ class Trial:
     task_id: str
     arm: str
     rep: int
+    backbone: str
     docs: int
     calls: int
     passed: bool
@@ -180,7 +181,8 @@ def one(task: HierarchyTask, arm: str, rep: int, *, workdir: Path) -> Trial:
     else:
         answer = _hierarchy(task, backend, synth=False, workdir=workdir)
     return Trial(
-        task_id=task.id, arm=arm, rep=rep, docs=docs, calls=backend.calls, passed=value_check(task, answer),
+        task_id=task.id, arm=arm, rep=rep, backbone=BACKBONE, docs=docs, calls=backend.calls,
+        passed=value_check(task, answer),
         passed_verbatim=task.check(answer),
         answer=answer, tokens=backend.tokens, usd=(None if backend.unpriced else backend.usd),
         seconds=round(time.monotonic() - t0, 1),
@@ -200,7 +202,8 @@ def report(path: Path) -> str:
     task_ids = sorted({r["task_id"] for r in rows})
     reps = max(r["rep"] for r in rows) + 1
     arms = {name: _arm(rows, name, task_ids, reps) for name in ARMS if any(r["arm"] == name for r in rows)}
-    lines = [f"# hierarchy_equal_calls — {len(rows)} trials, backbone {BACKBONE}, US$ {sum(r['usd'] or 0 for r in rows):.4f}", ""]
+    backbone = rows[0].get("backbone", BACKBONE)
+    lines = [f"# hierarchy_equal_calls — {len(rows)} trials, backbone {backbone}, US$ {sum(r['usd'] or 0 for r in rows):.4f}", ""]
     lines.append("| arm | calls/task (mean) | pass@1 | pass^k | flip rate | tokens/task (mean) | US$ |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
     for name, arm in arms.items():
@@ -246,7 +249,11 @@ def main() -> int:
     ap.add_argument("--arms", default=",".join(ARMS))
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--backbone", default="")
     args = ap.parse_args()
+    global BACKBONE
+    if args.backbone:
+        BACKBONE = args.backbone
     if args.report:
         print(report(Path(args.report)))
         return 0

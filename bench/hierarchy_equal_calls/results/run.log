@@ -1,0 +1,2015 @@
+backbone openrouter/meta-llama/llama-3.1-8b-instruct; 120 trials to run, 0 on disk
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  releases         hierarchy_no_synth r0 PASS calls=2 tokens=1870 5.5s  Σ US$ 0.0001
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  releases         single_1           r0 FAIL calls=1 tokens=1346 8.1s  Σ US$ 0.0002
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  vendors          single_1           r0 PASS calls=1 tokens=1921 3.3s  Σ US$ 0.0003
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  releases         hierarchy          r0 FAIL calls=3 tokens=2464 14.8s  Σ US$ 0.0004[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  releases         single_equal       r0 PASS calls=3 tokens=4791 16.5s  Σ US$ 0.0006
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  vendors          hierarchy          r0 PASS calls=4 tokens=3125 8.7s  Σ US$ 0.0008
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  vendors          hierarchy_no_synth r0 FAIL calls=3 tokens=2725 2.8s  Σ US$ 0.0009[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        single_1           r0 PASS calls=1 tokens=1322 3.1s  Σ US$ 0.0010
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  vendors          single_equal       r0 PASS calls=4 tokens=8534 13.5s  Σ US$ 0.0014
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  incidents        hierarchy_no_synth r0 PASS calls=2 tokens=1863 3.0s  Σ US$ 0.0015
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        single_equal       r0 PASS calls=3 tokens=4425 7.2s  Σ US$ 0.0017
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  teams            single_1           r0 PASS calls=1 tokens=1873 3.4s  Σ US$ 0.0018[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        hierarchy          r0 PASS calls=3 tokens=2204 8.2s  Σ US$ 0.0019
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  teams            hierarchy_no_synth r0 PASS calls=3 tokens=2695 1.4s  Σ US$ 0.0021
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  limits           single_1           r0 PASS calls=1 tokens=1266 1.8s  Σ US$ 0.0021
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  teams            hierarchy          r0 PASS calls=4 tokens=2882 3.4s  Σ US$ 0.0023[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  limits           single_equal       r0 PASS calls=3 tokens=4058 4.5s  Σ US$ 0.0025
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  limits           hierarchy_no_synth r0 PASS calls=2 tokens=1815 3.0s  Σ US$ 0.0026
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  limits           hierarchy          r0 PASS calls=3 tokens=2250 3.8s  Σ US$ 0.0027
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        single_1           r0 PASS calls=1 tokens=1873 2.4s  Σ US$ 0.0028
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  contracts        hierarchy          r0 PASS calls=4 tokens=3178 2.4s  Σ US$ 0.0029
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  contracts        hierarchy_no_synth r0 PASS calls=3 tokens=2699 2.9s  Σ US$ 0.0031
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  benchmarks       single_1           r0 PASS calls=1 tokens=1375 5.8s  Σ US$ 0.0031[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        single_equal       r0 PASS calls=4 tokens=8315 8.8s  Σ US$ 0.0035
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  benchmarks       hierarchy          r0 PASS calls=3 tokens=2000 1.9s  Σ US$ 0.0036[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  benchmarks       hierarchy_no_synth r0 PASS calls=2 tokens=1814 2.3s  Σ US$ 0.0037
+  policies         single_1           r0 PASS calls=1 tokens=1885 2.2s  Σ US$ 0.0038
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  teams            single_equal       r0 PASS calls=4 tokens=10106 22.3s  Σ US$ 0.0043
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  policies         hierarchy_no_synth r0 PASS calls=3 tokens=2688 2.8s  Σ US$ 0.0045
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  dependencies     single_1           r0 PASS calls=1 tokens=1279 2.6s  Σ US$ 0.0045
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  benchmarks       single_equal       r0 PASS calls=3 tokens=5078 15.0s  Σ US$ 0.0048
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+  policies         hierarchy          r0 PASS calls=4 tokens=3185 7.6s  Σ US$ 0.0049
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  policies         single_equal       r0 PASS calls=4 tokens=8482 10.6s  Σ US$ 0.0054
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         single_1           r0 PASS calls=1 tokens=1861 1.4s  Σ US$ 0.0055
+
+  dependencies     single_equal       r0 PASS calls=3 tokens=4168 4.0s  Σ US$ 0.0057[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  dependencies     hierarchy          r0 PASS calls=3 tokens=2026 3.6s  Σ US$ 0.0058
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  dependencies     hierarchy_no_synth r0 PASS calls=2 tokens=1809 4.1s  Σ US$ 0.0059
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  capacity         hierarchy_no_synth r0 PASS calls=3 tokens=2784 3.0s  Σ US$ 0.0060
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         hierarchy          r0 FAIL calls=4 tokens=3356 4.0s  Σ US$ 0.0062
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  releases         single_1           r1 PASS calls=1 tokens=1415 4.5s  Σ US$ 0.0062
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  releases         hierarchy_no_synth r1 PASS calls=2 tokens=1898 2.6s  Σ US$ 0.0063
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  releases         hierarchy          r1 PASS calls=3 tokens=2313 5.4s  Σ US$ 0.0065
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  vendors          single_1           r1 PASS calls=1 tokens=1862 1.8s  Σ US$ 0.0065
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         single_equal       r0 PASS calls=4 tokens=8707 11.2s  Σ US$ 0.0070
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  releases         single_equal       r1 FAIL calls=3 tokens=4915 9.4s  Σ US$ 0.0072
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  vendors          hierarchy_no_synth r1 PASS calls=3 tokens=2753 3.6s  Σ US$ 0.0074
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  vendors          hierarchy          r1 PASS calls=4 tokens=3151 6.7s  Σ US$ 0.0075
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        single_1           r1 PASS calls=1 tokens=1351 4.9s  Σ US$ 0.0076
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  vendors          single_equal       r1 PASS calls=4 tokens=8643 8.8s  Σ US$ 0.0080
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  teams            single_1           r1 PASS calls=1 tokens=1876 2.2s  Σ US$ 0.0081
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  incidents        hierarchy_no_synth r1 PASS calls=2 tokens=1838 3.7s  Σ US$ 0.0082[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  teams            hierarchy          r1 PASS calls=4 tokens=2962 2.6s  Σ US$ 0.0084
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        single_equal       r1 PASS calls=3 tokens=4868 10.8s  Σ US$ 0.0086
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  teams            hierarchy_no_synth r1 PASS calls=3 tokens=2646 2.3s  Σ US$ 0.0087
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        hierarchy          r1 PASS calls=3 tokens=2211 10.3s  Σ US$ 0.0088
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  limits           single_1           r1 PASS calls=1 tokens=1268 2.1s  Σ US$ 0.0089
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  limits           single_equal       r1 PASS calls=3 tokens=4434 1.3s  Σ US$ 0.0091
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        single_1           r1 PASS calls=1 tokens=1886 0.5s  Σ US$ 0.0092
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  limits           hierarchy_no_synth r1 PASS calls=2 tokens=1820 2.4s  Σ US$ 0.0093
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  teams            single_equal       r1 PASS calls=4 tokens=8707 9.9s  Σ US$ 0.0097
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        hierarchy_no_synth r1 PASS calls=3 tokens=2724 2.6s  Σ US$ 0.0099
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  limits           hierarchy          r1 PASS calls=3 tokens=2134 6.1s  Σ US$ 0.0100
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  benchmarks       single_1           r1 PASS calls=1 tokens=1416 0.6s  Σ US$ 0.0101
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        single_equal       r1 PASS calls=4 tokens=8295 6.8s  Σ US$ 0.0105
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        hierarchy          r1 PASS calls=4 tokens=3097 6.0s  Σ US$ 0.0106
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  benchmarks       hierarchy          r1 PASS calls=3 tokens=1997 3.8s  Σ US$ 0.0107[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  benchmarks       hierarchy_no_synth r1 PASS calls=2 tokens=1822 2.5s  Σ US$ 0.0108
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  policies         single_1           r1 PASS calls=1 tokens=1884 2.8s  Σ US$ 0.0109[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  benchmarks       single_equal       r1 PASS calls=3 tokens=4587 9.9s  Σ US$ 0.0111
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  policies         hierarchy_no_synth r1 PASS calls=3 tokens=2768 4.3s  Σ US$ 0.0113
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  dependencies     single_1           r1 PASS calls=1 tokens=1281 1.9s  Σ US$ 0.0113
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  policies         single_equal       r1 PASS calls=4 tokens=8316 8.0s  Σ US$ 0.0118
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  policies         hierarchy          r1 PASS calls=4 tokens=3134 8.2s  Σ US$ 0.0119
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  dependencies     hierarchy_no_synth r1 PASS calls=2 tokens=1760 1.4s  Σ US$ 0.0120
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  capacity         single_1           r1 PASS calls=1 tokens=1872 2.0s  Σ US$ 0.0121[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  dependencies     single_equal       r1 PASS calls=3 tokens=4359 5.5s  Σ US$ 0.0123
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  dependencies     hierarchy          r1 FAIL calls=3 tokens=2072 4.5s  Σ US$ 0.0124
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  releases         single_1           r2 PASS calls=1 tokens=1330 2.1s  Σ US$ 0.0125
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  capacity         hierarchy_no_synth r1 PASS calls=3 tokens=2747 4.1s  Σ US$ 0.0126
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         single_equal       r1 PASS calls=4 tokens=8452 7.5s  Σ US$ 0.0131
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         hierarchy          r1 FAIL calls=4 tokens=3172 7.0s  Σ US$ 0.0132
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  releases         hierarchy_no_synth r2 PASS calls=2 tokens=1894 1.7s  Σ US$ 0.0133
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  vendors          single_1           r2 PASS calls=1 tokens=1890 1.7s  Σ US$ 0.0134[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  releases         single_equal       r2 FAIL calls=3 tokens=4831 5.0s  Σ US$ 0.0136
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  vendors          hierarchy_no_synth r2 PASS calls=3 tokens=2702 2.2s  Σ US$ 0.0138
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  releases         hierarchy          r2 FAIL calls=3 tokens=2231 6.8s  Σ US$ 0.0139
+  vendors          hierarchy          r2 PASS calls=4 tokens=3110 4.0s  Σ US$ 0.0140
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        single_1           r2 PASS calls=1 tokens=1317 4.0s  Σ US$ 0.0141
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  vendors          single_equal       r2 PASS calls=4 tokens=8140 7.1s  Σ US$ 0.0145
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  incidents        hierarchy_no_synth r2 PASS calls=2 tokens=1840 2.5s  Σ US$ 0.0146
+
+
+  teams            single_1           r2 PASS calls=1 tokens=1867 2.3s  Σ US$ 0.0147
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  incidents        hierarchy          r2 PASS calls=3 tokens=2220 7.4s  Σ US$ 0.0148
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  teams            hierarchy_no_synth r2 PASS calls=3 tokens=2772 1.2s  Σ US$ 0.0150
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  teams            hierarchy          r2 PASS calls=4 tokens=2897 3.6s  Σ US$ 0.0151
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  limits           single_1           r2 PASS calls=1 tokens=1299 0.5s  Σ US$ 0.0152
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  limits           single_equal       r2 PASS calls=3 tokens=4132 1.1s  Σ US$ 0.0154
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  incidents        single_equal       r2 PASS calls=3 tokens=4441 11.5s  Σ US$ 0.0156
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        single_1           r2 PASS calls=1 tokens=1862 1.5s  Σ US$ 0.0157
+  limits           hierarchy          r2 PASS calls=3 tokens=2019 4.1s  Σ US$ 0.0158
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  limits           hierarchy_no_synth r2 PASS calls=2 tokens=1802 3.5s  Σ US$ 0.0159
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  teams            single_equal       r2 PASS calls=4 tokens=8804 10.6s  Σ US$ 0.0163
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  contracts        hierarchy_no_synth r2 PASS calls=3 tokens=2711 2.7s  Σ US$ 0.0165
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  contracts        single_equal       r2 PASS calls=4 tokens=8189 5.5s  Σ US$ 0.0169
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  benchmarks       single_1           r2 PASS calls=1 tokens=1310 2.9s  Σ US$ 0.0169
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  contracts        hierarchy          r2 FAIL calls=4 tokens=3021 6.8s  Σ US$ 0.0171
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  benchmarks       hierarchy_no_synth r2 PASS calls=2 tokens=1812 1.8s  Σ US$ 0.0172
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  benchmarks       hierarchy          r2 PASS calls=3 tokens=2011 2.5s  Σ US$ 0.0173[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  policies         single_1           r2 PASS calls=1 tokens=1884 2.0s  Σ US$ 0.0174
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+  policies         hierarchy          r2 PASS calls=4 tokens=2881 2.9s  Σ US$ 0.0175
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  policies         hierarchy_no_synth r2 PASS calls=3 tokens=2714 1.8s  Σ US$ 0.0176
+  policies         single_equal       r2 PASS calls=4 tokens=8303 5.2s  Σ US$ 0.0181
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  benchmarks       single_equal       r2 PASS calls=3 tokens=4793 9.2s  Σ US$ 0.0183[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  dependencies     single_1           r2 PASS calls=1 tokens=1328 2.8s  Σ US$ 0.0184
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m  dependencies     hierarchy_no_synth r2 PASS calls=2 tokens=1811 2.1s  Σ US$ 0.0185
+
+
+  capacity         single_1           r2 PASS calls=1 tokens=1870 1.8s  Σ US$ 0.0185
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  dependencies     single_equal       r2 PASS calls=3 tokens=4169 4.2s  Σ US$ 0.0188
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  dependencies     hierarchy          r2 PASS calls=3 tokens=2055 3.1s  Σ US$ 0.0189
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         hierarchy          r2 FAIL calls=4 tokens=3240 2.7s  Σ US$ 0.0190
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         hierarchy_no_synth r2 PASS calls=3 tokens=2769 4.4s  Σ US$ 0.0192
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  capacity         single_equal       r2 PASS calls=4 tokens=8638 6.5s  Σ US$ 0.0196
+written bench\hierarchy_equal_calls\results\2026-09-11.jsonl

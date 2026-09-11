@@ -44,6 +44,12 @@ in `results/pilot.jsonl` and is not part of the run.
 10 tasks × 3 runs. Above 85% the ceiling is back and the run is void (reported, not scored); below
 20% the model cannot do the task at all and the comparison is between two failures.
 
+*Amendment 2, same day, after the first registered run:* on the 8B backbone the single call scored
+**0.97 pass@1** — the ceiling, the run is **void by the rule above** and is kept as
+`results/2026-09-11.jsonl` / `2026-09-11-8b-report.md`, not scored. What it showed anyway is
+recorded in RESULTS.md as an observation, not a finding. The second run uses
+`openrouter/meta-llama/llama-3.2-3b-instruct` on every role, nothing else changed.
+
 ## Arms — every call on the same backbone
 
 | arm | calls per task | what |
