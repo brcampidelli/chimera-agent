@@ -95,24 +95,36 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
-        0.075, 0.25, tools=True, context_k=1048,
-        notes="the best price-to-index here by a distance: 0.075/0.25 with a third-party agentic index of 58.2, within a point of claude-opus-5 at 66x the input price. NOT the default, and the reason is measured: on the same one-file probe it took 257s against 72s for the slug above. Reach for it when the window or the index matters more than latency",
+        0.15, 0.50, tools=True, context_k=1048,
+        notes="a third-party agentic index of 58.2, within a point of claude-opus-5 at 33x the\n"
+        "        input price. Read 0.075/0.25 here until the live check on 2026-09-10 found it\n"
+        "        DOUBLED to 0.15/0.50 — still the best price-to-index in this tier, by half the\n"
+        "        margin the earlier note claimed. NOT the default, and the reason is measured: on\n"
+        "        the same one-file probe it took 257s against 72s for the slug above. Reach for it\n"
+        "        when the window or the index matters more than latency",
     ),
     CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
-        0.55, 1.65, tools=True, context_k=161,
-        notes="proven in this repo's benches. Priced 0.25/0.95 here for one day: a survey on\n"
-        "        2026-09-03 recorded that, and the live index on 2026-09-04 says 0.55/1.65 — the\n"
-        "        value it had before. A price does not halve and double back overnight, so the\n"
-        "        survey misread it. Restored, and the misreading is left in this note rather than\n"
-        "        deleted: it feeds `register_catalog_prices`, so every receipt for this model\n"
-        "        under-reported by 2.2x in and 1.7x out for as long as it stood. context_k is now\n"
+        0.25, 0.95, tools=True, context_k=161,
+        notes="proven in this repo's benches. This price OSCILLATES, and the note that used to\n"
+        "        stand here said it could not: a survey on 2026-09-03 read 0.25/0.95, the live\n"
+        "        index on 2026-09-04 read 0.55/1.65, and the reasoning 'a price does not halve and\n"
+        "        double back overnight, so the survey misread it' restored the higher figure. On\n"
+        "        2026-09-10 the index read 0.25/0.95 again — the thing the note said does not\n"
+        "        happen. OpenRouter quotes whichever route it currently prefers, and this model\n"
+        "        has more than one, so a static figure is right on some days by construction.\n"
+        "        Set to today's reading; a receipt for this model should be priced from the live\n"
+        "        index (`register_catalog_prices` is the fallback, not the source). context_k is\n"
         "        the window the provider SERVES (161k), not the 163,840 advertised",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-4.6", "mid", "Zhipu (GLM)",
-        0.55, 2.20, tools=True, context_k=204,
-        notes="strong agentic mid. Priced 0.50/2.00 here until a live check on 2026-09-03 measured\n        0.55/2.20 — this one went UP, which is the case a drift check has to be able to see:\n        anything written assuming prices only fall would have read this as still correct",
+        0.43, 1.75, tools=True, context_k=198,
+        notes="strong agentic mid. Priced 0.50/2.00 here until a live check on 2026-09-03 measured\n"
+        "        0.55/2.20 — UP, the case a drift check has to be able to see — and 0.43/1.75 on\n"
+        "        2026-09-10, down again. The window is the served 198,000 now: 204k was the\n"
+        "        advertised figure, and a catalogue window may be smaller than the provider's,\n"
+        "        never larger",
     ),
     CatalogEntry(
         "openrouter/google/gemini-2.5-flash", "mid", "Google",
