@@ -70,10 +70,24 @@ class Item:
     usd: float | None
 
 
+def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
+    """Retry a provider call on a 429. The weak tier is served from shared upstream pools that
+    overload for minutes at a time; one such minute must not end a run or bias its sample."""
+    for attempt in range(tries):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 — only the rate-limit shape is retried
+            text = str(exc)
+            if attempt == tries - 1 or ("429" not in text and "rate-limit" not in text.lower()):
+                raise
+            time.sleep(wait * (attempt + 1))
+    raise RuntimeError("unreachable")
+
+
 def _ask(gateway: Any, model: str, question: str) -> tuple[str, float | None]:
-    result = gateway.complete(
+    result = _retrying(lambda: gateway.complete(
         [{"role": "user", "content": question + SUFFIX}], model=model, temperature=0.3, max_tokens=1200,
-    )
+    ))
     cost = price_completion(result)
     return (result.content or "").strip(), (None if cost.unpriced else cost.usd)
 
@@ -100,7 +114,11 @@ def collect(out: Path, *, target: int, cap: int, workers: int) -> int:
             problem = problems[idx]
             question = problem["question"]
             reference = normalise(gsm8k_reference(problem["answer"]))
-            results = list(pool.map(_ask, [gateway] * 3, WEAK_PANEL, [question] * 3))
+            try:
+                results = list(pool.map(_ask, [gateway] * 3, WEAK_PANEL, [question] * 3))
+            except Exception as exc:  # noqa: BLE001 — a question the providers could not answer is skipped, not fatal
+                print(f"  asked {asked:>3} · SKIPPED {type(exc).__name__}: {str(exc)[:90]}", flush=True)
+                continue
             answers = [r[0] for r in results]
             usd = sum(r[1] or 0.0 for r in results)
             spent += usd
@@ -171,7 +189,7 @@ def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> R
     engine = _engine(arm == "blind")
     messages = [{"role": "user", "content": item.question + SUFFIX}]
     t0 = time.monotonic()
-    analysis, final, aggregation, judge, synth, shown = engine._aggregate(messages, panel)
+    analysis, final, aggregation, judge, synth, shown = _retrying(lambda: engine._aggregate(messages, panel))
     if aggregation != "synth" or judge is None or synth is None:
         raise RuntimeError(f"judge was bypassed ({aggregation})")
     if arm == "blind":
