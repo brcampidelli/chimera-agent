@@ -59,8 +59,18 @@ are collected, or 400 questions have been asked, whichever comes first; the comp
 
 | arm | labels shown to the judge | order | runs per item |
 |---|---|---|---|
-| `named` | the production slugs, assigned by cyclic rotation r ∈ {0, 1, 2} | original, reversed | 6 |
-| `blind` | `Answer A / B / C` (the change under test, `FusionConfig.blind_panel=True`) | original, reversed, seeded shuffle | 3 |
+| `named` | the production slugs, assigned by cyclic rotation r ∈ {0, 1, 2} | the three cyclic shifts o ∈ {0, 1, 2}, paired with r in a balanced design of six | 6 |
+| `blind` | `Answer A / B / C` (the change under test, `FusionConfig.blind_panel=True`) | the engine's own shuffle, three runs | 3 |
+
+*Amendment, same day, before any judge call:* the first draft used "original, reversed" as the two
+orders. Reversing three answers leaves the **middle one in the middle**, and the collected corpus
+made that fatal for the position axis: the middle writer (`gemma-3-4b-it`) is the correct one in
+38 of the 40 items, so the correct answer would have sat at position 2 in every named run. The six
+named runs are now the balanced pairs (r, o) ∈ {(0,0), (0,1), (1,1), (1,2), (2,2), (2,0)}: every text
+carries every name twice and sits at every position twice, and name and position are not the same
+variable across the six. Corpus composition, reported as registered: 28 items with 2 right / 1
+wrong, 12 with 1 right / 2 wrong; writers correct in 9 / 38 / 21 of 40 (3B llama / 4B gemma / 8B
+llama) — the judge is mostly deciding whether to trust the smallest model's text under a big name.
 
 Every run is judge → synthesiser through `_aggregate`; the outcome is whether the synthesised final
 answer is correct. The `task_typed` vote path stays off (the default), so the judge is always in the

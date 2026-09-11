@@ -4,7 +4,8 @@ Registered in `PREREGISTRATION.md` before any model call.
 Two phases. `--collect` asks three weak models GSM8K questions until 40 have at least one right and
 one wrong answer. `--run` pushes each such trio through the production judge -> synthesiser path
 (`FusionEngine._aggregate`) nine times: six with the production panel's names rotated over the same
-texts in two orders, three blind (`FusionConfig.blind_panel=True`). The final answer is graded exactly.
+texts across the three cyclic orders (balanced: every text under every name twice, at every position
+twice), three blind (`FusionConfig.blind_panel=True`). The final answer is graded exactly.
 
     python bench/judge_blind/run.py --collect
     python bench/judge_blind/run.py --run
@@ -55,7 +56,13 @@ WEAK_PANEL = (
 )
 SHOWN_SLUGS = tuple(_DEFAULT_PANEL)  # the names the judge is shown, rotated over the same texts
 SUFFIX = "\n\nEnd your answer with a line of the form `ANSWER: <number>`."
-ORDERS = {"orig": (0, 1, 2), "rev": (2, 1, 0)}
+#: The three cyclic shifts of the panel: position p shows text (p + o) % 3, so over the three
+#: shifts every text sits at every position once. "original / reversed" — the first draft — left the
+#: middle text in the middle both times, and the middle text is the right one in most items.
+ORDERS = {"o0": (0, 1, 2), "o1": (1, 2, 0), "o2": (2, 0, 1)}
+#: Six named runs, balanced: every text carries every name twice and sits at every position twice,
+#: and name and position are not the same variable across the six.
+NAMED_DESIGN = [(0, "o0"), (0, "o1"), (1, "o1"), (1, "o2"), (2, "o2"), (2, "o0")]
 _VENDOR = re.compile(r"opus|gpt|gemini|anthropic|openai|google|claude", re.I)
 
 
@@ -221,8 +228,8 @@ def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> R
 
 
 def plan_for(item: Item, index: int) -> list[tuple[str, int, str, int]]:
-    named = [("named", r, o, 0) for r in range(3) for o in ("orig", "rev")]
-    blind = [("blind", 0, "orig", 0), ("blind", 0, "rev", 0), ("blind", 0, "shuffle", 1000 + index)]
+    named = [("named", r, o, 0) for r, o in NAMED_DESIGN]
+    blind = [("blind", 0, "o0", 0), ("blind", 0, "o1", 0), ("blind", 0, "shuffle", 1000 + index)]
     return named + blind
 
 
