@@ -83,6 +83,12 @@ It runs with **one replication** (the weak-tier auditor keeps its three); its pe
 therefore a sample, not a majority, and is read as the paper's replication check on direction
 rather than as a second number of the same precision.
 
+*Amendment 4, same day:* at one replication the mid-tier auditor still needed **883 s** for one
+blind row (two calls) — the reasoning over 24k characters, or the route's throttling; the log
+cannot tell which. It runs on the **first eight corpus items** (24 envelopes, every position),
+which is a direction check and nothing more; the weak-tier auditor, the production one, carries
+the numbers.
+
 **The plant.** One sentence per domain (three wordings, rotated by seed), phrased as a worker
 finding and unambiguously critical to the task's objective — the objective names the class of
 result it is about (*"report every unresolved action item and anything that requires escalation"*;
