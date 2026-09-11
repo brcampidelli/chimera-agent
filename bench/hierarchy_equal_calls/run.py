@@ -38,7 +38,7 @@ from chimera.eval.replicated import (  # noqa: E402
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
 BACKBONE = "openrouter/meta-llama/llama-3.1-8b-instruct"  # overridden by --backbone; see PREREGISTRATION amendment 2
-ARMS = ("single_1", "single_equal", "hierarchy", "hierarchy_no_synth")
+ARMS = ("single_1", "single_equal", "hierarchy", "hierarchy_no_synth", "hierarchy_verbatim")
 TEMPERATURE = 0.3
 REFINE = (
     "Here is your previous answer:\n\n{previous}\n\nRe-read the documents above and revise the "
@@ -145,7 +145,9 @@ def _single(task: HierarchyTask, backend: _Metered, *, refine_rounds: int) -> st
     return answer
 
 
-def _hierarchy(task: HierarchyTask, backend: _Metered, *, synth: bool, workdir: Path) -> str:
+def _hierarchy(
+    task: HierarchyTask, backend: _Metered, *, synth: bool, workdir: Path, verbatim: bool = False
+) -> str:
     from chimera.orchestration.artifacts import ArtifactStore
     from chimera.orchestration.envelope_verify import EnvelopeVerifier
     from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
@@ -156,7 +158,9 @@ def _hierarchy(task: HierarchyTask, backend: _Metered, *, synth: bool, workdir: 
         weak_model=BACKBONE, mid_model=BACKBONE, top_model=BACKBONE,
         store=store,
         verifier=EnvelopeVerifier(store=store, backend=None, spot_rate=0.0),
-        config=HierarchyConfig(max_workers=4, fuse_final=False, spot_rate=0.0),
+        config=HierarchyConfig(
+            max_workers=4, fuse_final=False, spot_rate=0.0, synthesis_verbatim=verbatim
+        ),
     )
     if synth:
         return orchestrator.run_prepared(task.question, make_specs(task)).answer or ""
@@ -177,7 +181,11 @@ def one(task: HierarchyTask, arm: str, rep: int, *, workdir: Path) -> Trial:
     elif arm == "single_equal":
         answer = _single(task, backend, refine_rounds=docs)
     elif arm == "hierarchy":
-        answer = _hierarchy(task, backend, synth=True, workdir=workdir)
+        # The prompt as it was before the verbatim sentence became the default (see RESULTS.md).
+        answer = _hierarchy(task, backend, synth=True, workdir=workdir, verbatim=False)
+    elif arm == "hierarchy_verbatim":
+        # The follow-up RESULTS.md named: the same D + 1 calls, the synthesis asked for the figures.
+        answer = _hierarchy(task, backend, synth=True, workdir=workdir, verbatim=True)
     else:
         answer = _hierarchy(task, backend, synth=False, workdir=workdir)
     return Trial(
@@ -222,6 +230,8 @@ def report(path: Path) -> str:
         ("single_1", "single_equal", "does re-reading help at all"),
         ("hierarchy_no_synth", "hierarchy", "leave-one-in: the synthesiser"),
         ("single_1", "hierarchy", "the comparison the existing benches make, off the ceiling"),
+        ("hierarchy", "hierarchy_verbatim", "follow-up: the synthesis asked to carry the figures verbatim"),
+        ("hierarchy_no_synth", "hierarchy_verbatim", "follow-up: verbatim synthesis vs the workers alone"),
     ):
         if base in arms and treat in arms:
             lines.append(f"## {label}")
