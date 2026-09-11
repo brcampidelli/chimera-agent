@@ -100,3 +100,19 @@ Read-heavy extraction on synthetic documents with planted needles; one weak back
 no multi-step feedback (the paper's ALFWorld has an environment that answers back, this does not).
 It says nothing about `IsolatedCrew` on writing tasks, which the tab also routes to and which no
 gradable corpus here can measure without the ceiling problem `bench/fusion_paired` hit.
+
+
+## Addendum — the verbatim synthesis arm (registered 2026-09-11, after RESULTS.md, before any call)
+
+RESULTS.md named the follow-up: on the 3B backbone the workers' summaries carried the values (0.57
+pass@1 concatenated) and the synthesis over them did not (0.27). A fifth arm, `hierarchy_verbatim`,
+is the `hierarchy` arm with one sentence appended to the synthesis system prompt
+(`HierarchyConfig.synthesis_verbatim`): *carry every figure, name, version, path and identifier from
+the summaries into the answer exactly as written*. Same backbone, same ten tasks, three runs, D + 1
+calls — the only difference is that sentence.
+
+**Prediction:** `hierarchy_verbatim` recovers at least half the gap — pass@1 ≥ 0.42 — and the
+per-task table moves in one direction. **Decision:** if `hierarchy_verbatim` beats `hierarchy` by
+≥ 20 pp pass@1 with no task moving the other way, the sentence becomes part of `_SYNTH_SYSTEM`
+(no flag); if it is within the noise, the flag stays off and the null is published; if it is worse,
+the flag is removed.
