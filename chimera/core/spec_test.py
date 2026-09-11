@@ -94,16 +94,19 @@ def workspace_digest(workspace: Path, *, max_chars: int = _MAX_DIGEST_CHARS) -> 
     return "".join(parts)
 
 
-#: The completion budget the generator asks for, explicitly. With none the provider's own default
-#: applies, and the reasoning model behind the default tier can spend that whole default thinking
-#: and return an empty `content` at 200 OK — `bench/spec_test_vacuity` (2026-09-11) saw the
-#: generator return nothing on 8 of 28 tasks that had requirements, and a re-probe of one produced
-#: a nine-test module of 4,064 completion tokens, most of them reasoning. `bench/blind_audit` hit
-#: the same trap on the delegation path (`TaskSpec.max_tokens=8_000`).
+#: The completion budget the generator asks for, explicitly. With none the provider's ceiling
+#: applies, and the reasoning model behind the default tier can run away inside it: measured
+#: (`bench/spec_test_vacuity`, the 2026-09-11 probe), one unbounded call reasoned for **131,072**
+#: completion tokens — the ceiling — and returned an empty `content` at 200 OK, at about
+#: twenty-five times the cost of a normal generation. Converged replies there took 2k–15k tokens,
+#: so 16k is where the tail starts. The runaway is a property of the draw, not the task: the same
+#: task converged in 2,495 tokens on one call and ran past 32,000 on the next two.
 _GEN_MAX_TOKENS = 16_000
-#: Attempts before `generate` gives up. The empty reply was route- or run-dependent, not a property
-#: of the task (the re-probe above), so one retry at the same settings is the cheap fix; a retry
-#: after a `length` finish gets twice the budget, because that one was not chance.
+#: Attempts before `generate` gives up: a second draw. A retry after a `length` finish gets twice
+#: the budget — what was measured; both doubled retries on the probe also ran away, so a fresh
+#: draw at the same budget may be the better second attempt and is named there as the follow-up.
+#: On the probe the retry arm recovered a module on 5 of 7 tasks against 6 of 7 for the unbounded
+#: call; what the budget buys is the bound on runaway spend and an abstain that says why.
 _GEN_ATTEMPTS = 2
 
 
