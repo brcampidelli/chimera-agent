@@ -26,7 +26,7 @@ from chimera.core.verify import CommandVerifier, VerificationResult
 
 if TYPE_CHECKING:
     from chimera.core.checkpoint import FileSnapshot
-from chimera.providers.gateway import Message, SupportsComplete
+from chimera.providers.gateway import Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.spec_test")
@@ -94,15 +94,50 @@ def workspace_digest(workspace: Path, *, max_chars: int = _MAX_DIGEST_CHARS) -> 
     return "".join(parts)
 
 
+#: The completion budget the generator asks for, explicitly. With none the provider's own default
+#: applies, and the reasoning model behind the default tier can spend that whole default thinking
+#: and return an empty `content` at 200 OK — `bench/spec_test_vacuity` (2026-09-11) saw the
+#: generator return nothing on 8 of 28 tasks that had requirements, and a re-probe of one produced
+#: a nine-test module of 4,064 completion tokens, most of them reasoning. `bench/blind_audit` hit
+#: the same trap on the delegation path (`TaskSpec.max_tokens=8_000`).
+_GEN_MAX_TOKENS = 16_000
+#: Attempts before `generate` gives up. The empty reply was route- or run-dependent, not a property
+#: of the task (the re-probe above), so one retry at the same settings is the cheap fix; a retry
+#: after a `length` finish gets twice the budget, because that one was not chance.
+_GEN_ATTEMPTS = 2
+
+
 class SpecTestGenerator:
     """Generate a pytest module grounded in a task's atomic requirements ("" on any failure)."""
 
-    def __init__(self, backend: SupportsComplete, model: str | None = None) -> None:
+    def __init__(
+        self,
+        backend: SupportsComplete,
+        model: str | None = None,
+        *,
+        max_tokens: int = _GEN_MAX_TOKENS,
+        attempts: int = _GEN_ATTEMPTS,
+    ) -> None:
         self.backend = backend
         self.model = model
+        self.max_tokens = max_tokens
+        self.attempts = max(1, attempts)
+        self.last_finish_reason: str = ""
+        """`finish_reason` of the last reply `generate` read, verbatim from the provider ("" = none
+        reported — which is not "it finished"). `length` is the output ceiling; an empty `content`
+        with `stop` is the model declining. Read by the verifier's abstain message, so an abstain
+        that used to be silent says why."""
+        self.last_attempts: int = 0
+        """How many calls the last `generate` made (0 = it never called: no requirements)."""
 
     def generate(self, task: str, requirements: list[Requirement], *, code_context: str = "") -> str:
-        """Return a runnable pytest module, or "" if none could be produced (non-blocking)."""
+        """Return a runnable pytest module, or "" if none could be produced (non-blocking).
+
+        Retries once on a reply with no test in it — an empty `content` or prose — and records the
+        provider's `finish_reason` and the attempt count on the instance either way.
+        """
+        self.last_finish_reason = ""
+        self.last_attempts = 0
         if not requirements:
             return ""
         listing = "\n".join(f"- [{r.kind}] {r.text}" for r in requirements)
@@ -110,19 +145,33 @@ class SpecTestGenerator:
             f"Task:\n{task}\n\nAtomic requirements to test:\n{listing}\n\n"
             f"Code in the workspace:\n{code_context or '(no source files found)'}"
         )
-        try:
-            result = self.backend.complete(
-                [Message(role="system", content=_GEN_SYSTEM), Message(role="user", content=prompt)],
-                model=self.model,
-                temperature=0.0,
+        messages: list[MessageLike] = [
+            Message(role="system", content=_GEN_SYSTEM), Message(role="user", content=prompt),
+        ]
+        budget = self.max_tokens
+        for attempt in range(1, self.attempts + 1):
+            self.last_attempts = attempt
+            try:
+                result = self.backend.complete(
+                    messages, model=self.model, temperature=0.0, max_tokens=budget,
+                )
+            except Exception as exc:  # noqa: BLE001 — a generator must never break the run
+                _log.warning("spec-test generation failed, continuing without it: %s", exc)
+                return ""
+            self.last_finish_reason = str(getattr(result, "finish_reason", "") or "")
+            code = _strip_fence(result.content or "")
+            # Guard: only trust output that actually declares a test (a bare prose reply is useless
+            # and would otherwise be written to disk and fail collection, falsely blocking the
+            # attempt).
+            if "def test" in code:
+                return code
+            _log.warning(
+                "spec-test generation returned no test (attempt %d/%d, finish_reason=%r, %d chars)",
+                attempt, self.attempts, self.last_finish_reason, len(code),
             )
-        except Exception as exc:  # noqa: BLE001 — a generator must never break the run
-            _log.warning("spec-test generation failed, continuing without it: %s", exc)
-            return ""
-        code = _strip_fence(result.content or "")
-        # Guard: only trust output that actually declares a test (a bare prose reply is useless and
-        # would otherwise be written to disk and fail collection, falsely blocking the attempt).
-        return code if "def test" in code else ""
+            if self.last_finish_reason == "length":
+                budget *= 2
+        return ""
 
 
 class SpecTestVerifier:
@@ -161,6 +210,20 @@ class SpecTestVerifier:
         #: candidate and its exit code decides.
         self.base_snapshot: FileSnapshot | None = None
 
+    def _abstain_note(self) -> str:
+        """Why there is nothing to run, with what the generator recorded — an abstain that names
+        `finish_reason=length` after two attempts is a budget problem; one that names `stop` is the
+        model declining; `none reported` is a backend that does not carry the field."""
+        gen = self.generator
+        attempts = getattr(gen, "last_attempts", 0)
+        reason = getattr(gen, "last_finish_reason", "") or "none reported"
+        if not attempts:
+            return "spec-test: no runnable tests generated"
+        return (
+            f"spec-test: no runnable tests generated ({attempts} attempt{'s' if attempts != 1 else ''}, "
+            f"finish_reason={reason})"
+        )
+
     def verify(self) -> VerificationResult:
         if self._generated is None:
             self._generated = self.generator.generate(
@@ -171,7 +234,7 @@ class SpecTestVerifier:
             # ABSTAIN, not pass: no runnable tests means no evidence. The caller must fall back to its
             # other gates (Manager, coverage checklist) — accepting on this would be a fail-open that
             # SUPPLANTS those gates with nothing.
-            return VerificationResult(True, "spec-test: no runnable tests generated", abstained=True)
+            return VerificationResult(True, self._abstain_note(), abstained=True)
         test_path = self.workspace / _TEST_FILE
         try:
             test_path.write_text(code, encoding="utf-8")
