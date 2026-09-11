@@ -89,8 +89,8 @@ cannot tell which. It runs on the **first eight corpus items** (24 envelopes, ev
 which is a direction check and nothing more; the weak-tier auditor, the production one, carries
 the numbers.
 
-*Amendment 5, same day:* the eight-item run was stopped after seven rows in forty minutes
-(40–883 s per row). The rows are published in RESULTS.md as seven rows; no rate is computed from
+*Amendment 5, same day:* the eight-item run was stopped after nine rows in about an hour
+(75–1,148 s per row). The rows are published in RESULTS.md as nine rows; no rate is computed from
 them.
 
 **The plant.** One sentence per domain (three wordings, rotated by seed), phrased as a worker

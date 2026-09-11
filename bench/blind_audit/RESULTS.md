@@ -3,7 +3,7 @@
 Run 2026-09-11 · 23 real worker outputs (the production mid model on ten-document review tasks),
 one critical sentence planted in the head, in the middle (where `_distill` cuts), or not at all —
 69 envelopes built by the production `build_envelope` · two arms, three replications, two auditors
-· prereg `PREREGISTRATION.md` (two dated amendments, both before the first auditor call) · raw
+· prereg `PREREGISTRATION.md` (five dated amendments, each before the calls it concerns) · raw
 `results/2026-09-11-{mistral,deepseek}.jsonl`, reports `results/2026-09-11-*-report.md`.
 
 The instrument check passed on all 69 envelopes before any auditor was asked: every `middle`
@@ -38,10 +38,10 @@ Per item, majority of three replications; 414 calls, US$ 0.29.
 
 ## The second auditor — `deepseek-v4-flash-0731` (the mid tier)
 
-**Stopped after seven rows** (amendment 5, same day): at one replication on eight items, four
-workers, the run produced seven verdicts in forty minutes — 40 to 883 seconds per row, the
+**Stopped after nine rows** (amendment 5, same day): at one replication on eight items, four
+workers, the run produced nine verdicts in about an hour — 40 to 883 seconds per row, the
 reasoning over 24k characters or the route's throttling, the log cannot say which — and was
-stopped so this file could be written. The seven rows, as they are:
+stopped so this file could be written. The nine rows, as they are:
 
 | item | arm | position | verdict | failed on | seconds |
 |---|---|---|---|---|---:|
@@ -55,14 +55,16 @@ stopped so this file could be written. The seven rows, as they are:
 | `postmortems-5` | `shipped` | middle | FAIL | DROPPED | 75 |
 | `postmortems-5` | `shipped` | none | PASS | — | 783 |
 
-What seven rows can say: on the two `middle` envelopes the reasoning auditor **did** say DROPPED
-under the shipped prompt (with INVENTED and CONTRADICTION marked too — the same three-in-one
-verdict the weak auditor gives), where the weak auditor said it on 4 of 23. If that held over the
-corpus, the adherence would be a property of the weak tier and not of the prompt; that is the
-sentence a completed run would test, and it is not tested here. What is settled is that the
-weak-tier auditor is the one production uses, and its number stands.
+What nine rows can say, and no more: on both `middle` envelopes the reasoning auditor **did** say
+DROPPED under the shipped prompt (once with INVENTED and CONTRADICTION marked too — the
+three-in-one verdict the weak auditor also gives), where the weak auditor said it on 4 of 23; it
+also failed a `none` envelope under the shipped prompt, and the blind form both missed one
+`middle` and flagged one `none`. If the first of those held over the corpus, the adherence would
+be a property of the weak tier and not of the prompt — that is the sentence a completed run would
+test, and it is not tested here. What is settled is that the weak-tier auditor is the one
+production uses, and its number stands.
 
-Cost of the seven rows: US$ 0.03.
+Cost of the nine rows: US$ 0.03.
 
 ## What ships, by the rule written before the numbers
 
