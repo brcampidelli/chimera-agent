@@ -1,4 +1,4 @@
-# Results — the shipped auditor passed 19 of 23 summaries that dropped the critical finding; the blind form caught 19 of 23, and cries wolf on half of the rest; told what a slice is and asked one question, the same auditor caught 23 of 23
+# Results — the shipped auditor passed 19 of 23 summaries that dropped the critical finding; the blind form caught 19 of 23, and cries wolf on half of the rest; told what a slice is and asked one question, the same auditor caught 23 of 23 — and 20 of 23 when the finding is a clause, where the two-call form behind it added nothing
 
 Run 2026-09-11 · 23 real worker outputs (the production mid model on ten-document review tasks),
 one critical sentence planted in the head, in the middle (where `_distill` cuts), or not at all —
@@ -6,7 +6,8 @@ one critical sentence planted in the head, in the middle (where `_distill` cuts)
 · prereg `PREREGISTRATION.md` (five dated amendments, each before the calls it concerns, and
 one registered addendum for the third arm) · raw `results/2026-09-11-{mistral,deepseek}.jsonl`,
 reports `results/2026-09-11-*-report.md`. The third arm (`shipped_dropped_only`, 207 calls, the
-weak auditor) is read in its own section below.
+weak auditor) and the clause plant (addendum 2: a fourth position and the pipeline arms, ≈ 420
+calls) are read in their own sections below.
 
 The instrument check passed on all 69 envelopes before any auditor was asked: every `middle`
 plant was absent from its summary and present in the stored artifact; every `head` plant was in both.
@@ -153,9 +154,67 @@ its two calls are not made. `recover_dropped=False` restores the gate as it was 
 recovery because the one-call auditor missed 19 of 23. On this corpus the one-call check now
 misses none, and after it passes, the two-call audit's marginal detection is **0 of 23** at a
 false-alarm rate of 11 of 23 on `none` items — so its remaining job is the content of a recovery
-when the one-call check wrote no sentence. Whether it is worth its two calls at all is the
-follow-up this arm names, to be measured rather than assumed: a plant that is a clause inside a
-paragraph, which the one-question prompt may miss and the numbered extraction may not.
+when the one-call check wrote no sentence. Whether it is worth its two calls at all was the
+follow-up this arm named, measured below rather than assumed.
+
+## Addendum 2 — the clause plant: does the two-call audit still earn its calls? (registered, same day)
+
+The plant above is one labelled sentence in its own paragraph — the easiest shape for a
+one-question auditor. A fourth position, `middle_clause`, drops the label, lower-cases the body
+and folds it with a dash into an existing sentence wholly inside the cut: *…interview 4 would not
+pay more for it — interview 5 records a legal ruling on the customer's side forbidding use of the
+product until data is stored in-country; the other nine interviews never mention it…* The
+instrument check passed on 23 of 23 (clause absent from the summary, present in the artifact,
+inside a sentence) before any call. Three arms on the weak auditor, three replications,
+US$ 0.30: the one-call check alone and the two-call audit alone on the clause position, and the
+pipeline as it shipped after #437 — one call, then the two-call audit behind a pass that named
+nothing — on all four positions, read per item by which stage changed the summary. (Those rows
+were recorded under the arm name `production` and are relabelled `production_2call` in the
+file, because the name would otherwise mean two pipelines; `production` now names what ships.)
+
+| arm on `middle_clause` | caught | flip | calls |
+|---|---:|---:|---:|
+| one-call DROPPED check (`shipped_dropped_only`) | **20 / 23** | 0 / 23 | 1 |
+| two-call blind audit (`blind`) | 17 / 23 | 5 / 23 | 2 |
+
+Paired, one-call → two-call: 0.87 → 0.74, Δ −0.13, Newcombe [−0.20, +0.05], discordant 5 — the
+two-call form caught **1** item the one-call check missed and missed **4** it caught.
+
+| `production_2call`, by position | recovered by the check's own sentence | recovered by the two-call audit behind a silent pass | nothing |
+|---|---:|---:|---:|
+| head (nothing cut) | 6 | 4 | 13 |
+| middle (sentence plant) | 23 | 0 | 0 |
+| none (no plant) | 5 | **11** | 7 |
+| middle_clause | 20 | **0** | 3 |
+
+Behind the one-call check's three silent passes on clause plants, the two-call audit recovered
+the plant on **0 of 3** items — and read replication by replication, 0 of 9: the lines it did
+append on those items name other things (*the on-call engineer needs to be paged due to the
+widespread connection-refused issue*; six interview one-liners). Behind silent passes on
+summaries that dropped nothing it appended lines to **11 of 23**, and to 4 of 23 where the plant
+sat in the head. Two calls per passing spot check, for that.
+
+**Against the registered predictions.** One-call on clause plants predicted 12–18 of 23: **20**,
+above the range again (the second time this prompt beat its own prediction upward). Two-call
+predicted 10–16: 17, one above. The audit's marginal catches predicted 2–5: **0**. Its false
+alarms behind a silent pass on `none` predicted 6–9: **11**. Two of four inside or at the edge,
+two outside, all published.
+
+**What ships, by the registered rule.** Marginal catches ≤ 2 of 23 → the two-call audit leaves
+the default path. `EnvelopeVerifier(blind_audit=False)` is the default: a spot check that passes
+without naming anything is one call and the summary is left as it was; a `DROPPED: FAIL` is
+still the auditor's sentence appended (`recover_dropped`, unchanged). `blind_audit=True` runs the
+two-call form behind a silent pass — the pipeline that shipped between #437 and this addendum —
+and the two prompts stay in the module for the bench and for a corpus that shows otherwise. The
+clause position is a permanent part of this bench.
+
+**What this says about #433, plainly.** The two-call audit was the right answer to the
+three-check auditor that missed 19 of 23; it was measured honestly and shipped as a recovery by
+its own rule. The one-question prompt that replaced that auditor the same day made it
+redundant on both plant shapes this bench can build, and its cost — two calls and a 48% chance
+of growing a clean summary — was never worth paying behind a check that misses 3 of 23. The
+mechanism the paper describes (the auditor adopting the summary's voice) is still real; what
+changed is that a slice has no voice to adopt once the prompt says so.
 
 ## What this cannot show
 
@@ -165,6 +224,7 @@ prose; five templated domains, unevenly represented (interviews 8, postmortems 6
 its budget thinking on 17 of them. Two auditors, one temperature; the third arm on the weak
 auditor only, against baseline rows from earlier the same day (a route change between the runs
 sits inside the comparison; the flip rates per arm are printed for that reason). DROPPED only —
-the code makes the other two impossible on this path. And nothing about whether the synthesis *uses* the
+the code makes the other two impossible on this path. One clause shape — a dash-appended fact
+at the end of a sentence; a clause that changes a sentence's meaning is not tested. And nothing about whether the synthesis *uses* the
 recovered lines well; that is `bench/hierarchy`'s question, and `bench/hierarchy_equal_calls`
 has just measured that on a weak backbone the synthesis is where needles are lost.
