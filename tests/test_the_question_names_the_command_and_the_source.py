@@ -261,6 +261,20 @@ def test_the_level_travels_with_the_question_and_into_the_record(tmp_path: Path)
     assert row["decision"] == "block" and row["outcome"] == "refused"
 
 
+def test_the_level_is_on_the_file_the_queue_reads(tmp_path: Path) -> None:
+    """`pending()` reads the ask file, not the announcement — the level must be written there."""
+    clock = _Clock()
+    seen: list[list[pending.PendingApproval]] = []
+
+    def on_asked(q: pending.PendingApproval) -> None:
+        seen.append(pending.pending(tmp_path))
+        pending.answer(tmp_path, q.id, True)
+
+    pending.ask_durably(tmp_path, "run_shell: rm -rf /", "r", wait_seconds=30.0, poll_seconds=1.0,
+                        clock=clock, sleep=clock.sleep, on_asked=on_asked, decision="block")
+    assert [q.decision for q in seen[0]] == ["block"]
+
+
 def test_answer_stats_report_coverage_per_level_and_the_line_shows_it(tmp_path: Path) -> None:
     clock = _Clock()
     pending.ask_durably(tmp_path, "a", "r", wait_seconds=5.0, poll_seconds=1.0,
