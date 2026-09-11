@@ -433,3 +433,21 @@ def test_hierarchy_without_evolution_is_unchanged(tmp_path: Path) -> None:
     result = _orchestrator(backend, tmp_path).run(_READ_TASK)
     assert result.answer == "Final synthesized answer."
     assert all("Prior knowledge" not in c.get("user", "") for c in backend.calls)
+
+
+def test_the_synthesis_asks_for_the_figures_verbatim_by_default_and_can_be_told_not_to(tmp_path: Path) -> None:
+    """`bench/hierarchy_equal_calls` (2026-09-11): the synthesis over the workers' summaries is where a
+    weak backbone lost the values — 0.27 pass@1 against 0.57 for the summaries alone, 0.53 with the
+    sentence. On by default; off is the prompt as it was, kept so the bench's old arm stays what it
+    measured."""
+    from chimera.orchestration.hierarchy import _SYNTH_VERBATIM
+
+    backend = FakeBackend()
+    _orchestrator(backend, tmp_path).run(_READ_TASK)
+    synth_calls = [c for c in backend.calls if "Synthesize ONE final answer" in c["system"]]
+    assert synth_calls and all(_SYNTH_VERBATIM.strip() in c["system"] for c in synth_calls)
+
+    backend = FakeBackend()
+    _orchestrator(backend, tmp_path, synthesis_verbatim=False).run(_READ_TASK)
+    synth_calls = [c for c in backend.calls if "Synthesize ONE final answer" in c["system"]]
+    assert synth_calls and not any(_SYNTH_VERBATIM.strip() in c["system"] for c in synth_calls)

@@ -39,7 +39,13 @@ _log = get_logger("orchestration.envelope_verify")
 
 VerifyStage = Literal["schema", "criteria", "spot", "accepted"]
 
-_SPOT_SYSTEM = (
+#: The three-check prompt the spot check ran until 2026-09-11, kept for `bench/blind_audit`'s
+#: `shipped` arm so the number it measured stays reproducible. The spot check runs only where
+#: `build_envelope` spilled the output and the summary is `_distill`'s head + tail SLICE of it, so
+#: two of these three checks cannot fail for a true reason there: a verbatim slice asserts nothing
+#: the raw output does not, and contradicts nothing in it. Measured (RESULTS.md there): when this
+#: prompt failed an item it marked INVENTED and CONTRADICTION as often as DROPPED.
+_SPOT_SYSTEM_THREE_CHECKS = (
     "You are a strict, INDEPENDENT verification auditor. You receive a task, a worker's SUMMARY, and "
     "the worker's RAW OUTPUT. Do NOT trust the summary — re-derive every judgement from the RAW OUTPUT "
     "yourself. Grade three separate checks, each PASS or FAIL:\n"
@@ -50,6 +56,20 @@ _SPOT_SYSTEM = (
     "'CONTRADICTION: PASS|FAIL' — then one short justification sentence. The summary is faithful ONLY "
     "if all three are PASS."
 )
+#: What the spot check asks on the only path it runs on. The summary it is handed is a mechanical
+#: slice — the first 70% and the last 15% of the raw output, with a marker between — so the one
+#: thing that can be wrong with it is what the cut removed, and that is the one thing graded.
+_SPOT_SYSTEM_DROPPED_ONLY = (
+    "You are a strict, INDEPENDENT verification auditor. You receive a task, a worker's RAW OUTPUT, "
+    "and a SUMMARY that is a mechanical slice of that output: its beginning and its end, with the "
+    "middle cut out at the marker. Nothing in the summary was written by anyone, so it cannot invent "
+    "or contradict; what it can do is OMIT. Read the RAW OUTPUT yourself and grade one check:\n"
+    "DROPPED: the summary omits a critical result the raw output shows — a failure, a security or "
+    "data exposure, an escalation, a blocker, anything a reader of this task must not miss -> FAIL.\n"
+    "Reply with exactly one line — 'DROPPED: PASS|FAIL' — then one short sentence naming the "
+    "omitted result, or saying that none is critical."
+)
+_SPOT_SYSTEM = _SPOT_SYSTEM_DROPPED_ONLY
 
 # Named decomposed checks; any one FAILing (or the legacy holistic 'UNFAITHFUL') fails the spot check.
 _CRITERIA = ("INVENTED", "DROPPED", "CONTRADICT")
@@ -82,6 +102,25 @@ _VERDICT_LINE = re.compile(r"^\s*(\d+)[.)]?\s*[:\-]?\s*(PRESENT|ABSENT)\b", re.I
 #: voice in the synthesis.
 _MAX_RECOVERED = 6
 _MAX_RECOVERED_CHARS = 300
+
+
+#: A verdict line of either spot prompt, to be removed from a reply before its sentence is read.
+_VERDICT_ONLY = re.compile(
+    r"^\s*(?:INVENTED|DROPPED|CONTRADICT\w*)\s*[:=-]?\s*(?:PASS|FAIL)\s*[.,;—-]*\s*$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def omission_named(reply: str) -> tuple[str, ...]:
+    """The sentence the spot check wrote under its `DROPPED: FAIL` line — what the cut removed, in the
+    auditor's words — bounded like a recovered finding. Empty when the reply carries no sentence,
+    which is when the two-call audit is worth its calls."""
+    if _grade_faithfulness(reply):
+        return ()
+    body = " ".join(_VERDICT_ONLY.sub("", reply).split())
+    # A reply that puts the verdict and the sentence on one line: drop the verdict token itself.
+    body = re.sub(r"^(?:DROPPED|INVENTED|CONTRADICT\w*)\s*[:=-]?\s*FAIL\s*[.,;—-]*\s*", "", body, flags=re.I)
+    return (body[:_MAX_RECOVERED_CHARS],) if body else ()
 
 
 def absent_critical(findings: str, verdicts: str) -> list[str]:
@@ -157,13 +196,21 @@ class EnvelopeVerifier:
         spot_rate: float = 0.2,
         rng: random.Random | None = None,
         recover_dropped: bool = True,
+        spot_system: str = _SPOT_SYSTEM,
     ) -> None:
         self.store = store
         self.backend = backend
         self.model = model
-        #: Whether a spot check is followed by the blind audit that RECOVERS dropped findings. On by
-        #: default: it runs only where the spot check runs (evidence on disk, sampled or forced), it
-        #: costs two more calls there, and its output is an append, never a verdict.
+        #: The spot check's system prompt. A parameter so `bench/blind_audit` can run the prompt that
+        #: was measured beside the one that ships; production never passes it.
+        self.spot_system = spot_system
+        #: Whether a dropped finding is RECOVERED rather than refused. On by default. With it on, a
+        #: `DROPPED: FAIL` from the spot check is the auditor's sentence appended to the summary (one
+        #: call), and a spot check that passes without naming anything is followed by the two-call
+        #: blind audit; either way the append is never a verdict. With it off the spot check is the
+        #: gate it was before #433: a FAIL escalates to a re-ask and a second FAIL drops the result
+        #: — which on the only path the spot check runs on throws away a correct worker output
+        #: because `_distill` cut it, and cannot be fixed by asking the worker again.
         self.recover_dropped = recover_dropped
         # Cross-provider auditing (M18-2): the spot checker prefers a DISTINCT provider/model so a
         # model never grades its own family's output. Falls back to the worker's backend when none is
@@ -210,10 +257,14 @@ class EnvelopeVerifier:
             ran.append("spot")
             outcome = self._spot_check(spec, envelope)
             if outcome is not None:
-                if outcome.passed and self.recover_dropped:
-                    # The shipped auditor passed the summary. It passes summaries that dropped a
-                    # critical finding 19 times in 23 (`bench/blind_audit`), so the blind audit runs
-                    # behind it and hands back what the distillation cut. Recovery, not a verdict.
+                if outcome.passed and self.recover_dropped and not outcome.recovered:
+                    # The one-call check named nothing. The three-check auditor it replaced passed
+                    # summaries that dropped a critical finding 19 times in 23 (`bench/blind_audit`),
+                    # so the blind audit runs behind a silent pass and hands back what the
+                    # distillation cut. Recovery, not a verdict. When the one-call check already
+                    # named the omission, its sentence is the recovery and these two calls are not
+                    # made (measured: the DROPPED-only prompt caught 23 of 23 cut plants, the blind
+                    # audit 19 of 23, and the audit flags 11 of 23 summaries that dropped nothing).
                     ran.append("recover")
                     outcome = replace(outcome, recovered=self._recover_dropped(spec, envelope))
                 return replace(outcome, checks_run=tuple(ran))
@@ -274,7 +325,7 @@ class EnvelopeVerifier:
         try:
             result = self._spot_backend.complete(  # type: ignore[union-attr]
                 [
-                    {"role": "system", "content": _SPOT_SYSTEM},
+                    {"role": "system", "content": self.spot_system},
                     {"role": "user", "content": prompt},
                 ],
                 model=self._spot_model,
@@ -286,6 +337,17 @@ class EnvelopeVerifier:
         content = (result.content or "").strip()
         if _grade_faithfulness(content):
             return VerifyOutcome(passed=True, stage="spot", detail=content)
+        if self.recover_dropped:
+            # The summary is `_distill`'s slice, so a DROPPED verdict is the distillation's fault and
+            # not the worker's: a re-ask would be cut the same way, and a rejection would throw away
+            # a correct result. Nothing is rejected on the auditor's word — the rule #433 registered
+            # (`bench/blind_audit`, decision rule, second clause), applied here because this prompt's
+            # false alarms on summaries that dropped nothing rose by more than its 15 pp (0 → 5 of
+            # 23). What the auditor named goes back into the summary; an empty sentence leaves
+            # `recovered` empty, and `verify` then runs the two-call audit for the content.
+            return VerifyOutcome(
+                passed=True, stage="spot", detail=content, recovered=omission_named(content),
+            )
         return VerifyOutcome(
             passed=False,
             stage="spot",

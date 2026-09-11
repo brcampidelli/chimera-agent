@@ -171,3 +171,42 @@ offers. Five templated domains. Two auditors, one temperature. It measures DROPP
 code makes the other two impossible on this path — a worker-written summary (none exists today)
 would need its own corpus. And it says nothing about whether the orchestrator's *synthesis* is
 harmed by a dropped result; that is `bench/hierarchy`'s question.
+
+
+## Addendum — the DROPPED-only prompt on the slice path (registered 2026-09-11, after RESULTS.md, before any call)
+
+The last decision-rule clause above: INVENTED and CONTRADICTION stay in the spot check's prompt
+only if a path exists that can produce them. Checked again before this addendum: the spot check runs
+only when `envelope.evidence_refs` is non-empty, `build_envelope` is the only writer of that field,
+and it fills it only on the `_distill` path, where the summary is the first 70% and the last 15% of
+the raw output with a marker between. No worker-written summary reaches the spot check anywhere in
+the package. So the two checks grade a failure that cannot occur, and RESULTS.md already recorded
+what asking for them costs: when the shipped auditor fails an item it marks INVENTED and
+CONTRADICTION as often as DROPPED.
+
+**The arm.** `shipped_dropped_only` — the production `EnvelopeVerifier.verify(force_spot=True)`
+with the recovery off (so the call count matches the `shipped` arm as it was measured) and one
+change: the system prompt says what the summary is (a mechanical slice) and grades one check,
+`DROPPED: PASS|FAIL`, with one sentence naming the omitted result. Same 23 items × 3 positions,
+same weak-tier auditor (`mistral-small-3.2-24b-instruct`), three replications: **207 calls**.
+The `shipped` arm is not re-run; its rows from 2026-09-11 are the baseline, per item.
+
+**Prediction.** Detection on `middle` items rises from 4/23 to between 6/23 and 12/23 — the
+auditor's attention is on omission only, but the mechanism RESULTS.md read by hand (the summary's
+leading conclusion shaping the verdict) is still in the prompt, since the auditor still reads the
+summary and the raw output together. False alarms on `head` fall from 5/23 to ≤ 3/23 and on `none`
+stay at 0/23, because two of the three lines that could say FAIL for a wrong reason are gone.
+
+**Decision.** The two ungradeable checks leave the slice-path prompt whatever the numbers say —
+a check that cannot fail for a true reason can only fail for a false one — **unless** detection on
+`middle` falls below the shipped 4/23, in which case the three-check prompt stays, the number is
+published, and the loss is named. The three-check prompt is kept in the module under its own name
+either way, so the `shipped` arm stays reproducible. Nothing about the blind audit recovery (#433)
+changes: it runs behind whichever spot check passes.
+
+**Cost.** 207 calls at ~4–8k prompt tokens on the weak tier: ≈ US$ 0.15.
+
+**What this cannot show.** The same instrument as above: one planted sentence, five domains, one
+auditor at one temperature. And it is one arm against stored baseline rows from earlier the same
+day, so a route change between the two runs is inside the comparison — the flip rates per arm are
+printed so a reader can see how much of a difference a single day's noise is worth.
