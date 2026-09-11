@@ -39,7 +39,13 @@ _log = get_logger("orchestration.envelope_verify")
 
 VerifyStage = Literal["schema", "criteria", "spot", "accepted"]
 
-_SPOT_SYSTEM = (
+#: The three-check prompt the spot check ran until 2026-09-11, kept for `bench/blind_audit`'s
+#: `shipped` arm so the number it measured stays reproducible. The spot check runs only where
+#: `build_envelope` spilled the output and the summary is `_distill`'s head + tail SLICE of it, so
+#: two of these three checks cannot fail for a true reason there: a verbatim slice asserts nothing
+#: the raw output does not, and contradicts nothing in it. Measured (RESULTS.md there): when this
+#: prompt failed an item it marked INVENTED and CONTRADICTION as often as DROPPED.
+_SPOT_SYSTEM_THREE_CHECKS = (
     "You are a strict, INDEPENDENT verification auditor. You receive a task, a worker's SUMMARY, and "
     "the worker's RAW OUTPUT. Do NOT trust the summary — re-derive every judgement from the RAW OUTPUT "
     "yourself. Grade three separate checks, each PASS or FAIL:\n"
@@ -50,6 +56,20 @@ _SPOT_SYSTEM = (
     "'CONTRADICTION: PASS|FAIL' — then one short justification sentence. The summary is faithful ONLY "
     "if all three are PASS."
 )
+#: What the spot check asks on the only path it runs on. The summary it is handed is a mechanical
+#: slice — the first 70% and the last 15% of the raw output, with a marker between — so the one
+#: thing that can be wrong with it is what the cut removed, and that is the one thing graded.
+_SPOT_SYSTEM_DROPPED_ONLY = (
+    "You are a strict, INDEPENDENT verification auditor. You receive a task, a worker's RAW OUTPUT, "
+    "and a SUMMARY that is a mechanical slice of that output: its beginning and its end, with the "
+    "middle cut out at the marker. Nothing in the summary was written by anyone, so it cannot invent "
+    "or contradict; what it can do is OMIT. Read the RAW OUTPUT yourself and grade one check:\n"
+    "DROPPED: the summary omits a critical result the raw output shows — a failure, a security or "
+    "data exposure, an escalation, a blocker, anything a reader of this task must not miss -> FAIL.\n"
+    "Reply with exactly one line — 'DROPPED: PASS|FAIL' — then one short sentence naming the "
+    "omitted result, or saying that none is critical."
+)
+_SPOT_SYSTEM = _SPOT_SYSTEM_DROPPED_ONLY
 
 # Named decomposed checks; any one FAILing (or the legacy holistic 'UNFAITHFUL') fails the spot check.
 _CRITERIA = ("INVENTED", "DROPPED", "CONTRADICT")
@@ -157,10 +177,14 @@ class EnvelopeVerifier:
         spot_rate: float = 0.2,
         rng: random.Random | None = None,
         recover_dropped: bool = True,
+        spot_system: str = _SPOT_SYSTEM,
     ) -> None:
         self.store = store
         self.backend = backend
         self.model = model
+        #: The spot check's system prompt. A parameter so `bench/blind_audit` can run the prompt that
+        #: was measured beside the one that ships; production never passes it.
+        self.spot_system = spot_system
         #: Whether a spot check is followed by the blind audit that RECOVERS dropped findings. On by
         #: default: it runs only where the spot check runs (evidence on disk, sampled or forced), it
         #: costs two more calls there, and its output is an append, never a verdict.
@@ -274,7 +298,7 @@ class EnvelopeVerifier:
         try:
             result = self._spot_backend.complete(  # type: ignore[union-attr]
                 [
-                    {"role": "system", "content": _SPOT_SYSTEM},
+                    {"role": "system", "content": self.spot_system},
                     {"role": "user", "content": prompt},
                 ],
                 model=self._spot_model,

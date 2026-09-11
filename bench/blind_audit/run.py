@@ -39,6 +39,8 @@ from chimera.eval.anytime import wilson_bounds  # noqa: E402
 from chimera.eval.paired import compare_paired  # noqa: E402
 from chimera.orchestration.artifacts import ArtifactStore  # noqa: E402
 from chimera.orchestration.envelope_verify import (  # noqa: E402
+    _SPOT_SYSTEM_DROPPED_ONLY,
+    _SPOT_SYSTEM_THREE_CHECKS,
     COMPARE_SYSTEM,
     EXTRACT_SYSTEM,
     EnvelopeVerifier,
@@ -46,7 +48,7 @@ from chimera.orchestration.envelope_verify import (  # noqa: E402
 )
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
-ARMS = ("shipped", "blind")
+ARMS = ("shipped", "blind", "shipped_dropped_only")
 
 # --- the blind arm: the two prompts live in the module the product runs (`envelope_verify`), and
 # they are byte-identical to the strings this bench was registered and run with — checked on
@@ -124,10 +126,18 @@ def _meter(results: list[Any]) -> tuple[float | None, int, int]:
     return (None if unpriced else usd), ptok, ctok
 
 
-def audit_shipped(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str) -> tuple[str, str, list[Any]]:
-    """The production path: `EnvelopeVerifier.verify(force_spot=True)`, backend metered, nothing else."""
+def audit_shipped(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str,
+                  spot_system: str = _SPOT_SYSTEM_THREE_CHECKS) -> tuple[str, str, list[Any]]:
+    """The production path: `EnvelopeVerifier.verify(force_spot=True)`, backend metered, nothing else.
+
+    `spot_system` is the prompt under test: the three-check one that shipped until 2026-09-11 (the
+    `shipped` arm, the number in RESULTS.md) or the DROPPED-only one (`shipped_dropped_only`, the
+    registered addendum). Both are the module's own strings."""
     rec = _Recording(gateway)
-    verifier = EnvelopeVerifier(store=store, backend=rec, model=model, spot_rate=1.0)
+    verifier = EnvelopeVerifier(
+        store=store, backend=rec, model=model, spot_rate=1.0, recover_dropped=False,
+        spot_system=spot_system,
+    )
     outcome = verifier.verify(spec, envelope, force_spot=True)
     if "spot" not in outcome.checks_run or outcome.stage != "spot":
         # `_spot_check` returns None when the auditor call fails and `verify` then ACCEPTS the
@@ -173,6 +183,11 @@ def one(item: CorpusItem, position: str, arm: str, rep: int, *, auditor: str, st
     findings, critical = "", 0
     if arm == "shipped":
         verdict, reply, results = audit_shipped(gateway, store, spec, envelope, model=auditor)
+        failed_on = _failed_lines(reply)
+    elif arm == "shipped_dropped_only":
+        verdict, reply, results = audit_shipped(
+            gateway, store, spec, envelope, model=auditor, spot_system=_SPOT_SYSTEM_DROPPED_ONLY,
+        )
         failed_on = _failed_lines(reply)
     else:
         verdict, reply, findings, critical, results = audit_blind(gateway, store, spec, envelope, model=auditor)
@@ -226,29 +241,33 @@ def report(path: Path) -> str:
                 lines.append(f"| `{arm}` | {pos} | {n} | **{fails}/{n}** | [{lo:.2f}, {hi:.2f}] | "
                              f"{flips}/{n} | {toks / n:,.0f} | {usd:.4f} |")
         lines.append("")
-        for pos in POSITIONS:
-            s, b = verdicts.get(("shipped", pos), {}), verdicts.get(("blind", pos), {})
-            common = sorted(set(s) & set(b))
-            if not common:
-                continue
-            pr = compare_paired([s[i] for i in common], [b[i] for i in common],
-                                baseline_name="shipped", treatment_name="blind")
-            lo, hi = pr.diff_ci
-            lines.append(f"- **{pos}** paired FAIL, shipped → blind: {pr.baseline_rate:.2f} → {pr.treatment_rate:.2f} "
-                         f"(Δ {pr.delta:+.2f}, Newcombe 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
-                         f"blind-only {pr.treatment_only}, shipped-only {pr.baseline_only}; "
-                         f"{'significant' if pr.significant else 'not significant'})")
+        for treat in ("blind", "shipped_dropped_only"):
+            for pos in POSITIONS:
+                s, b = verdicts.get(("shipped", pos), {}), verdicts.get((treat, pos), {})
+                common = sorted(set(s) & set(b))
+                if not common:
+                    continue
+                pr = compare_paired([s[i] for i in common], [b[i] for i in common],
+                                    baseline_name="shipped", treatment_name=treat)
+                lo, hi = pr.diff_ci
+                lines.append(f"- **{pos}** paired FAIL, shipped → {treat}: {pr.baseline_rate:.2f} → {pr.treatment_rate:.2f} "
+                             f"(Δ {pr.delta:+.2f}, Newcombe 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
+                             f"{treat}-only {pr.treatment_only}, shipped-only {pr.baseline_only}; "
+                             f"{'significant' if pr.significant else 'not significant'})")
         for arm in ARMS:
             mid, none = verdicts.get((arm, "middle"), {}), verdicts.get((arm, "none"), {})
             if mid and none:
                 d = sum(mid.values()) / len(mid) - sum(none.values()) / len(none)
                 lines.append(f"- discrimination `{arm}` (middle FAIL − none FAIL): {d:+.2f}")
-        shipped_mid = [r for r in rows if r["auditor"] == auditor and r["arm"] == "shipped" and r["position"] == "middle"]
-        which = defaultdict(int)
-        for r in shipped_mid:
-            for key in r["failed_on"]:
-                which[key] += 1
-        lines.append(f"- shipped-arm FAIL lines on middle items (all reps): {dict(which)}")
+        for arm in ("shipped", "shipped_dropped_only"):
+            arm_mid = [r for r in rows if r["auditor"] == auditor and r["arm"] == arm and r["position"] == "middle"]
+            if not arm_mid:
+                continue
+            which: dict[str, int] = defaultdict(int)
+            for r in arm_mid:
+                for key in r["failed_on"]:
+                    which[key] += 1
+            lines.append(f"- {arm}-arm FAIL lines on middle items (all reps): {dict(which)}")
         lines.append("")
         lines.append("### Every shipped-arm PASS on a middle item (majority), one reply each — read these")
         lines.append("")
