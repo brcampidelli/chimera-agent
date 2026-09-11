@@ -29,6 +29,7 @@ function question(id = "q1") {
     reason: "write_file is restricted after this run consumed untrusted content",
     asked_at: Math.floor(Date.now() / 1000) - 12,
     age_seconds: 12,
+    decision: "review",
   };
 }
 
