@@ -253,6 +253,12 @@ class Settings(BaseSettings):
     # isn't averaged away, and it's cheaper. Off by default and conservative: knowledge/open tasks,
     # and any logic task without a panel majority, still use judge -> synthesizer. ---
     fusion_task_typed: bool = Field(default=False, validation_alias="CHIMERA_FUSION_TASK_TYPED")
+    # --- Blind presentation (arXiv 2609.08016): the judge and the agreed-path synthesiser read the
+    # panel as `Answer A / B / C` in a shuffled order instead of `Answer 1 (model <vendor slug>)` in
+    # arrival order. The vendor name and the position are not evidence about an answer; the trace
+    # keeps the permutation (`shown_order`) so every letter is still attributed to its model. Off by
+    # default until `bench/judge_blind` has measured what the names are worth. ---
+    fusion_blind_panel: bool = Field(default=False, validation_alias="CHIMERA_FUSION_BLIND_PANEL")
     # --- Diversity sampling (how_to_generate study): per-panelist decode spread. A comma-separated
     # list of temperatures (e.g. "0.2,0.5,0.7,0.9") — panelist i samples at temps[i % len], widening
     # the candidate set the judge/synthesizer selects from (one low-temp anchor + higher-temp

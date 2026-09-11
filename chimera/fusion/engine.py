@@ -15,6 +15,7 @@ tool-calling — fusion is for hard reasoning/synthesis; tool turns stay single-
 from __future__ import annotations
 
 import difflib
+import random
 import threading
 from collections.abc import Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -92,6 +93,13 @@ class FusionTrace:
     aggregation: Literal["synth", "vote"] = (
         "synth"  # task-typed routing: synthesize vs majority-vote
     )
+    shown_order: list[int] | None = None
+    """How the judge (or the agreed-path synthesiser) saw the panel, when it was shown blind.
+
+    ``shown_order[p]`` is the index into ``panel`` of the answer presented at position ``p`` as
+    ``Answer A``, ``Answer B``, … — the permutation that lets a receipt attribute a blind label back
+    to the model that wrote it. ``None`` means the panel was shown named and in panel order, which
+    is what ``FusionConfig.blind_panel=False`` does."""
 
     def successful_panel(self) -> list[PanelResponse]:
         return [r for r in self.panel if r.error is None]
@@ -178,6 +186,12 @@ class FusionConfig:
     # every other task, and any logic task without a majority, still uses judge -> synthesizer.
     task_typed: bool = False
     vote_threshold: float = 0.85
+    # Blind presentation (arXiv 2609.08016): the judge and the agreed-path synthesiser see the panel
+    # as ``Answer A / B / C`` in a shuffled order, never as ``Answer 1 (model <vendor slug>)`` in
+    # arrival order — the vendor name and the position are not evidence about an answer, and a judge
+    # given them uses them. The permutation is kept on the trace (``shown_order``) so the receipt
+    # still attributes every answer. Off by default until ``bench/judge_blind`` says what it costs.
+    blind_panel: bool = False
 
     def role_kinship(self) -> dict[str, object]:
         """How independent the judge actually is from the panel it grades.
@@ -224,6 +238,7 @@ class FusionConfig:
             agreement_threshold=s.fusion_agreement_threshold,
             task_typed=s.fusion_task_typed,
             panel_temperatures=list(s.fusion_panel_temperatures),
+            blind_panel=s.fusion_blind_panel,
         )
 
 
@@ -306,13 +321,14 @@ class FusionEngine:
     def _run_full(self, messages: list[MessageLike]) -> FusionTrace:
         _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))
         panel = self._run_panel(messages)
-        analysis, final, aggregation, judge, synth = self._aggregate(messages, panel)
+        analysis, final, aggregation, judge, synth, shown = self._aggregate(messages, panel)
         trace = FusionTrace(
             panel=panel,
             judge_analysis=analysis,
             final=final,
             usage=self._collect_usage(panel, judge, synth),
             aggregation=aggregation,
+            shown_order=shown,
         )
         self._log_usage(trace)
         return trace
@@ -320,11 +336,16 @@ class FusionEngine:
     def _aggregate(
         self, messages: list[MessageLike], panel: list[PanelResponse]
     ) -> tuple[
-        str, str, Literal["synth", "vote"], CompletionResult | None, CompletionResult | None
+        str,
+        str,
+        Literal["synth", "vote"],
+        CompletionResult | None,
+        CompletionResult | None,
+        list[int] | None,
     ]:
         """Aggregate the panel into a final answer, routing by task type when enabled.
 
-        Returns ``(judge_analysis, final, aggregation, judge_result, synth_result)``. For a
+        Returns ``(judge_analysis, final, aggregation, judge_result, synth_result, shown_order)``. For a
         logic-typed task on which the panel reaches a clear majority, aggregates by VOTE (no judge
         or synthesizer call — the majority answer *is* the final); otherwise runs the judge ->
         synthesizer path. The vote branch is conservative: it needs ≥2 successful panel answers and a
@@ -342,10 +363,10 @@ class FusionEngine:
                     _log.debug(
                         "fusion task-typed: logic task with panel majority -> vote (skipped judge+synth)"
                     )
-                    return "", winner, "vote", None, None
-        judge = self._run_judge(messages, panel)
+                    return "", winner, "vote", None, None, None
+        judge, shown = self._run_judge(messages, panel)
         synth = self._run_synth(messages, judge.content)
-        return judge.content, synth.content, "synth", judge, synth
+        return judge.content, synth.content, "synth", judge, synth, shown
 
     def _run_selective(self, messages: list[MessageLike]) -> FusionTrace:
         """Probe a few models first; short-circuit on agreement, else escalate to full.
@@ -360,25 +381,27 @@ class FusionEngine:
         ok = [r for r in probe if r.error is None]
         if len(ok) >= 2 and self._agree(ok):
             _log.debug("fusion early-stop: %d probe models agreed", len(ok))
-            agreed = self._run_synth_agreed(messages, ok)
+            agreed, shown = self._run_synth_agreed(messages, ok)
             trace = FusionTrace(
                 panel=probe,
                 judge_analysis="",
                 final=agreed.content,
                 usage=self._collect_usage(probe, None, agreed),
                 early_stopped=True,
+                shown_order=shown,
             )
             self._log_usage(trace)
             return trace
         rest = self._run_panel(messages, self.config.panel[k:])
         panel = probe + rest
-        analysis, final, aggregation, judge, synth = self._aggregate(messages, panel)
+        analysis, final, aggregation, judge, synth, shown = self._aggregate(messages, panel)
         trace = FusionTrace(
             panel=panel,
             judge_analysis=analysis,
             final=final,
             usage=self._collect_usage(panel, judge, synth),
             aggregation=aggregation,
+            shown_order=shown,
         )
         self._log_usage(trace)
         return trace
@@ -448,6 +471,7 @@ class FusionEngine:
                 for r in trace.panel
             ],
             "judge_analysis": trace.judge_analysis,
+            "shown_order": trace.shown_order,
             "stages": [
                 {
                     "stage": u.stage,
@@ -499,24 +523,43 @@ class FusionEngine:
         with ThreadPoolExecutor(max_workers=workers) as pool:
             return list(pool.map(call, panel_models))
 
+    def _present(self, panel: list[PanelResponse]) -> tuple[str, list[int] | None]:
+        """The panel as the judge or synthesiser will read it, and the order it was shown in.
+
+        Named (the default): ``Answer 1 (model <slug>)`` in panel order — the reader knows the vendor
+        and the position. Blind (``config.blind_panel``): ``Answer A / B / C`` in a fresh random
+        order, and the permutation comes back so the trace can attribute each letter to its model.
+        Errored panelists are never shown either way.
+        """
+        shown = [i for i, r in enumerate(panel) if r.error is None]
+        if not self.config.blind_panel:
+            text = "\n\n".join(
+                f"--- Answer {p} (model {panel[i].model}) ---\n{panel[i].content}"
+                for p, i in enumerate(shown, 1)
+            )
+            return text, None
+        random.shuffle(shown)
+        text = "\n\n".join(
+            f"--- Answer {chr(ord('A') + p)} ---\n{panel[i].content}" for p, i in enumerate(shown)
+        )
+        return text, shown
+
     def _run_judge(
         self, messages: list[MessageLike], panel: list[PanelResponse]
-    ) -> CompletionResult:
-        answers = "\n\n".join(
-            f"--- Answer {i} (model {r.model}) ---\n{r.content}"
-            for i, r in enumerate(panel, 1)
-            if r.error is None
-        )
+    ) -> tuple[CompletionResult, list[int] | None]:
+        answers, shown = self._present(panel)
         if not answers:
-            return CompletionResult(
-                content="No panel answers were produced.", model=self.config.judge
+            return (
+                CompletionResult(content="No panel answers were produced.", model=self.config.judge),
+                shown,
             )
         user = f"Task and context:\n{_conversation_text(messages)}\n\nCandidate answers:\n{answers}"
-        return self.backend.complete(
+        result = self.backend.complete(
             [Message(role="system", content=_JUDGE_SYSTEM), Message(role="user", content=user)],
             model=self.config.judge,
             temperature=0.1,
         )
+        return result, shown
 
     def _run_synth(self, messages: list[MessageLike], judge_analysis: str) -> CompletionResult:
         user = (
@@ -531,16 +574,14 @@ class FusionEngine:
 
     def _run_synth_agreed(
         self, messages: list[MessageLike], answers: list[PanelResponse]
-    ) -> CompletionResult:
+    ) -> tuple[CompletionResult, list[int] | None]:
         """Synthesize directly from agreeing probe answers (no judge step)."""
-        joined = "\n\n".join(
-            f"--- Answer {i} (model {r.model}) ---\n{r.content}" for i, r in enumerate(answers, 1)
-        )
+        joined, shown = self._present(answers)
         user = (
             f"Original task and context:\n{_conversation_text(messages)}\n\n"
             f"Agreeing answers:\n{joined}"
         )
-        return self.backend.complete(
+        result = self.backend.complete(
             [
                 Message(role="system", content=_SYNTH_AGREED_SYSTEM),
                 Message(role="user", content=user),
@@ -548,6 +589,7 @@ class FusionEngine:
             model=self.config.synthesizer,
             temperature=self.config.temperature,
         )
+        return result, shown
 
     # -- telemetry ---------------------------------------------------------
     def _collect_usage(
