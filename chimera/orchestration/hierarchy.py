@@ -751,6 +751,12 @@ class HierarchicalOrchestrator:
         if produced:
             outcome = self.verifier.verify(spec, envelope)
             verified = outcome.passed
+            if verified and outcome.recovered:
+                # What the distillation cut and the blind audit found again, appended so the
+                # synthesis reads it. An append rather than a rejection, because the audit also
+                # flags summaries that dropped nothing (11 of 23, `bench/blind_audit`) and a few
+                # extra lines are the price that buys the 19 of 23 it catches.
+                envelope = envelope.model_copy(update={"summary": _with_recovered(envelope.summary, outcome.recovered)})
             if not verified and self._stopped():
                 # The re-ask is a whole second model call — the single largest thing a cancel
                 # mid-dispatch can still avoid paying for.
@@ -1039,6 +1045,15 @@ class HierarchicalOrchestrator:
 
     def _ask_top(self, system: str, user: str) -> str:
         return self._complete_top(system, user).content
+
+
+def _with_recovered(summary: str, recovered: tuple[str, ...]) -> str:
+    """The summary plus the findings the audit recovered from the raw output, labelled as such."""
+    lines = "\n".join(f"- {item}" for item in recovered)
+    return (
+        f"{summary}\n\n## Recovered by the audit from the raw output (the distillation cut these)\n"
+        f"{lines}"
+    )
 
 
 def _shared_counterfactual(spec: TaskSpec, n_subtasks: int) -> ProfitEstimate:
