@@ -39,6 +39,8 @@ from chimera.eval.anytime import wilson_bounds  # noqa: E402
 from chimera.eval.paired import compare_paired  # noqa: E402
 from chimera.orchestration.artifacts import ArtifactStore  # noqa: E402
 from chimera.orchestration.envelope_verify import (  # noqa: E402
+    COMPARE_SYSTEM,
+    EXTRACT_SYSTEM,
     EnvelopeVerifier,
     _grade_faithfulness,
 )
@@ -46,24 +48,11 @@ from chimera.orchestration.receipts import price_completion  # noqa: E402
 
 ARMS = ("shipped", "blind")
 
-# --- the blind arm: two prompts, registered here -------------------------------------------------------
-
-_EXTRACT_SYSTEM = (
-    "You are a strict verification auditor. You receive a task and a worker's RAW OUTPUT for it. "
-    "List every result the raw output establishes that the task asks for — one finding per line, "
-    "numbered. Mark with [CRITICAL] any finding a reader of this task must not miss: a failure, a "
-    "security or data exposure, an escalation, a blocker, a contradiction with what the task expects. "
-    "Do not summarise, do not judge quality, do not add findings the raw output does not contain. "
-    "Reply with the numbered list only."
-)
-
-_COMPARE_SYSTEM = (
-    "You compare a numbered list of findings against a SUMMARY of the same work. For each finding, "
-    "reply on its own line with its number and PRESENT if the summary conveys that finding (same "
-    "substance, any wording) or ABSENT if it does not. Then reply with exactly one final line: "
-    "'DROPPED: FAIL' if any finding marked [CRITICAL] is ABSENT, otherwise 'DROPPED: PASS'."
-)
-
+# --- the blind arm: the two prompts live in the module the product runs (`envelope_verify`), and
+# they are byte-identical to the strings this bench was registered and run with — checked on
+# 2026-09-11 before the swap, so the numbers in RESULTS.md are the numbers this code produces.
+_EXTRACT_SYSTEM = EXTRACT_SYSTEM
+_COMPARE_SYSTEM = COMPARE_SYSTEM
 
 
 def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
