@@ -1181,6 +1181,7 @@ def register_code_api(
                 "action": question.action,
                 "reason": question.reason,
                 "asked_at": question.asked_at,
+                "decision": question.decision,
                 "wait_seconds": float(settings.approval_wait),
             },
         )
