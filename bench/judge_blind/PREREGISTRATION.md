@@ -33,10 +33,17 @@ to a final answer. Nothing in the pipeline is mocked.
 The **panel answers are real model outputs, but not from the production panel.** The production trio
 (Opus 5 / GPT-5.5 / Gemini 3.8 Flash) is at ceiling on any gradable corpus we have
 (`bench/fusion_paired/RESULTS.md`: 25/25 single-model solves), and a judge only matters when the
-panel disagrees. The answers are therefore produced by three weak-tier models —
-`openrouter/mistralai/mistral-small-3.2-24b-instruct`, `openrouter/meta-llama/llama-3.3-70b-instruct`,
-`openrouter/openai/gpt-oss-20b` — on GSM8K, and only questions on which **at least one answer is
-right and at least one is wrong** are kept. The judge is then shown those answers **under the
+panel disagrees. The answers are therefore produced by three small models from three vendors —
+`openrouter/meta-llama/llama-3.2-3b-instruct`, `openrouter/google/gemma-3-4b-it`,
+`openrouter/meta-llama/llama-3.1-8b-instruct` — on GSM8K, and only questions on which **at least one
+answer is right and at least one is wrong** are kept.
+
+*Amendment, same day, before any judge call:* the first draft named the weak tier itself
+(mistral-small 24B, llama-3.3 70B, gpt-oss 20B) as the writers. Collected live, they agreed on
+**51 of 52** questions — a disagreement rate of ~2%, which would have yielded about eight items from
+the 400-question cap. An instrument that cannot exhibit a disagreement cannot measure a judge, so
+the writers moved down to 3B–8B models; nothing else in the design changed, and the names the judge
+is shown are still the production panel's. The judge is then shown those answers **under the
 production panel's names**, rotated: the same mistral text is labelled `claude-opus-5` in one run
 and `gemini-3.8-flash` in another. That is the manipulation — the text never changes, only the name
 and the position — and it is the only way to attribute an effect to the label rather than to the

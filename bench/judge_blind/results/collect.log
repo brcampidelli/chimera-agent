@@ -1,0 +1,731 @@
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked   1 · kept  0 · this one RRR  Σ US$ 0.0003
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked   2 · kept  0 · this one RRR  Σ US$ 0.0006
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked   3 · kept  0 · this one RRR  Σ US$ 0.0007
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked   4 · kept  0 · this one RRR  Σ US$ 0.0009
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked   5 · kept  0 · this one RRR  Σ US$ 0.0010
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked   6 · kept  0 · this one RRR  Σ US$ 0.0011
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked   7 · kept  0 · this one RRR  Σ US$ 0.0013
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked   8 · kept  0 · this one RRR  Σ US$ 0.0015
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked   9 · kept  0 · this one RRR  Σ US$ 0.0018
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  10 · kept  0 · this one RRR  Σ US$ 0.0021
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mGive Feedback / Get Help: https://github.com/BerriAI/litellm/issues/new[0m
+LiteLLM.Info: If you need to debug this error, use `litellm._turn_on_debug()'.
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[08:49:53] WARNING  model openrouter/mistralai/mistral-small-3.2-24b-instruct  
+                    failed (overloaded -> fallback_model) : litellm.Timeout:   
+                    Timeout Error: OpenrouterException - Provider timed out    
+                    after 5057ms                                               
+  asked  11 · SKIPPED Timeout: litellm.Timeout: Timeout Error: OpenrouterException - Provider timed out after 5057ms
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  12 · kept  0 · this one RRR  Σ US$ 0.0024
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  13 · kept  0 · this one RRR  Σ US$ 0.0025
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked  14 · kept  0 · this one RRR  Σ US$ 0.0028
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  15 · kept  0 · this one RRR  Σ US$ 0.0030
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  16 · kept  0 · this one RRR  Σ US$ 0.0031
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  17 · kept  0 · this one RRR  Σ US$ 0.0034
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  18 · kept  0 · this one RRR  Σ US$ 0.0036
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  19 · kept  0 · this one RRR  Σ US$ 0.0039
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  20 · kept  0 · this one RRR  Σ US$ 0.0040
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  21 · kept  0 · this one RRR  Σ US$ 0.0042
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked  22 · kept  1 · this one RWR  Σ US$ 0.0044
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  23 · kept  1 · this one RRR  Σ US$ 0.0046
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked  24 · kept  1 · this one RRR  Σ US$ 0.0047
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked  25 · kept  1 · this one RRW  Σ US$ 0.0051
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  26 · kept  1 · this one RRR  Σ US$ 0.0054
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked  27 · kept  1 · this one RRR  Σ US$ 0.0055
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  28 · kept  1 · this one RRR  Σ US$ 0.0057
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  29 · kept  1 · this one RRR  Σ US$ 0.0058
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  30 · kept  1 · this one WWW  Σ US$ 0.0060
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  31 · kept  1 · this one RRR  Σ US$ 0.0062
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  32 · kept  1 · this one RRR  Σ US$ 0.0063
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  33 · kept  1 · this one RRR  Σ US$ 0.0065
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  34 · kept  1 · this one RRR  Σ US$ 0.0066
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  35 · kept  1 · this one RRR  Σ US$ 0.0069
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+  asked  36 · kept  1 · this one RRR  Σ US$ 0.0070
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  37 · kept  1 · this one RRR  Σ US$ 0.0071
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  38 · kept  1 · this one RRR  Σ US$ 0.0073
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  39 · kept  1 · this one RRR  Σ US$ 0.0075
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  40 · kept  1 · this one RRR  Σ US$ 0.0077
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  41 · kept  1 · this one RRR  Σ US$ 0.0078
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  42 · kept  1 · this one RRR  Σ US$ 0.0079
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  43 · kept  1 · this one RRR  Σ US$ 0.0081
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  44 · kept  1 · this one RRR  Σ US$ 0.0082
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  45 · kept  1 · this one RRR  Σ US$ 0.0083
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  46 · kept  1 · this one RRR  Σ US$ 0.0084
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  47 · kept  1 · this one RRR  Σ US$ 0.0085
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  48 · kept  1 · this one RRR  Σ US$ 0.0086
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  49 · kept  1 · this one RRR  Σ US$ 0.0089
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  50 · kept  1 · this one RRR  Σ US$ 0.0090
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+  asked  51 · kept  1 · this one RRR  Σ US$ 0.0091
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  52 · kept  1 · this one RRR  Σ US$ 0.0093
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  53 · kept  1 · this one RRR  Σ US$ 0.0095
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+  asked  54 · kept  1 · this one RRR  Σ US$ 0.0096
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+
+
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+[1;31mProvider List: https://docs.litellm.ai/docs/providers[0m
+
+
+

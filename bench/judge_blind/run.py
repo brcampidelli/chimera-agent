@@ -45,10 +45,13 @@ from chimera.eval.paired import compare_paired  # noqa: E402
 from chimera.fusion.engine import FusionConfig, FusionEngine, PanelResponse  # noqa: E402
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
+# Three small models from three vendors. The first draft used the weak tier (mistral-small 24B,
+# llama-3.3 70B, gpt-oss 20B) and they agreed on GSM8K 51 times in 52 — an instrument that cannot
+# exhibit a disagreement cannot measure a judge. Recorded in PREREGISTRATION.md as an amendment.
 WEAK_PANEL = (
-    "openrouter/mistralai/mistral-small-3.2-24b-instruct",
-    "openrouter/meta-llama/llama-3.3-70b-instruct",
-    "openrouter/openai/gpt-oss-20b",
+    "openrouter/meta-llama/llama-3.2-3b-instruct",
+    "openrouter/google/gemma-3-4b-it",
+    "openrouter/meta-llama/llama-3.1-8b-instruct",
 )
 SHOWN_SLUGS = tuple(_DEFAULT_PANEL)  # the names the judge is shown, rotated over the same texts
 SUFFIX = "\n\nEnd your answer with a line of the form `ANSWER: <number>`."
