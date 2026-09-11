@@ -38,8 +38,31 @@ Per item, majority of three replications; 414 calls, US$ 0.29.
 
 ## The second auditor — `deepseek-v4-flash-0731` (the mid tier)
 
-*(filled in when the run completes — a reasoning model reading 24k characters per call; see
-`results/2026-09-11-deepseek-report.md`.)*
+**Stopped after seven rows** (amendment 5, same day): at one replication on eight items, four
+workers, the run produced seven verdicts in forty minutes — 40 to 883 seconds per row, the
+reasoning over 24k characters or the route's throttling, the log cannot say which — and was
+stopped so this file could be written. The seven rows, as they are:
+
+| item | arm | position | verdict | failed on | seconds |
+|---|---|---|---|---|---:|
+| `postmortems-1` | `blind` | head | PASS | — | 883 |
+| `postmortems-1` | `shipped` | head | PASS | — | 842 |
+| `postmortems-1` | `blind` | middle | PASS | — | 1130 |
+| `postmortems-1` | `shipped` | middle | FAIL | INVENTED, DROPPED, CONTRADICT | 135 |
+| `postmortems-1` | `blind` | none | FAIL | DROPPED | 297 |
+| `postmortems-1` | `shipped` | none | FAIL | INVENTED, DROPPED, CONTRADICT | 117 |
+| `postmortems-5` | `shipped` | head | PASS | — | 1148 |
+| `postmortems-5` | `shipped` | middle | FAIL | DROPPED | 75 |
+| `postmortems-5` | `shipped` | none | PASS | — | 783 |
+
+What seven rows can say: on the two `middle` envelopes the reasoning auditor **did** say DROPPED
+under the shipped prompt (with INVENTED and CONTRADICTION marked too — the same three-in-one
+verdict the weak auditor gives), where the weak auditor said it on 4 of 23. If that held over the
+corpus, the adherence would be a property of the weak tier and not of the prompt; that is the
+sentence a completed run would test, and it is not tested here. What is settled is that the
+weak-tier auditor is the one production uses, and its number stands.
+
+Cost of the seven rows: US$ 0.03.
 
 ## What ships, by the rule written before the numbers
 

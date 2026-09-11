@@ -89,6 +89,10 @@ cannot tell which. It runs on the **first eight corpus items** (24 envelopes, ev
 which is a direction check and nothing more; the weak-tier auditor, the production one, carries
 the numbers.
 
+*Amendment 5, same day:* the eight-item run was stopped after seven rows in forty minutes
+(40–883 s per row). The rows are published in RESULTS.md as seven rows; no rate is computed from
+them.
+
 **The plant.** One sentence per domain (three wordings, rotated by seed), phrased as a worker
 finding and unambiguously critical to the task's objective — the objective names the class of
 result it is about (*"report every unresolved action item and anything that requires escalation"*;
