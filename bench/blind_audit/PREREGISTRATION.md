@@ -67,6 +67,15 @@ could be dropped — and every item was discarded. The corpus moved to ten docum
 9,000, and the plant to the **centre of the cut region** (which the code computes from the cap
 rather than from a fixed fraction). The instrument check is unchanged and still decides per item.
 
+*Amendment 2, same day, before any auditor call:* the corpus closed at **23 tasks** (of 40
+attempted; 17 discarded because the reasoning worker spent its whole completion budget thinking
+and returned nothing, or under 8,300 characters, twice) after 2 h 13 min of generation at 5
+workers. Every domain is represented, unevenly (interviews 8, postmortems 6, dependency audits
+5, logs 3, pull requests 1 — the pull-request reports came back shortest and were discarded most);
+raw outputs run 8,358–22,704 characters, 10 of the 23 needed the second, nudged call. Sixty-nine
+envelopes instead of one hundred and twenty; the arms, auditors,
+replications and rules are unchanged, and the intervals will be wider — reported as such.
+
 **The plant.** One sentence per domain (three wordings, rotated by seed), phrased as a worker
 finding and unambiguously critical to the task's objective — the objective names the class of
 result it is about (*"report every unresolved action item and anything that requires escalation"*;
