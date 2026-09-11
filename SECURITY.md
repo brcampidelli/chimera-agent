@@ -42,13 +42,17 @@ environment** when you grant autonomy:
 > **Measured, not asserted.** `chimera redteam` runs a corpus of injection attacks (a
 > malicious page/email trying to steer the agent into a harmful tool call) through the
 > governance stack. On the built-in corpus (**n=7, illustrative — not a sample size to
-> generalise from**), the taint-adaptive allowlist cuts the **attack success rate from 100%
-> to ~14% (6/7 blocked)** (destructive shell, backdoor writes, self-modification, and email
-> exfiltration; the remaining leak is exfiltration through an *allowed* tool like `http_get`,
-> which it names rather than hides). Read the number precisely: every block here comes from
-> the **coarse dangerous-tool narrowing** (`DANGEROUS_WHEN_TAINTED`), not the per-action flow
-> matcher — so the rate tracks *which tools the corpus attacks*, and a corpus weighted toward
-> allowed tools would score worse. It measures whether an already-injected
+> generalise from**), the governance stack cuts the **attack success rate from 100% to 0%
+> (7/7 blocked)** — destructive shell, backdoor writes, self-modification, email exfiltration,
+> and, since a tainted run's fetch carrying a query string became a review, exfiltration through
+> an *allowed* tool like `http_get`, which was the one leak this paragraph used to name. The
+> price is published beside it: five of the eight legitimate rows read something external and
+> each becomes a question — **0 of 8** refused with a person answering, **5 of 8** with nobody
+> to ask, because silence refuses by design ([`bench/injection/RESULTS.md`](bench/injection/RESULTS.md)).
+> Read the number precisely: most blocks come from the **coarse dangerous-tool narrowing**
+> (`DANGEROUS_WHEN_TAINTED`) and the query-string rule is a heuristic registered as one — so the
+> rate tracks *which tools the corpus attacks*, and a corpus weighted toward allowed tools
+> would score worse. It measures whether an already-injected
 > agent's harmful action is *stopped* — not whether the model can be injected at all, which
 > is the harder, still-open half of #5.
 

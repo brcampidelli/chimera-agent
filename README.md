@@ -32,7 +32,7 @@ its own work, and keeps only what actually works.
 > **Free and open-source (Apache-2.0), in early but active development.** It already works end to
 > end: chat with it, let it finish tasks on its own, run it as a bot on your favourite messaging app,
 > deploy it on a server so it works 24/7, and watch it learn from what it does. It's **alpha** — solid
-> and heavily tested (**2,800+ automated tests**, strict type-checking and linting on every change), but
+> and heavily tested (**6,100+ automated tests**, strict type-checking and linting on every change), but
 > not yet battle-hardened in production.
 
 ---
@@ -58,7 +58,7 @@ reverse-engineering study of five leaders (OpenClaw, Hermes, nanobot, CrewAI, La
 **all leave open** — and makes them its core:
 
 - 🧬 **Self-evolution with a fitness signal.** The others "learn" by appending whatever happened, or by human pull requests — nothing measures whether a learned change actually helped. Chimera keeps a change **only when a verified result proves it did**: the evolution step is gated on the real working-tree diff and an honest A/B, never the model's say-so. Independent evidence this matters: [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) measured that *automatic*, ungated experience-encoding methods routinely produce **negative transfer** — one popular method regressed **−12.3 points** on tasks it wasn't tuned on. Chimera's gate now also runs a **transfer holdout**: a learned change must not regress a disjoint, same-capability slice before it's promoted, so it can't just memorize its own eval.
-- 🛡️ **Security by architecture.** Prompt injection is now widely considered *unpatchable*; the popular agents mitigate at the app layer or declare it out of scope (one shipped 135k publicly-exposed instances and a marketplace ~12% full of malicious skills). Chimera ships a real defence layer — **opt-in with `--taint`, off by default**: it tracks taint provenance *heuristically* (verbatim reference/content flow, **not** true dataflow — a model that paraphrases tainted text launders it), strips control tokens from untrusted content, narrows dangerous-tool access for the rest of a tainted run, and guards side-effecting retries; untrusted code runs in an opt-in locked-down container. On the built-in **7-attack** corpus, **6 of 7** harmful calls are blocked (**~14%** still get through) — measured on an agent that is *already injected* and attempting the attacker's tool call, with no model in the loop. That block rate is never published alone: the same report carries how much *legitimate* work the narrowing refuses, measured on a benign corpus that trips the identical surface, and the gate will not read one half without the other (`chimera redteam` prints both — a defence scored on attacks alone has a trivial maximum: refuse everything). The undefended arm is 100% by construction, not by measurement: an unwrapped tool always runs, so treat it as the definitional floor this layer is compared against, not as a baseline system. This says nothing about how easily a model is injected in the first place — the harder, open half ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) states plainly what still gets through (sub-agent hand-offs, fusion/summarisation, non-CLI entry points) — the containment boundary is the sandbox, this layer is defence-in-depth on top of it.
+- 🛡️ **Security by architecture.** Prompt injection is now widely considered *unpatchable*; the popular agents mitigate at the app layer or declare it out of scope (one shipped 135k publicly-exposed instances and a marketplace ~12% full of malicious skills). Chimera ships a real defence layer, and as of 0.53.0 it is **on by default on every surface a person sits at** — `chimera chat`, `assist` and `tui`, the desktop app's chat and coding turn, the messaging bots (`solve` and `agent` are one-shots and still take `--taint` / `--guard` as flags). It tracks taint provenance *heuristically* (verbatim reference/content flow, **not** true dataflow — a model that paraphrases tainted text launders it), returns every external read inside a data fence with control tokens stripped, narrows dangerous-tool access for the rest of a tainted run, and guards side-effecting retries; untrusted code runs in an opt-in locked-down container. On the built-in **7-attack** corpus, **7 of 7** harmful calls are blocked — measured on an agent that is *already injected* and attempting the attacker's tool call, with no model in the loop. That block rate is never published alone: the same report carries the **price**, measured on a benign corpus that trips the identical surface. The price is *questions*, not refusals — five of the eight legitimate rows read something external and each becomes a question; with a person answering, **0 of 8** are refused; with nobody to ask, **5 of 8** are, because silence is a refusal by design ([`bench/injection/RESULTS.md`](bench/injection/RESULTS.md); `chimera redteam` prints both halves — a defence scored on attacks alone has a trivial maximum: refuse everything). The undefended arm is 100% by construction, not by measurement: an unwrapped tool always runs, so treat it as the definitional floor this layer is compared against, not as a baseline system. This says nothing about how easily a model is injected in the first place — the harder, open half ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) states plainly what still gets through (sub-agent hand-offs, fusion/summarisation, the OpenAI-compatible endpoint, which is deliberately left ungoverned because nobody is sitting there to answer a question) — the containment boundary is the sandbox, this layer is defence-in-depth on top of it.
 - 📊 **Honest, published benchmarks.** ~20% of a popular leaderboard's "solved" cases are actually wrong. Chimera reports every number with a confidence interval — **including the runs where it didn't win** — never re-rolls for significance, and retracts its own claims when a replication kills them. The numbers, the nulls and the retractions are all in [Benchmarks](#benchmarks-honest).
 
 **In one line: the governed, self-evolving agent — proved and governed.** It's alpha, and it says so.
@@ -138,8 +138,12 @@ it, and neither does a native installer.)
   significant +6.7% on the within-family transfer metric); **run 7, with more power, cut it to +2.0%
   and non-significant — so it was retracted**, exactly as the pre-registration committed. The honest
   verdict: **no adequately-powered run shows accumulated learning improves task success**, and the
-  blocker is the instrument — three attempts to author a suite landing in the informative 40–60% band
-  all came out at 84–92%. "It gets better the more you use it" remains **unevidenced**.
+  blocker is the instrument. This paragraph used to say that three attempts to author a suite in
+  the informative 40–60% band all came out at 84–92%; that was false, and the file it cited held
+  the number refuting it — the first attempt's control landed at **50%**, dead in band. What varies
+  between suites is whether a fix can be *edited in* or must be *invented*, which no difficulty
+  specification captured ([`bench/scenarios/PREREGISTRATION-v3.md`](bench/scenarios/PREREGISTRATION-v3.md)).
+  "It gets better the more you use it" remains **unevidenced**.
   Source: [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md).
 
 Significant internally (on our own hard suite). On real repos, **replicated out-of-sample and
@@ -195,7 +199,7 @@ token number as a dollar number.
 ### 🧬 Memory & self-improvement
 - **Long-term memory** — it keeps short-term, recent, factual, and about-you memories, plus a map of how things relate. It can store memories in a fast full-text database, carry a profile of your preferences into every chat, merge duplicate notes automatically, and gently suggest saving a preference when you mention one.
 - **Learns new skills** — when it succeeds at the same kind of task more than once, it turns that into a tested, reusable skill automatically.
-- **A curated skill library you can read and extend** — 23 skill cards in [`skills/`](skills/), 13 of them written from this project's own incidents. A card is **data, not code**: frontmatter plus Trigger / Do / Avoid / Check / Risk, and it executes nothing — the agent reads it into the prompt when a card matches, **opt-in with `--skill-cards` (or `CHIMERA_SKILL_CARDS=1`), off by default**: the registered A/B that would have turned reading on came back +16.7pp but *not significant* at +300% tokens, so it failed its own flip gate and stayed off ([`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)). They are grouped by where in the work they apply (define · build · verify · review · ship), with description, body and trigger chips translated into nine languages — kept honest by a test that fails on a translation that has gone stale or is only half done. Import one with `chimera skills-import skills/<name>`. It is also the lowest-barrier place to contribute: reviewing your pull request is reading a markdown page, not auditing a diff ([`skills/README.md`](skills/README.md)).
+- **A curated skill library you can read and extend** — 24 skill cards in [`skills/`](skills/), 13 of them written from this project's own incidents. A card is **data, not code**: frontmatter plus Trigger / Do / Avoid / Check / Risk, and it executes nothing — the agent reads it into the prompt when a card matches, **opt-in with `--skill-cards` (or `CHIMERA_SKILL_CARDS=1`), off by default**: the registered A/B that would have turned reading on came back +16.7pp but *not significant* at +300% tokens, so it failed its own flip gate and stayed off ([`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)). They are grouped by where in the work they apply (define · build · verify · review · ship), with description, body and trigger chips translated into nine languages — kept honest by a test that fails on a translation that has gone stale or is only half done. Import one with `chimera skills-import skills/<name>`. It is also the lowest-barrier place to contribute: reviewing your pull request is reading a markdown page, not auditing a diff ([`skills/README.md`](skills/README.md)).
 - **Optional self-training (advanced)** — it can record its own experience so you can later fine-tune a model from it. Off by default; nothing trains without you asking.
 
 ### 📏 A loop you can measure — and that says when it's lost
@@ -207,7 +211,7 @@ a long run stays useful, and most of it is invisible until it fails. Chimera mea
 - **Long runs survive their own context.** Running out of window used to end a run outright, which made the window — not the difficulty of the task — the real ceiling. Compaction now keeps the system message untouched (it's the stable prefix the whole prompt cache is keyed on), never orphans a tool result from its call, and **restores what the run needs to still be itself**: the open file, the plan, the task list, the current state. It says plainly what it dropped instead of summarising it — an agent can re-read a file, but it cannot un-believe a fabricated summary.
 
 ### 🔌 Connect & automate
-- **Talk to it anywhere** — a terminal chat, a full-screen terminal app, or as a bot on **Discord, Telegram, Slack, Signal, and WhatsApp**. There's also a simple HTTP endpoint.
+- **Talk to it anywhere** — a terminal chat, a full-screen terminal app, or as a bot on **Discord, Telegram, Slack, Signal, and WhatsApp** — all built through the same governed assembly, and a conversation started in `chat` resumes in `tui` (`chimera sessions`). There's also a simple HTTP endpoint.
 - **Scheduling & proactivity** — give it recurring jobs in plain language ("every morning, summarize the news"). With the built-in scheduler running, it **acts on time**, not only when you message it.
 - **Tools & integrations** — read and write files, run shell commands, **read fully-rendered web pages and scrape or crawl whole sites** (structured extraction runs through a quarantined, tool-less reader that can only emit schema-validated fields — bounding a hidden instruction's blast radius, not eliminating it), and run code in a sandbox. Connect almost any web service (through its API) or external tool — including any **MCP server** ([guide + runnable example](docs/mcp.md)) — and import your setup from other agent tools you already use.
 - **Batteries included** — web search, image generation (hosted **or fully local**), **speech-to-text** and text-to-speech, **media download**, **data analysis & charts**, email, calendar, code execution, and more, ready to switch on.
@@ -215,9 +219,9 @@ a long run stays useful, and most of it is invisible until it fails. Chimera mea
 ### 🚀 Run anywhere, safely
 - **Any model, one interface** — hosted models or your own local ones, with automatic fallback if one is down and rotation across multiple keys.
 - **One-command server deploy** — run it with Docker (or bare-metal) so it stays up and restarts on reboot. See **[docs/deploy.md](docs/deploy.md)**.
-- **Safety kernel** — a check on each action it is wired to (allow / warn / review / block), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a redacted audit log of what it did. **Where it runs, precisely:** `chimera agent --guard` and `solve --guard`, the scheduler, the ACP endpoint, and — once `CHIMERA_GOVERNANCE` is `observe` or `enforce` — the API's run and turn endpoints. It does **not** yet reach the chat stream, the OpenAI-compatible endpoint, or the board and project endpoints; that gap is named here rather than left for you to discover, and it is open work. This bullet used to say "every action", which was not true of anything served over HTTP. Whether a `review` verdict stops to ask you or simply refuses is the approval mode (`CHIMERA_APPROVAL_MODE=ask|deny|allow`) — unattended, it denies rather than inventing consent, and over HTTP it never prompts on the server's own terminal, because whoever is looking at that console is not the person who made the request.
+- **Safety kernel** — a check on each action it is wired to (allow / warn / review / block), an **opt-in** network-isolated container for untrusted code (`CHIMERA_SANDBOX=docker`; the default local runner is *not* isolated), and a redacted audit log of what it did. **Where it runs, precisely:** `chimera agent --guard` and `solve --guard`, and — once `CHIMERA_GOVERNANCE` is `observe` or `enforce` — every surface assembled through the governed profile: `chimera chat`, `assist` and `tui` (as of 0.53.0), the scheduler, the ACP endpoint, the messaging bots, the board and project endpoints, and the API's run and turn endpoints. It does **not** reach the desktop app's chat (which carries the taint guard and an approver, not the signature rules) or the OpenAI-compatible endpoint; that gap is named here rather than left for you to discover. This bullet used to say "every action", which was not true of anything served over HTTP. Whether a `review` verdict stops to ask you or simply refuses is the approval mode (`CHIMERA_APPROVAL_MODE=ask|deny|allow`). Unattended, `ask` no longer collapses into a refusal: the question is written down, delivered wherever the deployment delivers (`CHIMERA_APPROVAL_WEBHOOK`), answered with `chimera approve` from anywhere — and **silence still refuses** once `CHIMERA_APPROVAL_WAIT` runs out. Over HTTP it never prompts on the server's own terminal, because whoever is looking at that console is not the person who made the request.
 - **Stop before it commits, when it read something it shouldn't trust** (`--pause-on-taint`) — a run that consumed untrusted content parks itself instead of finalising, and waits for you. You can accept the result, accept a version you edited, send guidance and let it try again, or reject it outright — from the terminal *or* the desktop app. Nothing is saved and nothing is learned until you decide, and a pause is never reported as a failure: it hasn't reached a verdict, it's waiting on a person.
-- **A desktop app that pilots a run, not just launches one** — five destinations instead of a menu of fifteen, in ten languages. Start a run and walk away: the progress is still there when you come back, the status bar names what the agent is doing from every screen, and Stop works from all of them. Native installers for Windows / macOS / Linux on [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **A desktop app that pilots a run, not just launches one** — five destinations instead of a menu of fifteen, in ten languages. Start a run and walk away: the progress is still there when you come back, the status bar names what the agent is doing from every screen, and Stop works from all of them. A question the agent parks — a tool call waiting on you — is visible from every screen too; its card counts down, and at zero it says so instead of offering dead buttons. Native installers for Windows / macOS / Linux on [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Quickstart
 
@@ -243,6 +247,7 @@ unlocks 100+ models.
 cp .env.example .env
 # open .env and set, for example:  CHIMERA_OPENROUTER_KEYS=sk-or-...
 ```
+Or let `uv run chimera init` do it: it creates `.env`, takes the key, and points you at a real example to try.
 
 **3. Check everything is ready**
 ```bash
@@ -313,7 +318,7 @@ Prefer a lean install? Keep `pip install chimera-agent` and add only the extras 
 | **Read & scrape real web pages** (a real browser) | — | `chimera agent "open example.com and tell me the heading"` |
 | **Long-term memory** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Learn reusable skills automatically** | — | happens during `chimera solve`; list what it learned with `chimera skills-stats` (`chimera skills` lists the built-in ones) |
-| **Use a curated skill card** (23 of them, 9 languages) | — | `chimera skills-import skills/verify-before-claiming` |
+| **Use a curated skill card** (24 of them, 9 languages) | — | `chimera skills-import skills/verify-before-claiming` |
 | **Schedule recurring work** | — | `chimera cron add brief "0 8 * * *" "summarize the news"` |
 | **Run as a chat bot** (Discord/Telegram/Slack/Signal/WhatsApp) | `[messaging]` | `chimera serve --cron --discord` |
 | **Connect any external tool** (MCP) | `[mcp]` | guide: [docs/mcp.md](docs/mcp.md) |
@@ -367,13 +372,16 @@ flowchart TD
 Every command is `chimera <name>` (or `uv run chimera <name>` before installing).
 
 ```bash
+chimera init                          # first-run setup: .env, one provider key, a real example
 chimera doctor / models / features    # check setup, list models, see optional capabilities
 chimera chat                          # interactive assistant that remembers across turns
 chimera assist                        # the same chat, cheap by default (tier cascade)
-chimera tui                           # full-screen terminal app
+chimera tui                           # full-screen terminal app; chimera sessions lists what to resume
 chimera run "PROMPT" --image pic.png  # one-shot answer (can read an image)
 chimera fuse "PROMPT" --show-panel    # blend several models: panel -> judge -> synthesizer
 chimera solve "TASK" --verify "pytest -q" --isolate   # do a task; keep the change only if the check passes
+chimera solve-batch "TASK A" "TASK B"        # several tasks at once, each in its own git worktree
+chimera approve                        # answer a question the agent parked, from anywhere; omit the id to list them
 chimera crew "TASK" --mode supervisor         # a team of specialists tackles one task
 chimera crew-isolated "TASK" -W "name:role" --verify "..." --synthesize   # team, each in its own isolated copy
 chimera explore "where is login handled?"     # find the right files/lines, get a short answer
@@ -390,6 +398,7 @@ chimera skills-stats / skills-pending          # learned skills: usage, win rate
 chimera migrate <source> <dir> --apply         # import settings, skills, and memory from another agent tool
 chimera evolve status / tune / recipe          # optional: self-optimize; prepare data to fine-tune a model
 chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # honest A/B benchmarks: measure cost, quality & side effects before trusting a feature
+chimera redteam                        # the injection corpus through the governance stack; no key needed
 chimera pet new --name Chimi                   # adopt a small virtual companion :)
 ```
 
