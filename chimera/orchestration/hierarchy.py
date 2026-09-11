@@ -97,10 +97,12 @@ _SYNTH_SYSTEM = (
     # interface is translated into ten languages.
     "Answer in the SAME LANGUAGE the user's task is written in."
 )
-#: The sentence `HierarchyConfig.synthesis_verbatim` adds. `bench/hierarchy_equal_calls` (2026-09-11)
-#: measured the synthesis call as the place a weak backbone loses the workers' findings: 0.57 pass@1
-#: for the workers' summaries concatenated, 0.27 after the synthesis over them — the figures were in
-#: the summaries and not in the answer. This asks for them by name.
+#: The sentence `HierarchyConfig.synthesis_verbatim` adds — on by default. `bench/hierarchy_equal_calls`
+#: (2026-09-11) measured the synthesis call as the place a weak backbone loses the workers' findings:
+#: 0.57 pass@1 for the workers' summaries concatenated, 0.27 after the synthesis over them — the
+#: figures were in the summaries and not in the answer. With this sentence, 0.53, and no task moved
+#: the other way (RESULTS.md there). Measured on a 3B backbone only; a flag rather than a rewrite so
+#: the bench's old arm stays reproducible.
 _SYNTH_VERBATIM = (
     " Carry every figure, name, version, path and identifier from the summaries into the answer "
     "exactly as written — a value the summaries give is never rounded, paraphrased or left out, and "
@@ -200,9 +202,10 @@ class HierarchyConfig:
     worker_max_steps: int = 6
     effort: EffortPolicy = field(default_factory=EffortPolicy)
     spot_rate: float = 0.2
-    synthesis_verbatim: bool = False
-    """Append `_SYNTH_VERBATIM` to the synthesis system prompt. Off until `bench/hierarchy_equal_calls`
-    says what it buys on the backbone that loses the figures; see that bench's RESULTS.md."""
+    synthesis_verbatim: bool = True
+    """Append `_SYNTH_VERBATIM` to the synthesis system prompt. `bench/hierarchy_equal_calls` measured
+    it at +26 pp pass@1 on the 3B backbone that was losing the figures; `False` is the prompt as it
+    was, kept so that bench's `hierarchy` arm stays what it measured."""
     inline_below_spec_tokens: int = 0
     """Per-subtask gate (opt-in; 0 = off). A subtask whose rendered spec is smaller
     than this is answered INLINE by the trusted top model in one call — skipping the

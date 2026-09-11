@@ -181,7 +181,8 @@ def one(task: HierarchyTask, arm: str, rep: int, *, workdir: Path) -> Trial:
     elif arm == "single_equal":
         answer = _single(task, backend, refine_rounds=docs)
     elif arm == "hierarchy":
-        answer = _hierarchy(task, backend, synth=True, workdir=workdir)
+        # The prompt as it was before the verbatim sentence became the default (see RESULTS.md).
+        answer = _hierarchy(task, backend, synth=True, workdir=workdir, verbatim=False)
     elif arm == "hierarchy_verbatim":
         # The follow-up RESULTS.md named: the same D + 1 calls, the synthesis asked for the figures.
         answer = _hierarchy(task, backend, synth=True, workdir=workdir, verbatim=True)
