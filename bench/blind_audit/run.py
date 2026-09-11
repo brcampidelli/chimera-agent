@@ -66,15 +66,33 @@ _COMPARE_SYSTEM = (
 
 
 
+def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
+    """Retry a provider call on a 429. The weak tier is served from shared upstream pools that
+    overload for minutes at a time; one such minute must not end a run or bias its sample."""
+    for attempt in range(tries):
+        try:
+            return call()
+        except Exception as exc:  # noqa: BLE001 — only the rate-limit shape is retried
+            text = str(exc)
+            if attempt == tries - 1 or ("429" not in text and "rate-limit" not in text.lower()):
+                raise
+            time.sleep(wait * (attempt + 1))
+    raise RuntimeError("unreachable")
+
+
 class _Recording:
-    """Wraps a backend so the production verifier can be called unchanged while tokens are metered."""
+    """Wraps a backend so the production verifier can be called unchanged while tokens are metered.
+
+    Retries a 429 here rather than in the verifier, because `_spot_check` swallows every exception
+    into "spot check unavailable — passing through", and a rate-limited auditor would then be
+    recorded as a PASS."""
 
     def __init__(self, inner: Any) -> None:
         self.inner = inner
         self.results: list[Any] = []
 
     def complete(self, messages: Any, **kwargs: Any) -> Any:
-        result = self.inner.complete(messages, **kwargs)
+        result = _retrying(lambda: self.inner.complete(messages, **kwargs))
         self.results.append(result)
         return result
 
@@ -122,14 +140,17 @@ def audit_shipped(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, 
     rec = _Recording(gateway)
     verifier = EnvelopeVerifier(store=store, backend=rec, model=model, spot_rate=1.0)
     outcome = verifier.verify(spec, envelope, force_spot=True)
-    if "spot" not in outcome.checks_run:
-        raise RuntimeError(f"spot check did not run: {outcome.stage} {outcome.detail[:80]}")
+    if "spot" not in outcome.checks_run or outcome.stage != "spot":
+        # `_spot_check` returns None when the auditor call fails and `verify` then ACCEPTS the
+        # envelope un-spotted; that is the production behaviour and it must not be scored as a PASS.
+        raise RuntimeError(f"spot check did not decide: {outcome.stage} {outcome.detail[:80]}")
     return ("PASS" if outcome.passed else "FAIL"), outcome.detail, rec.results
 
 
 def audit_blind(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str) -> tuple[str, str, str, int, list[Any]]:
     """Stage 1 never sees the summary; stage 2 never sees the raw output."""
     raw = store.get(envelope.evidence_refs[0])
+    gateway = _Recording(gateway)
     stage1 = gateway.complete(
         [
             {"role": "system", "content": _EXTRACT_SYSTEM},
