@@ -602,6 +602,11 @@
             "title": "Asked At",
             "type": "number"
           },
+          "decision": {
+            "default": "review",
+            "title": "Decision",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"

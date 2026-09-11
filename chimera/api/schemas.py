@@ -1390,10 +1390,11 @@ class ApprovalOut(BaseModel):
     """One question waiting for a person, written by `pending.ask_durably` from an attended surface."""
 
     id: str
-    action: str  # often empty: the taint ledger describes the situation in `reason`, not the call
+    action: str  # `<tool>: <command | path | url>` — empty only on a question raised before 0.54
     reason: str
     asked_at: float
     age_seconds: float
+    decision: str = "review"  # the level of the verdict that raised it: block | review | warn
 
 
 class ApprovalAnswerIn(BaseModel):

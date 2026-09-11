@@ -159,6 +159,14 @@ class MemoryManager:
         ``persona`` facts (the durable cross-session profile) are NEVER pruned — they're identity,
         not budget fodder — so the ``max_items`` budget applies only to the prunable items. With
         ``dry_run=True`` nothing is deleted; the return value is how many WOULD be removed.
+
+        **What it evicts first, measured** (`bench/memory_prune`, 2026-09-11, deterministic): a
+        short fact written early — "the customer is allergic to penicillin", 40 characters — is
+        evicted at a 20% budget in 137 of 144 profiles, including keyed, user-written, semantic;
+        the seven survivors were all written LAST. Recency is the position in the store, specificity
+        is length, and neither knows what a fact is about (arXiv 2609.05767: no budget-time policy
+        can). A fact that must outlive any budget is written as ``persona`` — that is the mechanism,
+        and it is a decision the writer makes, not one this method can make for them.
         """
         from chimera.memory.value import rank
 
