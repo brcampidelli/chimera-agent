@@ -438,7 +438,7 @@ def test_the_posture_line_still_admits_an_unguarded_chat(
 
 #: Exactly the keys `chimera/api/code_api.py` emits for an `approval` frame. The client renders ONE
 #: card for both surfaces, so a key here that is not there — or missing — is a second card.
-APPROVAL_KEYS = {"id", "action", "reason", "asked_at", "wait_seconds"}
+APPROVAL_KEYS = {"id", "action", "reason", "asked_at", "wait_seconds", "decision"}
 
 
 def _announcing_client(tmp_path: Path) -> tuple[TestClient, ApprovalAnnouncer]:
