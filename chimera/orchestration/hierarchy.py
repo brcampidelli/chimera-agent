@@ -97,6 +97,15 @@ _SYNTH_SYSTEM = (
     # interface is translated into ten languages.
     "Answer in the SAME LANGUAGE the user's task is written in."
 )
+#: The sentence `HierarchyConfig.synthesis_verbatim` adds. `bench/hierarchy_equal_calls` (2026-09-11)
+#: measured the synthesis call as the place a weak backbone loses the workers' findings: 0.57 pass@1
+#: for the workers' summaries concatenated, 0.27 after the synthesis over them — the figures were in
+#: the summaries and not in the answer. This asks for them by name.
+_SYNTH_VERBATIM = (
+    " Carry every figure, name, version, path and identifier from the summaries into the answer "
+    "exactly as written — a value the summaries give is never rounded, paraphrased or left out, and "
+    "every part of the task gets its value."
+)
 
 # Write/edit intent markers -> sequential_write (multi-agent parallelism loses here).
 #
@@ -191,6 +200,9 @@ class HierarchyConfig:
     worker_max_steps: int = 6
     effort: EffortPolicy = field(default_factory=EffortPolicy)
     spot_rate: float = 0.2
+    synthesis_verbatim: bool = False
+    """Append `_SYNTH_VERBATIM` to the synthesis system prompt. Off until `bench/hierarchy_equal_calls`
+    says what it buys on the backbone that loses the figures; see that bench's RESULTS.md."""
     inline_below_spec_tokens: int = 0
     """Per-subtask gate (opt-in; 0 = off). A subtask whose rendered spec is smaller
     than this is answered INLINE by the trusted top model in one call — skipping the
@@ -905,7 +917,9 @@ class HierarchicalOrchestrator:
             "synthesizing", text=f"{len(envelopes)} summaries",
             envelopes=len(envelopes), fused=use_fusion,
         )
-        synth_system = self._owned(_SYNTH_SYSTEM)
+        synth_system = self._owned(
+            _SYNTH_SYSTEM + (_SYNTH_VERBATIM if self.config.synthesis_verbatim else "")
+        )
         if fusion is not None:
             _log.debug("envelopes conflict — engaging fusion for the final synthesis")
             result = fusion.complete(
