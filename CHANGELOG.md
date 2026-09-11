@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Three catalogue entries said what the index said on another day.** The `-m integration` check that runs on `main` went red on the 0.53.0 commit: `glm-5.3-flash` had **doubled** to 0.15/0.50, `deepseek-chat-v3.1` read 0.25/0.95 against a catalogue 0.55/1.65, and `glm-4.6` promised a 204k window where the provider serves 198,000. The second is the interesting one — the note beside it argued *"a price does not halve and double back overnight, so the survey misread it"*, and the index has now done exactly that twice in a week: OpenRouter quotes whichever route it currently prefers, so a static figure for that model is right on some days by construction. All three carry today's readings and a note that says so; a receipt should be priced from the live index, and the table is the fallback.
+
+
 ## [0.53.0] - 2026-09-10
 
 ### Added
