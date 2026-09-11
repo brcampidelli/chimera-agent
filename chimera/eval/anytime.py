@@ -76,6 +76,28 @@ def best_possible_wilson(n: int, k: int = 1, alpha: float = 0.05) -> float:
     return wilson_lower_best_of(n, n, k, alpha)
 
 
+def spend_across(z: float, decisions: int) -> float:
+    """The ``z`` one decision may use when ``decisions`` of them share one error budget.
+
+    A gate that promotes when a one-sided interval clears zero at ``z`` spends
+    ``α = 1 − Φ(z)`` per decision. A loop that makes ``R`` such decisions in a row — a spec search
+    proposing a candidate per round, an evolution loop peeking after every batch — spends it ``R``
+    times, and the chance that at least one null candidate is promoted somewhere in the search is
+    ``1 − (1 − α)^R``: about 22% over ten rounds at the 2.5% the default ``z`` buys. That is the
+    multiplicity PACE (arXiv 2606.08106) and GRASP (2605.29668) budget for, and what this project's
+    study 10 found in ``auto_evolve`` and left unfixed.
+
+    Bonferroni, deliberately: it holds for any dependence between the rounds (a search's rounds are
+    not independent — the incumbent carries over), it needs no assumption the loop cannot check, and
+    the price — a wider interval per round — is the price of a decision that means what it says.
+    Returns ``z`` unchanged for one decision.
+    """
+    if decisions <= 1:
+        return z
+    alpha = 1.0 - NormalDist().cdf(z)
+    return NormalDist().inv_cdf(1.0 - alpha / decisions)
+
+
 def proportion_diff_ci(
     s1: int, n1: int, s2: int, n2: int, z: float = Z95
 ) -> tuple[float, float]:
