@@ -54,6 +54,52 @@ _SPOT_SYSTEM = (
 # Named decomposed checks; any one FAILing (or the legacy holistic 'UNFAITHFUL') fails the spot check.
 _CRITERIA = ("INVENTED", "DROPPED", "CONTRADICT")
 
+# The blind audit (arXiv 2609.07680, `bench/blind_audit`): stage 1 reads the RAW OUTPUT and never the
+# summary, so the worker's leading conclusion cannot shape what it lists; stage 2 reads the list and
+# the summary and never the raw output, so it can only compare. Measured 2026-09-11 on 23 worker
+# outputs with one critical finding planted where `_distill` cuts: the shipped one-call auditor above
+# (summary + raw + "do not trust") said DROPPED on **4 of 23**; this two-call form on **19 of 23** —
+# and on 11 of 23 summaries that dropped nothing, which is the paper's stated cost and why the
+# result is a RECOVERY (the absent findings are appended to the summary) and never a rejection.
+EXTRACT_SYSTEM = (
+    "You are a strict verification auditor. You receive a task and a worker's RAW OUTPUT for it. "
+    "List every result the raw output establishes that the task asks for — one finding per line, "
+    "numbered. Mark with [CRITICAL] any finding a reader of this task must not miss: a failure, a "
+    "security or data exposure, an escalation, a blocker, a contradiction with what the task expects. "
+    "Do not summarise, do not judge quality, do not add findings the raw output does not contain. "
+    "Reply with the numbered list only."
+)
+COMPARE_SYSTEM = (
+    "You compare a numbered list of findings against a SUMMARY of the same work. For each finding, "
+    "reply on its own line with its number and PRESENT if the summary conveys that finding (same "
+    "substance, any wording) or ABSENT if it does not. Then reply with exactly one final line: "
+    "'DROPPED: FAIL' if any finding marked [CRITICAL] is ABSENT, otherwise 'DROPPED: PASS'."
+)
+_FINDING = re.compile(r"^\s*(\d+)[.)]?\s*(.+?)\s*$", re.MULTILINE)
+_VERDICT_LINE = re.compile(r"^\s*(\d+)[.)]?\s*[:\-]?\s*(PRESENT|ABSENT)\b", re.IGNORECASE | re.MULTILINE)
+#: How many recovered findings a summary may grow by, and how long each may be. A bound, because
+#: the extractor's list is model-written and an unbounded append would make the audit the loudest
+#: voice in the synthesis.
+_MAX_RECOVERED = 6
+_MAX_RECOVERED_CHARS = 300
+
+
+def absent_critical(findings: str, verdicts: str) -> list[str]:
+    """The [CRITICAL] findings stage 2 marked ABSENT, in stage 1's order, bounded and clean."""
+    listed = {int(num): text for num, text in _FINDING.findall(findings)}
+    absent = {int(num) for num, status in _VERDICT_LINE.findall(verdicts) if status.upper() == "ABSENT"}
+    out: list[str] = []
+    for num in sorted(absent):
+        text = listed.get(num, "")
+        if "[critical]" not in text.lower():
+            continue
+        clean = " ".join(text.replace("[CRITICAL]", "").replace("[critical]", "").split())
+        if clean:
+            out.append(clean[:_MAX_RECOVERED_CHARS])
+        if len(out) >= _MAX_RECOVERED:
+            break
+    return out
+
 
 def _grade_faithfulness(text: str) -> bool:
     """True if the auditor's reply indicates faithfulness. Handles the decomposed and legacy formats.
@@ -91,6 +137,10 @@ class VerifyOutcome:
     escalate: bool = False
     """True when the spot check disagreed with the summary — the orchestrator
     should treat the envelope as suspect (re-ask or read evidence itself)."""
+    recovered: tuple[str, ...] = ()
+    """Critical findings the blind audit found in the raw output and not in the summary. Never a
+    reason to fail: the orchestrator appends them to the summary so the synthesis can see what the
+    distillation cut. Empty when the audit did not run or found nothing absent."""
 
 
 class EnvelopeVerifier:
@@ -106,10 +156,15 @@ class EnvelopeVerifier:
         verifier_model: str | None = None,
         spot_rate: float = 0.2,
         rng: random.Random | None = None,
+        recover_dropped: bool = True,
     ) -> None:
         self.store = store
         self.backend = backend
         self.model = model
+        #: Whether a spot check is followed by the blind audit that RECOVERS dropped findings. On by
+        #: default: it runs only where the spot check runs (evidence on disk, sampled or forced), it
+        #: costs two more calls there, and its output is an append, never a verdict.
+        self.recover_dropped = recover_dropped
         # Cross-provider auditing (M18-2): the spot checker prefers a DISTINCT provider/model so a
         # model never grades its own family's output. Falls back to the worker's backend when none is
         # given (still a re-derivation from the raw artifact, just not provider-independent).
@@ -155,9 +210,50 @@ class EnvelopeVerifier:
             ran.append("spot")
             outcome = self._spot_check(spec, envelope)
             if outcome is not None:
+                if outcome.passed and self.recover_dropped:
+                    # The shipped auditor passed the summary. It passes summaries that dropped a
+                    # critical finding 19 times in 23 (`bench/blind_audit`), so the blind audit runs
+                    # behind it and hands back what the distillation cut. Recovery, not a verdict.
+                    ran.append("recover")
+                    outcome = replace(outcome, recovered=self._recover_dropped(spec, envelope))
                 return replace(outcome, checks_run=tuple(ran))
 
         return VerifyOutcome(passed=True, stage="accepted", checks_run=tuple(ran))
+
+    def _recover_dropped(self, spec: TaskSpec, envelope: ResultEnvelope) -> tuple[str, ...]:
+        """The blind audit: extract from the raw output alone, compare against the summary alone.
+
+        Returns the critical findings the summary lacks; empty on any failure, because a recovery
+        that cannot run is a summary left as it was, which is what shipped before it existed.
+        """
+        try:
+            raw = self.store.get(envelope.evidence_refs[0])
+            stage1 = self._spot_backend.complete(  # type: ignore[union-attr]
+                [
+                    {"role": "system", "content": EXTRACT_SYSTEM},
+                    {"role": "user", "content": (
+                        f"## Task\n{spec.objective}\n\n## Raw output (may be truncated)\n"
+                        f"{raw[:_SPOT_ARTIFACT_CHARS]}"
+                    )},
+                ],
+                model=self._spot_model,
+                temperature=0.0,
+            )
+            findings = (stage1.content or "").strip()
+            if "[critical]" not in findings.lower():
+                return ()
+            stage2 = self._spot_backend.complete(  # type: ignore[union-attr]
+                [
+                    {"role": "system", "content": COMPARE_SYSTEM},
+                    {"role": "user", "content": f"## Findings\n{findings}\n\n## Summary\n{envelope.summary}"},
+                ],
+                model=self._spot_model,
+                temperature=0.0,
+            )
+            return tuple(absent_critical(findings, (stage2.content or "").strip()))
+        except Exception as exc:  # the recovery must never take the pipeline down
+            _log.warning("blind audit unavailable (%s) — summary left as it was", exc)
+            return ()
 
     def _spot_check(self, spec: TaskSpec, envelope: ResultEnvelope) -> VerifyOutcome | None:
         """Grade summary faithfulness against the raw artifact. None = check unavailable."""
