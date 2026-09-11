@@ -1,0 +1,2882 @@
+[
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "first",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "middle",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "episodic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "none",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": false
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "chimera",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.2,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 50,
+  "seed": 3,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 1,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 2,
+  "kept": true
+ },
+ {
+  "position": "last",
+  "kind": "semantic",
+  "key": "keyed",
+  "source": "user",
+  "budget": 0.5,
+  "n": 200,
+  "seed": 3,
+  "kept": true
+ }
+]
