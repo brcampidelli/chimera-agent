@@ -89,8 +89,9 @@ class TrustKernel:
         context: str = "",
         record_as: str | None = None,
         document: str = "",
+        lineage: str = "",
     ) -> Verdict:
-        """Decide on ``action``, optionally told *why* it is happening.
+        """Decide on ``action``, optionally told *why* it is happening and under what authority.
 
         ``context`` was declared here and read nowhere: the signature accepted it, the body never
         mentioned it, and the one production caller (``GovernedTool``) never passed it. A parameter
@@ -105,6 +106,14 @@ class TrustKernel:
         It deliberately does NOT reach the precedent store: precedents are keyed on the action, and
         folding context into that key would fragment the cache so finely that nothing would ever
         match twice — turning a cost optimisation into a cost multiplier.
+
+        ``lineage`` does reach it. It is the authority the action is taken under — ``""`` while the
+        run is clean, ``"tainted"`` once it has consumed untrusted content (the ledger's
+        :meth:`~chimera.governance.ledger.TaintLedger.run_tainted`) — and a precedent learned under
+        one never answers under the other: the same ``curl`` is a different case after the run has
+        read a page that can name it (arXiv 2609.08472; the question side of the same defect was
+        measured in `bench/right_hand_governance`, #425). Two values, so the cache halves at worst.
+        The audit line carries it when it is set.
 
         ``document`` is the body the tool is about to write, kept apart from ``action`` so that
         command signatures are not matched against prose. It reaches the **rules** only. It is
@@ -121,7 +130,7 @@ class TrustKernel:
         # Precedent RAG: a confirmed precedent (2 judges agreed) answers a similar
         # action cheaply, before the expensive judge is consulted again.
         if verdict is None and self.precedents is not None:
-            recalled = self.precedents.recall(action)
+            recalled = self.precedents.recall(action, lineage=lineage)
             if recalled is not None:
                 verdict = Verdict(recalled, "matched a confirmed precedent", "precedent")
                 source = "precedent"
@@ -132,7 +141,7 @@ class TrustKernel:
                 verdict = cast("JudgeFn", self.judge)(action)
             source = "judge"
             if self.precedents is not None:
-                self.precedents.observe(action, verdict.decision)
+                self.precedents.observe(action, verdict.decision, lineage=lineage)
         if verdict is None:
             verdict = Verdict(self.default, "no rule matched; default policy", "default")
             source = "default"
@@ -152,6 +161,7 @@ class TrustKernel:
                     # Truncated like ``action`` above, and omitted when empty so the log does not
                     # grow a column of empty strings for the callers that have no context to give.
                     **({"context": context[:200]} if context else {}),
+                    **({"lineage": lineage} if lineage else {}),
                 },
             )
         return verdict

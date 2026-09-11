@@ -633,6 +633,7 @@ def assemble_registry(
         surface=surface,
         attended=False,
         audit_allows=False,
+        lineage=ledger.lineage,
     )
     return ledger_registry(
         step.registry,

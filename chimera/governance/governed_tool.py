@@ -33,6 +33,11 @@ from chimera.tools.registry import ToolRegistry
 ApproveFn = Callable[[Verdict, str], bool]
 #: Supplies the reason an action is being taken, read fresh at each tool call.
 ContextFn = Callable[[], str]
+#: Supplies the authority an action is taken under, read fresh at each tool call: ``""`` while the
+#: run is clean, ``"tainted"`` once it has consumed untrusted content. The kernel keys its case law
+#: on it (`precedent.py`). See :func:`~chimera.governance.ledger.lineage_of` for the one the
+#: assemblies pass.
+LineageFn = Callable[[], str]
 
 
 #: Argument names whose value is a document, not an identifier. Their contents never reach the audit.
@@ -203,10 +208,14 @@ class GovernedTool(Tool):
         context: ContextFn | None = None,
         ledger: ApprovalLedger | None = None,
         no_approver: str = "",
+        lineage: LineageFn | None = None,
     ) -> None:
         self.inner = inner
         self.kernel = kernel
         self.approve = approve
+        # Under what authority the call is made — the taint ledger's bit, read at call time because
+        # a run is clean until the fetch that taints it, and the wrapper is built before that fetch.
+        self.lineage = lineage
         # WHY no approver can say yes here, or "" when one genuinely can. Two situations produce the
         # same refusal and need different sentences: an approver was asked and declined, and no
         # approver could be asked at all. Only the assembly knows which — `profile.py` is where the
@@ -249,6 +258,7 @@ class GovernedTool(Tool):
             context=self._context(),
             record_as=f"{self.name} {elide_values(kwargs)}",
             document=document,
+            lineage=self._lineage(),
         )
         if verdict.decision == Decision.BLOCK:
             # Says WHOSE decision it was. The old text named only the reason, so an operator reading
@@ -308,6 +318,19 @@ class GovernedTool(Tool):
             )
         return "Nobody approved it."
 
+    def _lineage(self) -> str:
+        """The run's authority label, or ``""``. Fails OPEN like `_context`, and the two failures
+        are not the same: a lineage callable that raises makes the kernel consult the clean
+        partition, so a precedent learned clean could answer a tainted call — the defect this
+        parameter exists to close, for that one call. It still beats the alternative, which is a
+        typo in somebody's callable refusing every tool in the run."""
+        if self.lineage is None:
+            return ""
+        try:
+            return str(self.lineage() or "")
+        except Exception:  # noqa: BLE001 — see docstring
+            return ""
+
     def _context(self) -> str:
         """The current task, or ``""``. Never raises: a broken provider must not block a tool.
 
@@ -331,6 +354,7 @@ def govern_registry(
     context: ContextFn | None = None,
     ledger: ApprovalLedger | None = None,
     no_approver: str = "",
+    lineage: LineageFn | None = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`GovernedTool`.
 
@@ -343,7 +367,7 @@ def govern_registry(
         governed.register(
             GovernedTool(
                 tool, kernel, approve=approve, context=context, ledger=ledger,
-                no_approver=no_approver,
+                no_approver=no_approver, lineage=lineage,
             )
         )
     return governed
