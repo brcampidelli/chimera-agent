@@ -131,8 +131,8 @@ def report(path: Path) -> str:
         f"- instrument: hidden test fails on the base in {len(valid)}/{len(rows)} tasks"
         + (f" (excluded: {', '.join(excluded)})" if excluded else ""),
         f"- tasks where the generator produced a module: {len(with_tests)}/{len(valid)}",
-        f"- generated test functions: {funcs}; **pass on the buggy base: {vac}/{funcs}** "
-        f"({vac / funcs:.2f} if funcs else n/a, Wilson 95% [{lo:.2f}, {hi:.2f}])" if funcs else "- no functions",
+        (f"- generated test functions: {funcs}; **pass on the buggy base: {vac}/{funcs}** "
+         f"({vac / funcs:.2f}, Wilson 95% [{lo:.2f}, {hi:.2f}])") if funcs else "- no functions",
         f"- fail on the base: {sum(r['failed_on_base'] for r in with_tests)}; error: {sum(r['errored_on_base'] for r in with_tests)}",
         f"- **tasks where EVERY generated test passes on the buggy base: {all_pass}/{len(with_tests)}** — "
         f"the shipped verifier would have reported a green `evidence=\"verifier\"` on a workspace that still holds the bug",
