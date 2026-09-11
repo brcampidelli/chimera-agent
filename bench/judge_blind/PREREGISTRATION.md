@@ -44,7 +44,7 @@ answer is right and at least one is wrong** are kept.
 the 400-question cap. An instrument that cannot exhibit a disagreement cannot measure a judge, so
 the writers moved down to 3B–8B models; nothing else in the design changed, and the names the judge
 is shown are still the production panel's. The judge is then shown those answers **under the
-production panel's names**, rotated: the same mistral text is labelled `claude-opus-5` in one run
+production panel's names**, rotated: the same llama text is labelled `claude-opus-5` in one run
 and `gemini-3.8-flash` in another. That is the manipulation — the text never changes, only the name
 and the position — and it is the only way to attribute an effect to the label rather than to the
 answer.
