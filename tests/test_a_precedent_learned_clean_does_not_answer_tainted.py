@@ -209,3 +209,51 @@ def test_governed_profile_tells_the_kernel_the_ledger_it_wraps_the_tools_in(tmp_
     assert len(shell) >= 2, shell
     assert "lineage" not in shell[0]
     assert shell[-1]["lineage"] == "tainted"
+
+
+def _kernel_wrapper(registry: Any, name: str = "run_shell") -> Any:
+    tool = registry.get(name)
+    while tool is not None and type(tool).__name__ != "GovernedTool":
+        tool = getattr(tool, "_inner", None) or getattr(tool, "inner", None)
+    return tool
+
+
+def test_the_api_assembly_tells_the_kernel_its_ledger(tmp_path: Path) -> None:
+    """`assemble_registry` builds the ledger before the kernel; the kernel reads it. The wrapper is
+    driven directly because the outer taint narrowing would refuse a tainted `run_shell` before the
+    kernel saw it, and this test is about what the kernel is told, not about the narrowing."""
+    from chimera.api.code_api import CodeSeams, assemble_registry
+    from chimera.config import Settings
+    from chimera.providers import LLMGateway
+
+    home = tmp_path / "home"
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    settings = Settings(CHIMERA_HOME=str(home), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type]
+    registry, ledger = assemble_registry(CodeSeams(), ws, settings, LLMGateway(), steps=2)
+    governed = _kernel_wrapper(registry)
+    assert governed is not None
+    governed.run(command="git push --force origin main")  # REVIEW: written even with allows muted
+    ledger.record_fetch("https://example.test/page", "payload")
+    governed.run(command="git push --force origin main")
+    lines = [r for r in _governance_lines(home) if "push --force" in r.get("action", "")]
+    assert len(lines) == 2, lines
+    assert "lineage" not in lines[0]
+    assert lines[1]["lineage"] == "tainted"
+
+
+def test_the_terminal_assembly_tells_the_kernel_its_ledger(tmp_path: Path) -> None:
+    from chimera.cli.right_hand import build_right_hand
+    from chimera.config import Settings
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type]
+    hand = build_right_hand(tmp_path, settings=settings, surface="test", base=_registry())
+    governed = _kernel_wrapper(hand.registry)
+    assert governed is not None
+    governed.run(command="git push --force origin main")
+    hand.ledger.record_fetch("https://example.test/page", "payload")
+    governed.run(command="git push --force origin main")
+    lines = [r for r in _governance_lines(tmp_path) if "push --force" in r.get("action", "")]
+    assert len(lines) == 2, lines
+    assert "lineage" not in lines[0]
+    assert lines[1]["lineage"] == "tainted"
