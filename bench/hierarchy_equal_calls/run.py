@@ -78,6 +78,44 @@ class _Metered:
         return result
 
 
+def planted_facts(task: HierarchyTask) -> list[str]:
+    """The `- fact` lines under `## Key items` in each document — the facts the grader is about."""
+    facts: list[str] = []
+    for content in task.docs.values():
+        in_items = False
+        for line in content.splitlines():
+            if line.startswith("## Key items"):
+                in_items = True
+            elif in_items and line.startswith("- "):
+                facts.append(line[2:].strip())
+            elif in_items and line.startswith("#"):
+                in_items = False
+    return facts
+
+
+def _tokens_of(fact: str) -> set[str]:
+    """What an answer must carry to have reported this fact: its last word and its last figure.
+
+    `hierarchy_ab.check` wants the first figure and the word after it, verbatim — "3.1 requires" for
+    "Alpha 3.1 requires Python 3.12" — which grades the phrasing rather than the reading: the pilot's
+    single call answered "**Alpha 3.1** · Requires: Python 3.12" and failed every needle. The mid
+    model happened to write the sentence back verbatim; an 8B model does not, and a grader that
+    measures that difference is measuring style (§2l). Two tokens per fact, both values.
+    """
+    words = [w.strip(".,;:*`") for w in fact.split()]
+    out = {words[-1].lower()}
+    digits = [w for w in words if any(ch.isdigit() for ch in w)]
+    if digits:
+        out.add(digits[-1].lower())
+    return {w for w in out if w}
+
+
+def value_check(task: HierarchyTask, answer: str) -> bool:
+    """Every planted fact's value tokens appear in the answer. Robust to formatting, strict on values."""
+    low = answer.lower()
+    return all(all(tok in low for tok in _tokens_of(fact)) for fact in planted_facts(task))
+
+
 @dataclass
 class Trial:
     task_id: str
@@ -86,6 +124,8 @@ class Trial:
     docs: int
     calls: int
     passed: bool
+    passed_verbatim: bool
+    """`hierarchy_ab.check` — the published grader, reported beside the value grader, never used."""
     answer: str
     tokens: int
     usd: float | None
@@ -140,7 +180,8 @@ def one(task: HierarchyTask, arm: str, rep: int, *, workdir: Path) -> Trial:
     else:
         answer = _hierarchy(task, backend, synth=False, workdir=workdir)
     return Trial(
-        task_id=task.id, arm=arm, rep=rep, docs=docs, calls=backend.calls, passed=task.check(answer),
+        task_id=task.id, arm=arm, rep=rep, docs=docs, calls=backend.calls, passed=value_check(task, answer),
+        passed_verbatim=task.check(answer),
         answer=answer, tokens=backend.tokens, usd=(None if backend.unpriced else backend.usd),
         seconds=round(time.monotonic() - t0, 1),
     )

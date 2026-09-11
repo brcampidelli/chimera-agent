@@ -30,6 +30,16 @@ ceiling: `openrouter/meta-llama/llama-3.1-8b-instruct` (weak, 128k context). The
 across arms, as in the paper — every call in every arm is the same model, so the comparison is
 about the *arrangement of calls*, not about model strength.
 
+*Amendment, same day, after a one-task pilot and before the registered run:* the published
+grader `hierarchy_ab.check` wants the first figure of each fact **and the word after it**,
+verbatim — `"3.1 requires"` for *"Alpha 3.1 requires Python 3.12"*. The pilot's single call answered
+*"**Alpha 3.1** · Requires: Python 3.12"* — the right value, a different phrasing — and failed all
+four needles; so did every other arm. The mid model in `bench/hierarchy` wrote the sentences back
+verbatim; an 8B model does not, and a grader that scores that difference is scoring style (§2l).
+This bench grades **values**: for each planted fact, its last word and its last figure must appear
+(`value_check`); the verbatim verdict is recorded beside it, never used. The pilot trial is kept
+in `results/pilot.jsonl` and is not part of the run.
+
 **Instrument check, first:** the single-call arm must land between 20% and 85% pass@1 over
 10 tasks × 3 runs. Above 85% the ceiling is back and the run is void (reported, not scored); below
 20% the model cannot do the task at all and the comparison is between two failures.
