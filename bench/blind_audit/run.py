@@ -143,7 +143,10 @@ def audit_shipped(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, 
         # `_spot_check` returns None when the auditor call fails and `verify` then ACCEPTS the
         # envelope un-spotted; that is the production behaviour and it must not be scored as a PASS.
         raise RuntimeError(f"spot check did not decide: {outcome.stage} {outcome.detail[:80]}")
-    return ("PASS" if outcome.passed else "FAIL"), outcome.detail, rec.results
+    # The auditor's verdict is read off its reply, not off `passed`: with the recovery on, a
+    # DROPPED verdict passes the envelope and appends what was named, and `passed` would read PASS
+    # for every row. `recover_dropped=False` above keeps the two readings identical either way.
+    return ("PASS" if _grade_faithfulness(outcome.detail) else "FAIL"), outcome.detail, rec.results
 
 
 def audit_blind(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str) -> tuple[str, str, str, int, list[Any]]:
