@@ -200,7 +200,7 @@ def test_governed_profile_tells_the_kernel_the_ledger_it_wraps_the_tools_in(tmp_
     from chimera.config import Settings
     from chimera.governance.profile import governed_profile
 
-    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type]
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type,call-arg]
     registry, _ = governed_profile(_registry(), settings=settings, home=tmp_path, surface="test")
     registry.get("run_shell").run(command="echo one")
     registry.get("http_get").run(url="https://example.test/page")  # taints the run
@@ -229,7 +229,7 @@ def test_the_api_assembly_tells_the_kernel_its_ledger(tmp_path: Path) -> None:
     home = tmp_path / "home"
     ws = tmp_path / "ws"
     ws.mkdir()
-    settings = Settings(CHIMERA_HOME=str(home), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type]
+    settings = Settings(CHIMERA_HOME=str(home), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type,call-arg]
     registry, ledger = assemble_registry(CodeSeams(), ws, settings, LLMGateway(), steps=2)
     governed = _kernel_wrapper(registry)
     assert governed is not None
@@ -246,7 +246,7 @@ def test_the_terminal_assembly_tells_the_kernel_its_ledger(tmp_path: Path) -> No
     from chimera.cli.right_hand import build_right_hand
     from chimera.config import Settings
 
-    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type]
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_GOVERNANCE="observe")  # type: ignore[arg-type,call-arg]
     hand = build_right_hand(tmp_path, settings=settings, surface="test", base=_registry())
     governed = _kernel_wrapper(hand.registry)
     assert governed is not None
