@@ -73,3 +73,12 @@ do, which is a biased slice of a contaminated set — fine for "does the judge c
 wrong for any statement about AIME accuracy. One judge, one synthesiser (not the production one),
 writers weaker than the production panel under its names. Integer answers: nothing here bears on a
 fused prose turn, where the paper's bias may be larger and nothing is checkable.
+
+## Amendments
+
+1. *(2026-09-11, after 50 of 90 problems were asked, before any pipeline call.)* The collection is
+   stopped at 50. Zero items met the filter: the judge fails both attempts on 7 of 50, and on those
+   seven the reasoning writers return an empty text on 13 of 21 slots (the reasoning spends the
+   16k budget — the runaway `bench/spec_test_vacuity`'s probe measured the same day). The two
+   clauses of the filter select against each other, and the projection at 90 was zero or one. The
+   remaining ≈ US$ 2 is not spent. The pipeline is not run; RESULTS.md reads the fifty rows.

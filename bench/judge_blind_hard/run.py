@@ -4,6 +4,10 @@ Registered in `PREREGISTRATION.md` before any model call. The follow-up `bench/j
 Same pipeline, same design, same report as `bench/judge_blind` — imported from there — with a corpus
 the judge cannot solve: AIME problems on which the production judge, asked twice, was wrong twice.
 
+**The corpus could not be built** (RESULTS.md): on the problems the judge fails, the reasoning
+writers return nothing, so `--collect` kept 0 of 50 and was stopped. The runner stays as the
+pipeline for the next instrument RESULTS.md prices; `--run` was never invoked.
+
     python bench/judge_blind_hard/run.py --collect
     python bench/judge_blind_hard/run.py --run
     python bench/judge_blind_hard/run.py --report bench/judge_blind_hard/results/<tag>.jsonl
