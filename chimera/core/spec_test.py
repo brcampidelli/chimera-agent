@@ -17,10 +17,15 @@ wrong code the coverage grade would have passed.
 from __future__ import annotations
 
 import re
+import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from chimera.core.checklist import Requirement
 from chimera.core.verify import CommandVerifier, VerificationResult
+
+if TYPE_CHECKING:
+    from chimera.core.checkpoint import FileSnapshot
 from chimera.providers.gateway import Message, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -28,6 +33,22 @@ _log = get_logger("core.spec_test")
 _FENCE = re.compile(r"^\s*```(?:python)?\s*|\s*```\s*$", re.IGNORECASE | re.MULTILINE)
 _TEST_FILE = "test_chimera_spec.py"
 _MAX_DIGEST_CHARS = 12_000
+#: One line per test in pytest's `-rA` short summary: `PASSED file::name`, `FAILED file::name - …`.
+_OUTCOME = re.compile(r"^(PASSED|FAILED|ERROR|XFAIL|XPASS|SKIPPED)\s+(\S+?)::(\w+)", re.MULTILINE)
+
+
+def parse_outcomes(output: str, file: str) -> dict[str, str]:
+    """Per-test outcomes read off a `pytest -rA` run of ``file``: ``{test_name: PASSED|FAILED|…}``.
+
+    Empty when pytest never reached the tests — a collection error, a missing module, a crash — and
+    that emptiness is meaningful: on the base workspace it says every test "failed" before the
+    change (there was nothing to import), which is the ExecCritic condition for evidence.
+    """
+    out: dict[str, str] = {}
+    for status, path, name in _OUTCOME.findall(output):
+        if path.replace("\\", "/").endswith(file):
+            out[name] = status
+    return out
 
 _GEN_SYSTEM = (
     "You write ONE self-contained pytest module that checks whether the code in the current "
@@ -120,7 +141,7 @@ class SpecTestVerifier:
         requirements: list[Requirement],
         workspace: Path,
         *,
-        command: str = "python -m pytest -q {file}",
+        command: str = "python -m pytest -q -rA {file}",
         timeout: int = 120,
     ) -> None:
         self.generator = generator
@@ -130,6 +151,15 @@ class SpecTestVerifier:
         self.command = command
         self.timeout = timeout
         self._generated: str | None = None  # None = not attempted; "" = attempted, unusable
+        #: The workspace as it was BEFORE the attempt, when the caller has one (the verify-or-revert
+        #: loop snapshots it at `autonomous.py` before the worker runs). With it, a generated test
+        #: is evidence only if it fails before the change and passes after (ExecCritic, arXiv
+        #: 2609.09133): a test that passes on both measured nothing and is excluded from the
+        #: verdict; if none remain, the verifier abstains rather than reporting a green it cannot
+        #: back. Measured before this existed (`bench/spec_test_vacuity`): see RESULTS.md there.
+        #: None keeps the behaviour byte-identical to before — the whole module runs on the
+        #: candidate and its exit code decides.
+        self.base_snapshot: FileSnapshot | None = None
 
     def verify(self) -> VerificationResult:
         if self._generated is None:
@@ -162,8 +192,77 @@ class SpecTestVerifier:
         # that could not be checked came out as `evidence="verifier"`, a receipt naming a test that
         # never reached a verdict. Fixing the runner without this line would have made that worse,
         # by turning a wrong failure into a confident wrong pass.
-        return VerificationResult(
-            result.passed,
-            f"spec-grounded tests ({_TEST_FILE}):\n{result.output}",
-            abstained=result.abstained,
+        if self.base_snapshot is None or result.abstained:
+            return VerificationResult(
+                result.passed,
+                f"spec-grounded tests ({_TEST_FILE}):\n{result.output}",
+                abstained=result.abstained,
+            )
+        return self._against_base(code, result)
+
+    def _against_base(self, code: str, candidate: VerificationResult) -> VerificationResult:
+        """The ExecCritic gate: keep only the tests that could have failed before the change.
+
+        The base snapshot is materialised into a temporary directory (text files only — a snapshot
+        never holds binaries, and a base that cannot be rebuilt is reported, not guessed), the same
+        module runs there under the same command, and each test is classified by its two outcomes:
+
+        - passes before and after → **vacuous** for this change, excluded from the verdict;
+        - fails before, passes after → **discriminating**, the evidence the receipt may name;
+        - passes before, fails after → **regression**, fails the attempt;
+        - fails on both → unchanged from today: the candidate did not satisfy the spec.
+
+        No per-test line on the base (collection error, missing module) means every test failed
+        before the change, which is the ordinary case for a task that creates the module.
+        """
+        after = parse_outcomes(candidate.output, _TEST_FILE)
+        if not after:
+            # The candidate run produced no per-test lines: a collection error or a crash. That is
+            # a failure of the candidate as it always was, and there is nothing to classify.
+            return VerificationResult(
+                candidate.passed,
+                f"spec-grounded tests ({_TEST_FILE}):\n{candidate.output}",
+                abstained=candidate.abstained,
+            )
+        assert self.base_snapshot is not None
+        with tempfile.TemporaryDirectory(prefix="chimera-base-") as tmp:
+            root = Path(tmp)
+            for rel, content in self.base_snapshot.files.items():
+                if rel == _TEST_FILE:
+                    continue
+                target = root / rel
+                try:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(content, encoding="utf-8")
+                except OSError as exc:
+                    return VerificationResult(
+                        candidate.passed,
+                        f"spec-grounded tests ({_TEST_FILE}):\n{candidate.output}\n"
+                        f"(the base workspace could not be rebuilt to check the tests against it: {exc})",
+                        abstained=candidate.abstained,
+                    )
+            (root / _TEST_FILE).write_text(code, encoding="utf-8")
+            base_run = CommandVerifier(
+                self.command.format(file=_TEST_FILE), root, timeout=self.timeout, source="spec_test"
+            ).verify()
+        before = parse_outcomes(base_run.output, _TEST_FILE)
+        vacuous = sorted(t for t, s in after.items() if s == "PASSED" and before.get(t) == "PASSED")
+        regressions = sorted(t for t, s in after.items() if s != "PASSED" and before.get(t) == "PASSED")
+        failing = sorted(t for t, s in after.items() if s != "PASSED" and before.get(t) != "PASSED")
+        discriminating = sorted(t for t, s in after.items() if s == "PASSED" and before.get(t) != "PASSED")
+        summary = (
+            f"spec-test against the pre-change workspace: {len(discriminating)} discriminating, "
+            f"{len(vacuous)} vacuous (pass before and after — excluded), {len(regressions)} regression(s), "
+            f"{len(failing)} failing"
         )
+        if vacuous:
+            summary += "; vacuous: " + ", ".join(vacuous)
+        output = f"spec-grounded tests ({_TEST_FILE}):\n{candidate.output}\n{summary}"
+        if regressions or failing:
+            return VerificationResult(False, output)
+        if not discriminating:
+            # Every test the generator wrote passes on the base too: nothing here measured the
+            # change, and a green verdict would name evidence that does not exist. ABSTAIN, so the
+            # caller falls back to its other gates — the same rule as "no runnable tests".
+            return VerificationResult(True, output + " — no test could have failed before the change", abstained=True)
+        return VerificationResult(True, output)

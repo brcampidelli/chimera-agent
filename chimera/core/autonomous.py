@@ -33,7 +33,7 @@ if TYPE_CHECKING:
 
 from chimera.core.agent import AgentResult
 from chimera.core.checklist import RequirementChecklist
-from chimera.core.checkpoint import WorkspaceGuard
+from chimera.core.checkpoint import FileSnapshot, WorkspaceGuard
 from chimera.core.contract import CompletionContract
 from chimera.core.events import AgentEvent, EventSink
 from chimera.core.events import attempt as _ev_attempt
@@ -963,7 +963,7 @@ class AutonomousAgent:
             # failing attempt. Otherwise the Manager's approval is the gate. This
             # stops a strict reviewer from vetoing — and reverting — verified-correct
             # work just because it judged the narration rather than the artifact.
-            verified, vout, abstained = self._verify()
+            verified, vout, abstained = self._verify(snapshot)
             # A verifier that ABSTAINED (e.g. spec-test generation produced no tests) is NOT
             # authoritative — treat this attempt as if there were no verifier, so the Manager review
             # and the coverage checklist still run instead of accepting on an empty non-block.
@@ -1922,11 +1922,18 @@ class AutonomousAgent:
         """
         return self.manager is not None and bool(self.config.use_manager)
 
-    def _verify(self) -> tuple[bool, str, bool]:
+    def _verify(self, snapshot: FileSnapshot | None = None) -> tuple[bool, str, bool]:
         """Returns (passed, output, abstained). ``abstained`` = the verifier had nothing runnable to
-        check, so the caller must fall back to its other gates instead of accepting on it."""
+        check, so the caller must fall back to its other gates instead of accepting on it.
+
+        ``snapshot`` is the workspace before the attempt. A verifier that can use it — the
+        spec-test verifier, which then keeps only the tests that fail before the change and pass
+        after — is handed it; every other verifier ignores it, unchanged.
+        """
         if self.verifier is None:
             return True, "", True
+        if snapshot is not None and hasattr(self.verifier, "base_snapshot"):
+            self.verifier.base_snapshot = snapshot
         result = self.verifier.verify()
         return result.passed, result.output, result.abstained
 
