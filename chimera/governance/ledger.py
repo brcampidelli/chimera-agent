@@ -454,6 +454,13 @@ class TaintLedger:
             return True
         return self._shared is not None and self._shared.tainted
 
+    def lineage(self) -> str:
+        """The authority label the kernel keys its case law on: ``"tainted"`` once this run has
+        consumed any untrusted content, ``""`` before. The plain :meth:`run_tainted` — not the
+        ``for_narrowing`` reading — because a precedent is durable, like the provenance of a memory,
+        and a value the user asked to fetch is still an external value."""
+        return "tainted" if self.run_tainted() else ""
+
     def taint_sources(self, *, for_narrowing: bool = False) -> list[str]:
         """Which untrusted reads armed this run, each as ``<ref> (<who asked>)``, oldest first.
 

@@ -290,6 +290,7 @@ def build_right_hand(
     # `attended=True`: unlike every other caller of this, there really is a person at this console,
     # and they are the person who asked. `audit_allows=False` for the reason `assemble_registry`
     # gives — an ALLOW per tool call would bury this log's rare events within a day.
+    ledger = TaintLedger(authority=settings.taint_authority)
     step = govern_step(
         registry,
         settings=settings,
@@ -297,8 +298,8 @@ def build_right_hand(
         surface=surface,
         attended=True,
         audit_allows=False,
+        lineage=ledger.lineage,
     )
-    ledger = TaintLedger(authority=settings.taint_authority)
     # A union, like the denial list above and for the same reason. There is no request posture on
     # this surface, so the request half of `assemble_registry`'s expression is absent and the two
     # remaining terms are the owner's: the explicit switch and the reach/approval floor.

@@ -100,8 +100,15 @@ def govern_step(
     attended: bool = True,
     audit_allows: bool = True,
     home: Path | None = None,
+    lineage: Callable[[], str] | None = None,
 ) -> GovernanceStep:
     """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
+
+    ``lineage`` is read at every tool call and handed to the kernel — the taint ledger's
+    :meth:`~chimera.governance.ledger.TaintLedger.lineage`, so a precedent the judge set while the
+    run was clean does not answer the same command once the run has read something untrusted. The
+    three assemblies pass their ledger's; a caller with no ledger passes nothing and the kernel
+    keys everything on the clean partition, as it always did.
 
     Split out of :func:`governed_profile` for the one caller that could not use the whole thing. The
     API's ``assemble_registry`` builds its own write region, its own union of posture and denylist,
@@ -210,6 +217,7 @@ def govern_step(
         approve=approve,
         ledger=approvals,
         no_approver=no_approver,
+        lineage=lineage,
     )
     # One line per assembly, and the only place the deployment's mode is written where a reader can
     # find it. Two holes close here.
@@ -314,8 +322,10 @@ def governed_profile(
 
     **And it is called only when a ledger exists**, which is a fact about this function that the two
     assemblies beside it do not share: ``build_right_hand`` and ``guard_chat_registry`` both
-    construct a ledger unconditionally, while the ``mode == "off"`` return below sits ABOVE the ``TaintLedger``
-    line — and ``off`` is the shipped default. So on a stock deployment there is no ledger here for
+    construct a ledger unconditionally, while here the ``mode == "off"`` return sits ABOVE the line
+    that keeps the ``TaintLedger`` — it is built before the kernel so the kernel can read its
+    lineage, and thrown away, told to nobody, when the mode is ``off`` — and ``off`` is the shipped
+    default. So on a stock deployment there is no ledger here for
     anything to be told, ``on_ledger`` is never called, and a caller that wires a turn hook only
     when it has been handed one is stating that fact rather than papering over it. Measured, same
     instrument as the terminal's: ``CHIMERA_TAINT_AUTHORITY=authority`` moves **0 rows** with
@@ -372,13 +382,16 @@ def governed_profile(
     # the keyboard" (`scheduler/job_runner`, `server/manager`, `kanban/lanes`) enabled nothing,
     # and every REVIEW on those surfaces was refused with nobody asked. The parameter was named
     # in the signature, so the omission read as wiring rather than as a decision.
+    # Built BEFORE the kernel, whatever the mode: the kernel keys its case law on this ledger's
+    # lineage, read at each call. On `off` it is discarded below, handed to nobody.
+    ledger = TaintLedger(authority=settings.taint_authority)
     step = govern_step(
-        registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home
+        registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home,
+        lineage=ledger.lineage,
     )
     if step.mode == "off":
         return step.registry, step.approvals
 
-    ledger = TaintLedger(authority=settings.taint_authority)
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=workspace)
     # Handed over BEFORE the wrap and unconditionally, so a caller that asked for it holds the same
