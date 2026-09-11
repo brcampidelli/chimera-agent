@@ -18,8 +18,9 @@ Two rules the whole module exists to keep:
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from rich.markup import escape
 
@@ -140,6 +141,33 @@ def cut_short_line(report: TurnReport) -> str:
         # needs to know that something stopped.
         return f"[yellow]⚠ the turn stopped early:[/yellow] [dim]{escape(reason)}[/dim]"
     return f"[yellow]⚠ {note}[/yellow] [dim]({escape(reason)})[/dim]"
+
+
+def approval_stats_line(stats: Mapping[str, Any]) -> str:
+    """How the questions this deployment has asked actually ended — the answer rate and the wait.
+
+    Printed by ``chimera approve`` because that is the command the answering person runs, and the
+    two numbers are about them: with nobody reachable, a configured approver behaves exactly like
+    none, and the block rate reads perfect either way. A deployment that has never asked gets the
+    fact rather than a rate of zero over zero.
+    """
+    asked = int(stats.get("asked") or 0)
+    if not asked:
+        return "[dim]no question has been asked and resolved on this home yet[/dim]"
+    answered = int(stats.get("answered") or 0)
+    timeouts = int(stats.get("timeouts") or 0)
+    rate = float(stats.get("answer_rate") or 0.0)
+    p50, p90 = stats.get("p50_seconds"), stats.get("p90_seconds")
+    speed = (
+        f"; time to answer p50 {float(p50):.0f}s, p90 {float(p90):.0f}s"
+        if p50 is not None and p90 is not None
+        else ""
+    )
+    tone = "green" if rate >= 0.8 else "yellow"
+    return (
+        f"[{tone}]{answered} of {asked} question(s) answered ({rate:.0%}); "
+        f"{timeouts} timed out into a refusal{escape(speed)}.[/{tone}]"
+    )
 
 
 def budget_spent_line(reason: str) -> str:

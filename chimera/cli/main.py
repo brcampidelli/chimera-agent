@@ -5831,23 +5831,30 @@ def approve(
     as consent produces a record of an approval nobody gave.
     """
     from chimera.governance.pending import answer as responder
+    from chimera.governance.pending import answer_stats
     from chimera.governance.pending import pending as esperando
+    from chimera.interface import render
 
     home = Path(get_settings().home)
     if not request_id:
         aguardando = esperando(home)
         if not aguardando:
             console.print("[dim]nothing is waiting for a decision[/dim]")
-            return
-        tabela = Table(title="Waiting for you")
-        tabela.add_column("id")
-        tabela.add_column("waiting")
-        tabela.add_column("why")
-        tabela.add_column("action")
-        for p in aguardando:
-            tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
-        console.print(tabela)
-        console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
+        else:
+            tabela = Table(title="Waiting for you")
+            tabela.add_column("id")
+            tabela.add_column("waiting")
+            tabela.add_column("why")
+            tabela.add_column("action")
+            for p in aguardando:
+                tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
+            console.print(tabela)
+            console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
+        # The operating metrics of this mechanism, because a gate whose questions nobody answers
+        # behaves exactly like no gate while its block rate still reads perfect. Printed here, on
+        # the command a person runs to answer, so the person answering is the one who sees whether
+        # anyone does.
+        console.print(render.approval_stats_line(answer_stats(home)))
         return
 
     if yes == no:
