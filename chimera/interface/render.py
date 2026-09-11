@@ -164,9 +164,19 @@ def approval_stats_line(stats: Mapping[str, Any]) -> str:
         else ""
     )
     tone = "green" if rate >= 0.8 else "yellow"
+    levels = stats.get("by_level") or {}
+    per_level = ""
+    if isinstance(levels, Mapping) and len(levels) > 1:
+        # Only when there is more than one level to compare: the whole point of the breakdown is
+        # a `block` row timing out behind a healthy overall rate.
+        parts = []
+        for level, row in levels.items():
+            got, of = int(row.get("answered") or 0), int(row.get("asked") or 0)
+            parts.append(f"{level} {got}/{of}")
+        per_level = " Answered by level: " + ", ".join(parts) + "."
     return (
         f"[{tone}]{answered} of {asked} question(s) answered ({rate:.0%}); "
-        f"{timeouts} timed out into a refusal{escape(speed)}.[/{tone}]"
+        f"{timeouts} timed out into a refusal{escape(speed)}.{escape(per_level)}[/{tone}]"
     )
 
 

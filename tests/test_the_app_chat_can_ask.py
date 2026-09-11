@@ -294,17 +294,17 @@ def test_the_announcer_the_session_carries_is_the_one_the_approver_holds(
     result = _tainted_write(registry, ledger, "asked.txt")
 
     assert len(drawn) == 1, "the question never reached the screen the session exposes"
-    assert drawn[0].reason == (
-        "write_file is restricted after this run consumed untrusted content"
+    # The question names the page that tainted the run and who asked for it. Until 2026-09-11 it
+    # was the fixed sentence alone, and `action` was EMPTY on this path — the taint layer called
+    # its approver with `(assessment,)`, which carried no action, so the card's headline was blank
+    # for every command. Measured over the 12 rows of `bench/right_hand_governance`: six distinct
+    # question strings for twelve situations. Both facts are asserted here in their new form.
+    assert drawn[0].reason.startswith(
+        "write_file is restricted after this run consumed untrusted content from "
     )
-    # `action` is EMPTY on this path and that is the mechanism, not a defect to be patched here:
-    # the taint layer calls its approver with `(assessment,)` and only the trust kernel calls it
-    # with `(verdict, action)`, so `_describe` has no action to report
-    # (`chimera/governance/approval.py`). The coding turn's card has always been fed the same
-    # empty string from the same function. Asserted rather than skipped, because a screen that
-    # renders `action` as its headline will show a blank one here, and the next person to read
-    # this should meet that fact in a test instead of in a bug report.
-    assert drawn[0].action == ""
+    assert ATTACK_PAGE in drawn[0].reason
+    assert drawn[0].action == "write_file: asked.txt"
+    assert drawn[0].decision == "review"
     assert "needs review" not in result, "the answer from the screen did not reach the approver"
 
 
@@ -438,7 +438,7 @@ def test_the_posture_line_still_admits_an_unguarded_chat(
 
 #: Exactly the keys `chimera/api/code_api.py` emits for an `approval` frame. The client renders ONE
 #: card for both surfaces, so a key here that is not there — or missing — is a second card.
-APPROVAL_KEYS = {"id", "action", "reason", "asked_at", "wait_seconds"}
+APPROVAL_KEYS = {"id", "action", "reason", "asked_at", "wait_seconds", "decision"}
 
 
 def _announcing_client(tmp_path: Path) -> tuple[TestClient, ApprovalAnnouncer]:

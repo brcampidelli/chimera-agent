@@ -1272,6 +1272,7 @@ def build_api_app(
                 "reason": q.reason,
                 "asked_at": q.asked_at,
                 "age_seconds": q.age_seconds,
+                "decision": q.decision,
             }
             for q in pending(live_settings().home)
         ]
@@ -1920,6 +1921,7 @@ def build_api_app(
                     "action": question.action,
                     "reason": question.reason,
                     "asked_at": question.asked_at,
+                    "decision": question.decision,
                     "wait_seconds": float(live_settings().approval_wait),
                 },
             )
