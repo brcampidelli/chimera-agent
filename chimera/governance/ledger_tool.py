@@ -27,6 +27,7 @@ from chimera.governance.ledger import (
     WRITE_TOOLS,
     SequenceAssessment,
     TaintLedger,
+    _excerpt,
     _first,
     assess_action,
 )
@@ -127,10 +128,28 @@ class LedgeredTool(Tool):
             and self.name in DANGEROUS_WHEN_TAINTED
             and self.ledger.run_tainted(for_narrowing=True)
         ):
-            reason = f"{self.name} is restricted after this run consumed untrusted content"
+            # The question a person answers needs three things the old one lacked: what will run,
+            # where the taint came from, and who asked for that read. `sources` follows the same
+            # authority rule as the gate itself, so it names exactly the reads that armed it.
+            sources = self.ledger.taint_sources(for_narrowing=True)
+            reason = (
+                f"{self.name} is restricted after this run consumed untrusted content"
+                + (f" from {'; '.join(sources[:3])}" if sources else "")
+            )
+            target = (
+                _first(kwargs, _COMMAND_KEYS) or _first(kwargs, _PATH_KEYS)
+                or _first(kwargs, _URL_KEYS) or _first(kwargs, ("to", "recipient", "channel", "chat_id"))
+            )
+            action = f"{self.name}: {_excerpt(target, 300)}" if target else self.name
             if self.audit is not None:
-                self.audit.record("taint_narrowed", {"tool": self.name, "reason": reason})
-            approved = self.approve(SequenceAssessment(True, Decision.REVIEW, reason)) if self.approve else False
+                self.audit.record(
+                    "taint_narrowed",
+                    {"tool": self.name, "reason": reason, "action": action, "sources": sources},
+                )
+            assessment = SequenceAssessment(
+                True, Decision.REVIEW, reason, action=action, sources=sources
+            )
+            approved = self.approve(assessment) if self.approve else False
             if not approved:
                 return refusal(f"[taint: needs review — {reason}] "
                                f"The tool did NOT run. Do not report this as done.")
