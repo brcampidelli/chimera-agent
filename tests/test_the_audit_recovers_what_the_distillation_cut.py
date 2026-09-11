@@ -55,7 +55,10 @@ def _verify(tmp_path: Path, auditor: _Auditor, **kw: Any) -> tuple[Any, Any]:
     # `blind_audit=True` is the two-call form these tests are about; it is off by default since
     # `bench/blind_audit`'s addendum 2 measured it behind the one-call check (0 of 3 plants it
     # missed recovered, 11 of 23 clean summaries grown), and the default is asserted on its own below.
-    kw.setdefault("blind_audit", True)
+    if kw.pop("as_shipped", False):
+        kw.pop("blind_audit", None)  # the constructor's own default, whatever it is
+    else:
+        kw.setdefault("blind_audit", True)
     verifier = EnvelopeVerifier(store=store, backend=auditor, model="auditor", spot_rate=1.0, **kw)
     return verifier.verify(_spec(), envelope, force_spot=True), envelope
 
@@ -66,14 +69,14 @@ def test_by_default_a_silent_pass_is_one_call_and_the_two_call_audit_does_not_ru
         findings=f"1. Six postmortems reviewed\n2. [CRITICAL] {PLANT}",
         verdicts="1: PRESENT\n2: ABSENT\nDROPPED: FAIL",
     )
-    outcome, _ = _verify(tmp_path, auditor, blind_audit=False)
+    outcome, _ = _verify(tmp_path, auditor, as_shipped=True)
     assert outcome.passed is True and outcome.recovered == ()
     assert len(auditor.prompts) == 1 and outcome.checks_run == ("schema", "spot")
 
 
 def test_by_default_a_dropped_verdict_with_no_sentence_recovers_nothing_and_makes_no_second_call(tmp_path: Path) -> None:
     auditor = _Auditor(spot="DROPPED: FAIL", findings=f"1. [CRITICAL] {PLANT}", verdicts="1: ABSENT\nDROPPED: FAIL")
-    outcome, _ = _verify(tmp_path, auditor, blind_audit=False)
+    outcome, _ = _verify(tmp_path, auditor, as_shipped=True)
     assert outcome.passed is True and outcome.recovered == () and len(auditor.prompts) == 1
 
 
