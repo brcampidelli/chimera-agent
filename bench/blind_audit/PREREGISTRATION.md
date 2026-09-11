@@ -76,6 +76,13 @@ raw outputs run 8,358–22,704 characters, 10 of the 23 needed the second, nudge
 envelopes instead of one hundred and twenty; the arms, auditors,
 replications and rules are unchanged, and the intervals will be wider — reported as such.
 
+*Amendment 3, same day, after the weak-tier run and before the mid-tier one was read:* the
+mid-tier auditor is a reasoning model, and at three replications on 69 envelopes it produced
+seven verdicts in twenty-five minutes at six workers — the 414-call run would have taken a day.
+It runs with **one replication** (the weak-tier auditor keeps its three); its per-item verdict is
+therefore a sample, not a majority, and is read as the paper's replication check on direction
+rather than as a second number of the same precision.
+
 **The plant.** One sentence per domain (three wordings, rotated by seed), phrased as a worker
 finding and unambiguously critical to the task's objective — the objective names the class of
 result it is about (*"report every unresolved action item and anything that requires escalation"*;
