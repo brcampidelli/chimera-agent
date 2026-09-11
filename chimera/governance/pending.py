@@ -72,6 +72,17 @@ def _dir(home: Path) -> Path:
     return Path(home) / "approvals"
 
 
+#: The order a person should see questions in: the level of the verdict first, then age. A queue
+#: sorted by age alone spends a scarce answerer on whatever came first, and 2608.06949 measured
+#: what that costs when the answerer is overloaded — coverage fell 100% → 65.6% while judgement on
+#: the questions that were reviewed did not move; ordering by risk recovered it to 91.7%.
+LEVEL_RANK = {"block": 0, "review": 1, "warn": 2, "allow": 3}
+
+
+def level_rank(decision: str) -> int:
+    return LEVEL_RANK.get((decision or "").strip().lower(), 1)
+
+
 @dataclass(frozen=True)
 class PendingApproval:
     """One question waiting for a person."""
@@ -80,6 +91,8 @@ class PendingApproval:
     action: str
     reason: str
     asked_at: float
+    decision: str = "review"
+    """The level of the verdict that raised the question — ``block`` | ``review`` | ``warn``."""
 
     @property
     def age_seconds(self) -> float:
@@ -101,7 +114,7 @@ def sweep(home: Path, *, now: float | None = None) -> int:
 
 
 def pending(home: Path) -> list[PendingApproval]:
-    """Every question currently waiting, oldest first."""
+    """Every question currently waiting: highest level first, then oldest first."""
     out: list[PendingApproval] = []
     directory = _dir(home)
     if not directory.exists():
@@ -117,9 +130,10 @@ def pending(home: Path) -> list[PendingApproval]:
                 action=str(data.get("action") or ""),
                 reason=str(data.get("reason") or ""),
                 asked_at=float(data.get("asked_at") or 0.0),
+                decision=str(data.get("decision") or "review"),
             )
         )
-    return sorted(out, key=lambda p: p.asked_at)
+    return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
 
 def answer(home: Path, request_id: str, approved: bool) -> bool:
@@ -145,8 +159,12 @@ def ask_durably(
     poll_seconds: float = POLL_SECONDS,
     clock: Any = time.monotonic,
     sleep: Any = time.sleep,
+    decision: str = "review",
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
+
+    ``decision`` is the level of the verdict that raised it; it orders the queue (:func:`pending`)
+    and is kept on the record, so the answer rate can be read per level.
 
     Returns False on timeout, on an unreadable answer, and on any failure to write the question —
     every path that is not an explicit yes. That is the same rule the terminal prompt follows, and
@@ -162,7 +180,10 @@ def ask_durably(
         sweep(home)
         (directory / f"{request_id}.ask.json").write_text(
             json.dumps(
-                {"id": request_id, "action": action, "reason": reason, "asked_at": asked_at},
+                {
+                    "id": request_id, "action": action, "reason": reason, "asked_at": asked_at,
+                    "decision": decision,
+                },
                 ensure_ascii=False,
             ),
             encoding="utf-8",
@@ -178,7 +199,12 @@ def ask_durably(
         # independently of it: a screen that can render a button must not depend on a webhook
         # being configured, and a failure here is as harmless as a failed delivery below.
         try:
-            on_asked(PendingApproval(id=request_id, action=action, reason=reason, asked_at=asked_at))
+            on_asked(
+                PendingApproval(
+                    id=request_id, action=action, reason=reason, asked_at=asked_at,
+                    decision=decision,
+                )
+            )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
             _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
@@ -204,7 +230,10 @@ def ask_durably(
             except (OSError, ValueError):
                 decidido = False
                 outcome = "unreadable"
-            _record(directory, request_id, action, reason, asked_at, outcome, answered_at)
+            _record(
+                directory, request_id, action, reason, asked_at, outcome, answered_at,
+                decision=decision,
+            )
             _cleanup(directory, request_id)
             return decidido
         sleep(poll_seconds)
@@ -213,7 +242,7 @@ def ask_durably(
         "approval request %s went unanswered for %.0fs; refusing. Action: %s",
         request_id, wait_seconds, action[:200],
     )
-    _record(directory, request_id, action, reason, asked_at, "timeout", None)
+    _record(directory, request_id, action, reason, asked_at, "timeout", None, decision=decision)
     _cleanup(directory, request_id)
     return False
 
@@ -236,12 +265,15 @@ def _record(
     asked_at: float,
     outcome: str,
     answered_at: float | None,
+    *,
+    decision: str = "review",
 ) -> None:
     resolved_at = time.time()
     line = {
         "id": request_id,
         "action": action[:200],
         "reason": reason[:300],
+        "decision": decision,
         "asked_at": asked_at,
         "resolved_at": resolved_at,
         # The person's clock, not the poller's: the answer file carries when it was written, and
@@ -293,6 +325,18 @@ def answer_stats(home: Path) -> dict[str, Any]:
             return None
         return times[min(len(times) - 1, int(round(q * (len(times) - 1))))]
 
+    # Coverage per level: the number 2608.06949 says to watch. An overall answer rate can read
+    # fine while every `block` question timed out and every `warn` was answered.
+    by_level: dict[str, dict[str, Any]] = {}
+    for level in sorted({str(r.get("decision") or "review") for r in rows}, key=level_rank):
+        mine = [r for r in rows if str(r.get("decision") or "review") == level]
+        done = [r for r in mine if r.get("outcome") in ("approved", "refused")]
+        by_level[level] = {
+            "asked": len(mine),
+            "answered": len(done),
+            "timeouts": sum(r.get("outcome") == "timeout" for r in mine),
+            "answer_rate": (len(done) / len(mine)) if mine else None,
+        }
     return {
         "asked": len(rows),
         "answered": len(answered),
@@ -303,6 +347,7 @@ def answer_stats(home: Path) -> dict[str, Any]:
         "p50_seconds": pct(0.5),
         "p90_seconds": pct(0.9),
         "max_seconds": times[-1] if times else None,
+        "by_level": by_level,
     }
 
 

@@ -1153,6 +1153,9 @@ export interface CodeApprovalEvent {
   reason: string;
   asked_at: number;
   wait_seconds: number;
+  /** The level of the verdict that raised the question: `block` | `review` | `warn`. Optional
+   *  because a frame from a server older than 0.54 does not carry it. */
+  decision?: string;
 }
 
 export interface CodeTurnHandlers {

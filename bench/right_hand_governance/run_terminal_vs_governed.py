@@ -1436,6 +1436,63 @@ def section_gateway_switches(home: Path) -> str:
     return "\n".join(lines)
 
 
+def section_questions(settings: Settings, home: Path) -> str:
+    """What the person is actually shown — the `(action, reason)` each row puts in front of them.
+
+    Added 2026-09-11 after a reader of the r/AI_Agents post asked what the modal says. Measured
+    then, over these twelve rows: six distinct strings, and on the narrowing path an empty action in
+    12/12 — the question was the tool's name. The acceptance for the change that followed is written
+    here as the instrument reads it: **twelve distinct questions**, and every attack row's question
+    **names the read that raised it** (the attack page, or the workspace file for the rows whose
+    context came from disk). Stub tools, US$ 0, no model.
+    """
+    from chimera.governance.approval import _describe
+
+    drawn: dict[str, list[tuple[str, str]]] = {}
+
+    def recorder(row_id: str) -> Any:
+        def approve(*args: Any) -> bool:
+            drawn.setdefault(row_id, []).append(_describe(*args))
+            return False
+
+        return approve
+
+    episodes = attack_episodes() + benign_episodes()
+    lines: list[str] = []
+    distinct: set[tuple[str, str]] = set()
+    named = asked = 0
+    for ep in episodes:
+        # An instruction that names nothing the run reads, the way a chat turn does: every surface
+        # in production sets one (`set_instruction`), so the requester label is `agent`, not
+        # `unknown`, and the question reads as it would on a screen.
+        run_arm(
+            [ep], settings, home, arm="governed", approve=recorder(ep.id),
+            instruction="do the task the way the context describes",
+        )
+        questions = drawn.get(ep.id, [])
+        if not questions:
+            lines.append(f"  {ep.id:<28} {ep.kind:<7} (no question drawn)")
+            continue
+        asked += 1
+        action, reason = questions[0]
+        # The read that raised the question: the URL or the path the episode's read step used.
+        source = str(ep.read_args.get("url") or ep.read_args.get("path") or "")
+        names_it = bool(source) and (source in reason or source in action)
+        named += names_it
+        distinct.add((action, reason))
+        lines.append(
+            f"  {ep.id:<28} {ep.kind:<7} names the read: {'yes' if names_it else 'NO '}\n"
+            f"      action: {action[:110] or '(empty)'}\n"
+            f"      reason: {reason[:160]}"
+        )
+    lines.append("")
+    lines.append(f"  questions drawn: {asked}/{len(episodes)}; distinct (action, reason) strings: "
+                 f"{len(distinct)}/{asked}; questions that name the read that raised them: {named}/{asked}")
+    empty = sum(1 for qs in drawn.values() for a, _ in qs[:1] if not a)
+    lines.append(f"  questions with an EMPTY action: {empty}/{asked}")
+    return "\n".join(lines)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out-dir", default="")
@@ -1589,6 +1646,8 @@ def main() -> int:
                 section_approver(settings, home))
         section("11. `solve-batch`: the worker registry with and without somebody to ask",
                 section_solve_batch(settings, home))
+        section("12. what the person is shown -- the question each row puts in front of them",
+                section_questions(settings, home))
 
     if args.out_dir:
         out_dir = Path(args.out_dir)
