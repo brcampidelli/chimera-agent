@@ -2819,6 +2819,11 @@ export interface components {
             age_seconds: number;
             /** Asked At */
             asked_at: number;
+            /**
+             * Decision
+             * @default review
+             */
+            decision: string;
             /** Id */
             id: string;
             /** Reason */

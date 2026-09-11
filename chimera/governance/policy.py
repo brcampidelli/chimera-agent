@@ -137,6 +137,34 @@ def _default_rules() -> list[Rule]:
             Decision.REVIEW,
             "push to a remote other than origin",
         ),
+        # Installing a package BY NAME from an index. arXiv 2609.07754: the install is the attack
+        # surface — a name the task text supplied resolves to whatever the index holds under it, and
+        # its install scripts (setup.py, postinstall, build.rs) run code before anything is imported.
+        # Nothing here watched it: the taint ledger narrows `run_shell` only once the run is tainted,
+        # and an agent that decides on its own to `pip install` a helper is not tainted by anything.
+        #
+        # REVIEW, and only when a NAME (or URL) is given. `pip install -e .`, `-r requirements.txt`,
+        # a bare `npm install`, `npm ci`, `uv sync` and `cargo build` install what a lockfile or the
+        # repo already pins, and a rule that fired on those would teach people to click through.
+        Rule(
+            "package_install",
+            _pattern(
+                # pip / pipx / uv: `install` (or uv's `add`) followed by options, then a name — and
+                # not a requirements file (`-r`/`--requirement`), not a path, not an editable.
+                r"\b(?:pip3?|pipx|uv\s+pip|uv\s+tool)\s+install\b(?![^\n]*\s(?:-r|--requirement)\b)"
+                r"(?:\s+-[-\w=]+)*\s+['\"]?(?![-./~\\])[A-Za-z][\w.\-]*(?:\[[^\]]*\])?(?:[=<>!~]=?\S*)?"
+                r"|\buv\s+add(?:\s+-[-\w=]+)*\s+['\"]?(?![-./~\\])[A-Za-z][\w.\-]*"
+                # npm / yarn / pnpm: a name after `install`/`i`/`add`. Bare `npm install` (the
+                # lockfile) has no name and does not match; neither does `npm ci`.
+                r"|\b(?:npm\s+(?:install|i|add)|yarn\s+add|pnpm\s+(?:add|install))(?:\s+-[-\w=]+)*"
+                r"\s+['\"]?(?![-./~\\])[@A-Za-z][\w./@\-]*"
+                # cargo, apt, brew, gem, go: the same shape.
+                r"|\b(?:cargo\s+(?:add|install)|apt(?:-get)?\s+install|brew\s+install|gem\s+install"
+                r"|go\s+(?:get|install))(?:\s+-[-\w=]+)*\s+['\"]?(?![-./~\\])[A-Za-z][\w./@\-]*"
+            ),
+            Decision.REVIEW,
+            "installing a package by name — its install scripts run code before anything is imported",
+        ),
         Rule("sudo_rm", _pattern(r"\bsudo\s+rm\b"), Decision.WARN, "privileged delete"),
         # The one rule here that is NOT a shell-command signature, and so the one that reads
         # document bodies as well. A key does not become safe by being written to a file instead of
