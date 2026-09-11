@@ -48,7 +48,7 @@ from chimera.orchestration.envelope_verify import (  # noqa: E402
 )
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
-ARMS = ("shipped", "blind", "shipped_dropped_only", "production")
+ARMS = ("shipped", "blind", "shipped_dropped_only", "production", "production_2call")
 
 # --- the blind arm: the two prompts live in the module the product runs (`envelope_verify`), and
 # they are byte-identical to the strings this bench was registered and run with — checked on
@@ -174,13 +174,17 @@ def audit_blind(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *,
     return verdict, reply, findings, critical, [stage1, stage2]
 
 
-def audit_production(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str) -> tuple[str, list[str], str, list[Any]]:
-    """The pipeline as it ships after #437: the one-call DROPPED check, and the two-call audit behind a
-    pass that named nothing. `verdict` is FAIL when the summary was changed (something recovered);
-    `failed_on` says which stage did it — `SPOT` (the check's own sentence) or `AUDIT` (the two-call
-    extraction behind a silent pass)."""
+def audit_production(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str,
+                     blind_audit: bool = False) -> tuple[str, list[str], str, list[Any]]:
+    """The pipeline as it ships: the one-call DROPPED check whose sentence is the recovery. With
+    `blind_audit=True`, the pipeline as it shipped between #437 and addendum 2: the two-call audit
+    behind a pass that named nothing. `verdict` is FAIL when the summary was changed (something
+    recovered); `failed_on` says which stage did it — `SPOT` (the check's own sentence) or `AUDIT`
+    (the two-call extraction behind a silent pass)."""
     rec = _Recording(gateway)
-    verifier = EnvelopeVerifier(store=store, backend=rec, model=model, spot_rate=1.0, recover_dropped=True)
+    verifier = EnvelopeVerifier(
+        store=store, backend=rec, model=model, spot_rate=1.0, recover_dropped=True, blind_audit=blind_audit,
+    )
     outcome = verifier.verify(spec, envelope, force_spot=True)
     if "spot" not in outcome.checks_run or outcome.stage != "spot":
         raise RuntimeError(f"spot check did not decide: {outcome.stage} {outcome.detail[:80]}")
@@ -210,6 +214,10 @@ def one(item: CorpusItem, position: str, arm: str, rep: int, *, auditor: str, st
         failed_on = _failed_lines(reply)
     elif arm == "production":
         verdict, failed_on, reply, results = audit_production(gateway, store, spec, envelope, model=auditor)
+    elif arm == "production_2call":
+        verdict, failed_on, reply, results = audit_production(
+            gateway, store, spec, envelope, model=auditor, blind_audit=True,
+        )
     else:
         verdict, reply, findings, critical, results = audit_blind(gateway, store, spec, envelope, model=auditor)
         failed_on = ["DROPPED"] if verdict == "FAIL" else []
@@ -293,13 +301,15 @@ def report(path: Path) -> str:
                              f"(Δ {pr.delta:+.2f}, Newcombe 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
                              f"blind-only {pr.treatment_only}, dropped_only-only {pr.baseline_only}; "
                              f"{'significant' if pr.significant else 'not significant'})")
-        prod = [r for r in rows if r["auditor"] == auditor and r["arm"] == "production"]
-        if prod:
+        for prod_arm in ("production_2call", "production"):
+            prod = [r for r in rows if r["auditor"] == auditor and r["arm"] == prod_arm]
+            if not prod:
+                continue
             lines.append("")
-            lines.append("| production, by position | items | recovered by the check's own sentence (SPOT) | recovered by the two-call audit behind a silent pass (AUDIT) | nothing recovered |")
+            lines.append(f"| `{prod_arm}`, by position | items | recovered by the check's own sentence (SPOT) | recovered by the two-call audit behind a silent pass (AUDIT) | nothing recovered |")
             lines.append("|---|---:|---:|---:|---:|")
             for pos in POSITIONS:
-                keys = [k for k in by if k[0] == auditor and k[1] == "production" and k[3] == pos]
+                keys = [k for k in by if k[0] == auditor and k[1] == prod_arm and k[3] == pos]
                 if not keys:
                     continue
                 spot = audit = nothing = 0
