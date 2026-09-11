@@ -141,6 +141,10 @@ def one(task: dict[str, Any], *, model: str) -> Row:
     )
 
 
+def _fmt(replies: list[dict[str, Any]]) -> str:
+    return ", ".join(f"{x['finish_reason'] or '—'}/{x['completion_tokens'] or '?'}" for x in replies)
+
+
 def report(path: Path) -> str:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     n = len(rows)
@@ -162,10 +166,9 @@ def report(path: Path) -> str:
         for x in sh + rt:
             if not x["has_test"]:
                 empties[x["finish_reason"] or "none reported"] = empties.get(x["finish_reason"] or "none reported", 0) + 1
-        fmt = lambda xs: ", ".join(f"{x['finish_reason'] or '—'}/{x['completion_tokens'] or '?'}" for x in xs)  # noqa: E731
         lines.append(
-            f"| `{r['task_id']}` | {r['requirements']} | {'module' if r['shipped_module'] else '**nothing**'} | {fmt(sh)} "
-            f"| {'module' if r['retry_module'] else '**nothing**'} | {r['retry_attempts']} | {fmt(rt)} | {r['seconds']} |"
+            f"| `{r['task_id']}` | {r['requirements']} | {'module' if r['shipped_module'] else '**nothing**'} | {_fmt(sh)} "
+            f"| {'module' if r['retry_module'] else '**nothing**'} | {r['retry_attempts']} | {_fmt(rt)} | {r['seconds']} |"
         )
     lines += ["", "Replies with no test in them, by `finish_reason`: "
               + (", ".join(f"`{k}` × {v}" for k, v in sorted(empties.items(), key=lambda kv: -kv[1])) or "none")]
