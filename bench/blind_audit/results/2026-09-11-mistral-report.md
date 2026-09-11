@@ -1,4 +1,4 @@
-# blind_audit — 414 auditor calls, US$ 0.2858
+# blind_audit — 621 auditor calls, US$ 0.3708
 
 ## auditor `openrouter/mistralai/mistral-small-3.2-24b-instruct`
 
@@ -10,13 +10,21 @@
 | `blind` | head | 23 | **13/23** | [0.37, 0.74] | 10/23 | 9,450 | 0.0685 |
 | `blind` | middle | 23 | **19/23** | [0.63, 0.93] | 5/23 | 8,782 | 0.0609 |
 | `blind` | none | 23 | **11/23** | [0.29, 0.67] | 9/23 | 9,769 | 0.0709 |
+| `shipped_dropped_only` | head | 23 | **6/23** | [0.13, 0.46] | 3/23 | 5,422 | 0.0283 |
+| `shipped_dropped_only` | middle | 23 | **23/23** | [0.86, 1.00] | 0/23 | 5,454 | 0.0286 |
+| `shipped_dropped_only` | none | 23 | **5/23** | [0.10, 0.42] | 0/23 | 5,385 | 0.0281 |
 
 - **head** paired FAIL, shipped → blind: 0.22 → 0.57 (Δ +0.35, Newcombe 95% [+0.05, +0.47]; discordant 12: blind-only 10, shipped-only 2; significant)
 - **middle** paired FAIL, shipped → blind: 0.17 → 0.83 (Δ +0.65, Newcombe 95% [+0.34, +0.72]; discordant 17: blind-only 16, shipped-only 1; significant)
 - **none** paired FAIL, shipped → blind: 0.00 → 0.48 (Δ +0.48, Newcombe 95% [+0.23, +0.48]; discordant 11: blind-only 11, shipped-only 0; significant)
+- **head** paired FAIL, shipped → shipped_dropped_only: 0.22 → 0.26 (Δ +0.04, Newcombe 95% [-0.08, +0.11]; discordant 3: shipped_dropped_only-only 2, shipped-only 1; not significant)
+- **middle** paired FAIL, shipped → shipped_dropped_only: 0.17 → 1.00 (Δ +0.83, Newcombe 95% [+0.55, +0.83]; discordant 19: shipped_dropped_only-only 19, shipped-only 0; significant)
+- **none** paired FAIL, shipped → shipped_dropped_only: 0.00 → 0.22 (Δ +0.22, Newcombe 95% [+0.03, +0.22]; discordant 5: shipped_dropped_only-only 5, shipped-only 0; significant)
 - discrimination `shipped` (middle FAIL − none FAIL): +0.17
 - discrimination `blind` (middle FAIL − none FAIL): +0.35
+- discrimination `shipped_dropped_only` (middle FAIL − none FAIL): +0.78
 - shipped-arm FAIL lines on middle items (all reps): {'INVENTED': 11, 'DROPPED': 10, 'CONTRADICT': 10}
+- shipped_dropped_only-arm FAIL lines on middle items (all reps): {'DROPPED': 69}
 
 ### Every shipped-arm PASS on a middle item (majority), one reply each — read these
 

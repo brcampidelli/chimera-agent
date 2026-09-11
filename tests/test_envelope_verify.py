@@ -38,10 +38,10 @@ def _spec(**overrides: object) -> TaskSpec:
 
 
 def _verifier(tmp_path: Path, backend: SpotBackend | None, *, spot_rate: float = 0.0,
-              seed: int = 7) -> EnvelopeVerifier:
+              seed: int = 7, **kw: Any) -> EnvelopeVerifier:
     return EnvelopeVerifier(
         store=ArtifactStore(tmp_path), backend=backend, spot_rate=spot_rate,
-        rng=random.Random(seed),
+        rng=random.Random(seed), **kw,
     )
 
 
@@ -104,14 +104,19 @@ def test_spot_check_forced_by_gaps_and_passes_when_faithful(tmp_path: Path) -> N
     assert "Raw output" in backend.last_prompt  # artifact went to the VERIFIER's context
 
 
-def test_spot_check_unfaithful_escalates(tmp_path: Path) -> None:
-    backend = SpotBackend("UNFAITHFUL — the summary invents a count absent from the output.")
-    verifier = _verifier(tmp_path, backend, spot_rate=0.0)
+def test_spot_check_unfaithful_is_a_recovery_by_default_and_a_gate_with_the_recovery_off(tmp_path: Path) -> None:
+    # The spot check runs only on `_distill`'s slice, where a dropped result is the distillation's
+    # fault: what the auditor named goes back into the summary and nothing is rejected on its word.
+    # `recover_dropped=False` is the gate as it was before #433.
+    backend = SpotBackend("DROPPED: FAIL\nThe summary omits the failed-write count.")
     store = ArtifactStore(tmp_path)
     env = build_envelope(_spec(), "data\n" * 3_000, store, gaps=["unsure"])
-    outcome = verifier.verify(_spec(), env)
-    assert outcome.passed is False and outcome.stage == "spot"
-    assert outcome.escalate is True
+    outcome = _verifier(tmp_path, backend, spot_rate=0.0).verify(_spec(), env)
+    assert outcome.passed is True and outcome.stage == "spot" and outcome.escalate is False
+    assert outcome.recovered == ("The summary omits the failed-write count.",)
+    assert backend.calls == 1  # the sentence is the recovery; no second stage
+    gate = _verifier(tmp_path, backend, spot_rate=0.0, recover_dropped=False).verify(_spec(), env)
+    assert gate.passed is False and gate.stage == "spot" and gate.escalate is True
 
 
 def test_spot_check_probabilistic_with_seeded_rng(tmp_path: Path) -> None:
@@ -128,7 +133,7 @@ def test_force_spot_audits_even_without_gaps_or_rng(tmp_path: Path) -> None:
     # A re-ask triggered by a spot failure must be spot-checked again — not re-accepted on the free
     # schema+criteria gates ~80% of the time (spot_rate=0.0 here would otherwise skip it).
     backend = SpotBackend("UNFAITHFUL — the retry still invents a figure.")
-    verifier = _verifier(tmp_path, backend, spot_rate=0.0)
+    verifier = _verifier(tmp_path, backend, spot_rate=0.0, recover_dropped=False)
     store = ArtifactStore(tmp_path)
     env = build_envelope(_spec(), "row\n" * 5_000, store)  # no gaps -> normally skipped
     assert verifier.verify(_spec(), env).stage == "accepted"
@@ -181,13 +186,16 @@ def test_grade_faithfulness_decomposed_and_legacy() -> None:
     assert _grade_faithfulness("(the model rambled with no verdict)") is True  # garbled -> non-blocking
 
 
-def test_spot_check_decomposed_fail_escalates(tmp_path: Path) -> None:
+def test_spot_check_decomposed_fail_is_read_the_same_way(tmp_path: Path) -> None:
+    # The three-line reply of the prompt that shipped before 2026-09-11 still reads as a failure —
+    # a recovery by default, the gate with the recovery off.
     backend = SpotBackend("INVENTED: FAIL\nDROPPED: PASS\nCONTRADICTION: PASS\nsummary invents a total")
-    verifier = _verifier(tmp_path, backend, spot_rate=0.0)
     store = ArtifactStore(tmp_path)
     env = build_envelope(_spec(), "rows\n" * 3_000, store, gaps=["unsure"])
-    outcome = verifier.verify(_spec(), env)
-    assert outcome.passed is False and outcome.stage == "spot" and outcome.escalate is True
+    outcome = _verifier(tmp_path, backend, spot_rate=0.0).verify(_spec(), env)
+    assert outcome.passed is True and outcome.recovered == ("summary invents a total",)
+    gate = _verifier(tmp_path, backend, spot_rate=0.0, recover_dropped=False).verify(_spec(), env)
+    assert gate.passed is False and gate.stage == "spot" and gate.escalate is True
 
 
 def test_cross_provider_auditor_is_used_over_worker_backend(tmp_path: Path) -> None:
@@ -201,4 +209,4 @@ def test_cross_provider_auditor_is_used_over_worker_backend(tmp_path: Path) -> N
     )
     outcome = verifier.verify(_spec(), env)
     assert auditor.calls == 1 and worker.calls == 0  # the independent auditor graded, not the worker
-    assert outcome.passed is False and outcome.escalate is True
+    assert outcome.recovered == ("distinct provider caught it",)  # and its verdict is what was kept

@@ -84,10 +84,30 @@ def test_nothing_critical_absent_means_nothing_recovered_and_no_second_call(tmp_
     assert outcome.recovered == () and len(auditor.prompts) == 2
 
 
-def test_a_failing_spot_check_is_not_followed_by_a_recovery(tmp_path: Path) -> None:
-    auditor = _Auditor(spot="INVENTED: PASS\nDROPPED: FAIL\nCONTRADICTION: PASS\nmissing", findings="", verdicts="")
+def test_a_dropped_verdict_that_names_the_omission_is_the_recovery_and_needs_no_second_stage(tmp_path: Path) -> None:
+    auditor = _Auditor(spot=f"DROPPED: FAIL\nThe summary omits: {PLANT}", findings="", verdicts="")
     outcome, _ = _verify(tmp_path, auditor)
-    assert outcome.passed is False and outcome.recovered == () and len(auditor.prompts) == 1
+    assert outcome.passed is True and outcome.escalate is False
+    assert outcome.recovered == (f"The summary omits: {PLANT}",)
+    assert len(auditor.prompts) == 1 and outcome.checks_run == ("schema", "spot")
+
+
+def test_a_dropped_verdict_with_no_sentence_falls_back_to_the_two_call_audit(tmp_path: Path) -> None:
+    auditor = _Auditor(
+        spot="DROPPED: FAIL",
+        findings=f"1. Six postmortems reviewed\n2. [CRITICAL] {PLANT}",
+        verdicts="1: PRESENT\n2: ABSENT\nDROPPED: FAIL",
+    )
+    outcome, _ = _verify(tmp_path, auditor)
+    assert outcome.passed is True and outcome.recovered == (PLANT,)
+    assert len(auditor.prompts) == 3 and outcome.checks_run == ("schema", "spot", "recover")
+
+
+def test_with_the_recovery_off_a_dropped_verdict_is_the_gate_it_was(tmp_path: Path) -> None:
+    auditor = _Auditor(spot=f"DROPPED: FAIL\nThe summary omits: {PLANT}", findings="", verdicts="")
+    outcome, _ = _verify(tmp_path, auditor, recover_dropped=False)
+    assert outcome.passed is False and outcome.escalate is True and outcome.recovered == ()
+    assert len(auditor.prompts) == 1
 
 
 def test_switched_off_the_verifier_is_the_one_call_it_was(tmp_path: Path) -> None:
