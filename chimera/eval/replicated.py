@@ -98,6 +98,16 @@ class ReplicatedArm:
     name: str
     runs: list[list[bool]]
     active: list[list[bool]] | None = None
+    halted: list[list[bool]] | None = None
+    """Trials that STOPPED rather than finished: a budget cap, a wall-clock timeout, an infra
+    error, a provider outage. Same task × run shape as ``runs``.
+
+    A halt is not a failure (SaltBench, arXiv 2609.11076, and this project's own learning-lift 7a:
+    a swallowed timeout read as capability loss). A halted trial leaves every denominator — it is
+    neither a pass nor a fail — and a task whose every run halted is **unmeasured**, dropped from
+    ``n`` and named in the summary, never scored as 0%. ``None`` means nothing halted, which keeps
+    every existing caller's numbers exactly as they were.
+    """
 
     def __post_init__(self) -> None:
         if not self.runs:
@@ -110,16 +120,36 @@ class ReplicatedArm:
                 f"arm {self.name!r} is not rectangular — every task must have the same k, "
                 "or pass^k means different things on different rows"
             )
-        if self.active is not None and (
-            len(self.active) != len(self.runs) or any(len(a) != k for a in self.active)
-        ):
-            raise ValueError(
-                f"arm {self.name!r}: `active` must have the same task × run shape as `runs`"
-            )
+        for label, mask in (("active", self.active), ("halted", self.halted)):
+            if mask is not None and (len(mask) != len(self.runs) or any(len(a) != k for a in mask)):
+                raise ValueError(
+                    f"arm {self.name!r}: `{label}` must have the same task × run shape as `runs`"
+                )
+
+    def _halted_row(self, i: int) -> list[bool]:
+        return self.halted[i] if self.halted is not None else [False] * self.k
+
+    def _finished(self, i: int) -> list[bool]:
+        """The outcomes of task ``i``'s trials that ran to a verdict — halted ones removed."""
+        return [v for v, h in zip(self.runs[i], self._halted_row(i), strict=True) if not h]
+
+    @property
+    def measured(self) -> list[bool]:
+        """Per task: whether at least one trial finished. ``n`` counts only these."""
+        return [bool(self._finished(i)) for i in range(len(self.runs))]
+
+    @property
+    def unmeasured_tasks(self) -> int:
+        return sum(1 for m in self.measured if not m)
+
+    @property
+    def halted_trials(self) -> int:
+        return sum(1 for row in (self.halted or []) for h in row if h)
 
     @property
     def n(self) -> int:
-        return len(self.runs)
+        """Tasks with at least one finished trial — an all-halted task is not in the denominator."""
+        return sum(1 for m in self.measured if m)
 
     @property
     def k(self) -> int:
@@ -127,26 +157,35 @@ class ReplicatedArm:
 
     @property
     def per_task_rate(self) -> list[float]:
-        return [sum(1 for v in row if v) / self.k for row in self.runs]
+        """Per measured task, over its finished trials only."""
+        return [sum(1 for v in fin if v) / len(fin) for fin in self._finished_rows()]
+
+    def _finished_rows(self) -> list[list[bool]]:
+        return [self._finished(i) for i in range(len(self.runs)) if self.measured[i]]
 
     @property
     def pass_at_1(self) -> float:
-        """Mean pass rate over every trial — the number a single run pretends to be."""
-        return sum(1 for row in self.runs for v in row if v) / (self.n * self.k)
+        """Mean pass rate over every FINISHED trial — the number a single run pretends to be."""
+        rows = self._finished_rows()
+        total = sum(len(fin) for fin in rows)
+        return sum(1 for fin in rows for v in fin if v) / total if total else 0.0
 
     @property
     def pass_pow_k(self) -> float:
-        """Fraction of tasks that passed in EVERY run. Strict: it is what a user experiences."""
-        return sum(1 for row in self.runs if all(row)) / self.n
+        """Fraction of measured tasks that passed in EVERY finished run. Strict: what a user gets."""
+        rows = self._finished_rows()
+        return sum(1 for fin in rows if all(fin)) / len(rows) if rows else 0.0
 
     @property
     def per_task_pow_k(self) -> list[bool]:
-        return [all(row) for row in self.runs]
+        """Per MEASURED task. Aligns with ``measured`` filtered to True; see ``compare_replicated``."""
+        return [all(fin) for fin in self._finished_rows()]
 
     @property
     def flip_rate(self) -> float:
-        """Fraction of tasks whose outcome differed between runs of the SAME arm — the noise floor."""
-        return sum(1 for row in self.runs if any(row) and not all(row)) / self.n
+        """Fraction of measured tasks whose finished runs disagreed — the noise floor."""
+        rows = self._finished_rows()
+        return sum(1 for fin in rows if any(fin) and not all(fin)) / len(rows) if rows else 0.0
 
     @property
     def icc(self) -> float | None:
@@ -184,6 +223,8 @@ class ReplicatedArm:
             "name": self.name,
             "n": self.n,
             "k": self.k,
+            "halted_trials": self.halted_trials,
+            "unmeasured_tasks": self.unmeasured_tasks,
             "pass_at_1": round(self.pass_at_1, 4),
             "pass_pow_k": round(self.pass_pow_k, 4),
             "flip_rate": round(self.flip_rate, 4),
@@ -203,17 +244,22 @@ class ReplicatedResult:
     baseline: ReplicatedArm
     treatment: ReplicatedArm
     paired: PairedResult = field(init=False)
+    excluded_tasks: int = field(init=False, default=0)
 
     def __post_init__(self) -> None:
-        if self.baseline.n != self.treatment.n:
+        if len(self.baseline.runs) != len(self.treatment.runs):
             raise ValueError(
-                f"arms must cover the same tasks (got {self.baseline.n} vs {self.treatment.n})"
+                f"arms must cover the same tasks (got {len(self.baseline.runs)} vs "
+                f"{len(self.treatment.runs)})"
             )
+        # A task unmeasured in EITHER arm leaves the pairing: a halt on one side is not a verdict
+        # the other side can be compared against. Counted, so the report can say how many.
+        both = [b and t for b, t in zip(self.baseline.measured, self.treatment.measured, strict=True)]
+        self.excluded_tasks = sum(1 for m in both if not m)
+        base = [all(self.baseline._finished(i)) for i, m in enumerate(both) if m]
+        treat = [all(self.treatment._finished(i)) for i, m in enumerate(both) if m]
         self.paired = compare_paired(
-            self.baseline.per_task_pow_k,
-            self.treatment.per_task_pow_k,
-            baseline_name=self.baseline.name,
-            treatment_name=self.treatment.name,
+            base, treat, baseline_name=self.baseline.name, treatment_name=self.treatment.name,
         )
 
     @property
@@ -243,6 +289,7 @@ class ReplicatedResult:
             "paired_pow_k": self.paired.summary(),
             "noise_floor": round(self.noise_floor, 4),
             "inside_noise_floor": self.inside_noise_floor,
+            "excluded_tasks": self.excluded_tasks,
         }
 
 
@@ -289,4 +336,10 @@ def format_replicated_report(result: ReplicatedResult) -> str:
         f"verdict             {verdict}; |Δ| {abs(p.delta):.1%} vs floor {result.noise_floor:.1%}: {floor}",
         f"runs per task       k={result.k}: {seeds_verdict(result.k)}",
     ]
+    halted = b.halted_trials + t.halted_trials
+    if halted or result.excluded_tasks:
+        lines.append(
+            f"halted              {halted} trial(s) stopped short (budget, timeout, infra) and left "
+            f"every rate; {result.excluded_tasks} task(s) unmeasured in one arm and out of the pairing"
+        )
     return "\n".join(lines)
