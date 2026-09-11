@@ -79,8 +79,17 @@ def search_spec(
     rounds: int = 3,
     trials: int | None = None,
     z: float = 1.959963984540054,
+    error_budget: bool = True,
 ) -> SpecSearchResult:
     """Propose → evaluate → keep-on-improvement, for ``rounds`` rounds.
+
+    ``error_budget`` spends ``z``'s error rate across the whole search rather than once per round
+    (:func:`chimera.eval.anytime.spend_across`). Per round, the gate above promotes a null candidate
+    2.5% of the time; over ten rounds that is a one-in-five search that promotes noise, and a
+    promotion moves the incumbent, so the next round is measured against noise. Simulated on a
+    24-trial ruler (`tests/test_the_search_spends_one_error_budget.py`): without the budget about
+    20% of ten-round searches promote a candidate identical to the incumbent; with it, under 3%.
+    ``False`` keeps the per-round test, for a caller that budgets elsewhere.
 
     ``trials`` is the number of independent trials each score is a rate over, and supplying it is
     what turns the comparison into a decision. Without it the gate is ``score > best_score`` on a
@@ -99,17 +108,18 @@ def search_spec(
     numbers no achievable candidate clears it, and that is reported in ``undecidable`` rather than
     left to look like an unlucky search.
     """
-    from chimera.eval.anytime import proportion_diff_ci
+    from chimera.eval.anytime import proportion_diff_ci, spend_across
 
     best = initial
     best_score = scorer(initial)
     history = [SearchStep(initial, best_score, True, True)]
+    z_round = spend_across(z, max(1, rounds)) if error_budget else z
 
     def beats(score: float, incumbent: float) -> bool:
         if trials is None or trials <= 0:
             return score > incumbent
         lower, _ = proportion_diff_ci(
-            round(score * trials), trials, round(incumbent * trials), trials, z
+            round(score * trials), trials, round(incumbent * trials), trials, z_round
         )
         return lower > 0.0
 
@@ -125,7 +135,7 @@ def search_spec(
         best=best,
         best_score=best_score,
         history=history,
-        undecidable=_undecidable_reason(best_score, trials, z),
+        undecidable=_undecidable_reason(best_score, trials, z_round),
     )
 
 
