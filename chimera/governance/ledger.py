@@ -195,6 +195,12 @@ def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:12]
 
 
+def _excerpt(text: str, limit: int = 120) -> str:
+    """The opening of a tainted span, on one line, cut with a visible ellipsis."""
+    flat = " ".join(text.split())
+    return flat if len(flat) <= limit else flat[: limit - 1] + "…"
+
+
 def _first(args: Mapping[str, Any], keys: Iterable[str]) -> str:
     for key in keys:
         value = args.get(key)
@@ -235,12 +241,27 @@ class CapabilityEvent:
 
 @dataclass
 class SequenceAssessment:
-    """The sequence-aware verdict for a single action, given the run so far."""
+    """The sequence-aware verdict for a single action, given the run so far.
+
+    ``action``, ``sources`` and ``span`` are what a person needs in order to answer the question
+    this assessment turns into. Measured 2026-09-11 over the 12 rows of `bench/right_hand_governance`
+    before they existed: the question was the tool's name and one fixed sentence — six distinct
+    strings for twelve different situations, and on the narrowing path the action was empty in all
+    twelve. A person shown "run_shell is restricted" cannot tell a force-push named by a poisoned
+    page from a `git status` the user asked for; a person shown the command, the page and the line
+    that matched can (arXiv 2609.07162, 2609.08472).
+    """
 
     escalate: bool
     decision: Decision
     reason: str = ""
     tainted_refs: list[str] = field(default_factory=list)
+    action: str = ""
+    """What is about to run, as ``<tool>: <command | path | url | recipient>``."""
+    sources: list[str] = field(default_factory=list)
+    """Where the taint came from — each ``<ref> (<who asked>)``, oldest first."""
+    span: str = ""
+    """The tainted text found inside the action itself, when the escalation is a content flow."""
 
 
 class TaintLedger:
@@ -433,6 +454,54 @@ class TaintLedger:
             return True
         return self._shared is not None and self._shared.tainted
 
+    def taint_sources(self, *, for_narrowing: bool = False) -> list[str]:
+        """Which untrusted reads armed this run, each as ``<ref> (<who asked>)``, oldest first.
+
+        The same rule as :meth:`run_tainted` — including the ``authority`` overlook when
+        ``for_narrowing`` is set — so the sources named on a question are exactly the ones that made
+        it a question. A run tainted only through a sibling worker names the sibling, because the
+        shared view is one bit and carries no ref.
+        """
+        overlook_users_own = for_narrowing and self.authority == "authority"
+        out: list[str] = []
+        for event in self.events:
+            if not event.tainted or event.kind not in ("fetch", "read"):
+                continue
+            if overlook_users_own and event.requested_by == "user":
+                continue
+            who = {"user": "as the user asked", "agent": "fetched by the agent"}.get(
+                event.requested_by, "requester unknown"
+            )
+            label = f"{event.ref} ({who})"
+            if label not in out:
+                out.append(label)
+        if not out and self._shared is not None and self._shared.tainted:
+            out.append("a sibling worker's untrusted read (shared view)")
+        return out
+
+    def describe_refs(self, refs: list[str]) -> list[str]:
+        """The sources behind a list of tainted refs, ``<ref> (<who asked>)`` each.
+
+        A content-flow ref is a ``sha256:`` digest; it is mapped back to the fetch that produced it
+        so the question names the page, not the hash. A ref that is itself a URL or a path is named
+        as it is.
+        """
+        out: list[str] = []
+        for ref in refs:
+            label = ref
+            for event in self.events:
+                if not event.tainted:
+                    continue
+                if event.ref == ref or (ref.startswith("sha256:") and event.detail == ref):
+                    who = {"user": "as the user asked", "agent": "fetched by the agent"}.get(
+                        event.requested_by, "requester unknown"
+                    )
+                    label = f"{event.ref} ({who})"
+                    break
+            if label not in out:
+                out.append(label)
+        return out
+
     def is_tainted(self, ref: str) -> bool:
         return bool(ref) and ref.strip() in self._tainted
 
@@ -444,16 +513,26 @@ class TaintLedger:
 
     def _content_is_tainted(self, text: str) -> tuple[bool, list[str]]:
         """True if text references a tainted ref, or a tainted fetch flowed into it verbatim."""
+        tainted, refs, _ = self._tainted_span(text)
+        return tainted, refs
+
+    def _tainted_span(self, text: str) -> tuple[bool, list[str], str]:
+        """As :meth:`_content_is_tainted`, plus the tainted text that was found inside ``text``.
+
+        The span is what the question shows a person: the ref that appears in the command, or the
+        opening of the fetched content that flowed into it verbatim. Bounded, because a question is
+        read on a phone as often as on a terminal.
+        """
         if not text:
-            return False, []
+            return False, [], ""
         refs = self.tainted_refs_in(text)
         if refs:
-            return True, refs
+            return True, refs, refs[0]
         for snippet in self._snippets:
             probe = snippet.strip()
             if len(probe) >= _MIN_FLOW_CHARS and probe in text:
-                return True, [f"sha256:{_hash(snippet)}"]
-        return False, []
+                return True, [f"sha256:{_hash(snippet)}"], _excerpt(probe)
+        return False, [], ""
 
     # --- replay / summary (issue #2) -------------------------------------------------
 
@@ -498,22 +577,32 @@ def assess_action(
     """
     if tool_name in exec_tools:
         command = _first(args, _COMMAND_KEYS)
-        tainted, refs = ledger._content_is_tainted(command)
+        tainted, refs, span = ledger._tainted_span(command)
         if tainted:
+            sources = ledger.describe_refs(refs)
             return SequenceAssessment(
                 True, Decision.REVIEW,
-                f"executes an artifact derived from untrusted input ({', '.join(refs)})",
+                f"executes an artifact derived from untrusted input ({', '.join(refs)}) — "
+                f"the command contains text from {'; '.join(sources) or 'an untrusted read'}",
                 refs,
+                action=f"{tool_name}: {_excerpt(command, 300)}",
+                sources=sources,
+                span=span,
             )
     if tool_name in write_tools:
         path = _first(args, _PATH_KEYS)
         content = _first(args, _CONTENT_KEYS)
-        tainted, refs = ledger._content_is_tainted(content)
+        tainted, refs, span = ledger._tainted_span(content)
         if tainted and _is_self_executing(path):
+            sources = ledger.describe_refs(refs)
             return SequenceAssessment(
                 True, Decision.REVIEW,
-                f"writes untrusted content into an executable/interpreted file {path!r} ({', '.join(refs)})",
+                f"writes untrusted content into an executable/interpreted file {path!r} ({', '.join(refs)}) — "
+                f"the content comes from {'; '.join(sources) or 'an untrusted read'}",
                 refs,
+                action=f"{tool_name}: {path}",
+                sources=sources,
+                span=span,
             )
     if tool_name in fetch_tools and ledger.run_tainted():
         # The exfiltration that got through every configuration: `http_get` is a fetch tool, so the
@@ -528,10 +617,15 @@ def assess_action(
         url = _first(args, _URL_KEYS)
         parts = urlsplit(url) if url else None
         if parts is not None and parts.query:
+            sources = ledger.taint_sources()
             return SequenceAssessment(
                 True, Decision.REVIEW,
                 f"fetches {parts.netloc or url!r} with a query string while this run holds untrusted "
-                f"content — a GET can carry data out as easily as a POST",
+                f"content from {'; '.join(sources) or 'an untrusted read'} — a GET can carry data out "
+                f"as easily as a POST",
                 [],
+                action=f"{tool_name}: {_excerpt(url, 300)}",
+                sources=sources,
+                span=_excerpt(parts.query),
             )
     return SequenceAssessment(False, Decision.ALLOW)
