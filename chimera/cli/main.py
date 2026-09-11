@@ -5843,11 +5843,16 @@ def approve(
         else:
             tabela = Table(title="Waiting for you")
             tabela.add_column("id")
+            tabela.add_column("level")
             tabela.add_column("waiting")
             tabela.add_column("why")
             tabela.add_column("action")
             for p in aguardando:
-                tabela.add_row(p.id, f"{p.age_seconds / 60:.0f} min", p.reason[:40], p.action[:60])
+                # Forty characters of `why` used to be the whole question. The reason now names the
+                # page and who asked for it; cutting it back to the tool name would undo that.
+                tabela.add_row(
+                    p.id, p.decision, f"{p.age_seconds / 60:.0f} min", p.reason[:160], p.action[:120]
+                )
             console.print(tabela)
             console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
         # The operating metrics of this mechanism, because a gate whose questions nobody answers

@@ -68,12 +68,31 @@ Approver = Callable[..., bool]
 
 
 def _describe(*args: Any) -> tuple[str, str]:
-    """(action, reason) out of either call shape."""
+    """(action, reason) out of either call shape.
+
+    The one-argument shape used to return an empty action — the taint ledger described the situation
+    in ``reason`` and named nothing else, so every surface (terminal prompt, desktop card, webhook)
+    put the same sentence in front of a person for every command. The assessment now carries the
+    action; the span, when there is one, is appended to the reason so the person sees the line that
+    matched without a new field on any wire.
+    """
     if len(args) == 2:
         verdict, action = args
         return str(action), str(getattr(verdict, "reason", "") or "")
     assessment = args[0] if args else None
-    return "", str(getattr(assessment, "reason", "") or "")
+    reason = str(getattr(assessment, "reason", "") or "")
+    span = str(getattr(assessment, "span", "") or "")
+    if span and span not in reason:
+        reason = f"{reason} — matched: «{span}»"
+    return str(getattr(assessment, "action", "") or ""), reason
+
+
+def _decision_of(*args: Any) -> str:
+    """The level of the verdict behind a question: ``review`` unless the caller said otherwise."""
+    verdict = args[0] if args else None
+    decision = getattr(verdict, "decision", None)
+    value = getattr(decision, "value", decision)
+    return str(value or "review")
 
 
 def deny(ledger: ApprovalLedger | None = None) -> Approver:
@@ -315,7 +334,10 @@ def ask_elsewhere(
         wait = wait_seconds() if callable(wait_seconds) else wait_seconds
         if wait is not None:
             extra["wait_seconds"] = float(wait)
-        approved = ask_durably(home, action, reason, deliver=deliver, on_asked=on_asked, **extra)
+        approved = ask_durably(
+            home, action, reason, deliver=deliver, on_asked=on_asked,
+            decision=_decision_of(*args), **extra,
+        )
         if ledger is not None:
             ledger.record(action or reason, approved=approved)
         return approved
