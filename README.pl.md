@@ -32,7 +32,7 @@ użyje narzędzi, sprawdzi własną pracę i zachowa tylko to, co naprawdę dzia
 > **Darmowa i otwartoźródłowa (Apache-2.0), we wczesnym, ale aktywnym rozwoju.** Działa już od
 > początku do końca: porozmawiaj z nią, pozwól jej samodzielnie kończyć zadania, uruchom ją jako bota
 > w ulubionym komunikatorze, postaw ją na serwerze, by pracowała 24/7, i patrz, jak uczy się z tego,
-> co robi. To **alpha** — solidna i mocno przetestowana (**ponad 2800 testów automatycznych**, ścisłe
+> co robi. To **alpha** — solidna i mocno przetestowana (**ponad 6100 testów automatycznych**, ścisłe
 > sprawdzanie typów i lint przy każdej zmianie), ale jeszcze niezahartowana w ciężkiej produkcji.
 
 ---
@@ -59,7 +59,7 @@ CrewAI, LangGraph) wskazało jako **pozostawione otwartymi przez wszystkich** �
 rdzeń:
 
 - 🧬 **Samoewolucja z sygnałem dopasowania.** Inni „uczą się", dopisując cokolwiek się wydarzyło, albo przez pull requesty ludzi — nic nie mierzy, czy wyuczona zmiana faktycznie pomogła. Chimera zachowuje zmianę **tylko wtedy, gdy zweryfikowany wynik dowiedzie, że pomogła**: krok ewolucji jest uzależniony od rzeczywistego diffa drzewa roboczego i uczciwego testu A/B, nigdy od słowa modelu. Niezależny dowód, że to ma znaczenie: [EvoAgentBench (arXiv 2607.05202)](https://arxiv.org/abs/2607.05202) zmierzył, że *automatyczne*, niebramkowane metody kodowania doświadczenia regularnie dają **negatywny transfer** — popularna metoda cofnęła się o **−12,3 punktu** na zadaniach, pod które nie była strojona. Bramka Chimery uruchamia teraz również **holdout transferowy**: wyuczona zmiana nie może pogorszyć rozłącznego wycinka o tej samej zdolności, zanim zostanie promowana — więc nie może po prostu wykuć własnej ewaluacji.
-- 🛡️ **Bezpieczeństwo z architektury.** Prompt injection jest dziś powszechnie uznawany za *niemożliwy do załatania*; popularne agenty łagodzą go na poziomie aplikacji albo uznają za poza zakresem (jeden wypuścił 135 tys. publicznie wystawionych instancji i marketplace w ~12% pełen złośliwych umiejętności). Chimera wnosi prawdziwą warstwę obrony — **opcjonalną przez `--taint`, domyślnie wyłączoną**: śledzi pochodzenie skażenia *heurystycznie* (dosłowny przepływ odniesień/treści, **nie** prawdziwy dataflow — model, który parafrazuje skażony tekst, „pierze" go), usuwa tokeny sterujące z niezaufanych treści, zawęża dostęp do niebezpiecznych narzędzi na resztę skażonego przebiegu i chroni ponowne próby z efektami ubocznymi; niezaufany kod działa w opcjonalnym, zamkniętym kontenerze. Na wbudowanym korpusie **7 ataków** blokowanych jest **6 z 7** szkodliwych wywołań (**~14%** wciąż przechodzi) — mierzone na agencie, który *już został wstrzyknięty* i próbuje wykonać wywołanie narzędzia zlecone przez atakującego, bez modelu w pętli. Tego wskaźnika blokowania nigdy nie publikujemy samego: ten sam raport niesie, ile *uprawnionej* pracy odmawia to zawężenie, zmierzone na łagodnym korpusie przechodzącym przez tę samą maszynerię, a bramka nie czyta jednej połowy bez drugiej (`chimera redteam` wypisuje obie — obrona oceniana wyłącznie na atakach ma trywialne maksimum: odmawiać wszystkiego). Nie mówi to nic o tym, jak łatwo model daje się wstrzyknąć na samym początku — to trudniejsza, otwarta połowa ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) mówi wprost, co nadal przechodzi (przekazania między podagentami, fuzja/streszczanie, punkty wejścia inne niż CLI) — granicą izolacji jest sandbox, a ta warstwa to obrona w głąb nad nim.
+- 🛡️ **Bezpieczeństwo z architektury.** Prompt injection jest dziś powszechnie uznawany za *niemożliwy do załatania*; popularne agenty łagodzą go na poziomie aplikacji albo uznają za poza zakresem (jeden wypuścił 135 tys. publicznie wystawionych instancji i marketplace w ~12% pełen złośliwych umiejętności). Chimera wnosi prawdziwą warstwę obrony, a od wersji 0.53.0 jest ona **domyślnie włączona na każdej powierzchni, przy której siedzi człowiek** — `chimera chat`, `assist` i `tui`, czat i tura kodowania w aplikacji desktopowej, boty w komunikatorach (`solve` i `agent` są jednorazowe i nadal przyjmują `--taint` / `--guard` jako flagi). Śledzi pochodzenie skażenia *heurystycznie* (dosłowny przepływ odniesień/treści, **nie** prawdziwy dataflow — model, który parafrazuje skażony tekst, „pierze" go), każdy odczyt z zewnątrz zwraca w ogrodzonym bloku danych, z usuniętymi tokenami sterującymi, zawęża dostęp do niebezpiecznych narzędzi na resztę skażonego przebiegu i chroni ponowne próby z efektami ubocznymi; niezaufany kod działa w opcjonalnym, zamkniętym kontenerze. Na wbudowanym korpusie **7 ataków** blokowanych jest **7 z 7** szkodliwych wywołań — mierzone na agencie, który *już został wstrzyknięty* i próbuje wykonać wywołanie narzędzia zlecone przez atakującego, bez modelu w pętli. Tego wskaźnika blokowania nigdy nie publikujemy samego: ten sam raport niesie **cenę**, zmierzoną na łagodnym korpusie przechodzącym przez tę samą maszynerię. Tą ceną są *pytania*, nie odmowy — pięć z ośmiu uprawnionych wierszy czyta coś z zewnątrz i każdy z nich staje się pytaniem; gdy odpowiada człowiek, odmówionych jest **0 z 8**; gdy nie ma kogo zapytać — **5 z 8**, bo milczenie jest z założenia odmową ([`bench/injection/RESULTS.md`](bench/injection/RESULTS.md); `chimera redteam` wypisuje obie połowy — obrona oceniana wyłącznie na atakach ma trywialne maksimum: odmawiać wszystkiego). Nie mówi to nic o tym, jak łatwo model daje się wstrzyknąć na samym początku — to trudniejsza, otwarta połowa ([`chimera/eval/injection.py`](chimera/eval/injection.py)). [`SECURITY.md`](SECURITY.md) mówi wprost, co nadal przechodzi (przekazania między podagentami, fuzja/streszczanie, endpoint zgodny z OpenAI, celowo pozostawiony bez nadzoru, bo nikt tam nie siedzi, by odpowiedzieć na pytanie) — granicą izolacji jest sandbox, a ta warstwa to obrona w głąb nad nim.
 - 📊 **Uczciwe, opublikowane benchmarki.** Około 20% „rozwiązanych" przypadków w popularnym rankingu jest w rzeczywistości błędnych. Chimera podaje każdą liczbę z przedziałem ufności — **łącznie z przebiegami, w których nie wygrała** — nigdy nie przetacza kości dla istotności i wycofuje własne twierdzenia, gdy replikacja je zabija. Liczby, wyniki zerowe i wycofania są w całości w sekcji [Benchmarki](#benchmarki-uczciwie).
 
 **W jednym zdaniu: nadzorowany, samorozwijający się agent — udowodniony i nadzorowany.** To alpha i
@@ -145,8 +145,13 @@ pokazuje — natywny instalator również nie.)
   **przebieg 7, z większą mocą statystyczną, ściął to do +2,0% i nieistotne — więc został wycofany**,
   dokładnie tak, jak zobowiązywała prerejestracja. Uczciwy werdykt: **żaden przebieg o odpowiedniej
   mocy nie pokazuje, że nagromadzona nauka poprawia skuteczność w zadaniach**, a wąskim gardłem jest
-  przyrząd pomiarowy — trzy próby napisania zestawu mieszczącego się w informatywnym paśmie 40–60%
-  wylądowały wszystkie na 84–92%. „Im więcej używasz, tym lepsza" pozostaje **bez dowodu**.
+  przyrząd pomiarowy. Ten akapit głosił kiedyś, że trzy próby napisania zestawu mieszczącego się w
+  informatywnym paśmie 40–60% wylądowały wszystkie na 84–92%; to była nieprawda, a plik, na który się
+  powoływał, zawierał liczbę, która ją obalała — kontrola z pierwszej próby wylądowała na **50%**,
+  dokładnie w paśmie. To, co różni zestawy między sobą, to czy poprawkę da się *wprowadzić edycją*,
+  czy trzeba ją *wymyślić* — czego nie uchwyciła żadna specyfikacja trudności
+  ([`bench/scenarios/PREREGISTRATION-v3.md`](bench/scenarios/PREREGISTRATION-v3.md)).
+  „Im więcej używasz, tym lepsza" pozostaje **bez dowodu**.
   Źródło: [`bench/learning_lift/RESULTS.md`](bench/learning_lift/RESULTS.md).
 
 Istotne wewnętrznie (na naszym własnym trudnym zestawie). Na prawdziwych repozytoriach **zreplikowane
@@ -207,7 +212,7 @@ liczbę w dolarach.
 ### 🧬 Pamięć i samodoskonalenie
 - **Pamięć długoterminowa** — trzyma pamięć krótkoterminową, świeżą, faktograficzną i o tobie, plus mapę powiązań między rzeczami. Potrafi przechowywać wspomnienia w szybkiej bazie pełnotekstowej, wnosić profil twoich preferencji do każdej rozmowy, automatycznie scalać zduplikowane notatki i delikatnie podpowiadać zapisanie preferencji, gdy o niej wspomnisz.
 - **Uczy się nowych umiejętności** — gdy więcej niż raz uda jej się to samo zadanie, automatycznie zamienia to w przetestowaną, wielokrotnego użytku umiejętność.
-- **Kuratorowana biblioteka umiejętności, którą możesz czytać i rozszerzać** — 23 karty umiejętności w [`skills/`](skills/), 13 z nich napisanych na podstawie incydentów tego właśnie projektu. Karta to **dane, nie kod**: frontmatter plus Trigger / Do / Avoid / Check / Risk, i nic nie wykonuje — agent wczytuje ją do promptu, gdy karta pasuje, **opcjonalnie przez `--skill-cards` (albo `CHIMERA_SKILL_CARDS=1`), domyślnie wyłączone**: zarejestrowany test A/B, który miałby włączyć czytanie kart, dał +16,7 pp, ale *nieistotne statystycznie* przy +300% tokenów, więc nie przeszedł własnej bramki przełączenia i pozostał wyłączony ([`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)). Karty są pogrupowane według miejsca w pracy, w którym mają zastosowanie (define · build · verify · review · ship), z opisem, treścią i etykietami wyzwalaczy przetłumaczonymi na dziewięć języków — pilnowanymi przez test, który nie przechodzi, gdy tłumaczenie się zdezaktualizowało albo zrobiono je w połowie. Zaimportuj kartę przez `chimera skills-import skills/<nazwa>`. To także miejsce o najniższym progu wejścia do współtworzenia: przejrzenie twojego pull requesta to przeczytanie strony markdown, a nie audyt diffa ([`skills/README.md`](skills/README.md)).
+- **Kuratorowana biblioteka umiejętności, którą możesz czytać i rozszerzać** — 24 karty umiejętności w [`skills/`](skills/), 13 z nich napisanych na podstawie incydentów tego właśnie projektu. Karta to **dane, nie kod**: frontmatter plus Trigger / Do / Avoid / Check / Risk, i nic nie wykonuje — agent wczytuje ją do promptu, gdy karta pasuje, **opcjonalnie przez `--skill-cards` (albo `CHIMERA_SKILL_CARDS=1`), domyślnie wyłączone**: zarejestrowany test A/B, który miałby włączyć czytanie kart, dał +16,7 pp, ale *nieistotne statystycznie* przy +300% tokenów, więc nie przeszedł własnej bramki przełączenia i pozostał wyłączony ([`bench/skillcard/RESULTS.md`](bench/skillcard/RESULTS.md)). Karty są pogrupowane według miejsca w pracy, w którym mają zastosowanie (define · build · verify · review · ship), z opisem, treścią i etykietami wyzwalaczy przetłumaczonymi na dziewięć języków — pilnowanymi przez test, który nie przechodzi, gdy tłumaczenie się zdezaktualizowało albo zrobiono je w połowie. Zaimportuj kartę przez `chimera skills-import skills/<nazwa>`. To także miejsce o najniższym progu wejścia do współtworzenia: przejrzenie twojego pull requesta to przeczytanie strony markdown, a nie audyt diffa ([`skills/README.md`](skills/README.md)).
 - **Opcjonalny samotrening (zaawansowane)** — może zapisywać własne doświadczenie, żebyś mógł później dostroić na nim model. Domyślnie wyłączone; nic nie jest trenowane bez twojej prośby.
 
 ### 📏 Pętla, którą da się zmierzyć — i która mówi, kiedy się zgubiła
@@ -219,7 +224,7 @@ pozostaje użyteczny, a większość z niej jest niewidoczna, dopóki nie zawied
 - **Długie przebiegi przeżywają własny kontekst.** Wyczerpanie okna kiedyś po prostu kończyło przebieg, przez co to okno — a nie trudność zadania — było prawdziwym sufitem. Kompaktacja teraz nie tyka wiadomości systemowej (to stabilny prefiks, na którym zakotwiczony jest cały cache promptu), nigdy nie zostawia wyniku narzędzia osieroconego od jego wywołania i **przywraca to, czego przebieg potrzebuje, by wciąż być sobą**: otwarty plik, plan, listę zadań, bieżący stan. Mówi wprost, co porzuciła, zamiast to streszczać — agent może przeczytać plik ponownie, ale nie potrafi „odwierzyć" w zmyślone streszczenie.
 
 ### 🔌 Łączenie i automatyzacja
-- **Rozmawiaj z nią wszędzie** — czat w terminalu, pełnoekranowa aplikacja terminalowa albo bot na **Discordzie, Telegramie, Slacku, Signalu i WhatsAppie**. Jest też prosty endpoint HTTP.
+- **Rozmawiaj z nią wszędzie** — czat w terminalu, pełnoekranowa aplikacja terminalowa albo bot na **Discordzie, Telegramie, Slacku, Signalu i WhatsAppie** — wszystko zbudowane przez ten sam nadzorowany montaż, a rozmowa rozpoczęta w `chat` wznawia się w `tui` (`chimera sessions`). Jest też prosty endpoint HTTP.
 - **Harmonogram i proaktywność** — zlecaj cykliczne zadania zwykłym językiem („co rano streszczaj wiadomości"). Z działającym wbudowanym schedulerem **działa na czas**, a nie tylko wtedy, gdy do niej napiszesz.
 - **Narzędzia i integracje** — czyta i zapisuje pliki, uruchamia polecenia powłoki, **czyta w pełni wyrenderowane strony i zbiera lub przeczesuje całe witryny** (ekstrakcja strukturalna przechodzi przez odizolowany czytnik bez narzędzi, który może emitować wyłącznie pola zwalidowane schematem — ograniczając zasięg rażenia ukrytej instrukcji, a nie usuwając go) i uruchamia kod w sandboxie. Podłącz niemal dowolną usługę webową (przez jej API) albo narzędzie zewnętrzne — w tym dowolny **serwer MCP** ([przewodnik + działający przykład](docs/mcp.md)) — i zaimportuj swoją konfigurację z innych narzędzi agentowych, których już używasz.
 - **Wszystko w zestawie** — wyszukiwanie w sieci, generowanie obrazów (w chmurze **lub w pełni lokalnie**), **mowa na tekst** i tekst na mowę, **pobieranie mediów**, **analiza danych i wykresy**, e-mail, kalendarz, wykonywanie kodu i więcej, gotowe do włączenia.
@@ -227,9 +232,9 @@ pozostaje użyteczny, a większość z niej jest niewidoczna, dopóki nie zawied
 ### 🚀 Uruchom wszędzie, bezpiecznie
 - **Dowolny model, jeden interfejs** — modele w chmurze albo twoje lokalne, z automatycznym przełączeniem, gdy jeden padnie, i rotacją wielu kluczy.
 - **Wdrożenie na serwer jedną komendą** — uruchom z Dockerem (albo bez), żeby działała bez przerwy i wstawała po restarcie. Zobacz **[docs/deploy.md](docs/deploy.md)**.
-- **Jądro bezpieczeństwa** — kontrola przy każdym działaniu (pozwól / ostrzeż / sprawdź / zablokuj), **opcjonalny** kontener z odciętą siecią dla niezaufanego kodu (`CHIMERA_SANDBOX=docker`; domyślny lokalny runner *nie* jest odizolowany) i pełny dziennik audytu tego, co zrobiła. To, czy werdykt `review` zatrzyma się, by zapytać, czy po prostu odmówi, zależy od trybu zatwierdzania (`CHIMERA_APPROVAL_MODE=ask|deny|allow`) — bez nadzoru odmawia, zamiast wymyślać zgodę.
+- **Jądro bezpieczeństwa** — kontrola przy każdym działaniu, do którego jest podpięte (pozwól / ostrzeż / sprawdź / zablokuj), **opcjonalny** kontener z odciętą siecią dla niezaufanego kodu (`CHIMERA_SANDBOX=docker`; domyślny lokalny runner *nie* jest odizolowany) i dziennik audytu tego, co zrobiła, z wymazanymi danymi wrażliwymi. **Gdzie dokładnie działa:** `chimera agent --guard` i `solve --guard`, a — gdy `CHIMERA_GOVERNANCE` jest ustawione na `observe` albo `enforce` — każda powierzchnia zmontowana przez nadzorowany profil: `chimera chat`, `assist` i `tui` (od wersji 0.53.0), scheduler, endpoint ACP, boty w komunikatorach, endpointy tablicy i projektu oraz endpointy run i turn w API. **Nie** sięga czatu aplikacji desktopowej (który niesie strażnika skażenia i zatwierdzającego, a nie reguły sygnatur) ani endpointu zgodnego z OpenAI; tę lukę nazywamy tutaj, zamiast zostawiać ci ją do odkrycia. Ten punkt głosił kiedyś „przy każdym działaniu", co nie było prawdą dla niczego serwowanego przez HTTP. To, czy werdykt `review` zatrzyma się, by zapytać, czy po prostu odmówi, zależy od trybu zatwierdzania (`CHIMERA_APPROVAL_MODE=ask|deny|allow`). Bez nadzoru `ask` nie zapada się już w odmowę: pytanie zostaje zapisane, dostarczone tam, gdzie dostarcza dane wdrożenie (`CHIMERA_APPROVAL_WEBHOOK`), i można na nie odpowiedzieć przez `chimera approve` skądkolwiek — a **milczenie nadal odmawia**, gdy wyczerpie się `CHIMERA_APPROVAL_WAIT`. Przez HTTP nigdy nie pyta na własnym terminalu serwera, bo ten, kto patrzy na tę konsolę, nie jest osobą, która złożyła żądanie.
 - **Zatrzymaj ją, zanim coś zatwierdzi, gdy przeczytała coś, czemu nie należy ufać** (`--pause-on-taint`) — przebieg, który wchłonął niezaufaną treść, sam się parkuje zamiast finalizować i czeka na ciebie. Możesz zaakceptować wynik, zaakceptować wersję, którą sam poprawiłeś, wysłać wskazówki i pozwolić spróbować ponownie albo odrzucić w całości — z terminala *lub* z aplikacji desktopowej. Nic nie jest zapisywane i nic nie jest uczone, dopóki nie zdecydujesz, a pauza nigdy nie jest raportowana jako porażka: nie doszła do werdyktu, czeka na człowieka.
-- **Aplikacja desktopowa, która pilotuje przebieg, a nie tylko go uruchamia** — pięć miejsc docelowych zamiast menu z piętnastoma, w dziesięciu językach. Uruchom przebieg i odejdź: postęp nadal tam jest, gdy wrócisz, pasek stanu z każdego ekranu nazywa to, co robi agent, a Stop działa ze wszystkich. Natywne instalatory dla Windows / macOS / Linux w [Releases](https://github.com/brcampidelli/chimera-agent/releases).
+- **Aplikacja desktopowa, która pilotuje przebieg, a nie tylko go uruchamia** — pięć miejsc docelowych zamiast menu z piętnastoma, w dziesięciu językach. Uruchom przebieg i odejdź: postęp nadal tam jest, gdy wrócisz, pasek stanu z każdego ekranu nazywa to, co robi agent, a Stop działa ze wszystkich. Pytanie, które agent parkuje — wywołanie narzędzia czekające na ciebie — też jest widoczne z każdego ekranu; jego karta odlicza czas, a przy zerze mówi to wprost, zamiast oferować martwe przyciski. Natywne instalatory dla Windows / macOS / Linux w [Releases](https://github.com/brcampidelli/chimera-agent/releases).
 
 ## Szybki start
 
@@ -255,6 +260,7 @@ klucz odblokowuje ponad 100 modeli.
 cp .env.example .env
 # otwórz .env i ustaw, na przykład:  CHIMERA_OPENROUTER_KEYS=sk-or-...
 ```
+Albo pozwól zrobić to `uv run chimera init`: tworzy `.env`, przyjmuje klucz i wskazuje ci prawdziwy przykład do wypróbowania.
 
 **3. Sprawdź, czy wszystko gotowe**
 ```bash
@@ -326,7 +332,7 @@ chcesz (zobacz kolumnę „Wymaga"). **Używasz Dockera? Oficjalny obraz ma już
 | **Czytać i zbierać prawdziwe strony** (prawdziwa przeglądarka) | — | `chimera agent "otwórz example.com i podaj mi nagłówek"` |
 | **Pamięć długoterminowa** | — | `chimera memory add "..."` · `chimera memory search "..."` |
 | **Uczyć się wielokrotnego użytku umiejętności samodzielnie** | — | dzieje się podczas `chimera solve`; wypisz przez `chimera skills-stats` (`chimera skills` pokazuje wbudowane) |
-| **Użyć kuratorowanej karty umiejętności** (jest ich 23, w 9 językach) | — | `chimera skills-import skills/verify-before-claiming` |
+| **Użyć kuratorowanej karty umiejętności** (jest ich 24, w 9 językach) | — | `chimera skills-import skills/verify-before-claiming` |
 | **Planować cykliczną pracę** | — | `chimera cron add brief "0 8 * * *" "streść wiadomości"` |
 | **Działać jako bot czatu** (Discord/Telegram/Slack/Signal/WhatsApp) | `[messaging]` | `chimera serve --cron --discord` |
 | **Podłączyć dowolne narzędzie zewnętrzne** (MCP) | `[mcp]` | przewodnik: [docs/mcp.md](docs/mcp.md) |
@@ -381,13 +387,16 @@ flowchart TD
 Każde polecenie to `chimera <nazwa>` (albo `uv run chimera <nazwa>` przed instalacją).
 
 ```bash
+chimera init                          # konfiguracja przy pierwszym uruchomieniu: .env, klucz jednego dostawcy, prawdziwy przykład
 chimera doctor / models / features    # sprawdź konfigurację, wypisz modele, zobacz opcjonalne możliwości
 chimera chat                          # interaktywny asystent, który pamięta między turami
 chimera assist                        # ten sam czat, domyślnie tani (kaskada tierów)
-chimera tui                           # pełnoekranowa aplikacja terminalowa
+chimera tui                           # pełnoekranowa aplikacja terminalowa; chimera sessions wypisuje, co da się wznowić
 chimera run "PROMPT" --image pic.png  # jednorazowa odpowiedź (może przeczytać obraz)
 chimera fuse "PROMPT" --show-panel    # połącz kilka modeli: panel -> sędzia -> syntetyzator
 chimera solve "TASK" --verify "pytest -q" --isolate   # wykonaj zadanie; zachowaj zmianę tylko, gdy kontrola przejdzie
+chimera solve-batch "TASK A" "TASK B"        # kilka zadań naraz, każde we własnym git worktree
+chimera approve                        # odpowiedz skądkolwiek na pytanie, które agent zaparkował; pomiń id, by je wypisać
 chimera crew "TASK" --mode supervisor         # zespół specjalistów bierze się za jedno zadanie
 chimera crew-isolated "TASK" -W "name:role" --verify "..." --synthesize   # zespół, każdy we własnej odizolowanej kopii
 chimera explore "where is login handled?"     # znajdź właściwe pliki/linie, dostań krótką odpowiedź
@@ -404,6 +413,7 @@ chimera skills-stats / skills-pending          # wyuczone umiejętności: użyci
 chimera migrate <source> <dir> --apply         # zaimportuj ustawienia, umiejętności i pamięć z innego narzędzia
 chimera evolve status / tune / recipe          # opcjonalnie: samooptymalizacja; przygotuj dane do dostrojenia modelu
 chimera fusion-bench / skillcard-bench / schema-bench / sandbox-bench   # uczciwe benchmarki A/B: zmierz koszt, jakość i efekty uboczne, zanim zaufasz funkcji
+chimera redteam                        # korpus wstrzyknięć przez stos nadzoru; klucz niepotrzebny
 chimera pet new --name Chimi                   # adoptuj małego wirtualnego towarzysza :)
 ```
 
