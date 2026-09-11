@@ -190,8 +190,11 @@ class FusionConfig:
     # as ``Answer A / B / C`` in a shuffled order, never as ``Answer 1 (model <vendor slug>)`` in
     # arrival order — the vendor name and the position are not evidence about an answer, and a judge
     # given them uses them. The permutation is kept on the trace (``shown_order``) so the receipt
-    # still attributes every answer. Off by default until ``bench/judge_blind`` says what it costs.
-    blind_panel: bool = False
+    # still attributes every answer. On by default: ``bench/judge_blind`` (2026-09-11, 360 runs)
+    # measured its cost at zero — 240/240 named, 119/120 blind, the one miss a unit — on a corpus
+    # the judge could solve alone, so it could not show the bias either; a label the judge does not
+    # need is a label it should not be shown. ``False`` restores the named, ordered presentation.
+    blind_panel: bool = True
 
     def role_kinship(self) -> dict[str, object]:
         """How independent the judge actually is from the panel it grades.

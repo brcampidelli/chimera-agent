@@ -1,8 +1,9 @@
 """`FusionConfig.blind_panel`: the judge reads `Answer A / B / C` in a shuffled order, and the trace
 keeps the permutation so a receipt can still say who wrote what.
 
-Off, nothing changes — byte for byte the prompt the judge always got. The tests read the prompt the
-judge actually received, because that is the only place the claim can be checked."""
+Off (`blind_panel=False`), nothing changes — byte for byte the prompt the judge always got. The
+tests read the prompt the judge actually received, because that is the only place the claim can be
+checked. On is the default since `bench/judge_blind` measured the cost at zero (2026-09-11)."""
 
 from __future__ import annotations
 
@@ -36,9 +37,13 @@ def _config(**kw: Any) -> FusionConfig:
     return FusionConfig(panel=list(PANEL), judge="judge", synthesizer="synth", **kw)
 
 
-def test_named_by_default_the_judge_sees_slugs_in_panel_order_and_no_permutation_is_recorded() -> None:
+def test_blind_is_the_default() -> None:
+    assert FusionConfig(panel=list(PANEL), judge="judge", synthesizer="synth").blind_panel is True
+
+
+def test_named_when_switched_off_the_judge_sees_slugs_in_panel_order_and_no_permutation_is_recorded() -> None:
     backend = Recording()
-    trace = FusionEngine(backend, _config()).run([{"role": "user", "content": "q"}])
+    trace = FusionEngine(backend, _config(blind_panel=False)).run([{"role": "user", "content": "q"}])
     judge_view = backend.prompts["judge"][0]
     assert "--- Answer 1 (model openrouter/vendor-a/big) ---" in judge_view
     assert "--- Answer 3 (model openrouter/vendor-c/small) ---" in judge_view
@@ -91,7 +96,7 @@ def test_route_meta_carries_the_permutation() -> None:
     result = FusionEngine(backend, _config(blind_panel=True)).complete([{"role": "user", "content": "q"}])
     assert result.route_meta is not None
     assert sorted(result.route_meta["shown_order"]) == [0, 1, 2]
-    named = FusionEngine(Recording(), _config()).complete([{"role": "user", "content": "q"}])
+    named = FusionEngine(Recording(), _config(blind_panel=False)).complete([{"role": "user", "content": "q"}])
     assert named.route_meta is not None and named.route_meta["shown_order"] is None
 
 
