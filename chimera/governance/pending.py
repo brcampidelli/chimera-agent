@@ -25,6 +25,16 @@ pending now.
 **Nothing is remembered across runs.** A stale request is cleaned up on the way in. Reusing
 yesterday's yes for today's question is the same defect as treating silence as consent, one day
 later.
+
+**How every question ended is remembered, though — separately from the question.** Until
+2026-09-11 the request and the answer files were the only evidence a question had existed, and both
+were deleted the moment it resolved, so a deployment could not be asked the two numbers that decide
+whether this mechanism is worth anything: how often somebody answers, and how long they take. With
+nobody reachable, "approver present" behaves exactly like "no approver" and the block rate still
+reads perfect — the gate's usefulness is a property of the humans, not of the configuration
+(pointed out under the LLMDevs post of 2026-09-11). :func:`history` and :func:`answer_stats` read
+the append-only ``history.jsonl`` this module now writes on every resolution, and a timeout is
+recorded as a timeout rather than folded into "refused".
 """
 
 from __future__ import annotations
@@ -144,12 +154,15 @@ def ask_durably(
     """
     directory = _dir(home)
     request_id = uuid.uuid4().hex[:12]
+    # One clock reading for the file, the announcement and the record. There used to be one per
+    # site, and a time-to-answer measured between two of them carried their difference.
+    asked_at = time.time()
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
         (directory / f"{request_id}.ask.json").write_text(
             json.dumps(
-                {"id": request_id, "action": action, "reason": reason, "asked_at": time.time()},
+                {"id": request_id, "action": action, "reason": reason, "asked_at": asked_at},
                 ensure_ascii=False,
             ),
             encoding="utf-8",
@@ -165,7 +178,7 @@ def ask_durably(
         # independently of it: a screen that can render a button must not depend on a webhook
         # being configured, and a failure here is as harmless as a failed delivery below.
         try:
-            on_asked(PendingApproval(id=request_id, action=action, reason=reason, asked_at=time.time()))
+            on_asked(PendingApproval(id=request_id, action=action, reason=reason, asked_at=asked_at))
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
             _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
@@ -182,10 +195,16 @@ def ask_durably(
     limite = clock() + wait_seconds
     while clock() < limite:
         if resposta.exists():
+            answered_at: float | None = None
             try:
-                decidido = bool(json.loads(resposta.read_text(encoding="utf-8")).get("approved"))
+                dados = json.loads(resposta.read_text(encoding="utf-8"))
+                decidido = bool(dados.get("approved"))
+                answered_at = float(dados.get("answered_at") or 0.0) or None
+                outcome = "approved" if decidido else "refused"
             except (OSError, ValueError):
                 decidido = False
+                outcome = "unreadable"
+            _record(directory, request_id, action, reason, asked_at, outcome, answered_at)
             _cleanup(directory, request_id)
             return decidido
         sleep(poll_seconds)
@@ -194,8 +213,97 @@ def ask_durably(
         "approval request %s went unanswered for %.0fs; refusing. Action: %s",
         request_id, wait_seconds, action[:200],
     )
+    _record(directory, request_id, action, reason, asked_at, "timeout", None)
     _cleanup(directory, request_id)
     return False
+
+
+#: Where every resolved question leaves one line. Append-only, never swept: the questions are
+#: ephemeral by design (see :func:`sweep`), the record of how they ended is the point.
+HISTORY = "history.jsonl"
+
+#: The four ways a question ends. ``timeout`` is its own value because it is the one that says
+#: nobody was reachable, and a report that folded it into ``refused`` would read a night with no
+#: one on call as a night of careful refusals.
+OUTCOMES = ("approved", "refused", "timeout", "unreadable")
+
+
+def _record(
+    directory: Path,
+    request_id: str,
+    action: str,
+    reason: str,
+    asked_at: float,
+    outcome: str,
+    answered_at: float | None,
+) -> None:
+    resolved_at = time.time()
+    line = {
+        "id": request_id,
+        "action": action[:200],
+        "reason": reason[:300],
+        "asked_at": asked_at,
+        "resolved_at": resolved_at,
+        # The person's clock, not the poller's: the answer file carries when it was written, and
+        # the poll interval would otherwise be added to every measurement.
+        "seconds_to_answer": (
+            max(0.0, answered_at - asked_at) if answered_at is not None else None
+        ),
+        "waited_seconds": max(0.0, resolved_at - asked_at),
+        "outcome": outcome,
+    }
+    try:
+        with (directory / HISTORY).open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(line, ensure_ascii=False) + "\n")
+    except OSError as exc:  # the decision stands either way; only the record is lost
+        _log.warning("could not record how approval %s ended: %s", request_id, exc)
+
+
+def history(home: Path) -> list[dict[str, Any]]:
+    """Every resolved question this home has seen, oldest first. Empty when none were asked."""
+    path = _dir(home) / HISTORY
+    if not path.exists():
+        return []
+    out: list[dict[str, Any]] = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            out.append(json.loads(raw))
+        except ValueError:
+            continue
+    return out
+
+
+def answer_stats(home: Path) -> dict[str, Any]:
+    """The two operating metrics of this mechanism: how often somebody answers, and how fast.
+
+    ``answer_rate`` counts a question as answered when a person wrote a verdict, yes or no; a timeout
+    is not an answer. ``p50``/``p90`` are seconds-to-answer over the answered ones only, and are
+    ``None`` until there is something to measure — a rate of zero over zero questions is not a rate.
+    """
+    rows = history(home)
+    answered = [r for r in rows if r.get("outcome") in ("approved", "refused")]
+    times = sorted(
+        float(r["seconds_to_answer"]) for r in answered if r.get("seconds_to_answer") is not None
+    )
+
+    def pct(q: float) -> float | None:
+        if not times:
+            return None
+        return times[min(len(times) - 1, int(round(q * (len(times) - 1))))]
+
+    return {
+        "asked": len(rows),
+        "answered": len(answered),
+        "approved": sum(r.get("outcome") == "approved" for r in rows),
+        "refused": sum(r.get("outcome") == "refused" for r in rows),
+        "timeouts": sum(r.get("outcome") == "timeout" for r in rows),
+        "answer_rate": (len(answered) / len(rows)) if rows else None,
+        "p50_seconds": pct(0.5),
+        "p90_seconds": pct(0.9),
+        "max_seconds": times[-1] if times else None,
+    }
 
 
 def _cleanup(directory: Path, request_id: str) -> None:
