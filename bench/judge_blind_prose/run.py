@@ -61,6 +61,7 @@ class Run:
     final: str
     usd: float | None
     seconds: float
+    composition: str = "trio"  # trio = 2 faithful + 1 flawed; duo = 1 faithful + 1 flawed (no majority)
 
 
 def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> Run:
@@ -108,7 +109,58 @@ def plan_for(index: int) -> list[tuple[str, int, str, int]]:
     return named + blind
 
 
-def run(out: Path) -> None:
+# --- the duo composition: 1 faithful + 1 flawed, no majority to hide behind -----------------------
+# The trio's 2:1 faithful majority means "follow the majority token" reproduces 0 propagation without
+# the judge ever adjudicating the contradiction — so it cannot show a name effect. The duo removes the
+# majority: the judge must choose between one faithful and one flawed candidate, which is where a
+# vendor name or a position has leverage. This is the sensitive instrument for the bias question, and
+# the direct prose analogue of `judge_blind`'s one-right-one-wrong panels.
+_DUO_CAND = [0, 2]  # faithful_a, flawed; the flawed answer is local index 1
+_DUO_ORDERS = {"d01": (0, 1), "d10": (1, 0)}
+
+
+def one_duo(item: Item, arm: str, slug_rot: int, order: str, shuffle_seed: int) -> Run:
+    texts = [item.answers()[i] for i in _DUO_CAND]  # [faithful_a, flawed]
+    if order == "shuffle":
+        perm = [0, 1]
+        random.Random(shuffle_seed).shuffle(perm)
+    else:
+        perm = list(_DUO_ORDERS[order])
+    slug_on = [jb.SHOWN_SLUGS[(j + slug_rot) % 3] for j in range(2)] if arm == "named" else ["?", "?"]
+    panel = [
+        PanelResponse(model=slug_on[perm[p]] if arm == "named" else f"writer{p}", content=texts[perm[p]])
+        for p in range(2)
+    ]
+    engine = jb._engine(arm == "blind")
+    messages = [{"role": "user", "content": item.passage + "\n\n" + item.instruction}]
+    t0 = time.monotonic()
+    analysis, final, aggregation, judge, synth, shown = jb._retrying(lambda: engine._aggregate(messages, panel))
+    if aggregation != "synth" or judge is None or synth is None:
+        raise RuntimeError(f"judge was bypassed ({aggregation})")
+    shown_order = [perm[i] for i in (shown or range(2))]  # local candidate index at each shown position
+    flawed_position = shown_order.index(1) + 1  # the flawed candidate is local index 1
+    flawed_label = slug_on[1].split("/")[-1] if arm == "named" else chr(ord("A") + flawed_position - 1)
+    usd, unpriced = 0.0, False
+    for r in (judge, synth):
+        cost = price_completion(r)
+        usd += cost.usd
+        unpriced = unpriced or cost.unpriced is not None
+    return Run(
+        item_id=item.id, arm=arm, rotation=slug_rot, order=order,
+        flawed_position=flawed_position, flawed_label=flawed_label,
+        verdict=grade(final, item), judge_mentions_vendor=bool(jb._VENDOR.search(analysis)),
+        final=final, usd=(None if unpriced else usd), seconds=round(time.monotonic() - t0, 1),
+        composition="duo",
+    )
+
+
+def plan_duo(index: int) -> list[tuple[str, int, str, int]]:
+    named = [("named", rot, order, 0) for rot in (0, 1, 2) for order in ("d01", "d10")]
+    blind = [("blind", 0, "d01", 0), ("blind", 0, "d10", 0), ("blind", 0, "shuffle", 3000 + index)]
+    return named + blind
+
+
+def run(out: Path, composition: str = "trio") -> None:
     items = corpus()
     out.parent.mkdir(parents=True, exist_ok=True)
     done: set[tuple[str, str, int, str]] = set()
@@ -117,14 +169,16 @@ def run(out: Path) -> None:
             if line.strip():
                 r = json.loads(line)
                 done.add((r["item_id"], r["arm"], r["rotation"], r["order"]))
+    plan = plan_duo if composition == "duo" else plan_for
+    make = one_duo if composition == "duo" else one
     spent = 0.0
     with out.open("a", encoding="utf-8") as fh:
         for index, item in enumerate(items):
-            for arm, rotation, order, seed in plan_for(index):
+            for arm, rotation, order, seed in plan(index):
                 if (item.id, arm, rotation, order) in done:
                     continue
                 try:
-                    r = one(item, arm, rotation, order, seed)
+                    r = make(item, arm, rotation, order, seed)
                 except Exception as exc:  # noqa: BLE001 — a run the providers could not finish is a halt, skipped
                     print(f"  {item.id:<14} {arm:<6} r{rotation} {order:<7} SKIPPED {type(exc).__name__}: {str(exc)[:80]}", flush=True)
                     continue
@@ -232,12 +286,13 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--report", type=Path)
+    ap.add_argument("--composition", choices=("trio", "duo"), default="trio")
     ap.add_argument("--out", type=Path, default=REPO / "bench/judge_blind_prose/results/run.jsonl")
     args = ap.parse_args()
     if args.report:
         report(args.report)
     elif args.run:
-        run(args.out)
+        run(args.out, args.composition)
     else:
         ap.error("pass --run or --report")
 

@@ -74,3 +74,27 @@ powered version, not to change a default.
   is exactly what a name-bias test needs, and also all it can speak to.
 * **One judge and one synthesiser, one day.** No cross-model or next-day floor (PROTOCOL §5); the
   replication here is the 9 runs per item across rotation and order.
+
+## Amendment 1 — the duo composition (dated 2026-09-12, after the trio run, before the duo run)
+
+The trio run came back **0/90 propagated** (88 kept, 2 omitted), both arms, every vendor, every
+position — every registered prediction met. But 0/90 is the floor the caveats warned about, and it
+has a named cause that the result cannot separate itself from: with **two faithful candidates against
+one flawed**, "the synthesiser follows the majority token" reproduces 0 propagation **without the
+judge ever adjudicating the contradiction**. In that regime a vendor name has no leverage — there is
+nothing to tip — so the trio can show *faithfulness under a majority* but is structurally unable to
+show *name bias*. That is the same §2q/§2u shape the lessons file names: a superficial cue (the
+2-to-1 token majority) is sufficient to produce the outcome, so the outcome is not evidence about the
+mechanism under test.
+
+The **duo** composition removes the majority: one faithful candidate against one flawed, so the judge
+must choose, and a name or a position now has real leverage — the direct prose analogue of
+`judge_blind`'s one-right-one-wrong panels. Same items, same grader, same rotation-and-order design
+(6 named + 3 blind per item, 90 runs), written to `results/2026-09-12-duo.jsonl`.
+
+**Duo predictions.** (1) Blind propagation ≤ 0.25 — higher than the trio's floor because there is no
+majority cue, but still low if the judge reads the passage and sides with the faithful candidate.
+(2) |named − blind| ≤ 10 pp; a larger gap, or a vendor spread beyond its intervals, is the name
+effect the trio could not test. **Decision rule unchanged** — the three branches above are read on the
+duo numbers, which are the ones with the tension to decide them; the trio is reported as the
+faithful-under-majority check it turned out to be.
