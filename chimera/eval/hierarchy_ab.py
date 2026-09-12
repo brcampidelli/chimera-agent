@@ -67,7 +67,14 @@ def _doc(title: str, facts: list[str]) -> str:
 
 
 def synthetic_tasks() -> list[HierarchyTask]:
-    """10 read-heavy multi-part tasks, 2-4 docs each, all deterministically gradable."""
+    """30 read-heavy multi-part tasks, 2-4 docs each, all deterministically gradable.
+
+    The first ten are the corpus every published number of `bench/hierarchy`,
+    `bench/hierarchy_multistep` and `bench/hierarchy_equal_calls` was measured on, in that order;
+    the twenty after them were added on 2026-09-12 (`bench/hierarchy_equal_calls` addendum 3)
+    because ten tasks at three runs gave a 50% flip rate that no comparison could read through.
+    A run that wants the old corpus takes the first ten.
+    """
     tasks: list[HierarchyTask] = []
     specs: list[tuple[str, dict[str, list[str]], str]] = [
         (
@@ -155,6 +162,189 @@ def synthetic_tasks() -> list[HierarchyTask]:
                 "apac.md": ["APAC region has 140 spare cores"],
             },
             "Report the spare-core capacity for the EU, US and APAC regions.",
+        ),
+        # --- the twenty added on 2026-09-12 (bench/hierarchy_equal_calls addendum 3): the ten above
+        # gave a 50% flip rate that no comparison could read through. Same shape, different figures;
+        # no figure repeats across a task's documents, so a value from the wrong document never
+        # passes for the right one.
+        (
+            "budgets",
+            {
+                "marketing.md": ["Marketing budget is 480 thousand dollars"],
+                "engineering.md": ["Engineering budget is 1250 thousand dollars"],
+                "support.md": ["Support budget is 210 thousand dollars"],
+            },
+            "Read marketing.md, engineering.md and support.md and report each department's budget.",
+        ),
+        (
+            "slas",
+            {
+                "gold.md": ["Gold tier promises 99.95 percent uptime", "Gold tier response time is 25 minutes"],
+                "silver.md": ["Silver tier promises 99.5 percent uptime", "Silver tier response time is 12 hours"],
+            },
+            "From gold.md and silver.md: what uptime does each tier promise, and what is each tier's "
+            "response time?",
+        ),
+        (
+            "storage",
+            {
+                "hot.md": ["Hot storage holds 18 terabytes"],
+                "warm.md": ["Warm storage holds 96 terabytes"],
+                "cold.md": ["Cold storage holds 640 terabytes"],
+                "archive.md": ["Archive storage holds 2100 terabytes"],
+            },
+            "Read hot.md, warm.md, cold.md and archive.md and state how much each storage class holds.",
+        ),
+        (
+            "migrations",
+            {
+                "orders.md": ["Orders migration takes 35 minutes", "Orders migration locks the ledger table"],
+                "users.md": ["Users migration takes 16 minutes", "Users migration locks the sessions table"],
+            },
+            "Read orders.md and users.md: how long does each migration take, and which table does "
+            "each one lock?",
+        ),
+        (
+            "headcount",
+            {
+                "berlin.md": ["Berlin office has 46 engineers"],
+                "lisbon.md": ["Lisbon office has 23 engineers"],
+                "toronto.md": ["Toronto office has 71 engineers"],
+            },
+            "From berlin.md, lisbon.md and toronto.md: how many engineers does each office have?",
+        ),
+        (
+            "latency",
+            {
+                "search.md": ["Search ninety-fifth percentile latency is 340 milliseconds"],
+                "checkout.md": ["Checkout ninety-fifth percentile latency is 910 milliseconds"],
+            },
+            "Read search.md and checkout.md and report the ninety-fifth percentile latency of each service.",
+        ),
+        (
+            "retention",
+            {
+                "logs.md": ["Logs are retained for 45 days"],
+                "metrics.md": ["Metrics are retained for 400 days"],
+                "traces.md": ["Traces are retained for 14 days"],
+            },
+            "From logs.md, metrics.md and traces.md: how long is each kind of data retained?",
+        ),
+        (
+            "licences",
+            {
+                "editor.md": ["Editor licence costs 29 dollars per month", "Editor licence covers 12 devices"],
+                "viewer.md": ["Viewer licence costs 18 dollars per month", "Viewer licence covers 40 devices"],
+            },
+            "Read editor.md and viewer.md: what does each licence cost, and how many devices does "
+            "each cover?",
+        ),
+        (
+            "regions",
+            {
+                "frankfurt.md": ["Frankfurt region opened in 2019"],
+                "osaka.md": ["Osaka region opened in 2022"],
+                "saopaulo.md": ["Sao Paulo region opened in 2016"],
+                "sydney.md": ["Sydney region opened in 2021"],
+            },
+            "From frankfurt.md, osaka.md, saopaulo.md and sydney.md: in which year did each region open?",
+        ),
+        (
+            "audits",
+            {
+                "soc2.md": ["The SOC audit found 13 exceptions"],
+                "iso.md": ["ISO audit found 42 exceptions"],
+            },
+            "Read soc2.md and iso.md and report how many exceptions the SOC audit and the ISO audit found.",
+        ),
+        (
+            "tickets",
+            {
+                "billing.md": ["Billing queue has 128 open tickets", "Billing oldest ticket is 19 days old"],
+                "login.md": ["Login queue has 54 open tickets", "Login oldest ticket is 16 days old"],
+            },
+            "From billing.md and login.md: how many tickets are open in each queue, and how old is "
+            "the oldest ticket in each?",
+        ),
+        (
+            "quotas",
+            {
+                "free.md": ["Free plan allows 750 requests per day"],
+                "team.md": ["Team plan allows 20000 requests per day"],
+                "business.md": ["Business plan allows 250000 requests per day"],
+            },
+            "Read free.md, team.md and business.md and state the daily request quota of each plan.",
+        ),
+        (
+            "backups",
+            {
+                "nightly.md": ["Nightly backup completes in 52 minutes"],
+                "weekly.md": ["Weekly backup completes in 11 hours"],
+            },
+            "From nightly.md and weekly.md: how long does each backup take to complete?",
+        ),
+        (
+            "throughput",
+            {
+                "ingest.md": ["Ingest pipeline handles 8500 events per second"],
+                "export.md": ["Export pipeline handles 1200 events per second"],
+                "replay.md": ["Replay pipeline handles 300 events per second"],
+            },
+            "Read ingest.md, export.md and replay.md and report each pipeline's events per second.",
+        ),
+        (
+            "pricing",
+            {
+                "starter.md": ["Starter tier costs 49 dollars per month"],
+                "growth.md": ["Growth tier costs 199 dollars per month"],
+                "scale.md": ["Scale tier costs 890 dollars per month"],
+                "enterprise.md": ["Enterprise tier costs 4200 dollars per month"],
+            },
+            "From starter.md, growth.md, scale.md and enterprise.md: what does each tier cost per month?",
+        ),
+        (
+            "caches",
+            {
+                "edge.md": ["Edge cache hit rate is 93 percent", "Edge cache TTL is 60 seconds"],
+                "origin.md": ["Origin cache hit rate is 61 percent", "Origin cache TTL is 900 seconds"],
+            },
+            "Read edge.md and origin.md: what is each cache's hit rate, and what TTL does each use?",
+        ),
+        (
+            "queues",
+            {
+                "email.md": ["Email queue depth peaked at 7400 messages"],
+                "webhook.md": ["Webhook queue depth peaked at 260 messages"],
+                "sms.md": ["SMS queue depth peaked at 1900 messages"],
+            },
+            "From email.md, webhook.md and sms.md: what was the peak depth of each queue?",
+        ),
+        (
+            "endpoints",
+            {
+                "v1.md": ["The first API version retires on 30 June"],
+                "v2.md": ["The second API version retires on 15 December"],
+            },
+            "Read v1.md and v2.md and state the retirement date of each API version.",
+        ),
+        (
+            "uptime",
+            {
+                "q1.md": ["First quarter uptime was 99.91 percent", "First quarter had 12 major incidents"],
+                "q2.md": ["Second quarter uptime was 99.72 percent", "Second quarter had 25 major incidents"],
+                "q3.md": ["Third quarter uptime was 99.98 percent", "Third quarter had 17 major incidents"],
+            },
+            "From q1.md, q2.md and q3.md: what was the uptime each quarter, and how many major "
+            "incidents did each quarter have?",
+        ),
+        (
+            "certificates",
+            {
+                "public.md": ["Public certificate expires on 19 April"],
+                "internal.md": ["Internal certificate expires on 27 October"],
+                "vpn.md": ["VPN certificate expires on 14 January"],
+            },
+            "Read public.md, internal.md and vpn.md and report when each certificate expires.",
         ),
     ]
     for task_id, docs, question in specs:

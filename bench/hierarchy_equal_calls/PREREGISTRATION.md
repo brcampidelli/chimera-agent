@@ -149,3 +149,43 @@ plus 3B worker calls ≈ US$ 0. **≈ US$ 1.5.**
 **What this cannot show.** Ten tasks, a 50% flip rate: the size of any difference is a noise-floor
 sentence; direction and the token count are what is read. One strong synthesiser; the tasks'
 answers are the planted figures, which is the case the sentence was written for.
+
+
+## Addendum 3 — the corpus goes from ten tasks to thirty (registered 2026-09-12, before any call)
+
+Every number in this file, in `bench/hierarchy` and in `bench/hierarchy_multistep` was measured on
+the same ten read-heavy tasks, and RESULTS.md said what that costs: at three runs the flip rate is
+20–50%, so a 30–50 pp difference on `pass^3` is the size a task moves with nothing changed, and
+every verdict is a noise-floor sentence. Twenty tasks of the same shape are added to
+`chimera.eval.hierarchy_ab.synthetic_tasks` — two to four documents, one or two planted facts per
+document under `## Key items`, a question naming the documents, every figure two or more digits
+and unique within its task so a value from the wrong document never passes for the right one.
+The first ten are unchanged and in their order; a run that wants the old corpus takes them.
+
+**The instrument check, before anything is read.** On the twenty new tasks alone, `single_1` on the
+3B backbone lands inside the registered 20–85% band. If it does not, the corpus is not an
+instrument for this backbone and the run stops there with that number.
+
+**The run.** The five arms of this bench, the 3B backbone on every role (the run whose direction
+RESULTS.md read), thirty tasks, three runs: 450 trials, `results/2026-09-12-3b-30.jsonl`.
+
+**Predictions.** With thirty tasks the per-arm flip rate falls to **≤ 35%** for every arm (it was
+20–70% on ten); the four directions the ten-task run read hold on the twenty new tasks and on the
+thirty — `hierarchy` below `single_equal`, `hierarchy_no_synth` above `hierarchy`,
+`hierarchy_verbatim` above `hierarchy`, `single_equal` not above `single_1` by more than the
+floor; and the primary comparison (`hierarchy` against `single_equal` on `pass^3`) has a Newcombe
+interval that excludes zero **and** a point estimate larger than the noise floor for the first
+time.
+
+**Decision.** Nothing in code moves on these numbers — this addendum is the instrument, and what
+it decides is which sentence the Orchestration tab and the two benches may quote: if the primary
+comparison clears the floor, *at the same number of calls one agent that re-reads the documents
+does better on tasks like these* is a measured claim rather than a direction; if it does not, the
+sentence stays a direction and the corpus size stays in the caveat. A direction that reverses on
+the new twenty is published as a reversal.
+
+**Cost.** 450 trials on the 3B backbone, unpriced in the catalogue and under US$ 1 by the 8B run's
+receipts; two to three hours of wall clock.
+
+**What this cannot show.** Same shape, same filler, same needle grader: thirty tasks of one kind
+are not thirty kinds of task. One weak backbone.
