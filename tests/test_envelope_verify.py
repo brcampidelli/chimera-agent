@@ -96,11 +96,12 @@ def test_spot_check_forced_by_gaps_and_passes_when_faithful(tmp_path: Path) -> N
     env = build_envelope(_spec(), raw, store, gaps=["could not check source B"])
     outcome = verifier.verify(_spec(), env)
     assert outcome.passed is True and outcome.stage == "spot"
-    # Two calls, not one: a PASSING spot check is followed by the blind audit's extraction call
-    # (`bench/blind_audit`: the one-call auditor passes 19 of 23 summaries that dropped a critical
-    # finding). The extraction found nothing critical here, so stage 2 never ran.
-    assert backend.calls == 2
-    assert "recover" in outcome.checks_run and outcome.recovered == ()
+    # One call. A passing spot check used to be followed by the blind audit's extraction call;
+    # measured behind the DROPPED-only check (`bench/blind_audit`, addendum 2) that call recovered
+    # the plant on 0 of the 3 items the check missed and flagged 11 of 23 summaries that dropped
+    # nothing, so it is off the default path.
+    assert backend.calls == 1
+    assert "recover" not in outcome.checks_run and outcome.recovered == ()
     assert "Raw output" in backend.last_prompt  # artifact went to the VERIFIER's context
 
 

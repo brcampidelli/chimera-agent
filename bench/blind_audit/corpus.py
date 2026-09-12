@@ -351,7 +351,62 @@ def generate_item(domain: Domain, seed: int, *, model: str, temperature: float) 
 
 # --- planting and the instrument check ---------------------------------------------------------------
 
-POSITIONS = ("head", "middle", "none")
+POSITIONS = ("head", "middle", "none", "middle_clause")
+
+#: A plant's leading label — `ESCALATION REQUIRED:`, `RELEASE BLOCKER:`, `This changes the roadmap:` —
+#: is the loud half of the sentence. The clause position drops it and folds what remains into an
+#: ordinary sentence of a paragraph inside the cut, so that neither auditor is handed a headline.
+_LABEL_MAX_CHARS = 40
+
+
+def clause_of(plant: str) -> str:
+    """The plant without its label, lower-cased at the start, no final period — a clause."""
+    body = plant
+    head, sep, rest = plant.partition(":")
+    if sep and len(head) <= _LABEL_MAX_CHARS:
+        body = rest.strip()
+    body = body.rstrip(". ")
+    return body[:1].lower() + body[1:]
+
+
+def _cut_region(raw: str) -> tuple[int, int]:
+    """What `_distill` removes: it keeps the first 70% and the last 15% of (SUMMARY_MAX_CHARS - 200)."""
+    cap = SUMMARY_MAX_CHARS - 200
+    return int(cap * 0.7), len(raw) - int(cap * 0.15)
+
+
+def plant_clause(raw: str, plant: str) -> str:
+    """Fold `clause_of(plant)` into a sentence that lies wholly inside the cut.
+
+    The sentence keeps its own words on both sides of the clause, so the plant is neither a line nor
+    a paragraph of its own — ``…the remaining audits were routine — <clause>. The owners are
+    listed below.`` A sentence qualifies only if its whole span, clause included, sits inside the cut
+    region and it is not a heading; the instrument check then verifies the clause is absent from the
+    built summary and present in the artifact.
+    """
+    clause = clause_of(plant)
+    cut_start, cut_end = _cut_region(raw)
+    # Sentence ends inside the cut: a period followed by a space or a line break.
+    ends = [
+        m for m in range(cut_start, cut_end)
+        if raw[m] == "." and m + 1 < len(raw) and raw[m + 1] in (" ", "\n")
+    ]
+    candidates: list[tuple[int, int]] = []
+    for e in ends:
+        # The sentence starts after the previous sentence end or line break.
+        prev = max(raw.rfind(". ", 0, e), raw.rfind("\n", 0, e))
+        s = 0 if prev < 0 else prev + (2 if raw[prev] == "." else 1)
+        line_start = raw.rfind("\n", 0, s) + 1
+        if s <= cut_start or e + len(clause) + 6 >= cut_end:
+            continue
+        if raw[line_start:e].lstrip().startswith("#") or e - s < 40:
+            continue
+        candidates.append((s, e))
+    if not candidates:
+        raise ValueError("no sentence lies wholly inside the cut region")
+    target = (cut_start + cut_end) // 2
+    s, e = min(candidates, key=lambda p: abs((p[0] + p[1]) // 2 - target))
+    return raw[:e] + " — " + clause + raw[e:]
 
 
 def _boundaries(text: str) -> list[int]:
@@ -369,6 +424,8 @@ def plant_at(raw: str, plant: str, position: str) -> str:
     """Insert `plant` as its own paragraph at the registered position; `none` returns `raw` unchanged."""
     if position == "none":
         return raw
+    if position == "middle_clause":
+        return plant_clause(raw, plant)
     bounds = _boundaries(raw)
     if not bounds:
         raise ValueError("raw output has no paragraph breaks")
@@ -401,6 +458,20 @@ def instrument_check(item: CorpusItem, position: str, envelope: Any, planted: st
     if position == "none":
         if item.plant in planted:
             return "plant present in an unplanted item"
+        return None
+    if position == "middle_clause":
+        clause = clause_of(item.plant)
+        if clause not in planted:
+            return "clause missing from the raw output"
+        if item.plant in planted:
+            return "the labelled sentence is present — the clause position must not carry the label"
+        if not envelope.evidence_refs:
+            return "output fit the summary cap — nothing was distilled, nothing can be dropped"
+        if clause in envelope.summary:
+            return "clause survived into the summary — not inside the cut region"
+        marker = planted.index(clause)
+        if planted[max(0, marker - 2):marker] != "— " or not planted[marker + len(clause):].startswith("."):
+            return "clause is not inside a sentence"
         return None
     if item.plant not in planted:
         return "plant missing from the raw output"

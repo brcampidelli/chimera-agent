@@ -48,7 +48,7 @@ from chimera.orchestration.envelope_verify import (  # noqa: E402
 )
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
-ARMS = ("shipped", "blind", "shipped_dropped_only")
+ARMS = ("shipped", "blind", "shipped_dropped_only", "production", "production_2call")
 
 # --- the blind arm: the two prompts live in the module the product runs (`envelope_verify`), and
 # they are byte-identical to the strings this bench was registered and run with — checked on
@@ -174,6 +174,26 @@ def audit_blind(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *,
     return verdict, reply, findings, critical, [stage1, stage2]
 
 
+def audit_production(gateway: Any, store: ArtifactStore, spec: Any, envelope: Any, *, model: str,
+                     blind_audit: bool = False) -> tuple[str, list[str], str, list[Any]]:
+    """The pipeline as it ships: the one-call DROPPED check whose sentence is the recovery. With
+    `blind_audit=True`, the pipeline as it shipped between #437 and addendum 2: the two-call audit
+    behind a pass that named nothing. `verdict` is FAIL when the summary was changed (something
+    recovered); `failed_on` says which stage did it — `SPOT` (the check's own sentence) or `AUDIT`
+    (the two-call extraction behind a silent pass)."""
+    rec = _Recording(gateway)
+    verifier = EnvelopeVerifier(
+        store=store, backend=rec, model=model, spot_rate=1.0, recover_dropped=True, blind_audit=blind_audit,
+    )
+    outcome = verifier.verify(spec, envelope, force_spot=True)
+    if "spot" not in outcome.checks_run or outcome.stage != "spot":
+        raise RuntimeError(f"spot check did not decide: {outcome.stage} {outcome.detail[:80]}")
+    recovered = list(outcome.recovered)
+    stage = [] if not recovered else (["AUDIT"] if "recover" in outcome.checks_run else ["SPOT"])
+    reply = outcome.detail + ("\n\n## Recovered\n" + "\n".join(recovered) if recovered else "")
+    return ("FAIL" if recovered else "PASS"), stage, reply, rec.results
+
+
 def one(item: CorpusItem, position: str, arm: str, rep: int, *, auditor: str, store: ArtifactStore) -> Call:
     from chimera.providers import LLMGateway
 
@@ -192,6 +212,12 @@ def one(item: CorpusItem, position: str, arm: str, rep: int, *, auditor: str, st
             gateway, store, spec, envelope, model=auditor, spot_system=_SPOT_SYSTEM_DROPPED_ONLY,
         )
         failed_on = _failed_lines(reply)
+    elif arm == "production":
+        verdict, failed_on, reply, results = audit_production(gateway, store, spec, envelope, model=auditor)
+    elif arm == "production_2call":
+        verdict, failed_on, reply, results = audit_production(
+            gateway, store, spec, envelope, model=auditor, blind_audit=True,
+        )
     else:
         verdict, reply, findings, critical, results = audit_blind(gateway, store, spec, envelope, model=auditor)
         failed_on = ["DROPPED"] if verdict == "FAIL" else []
@@ -262,6 +288,44 @@ def report(path: Path) -> str:
             if mid and none:
                 d = sum(mid.values()) / len(mid) - sum(none.values()) / len(none)
                 lines.append(f"- discrimination `{arm}` (middle FAIL − none FAIL): {d:+.2f}")
+        # The clause plant: the one-call check against the two-call audit on the same items, and what
+        # the shipped pipeline (one call, then two behind a silent pass) recovered, by stage.
+        for pos in ("middle_clause",):
+            a, b = verdicts.get(("shipped_dropped_only", pos), {}), verdicts.get(("blind", pos), {})
+            common = sorted(set(a) & set(b))
+            if common:
+                pr = compare_paired([a[i] for i in common], [b[i] for i in common],
+                                    baseline_name="dropped_only", treatment_name="blind")
+                lo, hi = pr.diff_ci
+                lines.append(f"- **{pos}** paired FAIL, dropped_only → blind: {pr.baseline_rate:.2f} → {pr.treatment_rate:.2f} "
+                             f"(Δ {pr.delta:+.2f}, Newcombe 95% [{lo:+.2f}, {hi:+.2f}]; discordant {pr.discordant}: "
+                             f"blind-only {pr.treatment_only}, dropped_only-only {pr.baseline_only}; "
+                             f"{'significant' if pr.significant else 'not significant'})")
+        for prod_arm in ("production_2call", "production"):
+            prod = [r for r in rows if r["auditor"] == auditor and r["arm"] == prod_arm]
+            if not prod:
+                continue
+            lines.append("")
+            lines.append(f"| `{prod_arm}`, by position | items | recovered by the check's own sentence (SPOT) | recovered by the two-call audit behind a silent pass (AUDIT) | nothing recovered |")
+            lines.append("|---|---:|---:|---:|---:|")
+            for pos in POSITIONS:
+                keys = [k for k in by if k[0] == auditor and k[1] == prod_arm and k[3] == pos]
+                if not keys:
+                    continue
+                spot = audit = nothing = 0
+                for k in keys:
+                    calls = by[k]
+                    stage = [c["failed_on"][0] if c["failed_on"] else "" for c in calls]
+                    # Majority of replications per item, stage by stage.
+                    if stage.count("SPOT") * 2 > len(calls):
+                        spot += 1
+                    elif stage.count("AUDIT") * 2 > len(calls):
+                        audit += 1
+                    elif stage.count("") * 2 > len(calls):
+                        nothing += 1
+                    else:
+                        audit += 1  # a split between SPOT and AUDIT: something was recovered
+                lines.append(f"| {pos} | {len(keys)} | {spot} | {audit} | {nothing} |")
         for arm in ("shipped", "shipped_dropped_only"):
             arm_mid = [r for r in rows if r["auditor"] == auditor and r["arm"] == arm and r["position"] == "middle"]
             if not arm_mid:

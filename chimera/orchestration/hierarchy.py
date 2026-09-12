@@ -767,10 +767,10 @@ class HierarchicalOrchestrator:
             outcome = self.verifier.verify(spec, envelope)
             verified = outcome.passed
             if verified and outcome.recovered:
-                # What the distillation cut and the blind audit found again, appended so the
-                # synthesis reads it. An append rather than a rejection, because the audit also
-                # flags summaries that dropped nothing (11 of 23, `bench/blind_audit`) and a few
-                # extra lines are the price that buys the 19 of 23 it catches.
+                # What the distillation cut and the spot check named, appended so the synthesis
+                # reads it. An append rather than a rejection, because the check also names a
+                # result on 5 of 23 summaries that dropped nothing (`bench/blind_audit`) and a line
+                # in the synthesis is the price that buys the 23 of 23 it catches.
                 envelope = envelope.model_copy(update={"summary": _with_recovered(envelope.summary, outcome.recovered)})
             if not verified and self._stopped():
                 # The re-ask is a whole second model call — the single largest thing a cancel
