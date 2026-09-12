@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.54.0] - 2026-09-12
+
 ### Added
 
 - **The blind panel's one-run lead did not replicate, and the judge series ends on two nulls.** #442 recorded, unregistered, that the blind panel scored 11 pp above the named one on facts the judge cannot recall; #444's bounded rerun on the same items took it to −0.9 pp. `bench/judge_blind_qa` addendum 2 is the fresh-sample test, registered with that in view: a second, disjoint slice of 400 SimpleQA questions, 40 items kept, 360 runs under the shipped engine, US$ 0.24 in all. `blind` − `named` per item **−1.3 pp**, [−8.3, +6.2] (9 items up, 12 down, 19 equal); pooled with the bounded first sample, 78 items, **−1.1 pp**, [−6.2, +3.8]. Vendor spread 8 pp with overlapping intervals, position flat, a vendor named in 2 of 240 analyses. All three registered predictions held; the observation is closed as not replicated; `blind_panel` keeps the justification it already had — zero cost on every corpus measured and effects that could not be shown on any of them. The series ends unless a corpus of a different kind is built: a prose turn where nothing is checkable, which this design cannot grade.
