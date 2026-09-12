@@ -28,9 +28,9 @@ sys.path.insert(0, str(REPO))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
 from bench.judge_blind_prose.corpus import Item, corpus, grade  # noqa: E402
-from chimera.fusion.engine import PanelResponse  # noqa: E402
 from chimera.eval.anytime import wilson_bounds  # noqa: E402
 from chimera.eval.paired import compare_paired  # noqa: E402
+from chimera.fusion.engine import PanelResponse  # noqa: E402
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
 
