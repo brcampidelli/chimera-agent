@@ -145,7 +145,7 @@ def run(out: Path, model: str) -> None:
 
 
 def report(path: Path) -> None:
-    lines = [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     meta = lines[0]["_meta"]
     rows = lines[1:]
 
