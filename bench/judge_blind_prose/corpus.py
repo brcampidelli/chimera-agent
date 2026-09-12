@@ -55,6 +55,11 @@ class Item:
     faithful_a: str
     faithful_b: str
     flawed: str
+    right_aliases: tuple[str, ...] = ()
+    """Faithful spellings the synthesiser may use that `right` would miss — measured, not guessed:
+    the judge wrote `PostgreSQL` where the source said `Postgres`, and `\\bPostgres\\b` does not match
+    inside `PostgreSQL`. A faithful paraphrase must not read as `omitted` (the §2l/§2t lesson: a
+    token grader's blind spot is a silent miss). Aliases count as `right`; they never overlap `wrong`."""
 
     def answers(self) -> list[str]:
         """Panel order fixed here: two faithful, one flawed. Rotation is the runner's job."""
@@ -76,7 +81,7 @@ def grade(final: str, item: Item) -> str:
     """`kept` (faithful), `propagated` (carried the wrong token), or `omitted` (neither). A final that
     somehow carries both tokens counts as `propagated`: the contradiction reached the output."""
     has_wrong = _token_present(item.wrong, final)
-    has_right = _token_present(item.right, final)
+    has_right = _token_present(item.right, final) or any(_token_present(a, final) for a in item.right_aliases)
     if has_wrong:
         return "propagated"
     if has_right:
@@ -115,6 +120,7 @@ def corpus() -> list[Item]:
             "The ledger will use Postgres, chosen for its transactional guarantees.",
             "We are building the ledger on Postgres because its transactions give the guarantees the ledger needs.",
             "The ledger will use Redis, chosen for its transactional guarantees.",
+            right_aliases=("PostgreSQL",),
         ),
         Item(
             "latency",
@@ -214,6 +220,9 @@ def instrument_check() -> int:
             problems.append("wrong missing in flawed")
         if _token_present(it.right, it.flawed):
             problems.append("right leaks into flawed")
+        for alias in it.right_aliases:
+            if _token_present(alias, it.flawed) or _token_present(it.wrong, alias):
+                problems.append(f"alias {alias!r} collides with the flaw")
         # The grader must sort the three authored answers as designed.
         if grade(it.faithful_a, it) != "kept" or grade(it.faithful_b, it) != "kept":
             problems.append("grader does not call faithful 'kept'")

@@ -198,6 +198,13 @@ def _rate(rows: list[dict[str, Any]], verdict: str) -> tuple[int, int]:
 
 def report(path: Path) -> str:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # Re-grade from the stored `final`, never trust the `verdict` cell written at run time (§2z): a
+    # grader fix (e.g. accepting `PostgreSQL` for `Postgres`) must reach every past run without a
+    # re-run. The saved final is the raw datum; the verdict is a derived view of it.
+    items_by_id = {it.id: it for it in corpus()}
+    for r in rows:
+        if r["item_id"] in items_by_id:
+            r["verdict"] = grade(r["final"], items_by_id[r["item_id"]])
     lines = [f"# judge_blind_prose — {len(rows)} runs over {len({r['item_id'] for r in rows})} items, "
              f"US$ {sum(r['usd'] or 0 for r in rows):.4f}", ""]
     lines.append("Grade is on the synthesised final: `propagated` = the flawed candidate's wrong token "
