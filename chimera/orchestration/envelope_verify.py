@@ -77,10 +77,15 @@ _CRITERIA = ("INVENTED", "DROPPED", "CONTRADICT")
 # The blind audit (arXiv 2609.07680, `bench/blind_audit`): stage 1 reads the RAW OUTPUT and never the
 # summary, so the worker's leading conclusion cannot shape what it lists; stage 2 reads the list and
 # the summary and never the raw output, so it can only compare. Measured 2026-09-11 on 23 worker
-# outputs with one critical finding planted where `_distill` cuts: the shipped one-call auditor above
+# outputs with one critical finding planted where `_distill` cuts: the three-check one-call auditor
 # (summary + raw + "do not trust") said DROPPED on **4 of 23**; this two-call form on **19 of 23** —
 # and on 11 of 23 summaries that dropped nothing, which is the paper's stated cost and why the
 # result is a RECOVERY (the absent findings are appended to the summary) and never a rejection.
+#
+# Off the default path since the same day: the one-call DROPPED-only prompt above caught 23 of 23
+# of those plants and 20 of 23 planted as a clause inside a sentence, and behind its silent passes
+# this form recovered the plant on **0 of 3** clause items (0 of 9 replications) while appending
+# lines to 11 of 23 summaries that dropped nothing. `EnvelopeVerifier(blind_audit=True)` runs it.
 EXTRACT_SYSTEM = (
     "You are a strict verification auditor. You receive a task and a worker's RAW OUTPUT for it. "
     "List every result the raw output establishes that the task asks for — one finding per line, "
@@ -197,6 +202,7 @@ class EnvelopeVerifier:
         rng: random.Random | None = None,
         recover_dropped: bool = True,
         spot_system: str = _SPOT_SYSTEM,
+        blind_audit: bool = False,
     ) -> None:
         self.store = store
         self.backend = backend
@@ -206,12 +212,18 @@ class EnvelopeVerifier:
         self.spot_system = spot_system
         #: Whether a dropped finding is RECOVERED rather than refused. On by default. With it on, a
         #: `DROPPED: FAIL` from the spot check is the auditor's sentence appended to the summary (one
-        #: call), and a spot check that passes without naming anything is followed by the two-call
-        #: blind audit; either way the append is never a verdict. With it off the spot check is the
-        #: gate it was before #433: a FAIL escalates to a re-ask and a second FAIL drops the result
-        #: — which on the only path the spot check runs on throws away a correct worker output
-        #: because `_distill` cut it, and cannot be fixed by asking the worker again.
+        #: call); the append is never a verdict. With it off the spot check is the gate it was
+        #: before #433: a FAIL escalates to a re-ask and a second FAIL drops the result — which on
+        #: the only path the spot check runs on throws away a correct worker output because
+        #: `_distill` cut it, and cannot be fixed by asking the worker again.
         self.recover_dropped = recover_dropped
+        #: Whether a spot check that passed without naming anything is followed by the two-call
+        #: blind audit (`EXTRACT_SYSTEM` / `COMPARE_SYSTEM`). Off by default: measured behind the
+        #: one-call check (`bench/blind_audit`, addendum 2), it recovered the planted finding on 0 of
+        #: the 3 clause items the check missed and appended lines to 11 of 23 summaries that had
+        #: dropped nothing — two calls per passing spot check for noise. Kept for the bench and for
+        #: a corpus that shows otherwise.
+        self.blind_audit = blind_audit
         # Cross-provider auditing (M18-2): the spot checker prefers a DISTINCT provider/model so a
         # model never grades its own family's output. Falls back to the worker's backend when none is
         # given (still a re-derivation from the raw artifact, just not provider-independent).
@@ -257,14 +269,11 @@ class EnvelopeVerifier:
             ran.append("spot")
             outcome = self._spot_check(spec, envelope)
             if outcome is not None:
-                if outcome.passed and self.recover_dropped and not outcome.recovered:
-                    # The one-call check named nothing. The three-check auditor it replaced passed
-                    # summaries that dropped a critical finding 19 times in 23 (`bench/blind_audit`),
-                    # so the blind audit runs behind a silent pass and hands back what the
-                    # distillation cut. Recovery, not a verdict. When the one-call check already
-                    # named the omission, its sentence is the recovery and these two calls are not
-                    # made (measured: the DROPPED-only prompt caught 23 of 23 cut plants, the blind
-                    # audit 19 of 23, and the audit flags 11 of 23 summaries that dropped nothing).
+                if outcome.passed and self.recover_dropped and self.blind_audit and not outcome.recovered:
+                    # The one-call check named nothing and the caller asked for the two-call audit
+                    # behind it. Recovery, not a verdict. Not the default: measured behind the
+                    # DROPPED-only check it caught 0 of the 3 clause plants that check missed and
+                    # flagged 11 of 23 summaries that dropped nothing (`bench/blind_audit`).
                     ran.append("recover")
                     outcome = replace(outcome, recovered=self._recover_dropped(spec, envelope))
                 return replace(outcome, checks_run=tuple(ran))

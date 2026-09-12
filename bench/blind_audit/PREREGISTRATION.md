@@ -210,3 +210,50 @@ changes: it runs behind whichever spot check passes.
 auditor at one temperature. And it is one arm against stored baseline rows from earlier the same
 day, so a route change between the two runs is inside the comparison — the flip rates per arm are
 printed so a reader can see how much of a difference a single day's noise is worth.
+
+
+## Addendum 2 — does the two-call audit still earn its calls? The clause plant (registered 2026-09-11, after #437, before any call)
+
+After #437 the one-call DROPPED check catches 23 of 23 cut plants and the two-call blind audit runs
+only behind a spot check that passed without naming anything. On the corpus above its marginal
+detection behind that pass is 0 of 23, at 11 of 23 false alarms on `none` items. That corpus plants
+one sentence with a loud label (*ESCALATION REQUIRED:*, *RELEASE BLOCKER:*) as its own paragraph —
+the easiest shape for a one-question auditor. The claim the two-call audit still has is the harder
+shape: a finding that is a clause inside an ordinary sentence, which a numbered extraction may list
+and a single question may miss.
+
+**The instrument.** A fourth position, `middle_clause`: the plant loses its label (`clause_of`),
+is lower-cased at the start and folded with a dash into a sentence that lies wholly inside the cut —
+*…Interview 1 would switch for it, but interview 4 would not pay more for it — interview 5 records
+a legal ruling on the customer's side forbidding use of the product until data is stored
+in-country…* — never its own line or paragraph. The instrument check asserts, per item, that the
+clause is absent from the built summary, present in the artifact, and sits inside a sentence; it
+passed on 23 of 23 before this addendum was written.
+
+**Arms** (weak auditor, three replications):
+- `shipped_dropped_only` on `middle_clause` — the one-call check alone (69 calls).
+- `blind` on `middle_clause` — the two-call audit alone (138 calls).
+- `production` on all four positions — the pipeline as it ships: the one-call check, then the
+  two-call audit behind a pass that named nothing; read per item as *recovered by the check's own
+  sentence* (SPOT), *recovered by the audit behind a silent pass* (AUDIT), or *nothing* (≈ 420
+  calls).
+
+**Predictions.** The one-call check falls from 23 / 23 to **12–18 / 23** on clause plants (the
+label was doing work). The two-call audit lands at **10–16 / 23**. In `production`, the audit's
+marginal catches behind a silent pass on `middle_clause` are **2–5 / 23**; its false alarms behind
+a silent pass on `none` are **6–9 / 23** (the 11 / 23 rate times the pass rate).
+
+**Decision rule.** The two-call audit stays behind a silent pass if its marginal catches on
+`middle_clause` (AUDIT-stage recoveries in `production`) are **≥ 4 of 23**. If they are **≤ 2 of
+23**, it leaves the default path — `recover_dropped=True` keeps the one-call recovery and stops
+making the two calls — and its false-alarm lines with it; the two prompts stay in the module for
+the bench. Three is undecided: the shipped behaviour stays and the number is published as such.
+Whatever the count, the clause-plant detection of both forms is published, and the clause position
+becomes a permanent part of this bench.
+
+**Cost.** ≈ 630 weak-tier calls at 4–9k prompt tokens: ≈ US$ 0.35.
+
+**What this cannot show.** The same corpus and auditor as above; one clause shape (a dash-appended
+clause, always the plant's own body); the `production` arm's stage split is by majority of
+replications and a split between SPOT and AUDIT is counted as AUDIT. A clause that is a *change of
+meaning* inside the sentence, rather than an appended fact, is a shape this does not test.
