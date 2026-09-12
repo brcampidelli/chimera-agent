@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A catalogue row knows every price the index has quoted for it, and the live check stops reddening on the flip.** Three release days in a row the `-m integration` check on `main` went red because OpenRouter quotes whichever route it prefers that day and a slug served by two providers flips between two prices: `deepseek-chat-v3.1` (#421), `deepseek-v4-flash-0731` (#443), and `glm-5.3-flash` twice on 2026-09-12 alone — 0.15 in the morning, 0.075 by the release. Updating the figure each time was the wrong fix. `CatalogEntry.also_seen` carries the other (input, output) prices a row has been seen at; the live check accepts any of them and still reddens on a price the row has never seen. The three rows carry their history; a receipt is priced from the live index and the row is the fallback, as before.
+
 ## [0.54.0] - 2026-09-12
 
 ### Added
