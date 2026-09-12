@@ -116,3 +116,36 @@ per-task table moves in one direction. **Decision:** if `hierarchy_verbatim` bea
 ≥ 20 pp pass@1 with no task moving the other way, the sentence becomes part of `_SYNTH_SYSTEM`
 (no flag); if it is within the noise, the flag stays off and the null is published; if it is worse,
 the flag is removed.
+
+
+## Addendum 2 — the verbatim sentence on the production synthesiser (registered 2026-09-11, after #435, before any call)
+
+#435 adopted `synthesis_verbatim=True` on the strength of one backbone, a 3B model on every role,
+and said so: *the production synthesiser is the top model, and what the sentence costs there is
+unmeasured*. This addendum measures it. Same ten tasks, same three runs, same 3B workers
+(`llama-3.2-3b-instruct`, the summaries the synthesis reads are then the ones already measured), and
+the synthesis call alone on the production top tier, `claude-opus-5` (`--synth-backbone`). Two
+arms, `hierarchy` (the prompt without the sentence) and `hierarchy_verbatim` (with it); nothing
+else differs. The synthesis call's own completion tokens and price are recorded per trial.
+
+**What the instrument can show.** The summaries carry the values on about 57% of runs
+(`hierarchy_no_synth`, 0.57 pass@1), so a synthesiser that keeps everything it is given lands near
+that ceiling in both arms; the question is not whether the strong synthesiser needs the sentence
+but what it costs there — in tokens, and in tasks moved the wrong way.
+
+**Predictions.** Both arms land within the noise floor of the workers-alone ceiling (pass@1
+0.45–0.65), and the difference between them is inside the floor with no task moving consistently
+in either direction (no task 3/3 in one arm and 0/3 in the other). The sentence adds **≤ 15%** to
+the synthesis call's completion tokens.
+
+**Decision.** The default stays `True` unless `hierarchy_verbatim` loses ≥ 2 tasks (3/3 → ≤ 1/3)
+with none gained on the strong synthesiser, in which case the default is moved to `False` for the
+top tier and the number published; a token cost above +15% is published as the price and does not
+move the default on its own.
+
+**Cost.** 60 synthesis calls on `claude-opus-5` at ~2k prompt and ~0.5k completion tokens ≈ US$ 1.4,
+plus 3B worker calls ≈ US$ 0. **≈ US$ 1.5.**
+
+**What this cannot show.** Ten tasks, a 50% flip rate: the size of any difference is a noise-floor
+sentence; direction and the token count are what is read. One strong synthesiser; the tasks'
+answers are the planted figures, which is the case the sentence was written for.

@@ -38,6 +38,9 @@ from chimera.eval.replicated import (  # noqa: E402
 from chimera.orchestration.receipts import price_completion  # noqa: E402
 
 BACKBONE = "openrouter/meta-llama/llama-3.1-8b-instruct"  # overridden by --backbone; see PREREGISTRATION amendment 2
+#: The synthesiser's model when it is not the backbone (`--synth-backbone`; addendum 2). Empty = the
+#: backbone on every role, which is every run before the addendum.
+SYNTH_BACKBONE = ""
 ARMS = ("single_1", "single_equal", "hierarchy", "hierarchy_no_synth", "hierarchy_verbatim")
 TEMPERATURE = 0.3
 REFINE = (
@@ -62,12 +65,18 @@ def _retrying(call: Any, *, tries: int = 6, wait: float = 20.0) -> Any:
 class _Metered:
     """A backend that counts calls and prices them, so every arm's cost is what it spent."""
 
-    def __init__(self, inner: Any, model: str) -> None:
-        self.inner, self.model = inner, model
+    def __init__(self, inner: Any, model: str, synth_model: str = "") -> None:
+        self.inner, self.model, self.synth_model = inner, model, synth_model
         self.calls, self.usd, self.tokens, self.unpriced = 0, 0.0, 0, False
+        # The synthesis call on its own, when it runs on another model (addendum 2): its completion
+        # tokens are what the verbatim sentence can change, and its price is the top tier's.
+        self.synth_calls, self.synth_completion_tokens, self.synth_usd = 0, 0, 0.0
 
     def complete(self, messages: Any, **kwargs: Any) -> Any:
-        kwargs["model"] = self.model  # the backbone is frozen: every role, every arm
+        # The backbone is frozen on every role and every arm — except the synthesiser when the run
+        # asked for one (`--synth-backbone`), which the orchestrator requests by its `top_model`.
+        is_synth = bool(self.synth_model) and kwargs.get("model") == self.synth_model
+        kwargs["model"] = self.synth_model if is_synth else self.model
         kwargs.setdefault("temperature", TEMPERATURE)
         result = _retrying(lambda: self.inner.complete(messages, **kwargs))
         self.calls += 1
@@ -75,6 +84,10 @@ class _Metered:
         self.usd += cost.usd
         self.unpriced = self.unpriced or cost.unpriced is not None
         self.tokens += (result.prompt_tokens or 0) + (result.completion_tokens or 0)
+        if is_synth:
+            self.synth_calls += 1
+            self.synth_completion_tokens += result.completion_tokens or 0
+            self.synth_usd += cost.usd
         return result
 
 
@@ -131,6 +144,10 @@ class Trial:
     tokens: int
     usd: float | None
     seconds: float
+    synth_backbone: str = ""
+    """The synthesiser's model when it was not the backbone (addendum 2); "" before that."""
+    synth_completion_tokens: int = 0
+    synth_usd: float = 0.0
 
 
 def _single(task: HierarchyTask, backend: _Metered, *, refine_rounds: int) -> str:
@@ -155,7 +172,7 @@ def _hierarchy(
     store = ArtifactStore(workdir / task.id)
     orchestrator = HierarchicalOrchestrator(
         backend,
-        weak_model=BACKBONE, mid_model=BACKBONE, top_model=BACKBONE,
+        weak_model=BACKBONE, mid_model=BACKBONE, top_model=SYNTH_BACKBONE or BACKBONE,
         store=store,
         verifier=EnvelopeVerifier(store=store, backend=None, spot_rate=0.0),
         config=HierarchyConfig(
@@ -173,7 +190,7 @@ def _hierarchy(
 def one(task: HierarchyTask, arm: str, rep: int, *, workdir: Path) -> Trial:
     from chimera.providers import LLMGateway
 
-    backend = _Metered(LLMGateway(), BACKBONE)
+    backend = _Metered(LLMGateway(), BACKBONE, SYNTH_BACKBONE)
     docs = len(task.docs)
     t0 = time.monotonic()
     if arm == "single_1":
@@ -194,6 +211,8 @@ def one(task: HierarchyTask, arm: str, rep: int, *, workdir: Path) -> Trial:
         passed_verbatim=task.check(answer),
         answer=answer, tokens=backend.tokens, usd=(None if backend.unpriced else backend.usd),
         seconds=round(time.monotonic() - t0, 1),
+        synth_backbone=SYNTH_BACKBONE, synth_completion_tokens=backend.synth_completion_tokens,
+        synth_usd=backend.synth_usd,
     )
 
 
@@ -211,7 +230,10 @@ def report(path: Path) -> str:
     reps = max(r["rep"] for r in rows) + 1
     arms = {name: _arm(rows, name, task_ids, reps) for name in ARMS if any(r["arm"] == name for r in rows)}
     backbone = rows[0].get("backbone", BACKBONE)
-    lines = [f"# hierarchy_equal_calls — {len(rows)} trials, backbone {backbone}, US$ {sum(r['usd'] or 0 for r in rows):.4f}", ""]
+    synth_backbone = rows[0].get("synth_backbone", "")
+    lines = [f"# hierarchy_equal_calls — {len(rows)} trials, backbone {backbone}"
+             + (f", synthesiser {synth_backbone}" if synth_backbone else "")
+             + f", US$ {sum(r['usd'] or 0 for r in rows):.4f}", ""]
     lines.append("| arm | calls/task (mean) | pass@1 | pass^k | flip rate | tokens/task (mean) | US$ |")
     lines.append("|---|---:|---:|---:|---:|---:|---:|")
     for name, arm in arms.items():
@@ -220,6 +242,15 @@ def report(path: Path) -> str:
                      f"{arm.pass_pow_k:.2f} | {arm.flip_rate:.2f} | {sum(r['tokens'] for r in mine) / len(mine):,.0f} | "
                      f"{sum(r['usd'] or 0 for r in mine):.4f} |")
     lines.append("")
+    if synth_backbone:
+        lines.append("| arm | synthesis completion tokens (mean) | synthesis US$ (total) |")
+        lines.append("|---|---:|---:|")
+        for name in arms:
+            mine = [r for r in rows if r["arm"] == name and r.get("synth_backbone")]
+            if mine:
+                lines.append(f"| `{name}` | {sum(r.get('synth_completion_tokens', 0) for r in mine) / len(mine):,.0f} | "
+                             f"{sum(r.get('synth_usd', 0.0) for r in mine):.4f} |")
+        lines.append("")
     single = arms.get("single_1")
     if single is not None:
         lines.append(f"- instrument: `single_1` pass@1 = {single.pass_at_1:.2f} "
@@ -260,10 +291,13 @@ def main() -> int:
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--backbone", default="")
+    ap.add_argument("--synth-backbone", default="", help="the synthesiser's model, when not the backbone (addendum 2)")
     args = ap.parse_args()
-    global BACKBONE
+    global BACKBONE, SYNTH_BACKBONE
     if args.backbone:
         BACKBONE = args.backbone
+    if args.synth_backbone:
+        SYNTH_BACKBONE = args.synth_backbone
     if args.report:
         print(report(Path(args.report)))
         return 0
@@ -288,7 +322,7 @@ def main() -> int:
     plan = [(t, arm, rep) for rep in range(args.reps) for t in tasks for arm in args.arms.split(",")
             if (t.id, arm, rep) not in done]
     workdir = Path(tempfile.mkdtemp(prefix="equal-calls-"))
-    print(f"backbone {BACKBONE}; {len(plan)} trials to run, {len(done)} on disk")
+    print(f"backbone {BACKBONE}; synthesiser {SYNTH_BACKBONE or BACKBONE}; {len(plan)} trials to run, {len(done)} on disk")
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     spent = 0.0

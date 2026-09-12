@@ -4,7 +4,8 @@ Run 2026-09-11 · prereg `PREREGISTRATION.md` (two dated amendments, both before
 raw `results/2026-09-11-3b.jsonl`, report `results/2026-09-11-3b-report.md` · the 8B run that hit
 the ceiling is kept as `results/2026-09-11.jsonl` and `2026-09-11-8b-report.md`, void by the
 registered instrument rule. The verbatim-synthesis follow-up (registered addendum, 30 more
-trials, same file) is read in its own section below.
+trials, same file) and its second addendum — the same sentence on the production synthesiser,
+`results/2026-09-11-3b-opus-synth.jsonl` — are read in their own sections below.
 
 **Read the noise floor first.** Ten tasks, three runs each; the flip rate of the arms is 20–50%,
 so a 30–50 pp difference on `pass^3` is the size a task moves with nothing changed. Every verdict
@@ -107,9 +108,46 @@ as everywhere in this file; what is read is the direction (7 / 0) and the regist
 is void (ceiling). The tasks' answers *are* the planted figures, which is the case the sentence
 was written for; on a task whose answer is a judgement, a synthesis told to carry every figure
 verbatim can lengthen the answer without improving it, and that was not measured. The
-production synthesiser is the **top** model, not the one measured here — the sentence is a hedge
-for the weak backbones the tab lets a user choose, and what it costs a strong synthesiser (in
-tokens, at least ~+37% here) is unmeasured.
+production synthesiser is the **top** model, not the one measured here — what the sentence costs
+there was unmeasured when this section was written, and is measured in the next.
+
+## Addendum 2 — the sentence on the production synthesiser (registered, run 2026-09-11)
+
+The same ten tasks and three runs, the same 3B workers, and the synthesis call alone on the
+production top tier, `claude-opus-5` (`--synth-backbone`); two arms, with and without the
+sentence; the synthesis call's own completion tokens and price recorded per trial. 60 trials,
+US$ 0.74 on the synthesiser (the 3B slug is unpriced, so the arm table's US$ column reads zero
+and the synthesis column is the cost). Raw `results/2026-09-11-3b-opus-synth.jsonl`, report
+`results/2026-09-11-3b-opus-synth-report.md`.
+
+| arm (synthesiser `claude-opus-5`) | pass@1 | pass^3 | flip | synthesis completion tokens (mean) | synthesis US$ |
+|---|---:|---:|---:|---:|---:|
+| `hierarchy` (no sentence) | 0.63 | 0.50 | 0.30 | 404 | 0.41 |
+| `hierarchy_verbatim` | 0.67 | 0.50 | 0.40 | **344** | 0.34 |
+
+Paired on `pass^3`: Δ 0.0, Newcombe [−16, +16], discordant 1 / 1. Per task: `dependencies` went
+3/3 → 1/3 and `vendors` 1/3 → 0/3 against the sentence; `benchmarks` 1/3 → 2/3, `capacity`
+0/3 → 1/3, `policies` 2/3 → 3/3 and `releases` 0/3 → 1/3 for it; four tasks 3/3 in both arms.
+No task sits at 3/3 in one arm and 0/3 in the other.
+
+**Against the registered predictions.** *Both arms within 0.45–0.65* — `hierarchy` 0.63 held,
+`hierarchy_verbatim` 0.67 sits one run above the range. *No task moving consistently* — held.
+*The sentence adds ≤ 15% to the synthesis completion tokens* — held, and in the other direction:
+the strong synthesiser wrote **15% fewer** completion tokens with the sentence (344 against 404),
+an answer made of the figures instead of prose around them. The 3B synthesiser had done the
+opposite (+650 tokens per task), which is the difference between a model that carries values by
+restating everything and one that carries them by dropping the rest.
+
+**Against the registered decision.** The default moves to `False` only if the verbatim arm loses
+≥ 2 tasks (3/3 → ≤ 1/3) with none gained; it lost one (`dependencies`) and gained ground on four.
+The default stays `True`; on the production synthesiser the sentence costs nothing measurable in
+answers and saves tokens.
+
+**What this cannot show.** Ten tasks and a 30–40% flip rate: the 0.63 → 0.67 is a noise-floor
+sentence, as everywhere in this file. Both arms land above the 0.57 the workers' summaries
+carried in the 3B run — different worker runs, and a synthesiser that reads a figure the value
+grader did not find in the concatenation — and that gap is inside the same floor. One strong
+synthesiser; tasks whose answers are the figures.
 
 ## Apparatus notes, for the next reader
 
