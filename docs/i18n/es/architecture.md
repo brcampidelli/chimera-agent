@@ -1,5 +1,5 @@
 ---
-source_sha256: 1f1c80dd0c5b6b4b6bade6bfbe0cf3d94969fa6ec1e9918d2e186fad3f1a2cd4
+source_sha256: 130f046c549b02305eb71b3ece7fdef25d5d67b4e7832c10f9ecc549f5dcb33f
 ---
 
 # Chimera — Arquitectura
@@ -81,7 +81,12 @@ Un kernel de confianza autosuperador (AgentTrust v2, `2606.08539`):
 - `TrustKernel.evaluate(action)` → **allow / warn / block / review**. Un `RuleSet` léxico
   maneja de forma determinista las amenazas de firma fija; un **juez semántico** opcional maneja
   la intención; las reglas destiladas lo abaratan con el tiempo. Invariante: **nunca bloquear de
-  forma dura una acción benigna**.
+  forma dura una acción benigna**. El juez y su almacén de precedentes son una *costura de
+  biblioteca* que ninguna superficie distribuida cablea — decidido el 2026-09-12 con las cifras
+  del docstring de `kernel.py` (las reglas y el libro de taint bloquean 7 / 7 y 6 / 6 en los
+  dos corpus sin una sola llamada al modelo; un juez añadiría una llamada al modelo a la
+  mayoría de las acciones de herramienta y un sesgo medido); el build falla si una superficie
+  empieza a cablear uno sin decir por qué.
 - `SkillValidator` / `ScheduleValidator` — la **superficie de edición restringida y verificable
   estáticamente** para la automodificación (AutoMegaKernel `2606.09682`): las propuestas
   inseguras se rechazan antes de que lleguen a ejecutarse.

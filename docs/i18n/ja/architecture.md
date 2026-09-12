@@ -1,5 +1,5 @@
 ---
-source_sha256: 1f1c80dd0c5b6b4b6bade6bfbe0cf3d94969fa6ec1e9918d2e186fad3f1a2cd4
+source_sha256: 130f046c549b02305eb71b3ece7fdef25d5d67b4e7832c10f9ecc549f5dcb33f
 ---
 
 # Chimera — アーキテクチャ
@@ -52,7 +52,7 @@ source_sha256: 1f1c80dd0c5b6b4b6bade6bfbe0cf3d94969fa6ec1e9918d2e186fad3f1a2cd4
 
 自己改善型の信頼カーネル(AgentTrust v2、`2606.08539`)。
 
-- `TrustKernel.evaluate(action)` → **allow / warn / block / review**。字句ベースの `RuleSet` は固定署名の脅威を決定論的に処理します。オプションの**セマンティックジャッジ**は意図を処理します。蒸留されたルールは時間とともにコストを下げます。不変条件: **良性の行動を決してハードブロックしない**。
+- `TrustKernel.evaluate(action)` → **allow / warn / block / review**。字句ベースの `RuleSet` は固定署名の脅威を決定論的に処理します。オプションの**セマンティックジャッジ**は意図を処理します。蒸留されたルールは時間とともにコストを下げます。不変条件: **良性の行動を決してハードブロックしない**。ジャッジとその先例ストアは、出荷されたどの面も配線しない*ライブラリの継ぎ目*です — 2026-09-12 に `kernel.py` のdocstringにある数値で決定(ルールとtaint台帳は2つのコーパスで 7 / 7 と 6 / 6 をモデル呼び出しゼロでブロック。ジャッジは大半のtool動作にモデル呼び出しと測定済みのバイアスを加えるだけ)。理由を書かずに配線する面があればビルドは失敗します。
 - `SkillValidator` / `ScheduleValidator` — 自己修正のための**制約された、静的にチェック可能な編集面**(AutoMegaKernel `2606.09682`): 安全でない提案は実行される前に拒否されます。
 - `AuditLog` — 決定と進化の変更の追記専用JSONL。
 - `GovernedTool` / `govern_registry` — 任意のtoolをラップし、その実行をゲートします。既存のエージェントループに変更なしで組み合わさります(`chimera ... --guard`)。

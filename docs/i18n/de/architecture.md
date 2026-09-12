@@ -1,5 +1,5 @@
 ---
-source_sha256: 1f1c80dd0c5b6b4b6bade6bfbe0cf3d94969fa6ec1e9918d2e186fad3f1a2cd4
+source_sha256: 130f046c549b02305eb71b3ece7fdef25d5d67b4e7832c10f9ecc549f5dcb33f
 ---
 
 # Chimera — Architektur
@@ -77,7 +77,12 @@ Ein sich selbst verbessernder Trust-Kernel (AgentTrust v2, `2606.08539`):
 - `TrustKernel.evaluate(action)` → **allow / warn / block / review**. Ein lexikalisches `RuleSet`
   behandelt Bedrohungen mit festem Signaturmuster deterministisch; ein optionaler **semantischer
   Judge** behandelt Intention; destillierte Regeln machen es mit der Zeit günstiger. Invariante:
-  **niemals eine harmlose Aktion hart blockieren**.
+  **niemals eine harmlose Aktion hart blockieren**. Der Judge und sein Präzedenzspeicher sind
+  eine *Bibliotheksnaht*, die keine ausgelieferte Oberfläche verdrahtet — entschieden am
+  2026-09-12 mit den Zahlen im Docstring von `kernel.py` (Regeln und Taint-Ledger blockieren
+  7 / 7 und 6 / 6 auf den beiden Korpora ohne einen einzigen Modellaufruf; ein Judge würde den
+  meisten Tool-Aktionen einen Modellaufruf und eine gemessene Verzerrung hinzufügen); der Build
+  schlägt fehl, wenn eine Oberfläche einen verdrahtet, ohne zu sagen warum.
 - `SkillValidator` / `ScheduleValidator` — die **eingeschränkte, statisch prüfbare
   Bearbeitungsfläche** für Selbstmodifikation (AutoMegaKernel `2606.09682`): unsichere Vorschläge
   werden abgelehnt, bevor sie je ausgeführt werden.
