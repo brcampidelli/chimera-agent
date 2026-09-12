@@ -1,8 +1,10 @@
-# Results — on facts the judge cannot recall, its verdict followed neither the vendor name nor the position; the blind panel scored higher, and the file says how far that can be read
+# Results — on facts the judge cannot recall, its verdict followed neither the vendor name nor the position; the blind panel scored higher once, and not again with the judge bounded
 
-Run 2026-09-12 · prereg `PREREGISTRATION.md` (no amendments) · corpus `results/items.jsonl` (38 items)
-and `results/collect-all.jsonl` (all 400 questions asked) · runs `results/2026-09-12-runs.jsonl`
-(341 of 342), report `results/2026-09-12-runs-report.md` · US$ 0.16 collection + US$ 0.63 pipeline.
+Run 2026-09-12 · prereg `PREREGISTRATION.md` (one registered addendum, below) · corpus
+`results/items.jsonl` (38 items) and `results/collect-all.jsonl` (all 400 questions asked) · runs
+`results/2026-09-12-runs.jsonl` (341 of 342, the judge unbounded) and
+`results/2026-09-12-runs-capped.jsonl` (342 of 342, the judge and synthesiser bounded — the
+addendum) · US$ 0.16 collection + US$ 0.63 + US$ 0.09 pipeline.
 
 ## The corpus, and the instrument check it is
 
@@ -80,3 +82,51 @@ names they carry; a strict deterministic grader (every token of the reference on
 line) misgrades some right answers as wrong on both sides. Nothing here bears on a prose turn where
 nothing is checkable. The judge *recognised* facts it could not *recall* — 0.62–0.73 against 0 / 2
 alone — and that recognition, right or wrong, is what its verdicts are made of here.
+
+## Addendum — the same 38 items with the judge and synthesiser bounded (registered, run the same day)
+
+`FusionConfig.judge_max_tokens` and `synth_max_tokens` at 16,000, one retry on an empty reply
+(twice the budget after `length`), and `Settings.completion_ceiling` at 32,000 for every call whose
+caller set no budget. The same 38 items, the same nine runs each, the same judge and synthesiser.
+
+| | unbounded (first run) | bounded (this run) |
+|---|---:|---:|
+| runs | 341 of 342 (one halt at 40 min) | **342 of 342** |
+| seconds per run, median / p95 / max | 45 / 1,000 / 3,096 | **30 / 266 / 1,187** |
+| completion tokens per run, median / p95 / max | 1,901 / 48,371 / 145,999 | 1,431 / 9,711 / 33,419 |
+| US$ per run (total) | 0.00184 (0.63) | **0.00025 (0.09)** |
+| share of cost in the top 5% of runs | 62% | 28% |
+| runs whose judge analysis came back empty | 14 | **2** |
+| retried stages (empty first reply) | — | 31 of 684 calls |
+| `named` accuracy | 141 / 227 (0.62) | **162 / 228 (0.71)** |
+| `blind` accuracy | 83 / 114 (0.73) | 80 / 114 (0.70) |
+
+Paired per item, bounded against unbounded: `named` **+8.9 pp**, bootstrap 95% [+1.5, +16.2];
+`blind` −2.6 pp, [−11.4, +6.1]. The 19 named runaways of the first run had passed 3 of 19 and the
+10 blind ones 5 of 10; bounded and asked again, those runs pass like the rest.
+
+**Against the registered predictions.** *p95 under 300 s* — held (266). *Maximum under 600 s* —
+**failed** (1,187: one retry pair at 16k + 32k on a slow route). *Cost per run down ≥ 40%* — held,
+by more: **−86%**. *Accuracy within ±5 pp in both arms* — held for `blind` (−2.6), **failed
+upward** for `named` (+8.9): the cap did not cost accuracy, it returned some. *Retried stages under
+5% of runs* — **failed**: 31 retries over 342 runs is 9%.
+
+**The rule that failed, and why it is not followed.** The registration said that a retry rate over
+5% means the budget is too low for this judge, and that both budgets should move to 32,000 and the
+measurement be repeated. The unbounded run says otherwise about the premise: at the provider's
+own ceiling of 131,072 tokens, **14 of 341** judge analyses still came back empty — a budget eight
+times larger than 16k did not make those replies converge, because they are runaways of the draw,
+not replies cut short. Doubling the budget would double what each runaway costs and recover nothing
+the retry does not already recover (29 of 31 retries came back with text; 2 of 342 runs kept an
+empty analysis, against 14 of 341 unbounded). So the budgets stay at 16,000 and the retry stays as
+measured. This is a deviation from the rule as written, stated as one, with the number that decides
+it — a second measurement at 32k would cost US$ 0.10 and is not made because its result is in the
+first run's rows.
+
+**What this changes about the section above.** The blind arm's 11 pp advantage did not survive
+the cap on the same items: bounded, `blind` − `named` per item is **−0.9 pp**, [−7.9, +6.1], 11
+items each way. Part of the first gap was the runaways (19 named against 10 blind, passing 3 and 5),
+and the rest was one run's draw. Vendor effect, bounded: correct text under `claude-opus-5` 0.74,
+`gpt-5.5` 0.79, `gemini-3.8-flash` 0.73 — a 6 pp spread; position 0.77 / 0.76 / 0.74. The null on
+the registered question stands on both runs; the unregistered observation is read, on the same
+items, as not replicated.
