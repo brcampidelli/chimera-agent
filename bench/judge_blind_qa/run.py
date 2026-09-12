@@ -117,7 +117,7 @@ def _ask(gateway: Any, model: str, question: str, *, temperature: float) -> tupl
     return (result.content or "").strip(), (None if cost.unpriced else cost.usd)
 
 
-def collect(out: Path, *, target: int, cap: int, workers: int) -> int:
+def collect(out: Path, *, target: int, cap: int, workers: int, sample_index: int = 1) -> int:
     from concurrent.futures import ThreadPoolExecutor
 
     from chimera.providers import LLMGateway
@@ -126,15 +126,17 @@ def collect(out: Path, *, target: int, cap: int, workers: int) -> int:
     rows = load_simpleqa()
     rng = random.Random(SAMPLE_SEED)
     rng.shuffle(rows)
-    sample = rows[:cap]
+    # Sample k is the k-th slice of `cap` questions of the one seeded shuffle, so a second sample
+    # (addendum 2) shares no question with the first and needs no second seed to be disjoint.
+    sample = rows[(sample_index - 1) * cap : sample_index * cap]
     have = {jb.Item(**json.loads(line)).item_id for line in out.read_text(encoding="utf-8").splitlines() if line.strip()} if out.exists() else set()
-    log = out.with_name("collect-all.jsonl")
+    log = out.with_name(out.name.replace("items", "collect-all"))
     seen = {json.loads(line)["item_id"] for line in log.read_text(encoding="utf-8").splitlines() if line.strip()} if log.exists() else set()
     kept = len(have)
     spent = 0.0
 
     def one(index: int, row: dict[str, str]) -> dict[str, Any]:
-        item_id = f"sqa-{index}"
+        item_id = f"sqa-{index}" if sample_index == 1 else f"sqa{sample_index}-{index}"
         question = row["problem"].strip()
         reference = row["answer"].strip()
         with ThreadPoolExecutor(max_workers=5) as pool:
@@ -155,7 +157,8 @@ def collect(out: Path, *, target: int, cap: int, workers: int) -> int:
             "judge_alone_correct": judge_correct, "keep": keep, "usd": usd,
         }
 
-    todo = [(i, r) for i, r in enumerate(sample) if f"sqa-{i}" not in seen]
+    todo = [(i, r) for i, r in enumerate(sample)
+            if (f"sqa-{i}" if sample_index == 1 else f"sqa{sample_index}-{i}") not in seen]
     print(f"{len(rows)} eligible questions; sample {len(sample)}; {len(todo)} to ask, {len(seen)} asked, {kept} kept")
     batch = max(1, workers) * 4
     with out.open("a", encoding="utf-8") as fh, log.open("a", encoding="utf-8") as lg, ThreadPoolExecutor(max_workers=workers) as pool:
@@ -204,6 +207,7 @@ def main() -> int:
     ap.add_argument("--cap", type=int, default=SAMPLE_CAP)
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--sample", type=int, default=1, help="which slice of the seeded shuffle to collect (addendum 2 = 2)")
     args = ap.parse_args()
     items_path = Path(args.items)
     if args.report:
@@ -218,7 +222,7 @@ def main() -> int:
         return 2
     items_path.parent.mkdir(parents=True, exist_ok=True)
     if args.collect:
-        return collect(items_path, target=args.target, cap=args.cap, workers=args.workers)
+        return collect(items_path, target=args.target, cap=args.cap, workers=args.workers, sample_index=args.sample)
     if not args.run:
         ap.print_help()
         return 1
