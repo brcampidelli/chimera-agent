@@ -6,6 +6,10 @@ the same action (two judges agreeing), guarding against a single noisy call. Onc
 admitted, :meth:`recall` returns the precedent for a *similar* action (token overlap) —
 RAG over case law — so the kernel decides cheaply without re-invoking the judge.
 
+No shipped surface wires this store, because no shipped surface wires a judge: the decision, the
+numbers behind it and the corpus that would reverse it are in ``kernel.py``'s docstring, and
+``tests/test_the_judge_is_a_library.py`` keeps it a decision rather than an accident.
+
 Case law is keyed on the action **and its lineage**. A verdict the judge gave while the run was
 clean is not a verdict about the same command after the run has consumed untrusted content: the
 string is identical, the authority behind it is not (arXiv 2609.08472, read in the 2026-09-11

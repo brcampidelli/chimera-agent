@@ -70,7 +70,11 @@ A self-improving trust kernel (AgentTrust v2, `2606.08539`):
 - `TrustKernel.evaluate(action)` → **allow / warn / block / review**. Lexical `RuleSet`
   handles fixed-signature threats deterministically; an optional **semantic judge** handles
   intent; distilled rules make it cheaper over time. Invariant: **never hard-block a benign
-  action**.
+  action**. The judge and its precedent store are a *library seam*, wired by no shipped
+  surface — decided on 2026-09-12 with the numbers in `kernel.py`'s docstring (the rules and the
+  taint ledger block 7 / 7 and 6 / 6 on the two corpora with zero model calls; a judge would
+  add a model call to most tool actions and a measured bias); the build fails if a surface
+  starts to wire one without saying why.
 - `SkillValidator` / `ScheduleValidator` — the **constrained, statically-checkable edit
   surface** for self-modification (AutoMegaKernel `2606.09682`): unsafe proposals are rejected
   before they ever run.
