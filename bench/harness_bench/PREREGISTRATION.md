@@ -203,3 +203,18 @@ price. Re-projection: **600 × ≈ US$ 0.06 ≈ US$ 40–70** (scaffold arms cos
 magnitude under the US$ 400 hard stop, which is left unchanged as the safety net. Wall ~5–7 min/solve →
 ~10 h at 6 concurrent. The driver validated end-to-end (rc=0, receipts summed, outcomes read, spend
 tracked, resumable skip).
+
+## Amendment 2 — drop 078 and 088 (public-tunnel prerequisite), 23 tasks / 552 solves (dated 2026-09-12, after the first launch halted)
+
+The first launch halted itself on the §7 stop rule (4 of the first 25 solves rc!=0 and receiptless =
+16% > 5%) — the rule working as designed. All four were the same environment prerequisite, not a
+capability failure: `078-local-api-cursor-retry-ledger` and `088-api-contract-mock-client-compat` raise
+in their `prepare_runtime` hook (`_start_public_tunnel`) before the agent runs — *"no public mock URL
+configured: install cloudflared or set HARNESSBENCH_PUBLIC_URL_TEMPLATE / HARNESSBENCH_TUNNEL_CMD"* —
+they need a public tunnel to expose a mock API, which this WSL host does not have. A halt for a missing
+prerequisite is §2's "not a fail": it leaves the design rather than scoring 0. (Of the 25, only these
+two carry the tunnel hook; 003/006/081 do too but were never in the coding subset.)
+
+The design drops to **23 tasks × 8 arms × 3 = 552 solves**. The 21 keeper solves from the halted launch
+are kept (resumable skip); the relaunch runs the remainder. The stop rule stays at 5% and will catch
+any other lurking prerequisite the same way.

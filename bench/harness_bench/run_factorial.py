@@ -36,11 +36,11 @@ TASKS = [
     "011-code-debug", "016-code-repair-pytest", "022-local-rest-api-summary", "039-repo-architecture-map",
     "040-test-coverage-fill", "041-frontend-state-bug", "042-api-schema-migration", "043-db-migration-safety",
     "044-ci-config-repair", "045-dependency-upgrade-compat", "047-code-review-risk-report", "051-sql-query-report",
-    "064-service-dependency-triage", "078-local-api-cursor-retry-ledger", "080-schema-roundtrip-conversion",
+    "064-service-dependency-triage", "080-schema-roundtrip-conversion",
     "082-compose-config-repair", "083-monorepo-interface-repair", "084-js-state-type-bug", "085-flaky-test-root-cause",
-    "086-sql-migration-preflight-rollback", "087-cli-parser-bug-tests", "088-api-contract-mock-client-compat",
+    "086-sql-migration-preflight-rollback", "087-cli-parser-bug-tests",
     "089-ab-test-caveat-analysis", "092-schema-drift-audit", "094-metric-definition-migration-diff",
-]
+]  # 078 and 088 dropped: they require a public tunnel (cloudflared) absent here — see PREREGISTRATION amendment 2
 HIDS = [f"arm-{a}{b}{c}-r{k}" for a in (0, 1) for b in (0, 1) for c in (0, 1) for k in (0, 1, 2)]
 
 
