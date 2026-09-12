@@ -90,8 +90,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash-0731", "mid", "DeepSeek",
-        0.065, 0.18, tools=True, context_k=1048,
-        notes="the product default and the fusion judge since 2026-09-03. Same vendor as the chat-v3.1 it replaced, at 0.065/0.18 against 0.25/0.95 (3.8x cheaper in, 5.3x out) with eight times the window. Wrote a file on the first ask in a live probe, in 72s",
+        0.04, 0.08, tools=True, context_k=1048,
+        notes="the product default and the fusion judge since 2026-09-03. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421)",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
