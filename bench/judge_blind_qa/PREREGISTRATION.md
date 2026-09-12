@@ -117,3 +117,35 @@ of runs, the budget is too low for this judge and the same rule applies.
 the comparison (both runs are on consecutive days), which the per-item pairing partly absorbs. A
 16k budget is measured against replies that never needed it on this corpus; a task that does need
 more than 16k of reasoning is not represented here.
+
+
+## Addendum 2 — a second sample, and the observation registered as a direction (2026-09-12, before any call)
+
+RESULTS.md recorded, unregistered, that the blind arm scored 11 pp above the named one on the
+first sample, and the addendum above recorded that the gap did not survive the judge being bounded
+on the same items (−0.9 pp, [−7.9, +6.1]). This is the fresh-sample test of the same observation,
+under the engine as it now ships (`judge_max_tokens` / `synth_max_tokens` 16,000, the gateway
+ceiling 32,000).
+
+**The sample.** The second slice of 400 questions of the same seeded shuffle (`--sample 2`,
+questions 401–800), disjoint from the first by construction; the same writers, the same judge
+asked twice closed-book, the same filter and grader; collection stops at 40 kept items. Items
+`results/items-2.jsonl`, runs `results/2026-09-12-runs-2.jsonl`, nine per item as before.
+
+**Prediction, written with the bounded rerun in view.** `blind` − `named` per item is within
+**±5 pp** with a bootstrap interval that includes zero — the first sample's gap does not replicate.
+The vendor and position nulls hold again (no gap ≥ 10 pp, all intervals overlapping). Pooled over
+both samples under the bounded engine (the first sample's bounded rerun and this one, ~78 items),
+the per-item difference is within ±5 pp.
+
+**Decision.** If the fresh sample shows `blind` above `named` by ≥ 5 pp with an interval that
+excludes zero, the changelog says the blind default has a measured gain and states it with the
+pooled interval; if it is within ±5 pp, RESULTS.md closes the observation as not replicated and the
+default keeps the justification it already had (its cost is zero, and the position effect it
+removes could not be shown on any corpus so far). Either way, the judge series ends here unless a
+corpus of a different kind is built.
+
+**Cost.** ≤ 400 × 5 short calls ≈ US$ 0.16; 40 × 9 × 2 bounded calls ≈ US$ 0.10.
+
+**What this cannot show.** The same instrument's limits as above; two samples of one corpus,
+one judge.
