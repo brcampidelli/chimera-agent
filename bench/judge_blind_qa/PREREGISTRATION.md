@@ -80,3 +80,40 @@ they carry. A strict grader misgrades some right answers as wrong on both sides.
 not the concern it was for AIME (the questions are obscure by construction), but the judge may
 *recognise* a fact it could not *recall* — that is part of the mechanism under test, not a defect of
 the instrument.
+
+
+## Addendum — the same 38 items with the judge and synthesiser bounded (registered 2026-09-12, after RESULTS.md, before any call)
+
+RESULTS.md recorded what an unbounded reasoning judge costs: 29 of 341 runs (8.5%) ran past 16k
+completion tokens — one to 146k — carrying **71%** of the run's cost, one run of 3,096 s, one halt
+after forty minutes, and 8 of those 29 passing where the rest passed two in three. The same
+runaway the spec-test generator (#438) and the AIME writers (#439) showed.
+
+**The change under test** (`feat/completion-ceiling`): `FusionConfig.judge_max_tokens` and
+`synth_max_tokens`, 16,000 each — the far end of what a converged reply needed (median 1,901,
+90th percentile 12,628) — with one retry on an empty reply (twice the budget after `length`),
+and `Settings.completion_ceiling` (32,000) applied by the gateway to every call whose caller set
+no budget. The provider's `finish_reason` goes on the trace and the route meta.
+
+**The measurement.** The same 38 items, the same nine runs each, the same judge and synthesiser,
+through the bounded engine — `results/2026-09-12-runs-capped.jsonl` against the unbounded
+`results/2026-09-12-runs.jsonl`. Read per run: seconds (median, p95, max), completion tokens,
+US$; per arm: accuracy, and per item the paired difference against the unbounded run.
+
+**Predictions.** p95 seconds falls from 1,000 to under 300 and the maximum from 3,096 to under
+600; mean cost per run falls by **≥ 40%** (bounding the runaways at 16k + 16k removes most of the
+71%); accuracy stays within **±5 pp** of the unbounded run in both arms (named 0.62, blind 0.73);
+the number of retried stages (an empty first reply) is under 5% of runs.
+
+**Decision.** The cap ships whatever the cost numbers say — it is a bound on spend, and a run
+that costs less and takes a tenth of the time at the same accuracy is the point. If accuracy falls
+by more than 5 pp in either arm, both fusion budgets move to 32,000 and the measurement is
+repeated before merging; the number is published either way. If the retry fires on more than 5%
+of runs, the budget is too low for this judge and the same rule applies.
+
+**Cost.** 342 runs × 2 bounded calls ≈ US$ 0.3 (against US$ 0.63 unbounded).
+
+**What this cannot show.** One judge, one corpus; a route change between the two runs sits inside
+the comparison (both runs are on consecutive days), which the per-item pairing partly absorbs. A
+16k budget is measured against replies that never needed it on this corpus; a task that does need
+more than 16k of reasoning is not represented here.
