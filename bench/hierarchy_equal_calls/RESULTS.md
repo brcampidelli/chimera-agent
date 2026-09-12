@@ -4,8 +4,11 @@ Run 2026-09-11 · prereg `PREREGISTRATION.md` (two dated amendments, both before
 raw `results/2026-09-11-3b.jsonl`, report `results/2026-09-11-3b-report.md` · the 8B run that hit
 the ceiling is kept as `results/2026-09-11.jsonl` and `2026-09-11-8b-report.md`, void by the
 registered instrument rule. The verbatim-synthesis follow-up (registered addendum, 30 more
-trials, same file) and its second addendum — the same sentence on the production synthesiser,
-`results/2026-09-11-3b-opus-synth.jsonl` — are read in their own sections below.
+trials, same file), its second addendum — the same sentence on the production synthesiser,
+`results/2026-09-11-3b-opus-synth.jsonl` — and the third, the corpus at thirty tasks
+(`results/2026-09-12-3b-30.jsonl`, 450 trials), are read in their own sections below. **Read the
+third before quoting a size from the first**: on thirty tasks the verbatim sentence's +26 pp
+became +3 pp, and the primary comparison's interval finally excludes zero.
 
 **Read the noise floor first.** Ten tasks, three runs each; the flip rate of the arms is 20–50%,
 so a 30–50 pp difference on `pass^3` is the size a task moves with nothing changed. Every verdict
@@ -165,3 +168,65 @@ synthesiser; tasks whose answers are the figures.
 Read-heavy extraction on ten synthetic tasks, one weak backbone per run, no tools, no environment
 feedback. A 50–70% noise floor: the direction is consistent across four comparisons and two
 backbones; the size is not a number to quote. Nothing about `IsolatedCrew` on writing tasks.
+
+## Addendum 3 — the corpus at thirty tasks (registered, run 2026-09-12)
+
+Twenty tasks of the same shape added to `chimera.eval.hierarchy_ab.synthetic_tasks` (the first ten
+unchanged, in order); the five arms, the 3B backbone on every role, three runs — **450 trials**,
+US$ 0 on the catalogue (the slug is unpriced), four `single_equal` trials halted on the provider's
+context ceiling and re-run on resume. Raw `results/2026-09-12-3b-30.jsonl`, report
+`results/2026-09-12-3b-30-report.md`.
+
+**Instrument.** `single_1` 0.56 pass@1 on thirty (0.48 on the new twenty alone) — inside the band.
+
+| arm | pass@1 | pass^3 | flip | tokens/task |
+|---|---:|---:|---:|---:|
+| `single_1` | 0.56 | 0.40 | 0.33 | 1,160 |
+| `single_equal` | 0.56 | 0.37 | 0.40 | 13,611 |
+| `hierarchy` | **0.28** | **0.10** | 0.40 | 1,962 |
+| `hierarchy_no_synth` | 0.44 | 0.23 | 0.47 | 1,854 |
+| `hierarchy_verbatim` | 0.31 | 0.13 | 0.40 | 1,932 |
+
+| comparison (paired on `pass^3`, 30 tasks) | Δ | 95% CI | discordant |
+|---|---:|---|---|
+| **primary** — `hierarchy` vs `single_equal` | −26.7 pp | **[−36.2, −4.2]** | 2 for the hierarchy, 10 for the single agent |
+| `single_equal` vs `single_1` | −3.3 pp | [−18.7, +14.0] | 4 / 5 |
+| `hierarchy` vs `hierarchy_no_synth` | −13.3 pp | [−13.3, −0.3] | 0 / 4 |
+| `hierarchy` vs `single_1` | −30.0 pp | [−39.6, −6.7] | 2 / 11 |
+| `hierarchy_verbatim` vs `hierarchy` | +3.3 pp | [−2.0, +3.3] | 1 / 0 |
+| `hierarchy_verbatim` vs `hierarchy_no_synth` | −10.0 pp | [−10.0, +1.2] | 0 / 3 |
+
+**Against the registered predictions.** *Every arm's flip rate ≤ 35%* — **failed**: 33–47%. The
+prediction rested on a wrong premise, and the premise is worth writing down: a flip rate is a
+per-task property (how often one task changes its answer between runs), and adding tasks does not
+lower it; what more tasks narrow is the *interval*. *The four directions hold on the new twenty and
+on the thirty* — **held**, all four, on both. *The primary comparison's interval excludes zero* —
+**held** for the first time: [−36.2, −4.2] against [−40, −0.8] on ten. *…and its point estimate is
+larger than the noise floor* — **failed**, and for the reason above: the report's rule compares
+the point estimate to the flip rate, and no n can make a 27 pp difference clear a 40% flip rate on
+this backbone.
+
+**What the registered decision says.** The sentence the Orchestration tab may quote stays a
+direction — *at the same number of calls one agent that re-reads the documents does as well or
+better on tasks like these* — because the registered condition had two halves and one failed. What
+thirty tasks add is that the direction now carries an interval that excludes zero and a 10-to-2
+discordance, which ten tasks could not give it.
+
+**What thirty tasks took away — read this before the first addendum.** On the first ten, the
+verbatim sentence moved the hierarchy from 0.27 to 0.53 pass@1 (+26 pp, 7 tasks up, 0 down) and
+was adopted by the rule. On thirty it moves it from **0.28 to 0.31** (+3 pp; on the new twenty
+alone 0.18 → 0.22), `pass^3` 0.10 → 0.13, discordant 1 / 0. The ten-task number was the top of its
+own noise, and thirty tasks regressed it to the mean — the reason this addendum exists. The
+default stays `True` on the strength of addendum 2 (the production synthesiser, −15% tokens, no
+task lost by the rule), not on the +26 pp, and #435's changelog line should be read with this
+paragraph beside it. The workers-alone arm on thirty is 0.44 / 0.23 against the hierarchy's
+0.28 / 0.10: the synthesis on this backbone still loses what the workers found, on both corpora.
+
+**Apparatus.** `single_equal` re-reads D documents in D rounds and its context grows with each; on
+the 3B route four trials hit the provider's ceiling (halts, `bench/PROTOCOL.md` rule 2) and were
+re-run on resume, and its tokens per task read 13,611 against 3,810 on the ten — the twenty new
+tasks have more documents on average (14 with two, 13 with three, 3 with four).
+
+**What this cannot show.** Thirty tasks of one kind — planted figures under a heading, the same
+filler — and one weak backbone; the flip rate says a task on this backbone is a coin with a bias,
+and three runs per task read the bias, not the coin.
