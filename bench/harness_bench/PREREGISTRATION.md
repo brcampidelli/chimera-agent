@@ -193,3 +193,13 @@ raised budget; `-exp`, `-terminus` and the `r1` reasoning models are unstable va
 **Comparability caveat:** the four-solve cost pilot (§4) used `deepseek-chat-v3.1`. Its oracle scores
 are **not** directly comparable to this run's, and are kept only as the cost/apparatus pilot they were.
 Every §5/§6 number below is measured on `deepseek-v3.2`.
+
+### Amendment 1a — measured v3.2 per-solve cost (dry driver run, before the full run)
+
+Three dry solves on `deepseek-v3.2` with the shipped apparatus (011 bare 5-round ≈ US$ 0.03; 085 bare
+US$ 0.051, oracle 1.0; 087 bare US$ 0.068, oracle 0.66) came back **~8-10× cheaper than the v3.1 pilot**
+of the same tasks (US$ 0.41–0.72) — v3.2 solves these with far fewer tokens, not merely a lower output
+price. Re-projection: **600 × ≈ US$ 0.06 ≈ US$ 40–70** (scaffold arms cost more input), an order of
+magnitude under the US$ 400 hard stop, which is left unchanged as the safety net. Wall ~5–7 min/solve →
+~10 h at 6 concurrent. The driver validated end-to-end (rc=0, receipts summed, outcomes read, spend
+tracked, resumable skip).
