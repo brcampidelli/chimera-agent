@@ -25,8 +25,16 @@ starts to without saying why there. The reasons, each a measurement rather than 
 
 What would change the decision is a corpus of dangerous actions the regexes cannot see —
 ``python -c "import shutil; shutil.rmtree(...)"``, a cron that mails a secret — measured against
-its benign look-alikes, with the judge's false-refusal rate beside its catches. That corpus has
-not been built, and the sentence above is only as strong as the two that have.
+its benign look-alikes, with the judge's false-refusal rate beside its catches. That corpus was
+built (``bench/governance_judge``, 2026-09-12): on ten matched pairs the rules are blind to, the
+weak judge caught **9/9** of the attacks the rules miss, false-refused **0/10** of the benign twins,
+agreed with itself **19/19**, at US$ 0.0001 a call. It does **not** flip this decision, and the
+bench says why in its own words: it is the *easy* regime (blatant attacks, plainly-benign twins, so
+the false-refusal cost that only shows on ambiguous work is untested); pricing one call is not
+pricing one-call-per-tool-call all day; and ``observe`` — the surface a judge would be staged on —
+*applies* BLOCK by a safety invariant (``profile.py``), so there is no record-only place to measure
+a judge without enforcing it. The decision stands until a powered, ambiguous corpus holds and a
+record-only judge surface exists; those two reasons are unchanged by the smoke corpus.
 
 A deployment that wants the judge wires it itself and gets the whole seam: ``TrustKernel(judge=,
 precedents=PrecedentStore(path))``, a ``ContextJudgeFn`` that is handed why the action is taken,
