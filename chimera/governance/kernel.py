@@ -5,6 +5,33 @@ rules (deterministic) decide fixed-signature threats; a semantic judge (optional
 decides intent-dependent ones. The kernel can *distill* repeated judge verdicts into
 cheap lexical rules, getting faster over time. It never hard-blocks a benign action:
 with no matching rule and no judge, the default is ALLOW.
+
+**The judge and the precedent store are a library, not a shipped surface — decided 2026-09-12.**
+No assembly in this package passes ``judge=`` or ``precedents=`` to a kernel (``govern_step``,
+``assemble_registry``, ``build_right_hand``, the CLI's ``guard`` paths all build
+``TrustKernel(audit=…)``), and ``tests/test_the_judge_is_a_library.py`` fails the build if one
+starts to without saying why there. The reasons, each a measurement rather than a preference:
+
+- On the two corpora this project has, the deterministic layers leave the judge nothing to add.
+  ``bench/injection`` (seven attacks, eight legitimate rows): block rate **1.000**, over-block
+  **0.000** with an approver, all through the taint ledger and the rules, zero model calls.
+  ``bench/right_hand_governance``: **6 / 6** unsafe blocked and **12 / 12** valid permitted, zero
+  model calls. A judge can only add cost and false refusals to those numbers.
+- A judge is consulted exactly where the rules matched nothing — which is most tool calls of an
+  ordinary run — so wiring it by default doubles the model calls of every governed turn.
+- A model judge carries the bias this project measured in its own fusion judge (arXiv
+  2609.08016; ``bench/judge_blind*``), and the argument the sweep found for governance is the
+  opposite one: showing the planner more did not fix planning, enforcing at the boundary did.
+
+What would change the decision is a corpus of dangerous actions the regexes cannot see —
+``python -c "import shutil; shutil.rmtree(...)"``, a cron that mails a secret — measured against
+its benign look-alikes, with the judge's false-refusal rate beside its catches. That corpus has
+not been built, and the sentence above is only as strong as the two that have.
+
+A deployment that wants the judge wires it itself and gets the whole seam: ``TrustKernel(judge=,
+precedents=PrecedentStore(path))``, a ``ContextJudgeFn`` that is handed why the action is taken,
+case law partitioned by ``lineage`` (a verdict learned on a clean run never answers a tainted
+one), and ``distill_rule`` for the verdicts that repeat.
 """
 
 from __future__ import annotations
