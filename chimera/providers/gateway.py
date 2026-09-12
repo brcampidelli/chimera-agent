@@ -526,6 +526,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
+        max_tokens = self._bounded(max_tokens)
 
         extra = self._provider_kwargs()
         message_dicts = _to_message_dicts(messages)
@@ -672,6 +673,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
+        max_tokens = self._bounded(max_tokens)
 
         call_kwargs: dict[str, Any] = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
@@ -694,6 +696,18 @@ class LLMGateway:
             messages.append(Message(role="system", content=system))
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
+
+    def _bounded(self, max_tokens: int | None) -> int | None:
+        """The caller's `max_tokens`, or the deployment's completion ceiling when the caller set none.
+
+        `Settings.completion_ceiling` says why: a reasoning model with no bound can spend the
+        provider's whole ceiling thinking and return nothing, at the price of everything it thought.
+        A caller that chose a budget keeps it; 0 keeps the provider's ceiling.
+        """
+        if max_tokens is not None:
+            return max_tokens
+        ceiling = int(getattr(self.settings, "completion_ceiling", 0) or 0)
+        return ceiling if ceiling > 0 else None
 
     def _think_filter(self) -> ThinkFilter | None:
         """A fresh filter per call, or None when the user asked to keep the tags.
@@ -725,6 +739,7 @@ class LLMGateway:
 
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
+        max_tokens = self._bounded(max_tokens)
         call_kwargs = dict(self._provider_kwargs(), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
@@ -769,6 +784,7 @@ class LLMGateway:
         ``tool_calls``. Like :meth:`stream`, this is one direct call: NO fallback chain and NO cache
         (both meaningless for a live stream). Callers that need those keep using :meth:`complete`.
         """
+        max_tokens = self._bounded(max_tokens)
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
