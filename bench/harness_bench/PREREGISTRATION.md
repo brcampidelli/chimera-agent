@@ -165,3 +165,31 @@ uv venv --python 3.12 ~/hb-venv && uv pip install --python ~/hb-venv/bin/python 
 
 The runner, the arm writer and the reader are committed with the RESULTS, not before: a runner that
 exists before the design is approved invites "just a quick run".
+
+---
+
+## Amendment 1 — the fixed model is `deepseek-v3.2`, not `deepseek-chat-v3.1` (dated 2026-09-12, before any paid solve of this design)
+
+Bruno's call, after reviewing the current OpenRouter deepseek family. The factorial's model is a
+**controlled constant, not a factor** — changing it does not "help" the design, it moves the constant
+the factor effects are measured on. Two reasons this is the better constant:
+
+- **Newer and cheaper.** `deepseek/deepseek-v3.2` (0.269 in / 0.400 out) is the current sibling of the
+  pre-registration's `deepseek-chat-v3.1` (0.250 / 0.950) — same chat/mid tier, so a model where the
+  scaffolding factors can plausibly act, but with output priced 2.4× lower. Re-projecting the pilot's
+  token profile (~0.9M in + ~0.25M out per solve) at v3.2 prices: **600 × ≈ US$ 0.34 ≈ US$ 205**, down
+  from the v3.1 projection of ~US$ 278 for the same design. The **US$ 400 hard stop is unchanged**, and
+  the dry-run below will replace this projection with a v3.2-specific per-solve cost before the full run.
+- **The finding stays production-relevant.** It is the same tier as the agent's production default
+  (`deepseek/deepseek-chat`), so "which harness factors earn their cost" transfers.
+
+Rejected alternatives, from the full family measured against the cap: the `deepseek-v4-flash` line
+(US$ 27–171 projected) is the *weak/judge* tier — too weak an executor, it would floor the factor
+effects; `deepseek-v4-pro-0813` / `deepseek-v4-pro` (US$ 574 / 1,344 projected) are stronger but blow
+the US$ 400 stop for the full 600-solve design and would need a scope cut (k = 2, or fewer tasks) or a
+raised budget; `-exp`, `-terminus` and the `r1` reasoning models are unstable variants or a different
+(reasoning) regime, off the target.
+
+**Comparability caveat:** the four-solve cost pilot (§4) used `deepseek-chat-v3.1`. Its oracle scores
+are **not** directly comparable to this run's, and are kept only as the cost/apparatus pilot they were.
+Every §5/§6 number below is measured on `deepseek-v3.2`.
