@@ -93,6 +93,11 @@ class FusionTrace:
     aggregation: Literal["synth", "vote"] = (
         "synth"  # task-typed routing: synthesize vs majority-vote
     )
+    finish_reasons: dict[str, str] = field(default_factory=dict)
+    """`finish_reason` of the judge and synthesiser calls, verbatim from the provider, by stage
+    (``judge`` / ``synth``); a stage that was retried after an empty reply carries a second key,
+    ``<stage>_first``, with the reason the first reply gave. Empty means the provider reported
+    nothing, which is not "it finished"."""
     shown_order: list[int] | None = None
     """How the judge (or the agreed-path synthesiser) saw the panel, when it was shown blind.
 
@@ -195,6 +200,14 @@ class FusionConfig:
     # the judge could solve alone, so it could not show the bias either; a label the judge does not
     # need is a label it should not be shown. ``False`` restores the named, ordered presentation.
     blind_panel: bool = True
+    # The judge's and the synthesiser's completion budgets, explicit. `bench/judge_blind_qa`
+    # (2026-09-12, 341 runs): the median judge + synthesiser reply was 1,901 completion tokens, the
+    # 90th percentile 12,628 — and 29 runs (8.5%) ran past 16k, one of them to 146k, carrying 71%
+    # of the run's cost and passing 8 of 29 where the rest passed two in three. A reasoning judge
+    # with no bound spends the provider's ceiling thinking; these bound it at the far end of what
+    # a converged reply needs. An empty reply is asked once more (twice the budget after `length`).
+    judge_max_tokens: int = 16_000
+    synth_max_tokens: int = 16_000
 
     def role_kinship(self) -> dict[str, object]:
         """How independent the judge actually is from the panel it grades.
@@ -243,6 +256,19 @@ class FusionConfig:
             panel_temperatures=list(s.fusion_panel_temperatures),
             blind_panel=s.fusion_blind_panel,
         )
+
+
+def _finish_reasons(judge: CompletionResult | None, synth: CompletionResult | None) -> dict[str, str]:
+    """What the provider said about how each stage stopped, and whether the stage was asked twice."""
+    out: dict[str, str] = {}
+    for stage, result in (("judge", judge), ("synth", synth)):
+        if result is None:
+            continue
+        out[stage] = str(getattr(result, "finish_reason", "") or "")
+        retried = (result.route_meta or {}).get("retried_after")
+        if retried:
+            out[f"{stage}_first"] = str(retried)
+    return out
 
 
 def _content_text(content: object) -> str:
@@ -332,6 +358,7 @@ class FusionEngine:
             usage=self._collect_usage(panel, judge, synth),
             aggregation=aggregation,
             shown_order=shown,
+            finish_reasons=_finish_reasons(judge, synth),
         )
         self._log_usage(trace)
         return trace
@@ -371,6 +398,24 @@ class FusionEngine:
         synth = self._run_synth(messages, judge.content)
         return judge.content, synth.content, "synth", judge, synth, shown
 
+    def _bounded_call(
+        self, messages: list[MessageLike], *, model: str, temperature: float, budget: int, stage: str
+    ) -> CompletionResult:
+        """One judge or synthesiser call under an explicit budget, asked once more if it came back
+        empty — the generator's rule (`chimera/core/spec_test.py`): the empty reply is a runaway
+        that belongs to the draw, not the prompt. The reason the first reply gave is kept on the
+        result's ``route_meta`` so the trace can say the stage was retried."""
+        result = self.backend.complete(messages, model=model, temperature=temperature, max_tokens=budget)
+        if (result.content or "").strip():
+            return result
+        first = str(getattr(result, "finish_reason", "") or "")
+        _log.warning("fusion %s returned nothing (finish_reason=%r); asking once more", stage, first)
+        again = self.backend.complete(
+            messages, model=model, temperature=temperature,
+            max_tokens=budget * 2 if first == "length" else budget,
+        )
+        return again.model_copy(update={"route_meta": {**(again.route_meta or {}), "retried_after": first or "none reported"}})
+
     def _run_selective(self, messages: list[MessageLike]) -> FusionTrace:
         """Probe a few models first; short-circuit on agreement, else escalate to full.
 
@@ -392,6 +437,7 @@ class FusionEngine:
                 usage=self._collect_usage(probe, None, agreed),
                 early_stopped=True,
                 shown_order=shown,
+                finish_reasons=_finish_reasons(None, agreed),
             )
             self._log_usage(trace)
             return trace
@@ -405,6 +451,7 @@ class FusionEngine:
             usage=self._collect_usage(panel, judge, synth),
             aggregation=aggregation,
             shown_order=shown,
+            finish_reasons=_finish_reasons(judge, synth),
         )
         self._log_usage(trace)
         return trace
@@ -475,6 +522,7 @@ class FusionEngine:
             ],
             "judge_analysis": trace.judge_analysis,
             "shown_order": trace.shown_order,
+            "finish_reasons": dict(trace.finish_reasons),
             "stages": [
                 {
                     "stage": u.stage,
@@ -557,10 +605,9 @@ class FusionEngine:
                 shown,
             )
         user = f"Task and context:\n{_conversation_text(messages)}\n\nCandidate answers:\n{answers}"
-        result = self.backend.complete(
+        result = self._bounded_call(
             [Message(role="system", content=_JUDGE_SYSTEM), Message(role="user", content=user)],
-            model=self.config.judge,
-            temperature=0.1,
+            model=self.config.judge, temperature=0.1, budget=self.config.judge_max_tokens, stage="judge",
         )
         return result, shown
 
@@ -569,10 +616,10 @@ class FusionEngine:
             f"Original task and context:\n{_conversation_text(messages)}\n\n"
             f"Judge's analysis:\n{judge_analysis}"
         )
-        return self.backend.complete(
+        return self._bounded_call(
             [Message(role="system", content=_SYNTH_SYSTEM), Message(role="user", content=user)],
-            model=self.config.synthesizer,
-            temperature=self.config.temperature,
+            model=self.config.synthesizer, temperature=self.config.temperature,
+            budget=self.config.synth_max_tokens, stage="synth",
         )
 
     def _run_synth_agreed(
@@ -584,13 +631,13 @@ class FusionEngine:
             f"Original task and context:\n{_conversation_text(messages)}\n\n"
             f"Agreeing answers:\n{joined}"
         )
-        result = self.backend.complete(
+        result = self._bounded_call(
             [
                 Message(role="system", content=_SYNTH_AGREED_SYSTEM),
                 Message(role="user", content=user),
             ],
-            model=self.config.synthesizer,
-            temperature=self.config.temperature,
+            model=self.config.synthesizer, temperature=self.config.temperature,
+            budget=self.config.synth_max_tokens, stage="synth",
         )
         return result, shown
 

@@ -274,6 +274,18 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="CHIMERA_LOG_LEVEL")
     home: Path = Field(default=Path(".chimera"), validation_alias="CHIMERA_HOME")
 
+    # --- Completion ceiling: the most tokens one call may generate when the caller set no
+    # `max_tokens`. Without it the provider's own ceiling applies, and the reasoning model behind
+    # the default tier can spend all of it thinking and return an empty `content` at 200 OK —
+    # measured three times on 2026-09-11/12: the spec-test generator reasoned to **131,072** tokens
+    # and returned nothing (`bench/spec_test_vacuity`, about 25x the cost of a normal call); the
+    # AIME writers emptied 13 of 21 slots on the hard problems (`bench/judge_blind_hard`); the
+    # fusion judge ran for 52 minutes on one SimpleQA item (`bench/judge_blind_qa`, where 8.5% of
+    # runs carried 71% of the cost). The runaway is a property of the draw, not the task. 32k is
+    # four times the longest converged reply seen (15k) and a quarter of the ceiling; 0 restores the
+    # provider's. A caller that passes its own `max_tokens` is never touched. ---
+    completion_ceiling: int = Field(default=32_000, validation_alias="CHIMERA_COMPLETION_CEILING")
+
     # --- Exact-match completion cache for tool-free turns (HORIZON prompt caching) ---
     cache: bool = Field(default=False, validation_alias="CHIMERA_CACHE")
     prompt_cache: bool = Field(default=False, validation_alias="CHIMERA_PROMPT_CACHE")
