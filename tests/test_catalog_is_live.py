@@ -114,7 +114,7 @@ def test_the_catalogue_prices_are_not_wildly_stale(live_slugs: set[str]) -> None
     anyway, and this file is `-m integration`, so a real market move reddens a run somebody chose
     rather than the build.
     """
-    from chimera.providers.catalog import CATALOG
+    from chimera.providers.catalog import CATALOG, price_is_known
 
     live = {m.slug: m for m in openrouter_models()[0]}
     wrong: list[str] = []
@@ -126,7 +126,10 @@ def test_the_catalogue_prices_are_not_wildly_stale(live_slugs: set[str]) -> None
         # knowing and cannot be expressed as a ratio.
         if (entry.input_per_m == 0) != (current.input_per_m == 0):
             wrong.append(f"{entry.slug}: {entry.input_per_m} vs {current.input_per_m} (free tier changed)")
-        elif entry.input_per_m > 0 and not (0.67 <= current.input_per_m / entry.input_per_m <= 1.5):
+        elif entry.input_per_m > 0 and not price_is_known(entry, current.input_per_m):
+            # Any price the row has been seen at passes (`CatalogEntry.also_seen`): a slug served by
+            # two routes flips between two figures, and the check is for a price the row has never
+            # seen, not for the flip.
             wrong.append(f"{entry.slug}: catalogue {entry.input_per_m}, live {current.input_per_m}")
     assert not wrong, f"catalogue prices are off by more than half: {wrong}"
 

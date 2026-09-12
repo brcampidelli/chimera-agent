@@ -41,7 +41,29 @@ class CatalogEntry:
     context_k: int
     """Approximate context window, thousands of tokens."""
     notes: str = ""
+    also_seen: tuple[tuple[float, float], ...] = ()
+    """Other (input, output) prices the live index has quoted for this slug on other days.
 
+    OpenRouter quotes whichever route it prefers that day, and a slug served by two providers at
+    two prices flips between them — `deepseek-chat-v3.1` on 2026-09-04 and 2026-09-10,
+    `glm-5.3-flash` twice on 2026-09-12 alone. A row that carries only today's figure is right on
+    some days by construction, and the live check went red on three release days for it. The row
+    now names every price it has been seen at; the live check accepts any of them, and still
+    reddens on a price the row has never seen. A receipt is priced from the live index; the row
+    is the fallback."""
+
+
+
+def price_is_known(entry: CatalogEntry, live_input_per_m: float, *, tolerance: float = 0.5) -> bool:
+    """Whether a live input price is within `tolerance` of any price this row has been seen at.
+
+    The live check's question. `entry.input_per_m` first, then every `also_seen` price; a price
+    outside ±tolerance (as a ratio band `[1 - tolerance/1.5, 1 + tolerance]`, i.e. 0.67–1.5 at the
+    default) of all of them is one the row has never seen, and that is what the check is for.
+    """
+    lo, hi = 1 - tolerance / 1.5, 1 + tolerance
+    known = [entry.input_per_m, *(seen[0] for seen in entry.also_seen)]
+    return any(k is not None and k > 0 and lo <= live_input_per_m / k <= hi for k in known)
 
 # Curated multi-vendor suggestions per tier. DATA ONLY — extend/correct freely; `chimera models`
 # renders this and `resolve_tiers` picks defaults from it.
@@ -90,12 +112,12 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash-0731", "mid", "DeepSeek",
-        0.04, 0.08, tools=True, context_k=1048,
+        0.04, 0.08, tools=True, context_k=1048, also_seen=((0.065, 0.18),),
         notes="the product default and the fusion judge since 2026-09-03. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421)",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
-        0.15, 0.50, tools=True, context_k=1048,
+        0.15, 0.50, tools=True, context_k=1048, also_seen=((0.075, 0.25),),
         notes="a third-party agentic index of 58.2, within a point of claude-opus-5 at 33x the\n"
         "        input price. Read 0.075/0.25 here until the live check on 2026-09-10 found it\n"
         "        DOUBLED to 0.15/0.50 — still the best price-to-index in this tier, by half the\n"
@@ -105,7 +127,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
-        0.25, 0.95, tools=True, context_k=161,
+        0.25, 0.95, tools=True, context_k=161, also_seen=((0.55, 1.65),),
         notes="proven in this repo's benches. This price OSCILLATES, and the note that used to\n"
         "        stand here said it could not: a survey on 2026-09-03 read 0.25/0.95, the live\n"
         "        index on 2026-09-04 read 0.55/1.65, and the reasoning 'a price does not halve and\n"
