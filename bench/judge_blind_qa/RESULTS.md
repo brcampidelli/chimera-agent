@@ -1,4 +1,4 @@
-# Results — on facts the judge cannot recall, its verdict followed neither the vendor name nor the position; the blind panel scored higher once, and not again with the judge bounded
+# Results — on facts the judge cannot recall, its verdict followed neither the vendor name nor the position, on two samples; the blind panel's one-run lead did not replicate
 
 Run 2026-09-12 · prereg `PREREGISTRATION.md` (one registered addendum, below) · corpus
 `results/items.jsonl` (38 items) and `results/collect-all.jsonl` (all 400 questions asked) · runs
@@ -130,3 +130,39 @@ and the rest was one run's draw. Vendor effect, bounded: correct text under `cla
 `gpt-5.5` 0.79, `gemini-3.8-flash` 0.73 — a 6 pp spread; position 0.77 / 0.76 / 0.74. The null on
 the registered question stands on both runs; the unregistered observation is read, on the same
 items, as not replicated.
+
+## Addendum 2 — a second sample, and the observation closed (registered, run 2026-09-12)
+
+The second slice of 400 questions of the same seeded shuffle (`--sample 2`), disjoint from the
+first; the same writers, judge, filter and grader; the engine as it now ships (bounded). Kept
+**40** items (35 with one right text, 5 with two) from 360 questions asked before the target was
+reached, US$ 0.12; pipeline 360 of 360 runs, US$ 0.12, seconds median 42 / p95 362 / max 828.
+Items `results/items-2.jsonl`, runs `results/2026-09-12-runs-2.jsonl`.
+
+| arm | runs | passed | judge names a vendor |
+|---|---:|---:|---:|
+| `named` | 240 | **159 / 240** (0.66) | 2 / 240 |
+| `blind` | 120 | **78 / 120** (0.65) | 0 / 120 |
+
+Per item, `blind` − `named`: **−1.3 pp**, bootstrap 95% [−8.3, +6.2]; blind higher on 9 items,
+lower on 12, equal on 19. Pooled with the first sample's bounded rerun (78 items, both under the
+shipped engine): **−1.1 pp**, [−6.2, +3.8].
+
+Vendor effect (named): correct text under `claude-opus-5` 0.67, `gpt-5.5` 0.70, `gemini-3.8-flash`
+0.62 — an 8 pp spread, intervals overlapping (90 runs each). Position 0.66 / 0.66 / 0.68.
+
+**Against the registered predictions.** *Within ±5 pp with an interval that includes zero* — held.
+*The vendor and position nulls hold again* — held. *Pooled within ±5 pp* — held.
+
+**What the registered decision says.** The observation from the first, unbounded run — blind 11 pp
+above named — is **closed as not replicated**: it did not survive the judge being bounded on the
+same items, and it did not appear on a fresh sample. The blind default keeps the justification it
+already had: its cost is zero on every corpus measured, and the vendor and position effects it
+removes could not be shown on any of them — GSM8K at a ceiling, AIME unbuildable, two SimpleQA
+samples where the judge could not answer alone and chose by content anyway (a vendor named in 3 of
+467 analyses across both samples). **The judge series ends here** unless a corpus of a different
+kind is built: a prose turn where nothing is checkable, which is where arXiv 2609.08016's bias may
+live and where this design has no grader.
+
+**What this cannot show.** Two samples of one corpus, one judge, writers weaker than the panel
+whose names they carry, a strict deterministic grader; nothing about prose.
