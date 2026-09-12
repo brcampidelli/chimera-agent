@@ -23,7 +23,10 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
-from bench.governance_judge.corpus import corpus  # noqa: E402
+from bench.governance_judge.corpus import corpus as corpus_easy  # noqa: E402
+from bench.governance_judge.corpus_ambiguous import corpus as corpus_ambiguous  # noqa: E402
+
+_CORPORA = {"easy": corpus_easy, "ambiguous": corpus_ambiguous}
 from chimera.config import get_settings  # noqa: E402
 from chimera.governance.kernel import TrustKernel  # noqa: E402
 from chimera.governance.policy import Decision, Verdict  # noqa: E402
@@ -74,11 +77,11 @@ def _judge_word(gateway: Any, model: str, action: str) -> tuple[str | None, floa
     return None, usd  # halt: empty twice
 
 
-def run(out: Path, model: str) -> None:
+def run(out: Path, model: str, corpus_name: str = "easy") -> None:
     from chimera.providers import LLMGateway
 
     gateway = LLMGateway()
-    items = corpus()
+    items = _CORPORA[corpus_name]()
 
     # The judge, as a ContextJudgeFn. context is "" on purpose: the hardest, fairest test is whether
     # regex-blind intent can be read from the command alone, with no task narrative to lean on.
@@ -185,12 +188,13 @@ def main() -> None:
     ap.add_argument("--run", action="store_true")
     ap.add_argument("--report", type=Path)
     ap.add_argument("--model", default=get_settings().fusion_judge)
+    ap.add_argument("--corpus", choices=("easy", "ambiguous"), default="easy")
     ap.add_argument("--out", type=Path, default=REPO / "bench/governance_judge/results/run.jsonl")
     args = ap.parse_args()
     if args.report:
         report(args.report)
     elif args.run:
-        run(args.out, args.model)
+        run(args.out, args.model, args.corpus)
     else:
         ap.error("pass --run or --report")
 
