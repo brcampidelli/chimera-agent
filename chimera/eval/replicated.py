@@ -38,6 +38,7 @@ from chimera.eval.paired import PairedResult, compare_paired
 
 __all__ = [
     "ReplicatedArm",
+    "design_effect",
     "ReplicatedResult",
     "compare_replicated",
     "format_replicated_report",
@@ -298,6 +299,29 @@ def compare_replicated(baseline: ReplicatedArm, treatment: ReplicatedArm) -> Rep
     return ReplicatedResult(baseline, treatment)
 
 
+def design_effect(icc: float | None, m: int) -> float | None:
+    """Kish's design effect for a cluster of ``m`` correlated trials: ``1 + (m - 1) * icc``.
+
+    What it is FOR here is pricing, not correcting. The paired comparison in this module already
+    clusters properly — it pairs arms on **per-task** ``pass^k``, so a task contributes one
+    observation however many times it was run, and no interval in this file is inflated by
+    correlation. That was checked rather than assumed; see `bench/design_effect/RESULTS.md`.
+
+    What the number tells you instead is **what the next replica is worth**. Measured on our own
+    factorial, ICC(1) runs 0.53-0.77 with a median of 0.71, and at that correlation three runs of a
+    task carry 1.24 independent observations rather than 3: the second run adds 0.17 and the third
+    adds 0.07. A budget that buys replicas is buying a variance estimate, not precision, and it
+    should be spent knowing which of the two it wanted.
+
+    ``None`` in, ``None`` out — an ICC that could not be computed prices nothing. A negative ICC is
+    clamped to 0: the formula would otherwise claim a cluster is worth more than its members, and
+    "the runs disagree more than the tasks do" is a statement about noise, not a discount.
+    """
+    if icc is None:
+        return None
+    return 1.0 + (m - 1) * max(icc, 0.0)
+
+
 def _fmt_icc(arm: ReplicatedArm) -> str:
     if arm.icc is None:
         return f"n/a ({arm.icc_reason})"
@@ -311,6 +335,28 @@ def _fmt_active(arm: ReplicatedArm) -> str:
         return "0 trials — NOT MEASURED (the mechanism never fired)"
     assert arm.active_pass_rate is not None
     return f"{arm.active_pass_rate:.1%} over {arm.active_trials} active trials"
+
+
+def _fmt_replica_value(result: ReplicatedResult) -> str:
+    """The price of the replicas, printed where the k was chosen.
+
+    A report that says "k=3: decides" and nothing else invites the reading that three runs are three
+    observations. At the correlation this project actually measures they are 1.24, and the next run
+    would add 0.07 — which is worth knowing before a factorial spends 3x to find out.
+    """
+    iccs = [a.icc for a in (result.baseline, result.treatment) if a.icc is not None]
+    if not iccs or result.k < 2:
+        return f"k={result.k}, and no ICC to price it with — replicas cost 1x each and buy an unknown"
+    icc = sum(iccs) / len(iccs)
+    deff = design_effect(icc, result.k)
+    assert deff is not None
+    effective = result.k / deff
+    nxt = (result.k + 1) / design_effect(icc, result.k + 1)  # type: ignore[operator]
+    return (
+        f"ICC {icc:+.2f} -> design effect {deff:.2f}, so {result.k} runs per task carry "
+        f"{effective:.2f} independent observations, not {result.k}; a {result.k + 1}th would add "
+        f"{nxt - effective:.2f}"
+    )
 
 
 def format_replicated_report(result: ReplicatedResult) -> str:
@@ -335,6 +381,7 @@ def format_replicated_report(result: ReplicatedResult) -> str:
         f"discordant {t.name} +{p.treatment_only} / {b.name} +{p.baseline_only}",
         f"verdict             {verdict}; |Δ| {abs(p.delta):.1%} vs floor {result.noise_floor:.1%}: {floor}",
         f"runs per task       k={result.k}: {seeds_verdict(result.k)}",
+        f"what k bought       {_fmt_replica_value(result)}",
     ]
     halted = b.halted_trials + t.halted_trials
     if halted or result.excluded_tasks:
