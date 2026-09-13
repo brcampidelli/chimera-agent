@@ -166,8 +166,13 @@ export function ApprovalCard({
         ) : null}
       </div>
       <p className="mt-1 text-muted-foreground">{question.reason}</p>
+      {/* `whitespace-pre-wrap`: the action is one line for a tool call and a numbered list for a
+          plan-gate question (`chimera/api/plan_gate.py`), and a plan collapsed onto one line is a
+          plan nobody can refuse on. */}
       {question.action ? (
-        <p className="mt-1 font-mono text-xs text-muted-foreground">{question.action}</p>
+        <p className="mt-1 whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+          {question.action}
+        </p>
       ) : null}
       {/* The deadline line, in its two states. `aria-live` because the number changes without the
           reader touching anything, and the change from "refuses in 4s" to "silence refused this" is

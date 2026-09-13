@@ -763,6 +763,12 @@ class CodeTurnRequest(CodeSeams):
     """The file the user has open, workspace-relative. Two effects, both real: it focuses which
     ``AGENTS.md`` files apply, and it is what a compaction restores. Not read here — the agent has
     tools for that, and a server-side read would put a stale copy in the prompt."""
+    plan_gate: bool = False
+    """Stop for a person on the PLAN before the turn runs anything (:mod:`chimera.api.plan_gate`).
+
+    Off by default, and that default is a judgement rather than caution: this adds a model call and
+    a wait to the most-used surface in the product, so it has to be asked for. It only ever ADDS a
+    stop — every per-action question still happens, and BLOCK is untouched."""
 
 
 def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> None:
@@ -1325,6 +1331,50 @@ def register_code_api(
                 original_backend = getattr(agent, "backend", None) if fused else None
                 if fused:
                     agent.backend = _cast_for_turn(fuse_backend, req)  # type: ignore[assignment]
+
+                # BEFORE the branch, so it covers the external providers too — and there it matters
+                # more, not less: somebody else's agent runs its own loop, and the per-action
+                # governance underneath this one does not reach inside it. Here is the last point
+                # where a person can stop the whole thing having spent one planning call.
+                if req.plan_gate:
+                    from chimera.api import plan_gate as _plan_gate
+
+                    verdict = _plan_gate.gate(
+                        message,
+                        home=Path(settings.home),
+                        backend=getattr(agent, "backend", None),
+                        model=(req.roles.plan if req.roles else None) or req.model,
+                        on_plan=lambda p: emit("plan", {"steps": p.steps, "raw": p.raw}),
+                        on_asked=approval_sink.emit,
+                        wait_seconds=float(settings.approval_wait),
+                    )
+                    if not verdict.approved:
+                        # Through `_verify_and_finish` like every other way out, so a gated turn is
+                        # still logged, still snapshots, still offers the revert. A turn that never
+                        # started has nothing to revert — but taking a different exit here is how
+                        # the usage log lost its most expensive rows once already.
+                        _verify_and_finish({
+                            "answer": "",
+                            "steps": 0,
+                            "stopped_reason": f"plan_gate:{verdict.outcome}",
+                            "tool_names": [],
+                            "model": req.model or "",
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                            "usd": None,
+                            "tainted": False,
+                            "memory_facts_used": len(facts),
+                            "memory_layer": memory_layer,
+                            "fused": fused,
+                        })
+                        return
+                    if verdict.plan is not None:
+                        # The approved steps, into the SYSTEM prompt — same placement and same
+                        # reason as the recalled facts above: `absorb` drops system messages, so
+                        # this steers the turn without being recorded as something the user said.
+                        agent.config.system_prompt += "\n\n" + _plan_gate.as_system_note(
+                            verdict.plan
+                        )
 
                 external = (req.provider or "").strip().lower()
                 if external:
