@@ -30,7 +30,17 @@ from chimera.providers.gateway import Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.spec_test")
-_FENCE = re.compile(r"^\s*```(?:python)?\s*|\s*```\s*$", re.IGNORECASE | re.MULTILINE)
+#: The OUTERMOST fence, anchored to the whole reply — `\A` and `\Z`, never `^` and `$`.
+#:
+#: The previous pattern was `^\s*```(?:python)?\s*|\s*```\s*$` with `re.MULTILINE`, and under
+#: MULTILINE `$` matches at the end of *every line*. `re.sub` then deleted every ``` in the reply,
+#: not the two that fence it. Measured on a valid module whose docstring quoted a fenced example:
+#: both inner fences and five lines vanished, silently, and the generated test no longer said what
+#: the model wrote. arXiv 2609.06993 measured this class across 37,600 generations — **38.0% are
+#: content-correct and boundary-broken** — and its prescription is the split below: decide the
+#: BOUNDARY once, then hand the content through untouched.
+_FENCE_OPEN = re.compile(r"\A\s*```[A-Za-z0-9_+-]*[ \t]*\r?\n")
+_FENCE_CLOSE = re.compile(r"\r?\n\s*```\s*\Z")
 _TEST_FILE = "test_chimera_spec.py"
 _MAX_DIGEST_CHARS = 12_000
 #: One line per test in pytest's `-rA` short summary: `PASSED file::name`, `FAILED file::name - …`.
@@ -63,7 +73,33 @@ _GEN_SYSTEM = (
 
 
 def _strip_fence(text: str) -> str:
-    return _FENCE.sub("", text.strip()).strip()
+    """Remove the outer markdown fence, if the reply has one, and nothing else.
+
+    The boundary question and the content question are answered separately, which is the whole fix:
+    finding the opening fence decides where the payload starts, finding the closing one decides
+    where it ends, and everything between them is returned byte-for-byte. A ``` inside the payload —
+    a docstring quoting an example, a test asserting on markdown — is content, and content is not
+    this function's business.
+
+    An opener with no closer is **reported, not repaired**. It means the reply was truncated, and the
+    Python after the opener is usually still the Python the model wrote; silently trimming to make it
+    look well-formed is how a boundary failure gets recorded as a content failure.
+    """
+    body = text.strip()
+    opened = _FENCE_OPEN.match(body)
+    if not opened:
+        # No fence at all, which is what `_GEN_SYSTEM` asks for ("no markdown fences").
+        return body
+    rest = body[opened.end() :]
+    closed = _FENCE_CLOSE.search(rest)
+    if not closed:
+        _log.warning(
+            "the generated module opened a markdown fence and never closed it — the reply was "
+            "probably cut short. Using everything after the opener; if the module fails to "
+            "compile, the boundary is why, not the code."
+        )
+        return rest.strip()
+    return rest[: closed.start()].strip()
 
 
 def workspace_digest(workspace: Path, *, max_chars: int = _MAX_DIGEST_CHARS) -> str:
