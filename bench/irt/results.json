@@ -1,0 +1,121 @@
+{
+  "arms_moved": 7,
+  "control_median_abs_discrimination": {
+    "real": 0.619,
+    "shuffled_within_item": 0.663
+  },
+  "fitted": [
+    {
+      "difficulty": -1.318,
+      "discrimination": 7.642,
+      "rate": 0.875,
+      "task": "089-ab-test-caveat-analysis"
+    },
+    {
+      "difficulty": -1.103,
+      "discrimination": 6.748,
+      "rate": 0.667,
+      "task": "094-metric-definition-migration-diff"
+    },
+    {
+      "difficulty": -0.46,
+      "discrimination": 1.739,
+      "rate": 0.625,
+      "task": "044-ci-config-repair"
+    },
+    {
+      "difficulty": -0.233,
+      "discrimination": 0.839,
+      "rate": 0.542,
+      "task": "080-schema-roundtrip-conversion"
+    },
+    {
+      "difficulty": 4.922,
+      "discrimination": 0.634,
+      "rate": 0.083,
+      "task": "041-frontend-state-bug"
+    },
+    {
+      "difficulty": -6.544,
+      "discrimination": 0.605,
+      "rate": 0.958,
+      "task": "039-repo-architecture-map"
+    },
+    {
+      "difficulty": -4.332,
+      "discrimination": 0.572,
+      "rate": 0.917,
+      "task": "082-compose-config-repair"
+    },
+    {
+      "difficulty": -4.124,
+      "discrimination": 0.568,
+      "rate": 0.875,
+      "task": "040-test-coverage-fill"
+    },
+    {
+      "difficulty": 4.054,
+      "discrimination": 0.369,
+      "rate": 0.125,
+      "task": "043-db-migration-safety"
+    },
+    {
+      "difficulty": -2.431,
+      "discrimination": 0.02,
+      "rate": 0.583,
+      "task": "085-flaky-test-root-cause"
+    },
+    {
+      "difficulty": 1.584,
+      "discrimination": -0.33,
+      "rate": 0.625,
+      "task": "022-local-rest-api-summary"
+    },
+    {
+      "difficulty": 0.312,
+      "discrimination": -2.406,
+      "rate": 0.583,
+      "task": "011-code-debug"
+    }
+  ],
+  "items": 23,
+  "rank_by_ability": [
+    "arm-011",
+    "arm-010",
+    "arm-111",
+    "arm-110",
+    "arm-000",
+    "arm-100",
+    "arm-101",
+    "arm-001"
+  ],
+  "rank_by_rate": [
+    "arm-010",
+    "arm-000",
+    "arm-100",
+    "arm-111",
+    "arm-011",
+    "arm-101",
+    "arm-110",
+    "arm-001"
+  ],
+  "replicas": [
+    0,
+    1,
+    2
+  ],
+  "respondents": 24,
+  "uninformative_items": [
+    "016-code-repair-pytest",
+    "042-api-schema-migration",
+    "045-dependency-upgrade-compat",
+    "047-code-review-risk-report",
+    "051-sql-query-report",
+    "064-service-dependency-triage",
+    "083-monorepo-interface-repair",
+    "084-js-state-type-bug",
+    "086-sql-migration-preflight-rollback",
+    "087-cli-parser-bug-tests",
+    "092-schema-drift-audit"
+  ]
+}
