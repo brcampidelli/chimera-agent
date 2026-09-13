@@ -367,6 +367,17 @@ jobs:
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Pin the BINARY, not just the action SHA. The action's README says GITLEAKS_VERSION
+          # "defaults to a hard-coded version number" — at this SHA that default is 8.24.3, which we
+          # only knew by reading the action's bundled source. arXiv 2609.02983 confirmed a
+          # boundary-allowlist defect in gitleaks 8.21.2 (detection 0.9976 -> 0.5233 for a credential
+          # ending in a hyphen); 8.24.3 is past that range, so we are very likely not affected today —
+          # but "safe because the action happened to hard-code a version past the bug" is not a
+          # property we chose or can see. Pinning makes the secret-scanner a version WE audited and
+          # bump deliberately, like every other pin in this file. It is NOT a claim that 8.30.1 fixes
+          # that specific class — the durable defence against a single scanner's blind spot is that it
+          # is not the only gate (pr_intent_scan and the three CVE audits run beside it).
+          GITLEAKS_VERSION: "8.30.1"
 
       - name: Install uv
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
