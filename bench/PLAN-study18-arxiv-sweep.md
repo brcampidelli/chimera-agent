@@ -85,6 +85,10 @@ overstated.
    measures intra-group verifier-error correlation at **0.530**, i.e. **effective n = 1.70 for a group of
    8** — a design effect of ~4.7×. Anywhere we compute a CI over k outputs that passed the **same** gate
    (pass^k, replicated arms), the margin is narrower than the arithmetic says.
+   ⚠️ **TESTED 2026-09-13 and half wrong** (`bench/design_effect/RESULTS.md`): our measured ICC is **0.706**,
+   higher than theirs — but `replicated.py` already pairs on **per-task** `pass^k`, so the margin it publishes
+   is not inflated. Reading the paper said the mechanism exists; only reading our code could say we had it,
+   and this item skipped that step. The number prices replicas instead: k=3 buys 1.24 observations.
 3. **We measure the wrong noise axis.** `2608.22331`: semantically-neutral **prompt perturbation** SDs are
    **11× to 58×** the rerun SDs. Our three measured floors (seed 4.7 pp · sampling 2.3 pp · ruler 0) have
    no perturbation axis — *and `bench/PROTOCOL.md` §5 already requires one*. The rule is written and, as far
@@ -115,7 +119,7 @@ Ranked by (evidence × implementability × not-already-done). Everything here wa
 | 2 | **`2604.04918` + `2606.05647`** gate the plan, recommend-and-wait | move the approval gate from per-action to **per-plan** (we already have the plan step), and make the prompt state a recommendation with a spec-anchored reason, **defaulting to the safe option** | exposure 88.5% → 60.4% (p<.001); 56% approve after a *correct* alert; preference 70% vs 9% | desktop | **S** (gate) + **M** (prompt) |
 | 3 | **`2606.15549`** denylist bypass battery | run their bypass classes against `chimera/governance/policy.py` and publish the result | 1,709 real denylists **69–98.6% bypassable** | terminal | **S** — *the cheapest test that can refute us* |
 | 4 | **`2609.02983`** gitleaks defect | pin the gitleaks version in `ci.yml` and add a boundary-mutation battery per rule | **confirmed source defect in 8.21.2**: detection 0.9976 → **0.5233** for a credential ending in a hyphen; we have had a plaintext token before | terminal/CI | **S** |
-| 5 | **`2609.06386`** design effect | apply the intra-group correction before declaring any margin over k same-gate runs | correlation 0.530 → n_eff 1.70 of 8 | benches | **S** |
+| 5 | ~~**`2609.06386`** design effect~~ **MEASURED — the prediction below was HALF WRONG** | apply the intra-group correction before declaring any margin over k same-gate runs | **Our own ICC(1) is 0.706** (median of 8 factorial arms, 0.53–0.77) — *higher* than the paper's 0.530. But the exposure §2 claimed is **not in our code**: `replicated.py` pairs on per-task `pass^k`, so no interval it publishes is inflated. The number prices REPLICAS instead: k=3 buys 1.24 observations, the 3rd run adds 0.07. One genuinely un-clustered site named, not corrected (`auto_evolve` panel). `bench/design_effect/RESULTS.md` | benches | **done, US$0** |
 | 6 | **`2608.22331`** perturbation floor | execute the paraphrase arm `PROTOCOL.md` §5 already requires | perturbation SD **11–58×** rerun SD | benches | **S/M** |
 | 7 | **`2609.10969`** evidence lineage | record the evidence each panel member saw; treat shared evidence as a *correlated* vote | source effect 40.9 pp vs model effect 11.3 pp | terminal (fusion) | **M** |
 | 8 | **`2609.07360`** harness scanner | run their instrument over our own `skills/` and MCP declarations | 16.0% of 3,171 repos carry a validated defect; `Bash(python:*)`-shaped grants are the pattern | terminal + desktop | **S** |

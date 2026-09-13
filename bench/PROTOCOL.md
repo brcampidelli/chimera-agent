@@ -84,6 +84,32 @@ Two corollaries that the same bench paid for:
   what proves a grouped 0.60 is the signal's ceiling and not an underfit model — the §2aa idea
   (one arm must reproduce a known-high number) applied to a classifier.
 
+## 8. A replica is priced before it is bought
+
+Repeated runs of the same task are correlated, so `k` runs are not `k` observations. Measured on
+this project's own factorial with the shipped `icc1`: **ICC(1) median 0.706** across the eight arms
+(0.53–0.77), against the 0.530 the source paper reported — ours is higher, and a correlation
+imported from someone else's corpus would have understated it.
+
+At that correlation, **three runs of a task carry 1.24 independent observations**: the second run
+adds 0.17 and the third adds 0.07. Any bench choosing a `k` states what the `k`-th run is worth at
+its own measured ICC, and `format_replicated_report` now prints it beside the k.
+
+The rule that follows is about **where** the money goes, not about using fewer replicas — replicas
+are how the noise floor is measured at all (§2x: one run is a sample, two alert, three decide), and
+at k=1 there is no floor. So: **replicate a subset deep enough to measure the floor, and spend the
+rest on more tasks.** `bench/design_effect/RESULTS.md` works it through on a real budget — 552
+solves bought 28.6 effective observations per arm as 23 tasks × 3, where 8 tasks × 3 plus 45 × 1
+would have bought 54.9 and still had a floor.
+
+⚠️ **And the correction this rule does NOT license.** A design effect widens an interval only where
+the interval was computed over the correlated trials themselves. Our replicated comparison pairs
+arms on **per-task `pass^k`** — one observation per task however many times it ran — so no interval
+in `eval/replicated.py` is inflated, and the sweep item that said otherwise was refuted by reading
+the code (`RESULTS.md` §2). Check which unit the `n` counts before discounting it. One site is
+genuinely un-clustered and is named there rather than silently corrected with a number measured on
+a different population.
+
 ## Standing rules this file collects rather than adds
 
 - **Pre-register before the first call**, with the number the paper predicts written down so it can
