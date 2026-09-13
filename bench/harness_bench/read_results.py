@@ -45,7 +45,8 @@ def outcome_of(home: Path, h: str, task: str) -> float | None:
     hits = glob.glob(str(home / "data_try6" / "results" / h / "*" / f"{task}.json"))
     if not hits:
         return None
-    d = json.load(open(hits[0], encoding="utf-8"))
+    with open(hits[0], encoding="utf-8") as rf:
+        d = json.load(rf)
     o = d.get("oracle_result") or {}
     v = o.get("outcome_score")
     return float(v) if isinstance(v, (int, float)) else None
@@ -91,7 +92,7 @@ def main() -> None:
 
     # per-task mean per arm
     per_task_arm: dict = {}
-    for (task, bits, k), v in cells.items():
+    for (task, bits, _k), v in cells.items():
         if v["outcome"] is None:
             continue
         per_task_arm.setdefault((task, bits), []).append(v["outcome"])

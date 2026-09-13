@@ -75,7 +75,8 @@ def run_one(hid: str, task: str) -> dict:
     hits = glob.glob(str(HB / "data_try6" / "results" / hid / "*" / f"{task}.json"))
     if hits:
         try:
-            outcome = (json.load(open(hits[0], encoding="utf-8")).get("oracle_result") or {}).get("outcome_score")
+            with open(hits[0], encoding="utf-8") as rf:
+                outcome = (json.load(rf).get("oracle_result") or {}).get("outcome_score")
         except Exception:
             outcome = None
     return {
@@ -137,16 +138,19 @@ def main() -> None:
                     spent += r["usd"] or 0.0
                     rc_err += int(r["rc"] != 0)
                     receiptless += int(r["receiptless"])
-                    fh.write(json.dumps(r) + "\n"); fh.flush()
+                    fh.write(json.dumps(r) + "\n")
+                    fh.flush()
                     bad = rc_err + receiptless
                     print(f"[{done}/{len(pending)}] {r['task']:<34} {r['hid']:<12} rc={r['rc']} "
                           f"usd={r['usd']} out={r['outcome']} {r['seconds']}s | Σ${spent:.2f} bad={bad}", flush=True)
                     if r["rc"] != 0 and r["stderr_tail"]:
                         print(f"    stderr: {r['stderr_tail']}", flush=True)
                     if spent >= args.max_usd:
-                        halt = True; print(f"HALT: spend cap US${args.max_usd} reached", flush=True)
+                        halt = True
+                        print(f"HALT: spend cap US${args.max_usd} reached", flush=True)
                     if done >= 20 and bad / done > 0.05:
-                        halt = True; print(f"HALT: {bad}/{done} rc!=0-or-receiptless > 5% — investigate apparatus", flush=True)
+                        halt = True
+                        print(f"HALT: {bad}/{done} rc!=0-or-receiptless > 5% — investigate apparatus", flush=True)
                 if not halt:
                     submit_next(ex, futs)
     fh.close()
