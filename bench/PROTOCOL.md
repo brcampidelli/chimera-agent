@@ -54,6 +54,25 @@ judge's self-agreement, which is the floor under every difference it reports. `b
 reports its floor; a bench that scores with a model states the floor it measured or says it has
 none.
 
+⚠️ **The paraphrase half of this rule went unrun for two days after it was written, and running it
+moved a number.** `bench/perturbation_floor` (2026-09-13) measured both halves of the governance
+judge's floor in one session: **replay 20/20 = 1.000, paraphrase 23/26 = 0.885**, and one of the
+three moves is an attack whose **BLOCK became a REVIEW because two spaces were added between shell
+tokens**. A rule that is written and not executed is the §2t shape pointed at ourselves — so a
+bench citing this section now says which half it ran.
+
+And the direction was not the expected one: on the *ambiguous* corpus the paraphrase floor (0.902)
+sits at or above the replay floor (0.886). Where the judge is already uncertain, rewording adds
+nothing; where it is certain, rewording is where its instability lives. **A floor measured only on
+hard items would have found nothing.**
+
+⚠️ **The perturbation has to be verified before it is trusted.** Two of the four rewrites written
+for that bench were discarded after their output was read: quoting the trailing argument turned the
+redirection `0>&1` into a literal, and reversing what looked like a flag bundle turned
+`find -name … -delete` into `find -eman … -eteled`. Neither fails loudly — each asks the judge about
+a *different* command and reports the disagreement as a floor, inflating it, in the direction that
+agrees with the paper. Print every (original, rewritten) pair before spending.
+
 ## 6. Anything added to a prompt has a placebo arm
 
 An intervention that adds text — a skill card, a lesson, a checklist, a warning — is compared not
