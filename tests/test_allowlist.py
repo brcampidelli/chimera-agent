@@ -87,9 +87,28 @@ def test_audit_records_exclusions(tmp_path: Path) -> None:
 
 def test_no_audit_entry_when_nothing_excluded(tmp_path: Path) -> None:
     audit = AuditLog(tmp_path / "audit.jsonl")
+    reg = _registry("read_file", "list_dir")
+    restrict_registry(reg, allow=["read_file", "list_dir"], audit=audit)
+    assert audit.entries() == []  # nothing dropped → nothing to record
+
+
+def test_an_allowlist_that_kept_arbitrary_code_is_recorded_even_though_nothing_dropped(
+    tmp_path: Path,
+) -> None:
+    """The one case where "nothing dropped" is still worth a line in the trail.
+
+    This test's sibling above used to use `allow=["read_file", "run_shell"]` and assert silence.
+    Both halves were defensible and only one can be: a list that keeps `run_shell` did not bound
+    the session, and that is a governance fact, not an absence of one. See
+    `tests/test_an_allowlist_that_bounds_nothing_says_so.py` for why.
+    """
+    audit = AuditLog(tmp_path / "audit.jsonl")
     reg = _registry("read_file", "run_shell")
     restrict_registry(reg, allow=["read_file", "run_shell"], audit=audit)
-    assert audit.entries() == []  # nothing dropped → nothing to record
+    entries = audit.entries()
+    assert len(entries) == 1
+    assert entries[0]["arbitrary_code_kept"] == ["run_shell"]
+    assert entries[0]["excluded"] == []
 
 
 def test_default_registry_can_be_locked_to_read_only(monkeypatch: pytest.MonkeyPatch) -> None:
