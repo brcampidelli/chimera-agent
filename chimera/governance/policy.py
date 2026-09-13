@@ -81,8 +81,26 @@ def _pattern(source: str) -> re.Pattern[str]:
 
 def _default_rules() -> list[Rule]:
     return [
-        Rule("rm_rf_root", _pattern(r"\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r)\s+(/|~|\*|\.\s*$)"), Decision.BLOCK, "recursive force delete of a root/home/glob path"),
-        Rule("disk_destroy", _pattern(r"\bmkfs\b|\bdd\s+if=.*\bof=/dev/"), Decision.BLOCK, "disk format/overwrite"),
+        # The SAFETY of this rule is the dangerous-target anchor `(/|~|\*|\.\s*$)`, not the flag
+        # spelling — so the flag spelling is made not to matter. The first shipped version matched
+        # only a COMBINED `-rf`/`-fr`, and the bypass battery (`bench/denylist_bypass`, arXiv
+        # 2606.15549) confirmed it missed six ordinary spellings of the same command, `rm -r -f /`,
+        # `rm --recursive --force /` and even `rm -Rf /` (uppercase R) among them. Now: `rm`, then a
+        # lookahead that everything up to a dangerous target is flags, plus two lookaheads that a
+        # recursive flag AND a force flag are present in any order/case/separation (short, long, or
+        # split). The anchor is unchanged, so `rm -rf build/` / `rm -r -f ./build` stay ALLOWED —
+        # verified in `tests/test_a_denylist_bypass_battery.py`. Variable-indirection (`a=rm;$a -rf /`)
+        # and quote obfuscation (`r""m`) still pass here by design: those are the taint ledger's and
+        # capability narrowing's job, not a lexical rule's (see `kernel.py`).
+        Rule("rm_rf_root", _pattern(
+            r"\brm\b(?=(?:\s+-{1,2}[A-Za-z-]+)*\s+(?:/|~|\*|\.\s*$))"
+            r"(?=[^\n]*?(?:-[A-Za-z]*[rR]|--recursive))"
+            r"(?=[^\n]*?(?:-[A-Za-z]*[fF]|--force))",
+        ), Decision.BLOCK, "recursive force delete of a root/home/glob path"),
+        # `dd` writing a raw device is dangerous in ANY argument order; the first version anchored
+        # `if=` before `of=` and so was bypassed by `dd of=/dev/sda if=/dev/zero` (battery, #3). The
+        # device path `of=/dev/` is the guard; its position on the line is not.
+        Rule("disk_destroy", _pattern(r"\bmkfs\b|\bdd\b[^\n]*\bof=/dev/"), Decision.BLOCK, "disk format/overwrite"),
         Rule("fork_bomb", _pattern(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"), Decision.BLOCK, "fork bomb"),
         Rule("chmod_777_root", _pattern(r"\bchmod\s+-R\s+777\s+/"), Decision.BLOCK, "world-writable root"),
         Rule("curl_pipe_shell", _pattern(r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(bash|sh|zsh)\b"), Decision.REVIEW, "piping a remote script straight into a shell"),
