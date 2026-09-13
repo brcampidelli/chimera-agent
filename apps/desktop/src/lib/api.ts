@@ -1057,6 +1057,14 @@ export interface CodeTurnInput {
   /** Route this turn through the fusion panel. It will not be able to use tools — see
    *  {@link CodeTurnDone.fused}, which is how the answer says so. */
   fuse?: boolean;
+  /** Stop for a person on the PLAN before this turn touches anything
+   *  (`chimera/api/plan_gate.py`).
+   *
+   *  It ADDS a stop and never removes one: every dangerous action still raises its own question,
+   *  and BLOCK is untouched. A refusal ends the turn having run nothing, and the plan question
+   *  arrives on the same channel as every other approval — so it lands in the pending dialog, in
+   *  `chimera approve`, and under the same silence-refuses clock. */
+  plan_gate?: boolean;
   /** Hand this turn to an EXTERNAL coding agent over ACP — "claude", "gemini" or "custom".
    *
    *  Omit for Chimera's own loop. The events are identical either way, deliberately: the checkpoint,

@@ -13,6 +13,7 @@ import {
   Copy,
   Download,
   Eraser,
+  ListChecks,
   Loader2,
   MessageSquare,
   Network,
@@ -588,6 +589,7 @@ export function Conversation({
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
+  const [planGate, setPlanGate] = useState(false);
   // Empty means "whatever this install is configured for", which is what every turn sent before the
   // cast could be chosen at all. Per conversation, like the model and the ceiling beside it.
   const [cast, setCast] = useState<Cast>(EMPTY_CAST);
@@ -797,6 +799,7 @@ export function Conversation({
         allow_host_exec: posture.reach === "workspace_shell",
         profile,
         fuse,
+        plan_gate: planGate,
         // Only with `fuse`: a cast on a turn that is not fused would be a second, invisible way to
         // pick a model. Omitted rather than sent empty, so an unchosen role stays the install's.
         ...(fuse && cast.panel.length ? { fusion_panel: cast.panel } : {}),
@@ -1339,6 +1342,18 @@ export function Conversation({
             onClick={() => setFuse((f) => !f)}
           >
             <Network className="h-4 w-4" /> {t("composer.fuse")}
+          </Button>
+          {/* Stop on the plan before the turn touches anything. A per-turn choice for the same
+              reason fusion is one: it changes what this turn does, costs a planning call, and can
+              park the turn waiting for you. It ADDS a stop — every dangerous action still asks. */}
+          <Button
+            size="sm"
+            variant={planGate ? "primary" : "ghost"}
+            aria-pressed={planGate}
+            title={t("composer.planGateHint")}
+            onClick={() => setPlanGate((p) => !p)}
+          >
+            <ListChecks className="h-4 w-4" /> {t("composer.planGate")}
           </Button>
           {/* Only while fusion is armed. Who plays each part is a real decision — three models, six
               calls — and it is noise on every turn that is not fused. */}

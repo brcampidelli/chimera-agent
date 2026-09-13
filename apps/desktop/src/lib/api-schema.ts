@@ -3428,6 +3428,11 @@ export interface components {
             model?: string | null;
             /** Open File */
             open_file?: string | null;
+            /**
+             * Plan Gate
+             * @default false
+             */
+            plan_gate: boolean;
             posture?: components["schemas"]["Posture"] | null;
             /** Profile */
             profile?: ("economy" | "balanced" | "max") | null;

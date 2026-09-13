@@ -147,6 +147,8 @@ const en: Dict = {
   "app.backendStillDown":
     "It has not come back on its own. Close Chimera and open it again — what the backend said last is written to a report in the app's data folder.",
   "composer.fuse": "Fuse",
+  "composer.planGate": "Plan first",
+  "composer.planGateHint": "Stop on the plan before this turn touches anything. One planning call, then it waits for you. It ADDS a stop: every dangerous action still asks separately.",
   "composer.queued": "queued —",
   "composer.unqueue": "put back",
   "composer.fuseHint":
@@ -1473,6 +1475,8 @@ const pt: Dict = {
   "app.backendStillDown":
     "Ele não voltou sozinho. Feche o Chimera e abra de novo — o que o backend disse por último fica num relatório na pasta de dados do app.",
   "composer.fuse": "Fundir",
+  "composer.planGate": "Plano antes",
+  "composer.planGateHint": "Pare no plano antes de este turno tocar em qualquer coisa. Uma chamada de planejamento, e ele espera por você. Isto SOMA uma parada: toda ação perigosa continua perguntando à parte.",
   "composer.queued": "na fila —",
   "composer.unqueue": "devolver",
   "composer.fuseHint":
@@ -2840,6 +2844,8 @@ const es: Dict = {
   "common.add": "Añadir",
   "common.search": "buscar…",
   "composer.fuse": "Fusionar",
+  "composer.planGate": "Plan primero",
+  "composer.planGateHint": "Detente en el plan antes de que este turno toque nada. Una llamada de planificación y espera por ti. AÑADE una parada: cada acción peligrosa sigue preguntando aparte.",
   "composer.queued": "en cola —",
   "composer.unqueue": "devolver",
   "composer.fuseHint":
@@ -4189,6 +4195,8 @@ const fr: Dict = {
   "common.add": "Ajouter",
   "common.search": "rechercher…",
   "composer.fuse": "Fusion",
+  "composer.planGate": "Plan d'abord",
+  "composer.planGateHint": "Arrêtez-vous sur le plan avant que ce tour ne touche quoi que ce soit. Un appel de planification, puis il vous attend. Cela AJOUTE un arrêt : chaque action dangereuse demande toujours séparément.",
   "composer.queued": "en file —",
   "composer.unqueue": "reprendre",
   "composer.fuseHint":
@@ -5548,6 +5556,8 @@ const de: Dict = {
   "common.add": "Hinzufügen",
   "common.search": "suchen…",
   "composer.fuse": "Fusion",
+  "composer.planGate": "Erst der Plan",
+  "composer.planGateHint": "Halten Sie beim Plan an, bevor dieser Zug irgendetwas anfasst. Ein Planungsaufruf, dann wartet er auf Sie. Das FÜGT einen Halt HINZU: Jede gefährliche Aktion fragt weiterhin einzeln.",
   "composer.queued": "in Warteschlange —",
   "composer.unqueue": "zurücklegen",
   "composer.fuseHint":
@@ -6897,6 +6907,8 @@ const zh: Dict = {
   "common.add": "添加",
   "common.search": "搜索…",
   "composer.fuse": "融合",
+  "composer.planGate": "先看计划",
+  "composer.planGateHint": "在本回合动手之前先停在计划上。一次规划调用，然后等待你。这是新增一道关卡：每个危险操作仍会单独询问。",
   "composer.queued": "已排队 —",
   "composer.unqueue": "取回",
   "composer.fuseHint":
@@ -8186,6 +8198,8 @@ const ja: Dict = {
   "common.add": "追加",
   "common.search": "検索…",
   "composer.fuse": "融合",
+  "composer.planGate": "先に計画",
+  "composer.planGateHint": "このターンが何かに触れる前に計画で止まります。計画の呼び出しが一度あり、その後あなたを待ちます。これは停止を追加するものです。危険な操作は引き続き個別に確認されます。",
   "composer.queued": "待機中 —",
   "composer.unqueue": "戻す",
   "composer.fuseHint":
@@ -9492,6 +9506,8 @@ const it: Dict = {
   "app.backendStillDown":
     "Non è tornato da solo. Chiudi Chimera e riaprilo: l'ultima cosa detta dal backend finisce in un rapporto nella cartella dati dell'app.",
   "composer.fuse": "Fondi",
+  "composer.planGate": "Prima il piano",
+  "composer.planGateHint": "Fermati sul piano prima che questo turno tocchi qualcosa. Una chiamata di pianificazione, poi aspetta te. AGGIUNGE una fermata: ogni azione pericolosa chiede comunque a parte.",
   "composer.queued": "in coda —",
   "composer.unqueue": "riprendi",
   "composer.fuseHint":
@@ -10843,6 +10859,8 @@ const pl: Dict = {
   "app.backendStillDown":
     "Nie wrócił sam. Zamknij Chimerę i otwórz ją ponownie — to, co backend powiedział na końcu, trafia do raportu w folderze danych aplikacji.",
   "composer.fuse": "Połącz",
+  "composer.planGate": "Najpierw plan",
+  "composer.planGateHint": "Zatrzymaj się na planie, zanim ta tura czegokolwiek dotknie. Jedno wywołanie planowania, potem czeka na ciebie. To DODAJE przystanek: każde niebezpieczne działanie nadal pyta osobno.",
   "composer.queued": "w kolejce —",
   "composer.unqueue": "cofnij",
   "composer.fuseHint":
@@ -12187,6 +12205,8 @@ const ru: Dict = {
   "app.backendStillDown":
     "Сам он не вернулся. Закройте Chimera и откройте снова — последнее, что сказал бэкенд, записано в отчёт в папке данных приложения.",
   "composer.fuse": "Слияние",
+  "composer.planGate": "Сначала план",
+  "composer.planGateHint": "Остановитесь на плане, прежде чем этот ход что-либо затронет. Один вызов планирования, затем он ждёт вас. Это ДОБАВЛЯЕТ остановку: о каждом опасном действии по-прежнему спрашивают отдельно.",
   "composer.queued": "в очереди —",
   "composer.unqueue": "вернуть",
   "composer.fuseHint":

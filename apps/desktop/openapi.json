@@ -1783,6 +1783,11 @@
             ],
             "title": "Open File"
           },
+          "plan_gate": {
+            "default": false,
+            "title": "Plan Gate",
+            "type": "boolean"
+          },
           "posture": {
             "anyOf": [
               {
