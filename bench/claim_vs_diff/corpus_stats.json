@@ -1,0 +1,34 @@
+{
+  "claimed_successes": 385,
+  "claims_naming_a_file": 491,
+  "discordant_pairs": 557,
+  "dropped": {
+    "no receipt": 5,
+    "not a factorial arm": 4
+  },
+  "false_success": {
+    "asserts_verification": 0.281,
+    "contradicts": 5,
+    "median_exec_calls": 8,
+    "median_patch_lines": 132,
+    "median_tool_calls": 29,
+    "median_write_calls": 3,
+    "n": 139,
+    "names_a_file_the_diff_did_not_touch": 0.64
+  },
+  "false_successes": 139,
+  "items_in_askable_tasks": 174,
+  "solves_usable": 547,
+  "tasks_askable": 10,
+  "traces_present": 546,
+  "true_success": {
+    "asserts_verification": 0.504,
+    "contradicts": 3,
+    "median_exec_calls": 7,
+    "median_patch_lines": 120,
+    "median_tool_calls": 28,
+    "median_write_calls": 2,
+    "n": 246,
+    "names_a_file_the_diff_did_not_touch": 0.711
+  }
+}
