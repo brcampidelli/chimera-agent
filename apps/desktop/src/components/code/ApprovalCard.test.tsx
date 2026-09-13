@@ -57,6 +57,50 @@ describe("ApprovalCard — the other half of a pause", () => {
     expect(onAnswered).toHaveBeenCalledTimes(1);
   });
 
+  it("refuse is the FIRST button, so a dialog's focus trap lands on the safe answer", () => {
+    // The fail-safe the other two surfaces already declare: the TUI focuses `#ask-no` so that
+    // "Enter without reading" refuses, and the REPL prints `[y/N]`. This card shipped the inverse —
+    // allow first and styled primary — and `PendingApprovals` mounts it inside a Radix dialog,
+    // whose trap focuses the first focusable element. Order is the whole mechanism here, so the
+    // order is what gets pinned; a future tidy that reorders the buttons has to fail this.
+    mount();
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0]).toHaveAccessibleName(/^refuse$/i);
+    expect(buttons[1]).toHaveAccessibleName(/allow this once/i);
+  });
+
+  it("refuse is drawn as the primary action and allow as the quiet one", () => {
+    // Order settles the focus trap; weight settles what the eye lands on, and the two are separate
+    // claims. This card shipped with ALLOW as the gradient pill and REFUSE as the outline, so the
+    // loud button was the dangerous one. A screenshot would show this and prove nothing later — the
+    // class is what a future edit has to get past.
+    mount();
+    const [refuse, allow] = screen.getAllByRole("button");
+    expect(refuse.className).toContain("bg-accent-grad");
+    expect(allow.className).toContain("border-border");
+    expect(allow.className).not.toContain("bg-accent-grad");
+  });
+
+  it("shows the level the backend sorted the queue by", () => {
+    // `decision` has always been on the wire and in the CLI table; this card was the one surface
+    // that dropped it, so the person answering got a risk-ordered queue with the risk removed.
+    mount(() => {}, { ...question, decision: "review" });
+    expect(screen.getByText(/needs review/i)).toBeInTheDocument();
+  });
+
+  it("a level the interface has no word for is shown as nothing, never raw and never guessed", () => {
+    mount(() => {}, { ...question, decision: "escalated" });
+    expect(screen.queryByText(/escalated/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/needs review/i)).not.toBeInTheDocument();
+    expect(screen.getByText(question.reason)).toBeInTheDocument();
+  });
+
+  it("a question with no level still renders — the chip is the only thing missing", () => {
+    mount();
+    expect(screen.getByText(question.reason)).toBeInTheDocument();
+    expect(screen.queryByText(/needs review/i)).not.toBeInTheDocument();
+  });
+
   it("a stale click still clears the card: a verdict on a resolved question has nowhere to go", async () => {
     answerApproval.mockResolvedValueOnce({ ok: false });
     const onAnswered = vi.fn();

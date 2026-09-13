@@ -36,6 +36,17 @@ export interface ApprovalQuestionLike {
   id: string;
   action: string;
   reason: string;
+  /** The verdict's level — `review`, `warn`, or `block`.
+   *
+   * It has always been on the wire (`ApprovalOut`, and the stream frame `code_api` emits) and the
+   * CLI table has always printed it; this card was the one surface that dropped it. The backend
+   * *sorts the queue* by it (`pending.LEVEL_RANK`, from arXiv 2608.06949: ordering an overloaded
+   * answerer's queue by risk recovered coverage from 65.6% to 91.7%), so the person answering was
+   * being handed a risk-ordered queue with the risk removed.
+   *
+   * Optional because a question replayed from an older run may not carry one, and an absent level
+   * is shown as nothing rather than guessed into `review`. */
+  decision?: string;
   wait_seconds?: number;
   /** When the call parked, in the SERVER's epoch seconds. Both wire shapes carry it — the stream
    *  frame (`chimera/api/code_api.py`) and `ApprovalOut` — and it is what lets a card that mounts
@@ -87,6 +98,19 @@ function useSecondsLeft(question: ApprovalQuestionLike): number | null {
   return left;
 }
 
+/** The three levels a verdict can carry, and the tone each is drawn in.
+ *
+ * Closed set: it mirrors `chimera/governance/pending.py::LEVEL_RANK` minus `allow`, which never
+ * raises a question. `block` is here for completeness of the wire shape — in practice a BLOCK
+ * returns its refusal before any approver is consulted (`governed_tool.py`), so it should never
+ * reach this card; drawing it as `bad` rather than omitting it means that if one ever does, it
+ * arrives looking like what it is instead of silently as an ordinary review. */
+const LEVEL_LABEL: Record<string, { key: string; tone: string } | undefined> = {
+  block: { key: "code.approval.level.block", tone: "border-bad/40 text-bad-foreground" },
+  review: { key: "code.approval.level.review", tone: "border-accent/40 text-accent-foreground" },
+  warn: { key: "code.approval.level.warn", tone: "border-warn/40 text-warn-foreground" },
+};
+
 export function ApprovalCard({
   question,
   onAnswered,
@@ -98,6 +122,16 @@ export function ApprovalCard({
   const [busy, setBusy] = useState(false);
   const left = useSecondsLeft(question);
   const expired = left === 0;
+  // Normalised here and nowhere else. A level the UI has no word for is dropped rather than shown
+  // raw or coerced into `review`: an unrecognised string on a risk chip is worse than no chip.
+  //
+  // A literal map rather than `` t(`code.approval.level.${raw}`) ``, and that is deliberate:
+  // `i18n.reachable.test` proves every key in ten languages is rendered somewhere by searching the
+  // source for the key as a string, and an interpolated key is invisible to it. The test keeps a
+  // `DYNAMIC` prefix escape hatch, which belongs to keys whose suffix comes from open data — these
+  // three are a closed set fixed by `pending.LEVEL_RANK`, so spelling them out keeps the guard
+  // working instead of buying an exemption from it.
+  const level = LEVEL_LABEL[(question.decision ?? "").trim().toLowerCase()];
   const answer = async (approved: boolean) => {
     setBusy(true);
     try {
@@ -123,6 +157,13 @@ export function ApprovalCard({
           <ShieldQuestion className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
         )}
         {t("code.approval.title")}
+        {/* The level, at the top, beside the title: it is what the backend sorted this queue by,
+            and the answerer could not see it. Unknown levels render nothing rather than a guess. */}
+        {level ? (
+          <span className={cn("rounded-full border px-1.5 py-0.5 text-xs font-medium", level.tone)}>
+            {t(level.key)}
+          </span>
+        ) : null}
       </div>
       <p className="mt-1 text-muted-foreground">{question.reason}</p>
       {question.action ? (
@@ -143,13 +184,26 @@ export function ApprovalCard({
       ) : null}
       {/* Gone rather than disabled once silence has answered. A disabled button says "not now";
           these two are not coming back, and the tool call they belonged to was refused. */}
+      {/* REFUSE FIRST, and it is the primary button. Not a style preference — the other two
+          surfaces already carry this posture and wrote down why. The TUI declares
+          `AUTO_FOCUS = "#ask-no"` with the note "focus lands on NO, so a person who answers by
+          hitting Enter without reading has refused"; the REPL uses `typer.confirm(default=False)`
+          and prints `[y/N]`. This card shipped the exact inverse: "Allow this once" rendered first
+          and styled primary, so inside `PendingApprovals`'s Radix dialog the focus trap put the
+          caret on ALLOW — the fail-safe, running backwards, on the one surface where arXiv
+          2606.05647 measured people clicking through (of 16 sessions where the monitor alerted
+          CORRECTLY, 9 approved the malicious change anyway, 67% of those after minimal review).
+
+          Order, not `autoFocus`. This card also mounts inline in the composer, where stealing focus
+          would yank the caret out of a half-typed message; DOM order gives the dialog its safe
+          default and costs the inline mount nothing. */}
       {expired ? null : (
         <div className="mt-2 flex gap-2">
-          <Button size="sm" disabled={busy} onClick={() => void answer(true)}>
-            {t("code.approval.approve")}
-          </Button>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => void answer(false)}>
+          <Button size="sm" disabled={busy} onClick={() => void answer(false)}>
             {t("code.approval.refuse")}
+          </Button>
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void answer(true)}>
+            {t("code.approval.approve")}
           </Button>
         </div>
       )}
