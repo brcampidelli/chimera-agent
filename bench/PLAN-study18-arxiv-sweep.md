@@ -227,3 +227,59 @@ Nothing here is started. The natural order by cost is: **#3 and #4** (they can r
 almost nothing) → **#1 and #5** (cheap, and both correct a number we currently report) → **#2** (the
 desktop change with the best human evidence in the sweep) → the rest. The "do not build" list in §4 is
 free: it is work avoided.
+
+---
+
+## 9 · Addendum — the developer over-reliance lane (arrived after §1–§8 were written)
+
+A late lane surveyed **~180 titles on over-reliance in coding assistance, opened 35 papers, kept 17 and
+rejected 33 by name**. It does not change the three theses; it hardens §1.2 and §4, and adds four threads
+that cut across papers with **real human participants**.
+
+**Thread 1 — review time is not scrutiny.** Three independent apparatuses say it: an LLM label raises
+fixation **+33% to +60%** while saccade length stays flat (γ=0.01, CI [−0.07, 0.10], a clean null);
+explanation moves confidence and agreement while review time does not move at all (**p=0.57**); and patch
+*priority* moves time and cognitive load without moving the merge decision. **A harness that logs "review
+time" as evidence of care is measuring the wrong thing.**
+
+**Thread 2 — every intervention in the batch either did nothing, cost something, or inverted.** The
+roll-call, which is a stronger version of §4: security hints **0 pp** (the Gemini arm did not move a
+digit); a *correct* monitor alert converted to action only **44%** of the time; an under-specified
+explanation **lowered accuracy (OR 0.58) and raised confidence (3.99 → 4.25, p=0.005)**; a "what if"
+cognitive forcing function pushed over-reliance **70.6% → 80.7%**, and stacking it with the one that
+helped gave **exactly 0**; delegation contracts bought reviewability for **+13% tokens and +38%
+wall-clock** with **zero** correctness gain (64/64 passed either way); copy-friction more than doubled
+rework. **Nothing in this literature supports "add a warning and the human will verify."**
+
+**Thread 3 — self-report errs large and directionally, which invalidates a class of gate.** METR's RCT:
+predicted −24%, self-estimated −20% *after living it*, **measured +19%** — a 39 pp error in the wrong
+direction. Programmers judge correct assertions at **73.9%** and incorrect ones at **49.0%** (coin flip)
+**with statistically identical confidence**. 84% report a productivity gain while the share reporting a
+worse experience nearly doubles. Participants do not notice a label influencing them. **Any Chimera gate
+whose input is "the agent says it verified" or "the developer says they reviewed" is invalid by
+construction** — which is the independent case for shortlist item #1 (a deterministic detector over the
+completion claim) and #13 (diff the written summary against the real diff and test output).
+
+**Thread 4 — only one paper in the lane measured the damage after switching the intervention on.** The
+rest estimate the gain beforehand. That is our own §2r, now visible in someone else's literature.
+
+**Two additions to the shortlist context:**
+- **`2607.08885`** is the most on-point paper for our spec-test work: it measures humans judging
+  *assertions*, which is exactly what `core/spec_test.py` emits, and finds judgement at chance on the
+  wrong ones with unchanged confidence. Any future "show the generated test to the user" surface should
+  pre-register against it.
+- **`2509.08514`** (n=2,784, randomised factorial) supplies the hidden cost of any "require the human to
+  fix it" design: **under-correction rises as correcting gets effortful**, and two intervention arms
+  (seeding 100% errors early; paying for performance) were **null**.
+
+**One more standing rule, and the pair that backs it.** `2601.17087` (agent success moves up to 9 pp by
+swapping the LLM playing the user; miscalibration is systematic and directional) together with
+`2605.20767` (an RCT with LLM-simulated users **is** an observational study, because the intervention
+shifts the persona's latent attributes, so the arms hold different implicit populations; it proposes
+negative-control outcomes as the diagnostic) is the citation pair for discarding any simulated-user
+evaluation — ours included, if we ever build one.
+
+**Also flagged, and consistent with §6:** `2606.17099`'s "three independent reviewers blind to condition"
+are **models, not people**; and the Microsoft "+24% PRs merged" telemetry carries **no measure of
+verification or trust**, while its proxy (merged PR) is precisely the quantity METR showed diverging from
+measured time.
