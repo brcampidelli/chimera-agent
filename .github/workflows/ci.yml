@@ -393,6 +393,20 @@ jobs:
       # hides the step, so a misspelled flag or a missing binary renders exactly like a clean audit.
       # A scanner that cannot fail cannot report either, and the whole point of this job is that
       # somebody sees the output.
+      #
+      # TWO ALERTS ARE KNOWINGLY LEFT OPEN, written here so the next person does not re-derive it:
+      #
+      # * `glib` (moderate, `src-tauri/Cargo.lock`) — **cannot be bumped from here.** `cargo update -p
+      #   glib --precise 0.20.0` fails: `gtk v0.18.2` requires `glib = "^0.18"`, and gtk is pinned by
+      #   `tauri v2.11.5`. Reaching the patched glib means upgrading Tauri, which is a desktop-build
+      #   change and belongs in its own PR with its own installer smoke test. Scope note: glib/gtk is
+      #   Tauri's **Linux** backend — Windows uses WebView2 and macOS WKWebView — so the exposure is
+      #   the Linux build only.
+      # * `accelerate` (moderate, `uv.lock`) — **no patched version exists.** It is a declared
+      #   dependency of two opt-in extras, `imagegen-local` and `train`, both of which pull torch and
+      #   neither of which is on the default install path; Chimera runs a diffusion model and does not
+      #   train one. Nothing to bump; revisit when upstream ships a fix, or when the `train` extra is
+      #   reconsidered.
       - name: Known vulnerabilities — Python (pip-audit)
         continue-on-error: true
         run: |
