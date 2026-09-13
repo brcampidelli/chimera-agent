@@ -1,0 +1,55 @@
+{
+  "claim_chars": {
+    "at_truncation_cap": 157,
+    "empty": 0,
+    "max": 2000,
+    "median": 1599,
+    "min": 13
+  },
+  "delivered_matches_verified": {
+    "false": 0,
+    "none_not_checkable": 162,
+    "true": 385
+  },
+  "discordant_pairs": 1106,
+  "dropped": {
+    "no receipt": 5,
+    "not a factorial arm": 4
+  },
+  "exact_duplicate_claims": 2,
+  "items_in_askable_tasks": 287,
+  "joint_self_report_x_oracle": {
+    "claimed_failure_oracle_fail": 85,
+    "claimed_failure_oracle_pass": 77,
+    "claimed_success_oracle_fail": 139,
+    "claimed_success_oracle_pass": 246
+  },
+  "per_task_pass_rate": {
+    "011-code-debug": 0.583,
+    "016-code-repair-pytest": 1.0,
+    "022-local-rest-api-summary": 0.625,
+    "039-repo-architecture-map": 0.958,
+    "040-test-coverage-fill": 0.875,
+    "041-frontend-state-bug": 0.083,
+    "042-api-schema-migration": 0.0,
+    "043-db-migration-safety": 0.125,
+    "044-ci-config-repair": 0.652,
+    "045-dependency-upgrade-compat": 1.0,
+    "047-code-review-risk-report": 0.0,
+    "051-sql-query-report": 1.0,
+    "064-service-dependency-triage": 1.0,
+    "080-schema-roundtrip-conversion": 0.542,
+    "082-compose-config-repair": 0.917,
+    "083-monorepo-interface-repair": 1.0,
+    "084-js-state-type-bug": 1.0,
+    "085-flaky-test-root-cause": 0.583,
+    "086-sql-migration-preflight-rollback": 0.0,
+    "087-cli-parser-bug-tests": 0.0,
+    "089-ab-test-caveat-analysis": 0.875,
+    "092-schema-drift-audit": 0.0,
+    "094-metric-definition-migration-diff": 0.667
+  },
+  "solves_usable": 547,
+  "tasks_askable": 12,
+  "tasks_total": 23
+}
