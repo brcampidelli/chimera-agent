@@ -13,6 +13,7 @@ import argparse
 import json
 import random
 from collections import defaultdict
+from dataclasses import replace
 from pathlib import Path
 
 import corpus
@@ -158,9 +159,12 @@ def shuffled_within_task(population: list[Solve], rng: random.Random) -> list[So
     for _, rows in sorted(by_task.items()):
         oracles = [s.oracle for s in rows]
         rng.shuffle(oracles)
-        out.extend(
-            Solve(**{**s.__dict__, "oracle": o}) for s, o in zip(rows, oracles, strict=True)
-        )
+        # `replace` rather than `Solve(**{**s.__dict__, ...})`. The dict form names THIS module's
+        # `Solve` and therefore only works on this bench's rows; `bench/claim_vs_diff` reuses this
+        # scorer on a richer row and got a TypeError for its trouble. The helpers in this file are
+        # the shared ruler — one of them being secretly local to one corpus is the kind of thing
+        # that makes two benches' numbers quietly incomparable.
+        out.extend(replace(s, oracle=o) for s, o in zip(rows, oracles, strict=True))
     return out
 
 
