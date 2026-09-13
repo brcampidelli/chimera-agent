@@ -165,3 +165,56 @@ uv venv --python 3.12 ~/hb-venv && uv pip install --python ~/hb-venv/bin/python 
 
 The runner, the arm writer and the reader are committed with the RESULTS, not before: a runner that
 exists before the design is approved invites "just a quick run".
+
+---
+
+## Amendment 1 — the fixed model is `deepseek-v3.2`, not `deepseek-chat-v3.1` (dated 2026-09-12, before any paid solve of this design)
+
+Bruno's call, after reviewing the current OpenRouter deepseek family. The factorial's model is a
+**controlled constant, not a factor** — changing it does not "help" the design, it moves the constant
+the factor effects are measured on. Two reasons this is the better constant:
+
+- **Newer and cheaper.** `deepseek/deepseek-v3.2` (0.269 in / 0.400 out) is the current sibling of the
+  pre-registration's `deepseek-chat-v3.1` (0.250 / 0.950) — same chat/mid tier, so a model where the
+  scaffolding factors can plausibly act, but with output priced 2.4× lower. Re-projecting the pilot's
+  token profile (~0.9M in + ~0.25M out per solve) at v3.2 prices: **600 × ≈ US$ 0.34 ≈ US$ 205**, down
+  from the v3.1 projection of ~US$ 278 for the same design. The **US$ 400 hard stop is unchanged**, and
+  the dry-run below will replace this projection with a v3.2-specific per-solve cost before the full run.
+- **The finding stays production-relevant.** It is the same tier as the agent's production default
+  (`deepseek/deepseek-chat`), so "which harness factors earn their cost" transfers.
+
+Rejected alternatives, from the full family measured against the cap: the `deepseek-v4-flash` line
+(US$ 27–171 projected) is the *weak/judge* tier — too weak an executor, it would floor the factor
+effects; `deepseek-v4-pro-0813` / `deepseek-v4-pro` (US$ 574 / 1,344 projected) are stronger but blow
+the US$ 400 stop for the full 600-solve design and would need a scope cut (k = 2, or fewer tasks) or a
+raised budget; `-exp`, `-terminus` and the `r1` reasoning models are unstable variants or a different
+(reasoning) regime, off the target.
+
+**Comparability caveat:** the four-solve cost pilot (§4) used `deepseek-chat-v3.1`. Its oracle scores
+are **not** directly comparable to this run's, and are kept only as the cost/apparatus pilot they were.
+Every §5/§6 number below is measured on `deepseek-v3.2`.
+
+### Amendment 1a — measured v3.2 per-solve cost (dry driver run, before the full run)
+
+Three dry solves on `deepseek-v3.2` with the shipped apparatus (011 bare 5-round ≈ US$ 0.03; 085 bare
+US$ 0.051, oracle 1.0; 087 bare US$ 0.068, oracle 0.66) came back **~8-10× cheaper than the v3.1 pilot**
+of the same tasks (US$ 0.41–0.72) — v3.2 solves these with far fewer tokens, not merely a lower output
+price. Re-projection: **600 × ≈ US$ 0.06 ≈ US$ 40–70** (scaffold arms cost more input), an order of
+magnitude under the US$ 400 hard stop, which is left unchanged as the safety net. Wall ~5–7 min/solve →
+~10 h at 6 concurrent. The driver validated end-to-end (rc=0, receipts summed, outcomes read, spend
+tracked, resumable skip).
+
+## Amendment 2 — drop 078 and 088 (public-tunnel prerequisite), 23 tasks / 552 solves (dated 2026-09-12, after the first launch halted)
+
+The first launch halted itself on the §7 stop rule (4 of the first 25 solves rc!=0 and receiptless =
+16% > 5%) — the rule working as designed. All four were the same environment prerequisite, not a
+capability failure: `078-local-api-cursor-retry-ledger` and `088-api-contract-mock-client-compat` raise
+in their `prepare_runtime` hook (`_start_public_tunnel`) before the agent runs — *"no public mock URL
+configured: install cloudflared or set HARNESSBENCH_PUBLIC_URL_TEMPLATE / HARNESSBENCH_TUNNEL_CMD"* —
+they need a public tunnel to expose a mock API, which this WSL host does not have. A halt for a missing
+prerequisite is §2's "not a fail": it leaves the design rather than scoring 0. (Of the 25, only these
+two carry the tunnel hook; 003/006/081 do too but were never in the coding subset.)
+
+The design drops to **23 tasks × 8 arms × 3 = 552 solves**. The 21 keeper solves from the halted launch
+are kept (resumable skip); the relaunch runs the remainder. The stop rule stays at 5% and will catch
+any other lurking prerequisite the same way.
