@@ -61,6 +61,29 @@ only to *nothing* but to **equally long irrelevant text** in the same slot (arXi
 labels-only and placebo arms). Without it, "the card helped" and "more tokens in that position
 helped" are the same number.
 
+## 7. A split groups by whatever repeats, or it measures the repetition
+
+Our corpora are built by running **the same task many times** — arms, replicas, seeds. A classifier
+given a random split over that structure sees the same task on both sides and can score by
+recognising the task instead of by the thing being predicted, and nothing in the number says so.
+Any bench that fits a model **holds out the repeated unit whole** (task, item, tool root — whatever
+the corpus repeats) and reports the grouped figure as the result. A random-split figure may appear
+beside it, labelled as **the size of the leak**, never as performance.
+
+The instance is measured and it is ours: in `bench/false_success`, one TF-IDF over the agent's own
+completion claim scores **0.9342 random-split and 0.5996 leave-one-task-out** on the same 385 items
+with the same hyper-parameters — because 11 of the 23 tasks have a label that never varies. The
+published band this bench set out to reproduce (0.83–0.95, arXiv 2606.09863) lands inside the
+leaky number and nowhere near the grouped one.
+
+Two corollaries that the same bench paid for:
+
+- **The gap is the diagnostic, not an embarrassment.** Reporting both numbers is what identifies
+  the shortcut; reporting one leaves it invisible either way (Bee §2u).
+- **The leaky arm is also the power check.** The same fitter reaching 0.93 when the task leaks is
+  what proves a grouped 0.60 is the signal's ceiling and not an underfit model — the §2aa idea
+  (one arm must reproduce a known-high number) applied to a classifier.
+
 ## Standing rules this file collects rather than adds
 
 - **Pre-register before the first call**, with the number the paper predicts written down so it can
