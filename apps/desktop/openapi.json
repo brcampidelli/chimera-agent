@@ -864,6 +864,13 @@
             "title": "Denied Tools",
             "type": "array"
           },
+          "egress_allow": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Egress Allow",
+            "type": "array"
+          },
           "governance": {
             "default": "off",
             "title": "Governance",

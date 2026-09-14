@@ -576,7 +576,11 @@ def assemble_registry(
     # task and merging into a single workspace must, because untrusted content one of them read
     # can reach the others through the merge. It is the same distinction the CLI already draws
     # between `solve-batch` (independent, own ledgers) and `crew-isolated` (shared).
-    ledger = TaintLedger(shared=shared, authority=settings.taint_authority)
+    ledger = TaintLedger(
+        shared=shared,
+        authority=settings.taint_authority,
+        egress_allow=settings.egress_allow.split(","),
+    )
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=ws)
     # A UNION, exactly like the denial list twelve lines up, and for the reason that block already

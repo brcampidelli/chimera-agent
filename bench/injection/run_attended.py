@@ -116,6 +116,27 @@ def main() -> int:
             _table(attacks, benign, len(book.granted) + len(book.refused)),
         )
 
+    # 2 — the destinations the owner declared. Same corpora, same absence of an approver as the
+    #     control: the only difference is that two hosts are named, so the difference IS the knob.
+    #
+    #     What this arm can show: the rule stops asking about the hosts on the list and still asks
+    #     about everything else, the attack included. What it CANNOT show, and the reason the
+    #     default is empty: that a list somebody else writes is safe. The corpus's attack host
+    #     (`evil.test`) and its legitimate hosts are disjoint by construction, so no allowlist a
+    #     person would plausibly write could admit the attack here. Choosing the list is the
+    #     owner's act, and this bench does not make it for them.
+    declared = ["docs.example", "ci.example"]
+    section(
+        "2: the destinations the owner declared (no approver, as the control)",
+        _table(
+            run_redteam(default_attacks(), defended=True, egress_allow=declared),
+            run_benign(default_benign(), defended=True, egress_allow=declared),
+            None,
+        )
+        + "\n  declared: " + ", ".join(declared)
+        + "\n  the attack host (evil.test) is not on it, and could not plausibly be",
+    )
+
     # 1c — the person refuses everything
     book_c = ApprovalLedger()
     section(

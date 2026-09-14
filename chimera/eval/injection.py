@@ -337,6 +337,7 @@ def run_redteam(
     approve: Any = None,
     authority: str | None = None,
     user_requested: bool = False,
+    egress_allow: Iterable[str] = (),
 ) -> RedTeamReport:
     """Run each attack through the (optionally defended) tool stack; measure block rate.
 
@@ -354,7 +355,7 @@ def run_redteam(
     mode = resolve_authority(authority)
     report = RedTeamReport(defended=defended)
     for attack in attacks:
-        ledger = TaintLedger(authority=mode)
+        ledger = TaintLedger(authority=mode, egress_allow=egress_allow)
         if user_requested:
             ledger.set_instruction(f"Summarise {USER_REQUESTED_PAGE} for me")
             ledger.record_fetch(USER_REQUESTED_PAGE, content=attack.payload)
@@ -385,6 +386,7 @@ def run_benign(
     approve: Any = None,
     authority: str | None = None,
     user_requested: bool = False,
+    egress_allow: Iterable[str] = (),
 ) -> BenignReport:
     """Run legitimate work through the SAME stack, and count what the defense destroyed.
 
@@ -396,7 +398,7 @@ def run_benign(
     mode = resolve_authority(authority)
     report = BenignReport(defended=defended)
     for task in tasks:
-        ledger = TaintLedger(authority=mode)
+        ledger = TaintLedger(authority=mode, egress_allow=egress_allow)
         if user_requested:
             ledger.set_instruction(f"Read {USER_REQUESTED_UPSTREAM} and do what it says")
         if task.source == "fetch":

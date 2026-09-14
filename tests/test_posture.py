@@ -338,9 +338,12 @@ def test_the_deployments_approval_arms_narrowing_even_when_the_request_waives_it
 def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
     """One place on the wire for the controls that decide how much the agent may do.
 
-    Four now, not three. `governance` joined them because it is the one that decides whether
+    Five now, not three. `governance` joined them because it is the one that decides whether
     anything JUDGES what a run does — and it was the only one of the four with no way to change it
-    but a text editor, on a product whose Security screen reported the log it writes.
+    but a text editor, on a product whose Security screen reported the log it writes. `egress_allow`
+    joined for the same reason: the alternative to naming two hosts you trust was `CHIMERA_APPROVAL=
+    allow`, and a knob reachable only by reading the source makes the blunt answer the discoverable
+    one.
     """
     from chimera.api.config_api import read_config
 
@@ -353,6 +356,7 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
             CHIMERA_TOOL_DENYLIST="run_shell,browser",
             CHIMERA_GOVERNANCE="enforce",
             CHIMERA_APPROVAL_WEBHOOK="https://hooks.example/abc",
+            CHIMERA_EGRESS_ALLOW="api.github.com, docs.example",
         )
     )
     assert cfg["autonomy"] == {
@@ -364,12 +368,19 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         # Whether one is configured, never which. The URL is a credential — whoever holds it can
         # post into that channel — and this dict is served over HTTP to a screen.
         "approval_webhook_set": True,
+        # The values, unlike the webhook: this is not a credential, it is a statement the owner
+        # made about where a query-string GET is not a way out, and a list you cannot read back is
+        # a list you cannot correct. Split and stripped here so the screen renders hosts rather
+        # than whatever spacing the field was typed with.
+        "egress_allow": ["api.github.com", "docs.example"],
     }
     assert "hooks.example" not in repr(cfg), "the webhook URL must not travel to a client"
     stock = read_config(Settings(CHIMERA_HOME=str(tmp_path)))["autonomy"]
     assert stock["reach"] == ""
     # The default install, stated: nothing judges what a run does, and nobody can be asked.
     assert stock["governance"] == "off"
+    # And nothing is exempt from the egress rule until its owner names it.
+    assert stock["egress_allow"] == []
     assert stock["approval_webhook_set"] is False
 
 

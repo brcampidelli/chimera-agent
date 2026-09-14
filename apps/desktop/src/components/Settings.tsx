@@ -364,6 +364,19 @@ function AutonomyCard({
           onSave={(v) => save({ CHIMERA_APPROVAL_WEBHOOK: v })}
         />
       </Row>
+      <Row
+        label={t("settings.row.egressAllow")}
+        hint={t("settings.hint.egressAllow")}
+        env="CHIMERA_EGRESS_ALLOW"
+      >
+        <TextField
+          // The values, not a mask: this is the owner's own statement about where their agent may
+          // fetch from, and a list that cannot be read back is a list that cannot be corrected.
+          value={(c.autonomy.egress_allow ?? []).join(", ")}
+          placeholder="api.github.com, docs.example"
+          onSave={(v) => save({ CHIMERA_EGRESS_ALLOW: v })}
+        />
+      </Row>
       {(c.autonomy.denied_tools ?? []).length > 0 && (
         <Row
           label={t("settings.row.deniedTools")}

@@ -4458,7 +4458,10 @@ def solve(
             # capability ledger, and escalates execution/self-mod on tainted input to review.
             from chimera.governance import TaintLedger, ledger_registry
 
-            ledger = TaintLedger(authority=settings.taint_authority)
+            ledger = TaintLedger(
+                authority=settings.taint_authority,
+                egress_allow=settings.egress_allow.split(","),
+            )
             # The user's own words, so a fetch of a page or a file the task names is recorded as
             # the user's request — the signal `CHIMERA_TAINT_AUTHORITY=authority` reads, and every
             # mode records.
@@ -4842,7 +4845,10 @@ def solve_batch(
         def run(ws: Path) -> AutonomousResult:
             from chimera.tools import default_registry
 
-            ledger = TaintLedger(authority=settings.taint_authority)
+            ledger = TaintLedger(
+                authority=settings.taint_authority,
+                egress_allow=settings.egress_allow.split(","),
+            )
             ledger.set_instruction(one_task, workspace=ws)
             ledgers[name] = ledger
             # An approver, because the comment above promises one: `--taint` "arms each worker's
@@ -4995,7 +5001,11 @@ def crew_isolated(
 
     def make_factory(wname: str, prompt: str) -> Callable[[Path], Any]:
         def factory(ws: Path) -> Any:
-            ledger = TaintLedger(shared=shared_taint, authority=settings.taint_authority)
+            ledger = TaintLedger(
+                shared=shared_taint,
+                authority=settings.taint_authority,
+                egress_allow=settings.egress_allow.split(","),
+            )
             # Both halves are the person's own words: the shared task and this worker's brief.
             ledger.set_instruction(f"{task}\n{prompt}", workspace=ws)
             ledgers[wname] = ledger

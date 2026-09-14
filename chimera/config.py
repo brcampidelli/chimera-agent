@@ -647,6 +647,26 @@ class Settings(BaseSettings):
         default="provenance", validation_alias="CHIMERA_TAINT_AUTHORITY"
     )
 
+    # Destinations for which a query-string GET is NOT treated as a way out, while the run holds
+    # untrusted content. Comma-separated hosts, empty by default — nothing is exempt until someone
+    # says so.
+    #
+    # The rule it narrows is measured and worth keeping: `bench/injection` put `asr_exfil` at 0.500
+    # before it and 0.000 after. Its price is measured too — over-block 0.500 -> 0.625, and five
+    # questions per session of external-read work — and the results file says in as many words that
+    # whether five is acceptable "is a product decision this table informs and does not make". This
+    # is the knob for answering it without answering "no gate at all".
+    #
+    # ⚠️ Two things it is NOT. It is not a claim that the host is harmless: it is a claim that a GET
+    # to it does not hand data to a third party. `api.github.com` qualifies because reading a repo
+    # tree returns data to the caller and leaves nothing an attacker can read back; a host that
+    # renders what you send it, or whose logs the attacker can read, does not — and a host that
+    # accepts POSTs is irrelevant here, because this narrows GETs only and `http_post` is gated
+    # elsewhere. And it is not validated by the bench: the corpus's attack host (`evil.test`) and its
+    # legitimate hosts are disjoint by construction, so no measurement can tell you that YOUR list is
+    # safe. Choosing it is your act, and it is the reason this defaults to empty.
+    egress_allow: str = Field(default="", validation_alias="CHIMERA_EGRESS_ALLOW")
+
     # Let the chat build durable memory when the user explicitly asks ("remember that…"). Opt-in for
     # privacy: chatting should not silently persist unless you asked it to. Off = the prior behaviour
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
