@@ -139,6 +139,16 @@ a different population.
   *not measured*, never 0% (`ReplicatedArm.active`, §2r).
 - **The instrument check runs first**: a corpus that cannot exhibit the effect is discarded before
   the first scored call (§2q; `bench/blind_audit/corpus.py::instrument_check` is the shape).
+- **And the GRADER runs first too** (§2c #4), which this file required and `harness_bench` did not
+  do: `bench/harness_bench/preflight.py` checks that every module a task's grader shells out to
+  actually imports in the grading interpreter. It found one task whose `pytest` check failed on
+  `No module named pytest` in **24 of 24 runs**, costing 0.25 of 0.95 available weight and making
+  the task unpassable — read afterwards as a hard task. A missing tool does not fail loudly; it
+  fails as a low score (`bench/harness_bench/DEAD-TASKS.md`).
+- **`n` agreeing panel members are not `n` confirmations.** Measured on our own three models over
+  50 items: 34 unanimous where 16.5 were expected, ICC(1) +0.527, **1.46 independent votes of 3**
+  (`bench/panel_correlation`). A bound or a fraction over votes that share an input says so, or
+  does not claim the denominator.
 - **Every paired report reproduces a published number on at least one arm** before its difference
   is read (§2aa).
 - **Nulls are published**, in the same file the positive would have gone in.

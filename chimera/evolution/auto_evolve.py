@@ -142,6 +142,34 @@ class AutoSkillEvolver:
                 n, n, ceiling, k, self.min_transfer,
             )
 
+    def _warn_panel_votes_are_correlated(self) -> None:
+        """Say once that "n of n models agreed" is not n independent confirmations.
+
+        Every transfer model is handed the SAME test input, so their verdicts are correlated by the
+        thing they share. Measured on three of our own models over 50 items
+        (`bench/panel_correlation`): ICC(1) **+0.527**, 34 of 50 items unanimous where 16.5 were
+        expected, so three votes carried **1.46** independent ones. A unanimous panel is the most
+        likely outcome under correlation and the least informative one.
+
+        A warning and not a discount. That 0.527 is three specific models on one domain; this gate's
+        panel is different models running a learned skill against `bool(out.strip())`, and applying
+        a number measured elsewhere is the error `bench/design_effect` declined to make. What is
+        fixed here is that the assumption is now said out loud where the decision is taken.
+        """
+        assert self.collective is not None
+        models = getattr(self.collective, "transfer_models", None)
+        if not models or len(models) < 2:
+            return
+        if getattr(self, "_said_votes_correlated", False):
+            return
+        self._said_votes_correlated = True
+        _log.warning(
+            "the %d transfer models all see the same test input, so agreement among them is not %d "
+            "independent confirmations — measured on our own panel, three votes were worth 1.46 "
+            "(bench/panel_correlation). Read a unanimous panel as one strong reading, not three.",
+            len(models), len(models),
+        )
+
     def _duplicata(self, candidato: LearnedSkill) -> str | None:
         """O nome do cartao ja' guardado que diz a mesma coisa, ou None.
 
@@ -345,6 +373,10 @@ class AutoSkillEvolver:
         # of k, and a bound taken on a winner has to pay for that choice (see wilson_lower_best_of).
         candidates = list(self.collective.propose_collective(task, solution))
         k = len(candidates)
+        # Both modes read the transfer count as evidence, so both hear this — `point` states
+        # `3/3 = 1.00` on a denominator that is nearer 1.5, which is the same error without an
+        # interval around it.
+        self._warn_panel_votes_are_correlated()
         if self.accept_mode == "wilson":
             self._warn_if_gate_unsatisfiable(k)
         for candidate in candidates:
