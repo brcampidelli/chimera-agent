@@ -169,6 +169,30 @@ class CodeSessionMetaOut(BaseModel):
     updated_at: float
 
 
+class CodeProjectOut(BaseModel):
+    """One registered project: where it is, and what its owner calls it.
+
+    Distinct from the projects the sidebar derives from conversations. That grouping answers "where
+    has work happened"; this answers "where do I work", which is a question a fresh install has to be
+    able to answer before any work has happened in it.
+    """
+
+    path: str
+    alias: str = ""
+
+
+class CodeProjectIn(BaseModel):
+    """A project as a client registers it.
+
+    ``alias`` absent means *say nothing about the name*, and an empty string CLEARS it. The two read
+    identically in JSON unless the distinction is kept on purpose, and without it re-registering a
+    project you have already named would wipe the name — so the default is ``None``, never ``""``.
+    """
+
+    path: str
+    alias: str | None = None
+
+
 class FsDirOut(BaseModel):
     name: str
     path: str

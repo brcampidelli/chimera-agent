@@ -15,21 +15,17 @@ import {
 import {
   deleteCodeProject,
   deleteCodeSession,
+  forgetCodeProject,
   forkCodeSession,
   getCodeSessionRaw,
   listCodeSessions,
+  registerCodeProject,
   type CodeSessionMeta,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
-import {
-  addProject,
-  projectLabel,
-  readAliases,
-  readProjects,
-  setAlias,
-} from "@/lib/projects";
+import { aliasesOf, loadProjects, projectLabel } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
 /** Past conversations, filed under the project they were about.
@@ -81,10 +77,13 @@ export function SessionSidebar({
   const t = useT();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
-  // Local rather than server state: both are preferences about this interface, and neither has an
-  // endpoint. Held in state so adding or renaming redraws without a reload.
-  const [registered, setRegistered] = useState(readProjects);
-  const [aliases, setAliases] = useState(readAliases);
+  // Server state since the list stopped being a property of this browser profile. `loadProjects`
+  // carries the one-time migration of whatever this webview had stored, so a running install keeps
+  // its projects instead of meeting an empty sidebar after an update.
+  const projects = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
+  const rows = projects.data ?? [];
+  const registered = rows.map((row) => row.path);
+  const aliases = aliasesOf(rows);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -108,11 +107,30 @@ export function SessionSidebar({
       onResume(branch);
     },
   });
+  // Both writes return the whole list, which is why they return it: the sidebar takes the answer
+  // it was given rather than asking again, so adding a project cannot briefly show the list without
+  // it.
+  const register = useMutation({
+    mutationFn: ({ path, alias }: { path: string; alias?: string }) =>
+      registerCodeProject(path, alias),
+    onSuccess: (next) => qc.setQueryData(["code-projects"], next),
+  });
   const remove = useMutation({
-    mutationFn: async (target: NonNullable<typeof confirming>) =>
-      target.kind === "session"
-        ? deleteCodeSession(target.session.id)
-        : deleteCodeProject(target.project),
+    mutationFn: async (target: NonNullable<typeof confirming>) => {
+      if (target.kind === "session") {
+        await deleteCodeSession(target.session.id);
+        return;
+      }
+      // A project with no conversations has nothing to delete BUT the bookmark. Sending it to the
+      // route that removes transcripts deleted nothing and left the row on screen — a Delete that
+      // does nothing, on precisely the rows this list now makes ordinary: the ones you added and
+      // have not worked in yet.
+      if (target.n === 0) {
+        qc.setQueryData(["code-projects"], await forgetCodeProject(target.project));
+        return;
+      }
+      await deleteCodeProject(target.project);
+    },
     // Closed on settle, not on success: a delete that failed leaves the row on screen, and a dialog
     // that stays open over it reads as "still working" for something that already stopped.
     onSettled: () => {
@@ -131,13 +149,13 @@ export function SessionSidebar({
     setAdding(false);
     setDraft("");
     if (!path) return;
-    setRegistered(addProject(path));
+    register.mutate({ path });
     onProject(path); // adding a project is choosing it — the alternative is adding it and waiting
   }
 
   function commitRename() {
     if (renaming === null) return;
-    setAliases(setAlias(renaming, nameDraft));
+    register.mutate({ path: renaming, alias: nameDraft.trim() });
     setRenaming(null);
     setNameDraft("");
   }
@@ -373,7 +391,11 @@ export function SessionSidebar({
         onOpenChange={(next) => !next && setConfirming(null)}
         title={
           confirming?.kind === "project"
-            ? t("code.projects.deleteTitle", { n: confirming.n })
+            ? confirming.n === 0
+              ? t("code.projects.forgetTitle", {
+                  name: projectLabel(confirming.project, aliases),
+                })
+              : t("code.projects.deleteTitle", { n: confirming.n })
             : t("code.sessions.deleteTitle", {
                 name: confirming?.kind === "session"
                   ? confirming.session.title || t("code.sessions.untitled")
@@ -383,7 +405,9 @@ export function SessionSidebar({
       >
         <p className="text-sm text-muted-foreground">
           {confirming?.kind === "project"
-            ? t("code.projects.deleteBody")
+            ? confirming.n === 0
+              ? t("code.projects.forgetBody")
+              : t("code.projects.deleteBody")
             : t("code.sessions.deleteBody")}
         </p>
         <div className="mt-4 flex justify-end gap-2">

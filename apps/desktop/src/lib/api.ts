@@ -1596,6 +1596,41 @@ export const deleteCodeProject = (workspace: string) =>
     method: "DELETE",
   });
 
+/** One registered project: where it is, and what you call it. */
+export interface CodeProject {
+  path: string;
+  /** Your name for it. Empty means "no name", not the name "" — the fallback depends on telling
+   *  those apart. */
+  alias: string;
+}
+
+/** The projects you have added, in the order you added them.
+ *
+ * Server-side since 0.56.0. It lived in `localStorage` before, which made it a preference about one
+ * browser profile: clearing the webview's storage lost it and a reinstall started empty. The sidebar
+ * still unions this with the projects it derives from conversations, so nothing disappears because
+ * it was never registered. */
+export const listCodeProjects = () => json<CodeProject[]>("/api/code/workspaces");
+
+/** Add a project, or name one you already added. Idempotent on the path.
+ *
+ * Leave `alias` undefined to say NOTHING about the name — passing `""` clears it, and the two are
+ * different requests. Sending `""` on every add is how a list of named projects becomes a list of
+ * folder names. */
+export const registerCodeProject = (path: string, alias?: string) =>
+  json<CodeProject[]>("/api/code/workspaces", {
+    method: "POST",
+    body: JSON.stringify(alias === undefined ? { path } : { path, alias }),
+  });
+
+/** Forget a bookmark. **Conversations are not touched** — that is `deleteCodeProject`, one word
+ *  away, and the difference is a month of transcripts. A project you have worked in reappears in
+ *  the sidebar as one you have talked about. */
+export const forgetCodeProject = (path: string) =>
+  json<CodeProject[]>(`/api/code/workspaces?path=${encodeURIComponent(path)}`, {
+    method: "DELETE",
+  });
+
 /** Branch a conversation into a new one, and get the new one's sidebar row back.
  *
  * A conversation is a linear message list that each turn replaces, so trying a different approach

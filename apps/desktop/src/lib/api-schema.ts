@@ -480,6 +480,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Code Workspaces
+         * @description The projects you have added, in the order you added them.
+         *
+         *     The sidebar unions these with the projects it derives from conversations, so a project you
+         *     have worked in stays listed whether or not it was ever registered — nothing disappears
+         *     because it was not on this list.
+         */
+        get: operations["list_code_workspaces_api_code_workspaces_get"];
+        put?: never;
+        /**
+         * Register Code Workspace
+         * @description Add a project, or name one you already added. Idempotent on the path.
+         *
+         *     Registering says nothing about whether the folder exists — a bookmark to a moved checkout
+         *     should stay visible so it can be corrected, rather than vanishing and taking its name with
+         *     it — and nothing about where the agent may write, which the workspace guard decides from the
+         *     request and never from here.
+         */
+        post: operations["register_code_workspace_api_code_workspaces_post"];
+        /**
+         * Forget Code Workspace
+         * @description Forget a bookmark. **Conversations are not touched**, so a project you have worked in
+         *     reappears in the sidebar as one you have talked about rather than one you registered.
+         */
+        delete: operations["forget_code_workspace_api_code_workspaces_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/worth": {
         parameters: {
             query?: never;
@@ -3307,6 +3345,37 @@ export interface components {
             } | null;
             /** You */
             you: string;
+        };
+        /**
+         * CodeProjectIn
+         * @description A project as a client registers it.
+         *
+         *     ``alias`` absent means *say nothing about the name*, and an empty string CLEARS it. The two read
+         *     identically in JSON unless the distinction is kept on purpose, and without it re-registering a
+         *     project you have already named would wipe the name — so the default is ``None``, never ``""``.
+         */
+        CodeProjectIn: {
+            /** Alias */
+            alias?: string | null;
+            /** Path */
+            path: string;
+        };
+        /**
+         * CodeProjectOut
+         * @description One registered project: where it is, and what its owner calls it.
+         *
+         *     Distinct from the projects the sidebar derives from conversations. That grouping answers "where
+         *     has work happened"; this answers "where do I work", which is a question a fresh install has to be
+         *     able to answer before any work has happened in it.
+         */
+        CodeProjectOut: {
+            /**
+             * Alias
+             * @default
+             */
+            alias: string;
+            /** Path */
+            path: string;
         };
         /**
          * CodeSessionMetaOut
@@ -7126,6 +7195,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeTurnFramesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_code_workspaces_api_code_workspaces_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+        };
+    };
+    register_code_workspace_api_code_workspaces_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    forget_code_workspace_api_code_workspaces_delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
                 };
             };
             /** @description Validation Error */
