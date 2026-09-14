@@ -46,8 +46,25 @@ def z_for(alpha: float) -> float:
     return NormalDist().inv_cdf(1.0 - alpha / 2.0)
 
 
-def wilson_lower_best_of(successes: int, n: int, k: int, alpha: float = 0.05) -> float:
+def wilson_lower_best_of(
+    successes: int, n: int, k: int, alpha: float = 0.05, *, effective_n: float | None = None
+) -> float:
     """Wilson lower bound for a candidate that was picked as the **best of k**.
+
+    ``n`` is a count of TRIALS, and it is the amount of *information* in those trials only when they
+    are independent. ``effective_n`` is where a caller says they are not: pass the number of
+    independent observations the trials are worth and the bound widens accordingly, leaving the
+    point estimate (``successes / n``) alone. ``None`` keeps the previous behaviour exactly.
+
+    The parameter exists because the assumption was invisible. `bench/panel_correlation` measured
+    three of our models answering the **same** question and found ICC(1) **+0.527** — 34 of 50 items
+    unanimous where 16.5 were expected — so three panel votes carried **1.46** independent ones. A
+    caller that puts a bound on "3 of 3 models agreed" is not wrong to want a bound; it is wrong to
+    call that three trials without saying so.
+
+    No default discount is applied, deliberately. The 0.527 above is three specific models on one
+    domain, and importing it into a different panel would be the error `bench/design_effect` refused
+    to make. A caller discounts with a number it has measured, or not at all.
 
     Scoring k candidates and keeping the top one is not the same as scoring one: the maximum of k
     noisy estimates is biased upward (the winner's curse), so a plain bound taken on the winner
@@ -62,6 +79,11 @@ def wilson_lower_best_of(successes: int, n: int, k: int, alpha: float = 0.05) ->
 
     ``k <= 1`` returns the ordinary bound.
     """
+    # The successes are rescaled with the denominator so the POINT estimate does not move: only the
+    # interval around it widens, which is the whole claim a design effect makes.
+    if effective_n is not None and 0 < effective_n < n:
+        successes = round(successes * effective_n / n)
+        n = max(1, round(effective_n))
     if k <= 1:
         return wilson_lower(successes, n, z_for(alpha))
     return wilson_lower(successes, n, z_for(alpha / k))
