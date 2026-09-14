@@ -60,6 +60,8 @@ from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
     AttachmentOut,
+    CodeProjectIn,
+    CodeProjectOut,
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionRawOut,
@@ -962,6 +964,7 @@ def register_code_api(
     does not cover, and the cost was that the toggle in Settings did nothing from the app at all
     while the empty Memory screen advertised it as the way to fill memory.
     """
+    from chimera.core.code_projects import CodeProjectRegistry
     from chimera.core.code_session import CodeSession, CodeSessionStore
     from chimera.core.events import tool as tool_event
     from chimera.core.instructions import load as load_identity
@@ -981,6 +984,9 @@ def register_code_api(
     live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
+    # Beside the conversations, not inside them: a project you have added but not yet worked in
+    # has no conversation to hang off, which is the whole reason the list cannot be derived.
+    projects = CodeProjectRegistry(settings.home / "code_projects.json")
     # One lock per session: two concurrent turns on the same conversation would interleave their
     # transcripts and the last save would silently win. Different sessions never wait on each other.
     locks: dict[str, threading.Lock] = {}
@@ -1793,3 +1799,40 @@ def register_code_api(
         than reporting a success with no size.
         """
         return {"deleted": store.delete_project(workspace)}
+
+    # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is
+    # deliberate. `DELETE /api/code/projects` above already means "delete every conversation filed
+    # under this project" — a second DELETE on that path meaning "forget the bookmark" would read
+    # identically at the call site and destroy transcripts when a user tidied their list. Two verbs
+    # that differ only in what they erase do not share a noun.
+    @app.get("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
+    def list_code_workspaces() -> list[dict[str, str]]:
+        """The projects you have added, in the order you added them.
+
+        The sidebar unions these with the projects it derives from conversations, so a project you
+        have worked in stays listed whether or not it was ever registered — nothing disappears
+        because it was not on this list.
+        """
+        return [{"path": row.path, "alias": row.alias} for row in projects.entries()]
+
+    @app.post("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
+    def register_code_workspace(body: CodeProjectIn) -> list[dict[str, str]]:
+        """Add a project, or name one you already added. Idempotent on the path.
+
+        Registering says nothing about whether the folder exists — a bookmark to a moved checkout
+        should stay visible so it can be corrected, rather than vanishing and taking its name with
+        it — and nothing about where the agent may write, which the workspace guard decides from the
+        request and never from here.
+        """
+        try:
+            rows = projects.register(body.path, body.alias)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return [{"path": row.path, "alias": row.alias} for row in rows]
+
+    @app.delete("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
+    def forget_code_workspace(path: str) -> list[dict[str, str]]:
+        """Forget a bookmark. **Conversations are not touched**, so a project you have worked in
+        reappears in the sidebar as one you have talked about rather than one you registered."""
+        return [{"path": row.path, "alias": row.alias} for row in projects.remove(path)]
+

@@ -1,72 +1,51 @@
 /** The projects you work in, and what you call them.
  *
- * The sidebar has always grouped conversations by project — but the only way a project could appear
- * there was to have already talked about it, because the group came from the conversations. So you
- * could not add a project before using it, and the name was the last segment of its path: two repos
- * checked out as `frontend` read as the same project, and a folder called `app` names nothing.
+ * The sidebar groups conversations by project — but the only way a project could appear there was to
+ * have already talked about it, because the group came from the conversations. So a project could
+ * not be added before it was used, and the name was the last segment of its path: two repos checked
+ * out as `frontend` read as the same project, and a folder called `app` names nothing.
  *
- * Two things are stored, and they are deliberately separate:
+ * Both halves — the list and the names — now live on the server, under `CHIMERA_HOME`. Before, they
+ * were in this browser's `localStorage`, which made "these are my projects" a statement about one
+ * webview profile: clearing its storage lost the list, a reinstall started empty, and nothing
+ * outside that one browser could read or seed it.
  *
- * - **the list** is the set of projects you have added, so a project can exist with no conversations
- *   in it. A project you have talked about is implied by its conversations and does not have to be
- *   here — the two are unioned, never replaced, so nothing disappears from the sidebar because it
- *   was not registered.
- * - **the aliases** are what you call each one. Client-side on purpose: there is no rename endpoint
- *   anywhere, and an alias is a preference about the interface rather than a fact about the project,
- *   so it belongs beside the theme and the chosen workspace rather than in the agent's data.
+ * That reverses an argument written here, and it is worth saying which one rather than quietly
+ * deleting it: the aliases were client-side because "an alias is a preference about the interface
+ * rather than a fact about the project". True, and it stops mattering once the list itself has to
+ * outlive the interface — splitting them would leave half the answer portable, and the half left
+ * behind is the half that makes a row recognisable.
+ *
+ * What stays local is the OLD data, kept as the migration source. It is read once, pushed to the
+ * server, and then left alone rather than deleted: an older build reads it, and nothing here is
+ * worth destroying to save two keys.
  *
  * Keyed by the workspace string exactly as it was stored, never a resolved path — same rule the
  * sidebar's grouping follows, and for the same reason: resolving needs a filesystem, would diverge
  * from what the conversations recorded, and would silently merge two projects that reach the same
  * directory through a symlink.
- *
- * Same discipline as `workspace.ts` and `theme.ts`: storage can be unavailable, and a preference is
- * never worth throwing over.
  */
 
+import { listCodeProjects, registerCodeProject, type CodeProject } from "@/lib/api";
+
+/** Where the list used to live. Read for migration; never written again. */
 export const PROJECTS_KEY = "chimera:code:projects";
 export const ALIASES_KEY = "chimera:code:projectNames";
+/** Set once the old keys have been handed to the server, so the migration does not run every load. */
+export const MIGRATED_KEY = "chimera:code:projectsMoved";
 
-/** The registered projects, in the order they were added. Unknown shapes read as empty. */
-export function readProjects(): string[] {
+/** The projects this browser had stored before the list moved. Unknown shapes read as empty. */
+export function legacyProjects(): string[] {
   try {
-    const raw = JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? "[]");
+    const raw: unknown = JSON.parse(localStorage.getItem(PROJECTS_KEY) ?? "[]");
     return Array.isArray(raw) ? raw.filter((p): p is string => typeof p === "string" && !!p) : [];
   } catch {
     return [];
   }
 }
 
-/** Add a project. Idempotent, and a blank path is not a project. */
-export function addProject(path: string): string[] {
-  const value = path.trim();
-  if (!value) return readProjects();
-  const next = readProjects();
-  if (!next.includes(value)) next.push(value);
-  write(PROJECTS_KEY, next);
-  return next;
-}
-
-/** Forget a project, and its alias with it.
- *
- * Removing it from the list does NOT remove its conversations: they still exist on the server and
- * the sidebar still groups them, so the project reappears there — as a project you have talked about
- * rather than one you registered. Deleting conversations is a different act with a different button,
- * and quietly performing it here would make "tidy up my list" destroy work.
- */
-export function removeProject(path: string): string[] {
-  const next = readProjects().filter((p) => p !== path);
-  write(PROJECTS_KEY, next);
-  const names = readAliases();
-  if (path in names) {
-    delete names[path];
-    write(ALIASES_KEY, names);
-  }
-  return next;
-}
-
-/** Every alias, keyed by workspace. */
-export function readAliases(): Record<string, string> {
+/** The names this browser had stored, keyed by workspace. */
+export function legacyAliases(): Record<string, string> {
   try {
     const raw: unknown = JSON.parse(localStorage.getItem(ALIASES_KEY) ?? "{}");
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
@@ -80,19 +59,32 @@ export function readAliases(): Record<string, string> {
   }
 }
 
-/** Name a project, or clear the name by passing an empty one.
+/** The registered projects, moving this browser's old list across first if it has not been.
  *
- * Clearing removes the key rather than storing "", so "no alias" round-trips as absence — the same
- * distinction `writeWorkspace` makes, and for the same reason: an empty string reads identically to
- * a missing one but is a different statement, and the fallback name depends on telling them apart.
+ * Migration failure is deliberately not swallowed into "done": the flag is set only after every
+ * project is across, so a backend that was not up yet is retried on the next load. Re-registering is
+ * idempotent on the path, so a migration that stopped halfway resumes without duplicating anything.
  */
-export function setAlias(path: string, alias: string): Record<string, string> {
-  const names = readAliases();
-  const value = alias.trim();
-  if (value) names[path] = value;
-  else delete names[path];
-  write(ALIASES_KEY, names);
-  return names;
+export async function loadProjects(): Promise<CodeProject[]> {
+  await migrateOnce();
+  return listCodeProjects();
+}
+
+async function migrateOnce(): Promise<void> {
+  if (readFlag()) return;
+  const paths = legacyProjects();
+  const names = legacyAliases();
+  // A fresh install has nothing to move, and the flag is still set: retrying an empty migration on
+  // every load is a request per load that can never do anything.
+  for (const path of paths) await registerCodeProject(path, names[path]);
+  writeFlag();
+}
+
+/** The names, as the sidebar wants them: keyed by workspace, absent when unnamed. */
+export function aliasesOf(rows: CodeProject[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const row of rows) if (row.alias) out[row.path] = row.alias;
+  return out;
 }
 
 /** The last segment of a path, which is the best a machine can do without being told.
@@ -111,10 +103,21 @@ export function projectLabel(path: string, aliases: Record<string, string>): str
   return aliases[path] || basename(path);
 }
 
-function write(key: string, value: unknown): void {
+function readFlag(): boolean {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    return localStorage.getItem(MIGRATED_KEY) === "1";
   } catch {
-    // Same reasoning as the theme and the workspace: the choice will not survive a restart.
+    // Storage unavailable means the old keys are unreadable too, so there is nothing to migrate and
+    // nothing to remember about having done it.
+    return true;
+  }
+}
+
+function writeFlag(): void {
+  try {
+    localStorage.setItem(MIGRATED_KEY, "1");
+  } catch {
+    // The migration will be attempted again next load. It is idempotent, so that costs requests
+    // rather than correctness.
   }
 }

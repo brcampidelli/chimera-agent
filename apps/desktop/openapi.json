@@ -1493,6 +1493,50 @@
         "title": "CodeExchangeOut",
         "type": "object"
       },
+      "CodeProjectIn": {
+        "description": "A project as a client registers it.\n\n``alias`` absent means *say nothing about the name*, and an empty string CLEARS it. The two read\nidentically in JSON unless the distinction is kept on purpose, and without it re-registering a\nproject you have already named would wipe the name \u2014 so the default is ``None``, never ``\"\"``.",
+        "properties": {
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "CodeProjectIn",
+        "type": "object"
+      },
+      "CodeProjectOut": {
+        "description": "One registered project: where it is, and what its owner calls it.\n\nDistinct from the projects the sidebar derives from conversations. That grouping answers \"where\nhas work happened\"; this answers \"where do I work\", which is a question a fresh install has to be\nable to answer before any work has happened in it.",
+        "properties": {
+          "alias": {
+            "default": "",
+            "title": "Alias",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "CodeProjectOut",
+        "type": "object"
+      },
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
@@ -9343,6 +9387,112 @@
           }
         },
         "summary": "Code Turn Frames"
+      }
+    },
+    "/api/code/workspaces": {
+      "delete": {
+        "description": "Forget a bookmark. **Conversations are not touched**, so a project you have worked in\nreappears in the sidebar as one you have talked about rather than one you registered.",
+        "operationId": "forget_code_workspace_api_code_workspaces_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeProjectOut"
+                  },
+                  "title": "Response Forget Code Workspace Api Code Workspaces Delete",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Forget Code Workspace"
+      },
+      "get": {
+        "description": "The projects you have added, in the order you added them.\n\nThe sidebar unions these with the projects it derives from conversations, so a project you\nhave worked in stays listed whether or not it was ever registered \u2014 nothing disappears\nbecause it was not on this list.",
+        "operationId": "list_code_workspaces_api_code_workspaces_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeProjectOut"
+                  },
+                  "title": "Response List Code Workspaces Api Code Workspaces Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Code Workspaces"
+      },
+      "post": {
+        "description": "Add a project, or name one you already added. Idempotent on the path.\n\nRegistering says nothing about whether the folder exists \u2014 a bookmark to a moved checkout\nshould stay visible so it can be corrected, rather than vanishing and taking its name with\nit \u2014 and nothing about where the agent may write, which the workspace guard decides from the\nrequest and never from here.",
+        "operationId": "register_code_workspace_api_code_workspaces_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeProjectIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeProjectOut"
+                  },
+                  "title": "Response Register Code Workspace Api Code Workspaces Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Code Workspace"
       }
     },
     "/api/code/worth": {

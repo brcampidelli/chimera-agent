@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **The projects you work in belong to the installation, not to one browser.** The Code sidebar has always grouped conversations by project, and since the sidebar learned to register a project before it was used, that list — and the name you give each one — lived in the desktop webview's `localStorage`. That made "these are my projects" a statement about one browser profile: clearing its storage lost the list, a reinstall started empty, and nothing outside that one webview could read it, seed it, or answer what the projects were. Both halves now live in a file under `CHIMERA_HOME`, behind `GET`/`POST`/`DELETE /api/code/workspaces`, and the desktop carries whatever it had stored across on the first load after updating — once, idempotently on the path, and **retried rather than recorded as done** if the backend was not up yet. The union the sidebar does is unchanged: a project you have worked in stays listed whether or not it was ever registered, so nothing disappears for not being on the list. Two details are load-bearing. The routes are at `/workspaces` and **not** at `/projects`, because `DELETE /api/code/projects` already means *delete every conversation filed under this project* — two DELETEs one word apart, taking the same kind of argument, where one destroys transcripts and the other removes a bookmark, and the test that matters most in the new file is the one proving they do not touch each other's data. And an absent alias is not an empty one: `{"path": …}` says *nothing about the name* while `{"path": …, "alias": ""}` clears it, which is what stops re-registering a project you have named from wiping the name. The file is indented JSON with the paths unescaped, because seeding it by hand is a supported thing to do.
+  This reverses an argument the code had written down, and the reversal is recorded where the argument was: the aliases were client-side because "an alias is a preference about the interface rather than a fact about the project". That holds until the list itself has to outlive the interface, and then splitting them leaves half the answer portable — the half that makes a row recognisable, since a checkout's folder name is often not its repository's.
+
+### Fixed
+
+- **Delete on a project with no conversations did nothing at all.** It asked the route that removes transcripts to remove none, reported a success with no size, and left the row on screen. That was invisible while a project could only exist by having been worked in — and became ordinary the moment the sidebar could hold projects you have added and not started on. A project with nothing filed under it now forgets the bookmark instead, and the dialog says which of the two is about to happen rather than offering one word for both: *"Nothing is deleted. The folder stays where it is — only the entry in your list goes."*
+
 ## [0.55.0] - 2026-09-13
 
 ### Security
