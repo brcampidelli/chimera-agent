@@ -273,6 +273,7 @@ class TaintLedger:
         snippet_chars: int = 2000,
         shared: SharedTaint | None = None,
         authority: str = "provenance",
+        egress_allow: Iterable[str] = (),
     ) -> None:
         if authority not in AUTHORITY_MODES:
             raise ValueError(
@@ -284,6 +285,13 @@ class TaintLedger:
         # Which tainted events arm the coarse narrowing — see `run_tainted(for_narrowing=True)`.
         # The default is the shipped behaviour; construction sites pass `settings.taint_authority`.
         self.authority = authority
+        # Hosts whose query-string GETs are not treated as a way out. Normalised here rather than at
+        # every call site, and compared against `urlsplit(...).hostname` — never `netloc`, which
+        # carries userinfo: `https://api.github.com@evil.test/x` has a netloc that STARTS with an
+        # allowlisted host and a destination that is not one.
+        self.egress_allow = frozenset(
+            host.strip().lower().rstrip(".") for host in egress_allow if host and host.strip()
+        )
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
         # Optional cross-agent taint view: siblings in a fan-out share one, so a fetch here arms the
@@ -623,7 +631,14 @@ def assess_action(
         # rows added to the corpus for the purpose, not assumed away.
         url = _first(args, _URL_KEYS)
         parts = urlsplit(url) if url else None
-        if parts is not None and parts.query:
+        allowed = False
+        if parts is not None and ledger.egress_allow:
+            # `hostname` and not `netloc`: the latter includes userinfo, so a URL crafted as
+            # `https://api.github.com@evil.test/collect?data=…` would match an allowlisted prefix
+            # while going somewhere else entirely. It is also already lowercased and port-free.
+            host = (parts.hostname or "").rstrip(".")
+            allowed = host in ledger.egress_allow
+        if parts is not None and parts.query and not allowed:
             sources = ledger.taint_sources()
             return SequenceAssessment(
                 True, Decision.REVIEW,

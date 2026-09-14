@@ -249,6 +249,8 @@ const en: Dict = {
     '"Allow" runs shell commands on this machine with nobody asked first, including unattended runs and scheduled jobs. Prefer the Docker sandbox if you have it.',
   "settings.hostExec.confirm": "I understand — allow",
   "settings.row.deniedTools": "Switched off",
+  "settings.row.egressAllow": "Fetching without asking",
+  "settings.hint.egressAllow": "Hosts where a link with a ?query is not treated as a way out, after the run has read something from the web. Comma-separated. Empty asks every time.",
   "settings.hint.deniedTools":
     "turn tools on and off under Connections › Capabilities",
   "common.cancel": "Cancel",
@@ -1576,6 +1578,8 @@ const pt: Dict = {
     '"Permitir" roda comandos de shell nesta máquina sem perguntar a ninguém, inclusive em execuções sem supervisão e agendadas. Prefira o sandbox Docker se você tiver.',
   "settings.hostExec.confirm": "Entendi — permitir",
   "settings.row.deniedTools": "Desligadas",
+  "settings.row.egressAllow": "Buscar sem perguntar",
+  "settings.hint.egressAllow": "Hosts em que um link com ?consulta não é tratado como saída de dados, depois que o agente leu algo da web. Separados por vírgula. Vazio pergunta sempre.",
   "settings.hint.deniedTools":
     "ligue e desligue ferramentas em Conexões › Capacidades",
   "common.cancel": "Cancelar",
@@ -2950,6 +2954,8 @@ const es: Dict = {
     '"Permitir" ejecuta comandos de shell en esta máquina sin preguntar a nadie, incluidas las ejecuciones desatendidas y programadas. Prefiere el sandbox de Docker si lo tienes.',
   "settings.hostExec.confirm": "Entendido — permitir",
   "settings.row.deniedTools": "Desactivadas",
+  "settings.row.egressAllow": "Consultar sin preguntar",
+  "settings.hint.egressAllow": "Hosts donde un enlace con ?consulta no se trata como una salida de datos, después de que la sesión haya leído algo de la web. Separados por comas. Vacío pregunta siempre.",
   "settings.hint.deniedTools":
     "activa y desactiva herramientas en Conexiones › Capacidades",
   "common.cancel": "Cancelar",
@@ -4303,6 +4309,8 @@ const fr: Dict = {
     "« Autoriser » exécute des commandes shell sur cette machine sans rien demander à personne, y compris pour les exécutions sans surveillance et planifiées. Préférez le bac à sable Docker si vous l'avez.",
   "settings.hostExec.confirm": "J'ai compris — autoriser",
   "settings.row.deniedTools": "Désactivés",
+  "settings.row.egressAllow": "Récupérer sans demander",
+  "settings.hint.egressAllow": "Hôtes où un lien avec une ?requête n'est pas traité comme une sortie de données, une fois que la session a lu quelque chose sur le web. Séparés par des virgules. Vide demande à chaque fois.",
   "settings.hint.deniedTools":
     "activez et désactivez les outils dans Connexions › Capacités",
   "common.cancel": "Annuler",
@@ -5666,6 +5674,8 @@ const de: Dict = {
     "„Erlauben“ führt Shell-Befehle auf diesem Rechner aus, ohne jemanden zu fragen — auch bei unbeaufsichtigten und geplanten Läufen. Nimm lieber die Docker-Sandbox, wenn du sie hast.",
   "settings.hostExec.confirm": "Verstanden — erlauben",
   "settings.row.deniedTools": "Abgeschaltet",
+  "settings.row.egressAllow": "Abrufen ohne Nachfrage",
+  "settings.hint.egressAllow": "Hosts, bei denen ein Link mit ?Abfrage nicht als Datenausgang gilt, nachdem der Lauf etwas aus dem Web gelesen hat. Mit Komma getrennt. Leer fragt jedes Mal.",
   "settings.hint.deniedTools":
     "Werkzeuge an- und abschalten unter Verbindungen › Fähigkeiten",
   "common.cancel": "Abbrechen",
@@ -7012,6 +7022,8 @@ const zh: Dict = {
     "“允许”会在本机直接执行 shell 命令，不询问任何人，包括无人值守和定时任务。如果有 Docker 沙箱，优先用它。",
   "settings.hostExec.confirm": "我明白 —— 允许",
   "settings.row.deniedTools": "已关闭",
+  "settings.row.egressAllow": "获取时不再询问",
+  "settings.hint.egressAllow": "在本次运行读取过网络内容之后，带 ?查询 的链接指向这些主机时不视为数据外泄通道。用逗号分隔。留空则每次都询问。",
   "settings.hint.deniedTools": "在“连接 › 能力”里开关工具",
   "common.cancel": "取消",
   "settings.row.agentName": "名称",
@@ -8311,6 +8323,8 @@ const ja: Dict = {
     "「許可する」は、誰にも確認せずにこのマシンでシェルコマンドを実行します。無人実行やスケジュール実行も同じです。Docker サンドボックスがあるならそちらを使ってください。",
   "settings.hostExec.confirm": "理解しました — 許可する",
   "settings.row.deniedTools": "オフにしたもの",
+  "settings.row.egressAllow": "確認なしで取得するホスト",
+  "settings.hint.egressAllow": "この実行が Web から何かを読み込んだ後でも、?クエリ付きのリンクをデータの出口とみなさないホスト。カンマ区切り。空欄なら毎回確認します。",
   "settings.hint.deniedTools": "ツールの入切は「接続 › 機能」で",
   "common.cancel": "キャンセル",
   "settings.row.agentName": "名前",
@@ -9621,6 +9635,8 @@ const it: Dict = {
     '"Permettere" esegue comandi shell su questa macchina senza chiedere a nessuno, comprese le esecuzioni non presidiate e pianificate. Se ce l\'hai, preferisci la sandbox Docker.',
   "settings.hostExec.confirm": "Ho capito — permetti",
   "settings.row.deniedTools": "Disattivati",
+  "settings.row.egressAllow": "Recuperare senza chiedere",
+  "settings.hint.egressAllow": "Host per cui un link con ?query non viene trattato come una via d'uscita dei dati, dopo che la sessione ha letto qualcosa dal web. Separati da virgole. Vuoto chiede ogni volta.",
   "settings.hint.deniedTools":
     "attiva e disattiva gli strumenti in Connessioni › Capacità",
   "common.cancel": "Annulla",
@@ -10976,6 +10992,8 @@ const pl: Dict = {
     "„Zezwalaj” uruchamia polecenia powłoki na tej maszynie, nikogo nie pytając — także przy przebiegach bez nadzoru i zaplanowanych. Jeśli masz sandbox Dockera, wybierz raczej jego.",
   "settings.hostExec.confirm": "Rozumiem — zezwalaj",
   "settings.row.deniedTools": "Wyłączone",
+  "settings.row.egressAllow": "Pobieranie bez pytania",
+  "settings.hint.egressAllow": "Hosty, dla których link z ?zapytaniem nie jest traktowany jako droga wyjścia danych, gdy sesja przeczytała już coś z sieci. Rozdzielone przecinkami. Puste pyta za każdym razem.",
   "settings.hint.deniedTools":
     "narzędzia włączasz i wyłączasz w Połączenia › Możliwości",
   "common.cancel": "Anuluj",
@@ -12326,6 +12344,8 @@ const ru: Dict = {
     "«Разрешить» выполняет команды оболочки на этой машине, никого не спрашивая, в том числе при запусках без присмотра и в заданиях по расписанию. Если есть песочница Docker, предпочтите её.",
   "settings.hostExec.confirm": "Я понимаю — разрешить",
   "settings.row.deniedTools": "Отключены",
+  "settings.row.egressAllow": "Загрузка без вопросов",
+  "settings.hint.egressAllow": "Хосты, для которых ссылка с ?запросом не считается каналом утечки после того, как сессия что-то прочитала из сети. Через запятую. Пустое поле спрашивает каждый раз.",
   "settings.hint.deniedTools":
     "включайте и выключайте инструменты в разделе «Подключения › Возможности»",
   "common.cancel": "Отмена",

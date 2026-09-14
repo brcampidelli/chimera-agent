@@ -2987,6 +2987,8 @@ export interface components {
             approval_webhook_set: boolean;
             /** Denied Tools */
             denied_tools?: string[];
+            /** Egress Allow */
+            egress_allow?: string[];
             /**
              * Governance
              * @default off

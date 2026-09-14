@@ -112,6 +112,11 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_FUSION_PANEL",
     "CHIMERA_FUSION_JUDGE",
     "CHIMERA_FUSION_SYNTHESIZER",
+    # Where a query-string GET is not a way out, while the run holds untrusted content. Editable for
+    # the reason the others are: the alternative to naming two hosts you trust is `CHIMERA_APPROVAL=
+    # allow`, which says yes to everything escalated — a setting only reachable by reading the source
+    # would make the blunt answer the only discoverable one.
+    "CHIMERA_EGRESS_ALLOW",
 }
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
 
@@ -349,6 +354,12 @@ def read_config(settings: Settings) -> dict[str, Any]:
             # Reported as a fact about configuration, never as the value: the URL is a credential,
             # and whoever holds it can post into that channel. Same shape as `server.token_set`.
             "approval_webhook_set": bool(settings.approval_webhook.strip()),
+            # The destinations the owner declared as not-a-way-out. A plain list, not a secret:
+            # it is a statement the owner made and has to be able to read back, and a row that
+            # cannot show what it holds is a row nobody can correct.
+            "egress_allow": [
+                host.strip() for host in settings.egress_allow.split(",") if host.strip()
+            ],
         },
         # ON by default since 2026-09-10 — see Settings.guard_chat. Exposed here because the posture
         # line points at this switch by name when it reports a conversation as unguarded, which is

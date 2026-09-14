@@ -400,6 +400,13 @@ class AutonomyCfgOut(BaseModel):
     what a run may reach; this decides whether the trust kernel is in the path at all. It ships
     ``off``, so on a stock install the only thing between the model and a `git push --force`
     inside the workspace is the folder jail."""
+
+    egress_allow: list[str] = Field(default_factory=list)
+    """Hosts where a query-string GET is not treated as a way out while the run holds untrusted
+    content. Empty by default: nothing is exempt until the owner names it.
+
+    Reported as the values, unlike the webhook above, because this is not a credential — it is a
+    statement the owner made, and a list you cannot read back is one you cannot correct."""
     approval_webhook_set: bool = False
     """Whether this deployment has said where an approval question goes.
 

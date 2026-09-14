@@ -322,7 +322,10 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     #
     # A caller that does NOT tell it keeps the old behaviour exactly, which is what makes this safe
     # for the messaging gateway and `/v1/chat/completions` sharing this registry.
-    ledger = TaintLedger(authority=get_settings().taint_authority)
+    ledger = TaintLedger(
+        authority=get_settings().taint_authority,
+        egress_allow=get_settings().egress_allow.split(","),
+    )
     # The audit log, which this was the ONE `ledger_registry` caller not passing. Both siblings do
     # — `code_api` and `governed_profile` — and every write inside `LedgeredTool` is guarded by
     # `if self.audit is not None`, so omitting it meant this guard recorded nothing at all.
