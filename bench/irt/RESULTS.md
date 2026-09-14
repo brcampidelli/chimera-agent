@@ -1,4 +1,23 @@
-# Eleven of twenty-three tasks could not tell any arm from any other — and the IRT fit that was supposed to rank the rest does not survive its own control
+# Eleven of twenty-three tasks are constant AT A THRESHOLD I CHOSE — and the IRT fit that was supposed to rank the rest does not survive its own control
+
+> ## ⚠️ RETRACTION, 2026-09-13, the same day
+>
+> **The first version of this file claimed the eleven constant items "reframe #453's null" because
+> "the instrument had twelve live items". That is false, and the error was mine.**
+>
+> `bench/harness_bench/read_results.py` computes its main effects on the **continuous**
+> `outcome_score`, per task, over **all 23 tasks** — `n_tasks=23` prints on every line of its
+> output. The 0.8 threshold appears there only in the secondary flip-rate. The eleven tasks each
+> contributed a real, varying per-task delta to #453's numbers.
+>
+> What had twelve live items is **this bench**, because **I** binarised at 0.8 to feed a 2PL. I
+> presented a property of my own instrument as a property of the factorial. Checked afterwards:
+> **nine of the eleven vary continuously** — 042 spans 0.150–0.740, 047 has 15 distinct values,
+> 045 has 13 — and only 016 and 083 are genuinely flat at 1.000.
+>
+> Everything below about the **fit** stands: it still fails its own shuffle control, and the 7-of-8
+> re-ranking still means nothing. What is withdrawn is every sentence that read the binarised count
+> as a statement about #453.
 
 **2026-09-13.** Study 18 shortlist item #12. **US$0** — a 2PL fitted over the Harness-Bench
 factorial (#453) we already paid for: 24 respondents (8 arms × 3 replicas), 23 items (tasks), one
@@ -6,9 +25,14 @@ binary cell each at the same 0.8 oracle threshold every bench here uses.
 
 ## The verdict in one line
 
-**The count survives and the fit does not.** Eleven of the factorial's twenty-three tasks carry zero
-information about any arm — that is a direct reading of the data. Everything the 2PL adds on top of
-it reproduces at the same magnitude on **shuffled** answers, so none of it can be read.
+**Neither the count nor the fit says what the first version claimed.** Eleven of twenty-three tasks
+are constant **once binarised at 0.8**, which is a fact about that cut and not about the factorial —
+nine of the eleven vary on the continuous score #453 actually used. And everything the 2PL adds on
+top reproduces at the same magnitude on **shuffled** answers, so none of it can be read either.
+
+What survives is a methods result: **a 2PL over 24 respondents manufactures discrimination from
+noise**, and **binarising a continuous DV to fit one costs most of the information before the fit
+begins**.
 
 ## 1. What the data says without a model
 
@@ -22,13 +46,24 @@ everyone passed:  016, 045, 051, 064, 083, 084
 everyone failed:  042, 047, 086, 087, 092
 ```
 
-Nearly half the factorial's tasks could not have distinguished the best arm from the worst. This is
-not an estimate — it is a count, and it needs no estimator to be trusted.
+Nearly half the tasks are constant **in this binarised view**. That is a count and needs no
+estimator — but it is a count about the view, and the view is mine.
 
-It also reframes #453's null. That bench concluded that repo-map, checklist and planner all sit
-inside the noise floor. It could equally be said that **the instrument had twelve live items**, and
-the other eleven contributed a fixed number to every arm's total. An aggregate over 23 tasks reads
-as a 23-item measurement; here it was a 12-item measurement with 11 constants added to both sides.
+**It does not reframe #453's null, and the first version of this file said it did.** That bench's
+main effects are computed on the continuous `outcome_score`, per task, across all 23 — its own
+output prints `n_tasks=23` on every effect line. Measured afterwards, **nine of these eleven vary
+continuously**:
+
+| task | binarised | continuous range | distinct values |
+|---|---|---|---:|
+| 042 | constant | 0.150 – 0.740 | 3 |
+| 047 | constant | 0.615 – 0.737 | **15** |
+| 045 | constant | 0.817 – 0.991 | **13** |
+| 086 | constant | 0.138 – 0.700 | 10 |
+| 087 | constant | 0.287 – 0.675 | 6 |
+| 016, 083 | constant | 1.000 – 1.000 | 1 — genuinely flat |
+
+So the instrument that had twelve live items is **this one**. The factorial's had twenty-one.
 
 ## 2. The fit, and the control that kills it
 
@@ -78,9 +113,10 @@ difficulty separates informative holdout items from noise" — and at our scale 
 estimator offers is indistinguishable from one it would offer on random data. Dropping `011` because
 its discrimination came out at −2.41 would be dropping a task on the strength of a coin.
 
-**Do prune by variance, because that needs no estimator.** The eleven constant items are dead by
-inspection: they cost a third of the factorial's US$29 and moved no comparison. A future run replaces
-them rather than fitting them.
+**Prune by variance — on the DV the analysis will actually use.** Two items are genuinely flat
+(016 and 083, 1.000 everywhere) and a future run replaces those. The other nine are dead only to a
+threshold, and the first version of this file said all eleven "moved no comparison", which was
+wrong: they moved #453's comparison, because #453 never binarised them.
 
 That sharpens `bench/design_effect`'s conclusion rather than replacing it. That bench said the money
 goes into more tasks, not more replicas. This one adds: **more tasks that vary.** Twenty-three tasks
@@ -99,8 +135,11 @@ carry the fit; this one cannot.
 - **One null.** The shuffle preserves each item's marginal and randomises each respondent's. A
   stricter permutation preserving both marginals would be a harder null; this one is already enough
   to show the estimator manufactures discrimination, which is all that was needed to stop reading it.
-- One benchmark, one model, one threshold. Binarising a continuous oracle score at 0.8 throws
-  information away before the fit sees it, and a different cut would give different constants.
+- One benchmark, one model, one threshold — and **the threshold turned out to be the story**.
+  Binarising a continuous oracle score at 0.8 throws information away before the fit sees it, a
+  different cut gives different constants, and a claim about the binarised view is not a claim about
+  the experiment that did not binarise. This file said otherwise for a few hours; see the retraction
+  at the top.
 
 ## 6. Reproducing
 

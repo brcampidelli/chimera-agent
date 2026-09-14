@@ -1,20 +1,27 @@
 # The eleven tasks that told us nothing, and the one that could not have
 
-**2026-09-13.** `bench/irt` found that **11 of the factorial's 23 tasks were answered identically by
-all 24 respondents**. This is what each of them actually was. **US$0** — reading results we already
-have.
+**2026-09-13.** `bench/irt` found that 11 of the factorial's 23 tasks were answered identically by
+all 24 respondents **once binarised at 0.8**. This is what each of them actually was. **US$0** —
+reading results we already have.
+
+> ⚠️ **Corrected the same day.** The threshold is `bench/irt`'s, not the factorial's:
+> `read_results.py` computes its main effects on the **continuous** score over all 23 tasks
+> (`n_tasks=23`). **Nine of these eleven vary continuously** and did contribute to #453's numbers.
+> Only 016 and 083 are genuinely flat. See the retraction at the top of `bench/irt/RESULTS.md`.
+> What is unaffected is §087 below, which is about the grader rather than the cut.
 
 ## The eleven are three different things
 
 | | tasks | what it is |
 |---|---|---|
 | never failed | 016, 045, 051, 064, 083, 084 | too easy for `deepseek-v3.2` at a 0.8 threshold |
-| never passed, genuine partial credit | 042 (0.40), 047 (0.73), 086 (0.64), 092 (0.34) | real difficulty, flattened by the binary cut |
+| never passed, genuine partial credit | 042 (0.40), 047 (0.73), 086 (0.64), 092 (0.34) | real difficulty, flattened by `bench/irt`'s cut — not by #453's analysis |
 | **never passed, and could not have** | **087** | **our grading environment lacked `pytest`** |
 
-Calling all eleven "hard" was never right. Four of the five never-passed tasks scored 0.34–0.73 —
-they are partial successes the 0.8 threshold renders as zeros, which is a property of the cut, not
-of the tasks. And the fifth is not about difficulty at all.
+Calling all eleven "hard" was never right, and calling them uninformative was wrong too. Four of the
+five never-passed tasks scored 0.34–0.73 — partial successes the 0.8 threshold renders as zeros,
+which is a property of the cut and not of the tasks, and #453 never applied that cut to its effects.
+The fifth is not about difficulty at all.
 
 ## 087 was unpassable in our environment
 
@@ -94,5 +101,5 @@ and then did not execute before spending US$29.
 2. **Replace the six never-failed tasks**, which cost money and moved nothing.
 3. **Do not treat the four genuine partials as dead.** At a threshold of 0.8 they are constants; the
    information in 0.34 against 0.73 is real and the binary cut throws it away. `bench/irt` could not
-   use them *because of the cut*, not because they are uninformative.
+   use them *because of the cut it chose* — the factorial itself used them fine.
 4. **Re-run 087 with pytest installed** before deciding anything about it.

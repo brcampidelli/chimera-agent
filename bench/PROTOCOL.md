@@ -129,6 +129,28 @@ the code (`RESULTS.md` §2). Check which unit the `n` counts before discounting 
 genuinely un-clustered and is named there rather than silently corrected with a number measured on
 a different population.
 
+## 9. A claim about the binarised view is not a claim about the experiment
+
+§7 says a split groups by whatever repeats. This is its sibling and it cost a retraction the same
+day §7 was written.
+
+**Thresholding a continuous outcome is choosing an instrument.** Whatever is then found — which
+items are constant, which discriminate, how much power there is — is a property of *that* instrument.
+It transfers to the original experiment only if the original used the same cut, and that has to be
+checked in the analysis code rather than assumed from the corpus.
+
+The instance is ours and it is embarrassing in the useful way. `bench/irt` binarised the factorial's
+oracle score at 0.8 to fit a 2PL, found eleven of twenty-three tasks constant, and published that it
+"reframes #453's null — the instrument had twelve live items". **`read_results.py` computes its main
+effects on the CONTINUOUS score over all 23 tasks and prints `n_tasks=23` on every line.** Nine of
+the eleven vary continuously; 042 spans 0.150–0.740 and 047 has fifteen distinct values. The twelve-
+item instrument was the new bench's, not the factorial's.
+
+Nothing in the fit changed — it still fails its shuffle control. What changed is every sentence that
+read the binarised count as a statement about the experiment that did not binarise. So: **before
+citing a derived view against an earlier result, open the earlier result's analysis and check which
+DV it used.** One command would have done it.
+
 ## Standing rules this file collects rather than adds
 
 - **Pre-register before the first call**, with the number the paper predicts written down so it can
