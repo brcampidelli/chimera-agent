@@ -43,6 +43,38 @@ with score **1.0**. The agent did the work; the grader could not check it.
 **A missing module did not fail loudly. It failed as a low score, which reads as a hard task**, and
 sat in the factorial as one of the eleven that "could not distinguish any arm".
 
+### Answered: re-graded with pytest installed, US$0
+
+`regrade_087.py`. The run's sandboxes survive on disk, so the agent's work was not paid for twice —
+the very directories the original left behind were re-graded by the same grader in a fixed
+environment. The agent's work is unchanged and only the grader's environment differs.
+
+| | mean | max | passing (≥0.8) |
+|---|---:|---:|---:|
+| as recorded | 0.6050 | 0.6750 | **0 of 24** |
+| re-graded | 0.8030 | 0.9250 | **19 of 24** |
+
+**The agent solved it in 19 of 24 runs and the factorial recorded 0.** The five that still fail
+pytest fail it for real — so the task *discriminates*, which makes it one of the more informative
+items in the suite rather than a dead one. It was never a hard task. It was an unpassable one.
+
+### And what it does to #453's published effects: almost nothing
+
+`effects_with_087_corrected.py` re-runs `read_results.py`'s own analysis with the 24 corrected cells
+overlaid. Nothing is written back into the harness's result files — the record of what the run
+produced stays as it was, and this is the corrected reading of it.
+
+| effect | published | with 087 corrected |
+|---|---|---|
+| A repo-map | −0.012 [−0.036, +0.010] | −0.013 [−0.037, +0.009] |
+| B checklist | +0.005 [−0.052, +0.052] | +0.006 [−0.051, +0.053] |
+| C planner | +0.003 [−0.023, +0.029] | +0.002 [−0.023, +0.028] |
+
+Every interval still spans zero and no point estimate moves by more than 0.001. **Both halves are
+true and neither cancels the other**: the defect was serious for reading *that task*, and it was
+roughly balanced across arms, so the paired comparison barely felt it. #453's null stands, now on
+a corrected 087.
+
 ## A worry raised and retired
 
 The same results showed `'rubric': {'skipped': True, 'reason': 'no proxy trace: missing responses/'}`
@@ -102,4 +134,5 @@ and then did not execute before spending US$29.
 3. **Do not treat the four genuine partials as dead.** At a threshold of 0.8 they are constants; the
    information in 0.34 against 0.73 is real and the binary cut throws it away. `bench/irt` could not
    use them *because of the cut it chose* — the factorial itself used them fine.
-4. **Re-run 087 with pytest installed** before deciding anything about it.
+4. ~~**Re-run 087 with pytest installed** before deciding anything about it.~~ **Done** — see
+   above. 19 of 24, and #453's effects move by ≤0.001.
