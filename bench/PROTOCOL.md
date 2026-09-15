@@ -100,6 +100,21 @@ sit inside the band where the judges disagree with each other is a reading of th
 2026-09-15 **no bench in `bench/` stores per-judge votes over two arms**, so this is a rule for the
 next one: keep the votes, print disagreement against separation, refuse the close band.
 
+**An LLM grader reads one item per call** (2026-09-15, study 19 item A4, arXiv 2609.09696). An
+auditor's recall went **50% on one document → 60% on a small batch → 2.8% on a large one**, and it
+failed by *confident fabrication* — verdicts for items it had not read — not by degradation. The
+census before any re-grade: every model-scoring call site in `bench/` (the blind audit, the
+governance judge, the review judge, the recognition probe, the three `judge_blind` runners, the
+fusion panel) and in `chimera/` (`envelope_verify`, `strong_verify`, `rubric`, `supervisor`,
+`checklist`, `spec_test`, `verifier_select`, `draft`, `continuous`) sends **one item per call**;
+batched grading never entered the apparatus, so there is no stored round to re-grade at batch 1
+and the paper's regime cannot have produced any number we hold. The two places a model reads
+several items in one prompt — the fusion judge over N candidates and the hierarchy's synthesis
+over N envelopes — are comparisons by design, and the shape the paper describes would surface there
+as propagation or omission, which `judge_blind_prose` measured at 0/180 with N = 2 and N = 3. The
+rule this leaves: a grader that batches is a registered deviation, and it re-grades a sample at
+batch 1 from the stored item before its number is read.
+
 ## 6. Anything added to a prompt has a placebo arm
 
 An intervention that adds text — a skill card, a lesson, a checklist, a warning — is compared not
