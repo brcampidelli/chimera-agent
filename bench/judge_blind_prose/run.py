@@ -66,6 +66,9 @@ class Run:
     # names that as the record defect): a tie the judge wrote and the synthesiser then broke was
     # invisible. Default "" so the stored rows still load.
     judge_analysis: str = ""
+    # The routes that served the judge and the synthesiser (study 19, A5). "" on the 2026-09-12 rows.
+    judge_route: str = ""
+    synth_route: str = ""
 
 
 def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> Run:
@@ -105,6 +108,7 @@ def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> R
         verdict=grade(final, item), judge_mentions_vendor=bool(jb._VENDOR.search(analysis)),
         final=final, usd=(None if unpriced else usd), seconds=round(time.monotonic() - t0, 1),
         judge_analysis=analysis,
+        judge_route=str(getattr(judge, "provider", "") or ""), synth_route=str(getattr(synth, "provider", "") or ""),
     )
 
 
@@ -156,6 +160,7 @@ def one_duo(item: Item, arm: str, slug_rot: int, order: str, shuffle_seed: int) 
         verdict=grade(final, item), judge_mentions_vendor=bool(jb._VENDOR.search(analysis)),
         final=final, usd=(None if unpriced else usd), seconds=round(time.monotonic() - t0, 1),
         composition="duo", judge_analysis=analysis,
+        judge_route=str(getattr(judge, "provider", "") or ""), synth_route=str(getattr(synth, "provider", "") or ""),
     )
 
 

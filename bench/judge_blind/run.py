@@ -173,6 +173,11 @@ class Run:
     prompt_tokens: int
     completion_tokens: int
     seconds: float
+    # The routes that served the judge and the synthesiser (study 19, A5: a score belongs to the
+    # route, not the model id — arXiv 2609.08765 / 2609.10494). "" on the 2026-09-11 rows, which
+    # were written before the gateway exposed it; default "" so they still load.
+    judge_route: str = ""
+    synth_route: str = ""
 
 
 def _engine(blind: bool) -> FusionEngine:
@@ -224,6 +229,7 @@ def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> R
         extracted=extracted, passed=(extracted == item.reference), judge_mentions_vendor=bool(_VENDOR.search(analysis)),
         judge_analysis=analysis, usd=(None if unpriced else usd), prompt_tokens=ptok, completion_tokens=ctok,
         seconds=round(time.monotonic() - t0, 1),
+        judge_route=str(getattr(judge, "provider", "") or ""), synth_route=str(getattr(synth, "provider", "") or ""),
     )
 
 
