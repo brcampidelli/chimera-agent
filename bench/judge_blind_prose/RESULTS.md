@@ -78,3 +78,39 @@ instrument. **The series closes here.**
 - **Authored candidates, attached names; one judge, one synthesiser, one day.** No cross-model or
   next-day floor (PROTOCOL §5); the replication is the 9 runs per item across rotation and order,
   ×2 compositions.
+
+## The resolution number beside the bias number — study 19, item A3 (2026-09-15)
+
+Registered in [`PREREGISTRATION-resolution.md`](PREREGISTRATION-resolution.md) before any figure was
+computed; **US$ 0**, read from the 180 stored finals by `report()`. The question `2609.12439` puts to
+the verdict above: 0% propagation is also what a judge that **stops choosing** produces — under
+debiasing that paper's tie rate went from under 1% to 31% while its bias metric improved — and the
+verdict carried no resolution number to say which of the two this is.
+
+| composition | arm | runs | resolved (source only) | hedged (both) | flaw only | abstained (neither) | resolution | Wilson 95% | lexical hedge (R5) |
+|---|---|---:|---:|---:|---:|---:|---:|---|---:|
+| trio | `named` | 60 | 60 | 0 | 0 | 0 | **1.00** | [0.94, 1.00] | 1/60 |
+| trio | `blind` | 30 | 30 | 0 | 0 | 0 | **1.00** | [0.89, 1.00] | 0/30 |
+| duo | `named` | 60 | 60 | 0 | 0 | 0 | **1.00** | [0.94, 1.00] | 0/60 |
+| duo | `blind` | 30 | 30 | 0 | 0 | 0 | **1.00** | [0.89, 1.00] | 0/30 |
+
+**Decision, first row of the registered table: the 0/180 is a *resolved* null.** In every run the
+final carried the source's token and not the flawed one — no hedge, no drop — and blinding cost
+nothing: on the duo pairs, where there is no majority to lean on and a judge that will not choose
+has nowhere to hide, resolution is 30/30 blind against 60/60 named. The verdict above does not
+change; it gains the number it lacked, and the number makes it stronger rather than weaker.
+
+The one R5 match is a false positive of the registered substring list, reported rather than edited
+away: `tier_price`/named/rot0's final commits to "$49 per month" and ends "*neither* is included",
+and `neither` contains `either`. Read, it is a choice.
+
+**What was not on disk, and now is.** The judge's own critique was never stored by this bench
+(`judge_blind`'s runs keep `judge_analysis`; `Run` here had no such field), so a tie the judge wrote
+and the synthesiser then broke was invisible — the reading above is of the pipeline's output, which
+is what a user receives, and not of the judge alone. `Run.judge_analysis` is stored from now on.
+Both predictions held (P1: R1 = 180/180; P2: R5 ≤ 5% everywhere, 1.7% at most, no named–blind gap).
+
+**The other half of the plan's item (#4) is not readable from anything we kept.** "Judge
+disagreement as a function of arm separation" needs per-judge votes over two arms, and no bench in
+`bench/` stores them (`panel_correlation` keeps per-member correctness over items, not arms). It is
+now a rule for the next judge-scored comparison — PROTOCOL §5 — not a reading of this one.

@@ -89,6 +89,38 @@ def grade(final: str, item: Item) -> str:
     return "omitted"
 
 
+#: Fixed before any final was read (PREREGISTRATION-resolution.md, R5): phrases a synthesiser uses
+#: when it declines to choose. A hedge written around the tokens is still a hedge, and the token
+#: partition below cannot see it. Case-insensitive substring match; a false positive is reported by
+#: quoting the final, never by editing this list after the fact.
+HEDGE_PHRASES: tuple[str, ...] = (
+    "either", "conflicting", "disagree", "unclear", "cannot determine", "not certain", "uncertain",
+    "some sources", "one source", "according to one", "the candidates", "the answers differ",
+    "discrepancy", "inconsisten",
+)
+
+
+def resolution(final: str, item: Item) -> str:
+    """The same partition as `grade`, read as resolution rather than as bias (arXiv 2609.12439: a
+    0% bias number is what a judge that stops choosing also produces). `resolved` = the source's
+    token only; `hedged` = both tokens; `flaw` = the wrong token only; `abstained` = neither."""
+    has_wrong = _token_present(item.wrong, final)
+    has_right = _token_present(item.right, final) or any(_token_present(a, final) for a in item.right_aliases)
+    if has_right and has_wrong:
+        return "hedged"
+    if has_wrong:
+        return "flaw"
+    if has_right:
+        return "resolved"
+    return "abstained"
+
+
+def hedges(final: str) -> list[str]:
+    """Which of `HEDGE_PHRASES` the final contains (R5). Empty when the final commits."""
+    low = final.lower()
+    return [p for p in HEDGE_PHRASES if p in low]
+
+
 def corpus() -> list[Item]:
     items = [
         Item(

@@ -73,6 +73,20 @@ redirection `0>&1` into a literal, and reversing what looked like a flag bundle 
 a *different* command and reports the disagreement as a floor, inflating it, in the direction that
 agrees with the paper. Print every (original, rewritten) pair before spending.
 
+**A bias number is read beside a resolution number** (2026-09-15, `bench/judge_blind_prose`
+item A3). 0% bias is also what a judge that stops choosing scores — arXiv 2609.12439 measured tie
+rates going from under 1% to 31% under debiasing while the bias metric improved — so a judge bench
+that reports "unbiased" reports, in the same table, how often the judge *committed*: chose one
+candidate, hedged between two, or dropped the question. On the prose corpus that number was 180/180
+and the 0/180 became a *resolved* null; without it the verdict could not have said so.
+
+**A judge-scored comparison stores per-judge votes and reports disagreement in the band its arms
+fall in** (arXiv 2609.12191). Judge disagreement is largest where two arms are close, which is
+exactly where our effects live (ICC(1) 0.527 on the panel, 0.706 across arms). A reading whose arms
+sit inside the band where the judges disagree with each other is a reading of the judges. As of
+2026-09-15 **no bench in `bench/` stores per-judge votes over two arms**, so this is a rule for the
+next one: keep the votes, print disagreement against separation, refuse the close band.
+
 ## 6. Anything added to a prompt has a placebo arm
 
 An intervention that adds text — a skill card, a lesson, a checklist, a warning — is compared not

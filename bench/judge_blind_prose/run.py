@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
-from bench.judge_blind_prose.corpus import Item, corpus, grade  # noqa: E402
+from bench.judge_blind_prose.corpus import Item, corpus, grade, hedges, resolution  # noqa: E402
 from chimera.eval.anytime import wilson_bounds  # noqa: E402
 from chimera.eval.paired import compare_paired  # noqa: E402
 from chimera.fusion.engine import PanelResponse  # noqa: E402
@@ -62,6 +62,10 @@ class Run:
     usd: float | None
     seconds: float
     composition: str = "trio"  # trio = 2 faithful + 1 flawed; duo = 1 faithful + 1 flawed (no majority)
+    # The judge's own critique. Not stored by the 2026-09-12 runs (PREREGISTRATION-resolution.md
+    # names that as the record defect): a tie the judge wrote and the synthesiser then broke was
+    # invisible. Default "" so the stored rows still load.
+    judge_analysis: str = ""
 
 
 def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> Run:
@@ -100,6 +104,7 @@ def one(item: Item, arm: str, rotation: int, order: str, shuffle_seed: int) -> R
         flawed_position=flawed_position, flawed_label=flawed_label,
         verdict=grade(final, item), judge_mentions_vendor=bool(jb._VENDOR.search(analysis)),
         final=final, usd=(None if unpriced else usd), seconds=round(time.monotonic() - t0, 1),
+        judge_analysis=analysis,
     )
 
 
@@ -150,7 +155,7 @@ def one_duo(item: Item, arm: str, slug_rot: int, order: str, shuffle_seed: int) 
         flawed_position=flawed_position, flawed_label=flawed_label,
         verdict=grade(final, item), judge_mentions_vendor=bool(jb._VENDOR.search(analysis)),
         final=final, usd=(None if unpriced else usd), seconds=round(time.monotonic() - t0, 1),
-        composition="duo",
+        composition="duo", judge_analysis=analysis,
     )
 
 
@@ -196,6 +201,42 @@ def _rate(rows: list[dict[str, Any]], verdict: str) -> tuple[int, int]:
     return sum(r["verdict"] == verdict for r in scored), len(scored)
 
 
+def _resolution_table(rows: list[dict[str, Any]], items_by_id: dict[str, Item]) -> list[str]:
+    """The resolution number beside the bias number (PREREGISTRATION-resolution.md). Same finals,
+    read for whether the judge CHOSE: a 0% propagation rate is also what a judge that hedges every
+    pair or drops the fact would score, and the bias table cannot tell the two apart."""
+    out = ["### Resolution beside bias — did the final commit to one token? (from the stored finals)", ""]
+    out.append("| composition | arm | runs | resolved (source only) | hedged (both) | flaw only | "
+               "abstained (neither) | resolution rate | Wilson 95% | lexical hedge (R5) |")
+    out.append("|---|---|---:|---:|---:|---:|---:|---:|---|---:|")
+    quoted: list[str] = []
+    for composition in sorted({r.get("composition", "trio") for r in rows}):
+        for arm in ("named", "blind"):
+            rs = [r for r in rows if r.get("composition", "trio") == composition and r["arm"] == arm
+                  and r["item_id"] in items_by_id]
+            if not rs:
+                continue
+            kinds = [resolution(r["final"], items_by_id[r["item_id"]]) for r in rs]
+            counts = {k: kinds.count(k) for k in ("resolved", "hedged", "flaw", "abstained")}
+            lo, hi = wilson_bounds(counts["resolved"], len(rs))
+            hedged_rows = [(r, hedges(r["final"])) for r in rs]
+            lexical = [(r, h) for r, h in hedged_rows if h]
+            out.append(f"| {composition} | `{arm}` | {len(rs)} | {counts['resolved']} | {counts['hedged']} | "
+                       f"{counts['flaw']} | {counts['abstained']} | **{counts['resolved'] / len(rs):.2f}** | "
+                       f"[{lo:.2f}, {hi:.2f}] | {len(lexical)}/{len(rs)} |")
+            for r, h in lexical:
+                quoted.append(f"- {composition}/{arm}/{r['item_id']}/rot{r['rotation']}: matched {h} — "
+                              f"“{r['final'][:220].strip()}…”")
+    out.append("")
+    if quoted:
+        out.append("Finals that matched a hedge phrase (R5) — read them; the list is registered and is not "
+                   "edited after the fact:")
+        out.append("")
+        out.extend(quoted)
+        out.append("")
+    return out
+
+
 def report(path: Path) -> str:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     # Re-grade from the stored `final`, never trust the `verdict` cell written at run time (§2z): a
@@ -230,6 +271,8 @@ def report(path: Path) -> str:
         lines.append(f"| `{arm}` | {len(rs)} | {prop} | {kept} | {omit} | **{rate:.2f}** | "
                      f"[{lo:.2f}, {hi:.2f}] | {mentions}/{len(rs)} |")
     lines.append("")
+
+    lines.extend(_resolution_table(rows, items_by_id))
 
     # The bias question: propagation grouped by the vendor shown on the flawed candidate (named arm).
     lines.append("### Named arm — propagation when the flawed candidate wore this vendor's name")
