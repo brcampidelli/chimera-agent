@@ -21,6 +21,7 @@ import glob
 import json
 import os
 import statistics
+from collections import Counter
 from itertools import product
 from pathlib import Path
 
@@ -52,16 +53,22 @@ def outcome_of(home: Path, h: str, task: str) -> float | None:
     return float(v) if isinstance(v, (int, float)) else None
 
 
-def receipt_of(h: str, task: str) -> tuple[float | None, str | None]:
-    """(summed usd over rounds, last ending) or (None, None) if no receipt."""
+def receipt_of(h: str, task: str) -> tuple[float | None, str | None, str | None]:
+    """(summed usd over rounds, last ending, route) or (None, None, None) if no receipt.
+
+    The route is the provider that served the first step of the first attempt — on the receipt
+    since #484; `None` on every receipt this factorial wrote, which is the point of printing it:
+    the 552 published solves were served by a route nobody recorded (study 19, A5)."""
     p = Path(os.path.expanduser(f"~/hb-homes/{task}-{h}/runs.jsonl"))
     if not p.is_file():
-        return None, None
+        return None, None, None
     lines = [json.loads(x) for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
     if not lines:
-        return None, None
+        return None, None, None
     usd = sum(float(r.get("usd") or 0.0) for r in lines)
-    return usd, lines[-1].get("ending")
+    attempts = lines[0].get("attempts") or []
+    route = (attempts[0].get("provider") if attempts else None) or None
+    return usd, lines[-1].get("ending"), route
 
 
 def collect(home: Path) -> dict:
@@ -69,9 +76,9 @@ def collect(home: Path) -> dict:
     for (a, b, c), k in product(BITS, REPLICAS):
         h = hid(a, b, c, k)
         for task in TASKS:
-            usd, ending = receipt_of(h, task)
+            usd, ending, route = receipt_of(h, task)
             cells[(task, (a, b, c), k)] = {
-                "outcome": outcome_of(home, h, task), "usd": usd, "ending": ending,
+                "outcome": outcome_of(home, h, task), "usd": usd, "ending": ending, "route": route,
             }
     return cells
 
@@ -142,6 +149,17 @@ def main() -> None:
             print(f"  arm-{a}{b}{c}: n={len(us):>3} totalUSD={sum(us):.3f} mean/solve={statistics.mean(us):.4f}")
     total = sum(v["usd"] for v in cells.values() if v["usd"] is not None)
     print(f"\n  total spend so far: US$ {total:.2f}")
+
+    # Route census (study 19, A5): a score belongs to the route that served it (arXiv 2609.08765,
+    # 2609.10494: pipeline config alone moves scores by tens of pp). Printed per arm so a factorial
+    # served by two routes cannot pass as one; "unrecorded" is what this archive says on every cell.
+    print("\n=== Route per arm (provider on the receipt; unrecorded = written before #484) ===")
+    for (a, b, c) in BITS:
+        routes = Counter(
+            cells[(task, (a, b, c), k)]["route"] or "unrecorded"
+            for task in TASKS for k in REPLICAS if cells[(task, (a, b, c), k)]["ending"] is not None
+        )
+        print(f"  arm-{a}{b}{c}: " + ", ".join(f"{name} x{n}" for name, n in sorted(routes.items())))
 
     # self-report vs oracle (secondary)
     agree = tot = 0
