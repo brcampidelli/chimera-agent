@@ -37,6 +37,19 @@ trial, and says which) or **reports** the cache-read tokens per arm beside the t
 `bench/hierarchy_multistep` does. A cost comparison that cannot say what was cached is a comparison
 of two unknowns.
 
+**The route is part of the apparatus too, and "cache off" does not exist on a hosted one**
+(2026-09-15, `bench/cache_confound`). Nothing we had published recorded which provider served a
+solve or whether the cache answered; both are on every attempt receipt now (`provider`,
+`cache_read_tokens`), and a measurement pins the route (`CHIMERA_PROVIDER_ORDER`, fallbacks off).
+What the probe could not do is the paper's contrast: on a hosted route anything that defeats the
+cache changes the bytes, and byte-identical requests are cacheable by definition — a nonce defeats
+only the cross-run share of the system prefix (~6k tokens of a run's ~230k). And the baseline the
+contrast needs is absent: **four byte-identical T = 0 requests, pinned to one route, three of them
+served 99.3% from the same warm cache, produced four different first responses.** So a bench does not
+assume T = 0 reproduces on a hosted route, does not attribute replica noise to sampling alone, and
+does not let a component with its own temperature (the planner's hard-coded 0.2) sit upstream of a
+"T = 0" worker without saying so — the first version of that probe did, and its cell was void.
+
 ## 4. The interface is measured before the model is
 
 A tool bench measures the adapter first and the model second (study 16). Before any tool-calling

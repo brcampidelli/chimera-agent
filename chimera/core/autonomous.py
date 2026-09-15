@@ -89,6 +89,24 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:80]
 
 
+def _cache_read_tokens(steplog: Any) -> int | None:
+    """Prompt tokens the provider served from cache over the whole attempt; None if it never said."""
+    steps = list(getattr(steplog, "steps", ()) or ())
+    reported = [s for s in steps if getattr(s, "cached_tokens", None) is not None]
+    if not reported:
+        return None
+    return int(sum(int(s.cached_tokens or 0) for s in reported))
+
+
+def _provider(steplog: Any) -> str:
+    """The first provider a step named — the route that actually answered, not the id we asked."""
+    for step in getattr(steplog, "steps", ()) or ():
+        name = str(getattr(step, "provider", "") or "")
+        if name:
+            return name
+    return ""
+
+
 def _side_effects(steplog: Any) -> list[str]:
     """Which out-of-checkout side-effect tools this attempt actually called, in first-call order.
 
@@ -304,6 +322,12 @@ class Attempt:
     tool_names: list[str] = field(default_factory=list)
     #: The model slug that actually answered this attempt (the EDITOR's model under role routing).
     model: str = ""
+    #: Prompt tokens the provider served from its cache, summed over the attempt; ``None`` when the
+    #: route never reported cache usage, which is not a miss. See `_cache_read_tokens`.
+    cache_read_tokens: int | None = None
+    #: The provider that actually answered (a route name), as distinct from ``model``, the id asked
+    #: for. The same id served by two routes is two instruments.
+    provider: str = ""
     #: The id this attempt's trace line was written under, or "" when no trace was written.
     #:
     #: One attempt IS one agent run, which is one trace line — so this is the exact key that joins a
@@ -1191,6 +1215,14 @@ class AutonomousAgent:
             # than as "unchanged".
             attempt.verified_fingerprint = impressao_verificada
             attempt.side_effects = _side_effects(steplog)
+            # What the provider served from its cache, and which provider. Read off the same
+            # steplog as the side effects, and recorded because it was NOT: `StepLog.cache_hit_rate`
+            # existed in memory for a year while 556 factorial receipts and every paired bench went
+            # to disk without it, so whether any published pair ran under cache hits is unknowable
+            # from what we kept (`bench/cache_confound`). None means the route reported nothing —
+            # a silent provider, not a miss — and that distinction has to survive to the receipt.
+            attempt.cache_read_tokens = _cache_read_tokens(steplog)
+            attempt.provider = _provider(steplog)
             # The key that joins this outcome to the trace line the same run just wrote. Read off
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
