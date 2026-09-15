@@ -103,7 +103,17 @@ def _default_rules() -> list[Rule]:
         Rule("disk_destroy", _pattern(r"\bmkfs\b|\bdd\b[^\n]*\bof=/dev/"), Decision.BLOCK, "disk format/overwrite"),
         Rule("fork_bomb", _pattern(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;\s*:"), Decision.BLOCK, "fork bomb"),
         Rule("chmod_777_root", _pattern(r"\bchmod\s+-R\s+777\s+/"), Decision.BLOCK, "world-writable root"),
-        Rule("curl_pipe_shell", _pattern(r"\b(curl|wget)\b[^\n|]*\|\s*(sudo\s+)?(bash|sh|zsh)\b"), Decision.REVIEW, "piping a remote script straight into a shell"),
+        # The sink anchor is `| bash|sh|zsh` fed straight from curl/wget; what lies between must not
+        # contain a pipe of its own, or `curl x | tee f | bash` and `curl x | jq` would read as the
+        # same shape. A command substitution inside curl's ARGUMENTS is not a pipe of the output —
+        # `curl -fsSL $(echo … | base64 --decode) | bash` pipes the download straight into bash, and
+        # the first shipped version missed it because `[^\n|]*` refused to cross the `|` inside
+        # `$(…)` (arXiv 2609.12001's corpus, `bench/denylist_bypass/PREREGISTRATION-oats.md`). The
+        # substitution is now stepped over as a unit; the anchor and the no-outer-pipe rule are
+        # unchanged, so `curl $(cat url.txt) | jq .` stays allowed.
+        Rule("curl_pipe_shell", _pattern(
+            r"\b(curl|wget)\b(?:[^\n|$]|\$(?!\()|\$\([^\n)]*\))*\|\s*(sudo\s+)?(bash|sh|zsh)\b",
+        ), Decision.REVIEW, "piping a remote script straight into a shell"),
         Rule("git_force_push", _pattern(r"\bgit\s+push\b[^\n]*(--force\b|--force-with-lease\b|\s-f\b)"), Decision.REVIEW, "force push"),
         # The eight rules this set shipped with all watch what comes IN (a remote script piped into
         # a shell) or what gets DESTROYED (rm -rf, mkfs, a force push). None of them watched data
