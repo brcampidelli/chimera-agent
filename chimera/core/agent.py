@@ -113,6 +113,20 @@ def _default_compact_schemas() -> bool:
     return get_settings().compact_schemas
 
 
+def _default_temperature() -> float:
+    """0.2 unless `CHIMERA_TEMPERATURE` says otherwise — see `Settings.agent_temperature`."""
+    from chimera.config import get_settings
+
+    override = get_settings().agent_temperature
+    return 0.2 if override is None else float(override)
+
+
+def _default_prefix_nonce() -> str:
+    from chimera.config import get_settings
+
+    return get_settings().prefix_nonce
+
+
 #: The sentence that turns the task-list schema into a task list. See `Agent.run` for the
 #: measurement that decides it is not optional.
 TODO_PROMPT = (
@@ -145,8 +159,13 @@ class AgentConfig:
 
     model: str | None = None
     max_steps: int = 8
-    temperature: float = 0.2
+    temperature: float = field(default_factory=_default_temperature)
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    # A per-run line at the very FRONT of the system prompt, so no prefix is shared with any other
+    # run and the provider's prefix cache cannot serve it. Empty in production; a measurement
+    # instrument (`bench/cache_confound`). Front, not tail: a cache matches the longest shared
+    # prefix, so a nonce appended after the persona would leave the persona cacheable.
+    prefix_nonce: str = field(default_factory=_default_prefix_nonce)
     # When True, a text-only "answer" that merely describes a plan (a code block / "you can run …")
     # is pushed back ONCE with a nudge to actually execute it — the fix for narrate-instead-of-act.
     # Off for plain Q&A (chimera run); on for autonomous task completion (chimera solve).
@@ -483,6 +502,8 @@ class Agent:
                 else None,
             )
         system_prompt = self.config.system_prompt
+        if self.config.prefix_nonce:
+            system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
         skill_block = self._skill_context(task)
         if skill_block:
             system_prompt = f"{system_prompt}\n\n{skill_block}"

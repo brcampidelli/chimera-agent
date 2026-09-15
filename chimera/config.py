@@ -478,6 +478,37 @@ class Settings(BaseSettings):
     # largest with verbose MCP/OpenAPI toolsets — measure with `chimera schema-bench`. ---
     compact_schemas: bool = Field(default=False, validation_alias="CHIMERA_COMPACT_SCHEMAS")
 
+    # Two measurement instruments, both off by default, both from `bench/cache_confound`.
+    #
+    # `CHIMERA_TEMPERATURE` overrides the WORKER LOOP's sampling temperature (default 0.2 in
+    # `AgentConfig`) and nothing else: the planner (`Planner.plan`, 0.2), the manager and the fusion
+    # roles keep their own. Set to 0 to make the loop reproducible enough that a change in trajectory
+    # can be attributed to something other than sampling — which is the only way to ask whether the
+    # provider's prefix cache moves a trajectory (arXiv 2609.04748 measured 36.2% of episodes on
+    # self-hosted stacks). Measured 2026-09-15: a run that wants a byte-identical first request must
+    # also pass `--no-plan`, or four T=0 workers start from four T=0.2 plans and diverge at step 1
+    # for the ordinary reason (`bench/cache_confound`, Amendment 2).
+    agent_temperature: float | None = Field(default=None, validation_alias="CHIMERA_TEMPERATURE")
+
+    # `CHIMERA_PREFIX_NONCE` prepends a line to the system prompt so the prefix is unique to the run.
+    # It was meant as the analogue of the paper's "cache off" on a route with no off switch, and it
+    # is not one — measured 2026-09-15 (`bench/cache_confound`): it defeats the share of the system
+    # prefix ACROSS runs (step-1 `cached_tokens` 0 where a shared run reads ~5,400 of ~6,200 from
+    # cache) and nothing else, because a multi-step agent re-sends its own transcript and the
+    # provider serves that intra-run prefix from cache whatever the system prompt says; the run-level
+    # hit rate barely moves (0.83 against 0.84–0.89). Kept as the instrument it is: a cross-run-share
+    # switch, verifiable on the receipt (`cache_read_tokens` lands on every attempt). Never set in
+    # production: it throws away the ~10x cheaper cached prompt tokens on purpose.
+    prefix_nonce: str = Field(default="", validation_alias="CHIMERA_PREFIX_NONCE")
+
+    # `CHIMERA_PROVIDER_ORDER` pins an OpenRouter request to named providers, in order, with
+    # fallbacks OFF. Comma-separated route names as OpenRouter spells them. Off by default. The
+    # reason it exists is a measurement: a score belongs to the route that served it, and the same
+    # model id served by two routes is two instruments (`bench/context_rot` found the two disagreeing
+    # 7/10 against 2/15). With fallbacks on, an arm silently becomes whatever answered — the confound
+    # wearing the manipulation's name. OpenRouter only: other providers may reject the field.
+    provider_order: str = Field(default="", validation_alias="CHIMERA_PROVIDER_ORDER")
+
     # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
     discord_bot_token: str | None = Field(
         default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN"

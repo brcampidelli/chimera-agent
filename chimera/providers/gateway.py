@@ -482,6 +482,10 @@ class LLMGateway:
             kwargs["api_base"] = self.settings.api_base
         if self.settings.request_timeout and self.settings.request_timeout > 0:
             kwargs["timeout"] = self.settings.request_timeout
+        order = [p.strip() for p in self.settings.provider_order.split(",") if p.strip()]
+        if order:
+            # `allow_fallbacks: false` is not decoration — see `Settings.provider_order`.
+            kwargs["extra_body"] = {"provider": {"order": order, "allow_fallbacks": False}}
         return kwargs
 
     def _model_candidates(self, resolved: str) -> list[str]:

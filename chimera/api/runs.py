@@ -89,6 +89,15 @@ class AttemptReceipt(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
     model: str = ""  # the model that actually answered (the EDITOR's, under role routing)
+    #: Prompt tokens the provider served from its cache across the attempt. ``None`` is "the route
+    #: reported nothing", which is not a miss. Recorded because a year of receipts went to disk
+    #: without it and the question "did this pair run under cache hits?" became unanswerable —
+    #: and arXiv 2609.04748 measured that cache state moves trajectories (`bench/cache_confound`).
+    cache_read_tokens: int | None = None
+    #: The provider that actually served the attempt (an OpenRouter route name), as opposed to the
+    #: model id that was asked for. A score belongs to the route: the same id served by two routes
+    #: is two instruments, and until this field the receipt could not tell them apart.
+    provider: str = ""
     #: The trace line this attempt wrote, by id. The join key between what a run ACHIEVED (here) and
     #: what it was CARRYING (the step log) — the pair nobody could compute while the trace was keyed
     #: by a truncated task. Empty for an attempt that ran without tracing, and for every receipt
@@ -297,6 +306,8 @@ def build_receipt(
             prompt_tokens=int(getattr(a, "prompt_tokens", 0) or 0),
             completion_tokens=int(getattr(a, "completion_tokens", 0) or 0),
             model=str(getattr(a, "model", "") or ""),
+            cache_read_tokens=getattr(a, "cache_read_tokens", None),
+            provider=str(getattr(a, "provider", "") or ""),
             discarded_at=str(getattr(a, "discarded_at", "") or ""),
             verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
             failure_class=str(getattr(a, "failure_class", "") or ""),
