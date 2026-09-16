@@ -5075,7 +5075,7 @@
           "type": "boolean"
         },
         {
-          "help": "With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps).",
+          "help": "With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps). Measured on 78 labelled patches (bench/test_gate_two_sided): fails every wrong patch, and reverts 4 of 64 correct ones (6%) on a test of its own that is wrong \u2014 opt-in for that reason.",
           "kind": "option",
           "name": "gen_tests",
           "opts": [

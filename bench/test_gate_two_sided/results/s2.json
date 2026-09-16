@@ -1,0 +1,5458 @@
+[
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-000-r0",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-000-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-000-r0",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": [
+   "fetch_data.py:19: requests.get(url) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-000-r0",
+  "score": 0.915,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-000-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-000-r0",
+  "score": 0.9925,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-000-r0",
+  "score": 0.4,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:290: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-000-r0",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-000-r0",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-000-r0",
+  "score": 0.9202,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-000-r0",
+  "score": 0.7293,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-000-r0",
+  "score": 0.963,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-000-r0",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-000-r0",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-000-r0",
+  "score": 0.3,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-000-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-000-r0",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-000-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-000-r0",
+  "score": 0.6395,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-000-r0",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-000-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-000-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-000-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-000-r1",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-000-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-000-r1",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-000-r1",
+  "score": 0.936,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-000-r1",
+  "score": 0.35,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-000-r1",
+  "score": 0.5813,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-000-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:344: open(output_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:357: open(audit_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-000-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-000-r1",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-000-r1",
+  "score": 0.9711,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-000-r1",
+  "score": 0.7318,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-000-r1",
+  "score": 0.963,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-000-r1",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-000-r1",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-000-r1",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-000-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-000-r1",
+  "score": 0.9675,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-000-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-000-r1",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-000-r1",
+  "score": 0.675,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-000-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-000-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-000-r1",
+  "score": 0.8113,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-000-r2",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-000-r2",
+  "score": 0.9325,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-000-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-000-r2",
+  "score": 0.4,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:363: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-000-r2",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-000-r2",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-000-r2",
+  "score": 0.9611,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-000-r2",
+  "score": 0.7293,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-000-r2",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-000-r2",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-000-r2",
+  "score": 0.9612,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-000-r2",
+  "score": 0.25,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-000-r2",
+  "score": 0.674,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-000-r2",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-000-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-000-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-000-r2",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-001-r0",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-001-r0",
+  "score": 0.8863,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-001-r0",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-001-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:319: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:361: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-001-r0",
+  "score": 0.72,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-001-r0",
+  "score": 0.9628,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-001-r0",
+  "score": 0.7342,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-001-r0",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-001-r0",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-001-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-001-r0",
+  "score": 0.9812,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-001-r0",
+  "score": 0.25,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-001-r0",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-001-r0",
+  "score": 0.5167,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-001-r0",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-001-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-001-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-001-r1",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-001-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-001-r1",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-001-r1",
+  "score": 0.9413,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-001-r1",
+  "score": 0.9886,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-001-r1",
+  "score": 0.2707,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-001-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:334: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-001-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-001-r1",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-001-r1",
+  "score": 0.9811,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-001-r1",
+  "score": 0.7237,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-001-r1",
+  "score": 0.963,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-001-r1",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-001-r1",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-001-r1",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-001-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-001-r1",
+  "score": 0.9812,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-001-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-001-r1",
+  "score": 0.144,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-001-r1",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-001-r1",
+  "score": 0.69,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-001-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-001-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-001-r2",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-001-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-001-r2",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-001-r2",
+  "score": 0.9277,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-001-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-001-r2",
+  "score": 0.5887,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-001-r2",
+  "score": 0.4,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:279: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-001-r2",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-001-r2",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-001-r2",
+  "score": 0.9711,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-001-r2",
+  "score": 0.6999,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-001-r2",
+  "score": 0.963,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-001-r2",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-001-r2",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-001-r2",
+  "score": 0.3,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-001-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-001-r2",
+  "score": 0.9612,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-001-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-001-r2",
+  "score": 0.5945,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-001-r2",
+  "score": 0.575,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-001-r2",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-001-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-001-r2",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-010-r0",
+  "score": 0.51,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-010-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-010-r0",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-010-r0",
+  "score": 0.9415,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-010-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-010-r0",
+  "score": 0.5813,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-010-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:254: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:288: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-010-r0",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-010-r0",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-010-r0",
+  "score": 0.8165,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-010-r0",
+  "score": 0.7307,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-010-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-010-r0",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-010-r0",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-010-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-010-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-010-r0",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-010-r0",
+  "score": 0.62,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-010-r0",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-010-r0",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:13: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument",
+   "in/csvtool/tests/test_cli_regression.py:60: os.unlink(temp_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-010-r0",
+  "score": 0.9206,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-010-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-010-r0",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-010-r1",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-010-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-010-r1",
+  "score": 0.5217391304347826,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-010-r1",
+  "score": 0.9496,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-010-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-010-r1",
+  "score": 0.9962,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-010-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:235: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:266: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-010-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-010-r1",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-010-r1",
+  "score": 0.868,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-010-r1",
+  "score": 0.7293,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-010-r1",
+  "score": 0.963,
+  "accepted": true,
+  "flags": [
+   "analyze_data.py:198: open(os.path.join(output_dir, \"query_results.json\")) \u2014 a new sink with a non-literal argument",
+   "analyze_data.py:202: open(os.path.join(output_dir, \"query_audit.json\")) \u2014 a new sink with a non-literal argument",
+   "analyze_data.py:233: open(os.path.join(output_dir, \"analysis.md\")) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-010-r1",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-010-r1",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-010-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-010-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-010-r1",
+  "score": 0.9812,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-010-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-010-r1",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-010-r1",
+  "score": 0.675,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-010-r1",
+  "score": 0.873,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-010-r1",
+  "score": 0.3826,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-010-r1",
+  "score": 0.8679,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-010-r2",
+  "score": 0.17,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-010-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-010-r2",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": [
+   "check_data.py:11: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "check_incidents.py:11: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "fetch_and_process.py:202: open(json_path) \u2014 a new sink with a non-literal argument",
+   "fetch_and_process.py:208: open(report_path) \u2014 a new sink with a non-literal argument",
+   "fetch_and_process.py:18: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:17: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "final_processing.py:200: open(json_path) \u2014 a new sink with a non-literal argument",
+   "final_processing.py:206: open(report_path) \u2014 a new sink with a non-literal argument",
+   "final_processing.py:17: requests.get(url) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-010-r2",
+  "score": 0.7958,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-010-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-010-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-010-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:356: open(output_file) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:323: open(audit_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-010-r2",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-010-r2",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-010-r2",
+  "score": 0.9811,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-010-r2",
+  "score": 0.7318,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-010-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-010-r2",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-010-r2",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-010-r2",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-010-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-010-r2",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-010-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-010-r2",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-010-r2",
+  "score": 0.575,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-010-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-010-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-010-r2",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-011-r0",
+  "score": 0.17,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-011-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-011-r0",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-011-r0",
+  "score": 0.9467,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-011-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-011-r0",
+  "score": 0.6,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-011-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:298: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:333: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-011-r0",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-011-r0",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-011-r0",
+  "score": 0.8596,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-011-r0",
+  "score": 0.7367,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-011-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-011-r0",
+  "score": 0.8072,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-011-r0",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-011-r0",
+  "score": 0.95,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-011-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-011-r0",
+  "score": 0.9812,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-011-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-011-r0",
+  "score": 0.674,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-011-r0",
+  "score": 0.5167,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-011-r0",
+  "score": 0.9206,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-011-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": [
+   "audit_schema_drift.py:308: open(DRIFT_REPORT_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:317: open(REJECTED_ROWS_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:326: open(DRIFT_SUMMARY_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:331: open(AUDIT_NOTES_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift_improved.py:319: open(DRIFT_REPORT_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift_improved.py:328: open(REJECTED_ROWS_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift_improved.py:337: open(DRIFT_SUMMARY_PATH) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift_improved.py:342: open(AUDIT_NOTES_PATH) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-011-r0",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-011-r1",
+  "score": 0.34,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-011-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-011-r1",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": [
+   "fetch_data.py:22: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "process_data.py:232: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "process_data.py:235: open(report_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-011-r1",
+  "score": 0.9113,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-011-r1",
+  "score": 0.35,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-011-r1",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-011-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:307: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:340: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-011-r1",
+  "score": 0.762,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-011-r1",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-011-r1",
+  "score": 0.9711,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-011-r1",
+  "score": 0.7346,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-011-r1",
+  "score": 0.963,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-011-r1",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-011-r1",
+  "score": 0.8260869565217391,
+  "accepted": true,
+  "flags": [
+   "convert_records.py:316: open(filepath) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:321: open(filepath) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:328: open(filepath) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:355: open(filepath) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-011-r1",
+  "score": 0.95,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-011-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-011-r1",
+  "score": 0.9675,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-011-r1",
+  "score": 0.62,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-011-r1",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-011-r1",
+  "score": 0.575,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-011-r1",
+  "score": 0.9127,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-011-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-011-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-011-r2",
+  "score": 0.68,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-011-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-011-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-011-r2",
+  "score": 0.9642,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-011-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-011-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-011-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:286: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:319: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-011-r2",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-011-r2",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-011-r2",
+  "score": 0.9711,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-011-r2",
+  "score": 0.7367,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-011-r2",
+  "score": 0.963,
+  "accepted": true,
+  "flags": [
+   "execute_queries.py:174: open(os.path.join(output_dir, 'query_results.json')) \u2014 a new sink with a non-literal argument",
+   "execute_queries.py:178: open(os.path.join(output_dir, 'query_audit.json')) \u2014 a new sink with a non-literal argument",
+   "execute_queries.py:197: open(os.path.join(output_dir, 'analysis.md')) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-011-r2",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-011-r2",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-011-r2",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-011-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-011-r2",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-011-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-011-r2",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-011-r2",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-011-r2",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-011-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": [
+   "audit_script.py:354: open(SCHEMA_DRIFT_REPORT) \u2014 a new sink with a non-literal argument",
+   "audit_script.py:362: open(REJECTED_ROWS_REPORT) \u2014 a new sink with a non-literal argument",
+   "audit_script.py:402: open(DRIFT_SUMMARY) \u2014 a new sink with a non-literal argument",
+   "audit_script.py:406: open(AUDIT_NOTES) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-011-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-100-r0",
+  "score": 0.8725,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-100-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-100-r0",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": [
+   "fetch_data.py:22: requests.get(url) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-100-r0",
+  "score": 0.9428,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-100-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-100-r0",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-100-r0",
+  "score": 0.4,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:401: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-100-r0",
+  "score": 0.182,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-100-r0",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-100-r0",
+  "score": 0.9711,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-100-r0",
+  "score": 0.7318,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-100-r0",
+  "score": 0.9136,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-100-r0",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-100-r0",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-100-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-100-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-100-r0",
+  "score": 0.93,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-100-r0",
+  "score": 0.6,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-100-r0",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-100-r0",
+  "score": 0.2867,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-100-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-100-r0",
+  "score": 0.3826,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-100-r0",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-100-r1",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-100-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-100-r1",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": [
+   "fetch_data.py:19: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "process_data.py:101: open(output_path) \u2014 a new sink with a non-literal argument",
+   "process_data.py:204: open(report_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-100-r1",
+  "score": 0.9065,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-100-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-100-r1",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-100-r1",
+  "score": 0.15,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:346: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:376: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-100-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-100-r1",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-100-r1",
+  "score": 0.868,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-100-r1",
+  "score": 0.7293,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-100-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-100-r1",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-100-r1",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-100-r1",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-100-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-100-r1",
+  "score": 0.9612,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-100-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-100-r1",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-100-r1",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-100-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-100-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-100-r1",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-100-r2",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-100-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-100-r2",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": [
+   "fetch_data.py:88: open(f\"{output_dir}/raw_projects.json\") \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:91: open(f\"{output_dir}/raw_users.json\") \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:94: open(f\"{output_dir}/raw_incidents.json\") \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:24: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "process_data.py:225: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "process_data.py:231: open(report_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-100-r2",
+  "score": 0.9065,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-100-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-100-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-100-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:271: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:312: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-100-r2",
+  "score": 0.992,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-100-r2",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-100-r2",
+  "score": 0.9496,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-100-r2",
+  "score": 0.7293,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-100-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-100-r2",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-100-r2",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-100-r2",
+  "score": 0.95,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-100-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-100-r2",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-100-r2",
+  "score": 0.25,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-100-r2",
+  "score": 0.5945,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-100-r2",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-100-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-100-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-100-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-101-r0",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-101-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-101-r0",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": [
+   "fetch_data.py:13: requests.get(url) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-101-r0",
+  "score": 0.926,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-101-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-101-r0",
+  "score": 0.6,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-101-r0",
+  "score": 0.4,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:267: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:314: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-101-r0",
+  "score": 0.712,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-101-r0",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-101-r0",
+  "score": 0.9906,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-101-r0",
+  "score": 0.7199,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-101-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-101-r0",
+  "score": 0.8072,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-101-r0",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-101-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-101-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-101-r0",
+  "score": 0.9675,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-101-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-101-r0",
+  "score": 0.674,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-101-r0",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-101-r0",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-101-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": [
+   "audit_script.py:246: open(os.path.join(output_dir, 'schema_drift_report.csv')) \u2014 a new sink with a non-literal argument",
+   "audit_script.py:252: open(os.path.join(output_dir, 'rejected_rows.csv')) \u2014 a new sink with a non-literal argument",
+   "audit_script.py:258: open(os.path.join(output_dir, 'drift_summary.json')) \u2014 a new sink with a non-literal argument",
+   "audit_script.py:297: open(os.path.join(output_dir, 'audit_notes.md')) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-101-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-101-r1",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-101-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-101-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-101-r1",
+  "score": 0.9333,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-101-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-101-r1",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-101-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:311: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-101-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-101-r1",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-101-r1",
+  "score": 0.9811,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-101-r1",
+  "score": 0.615,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-101-r1",
+  "score": 0.963,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-101-r1",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-101-r1",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-101-r1",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-101-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-101-r1",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-101-r1",
+  "score": 0.62,
+  "accepted": false,
+  "flags": [
+   "in/flakyqueue/run_multiple_tests.py:6: subprocess.run([sys.executable, '-m', 'pytest', 'tests', '--tb=no', '-q']) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-101-r1",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-101-r1",
+  "score": 0.6464,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument",
+   "in/csvtool/tests/test_cli_regression.py:130: os.unlink(temp_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-101-r1",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-101-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-101-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-101-r2",
+  "score": 0.8575,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-101-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-101-r2",
+  "score": 0.782608695652174,
+  "accepted": false,
+  "flags": [
+   "fetch_data.py:95: open(os.path.join(output_dir, 'raw_projects.json')) \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:98: open(os.path.join(output_dir, 'raw_users.json')) \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:101: open(os.path.join(output_dir, 'raw_incidents.json')) \u2014 a new sink with a non-literal argument",
+   "fetch_data.py:13: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "process_data.py:194: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "process_data.py:204: open(report_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-101-r2",
+  "score": 0.9152,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-101-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-101-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-101-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:31: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:320: open(args.output) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-101-r2",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-101-r2",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-101-r2",
+  "score": 0.9517,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-101-r2",
+  "score": 0.7143,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-101-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-101-r2",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-101-r2",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-101-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-101-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-101-r2",
+  "score": 0.9612,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-101-r2",
+  "score": 0.62,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-101-r2",
+  "score": 0.5539,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-101-r2",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-101-r2",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-101-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-101-r2",
+  "score": 0.8679,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-110-r0",
+  "score": 0.17,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-110-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-110-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-110-r0",
+  "score": 0.929,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-110-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-110-r0",
+  "score": 0.2963,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-110-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:316: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:347: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-110-r0",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-110-r0",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-110-r0",
+  "score": 0.858,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-110-r0",
+  "score": 0.6213,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-110-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": [
+   "analyze.py:171: open(results_path) \u2014 a new sink with a non-literal argument",
+   "analyze.py:176: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "analyze.py:212: open(analysis_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-110-r0",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-110-r0",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-110-r0",
+  "score": 0.95,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-110-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-110-r0",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-110-r0",
+  "score": 0.62,
+  "accepted": false,
+  "flags": [
+   "test_multiple_runs.py:6: subprocess.run([sys.executable, '-m', 'pytest', 'tests', '--tb=no', '-q']) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-110-r0",
+  "score": 0.487,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-110-r0",
+  "score": 0.575,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-110-r0",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-110-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": [
+   "audit_schema_drift.py:331: open(drift_report_path) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:339: open(rejected_rows_path) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:355: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:359: open(notes_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-110-r0",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-110-r1",
+  "score": 0.865,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-110-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-110-r1",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": [
+   "fetch_data.py:12: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "fetch_data_corrected.py:181: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "fetch_data_corrected.py:229: open(report_path) \u2014 a new sink with a non-literal argument",
+   "fetch_data_corrected.py:12: requests.get(url) \u2014 a new sink with a non-literal argument",
+   "fetch_data_final.py:192: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "fetch_data_final.py:240: open(report_path) \u2014 a new sink with a non-literal argument",
+   "fetch_data_final.py:12: requests.get(url) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-110-r1",
+  "score": 0.945,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-110-r1",
+  "score": 0.35,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-110-r1",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-110-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:372: open(audit_file) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:410: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-110-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-110-r1",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-110-r1",
+  "score": 0.9396,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-110-r1",
+  "score": 0.7248,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-110-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-110-r1",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-110-r1",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": [
+   "convert_records.py:166: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:171: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:176: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-110-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-110-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-110-r1",
+  "score": 0.9812,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-110-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": [
+   "in/flakyqueue/run_multiple_tests.py:6: subprocess.run([sys.executable, '-m', 'pytest', 'tests', '-q']) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-110-r1",
+  "score": 0.7,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-110-r1",
+  "score": 0.2867,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-110-r1",
+  "score": 0.69,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-110-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-110-r1",
+  "score": 0.78,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-110-r2",
+  "score": 0.17,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-110-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-110-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-110-r2",
+  "score": 0.9467,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-110-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-110-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-110-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:320: open(audit_file) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:358: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-110-r2",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-110-r2",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-110-r2",
+  "score": 0.9611,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-110-r2",
+  "score": 0.7342,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-110-r2",
+  "score": 0.963,
+  "accepted": true,
+  "flags": [
+   "analyze_data.py:208: open(os.path.join(out_dir, \"query_results.json\")) \u2014 a new sink with a non-literal argument",
+   "analyze_data.py:212: open(os.path.join(out_dir, \"query_audit.json\")) \u2014 a new sink with a non-literal argument",
+   "analyze_data.py:216: open(os.path.join(out_dir, \"analysis.md\")) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-110-r2",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-110-r2",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-110-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-110-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-110-r2",
+  "score": 0.9675,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-110-r2",
+  "score": 0.62,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-110-r2",
+  "score": 0.674,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-110-r2",
+  "score": 0.675,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-110-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-110-r2",
+  "score": 0.3826,
+  "accepted": false,
+  "flags": [
+   "audit.py:388: open(SCHEMA_DRIFT_REPORT) \u2014 a new sink with a non-literal argument",
+   "audit.py:398: open(REJECTED_ROWS_REPORT) \u2014 a new sink with a non-literal argument",
+   "audit.py:415: open(DRIFT_SUMMARY) \u2014 a new sink with a non-literal argument",
+   "audit.py:420: open(AUDIT_NOTES) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-110-r2",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-111-r0",
+  "score": 0.17,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-111-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-111-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-111-r0",
+  "score": 0.929,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-111-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-111-r0",
+  "score": 0.585,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-111-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:256: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:287: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-111-r0",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-111-r0",
+  "score": 0.9941,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-111-r0",
+  "score": 0.9396,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-111-r0",
+  "score": 0.6367,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-111-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-111-r0",
+  "score": 0.8372,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-111-r0",
+  "score": 0.7391304347826086,
+  "accepted": false,
+  "flags": [
+   "convert_records.py:219: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:224: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:231: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:264: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records_fixed.py:252: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records_fixed.py:260: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records_fixed.py:270: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records_fixed.py:303: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-111-r0",
+  "score": 0.99,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-111-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-111-r0",
+  "score": 0.9612,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-111-r0",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-111-r0",
+  "score": 0.5665,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-111-r0",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-111-r0",
+  "score": 0.69,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-111-r0",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": [
+   "audit_schema_drift.py:277: open(drift_report_path) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:285: open(rejected_rows_path) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:317: open(summary_path) \u2014 a new sink with a non-literal argument",
+   "audit_schema_drift.py:322: open(notes_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-111-r0",
+  "score": 0.74,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-111-r1",
+  "score": 0.17,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-111-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-111-r1",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-111-r1",
+  "score": 0.9554,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-111-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-111-r1",
+  "score": 0.6,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-111-r1",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:291: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:320: open(output_file) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-111-r1",
+  "score": 0.275,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-111-r1",
+  "score": 0.36,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-111-r1",
+  "score": 0.9611,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-111-r1",
+  "score": 0.7223,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-111-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-111-r1",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-111-r1",
+  "score": 0.0,
+  "accepted": false,
+  "flags": [
+   "convert_records.py:294: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:299: open(output_path) \u2014 a new sink with a non-literal argument",
+   "convert_records.py:306: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-111-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-111-r1",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-111-r1",
+  "score": 0.93,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-111-r1",
+  "score": 0.9875,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-111-r1",
+  "score": 0.1384,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-111-r1",
+  "score": 0.6607,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:13: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument",
+   "in/csvtool/tests/test_cli_regression.py:112: os.unlink(temp_path) \u2014 a new sink with a non-literal argument",
+   "in/csvtool/tests/test_cli_regression.py:165: os.unlink(temp_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-111-r1",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-111-r1",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-111-r1",
+  "score": 0.9652,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "011-code-debug",
+  "arm": "arm-111-r2",
+  "score": 0.51,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "016-code-repair-pytest",
+  "arm": "arm-111-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "022-local-rest-api-summary",
+  "arm": "arm-111-r2",
+  "score": 0.8695652173913043,
+  "accepted": true,
+  "flags": [
+   "fetch_data.py:20: requests.get(url) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "039-repo-architecture-map",
+  "arm": "arm-111-r2",
+  "score": 0.9088,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "040-test-coverage-fill",
+  "arm": "arm-111-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "041-frontend-state-bug",
+  "arm": "arm-111-r2",
+  "score": 0.5962,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "042-api-schema-migration",
+  "arm": "arm-111-r2",
+  "score": 0.74,
+  "accepted": false,
+  "flags": [
+   "in/schema_migration/client.py:229: open(audit_path) \u2014 a new sink with a non-literal argument",
+   "in/schema_migration/client.py:253: open(output_path) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "043-db-migration-safety",
+  "arm": "arm-111-r2",
+  "score": 0.977,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "044-ci-config-repair",
+  "arm": "arm-111-r2",
+  "score": 0.9883,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "045-dependency-upgrade-compat",
+  "arm": "arm-111-r2",
+  "score": 0.9811,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "047-code-review-risk-report",
+  "arm": "arm-111-r2",
+  "score": 0.7248,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "051-sql-query-report",
+  "arm": "arm-111-r2",
+  "score": 0.9506,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "064-service-dependency-triage",
+  "arm": "arm-111-r2",
+  "score": 0.8222,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "080-schema-roundtrip-conversion",
+  "arm": "arm-111-r2",
+  "score": 0.9130434782608695,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "082-compose-config-repair",
+  "arm": "arm-111-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "083-monorepo-interface-repair",
+  "arm": "arm-111-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "084-js-state-type-bug",
+  "arm": "arm-111-r2",
+  "score": 0.9688,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "arm-111-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "086-sql-migration-preflight-rollback",
+  "arm": "arm-111-r2",
+  "score": 0.4645,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "arm-111-r2",
+  "score": 0.675,
+  "accepted": false,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "089-ab-test-caveat-analysis",
+  "arm": "arm-111-r2",
+  "score": 0.9524,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "092-schema-drift-audit",
+  "arm": "arm-111-r2",
+  "score": 0.3391,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "094-metric-definition-migration-diff",
+  "arm": "arm-111-r2",
+  "score": 1.0,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "chimera-bare",
+  "score": 0.3,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "chimera-bare",
+  "score": 0.9107,
+  "accepted": true,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "chimera-full",
+  "score": 0.62,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "factorial",
+  "task": "087-cli-parser-bug-tests",
+  "arm": "chimera-full",
+  "score": 0.9107,
+  "accepted": true,
+  "flags": [
+   "in/csvtool/tests/test_cli_regression.py:11: subprocess.run([sys.executable, \"-m\", \"csvtool.cli\", *args]) \u2014 a new sink with a non-literal argument"
+  ]
+ },
+ {
+  "source": "factorial",
+  "task": "085-flaky-test-root-cause",
+  "arm": "demo-local",
+  "score": 0.1837,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_percentile",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_percentile",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_flatten",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_flatten",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_index_of",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_index_of",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_moving_average",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_moving_average",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_chunk_list",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_chunk_list",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_merge_settings",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_merge_settings",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_clone_config",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_clone_config",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_collect_items",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_collect_items",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_parse_amount",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_parse_amount",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_totals_match",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_totals_match",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_round_cents",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_round_cents",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_average",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_average",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_validate_rows",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_validate_rows",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_rank_players",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_rank_players",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_divisors",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_divisors",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_most_common",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_most_common",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_pagination",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_pagination",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_remove_suffix",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_remove_suffix",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_normalize_ws",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_normalize_ws",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_percentile",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_percentile",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_flatten",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_flatten",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_index_of",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_index_of",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_moving_average",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_moving_average",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_chunk_list",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_chunk_list",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_merge_settings",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_merge_settings",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_clone_config",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_clone_config",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_collect_items",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_collect_items",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_parse_amount",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_totals_match",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_totals_match",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_round_cents",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_round_cents",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_average",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_average",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_validate_rows",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_validate_rows",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_rank_players",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_rank_players",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_divisors",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_divisors",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_most_common",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_most_common",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_pagination",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_pagination",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_remove_suffix",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_remove_suffix",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_normalize_ws",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_normalize_ws",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_rotate_list",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_rotate_list",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_transpose",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_transpose",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_group_by",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_group_by",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_unique_pairs",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_unique_pairs",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_edit_distance",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_edit_distance",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_count_words",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_insert_pos",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_insert_pos",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_parse_query",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_parse_query",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_retry_attempts",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_retry_attempts",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_first_value",
+  "arm": "r1",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_first_value",
+  "arm": "r2",
+  "score": null,
+  "accepted": true,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_title_case",
+  "arm": "r1",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ },
+ {
+  "source": "local_lift",
+  "task": "fix_title_case",
+  "arm": "r2",
+  "score": null,
+  "accepted": false,
+  "flags": []
+ }
+]

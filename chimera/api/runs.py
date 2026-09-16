@@ -107,6 +107,11 @@ class AttemptReceipt(BaseModel):
     #: An empty diff means one thing for a run that only touched files and something else entirely
     #: for a run that already sent mail — the receipt should not force that inference.
     side_effects: list[str] = []
+    #: What the deterministic diff rule saw in the change — a new sink with a non-literal argument,
+    #: one rendered line each (`chimera/governance/diff_rules.py`). Recorded on every attempt; a
+    #: surface that opted into `pause_on_diff_flags` also paused on them. Empty on rows written
+    #: before the rule existed, which reads as "not checked", not as "clean".
+    diff_flags: list[str] = []
     #: Every tool this attempt called, in order — the last leg of a wire that used to end at the
     #: loop. A receipt said what an attempt COST and never what it DID, so "how many edits did this
     #: task take?" was unanswerable from a finished run, and `bench/edit_tools/` could not read its
@@ -300,6 +305,7 @@ def build_receipt(
             run_id=getattr(a, "run_id", "") or "",
             diff_productive=getattr(a, "diff_productive", None),
             side_effects=list(getattr(a, "side_effects", None) or []),
+            diff_flags=[str(f) for f in (getattr(a, "diff_flags", None) or [])][:50],
             tool_names=[str(n) for n in (getattr(a, "tool_names", None) or [])][:200],
             usd=getattr(a, "usd", None),
             overhead_usd=getattr(a, "overhead_usd", None),

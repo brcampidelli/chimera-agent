@@ -81,3 +81,15 @@ def test_a_closing_fence_needs_its_own_line() -> None:
     line of its own at the very end."""
     source = 'x = "```"'
     assert _strip_fence(source) == source
+
+
+def test_a_closer_with_no_opener_is_a_boundary_and_is_dropped() -> None:
+    """`bench/test_gate_two_sided` (2026-09-15): one generated module in thirty came back as bare
+    Python ending in a ``` line — no opener to match. It failed to collect on every tree and the
+    gate reverted three correct patches on the strength of a syntax error in its own test. A fence
+    as the LAST line of a module is never Python; earlier ones are still content."""
+    assert _strip_fence("import x\n\ndef test_it():\n    assert True\n```") == "import x\n\ndef test_it():\n    assert True"
+    assert _strip_fence("import x\n\ndef test_it():\n    assert True\n```\n") == "import x\n\ndef test_it():\n    assert True"
+    # A fence line in the middle of the payload is content and stays.
+    middle = 'DOC = """\n```\n"""\nassert DOC'
+    assert _strip_fence(middle) == middle

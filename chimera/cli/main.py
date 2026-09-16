@@ -4185,7 +4185,7 @@ def solve(
         False, "--checklist", help="Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints)."
     ),
     gen_tests: bool = typer.Option(
-        False, "--gen-tests", help="With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps)."
+        False, "--gen-tests", help="With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps). Measured on 78 labelled patches (bench/test_gate_two_sided): fails every wrong patch, and reverts 4 of 64 correct ones (6%) on a test of its own that is wrong — opt-in for that reason."
     ),
     profile: str = typer.Option(
         None, "--profile",

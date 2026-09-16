@@ -1387,7 +1387,7 @@ chimera solve [TASK]
 | `--repo-map` | Prepend a structural map of the workspace (files + top-level symbols) to the agent's context. |  |
 | `--progress-ledger` | After a failed attempt, run a structured self-check that steers the retry (helps weak models). |  |
 | `--checklist` | Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints). |  |
-| `--gen-tests` | With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps). |  |
+| `--gen-tests` | With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps). Measured on 78 labelled patches (bench/test_gate_two_sided): fails every wrong patch, and reverts 4 of 64 correct ones (6%) on a test of its own that is wrong — opt-in for that reason. |  |
 | `--profile` | Model-role profile: economy | balanced | max. Puts a different model on each role (explore/plan/edit/review) drawn from the tier ladder. Routing is NOT yet shown to improve outcomes — see bench/role_routing/PREREGISTRATION.md. |  |
 | `--role-models` | Per-role model overrides: 'edit=vendor/slug,plan=vendor/other'. Roles: explore, plan, edit, review. Merges over --profile; a role left unset keeps --model. `verify` is not a role here — it runs a command and has no model to choose. |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |

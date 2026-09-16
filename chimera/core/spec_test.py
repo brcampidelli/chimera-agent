@@ -88,8 +88,13 @@ def _strip_fence(text: str) -> str:
     body = text.strip()
     opened = _FENCE_OPEN.match(body)
     if not opened:
-        # No fence at all, which is what `_GEN_SYSTEM` asks for ("no markdown fences").
-        return body
+        # No opener, which is what `_GEN_SYSTEM` asks for ("no markdown fences") — but a closer with
+        # no opener does happen (`bench/test_gate_two_sided`, 2026-09-15: one module in thirty came
+        # back as bare Python ending in a ``` line, failed to collect on every tree, and reverted
+        # three correct patches). A fence as the LAST line of a module is never Python, so it is a
+        # boundary and is dropped; a ``` anywhere earlier is content and stays.
+        closed = _FENCE_CLOSE.search(body)
+        return body[: closed.start()].strip() if closed else body
     rest = body[opened.end() :]
     closed = _FENCE_CLOSE.search(rest)
     if not closed:
