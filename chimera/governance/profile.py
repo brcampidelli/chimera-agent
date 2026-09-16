@@ -90,6 +90,22 @@ class GovernanceStep(NamedTuple):
     mode: str
 
 
+def _via_screen(screen: Callable[..., bool], approvals: Any) -> Callable[..., bool]:
+    """The surface's own approver, recorded in the step's ledger like every other approver's
+    verdict — so a caller that keeps ``approvals`` reads the screen's answers beside the
+    terminal's. The kernel asks in one shape, ``(verdict, action)``; the action is the second half,
+    and a one-argument call (the taint ledger's shape, should a caller ever wire this there) is
+    recorded by its own description."""
+
+    def approve(*args: Any) -> bool:
+        approved = bool(screen(*args))
+        described = str(args[1]) if len(args) == 2 else str(getattr(args[0], "action", "") or args[0])
+        approvals.record(described, approved=approved)
+        return approved
+
+    return approve
+
+
 def govern_step(
     registry: Any,
     *,
@@ -101,6 +117,7 @@ def govern_step(
     audit_allows: bool = True,
     home: Path | None = None,
     lineage: Callable[[], str] | None = None,
+    screen: Callable[..., bool] | None = None,
 ) -> GovernanceStep:
     """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
 
@@ -140,6 +157,17 @@ def govern_step(
     down, sent, and answered with ``chimera approve``. With a home and no destination, this
     refuses immediately and says which setting would have let it ask, rather than parking the
     worker for fifteen minutes to reach the same refusal.
+
+    ``screen`` is the surface's own way of reaching the person who made the request: the desktop's
+    approval card, an approver bound to the turn's own stream (`code_api._owner_allows`). It answers
+    the question ``attended`` cannot — ``attended`` asks whether the SERVER's console could reach
+    the requester, and a screen bound to the request is not the server's console — so when one is
+    given, ``attended`` is not consulted. Honoured only under ``enforce`` with the owner's mode
+    ``ask``: ``allow`` and ``deny`` decide first exactly as before, and ``observe`` keeps measuring
+    with an approver that says yes. Measured before it existed, on an installed 0.57.0 with the
+    kernel switched on: the taint ledger on the same screen already asked with a card, and a policy
+    REVIEW one layer in — `curl … | bash` — was refused with a sentence that told the person to use
+    the taint switch. The card is the same one; only the kernel had never been handed it.
     """
     from chimera.governance import ApprovalLedger, TrustKernel
     from chimera.governance.approval import allow as allow_everything
@@ -172,17 +200,26 @@ def govern_step(
     # decline is a decline; the two values below are the cases where retrying cannot change the
     # answer, and the refusal has to say so instead of inviting a retry that costs money.
     no_approver = ""
+    approver_name = ""
     if resolved == "observe":
         approver_name = "allow"
         approve = allow_everything(approvals)
     else:
-        wanted = settings.approval_mode
+        # Normalised the way `approver_for` and `_owner_allows` already read it: an owner whose
+        # variable is set but empty meant `ask`, and an unnormalised `""` used to slip past the
+        # unattended check below straight into `approver_for("")` — which is `ask`, on the server's
+        # console, for an HTTP caller: the exact prompt the flag exists to prevent.
+        wanted = (settings.approval_mode or "ask").strip().lower()
         # Where a question would go if one had to be asked, resolved before the mode is: on an
         # unattended surface it is what decides whether "ask" has anywhere to go at all.
         deliver = deliverer_for(settings)
         if wanted == "deny":
             no_approver = "owner_denies"
-        if not attended and wanted == "ask":
+        if screen is not None and wanted == "ask":
+            # The person who made the request is reachable through the surface itself.
+            approver_name = "screen"
+            approve = _via_screen(screen, approvals)
+        elif not attended and wanted == "ask":
             no_approver = "unattended"
             # `deny` is what `approver_for` picks for itself once it finds no terminal; this reaches
             # the same fail-closed answer one step earlier, before a tty that belongs to somebody
@@ -202,14 +239,16 @@ def govern_step(
             # inviting a retry that will be refused identically.
             no_approver = "unreachable"
             wanted = "deny"
-        approver_name = wanted
-        # `home` travels unconditionally, and the branch above is the only thing deciding whether
-        # it can be used: with no destination `wanted` is already `deny`, and `approver_for`
-        # returns before it reads a home at all. An earlier draft ALSO withheld `home` here, and
-        # the sabotage matrix found that no test could tell the two versions apart — because in
-        # every reachable path the branch had already answered. A second guard that cannot be
-        # observed to fail is not depth; it is a line the next reader has to reason about twice.
-        approve = approver_for(wanted, approvals, home=home, deliver=deliver)
+        if approver_name != "screen":
+            approver_name = wanted
+            # `home` travels unconditionally, and the branch above is the only thing deciding
+            # whether it can be used: with no destination `wanted` is already `deny`, and
+            # `approver_for` returns before it reads a home at all. An earlier draft ALSO withheld
+            # `home` here, and the sabotage matrix found that no test could tell the two versions
+            # apart — because in every reachable path the branch had already answered. A second
+            # guard that cannot be observed to fail is not depth; it is a line the next reader has
+            # to reason about twice.
+            approve = approver_for(wanted, approvals, home=home, deliver=deliver)
 
     registry = govern_registry(
         registry,

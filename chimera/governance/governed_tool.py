@@ -294,14 +294,18 @@ class GovernedTool(Tool):
         identical refusals and a bill.
         """
         if self.no_approver == "unattended":
+            # The way out named here is the one that releases THIS refusal. Until 0.58.0 the
+            # sentence offered the taint switch and "keep MCP reads out of the run" — remedies for
+            # the taint ledger's refusal, which is a different sentence one layer out. A kernel
+            # verdict is a policy match, never taint (the kernel reads lineage only to partition its
+            # precedents), so a person following that advice would have changed nothing; measured
+            # on an installed 0.57.0, a clean run stopped by the curl rule was told exactly that.
             return (
                 "Nobody could be asked: this request arrived over the API, where the only terminal "
                 "belongs to somebody who did not make it and cannot consent for whoever did. "
-                "Retrying will be refused identically. To let this through, start the run with "
-                "pause-on-taint — in the app, 'pause for my approval if the run reads untrusted "
-                "content' — which parks it for a verdict instead of refusing it. Or keep untrusted "
-                "content out of the run: reading data through an MCP server taints it, and the same "
-                "read done with the built-in tools does not."
+                "Retrying will be refused identically. A turn started from the app's Code screen "
+                "puts this question on the screen as a card and waits for the answer, and "
+                "`chimera solve` asks at the terminal; over the API there is nobody to ask."
             )
         if self.no_approver == "unreachable":
             return (
