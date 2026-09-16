@@ -6,6 +6,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.57.0] - 2026-09-16
+
 ### Added
 
 - **Every attempt receipt now says which provider served the run and how much of its prompt the cache answered.** `provider` (the route that served the first step — for `deepseek-v3.2` through OpenRouter it turned out to be AtlasCloud, not DeepSeek) and `cache_read_tokens` (the sum the route reported; `None` when it reported nothing, never 0) sit on `Attempt` and on the `AttemptReceipt` in `runs.jsonl`. Both were missing from everything this project had published: the 552-solve factorial, every paired bench, the seed floor — served by routes nobody recorded, under cache states nobody kept. Three knobs came with the measurement that found that out: `CHIMERA_PROVIDER_ORDER` pins an OpenRouter request to named routes with fallbacks off; `CHIMERA_TEMPERATURE` overrides the worker loop's temperature (the worker's only — the planner keeps its own 0.2, which the measurement learned the hard way: four "T = 0" workers seeded by four sampled plans); `CHIMERA_PREFIX_NONCE` makes the system prefix unique per run, documented as what it measured to be — a switch on the cross-run share of the prefix, not "cache off", because a multi-step agent re-sends its own transcript and the provider serves that from cache whatever the system prompt says. All three off by default. What the probe closed: four byte-identical T = 0 requests, three of them served 99.3% from the same warm cache, pinned to one route, came back as four different first responses — so on a hosted route the cache's own share of run-to-run noise is not isolable, and no bench here assumes T = 0 reproduces. `bench/cache_confound/RESULTS.md`.
