@@ -55,6 +55,7 @@ from chimera.core.repomap import build_repo_map
 from chimera.core.runstate import RunCheckpointer
 from chimera.core.spec_test import SpecTestGenerator, SpecTestVerifier
 from chimera.core.spine import assemble_spine
+from chimera.core.steplog import StepLog
 from chimera.core.strong_verify import StrongVerifier
 from chimera.core.supervisor import Manager
 from chimera.core.task_normalizer import normalize_task
@@ -90,21 +91,19 @@ def _slug(text: str) -> str:
 
 
 def _cache_read_tokens(steplog: Any) -> int | None:
-    """Prompt tokens the provider served from cache over the whole attempt; None if it never said."""
-    steps = list(getattr(steplog, "steps", ()) or ())
-    reported = [s for s in steps if getattr(s, "cached_tokens", None) is not None]
-    if not reported:
-        return None
-    return int(sum(int(s.cached_tokens or 0) for s in reported))
+    """Prompt tokens the provider served from cache over the whole attempt; None if it never said.
+
+    The definition lives on :class:`~chimera.core.steplog.StepLog` since the Code screen's turn
+    receipt started carrying the same number: one place for "what counts as served from cache",
+    so the two receipts cannot drift. Kept here as a name because the tests and this module read it
+    off any steplog-shaped object, not only a real one.
+    """
+    return StepLog(steps=list(getattr(steplog, "steps", ()) or ())).cache_read_tokens
 
 
 def _provider(steplog: Any) -> str:
     """The first provider a step named — the route that actually answered, not the id we asked."""
-    for step in getattr(steplog, "steps", ()) or ():
-        name = str(getattr(step, "provider", "") or "")
-        if name:
-            return name
-    return ""
+    return StepLog(steps=list(getattr(steplog, "steps", ()) or ())).provider
 
 
 def _side_effects(steplog: Any) -> list[str]:

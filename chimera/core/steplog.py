@@ -214,6 +214,36 @@ class StepLog:
         return sum(s.cached_tokens or 0 for s in reported) / prompt
 
     @property
+    def cache_read_tokens(self) -> int | None:
+        """Prompt tokens the provider served from its cache, summed over the whole run.
+
+        The count behind :attr:`cache_hit_rate`, kept as a count because it is what a receipt
+        stores: a rate cannot be re-added across attempts or read against another run's prompt
+        size, and the number a person compares between two receipts is "how much of the work was
+        served from cache". ``None`` when NO step reported cache usage — a silent route, not a
+        miss, for the reason the rate gives: a silent route scored as zero reads as a broken cache.
+        """
+        reported = [s for s in self.steps if s.cached_tokens is not None]
+        if not reported:
+            return None
+        return int(sum(int(s.cached_tokens or 0) for s in reported))
+
+    @property
+    def provider(self) -> str:
+        """The first route a step named — the provider that actually answered, not the id asked.
+
+        A model id like ``deepseek-v3.2`` through OpenRouter is served by several providers, and
+        `bench/cache_confound` measured that the answer belongs to the route: byte-identical
+        requests differ across them. The first, because that is the route the run's trajectory
+        was set by; a run that switched routes mid-way reports that one, and the per-step record
+        keeps the rest. Empty when no step named one.
+        """
+        for step in self.steps:
+            if step.provider:
+                return step.provider
+        return ""
+
+    @property
     def drift(self) -> DriftReport:
         """Whether this trajectory stopped getting anywhere. See :mod:`chimera.core.context_drift`.
 

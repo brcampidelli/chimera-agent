@@ -1461,6 +1461,15 @@ def register_code_api(
                         # and the verifier into the model's speed. None when nothing was measured;
                         # zero would say the model produced nothing.
                         "tokens_per_second": result.steplog.tokens_per_second,
+                        # Which route answered, and what its cache served — the two fields every
+                        # autonomous attempt receipt carries since `bench/cache_confound`, and this
+                        # receipt did not: tested live on 0.57.0, the run receipt named the route
+                        # and the turn receipt of the same install said nothing. A score belongs
+                        # to the route that produced it, and a turn's cost differs ~10x on the cache
+                        # alone, so a receipt without them is a receipt for a different run.
+                        # `None`, never zero, when no step reported cache usage.
+                        "provider": result.steplog.provider,
+                        "cache_read_tokens": result.steplog.cache_read_tokens,
                         "route_meta": result.route_meta,
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.

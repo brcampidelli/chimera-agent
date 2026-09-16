@@ -642,6 +642,8 @@ const en: Dict = {
   "edit.search.fallback":
     "Searched without ripgrep: slower, and it does not read .gitignore.",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "via {p}",
+  "code.chat.cache": "{n} from cache",
   "machine.title": "This machine",
   "machine.cpu": "CPU",
   "machine.memory": "Memory",
@@ -1978,6 +1980,8 @@ const pt: Dict = {
   "edit.search.fallback":
     "Buscou sem o ripgrep: mais lento, e não lê o .gitignore.",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "via {p}",
+  "code.chat.cache": "{n} do cache",
   "machine.title": "Esta máquina",
   "machine.cpu": "CPU",
   "machine.memory": "Memória",
@@ -3326,6 +3330,8 @@ const es: Dict = {
   "edit.search.fallback":
     "Se buscó sin ripgrep: más lento, y no lee el .gitignore.",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "vía {p}",
+  "code.chat.cache": "{n} de la caché",
   "machine.title": "Esta máquina",
   "machine.cpu": "CPU",
   "machine.memory": "Memoria",
@@ -4684,6 +4690,8 @@ const fr: Dict = {
   "edit.search.fallback":
     "Recherche sans ripgrep : plus lente, et elle ne lit pas le .gitignore.",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "via {p}",
+  "code.chat.cache": "{n} depuis le cache",
   "machine.title": "Cette machine",
   "machine.cpu": "Processeur",
   "machine.memory": "Mémoire",
@@ -6049,6 +6057,8 @@ const de: Dict = {
   "edit.search.fallback":
     "Ohne ripgrep gesucht: langsamer, und die .gitignore wird nicht gelesen.",
   "code.chat.speed": "{n} Tok/s",
+  "code.chat.route": "über {p}",
+  "code.chat.cache": "{n} aus dem Cache",
   "machine.title": "Dieser Rechner",
   "machine.cpu": "CPU",
   "machine.memory": "Arbeitsspeicher",
@@ -7373,6 +7383,8 @@ const zh: Dict = {
   "edit.search.timedOut": "搜索在完成前超时了。",
   "edit.search.fallback": "未使用 ripgrep 搜索：更慢，且不读取 .gitignore。",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "经由 {p}",
+  "code.chat.cache": "{n} 来自缓存",
   "machine.title": "这台机器",
   "machine.cpu": "CPU",
   "machine.memory": "内存",
@@ -8690,6 +8702,8 @@ const ja: Dict = {
   "edit.search.fallback":
     "ripgrep なしで検索しました：遅く、.gitignore も読みません。",
   "code.chat.speed": "{n} tok/秒",
+  "code.chat.route": "{p} 経由",
+  "code.chat.cache": "キャッシュから {n}",
   "machine.title": "このマシン",
   "machine.cpu": "CPU",
   "machine.memory": "メモリ",
@@ -10041,6 +10055,8 @@ const it: Dict = {
   "edit.search.fallback":
     "Cercato senza ripgrep: più lento, e non legge il .gitignore.",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "via {p}",
+  "code.chat.cache": "{n} dalla cache",
   "machine.title": "Questa macchina",
   "machine.cpu": "CPU",
   "machine.memory": "Memoria",
@@ -11394,6 +11410,8 @@ const pl: Dict = {
   "edit.search.fallback":
     "Szukano bez ripgrepa: wolniej i bez czytania .gitignore.",
   "code.chat.speed": "{n} tok/s",
+  "code.chat.route": "przez {p}",
+  "code.chat.cache": "{n} z pamięci podręcznej",
   "machine.title": "Ta maszyna",
   "machine.cpu": "Procesor",
   "machine.memory": "Pamięć",
@@ -12747,6 +12765,8 @@ const ru: Dict = {
   "edit.search.fallback":
     "Искали без ripgrep: медленнее, и .gitignore не читается.",
   "code.chat.speed": "{n} ток/с",
+  "code.chat.route": "через {p}",
+  "code.chat.cache": "{n} из кэша",
   "machine.title": "Эта машина",
   "machine.cpu": "Процессор",
   "machine.memory": "Память",
