@@ -11,7 +11,8 @@ import { useT } from "@/lib/i18n";
  * Before this the same situation reached the screen as `"{n} write(s) refused"` after the turn had
  * already finished — a count, no reason, nothing to do about it. The tool call is now waiting on a
  * worker thread for the answer, so this card is not a notice: it is the other half of a pause. The
- * reason is the taint ledger's own sentence, shown verbatim; silence refuses after `wait_seconds`,
+ * reason is the asking layer's own sentence, shown verbatim — the taint ledger's, the plan gate's,
+ * or (since 0.58.0, when the kernel is on) a policy rule's; silence refuses after `wait_seconds`,
  * and the card says so, because a control that quietly expires is a control that lied about being
  * one.
  *

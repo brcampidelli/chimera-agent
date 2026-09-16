@@ -636,11 +636,23 @@ def assemble_registry(
     # `attended=False`: nobody is at this server's console on behalf of an HTTP caller.
     # `audit_allows=False`: an ALLOW per tool call would bury this log's rare events in a day.
     #
+    # `screen`: the owner's approver, the SAME object the ledger gets below, and only when this
+    # request has a screen to announce to. Until 0.58.0 the kernel got nothing here, so with the
+    # kernel switched on every policy REVIEW on the Code screen was a refusal — measured on an
+    # installed 0.57.0: `curl … | bash` came back "Nobody could be asked … start the run with
+    # pause-on-taint", the taint switch, for a clean run stopped by a policy rule — while the taint
+    # ledger one layer out asked the very same screen with a card. A surface with no announcer
+    # (`POST /api/runs`, the lifecycle and orchestration routes) keeps the unattended refusal: a
+    # question announced to nobody is a timeout with a bill, which `pending.py` names as the thing
+    # to avoid.
+    #
     # Deliberately NOT passing `step.approve` to the ledger below. In `observe` that approver says
     # yes to everything, so handing it to the taint layer would turn taint narrowing on this path
     # from REFUSING a dangerous call after untrusted input into allowing it — someone switching to
     # `observe` in order to MEASURE would silently weaken the surface. Observe adds measurement; it
-    # must never subtract protection that was already there.
+    # must never subtract protection that was already there. The other direction is the point of
+    # `screen`: the owner's approver reaches the kernel only under `enforce`, where a yes is a yes.
+    owner = _owner_allows(settings, approval_sink)
     step = govern_step(
         registry,
         settings=settings,
@@ -649,6 +661,7 @@ def assemble_registry(
         attended=False,
         audit_allows=False,
         lineage=ledger.lineage,
+        screen=owner if approval_sink is not None else None,
     )
     return ledger_registry(
         step.registry,
@@ -675,7 +688,7 @@ def assemble_registry(
         #
         # And never `step.approve`, for the reason above: in `observe` that one says yes to
         # everything, so measurement would silently subtract protection.
-        approve=_owner_allows(settings, approval_sink),
+        approve=owner,
     ), ledger
 
 

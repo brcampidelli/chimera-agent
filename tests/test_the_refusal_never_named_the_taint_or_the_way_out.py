@@ -24,6 +24,16 @@ write-region, changing only how the catalogue was read:
 And the way out already existed on the same screen: *"pause for my approval if the run reads
 untrusted content"*, which parks the run for a verdict instead of refusing it. It was simply never
 mentioned at the moment it would have helped.
+
+**Amendment, 2026-09-16.** Measured on an installed 0.57.0 with the kernel switched on: a clean run
+(`tainted: false`) stopped by the curl rule got this sentence, and its advice — the taint switch,
+keeping MCP reads out of the run — releases nothing here. The kernel's REVIEW is a policy verdict
+(it reads lineage only to partition its precedents); the tainted write of the story above is
+refused one layer OUT, by the taint ledger, with its own sentence — which never carried these two
+ways out and still does not. So the sentence now names the way out of THIS refusal: the Code
+screen's card (the kernel is handed it since 0.58.0) and the terminal prompt. Everything else the
+measurement asked for stays: nobody COULD be asked, why the console cannot consent, retrying is
+futile. The taint remedies belong beside the taint refusal, and that is a separate change.
 """
 
 from __future__ import annotations
@@ -88,19 +98,19 @@ def test_it_says_retrying_cannot_help() -> None:
     assert "Retrying will be refused identically" in _recusa("unattended")
 
 
-def test_it_names_the_switch_that_exists_on_the_same_screen() -> None:
+def test_it_names_the_surfaces_that_can_ask() -> None:
+    """The way out of a policy review is a surface with a person on it — not the taint switch."""
     saida = _recusa("unattended")
-    assert "pause-on-taint" in saida
-    assert "pause for my approval if the run reads untrusted content" in saida, (
-        "quote the control as it is labelled, or the reader has to guess which switch is meant"
-    )
+    assert "Code screen" in saida and "card" in saida, "the desktop asks with a card since 0.58.0"
+    assert "chimera solve" in saida and "terminal" in saida
 
 
-def test_it_names_the_other_way_out_too() -> None:
-    """A user who does not want to pause has a second option, and it is the cheaper one."""
+def test_it_no_longer_prescribes_the_taint_remedies() -> None:
+    """Advice that releases a different refusal is worse than none: a person who followed it on
+    the installed 0.57.0 would have changed nothing and been refused identically."""
     saida = _recusa("unattended")
-    assert "MCP" in saida
-    assert "built-in tools" in saida
+    assert "pause-on-taint" not in saida
+    assert "MCP" not in saida
 
 
 def test_it_explains_why_the_console_cannot_consent() -> None:
