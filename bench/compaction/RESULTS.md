@@ -90,3 +90,87 @@ saturated. This is that precedent, applied.
 - **Only runs with a trace.** A run started without `trace_path` writes nothing here.
 - **It says nothing about whether a summary would help**, only that nothing currently reaches the
   place where it would.
+
+---
+
+# The arms, run — the summary keeps what the note drops: 25/30 against 6/30 (study 19, B1, 2026-09-15)
+
+Run against [`PREREGISTRATION.md`](PREREGISTRATION.md) and its Amendment 2 (a **mechanism test at
+a forced-low budget** — `context_budget=0.0025`, the fraction the calibration measured as the one
+that fires on this model; production still never compacts, see the census above). Model
+`deepseek-v4-flash-0731`, 30 paired conversations, one compaction per conversation in both arms
+(60/60 fired; 0 void, 0 halted). **US$ 0.084.** Raw: `results-2026-09-15.jsonl` (one line per
+conversation, the summaries included); reader `read.py`.
+
+## The registered outcome
+
+| arm | final file honours the turn-one convention |
+|---|---:|
+| **A — note** (control) | **6/30 = 0.20** |
+| **B — note + rules** | **25/30 = 0.83** |
+
+Paired: **+63 pp**, 19 pairs moved A→B and **none** the other way, exact McNemar **p = 3.8 × 10⁻⁶**,
+Wilson interval on the discordant pairs [+0.42, +0.63]. **Registered decision: ADOPT** (≥ +15 pp and
+p < 0.05). Per Amendment 2 that means the Code screen sends `summarise_compaction` beside
+`context_budget` (`Conversation.tsx`, `SUMMARISE_COMPACTION = true`, pinned by `Code.budget.test.tsx`);
+the seam itself (`CodeSeams.summarise_compaction`, default off) is on every coding request.
+
+By convention (B / A honoured, of 5 each): copyright header **5/1**, `AUTOR` constant **5/0**,
+`# fim` end marker **3/1**, `bee_` function prefix **3/0**, future import **4/0**, no `print()`
+**5/4**. The last row is the one the registration warned about — *a convention the control also
+honours is not evidence* — the control is at 4/5 there because not printing is the model's habit,
+not its memory. Excluding it, the note keeps **2/25** and the summary **20/25**.
+
+**Cost, the other half of the decision.** The treatment conversations cost **no more** than the
+control ones (US$ 0.0381 against 0.0456 over 30 each): the summariser's call is small and the
+compacted prompt it leaves behind is shorter. Wall-clock is not reported as a cost — the detached
+session had a pseudo-terminal, so `CHIMERA_HOST_EXEC=ask` prompted on 21 attempted host commands
+and refused each after its 120 s timeout, exactly as the headless run refused them at once; the
+seconds column carries that and the dollars do not.
+
+## The fabrication count, and what it found instead
+
+All thirty treatment summaries were read against the span they compress (the registration asked for
+three). **Fabricated rules: 0/30** — nothing in a summary states something the span did not contain.
+But only **1/30 is what the summariser was built to produce**: a standing instruction in imperative
+form (`function-prefix/strings`: "Create final.py with a bee_ string helper …"). The rest:
+
+| what the model returned as "standing" | n | carries the convention |
+|---|---:|---:|
+| a **code block** — the last file written, echoed verbatim | 23 | 14 (the header, the constant, the import, the prefix is *in* the file) |
+| narration or self-talk ("I'll check the current files…") | 3 | 1 (mentions `# fim` while complaining it could not verify it) |
+| **raw tool-call markup** (`<｜DSML｜invoke name="exec_command">…`) | 2 | 0 |
+| `NONE` (note only) | 1 | — |
+
+So the gain the primary outcome measures is mostly **echo, not rule**: the summary carries an earlier
+file, and the convention rides along inside it. That is not the mechanism arXiv 2608.11392 describes
+and the prompt asks for, and it is the honest description of why 25/30 happened. It is also why the
+two rows this cannot explain are listed: `author-constant/money` and `copyright-first-line/lists`
+honoured the convention although their echo did not carry it — five of the nine echoes that lacked
+the token still ended in an honouring file, and nothing here says why.
+
+**The two tool-markup rows are a defect, fixed and tested.** A summary is believed, and a prompt that
+carries raw tool-call syntax is a call waiting to be made. `rule_summariser` now replaces such a reply
+with the structural note (`_leaks_tool_markup`, the DSML envelope and the `<tool_call>` /
+`<function_call>` tags), pinned by a test that fails when the guard is removed. The count above is of
+the run *before* the guard; with it, those two conversations would have received the note alone.
+
+## What this does and does not say
+
+- **Mechanism, not production.** At `0.6` of a 1.31M-token window the Code screen compacts at 786k
+  tokens and no traced run has reached 64k; the summariser will do exactly nothing to today's
+  conversations. What it decides is which behaviour a conversation gets *when* compaction fires —
+  and that the note alone loses the convention 24 times in 30.
+- **A forced-low budget shortens the span.** Registered as a bias toward the treatment: a dropped
+  span of four messages is easier to echo than a real one of two hundred, and an echo of one file
+  is not a summary of a day's work. The 25/30 is an upper bound on what a long conversation would
+  keep.
+- **Synthetic conventions, one model, one venue.** A first-line header is the easy end of what
+  compaction destroys; "not that directory" was not tested.
+- **Replication of the direction, from a run this bench killed.** The first launch died at pair 15
+  on the shell's timeout with everything held in memory; its log kept the outcomes of 14 complete
+  pairs: note **1/14**, summary **10/14**, 10 discordant one way and 1 the other. Same direction,
+  same model, an hour apart; recorded because the run happened, not counted because it did not
+  finish.
+- The runs were served by three routes (`Relace` 138 turns, `StreamLake` 90, `Baidu` 12 — on the
+  receipt since #484), which the arms shared by interleaving and which nothing here separates.

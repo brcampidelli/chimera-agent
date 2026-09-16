@@ -835,6 +835,16 @@ def test_context_budget_reaches_the_worker(tmp_path: Any) -> None:
     assert agent.worker.config.context_budget == 0.6
 
 
+def test_the_compaction_summariser_is_a_seam_and_off_unless_asked(tmp_path: Any) -> None:
+    """`chimera/core/summarise.py` was written, tested and passed by no production caller (study 19,
+    B1). The seam is now on every coding request, off by default — a summary is believed in a way
+    a count is not, and `bench/compaction` measures it before a screen sends it."""
+    assert _solve_agent(tmp_path, context_budget=0.6).worker.config.summarise_compaction is False
+    on = _solve_agent(tmp_path, context_budget=0.6, summarise_compaction=True)
+    assert on.worker.config.summarise_compaction is True
+    assert on.worker._summarise is not None  # the rule summariser is built, not just flagged
+
+
 def test_the_spend_ceiling_reaches_the_worker(tmp_path: Any) -> None:
     """The loose wire this reconnects.
 

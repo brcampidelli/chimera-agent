@@ -74,6 +74,16 @@ def _flatten(messages: list[Any]) -> str:
     return f"{text[:head]}\n…\n{text[-(MAX_INPUT_CHARS - head):]}"
 
 
+#: The shapes a model's own tool-call syntax takes when it leaks into prose: the DeepSeek `DSML`
+#: envelope seen in the bench, the OpenAI-style `<tool_call>`/`<function_call>` tags, and a bare
+#: `tool_calls` block. Matched anywhere; a summary is short and a person's rule never contains these.
+_TOOL_MARKUP = ("<｜DSML｜", "<|DSML|", "<tool_call", "<function_call", "<tool_calls", "</tool_calls")
+
+
+def _leaks_tool_markup(text: str) -> bool:
+    return any(marker in text for marker in _TOOL_MARKUP)
+
+
 def rule_summariser(
     backend: Any,
     model: str | None = None,
@@ -110,6 +120,14 @@ def rule_summariser(
         if not rules or rules.upper().startswith("NONE"):
             # Nothing standing was said, which is a real answer and a common one. The note is then
             # both cheaper and more informative than an empty summary.
+            return to_note(older)
+        if _leaks_tool_markup(rules):
+            # Read in the 30 summaries of `bench/compaction` (2026-09-15): twice the model answered
+            # with its own tool-call syntax (`<｜DSML｜invoke name="exec_command">…`) instead of
+            # words. A summary is believed, and a prompt that carries raw tool-call markup is a
+            # prompt that may get it executed; the note is the honest replacement, not a cleaned
+            # version of the leak.
+            _log.warning("compaction summariser returned tool-call markup, using the structural note")
             return to_note(older)
         # The note goes WITH it, never instead of it. They answer different questions — the note
         # says how much was dropped and which tools ran, the summary says what still binds — and an

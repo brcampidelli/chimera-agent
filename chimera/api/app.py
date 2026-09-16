@@ -1385,6 +1385,7 @@ def build_api_app(
                 deny_tools=req.deny_tools,
                 max_steps=req.max_steps,
                 context_budget=req.context_budget,
+                summarise_compaction=req.summarise_compaction,
                 # Per TASK, and the batch multiplies it: five tasks under a $1 ceiling can spend $5
                 # (times the attempts, per the field's docstring). The alternative — splitting one
                 # ceiling across concurrent workers — would need a shared budget the tasks do not
@@ -2339,6 +2340,7 @@ def _build_solve_agent(
         model=roles.models.edit or req.model,
         max_steps=steps,
         context_budget=req.context_budget,
+        summarise_compaction=req.summarise_compaction,
         # Bounds ONE attempt, not the run: this config builds the worker, and the loop below calls
         # `worker.run` once per attempt, each of which mints its own budget. Left as the caller sent
         # it rather than divided by `max_attempts` — dividing would make the same field mean

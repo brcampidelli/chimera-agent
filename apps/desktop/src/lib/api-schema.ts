@@ -2805,6 +2805,11 @@ export interface components {
              */
             repo_map: boolean;
             roles?: components["schemas"]["RoleModels"] | null;
+            /**
+             * Summarise Compaction
+             * @default false
+             */
+            summarise_compaction: boolean;
             /** Tasks */
             tasks: components["schemas"]["AgentTaskIn"][];
             /** Workspace */
@@ -3524,6 +3529,11 @@ export interface components {
              * @default true
              */
             stream: boolean;
+            /**
+             * Summarise Compaction
+             * @default false
+             */
+            summarise_compaction: boolean;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -3719,6 +3729,11 @@ export interface components {
              */
             repo_map: boolean;
             roles?: components["schemas"]["RoleModels"] | null;
+            /**
+             * Summarise Compaction
+             * @default false
+             */
+            summarise_compaction: boolean;
             /**
              * Synthesize
              * @description Fold the merged workers' answers into one report. Costs a top-model call.
@@ -4940,6 +4955,11 @@ export interface components {
              */
             repo_map: boolean;
             roles?: components["schemas"]["RoleModels"] | null;
+            /**
+             * Summarise Compaction
+             * @default false
+             */
+            summarise_compaction: boolean;
             /** Task */
             task: string;
             /** Verify */
@@ -5941,6 +5961,11 @@ export interface components {
             /** Requirements */
             requirements?: components["schemas"]["RequirementOut"][] | null;
             roles?: components["schemas"]["RoleModels"] | null;
+            /**
+             * Summarise Compaction
+             * @default false
+             */
+            summarise_compaction: boolean;
             /** Task */
             task: string;
             /** Thread Id */

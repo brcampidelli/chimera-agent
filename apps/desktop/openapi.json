@@ -484,6 +484,11 @@
               }
             ]
           },
+          "summarise_compaction": {
+            "default": false,
+            "title": "Summarise Compaction",
+            "type": "boolean"
+          },
           "tasks": {
             "items": {
               "$ref": "#/components/schemas/AgentTaskIn"
@@ -1918,6 +1923,11 @@
             "title": "Stream",
             "type": "boolean"
           },
+          "summarise_compaction": {
+            "default": false,
+            "title": "Summarise Compaction",
+            "type": "boolean"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -2403,6 +2413,11 @@
                 "type": "null"
               }
             ]
+          },
+          "summarise_compaction": {
+            "default": false,
+            "title": "Summarise Compaction",
+            "type": "boolean"
           },
           "synthesize": {
             "default": false,
@@ -4998,6 +5013,11 @@
               }
             ]
           },
+          "summarise_compaction": {
+            "default": false,
+            "title": "Summarise Compaction",
+            "type": "boolean"
+          },
           "task": {
             "title": "Task",
             "type": "string"
@@ -7307,6 +7327,11 @@
                 "type": "null"
               }
             ]
+          },
+          "summarise_compaction": {
+            "default": false,
+            "title": "Summarise Compaction",
+            "type": "boolean"
           },
           "task": {
             "title": "Task",
