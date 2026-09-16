@@ -340,6 +340,13 @@ class Attempt:
     #: something very different once a run has already sent mail, and a reader of the receipt
     #: should be able to see that without re-deriving it from a transcript.
     side_effects: list[str] = field(default_factory=list)
+    #: What the deterministic diff rule saw in this attempt's change: a NEW sink called with a
+    #: non-literal argument (`chimera/governance/diff_rules.py`), one rendered line per flag.
+    #: Always recorded; whether it PAUSES the run is the surface's choice (`pause_on_diff_flags`),
+    #: because the rule's false-alarm rate on accepted patches was measured before it was wired
+    #: (`bench/test_gate_two_sided`) and a receipt-only flag is the record-only surface the kernel
+    #: docstring said the judge never had.
+    diff_flags: list[str] = field(default_factory=list)
     #: The class this failure was given before it was fed back — ``failing_test``, ``tool_skip``,
     #: ``reverted``… (see :mod:`chimera.core.failure_class`) — as the enum's value, because this
     #: record goes through ``asdict`` → JSON → ``Attempt(**saved)`` on a resume. ``""`` means
@@ -458,6 +465,7 @@ class AutonomousAgent:
         replan_on_stall: bool = False,
         pause_on_taint: bool = False,
         pause_always: bool = False,
+        pause_on_diff_flags: bool = False,
         repo_map: bool = False,
         checklist: RequirementChecklist | None = None,
         given_requirements: list[Any] | None = None,
@@ -510,6 +518,9 @@ class AutonomousAgent:
         self.replan_on_stall = replan_on_stall
         self.pause_on_taint = pause_on_taint
         self.pause_always = pause_always
+        # A successful attempt whose change added a dangerous sink with a variable argument is held
+        # for sign-off, like a tainted one. Off by default; the flags are on the receipt regardless.
+        self.pause_on_diff_flags = pause_on_diff_flags
         self.repo_map = repo_map
         self.checklist = checklist
         #: Requirements a PERSON already read and edited, in place of extracting them here.
@@ -1006,6 +1017,7 @@ class AutonomousAgent:
             diff_productive: bool | None = None
             diff_summary: str | None = None
             diffs: list[FileDiff] = []
+            diff_flags: list[str] = []
             # Per attempt, not `last_after`: that one survives the loop for `--keep-workspace`, so
             # on a second attempt without a capture it would still hold the FIRST attempt's tree and
             # this receipt would attest to a verdict about somebody else's files.
@@ -1027,6 +1039,10 @@ class AutonomousAgent:
                 diff_productive = pdiff.is_productive
                 diff_summary = pdiff.audit_summary()
                 diffs = unified_diffs(snapshot, after)  # real diffs, BEFORE any revert below
+                # The diff rule reads the full texts, never the clipped receipt patch.
+                from chimera.governance.diff_rules import flag_snapshots
+
+                diff_flags = [f.render() for f in flag_snapshots(snapshot.files, after.files)]
                 # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
                 # verdict is about — not a fresh read a later write could already have changed.
                 from chimera.core.checkpoint import fingerprint as _impressao
@@ -1223,6 +1239,7 @@ class AutonomousAgent:
             # a silent provider, not a miss — and that distinction has to survive to the receipt.
             attempt.cache_read_tokens = _cache_read_tokens(steplog)
             attempt.provider = _provider(steplog)
+            attempt.diff_flags = diff_flags
             # The key that joins this outcome to the trace line the same run just wrote. Read off
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
@@ -1292,7 +1309,11 @@ class AutonomousAgent:
                 # wants to see each change before it counts as done has to be able to say so, and
                 # the alternative — a UI control that quietly maps onto the taint trigger — would
                 # be a switch that does nothing most of the time.
-                if (run_tainted and self.pause_on_taint) or self.pause_always:
+                # A third trigger, opt-in: the change added a dangerous sink with a variable
+                # argument (`diff_flags`). A REVIEW and never a BLOCK — the same pause, the flags
+                # in the reason, and the person decides. See `chimera/governance/diff_rules.py`.
+                flagged = bool(diff_flags) and self.pause_on_diff_flags
+                if (run_tainted and self.pause_on_taint) or self.pause_always or flagged:
                     self._save_checkpoint(
                         thread_id, task, index, feedback, plan, attempts,
                         awaiting_approval=True, paused_answer=answer, was_tainted=run_tainted,
@@ -1301,7 +1322,12 @@ class AutonomousAgent:
                         # otherwise the HITL path silently bypasses the anti-hollow-learning gate.
                         productive=diff_productive,
                     )
-                    reason = "tainted run" if run_tainted else "every run held for sign-off"
+                    if run_tainted and self.pause_on_taint:
+                        reason = "tainted run"
+                    elif flagged:
+                        reason = "the change adds a sink with a non-literal argument: " + "; ".join(diff_flags[:3])
+                    else:
+                        reason = "every run held for sign-off"
                     self._emit(_ev_status(f"paused for approval — {reason} (thread {thread_id})"))
                     return AutonomousResult(
                         answer=answer, success=False, attempts=attempts, plan=plan, paused=True,

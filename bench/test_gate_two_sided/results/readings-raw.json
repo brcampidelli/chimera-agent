@@ -1,0 +1,2596 @@
+{
+ "per_test": [
+  {
+   "task_id": "fix_percentile",
+   "test": "test_do_not_change_function_signature",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_percentile",
+   "test": "test_fix_percentile_function_in_metrics_calc",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_percentile",
+   "test": "test_use_linear_interpolation_between_the_two_neighbouring_order_statistics",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_percentile",
+   "test": "test_compute_rank_as_p_over_100_times_n_minus_1",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_percentile",
+   "test": "test_interpolate_between_floor_and_ceil_ranks",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_percentile",
+   "test": "test_return_linearly_interpolated_percentile_using_standard_linear_method",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_percentile",
+   "test": "test_do_not_use_naive_nearest_rank_index",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9,
+    10,
+    11,
+    12
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_must_treat_a_str_as_a_leaf",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_must_not_split_strings_into_characters",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_the_signature_of_flatten_must_remain_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_a_bc_must_return_a_bc",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_fix_the_flatten_function_in_nested_core_py",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_must_fully_flatten_arbitrarily_deep_nested_lists",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_must_return_all_non_list_leaves_in_order",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_must_recurse_to_any_depth",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_flatten_1_2_3_4_must_return_1_2_3_4",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_flatten",
+   "test": "test_the_implementation_must_include_a_recursive_call_to_flatten_for_nested_lists",
+   "fails_on_base": true,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    10
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_index_of",
+   "test": "test_return_minus_one_when_absent",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    7,
+    9,
+    10,
+    11,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_index_of",
+   "test": "test_keep_correct_behavior_without_duplicates",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    7,
+    9,
+    10,
+    11,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_index_of",
+   "test": "test_keep_correct_behavior_absent_targets",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    7,
+    9,
+    10,
+    11,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_index_of",
+   "test": "test_do_not_change_signature",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    6,
+    7,
+    9,
+    10,
+    11,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_index_of",
+   "test": "test_return_index_of_first_occurrence",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    7,
+    9,
+    10,
+    11,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_index_of",
+   "test": "test_specific_duplicate_case",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    7,
+    9,
+    10,
+    11,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_moving_average",
+   "test": "test_moving_average_returns_empty_when_values_shorter_than_window",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_moving_average",
+   "test": "test_moving_average_raises_value_error_when_window_non_positive",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_moving_average",
+   "test": "test_moving_average_signature_is_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_moving_average",
+   "test": "test_moving_average_returns_mean_of_every_consecutive_window_slice",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_moving_average",
+   "test": "test_moving_average_example",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "test": "test_exact_multiples_of_size_keep_working",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    14,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "test": "test_size_nonpositive_raises_valueerror",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    14,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "test": "test_signature_of_chunk_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    14,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "test": "test_chunk_splits_into_consecutive_lists_of_at_most_size_items",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    14,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "test": "test_every_item_covered_by_exactly_one_chunk",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    14,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "test": "test_chunk_example_returns_expected",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    14,
+    15
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "test": "test_merge_returns_base_overlaid_with_override",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "test": "test_merge_does_not_modify_override",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "test": "test_merge_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "test": "test_merge_returns_new_dict",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "test": "test_merge_does_not_modify_base",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_clone_config",
+   "test": "test_clone_returns_equal_config",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    1,
+    2,
+    3,
+    4,
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_clone_config",
+   "test": "test_clone_signature_is_not_changed",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    1,
+    2,
+    3,
+    4,
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_clone_config",
+   "test": "test_clone_returns_fully_independent_copy",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    1,
+    2,
+    3,
+    4,
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_clone_config",
+   "test": "test_mutating_copy_at_any_depth_does_not_affect_original",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    1,
+    2,
+    3,
+    4,
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_clone_config",
+   "test": "test_original_config_does_not_change_when_copy_is_mutated",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    1,
+    2,
+    3,
+    4,
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_clone_config",
+   "test": "test_appending_to_nested_copy_list_does_not_change_original_list",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    1,
+    2,
+    3,
+    4,
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_parse_amount_parses_comma_and_decimal_to_float",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_parse_amount_empty_string_returns_zero",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_parse_amount_whitespace_only_returns_zero",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_valid_amount_strings_continue_to_parse_correctly",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_parse_amount_signature_is_not_changed",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_parse_amount_abc_raises_valueerror",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "test": "test_any_non_numeric_text_other_than_empty_or_whitespace_raises_valueerror",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 2
+  },
+  {
+   "task_id": "fix_average",
+   "test": "test_average_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    5,
+    6,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_average",
+   "test": "test_average_returns_arithmetic_mean_as_float",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_average",
+   "test": "test_average_empty_returns_zero_float",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_average",
+   "test": "test_average_known_values_returns_2_5",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_average",
+   "test": "test_average_does_not_return_2_for_1_2_3_4",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_average",
+   "test": "test_average_empty_does_not_raise_zero_division_error",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_returns_empty_name_before_negative_age_for_both_problems",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_signature_is_rows",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_returns_message_for_every_problem_row",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_returns_messages_in_row_order",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_returns_empty_name_message_when_name_missing_or_empty",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_returns_negative_age_message_when_age_below_zero",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "test": "test_validate_problem_messages_unchanged",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    12,
+    13
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rank_players",
+   "test": "test_rank_accepts_list_of_name_score_pairs",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rank_players",
+   "test": "test_rank_orders_players_by_score_descending",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rank_players",
+   "test": "test_avoid_changing_signature_of_rank",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rank_players",
+   "test": "test_avoid_changing_existing_score_sorting_behavior",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rank_players",
+   "test": "test_rank_breaks_ties_by_name_ascending",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rank_players",
+   "test": "test_rank_example_returns_expected",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_most_common",
+   "test": "test_most_common_returns_most_frequent_item",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_most_common",
+   "test": "test_most_common_clear_single_winner",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_most_common",
+   "test": "test_most_common_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_most_common",
+   "test": "test_most_common_tie_returns_first_appeared_item",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_most_common",
+   "test": "test_most_common_specific_example_b_a_b_a_returns_b",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_most_common",
+   "test": "test_most_common_empty_raises_value_error",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6,
+    7,
+    9
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_count_raises_value_error_for_nonpositive_per_page",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_signatures_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_count_counts_partial_last_page",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_count_10_3_returns_4",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_count_1_3_returns_1",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_items_returns_slice_for_page_number_from_1",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_items_returns_empty_for_out_of_range_page",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_pagination",
+   "test": "test_page_items_1_2_returns_first_two",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    13
+   ],
+   "correct_patches": 3,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "test": "test_remove_suffix_returns_text_without_trailing_suffix",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "test": "test_remove_suffix_returns_text_unchanged_when_text_does_not_end_with_suffix",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "test": "test_ordinary_suffixes_keep_working",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "test": "test_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "test": "test_remove_suffix_empty_suffix_returns_original_text",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "test": "test_normalize_strips_leading_and_trailing_whitespace",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "test": "test_normalize_two_spaces_continues_to_return_single_space",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "test": "test_do_not_change_signature_of_normalize",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "test": "test_normalize_collapses_every_run_of_whitespace_to_single_space",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "test": "test_normalize_three_spaces_returns_single_space",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "test": "test_normalize_tab_returns_single_space",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5,
+    6
+   ],
+   "correct_patches": 4,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_rotate_items_left_by_k_places",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_returns_new_list_for_every_call",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_does_not_return_original_list_object",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_rotates_right_when_k_negative",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_returns_empty_list_when_items_empty",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_does_not_change_signature",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "test": "test_wraps_k_when_magnitude_larger_than_list_length",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    5,
+    6
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_transpose",
+   "test": "test_transpose_empty_list",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_transpose",
+   "test": "test_square_matrices_still_work",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_transpose",
+   "test": "test_transpose_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_transpose",
+   "test": "test_transpose_rectangular_matrix",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_transpose",
+   "test": "test_transpose_example",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_transpose",
+   "test": "test_transpose_raises_value_error_for_unequal_row_lengths",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    4,
+    5
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_do_single_group_input_returns_all_items_in_input_order",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_avoid_group_by_signature_is_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_do_group_by_returns_dict_mapping_each_key_to_list_of_items",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 2
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_do_each_group_list_contains_exactly_items_with_matching_key",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_do_each_group_list_preserves_input_order",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_do_each_group_list_is_independent_list_object",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_group_by",
+   "test": "test_do_group_by_parity_returns_expected_groups",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    6,
+    8
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_do_not_change_signature",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_return_tuple_for_every_pair_distinct_positions",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_put_item_from_smaller_position_first",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_do_not_return_tuples_with_first_index_not_less_than_second",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_do_not_return_same_pair_of_positions_more_than_once",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_treat_two_positions_as_distinct_even_if_values_equal",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "test": "test_return_aa_for_pairs_aa",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    8,
+    9
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_distance_returns_correct_for_pure_insertions",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_distance_returns_0_for_identical_strings",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_signature_of_distance_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_distance_still_correct_for_pure_insertions_and_identical_strings",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_fix_bug_returns_levenshtein_distance",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_distance_cat_cut_returns_1",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "test": "test_distance_kitten_sitting_returns_3",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    17
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_count_words_case_insensitive",
+   "fails_on_base": false,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_word_is_run_of_letters_and_digits",
+   "fails_on_base": false,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_plain_space_separated_text_still_works",
+   "fails_on_base": false,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_punctuation_apostrophe_whitespace_are_separators",
+   "fails_on_base": true,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_hi_example",
+   "fails_on_base": true,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_count_words",
+   "test": "test_its_ok_example",
+   "fails_on_base": true,
+   "reaches_fault": null,
+   "fault_lines": [],
+   "correct_patches": 0,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "test": "test_insert_pos_returns_index_to_keep_sorted",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "test": "test_insert_pos_no_equal_entry",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "test": "test_insert_pos_signature_unchanged",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "test": "test_insert_pos_places_after_equal_entries",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "test": "test_insert_pos_example_returns_4",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    9
+   ],
+   "correct_patches": 1,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_run_with_retries_calls_func_until_it_returns_without_raising",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_calls_func_at_most_1_plus_retries_times",
+   "fails_on_base": false,
+   "reaches_fault": true,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_does_not_change_signature_of_run_with_retries",
+   "fails_on_base": false,
+   "reaches_fault": false,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_re_raises_last_exception_when_all_attempts_fail",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_retries_two_allows_third_call_to_succeed_after_two_failures",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_retries_zero_calls_func_exactly_once",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "test": "test_retries_zero_does_not_raise_typeerror_without_calling_func",
+   "fails_on_base": true,
+   "reaches_fault": true,
+   "fault_lines": [
+    7
+   ],
+   "correct_patches": 2,
+   "false_alarms": 0
+  }
+ ],
+ "per_patch": [
+  {
+   "task_id": "fix_percentile",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_percentile",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_percentile",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_percentile",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_flatten",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_flatten",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_flatten",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_fix_the_flatten_function_in_nested_core_py",
+    "test_flatten_1_2_3_4_must_return_1_2_3_4",
+    "test_flatten_must_fully_flatten_arbitrarily_deep_nested_lists",
+    "test_flatten_must_not_split_strings_into_characters",
+    "test_flatten_must_recurse_to_any_depth",
+    "test_flatten_must_return_all_non_list_leaves_in_order"
+   ]
+  },
+  {
+   "task_id": "fix_flatten",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_index_of",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_index_of",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_index_of",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_index_of",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_moving_average",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_moving_average",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_moving_average",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_moving_average",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_chunk_list",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_merge_settings",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_clone_config",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_clone_config",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_clone_config",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_clone_config",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_appending_to_nested_copy_list_does_not_change_original_list",
+    "test_clone_returns_equal_config",
+    "test_clone_returns_fully_independent_copy",
+    "test_mutating_copy_at_any_depth_does_not_affect_original",
+    "test_original_config_does_not_change_when_copy_is_mutated"
+   ]
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_any_non_numeric_text_other_than_empty_or_whitespace_raises_valueerror"
+   ]
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_any_non_numeric_text_other_than_empty_or_whitespace_raises_valueerror"
+   ]
+  },
+  {
+   "task_id": "fix_parse_amount",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_any_non_numeric_text_other_than_empty_or_whitespace_raises_valueerror",
+    "test_parse_amount_empty_string_returns_zero",
+    "test_parse_amount_whitespace_only_returns_zero"
+   ]
+  },
+  {
+   "task_id": "fix_totals_match",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_totals_match",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_totals_match",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_totals_match",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_average",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_average",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_average",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_average",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_validate_rows",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_rank_players",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_rank_players",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_rank_players",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_avoid_changing_existing_score_sorting_behavior",
+    "test_rank_example_returns_expected",
+    "test_rank_orders_players_by_score_descending"
+   ]
+  },
+  {
+   "task_id": "fix_rank_players",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_most_common",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_most_common",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_most_common",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_most_common",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_pagination",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_pagination",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_pagination",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_pagination",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_page_count_10_3_returns_4",
+    "test_page_count_1_3_returns_1",
+    "test_page_count_counts_partial_last_page"
+   ]
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_remove_suffix",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "replica": 1,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "replica": 2,
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_normalize_ws",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_rotate_list",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_transpose",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_square_matrices_still_work",
+    "test_transpose_empty_list"
+   ]
+  },
+  {
+   "task_id": "fix_transpose",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_group_by",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_do_group_by_returns_dict_mapping_each_key_to_list_of_items"
+   ]
+  },
+  {
+   "task_id": "fix_group_by",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_do_group_by_returns_dict_mapping_each_key_to_list_of_items"
+   ]
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_unique_pairs",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_edit_distance",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_count_words",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_count_words_case_insensitive",
+    "test_hi_example",
+    "test_its_ok_example",
+    "test_plain_space_separated_text_still_works",
+    "test_punctuation_apostrophe_whitespace_are_separators",
+    "test_word_is_run_of_letters_and_digits"
+   ]
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "incorrect",
+   "bilateral": "FAIL",
+   "exit_code": "FAIL",
+   "failing_tests": [
+    "test_insert_pos_example_returns_4",
+    "test_insert_pos_places_after_equal_entries"
+   ]
+  },
+  {
+   "task_id": "fix_insert_pos",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "replica": 1,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  },
+  {
+   "task_id": "fix_retry_attempts",
+   "replica": 2,
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "label": "correct",
+   "bilateral": "PASS",
+   "exit_code": "PASS",
+   "failing_tests": []
+  }
+ ],
+ "tasks_without_module": [
+  "fix_collect_items",
+  "fix_round_cents",
+  "fix_divisors",
+  "fix_parse_query",
+  "fix_first_value",
+  "fix_title_case"
+ ]
+}
