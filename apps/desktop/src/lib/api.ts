@@ -1037,6 +1037,10 @@ export interface CodeTurnInput {
   open_file?: string | null;
   max_steps?: number | null;
   context_budget?: number | null;
+  /** When a compaction fires, keep the dropped span's standing instructions beside the structural
+   *  note instead of the note alone (`chimera/core/summarise.py`). Meaningless without
+   *  `context_budget`; measured in `bench/compaction` before any screen sends it. */
+  summarise_compaction?: boolean;
   /** Whether a mounted shell tool may run on the host. The second of two locks: the posture's
    *  reach decides whether the tools exist, this decides whether they may run outside a container.
    *  Neither does anything alone. */

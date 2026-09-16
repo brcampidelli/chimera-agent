@@ -138,3 +138,26 @@ grounds after its pilot showed the corpus saturated.
 
 The rule above stands unchanged for whoever has a reason to run it. `bench/compaction/run.py` is the
 harness; `RESULTS.md` records the census and the measurement it asks for instead.
+
+## Amendment 2 — 2026-09-15, before any arm ran
+
+Study 19, item B1, asks for the number this registration was written to produce: does the rule-form
+summariser keep what the note drops? The 2026-09-04 census stands — production has never compacted,
+and a trigger cannot yet be set from the model because `bench/context_rot` found no knee on a pinned
+backend up to 953k tokens. What changes is the reading the arms are given: **a mechanism test at a
+forced-low budget**, which this registration's own "What this cannot show" already priced (the
+dropped span is shorter and easier than a real one, so the bias runs *toward* the treatment and is
+stated rather than corrected). It does not become a claim about production, where nothing reaches
+the compaction.
+
+- `BUDGET` goes from 0.04 to **0.0025**, the fraction the calibration measured as the one that
+  compacts within a six-turn conversation on this model (the amendment above). Nothing else in
+  the apparatus changes; the pilot's six runs confirm a compaction fires before the arms are run,
+  and their outcomes are still not read.
+- The decision rule is unchanged: ADOPT at ≥ +15 pp paired and p < 0.05 (McNemar), REJECT
+  otherwise, REJECT AND REPORT LOUDLY if B < A. ADOPT means `summarise_compaction` is sent by the
+  Code screen beside `context_budget`; REJECT means the seam is exposed and left off. Either way
+  the seam is wired through the API so a surface can choose without a code change.
+- Fabrication is counted by hand over the treatment arm's summaries, all of them, not a sample:
+  at n = 30 that is thirty short texts.
+- The route that serves the runs is recorded per turn from the receipts (#484) and reported.

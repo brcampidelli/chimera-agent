@@ -197,3 +197,25 @@ def test_a_router_that_says_nothing_leaves_it_empty() -> None:
         usage = None
 
     assert LLMGateway._normalize(_Silent(), "openrouter/x/y").provider == ""
+
+
+# --- what it refuses to carry ------------------------------------------------------------------
+
+
+def test_a_reply_made_of_tool_call_markup_is_replaced_by_the_note() -> None:
+    """Read in the 30 summaries of `bench/compaction` (2026-09-15): twice the model answered with its
+    own tool-call envelope instead of words. A summary is believed; raw tool-call syntax in a
+    prompt is a call waiting to be made. The note replaces it — never a cleaned-up leak."""
+    leak = (
+        '<｜DSML｜tool_calls>\n<｜DSML｜invoke name="exec_command">\n'
+        '<｜DSML｜parameter name="cmd" string="true">cat final.py</｜DSML｜parameter>\n'
+        "</｜DSML｜invoke>\n</｜DSML｜tool_calls>"
+    )
+    for answer in (leak, '<tool_call>{"name": "read_file"}</tool_call>', "<function_call>x</function_call>"):
+        text = rule_summariser(_Backend(answer=answer))(SPAN)
+        assert "Standing from that span" not in text
+        assert "DSML" not in text and "tool_call" not in text and "function_call" not in text
+        assert "earlier messages were removed" in text
+    # And a rule that merely mentions a tool by name is still a rule.
+    text = rule_summariser(_Backend(answer="Use write_file, never run_shell, to create files."))(SPAN)
+    assert "Standing from that span:\nUse write_file" in text

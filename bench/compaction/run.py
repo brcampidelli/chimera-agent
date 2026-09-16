@@ -28,7 +28,7 @@ from chimera.providers.gateway import LLMGateway  # noqa: E402
 from chimera.tools.builtin import default_registry  # noqa: E402
 
 MODEL = "openrouter/deepseek/deepseek-v4-flash-0731"
-BUDGET = 0.04
+BUDGET = 0.0025  # amendment 2: the fraction the calibration measured as the one that fires
 MARKER = "[earlier conversation, compacted]"
 
 
@@ -114,9 +114,26 @@ class Outcome:
     seconds: float = 0.0
     turns: int = 0
     summaries: list[str] = field(default_factory=list)
+    routes: list[str] = field(default_factory=list)  # the provider that served each turn's first step (#484)
+    halted: str = ""  # a transport error that survived one retry; the pair is void (PROTOCOL §2)
 
 
 def run_conversation(pair: Pair, arm: str) -> Outcome:
+    """One conversation, retried once from scratch on a transport error: the second run of this
+    bench died at pair 13 on a connection reset the loop did not catch. A conversation that fails
+    twice is recorded as halted — never as a miss — and its pair is void."""
+    last = ""
+    for attempt in (1, 2):
+        try:
+            return _run_conversation(pair, arm)
+        except Exception as exc:  # noqa: BLE001 — the provider's failure is not the arm's
+            last = f"{type(exc).__name__}: {str(exc)[:200]}"
+            print(f"    transport error on {pair.convention.name}/{pair.theme[0]} {arm} (attempt {attempt}): {last}", flush=True)
+            time.sleep(30)
+    return Outcome(pair_id=f"{pair.convention.name}/{pair.theme[0]}", arm=arm, halted=last)
+
+
+def _run_conversation(pair: Pair, arm: str) -> Outcome:
     workspace = Path(tempfile.mkdtemp(prefix="compact-bench-"))
     out = Outcome(pair_id=f"{pair.convention.name}/{pair.theme[0]}", arm=arm)
     settings = get_settings()
@@ -141,6 +158,8 @@ def run_conversation(pair: Pair, arm: str) -> Outcome:
             result = agent.run(task, history=list(history))  # type: ignore[arg-type]
             out.turns += 1
             out.usd += result.usd or 0.0
+            first_step = result.steplog.steps[0] if getattr(result.steplog, "steps", None) else None
+            out.routes.append(str(getattr(first_step, "provider", "") or ""))
             history = [
                 m for m in result.transcript
                 if not (isinstance(m, dict) and m.get("role") == "system")
@@ -164,7 +183,8 @@ def run_conversation(pair: Pair, arm: str) -> Outcome:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pilot", action="store_true", help="apparatus only; outcomes not printed")
-    parser.add_argument("--out", default="bench/compaction/outcomes.json")
+    parser.add_argument("--out", default="bench/compaction/outcomes.jsonl")
+    parser.add_argument("--start", type=int, default=1, help="first pair index to run (resume after a kill)")
     args = parser.parse_args()
 
     pairs = [Pair(c, t) for c in CONVENTIONS for t in THEMES]
@@ -181,17 +201,22 @@ def main() -> int:
                 print(f"     vao: {out.summaries[0][:150]}")
         return 0
 
-    results: list[Outcome] = []
-    for index, pair in enumerate(pairs, 1):
-        for arm in ("note", "rules"):
-            out = run_conversation(pair, arm)
-            results.append(out)
-            print(f"  [{index:2}/{len(pairs)}] {arm:5} {out.pair_id:34} "
-                  f"compactou={out.compacted} honrou={out.honoured} usd={out.usd:.4f}")
-    Path(args.out).write_text(
-        json.dumps([vars(r) for r in results], indent=2, ensure_ascii=False), encoding="utf-8"
-    )
-    print(f"\n  gravado em {args.out}")
+    # One JSON line per conversation, written as it finishes: the first run of this bench was
+    # killed at pair 15 by the shell's timeout and left nothing but its log, because everything was
+    # held in memory for a single write at the end — the summaries the fabrication count needs died
+    # with it. Append-only, so `--start` resumes after a kill.
+    out_path = Path(args.out)
+    with out_path.open("a", encoding="utf-8") as handle:
+        for index, pair in enumerate(pairs, 1):
+            if index < args.start:
+                continue
+            for arm in ("note", "rules"):
+                out = run_conversation(pair, arm)
+                handle.write(json.dumps(vars(out), ensure_ascii=False) + "\n")
+                handle.flush()
+                print(f"  [{index:2}/{len(pairs)}] {arm:5} {out.pair_id:34} "
+                      f"compactou={out.compacted} honrou={out.honoured} usd={out.usd:.4f}", flush=True)
+    print(f"\n  gravado em {out_path}")
     return 0
 
 

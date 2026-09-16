@@ -80,10 +80,22 @@ import { cn } from "@/lib/utils";
  *  is standing by to restart a chat window the way an operator restarts a job.
  *
  *  0.6 is the library's own `DEFAULT_BUDGET_FRACTION`, matched on purpose so the app and `chimera
- *  solve --context-budget` behave the same at the same number. Compaction here is free: no
- *  summarising model call, just a structural note plus the recent tail, and it fires at 80% of the
- *  budget so there is still room to compact into. */
+ *  solve --context-budget` behave the same at the same number. It fires at 80% of the budget so
+ *  there is still room to compact into.
+ *
+ *  What replaces the dropped span is decided by SUMMARISE_COMPACTION below. */
 const CONTEXT_BUDGET = 0.6;
+
+/** When a compaction fires, keep the dropped span's standing instructions beside the structural
+ *  note instead of the note alone (`chimera/core/summarise.py`).
+ *
+ *  Measured before being sent (`bench/compaction`, 2026-09-15, 30 paired conversations on the
+ *  shipped model): a convention stated in turn one survived compaction in **6/30** conversations
+ *  with the note alone and **25/30** with the summary beside it — 19 pairs moved one way, none the
+ *  other, exact McNemar p = 4e-6. One model call per compaction, on the turn's own model; the
+ *  conversations that paid it cost no more in dollars than the ones that did not. Sent per turn,
+ *  like the budget, for the same reason. */
+const SUMMARISE_COMPACTION = true;
 
 /** How many tool-calling steps one turn may take.
  *
@@ -785,6 +797,7 @@ export function Conversation({
         // See CONTEXT_BUDGET. Sent on every turn because the agent is rebuilt per turn from this
         // request — a budget sent once is a budget that applied once.
         context_budget: CONTEXT_BUDGET,
+        summarise_compaction: SUMMARISE_COMPACTION,
         // See MAX_STEPS. Same per-turn reason as the budget above, and they move together on
         // purpose: more steps means more observations to hold.
         max_steps: MAX_STEPS,

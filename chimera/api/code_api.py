@@ -135,6 +135,15 @@ class CodeSeams(BaseModel):
     terminal. This pairs with ``max_steps`` and should usually move with it — raising the step
     ceiling without a budget raises the chance of dying on overflow instead of finishing."""
 
+    summarise_compaction: bool = False
+    """When a compaction fires, ask the model for the standing instructions of the dropped span and
+    keep them beside the structural note (`chimera/core/summarise.py`), instead of the note alone.
+
+    Off by default: a summary is believed in a way a count is not, and the rule-form summariser is
+    measured before a surface sends this (`bench/compaction`, study 19 B1). Meaningless without
+    ``context_budget`` — nothing compacts, so nothing is summarised — and it costs one model call
+    per compaction on the turn's own model."""
+
     max_usd: float | None = Field(default=None, gt=0)
     """Dollar ceiling for the model calls of ONE loop. None (the default) = no cap, as before.
 
@@ -1044,6 +1053,7 @@ def register_code_api(
                 system_prompt=system_prompt,
                 max_steps=steps,
                 context_budget=req.context_budget,
+                summarise_compaction=req.summarise_compaction,
                 # A conversational turn is exactly one loop, so the ceiling and the turn's bill are
                 # the same number — the one surface where the cap means what its name says without
                 # a footnote about attempts.

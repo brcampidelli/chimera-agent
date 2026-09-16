@@ -46,6 +46,13 @@ describe("Code — the conversation asks for a context budget", () => {
     expect(sent).toBeLessThanOrEqual(1);
   });
 
+  it("asks for the standing instructions to survive a compaction, not the note alone", async () => {
+    // `bench/compaction` (2026-09-15): 6/30 conventions survived with the note alone, 25/30 with
+    // the summary beside it. Meaningless without the budget, which the test above pins.
+    await ask("what is this?");
+    expect(vi.mocked(streamCodeTurn).mock.calls[0][0].summarise_compaction).toBe(true);
+  });
+
   it("sends it on the second turn too, not only the first", async () => {
     // The agent is rebuilt per turn from this request. A budget sent once is a budget that applied
     // once — and the turn where it matters is the late one, never the first.
