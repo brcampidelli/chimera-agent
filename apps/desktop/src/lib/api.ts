@@ -1107,6 +1107,16 @@ export interface CodeTurnDone {
    *  out of the turn's duration, which would fold the tools and the verifier into the model's speed.
    *  Null when nothing was measured; zero would say the model produced nothing. */
   tokens_per_second?: number | null;
+  /** The route that actually answered — an OpenRouter provider name such as `DeepSeek`, as
+   *  distinct from `model`, the id that was asked for. Empty when no step named one. A model id
+   *  is served by several routes and byte-identical requests differ across them, so the score,
+   *  the cost and the cache below belong to the route, not to the id. The autonomous run's
+   *  receipt has carried it since 0.57.0; the turn's did not, on the same install. */
+  provider?: string;
+  /** Prompt tokens the route served from its cache over the turn. Null when NO step reported cache
+   *  usage — a silent route, not a miss; zero is a real answer (a route that switched and cached
+   *  nothing), and the two must not be drawn alike. */
+  cache_read_tokens?: number | null;
   // Typed as the real shape rather than an opaque bag: the fusion panel renders it, and an opaque
   // record forced every consumer to cast — which is how a field silently stops being rendered.
   route_meta: RouteMeta | null;

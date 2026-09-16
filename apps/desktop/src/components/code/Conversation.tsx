@@ -409,6 +409,18 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
           {t("code.chat.speed", { n: Math.round(done.tokens_per_second) })}
         </Badge>
       ) : null}
+      {/* The route that answered, beside the model that was asked for: the two are not the same
+          thing, and every number after this badge belongs to the route. Absent when no step named
+          one — an external turn, or a provider that does not say. */}
+      {done.provider && !done.external ? (
+        <Badge>{t("code.chat.route", { p: done.provider })}</Badge>
+      ) : null}
+      {/* Null is a silent route and draws nothing; zero is a route that cached nothing, and is
+          drawn — on the same install, the second run of the day switched route and went from
+          55,166 cached tokens to 0. That is the fact the badge exists to show. */}
+      {done.cache_read_tokens != null ? (
+        <Badge>{t("code.chat.cache", { n: num(done.cache_read_tokens) })}</Badge>
+      ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
           Both are the receipt's half of the bargain the posture note describes. */}
       {done.auto_approved?.length ? (

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **The Code screen's turn receipt now names the route that answered and what its cache served — 0.57.0 said "every attempt receipt" and this one had neither.** Found by running the same request twice on the installed 0.57.0: the autonomous run's receipt read `provider: Relace` then `StreamLake`, with `cache_read_tokens` going from 55,166 to 0 as the route changed; the Code-screen turn's receipt, written by the same backend a minute later, carried `usd`, `prompt_tokens` and `route_meta: null` and nothing about the route or the cache. `provider` and `cache_read_tokens` are on the turn's `done` frame and on the receipt the conversation keeps, with two badges under the turn (`via Relace`, `55,166 from cache`); null draws nothing and zero is drawn, because a route that cached nothing is the event worth seeing. One definition for both receipts: `StepLog.provider` and `StepLog.cache_read_tokens`, which the autonomous receipt's helpers now read from too. The status bar's cache count, which the coding turn never filled, fills.
+
 ## [0.57.0] - 2026-09-16
 
 ### Added

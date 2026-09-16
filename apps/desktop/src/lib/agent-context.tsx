@@ -17,8 +17,9 @@ import type { RouteMeta, ToolEvent } from "@/lib/types";
 /** The bit of a turn's receipt the status bar actually reads.
  *
  *  Deliberately narrower than `TurnReport`: the chat and the coding turn report different shapes,
- *  and asking the conversation to fabricate the fields it does not have — a session id, a cache
- *  count — would be inventing data to satisfy a type. */
+ *  and asking the conversation to fabricate the fields it does not have — a session id — would be
+ *  inventing data to satisfy a type. (A cache count used to be on that list; the coding turn
+ *  reports one since 0.58.0, and reports null rather than a number when its route never said.) */
 export interface AgentReport {
   prompt_tokens: number;
   completion_tokens: number;
@@ -31,8 +32,9 @@ export interface AgentReport {
    *  zero — "no ceiling" and "a ceiling of nothing" are opposite claims. */
   max_usd?: number | null;
   /** Optional because the two surfaces measure different things, and an absent number is not zero:
-   *  rendering "0 facts recalled" for a surface that never looked is a measurement nobody took. */
-  cache_read_tokens?: number;
+   *  rendering "0 facts recalled" for a surface that never looked is a measurement nobody took.
+   *  Null is the coding turn's "the route never reported cache usage" — silent, not a miss. */
+  cache_read_tokens?: number | null;
   memory_facts_used?: number;
   memory_layer?: string | null;
   route_meta?: RouteMeta | null;

@@ -114,3 +114,47 @@ describe("a turn that stopped early", () => {
     },
   );
 });
+
+/**
+ * Which route answered, and what its cache served.
+ *
+ * Found on the installed 0.57.0: the same request as an autonomous run named its route (`Relace`,
+ * then `StreamLake`, cache 55,166 → 0 tokens between the two) and as a Code-screen turn named
+ * nothing — the backend wrote the receipt without the fields. The badge has three states that must
+ * not collapse into two: a named route, a silent one (no badge), and a route that cached NOTHING
+ * (a real zero, drawn), which is the very event the run receipt caught.
+ */
+describe("the route and the cache", () => {
+  it("names the route that answered", () => {
+    receipt({ provider: "Relace" });
+
+    expect(screen.getByText("code.chat.route")).toBeInTheDocument();
+  });
+
+  it("draws a cache of zero, because a route that cached nothing is a fact", () => {
+    receipt({ provider: "StreamLake", cache_read_tokens: 0 });
+
+    expect(screen.getByText("code.chat.cache")).toBeInTheDocument();
+  });
+
+  it("stays quiet on a silent route", () => {
+    // Null is "the route never said". A badge reading 0 here would look like a broken cache and
+    // send someone to fix a prefix that was never the problem.
+    receipt({ provider: "", cache_read_tokens: null });
+
+    expect(screen.queryByText("code.chat.route")).not.toBeInTheDocument();
+    expect(screen.queryByText("code.chat.cache")).not.toBeInTheDocument();
+  });
+
+  it("does not name a route on an external turn — the agent's own name already says who", () => {
+    receipt({ external: "claude-code", provider: "claude-code" });
+
+    expect(screen.queryByText("code.chat.route")).not.toBeInTheDocument();
+  });
+
+  it.each(LANGS.map((l) => l.code))("%s has both strings", (code) => {
+    const dict = DICTS[code];
+    expect(dict["code.chat.route"]).toContain("{p}");
+    expect(dict["code.chat.cache"]).toContain("{n}");
+  });
+});
