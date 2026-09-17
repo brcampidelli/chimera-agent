@@ -1,5 +1,5 @@
 ---
-source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
+source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
 ---
 
 # Segurança & salvaguardas
@@ -154,6 +154,21 @@ WhatsApp, defina `CHIMERA_WHATSAPP_APP_SECRET` com o secret do seu app Meta — 
 verifica o HMAC `X-Hub-Signature-256` de cada requisição e rejeita um payload forjado com `403`.
 Ambos são opt-in (não definido = sem autenticação, ok para localhost); uma implantação pública
 deveria defini-los (ou ficar atrás de um proxy que autentique).
+
+### Compartilhar uma conversa com uma segunda pessoa
+
+O app desktop pode compartilhar uma conversa de código por um **token que abre só aquela conversa** —
+nunca o token do servidor. O dono emite um por convidado (`POST /api/code/sessions/{id}/share`) e pode
+revogá-lo sozinho; apagar a conversa revoga todos. Um convidado alcança quatro rotas sob
+`/guest/api/…`: ler a conversa, acompanhá-la ao vivo, enviar uma mensagem nela, ver quem está lá. Nada
+mais responde a um token de compartilhamento, e o app de convidado não tem rota para responder a um
+card de governança — esses ficam na tela do dono.
+
+O app de convidado é também a **única** coisa servida quando o dono abre a porta da rede
+(`POST /api/code/share/network`, fechada de novo com `DELETE`, nunca aberta ao iniciar): uma máquina na
+LAN alcança essas quatro rotas e nada do que o token do servidor protege. Dito sem rodeios antes de
+entregar um link: um convidado pode pedir ao agente qualquer coisa que o dono pediria, no projeto do
+dono, com as ferramentas e o gasto do dono — sob as costuras padrão da requisição, e sem aprovar cards.
 
 ## Limites honestos
 

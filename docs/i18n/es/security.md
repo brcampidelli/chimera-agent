@@ -1,5 +1,5 @@
 ---
-source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
+source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
 ---
 
 # Seguridad y salvaguardas
@@ -155,6 +155,22 @@ tu app de Meta — Chimera entonces verifica el HMAC `X-Hub-Signature-256` de ca
 rechaza una carga útil falsificada con `403`. Ambos son opcionales (sin configurar = sin
 autenticación, correcto para localhost); un despliegue público debería configurarlos (o estar
 detrás de un proxy que autentique).
+
+### Compartir una conversación con una segunda persona
+
+La app de escritorio puede compartir una conversación de código mediante un **token que abre solo esa
+conversación** — nunca el token del servidor. El dueño emite uno por invitado
+(`POST /api/code/sessions/{id}/share`) y puede revocarlo por separado; borrar la conversación los revoca
+todos. Un invitado alcanza cuatro rutas bajo `/guest/api/…`: leer la conversación, seguirla en vivo,
+enviar un mensaje en ella, ver quién está. Nada más responde a un token de compartición, y la app de
+invitado no tiene ruta para responder a una tarjeta de gobernanza — esas quedan en la pantalla del dueño.
+
+La app de invitado es también lo **único** que se sirve cuando el dueño abre la puerta de red
+(`POST /api/code/share/network`, cerrada de nuevo con `DELETE`, nunca abierta al arrancar): una máquina en
+la LAN alcanza esas cuatro rutas y nada de lo que protege el token del servidor. Dicho sin rodeos antes de
+entregar un enlace: un invitado puede pedirle al agente cualquier cosa que el dueño le pediría, en el
+proyecto del dueño, con sus herramientas y su gasto — bajo las costuras por defecto de la petición, y sin
+aprobar tarjetas.
 
 ## Límites honestos
 

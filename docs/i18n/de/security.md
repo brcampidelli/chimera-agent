@@ -1,5 +1,5 @@
 ---
-source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
+source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
 ---
 
 # Sicherheit & Schutzmaßnahmen
@@ -161,6 +161,22 @@ verifiziert dann die `X-Hub-Signature-256`-HMAC jeder Anfrage und weist eine gef
 Payload mit `403` zurück. Beide sind opt-in (nicht gesetzt = keine Auth, für Localhost in
 Ordnung); ein öffentliches Deployment sollte sie setzen (oder hinter einem authentifizierenden
 Proxy sitzen).
+
+### Ein Gespräch mit einer zweiten Person teilen
+
+Die Desktop-App kann ein Code-Gespräch über ein **Token teilen, das nur dieses Gespräch öffnet** — nie
+über das Server-Token. Der Besitzer stellt eines pro Gast aus (`POST /api/code/sessions/{id}/share`) und
+kann es einzeln widerrufen; das Löschen des Gesprächs widerruft alle. Ein Gast erreicht vier Routen unter
+`/guest/api/…`: das Gespräch lesen, live verfolgen, eine Nachricht hineinschicken, sehen, wer da ist.
+Nichts anderes antwortet auf ein Freigabe-Token, und die Gast-App hat keine Route, um eine
+Governance-Karte zu beantworten — die bleiben auf dem Bildschirm des Besitzers.
+
+Die Gast-App ist auch das **Einzige**, was ausgeliefert wird, wenn der Besitzer die Netzwerktür öffnet
+(`POST /api/code/share/network`, mit `DELETE` wieder geschlossen, beim Start nie offen): ein Rechner im LAN
+erreicht diese vier Routen und nichts von dem, was das Server-Token schützt. Klar gesagt, bevor ein Link
+weitergegeben wird: ein Gast kann den Agenten um alles bitten, worum der Besitzer ihn bitten würde, im
+Projekt des Besitzers, mit dessen Werkzeugen und Ausgaben — unter den Standard-Nähten der Anfrage, und
+ohne Karten freizugeben.
 
 ## Ehrliche Grenzen
 

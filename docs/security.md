@@ -140,6 +140,21 @@ With it set, those POST endpoints return `401` without a matching `Authorization
 `X-Hub-Signature-256` HMAC and rejects a forged payload with `403`. Both are opt-in (unset = no auth,
 fine for localhost); a public deployment should set them (or sit behind an authenticating proxy).
 
+### Sharing one conversation with a second person
+
+The desktop app can share a coding conversation by a **token that opens only that conversation** —
+never the server token. The owner mints one per guest (`POST /api/code/sessions/{id}/share`) and can
+revoke it alone; deleting the conversation revokes all of them. A guest reaches four routes under
+`/guest/api/…`: read the conversation, watch it live, send a message into it, see who is there.
+Nothing else answers a share token, and the guest app has no route to answer a governance card —
+those stay on the owner's screen.
+
+The guest app is also the **only** thing served when the owner opens the network door
+(`POST /api/code/share/network`, closed again with `DELETE`, never open at launch): a machine on the
+LAN reaches those four routes and nothing the server token protects. Say it plainly before handing
+out a link: a guest can ask the agent to do anything the owner can ask it, in the owner's project,
+with the owner's tools and spend — under the request's default seams, and short of approving cards.
+
 ## Honest limits
 
 This measures whether an *already-injected* agent's harmful action is stopped — not whether

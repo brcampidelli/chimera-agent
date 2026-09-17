@@ -1,5 +1,5 @@
 ---
-source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
+source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
 ---
 
 # Bezpieczeństwo i zabezpieczenia
@@ -153,6 +153,21 @@ webhooka WhatsApp, ustaw `CHIMERA_WHATSAPP_APP_SECRET` na sekret twojej aplikacj
 wtedy weryfikuje HMAC `X-Hub-Signature-256` każdego żądania i odrzuca sfałszowany payload z
 `403`. Oba są opt-in (nieustawione = brak autoryzacji, w porządku dla localhost); wdrożenie
 publiczne powinno je ustawić (albo siedzieć za uwierzytelniającym proxy).
+
+### Udostępnianie rozmowy drugiej osobie
+
+Aplikacja desktopowa może udostępnić rozmowę o kodzie przez **token otwierający tylko tę rozmowę** —
+nigdy przez token serwera. Właściciel wystawia po jednym na gościa (`POST /api/code/sessions/{id}/share`)
+i może go unieważnić osobno; usunięcie rozmowy unieważnia wszystkie. Gość dociera do czterech tras pod
+`/guest/api/…`: odczytać rozmowę, śledzić ją na żywo, wysłać do niej wiadomość, zobaczyć kto jest.
+Nic więcej nie odpowiada na token udostępnienia, a aplikacja gościa nie ma trasy, którą można by
+odpowiedzieć na kartę nadzoru — te zostają na ekranie właściciela.
+
+Aplikacja gościa jest też **jedyną** rzeczą serwowaną, gdy właściciel otwiera drzwi sieciowe
+(`POST /api/code/share/network`, zamykane przez `DELETE`, nigdy otwarte przy starcie): maszyna w LAN
+dociera do tych czterech tras i do niczego, co chroni token serwera. Powiedziane wprost przed wręczeniem
+linku: gość może poprosić agenta o wszystko, o co poprosiłby właściciel, w projekcie właściciela, jego
+narzędziami i za jego pieniądze — w domyślnych ramach żądania, i bez zatwierdzania kart.
 
 ## Uczciwe granice
 

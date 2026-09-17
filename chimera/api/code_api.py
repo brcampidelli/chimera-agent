@@ -1040,6 +1040,13 @@ def register_code_api(
     live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
+    # A conversation shared with a second person (`chimera.api.sharing`): the tokens that open one
+    # conversation each, and the bus every turn's frames go out on so the owner's screen and a
+    # guest's both see a turn whoever started it.
+    from chimera.api.sharing import SHARES_FILE, SessionBus, ShareStore
+
+    shares = ShareStore(settings.home / SHARES_FILE)
+    bus = SessionBus()
     # The index of finished turns (`chimera.memory.history`), one per home, shared with the
     # `recall_history` tool every registry mounts. The session file is what a conversation is
     # RESUMED from and trims itself accordingly; this is what a person's question about a turn
@@ -1134,6 +1141,16 @@ def register_code_api(
 
     @app.post("/api/code/turn", dependencies=[guard], responses=SSE_RESPONSE)
     async def code_turn(req: CodeTurnRequest) -> EventSourceResponse:
+        return await _start_turn(req)
+
+    async def _start_turn(req: CodeTurnRequest, *, author: str = "") -> EventSourceResponse:
+        """One coding turn, started by the owner (``author`` empty) or by a guest (their name).
+
+        The guest app calls this directly with the request it built, so a guest's message runs
+        through exactly the machinery the owner's does: one turn, one receipt shape, one bus. The
+        author reaches the receipt — so a reopened conversation still says who asked — and every
+        frame the turn emits, so a screen watching live can label it as it happens.
+        """
         # SAFETY POSTURE: identical to the run endpoint — file writes and shell inside ``ws``, behind
         # the bearer guard and the localhost bind, scoped by whatever seams the caller declared.
         # Validated the same way the read-only fs endpoints and POST /api/runs validate theirs. A
@@ -1275,6 +1292,22 @@ def register_code_api(
             if isinstance(numbered, dict) and event != "browser":
                 runlog.append(settings.home, turn_id, event, numbered, area="code")
             loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+            # And onto the session's bus, for everyone watching this conversation — the owner's
+            # own screen when a guest asked, a guest's when the owner did. The browser picture goes
+            # live and is not kept, for the reason the run log does not keep it.
+            bus.publish(
+                session_id, event,
+                numbered if isinstance(numbered, dict) else {"value": payload},
+                turn_id=turn_id, author=author, keep=event != "browser",
+            )
+
+        # The turn's opening frame on the bus: what was asked and by whom, before any work. A
+        # viewer who did not send this message needs both to draw the row the answer will land
+        # under; the session file only learns the author when the receipt is written at the end.
+        bus.publish(
+            session_id, "turn_started", {"message": req.message, "author": author},
+            turn_id=turn_id, author=author,
+        )
 
         # What the panel draws: the viewport as base64 JPEG, the page's address and title, and
         # which action produced it. `n` counts frames of this turn so the screen can say "frame 7".
@@ -1430,6 +1463,11 @@ def register_code_api(
                     receipt = {k: v for k, v in payload.items() if k != "answer"}
                     if verdict is not None:
                         receipt["verified"] = verdict
+                    # Who asked, when it was not the owner. Absent for the owner's own turns —
+                    # every turn before sharing existed was theirs, and an absent field reads as
+                    # exactly that rather than as a name nobody gave.
+                    if author:
+                        receipt["author"] = author
                     session.remember_receipt(receipt)
                     try:
                         store.save(session)
@@ -1839,17 +1877,30 @@ def register_code_api(
         file as the ordinary first-turn case, and a screen that errors on a session someone just
         deleted in another window would be reporting a race as a fault.
         """
+        view = _session_view(session_id)
+        return view if view is not None else {"id": session_id, "workspace": "", "exchanges": []}
+
+    def _session_view(session_id: str) -> dict[str, Any] | None:
+        """The stored conversation as exchanges, or None when there is no readable file.
+
+        Split from the route so the guest app reads the same fold with the same receipts: two
+        readers of one file would be two ways for the owner and the guest to see different
+        conversations.
+        """
         from chimera.api.code_replay import attach_receipts, exchanges_from_messages
 
-        path = store._path(session_id)
+        try:
+            path = store._path(session_id)
+        except ValueError:
+            return None
         if not path.is_file():
-            return {"id": session_id, "workspace": "", "exchanges": []}
+            return None
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
             messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
             receipts = [r for r in data.get("receipts", []) if isinstance(r, dict)]
         except (OSError, ValueError):
-            return {"id": session_id, "workspace": "", "exchanges": []}
+            return None
         # A streamed turn's receipt was written before its route could be known (the router's
         # record appears ~10 s after the call — `chimera.providers.generation`). This is where the
         # receipt is read back, so this is where it learns the route: bounded, newest first, and
@@ -1972,8 +2023,10 @@ def register_code_api(
         except ValueError:
             return {"ok": False}
         # Its rows in the history index go with it: the screen says the conversation is gone, and
-        # an index that still answered questions about it would make that a lie.
+        # an index that still answered questions about it would make that a lie. So do its share
+        # tokens: a link into a deleted conversation must open nothing.
         history.forget_session(session_id)
+        shares.revoke_session(session_id)
         return {"ok": gone}
 
     @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)
@@ -1990,6 +2043,8 @@ def register_code_api(
         ids = [str(m["id"]) for m in store.list_meta() if m["workspace"] == workspace]
         deleted = store.delete_project(workspace)
         history.forget_sessions(ids)
+        for sid in ids:
+            shares.revoke_session(sid)
         return {"deleted": deleted}
 
     # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is
@@ -2027,4 +2082,37 @@ def register_code_api(
         """Forget a bookmark. **Conversations are not touched**, so a project you have worked in
         reappears in the sidebar as one you have talked about rather than one you registered."""
         return [{"path": row.path, "alias": row.alias} for row in projects.remove(path)]
+
+    # --- sharing: the owner's controls, and the guest app under /guest -------------------------
+    #
+    # Last, because the guest app is handed the turn starter and the session view defined above,
+    # and `register_code_api` is the only place both exist. The network listener it returns is
+    # kept on `app.state` so the process can close the door on shutdown.
+    from chimera.api.guest_api import build_guest_app, register_sharing_api
+
+    def _session_workspace(session_id: str) -> str:
+        # A conversation started in the server's own folder stores no workspace ("" is the
+        # request's convention for "yours"); the guest is told, and sent to, that folder.
+        view = _session_view(session_id)
+        stored = str(view.get("workspace") or "") if view else ""
+        return stored or str(workspace)
+
+    def _session_exists(session_id: str) -> bool:
+        try:
+            return store._path(session_id).is_file()
+        except ValueError:
+            return False
+
+    guest_app = build_guest_app(
+        store=shares,
+        bus=bus,
+        session_view=_session_view,
+        session_workspace=_session_workspace,
+        start_turn=_start_turn,
+    )
+    app.state.guest_server = register_sharing_api(
+        app, guard, store=shares, bus=bus, guest=guest_app, session_exists=_session_exists
+    )
+    app.state.session_bus = bus
+    app.state.share_store = shares
 

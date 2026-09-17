@@ -1,5 +1,5 @@
 ---
-source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
+source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
 ---
 
 # Sécurité & garde-fous
@@ -160,6 +160,22 @@ vérifie alors le HMAC `X-Hub-Signature-256` de chaque requête et rejette une c
 avec `403`. Les deux sont opt-in (non défini = pas d'authentification, ce qui convient en
 localhost) ; un déploiement public devrait les définir (ou se placer derrière un proxy
 authentifiant).
+
+### Partager une conversation avec une seconde personne
+
+L'application de bureau peut partager une conversation de code par un **jeton qui n'ouvre que cette
+conversation** — jamais le jeton du serveur. Le propriétaire en émet un par invité
+(`POST /api/code/sessions/{id}/share`) et peut le révoquer seul ; supprimer la conversation les révoque
+tous. Un invité atteint quatre routes sous `/guest/api/…` : lire la conversation, la suivre en direct, y
+envoyer un message, voir qui est là. Rien d'autre ne répond à un jeton de partage, et l'application invité
+n'a aucune route pour répondre à une carte de gouvernance — celles-ci restent sur l'écran du propriétaire.
+
+L'application invité est aussi la **seule** chose servie quand le propriétaire ouvre la porte réseau
+(`POST /api/code/share/network`, refermée par `DELETE`, jamais ouverte au lancement) : une machine du LAN
+atteint ces quatre routes et rien de ce que protège le jeton du serveur. À dire sans détour avant de
+remettre un lien : un invité peut demander à l'agent tout ce que le propriétaire lui demanderait, dans le
+projet du propriétaire, avec ses outils et sa dépense — sous les coutures par défaut de la requête, et
+sans approuver de cartes.
 
 ## Limites honnêtes
 
