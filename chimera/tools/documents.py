@@ -17,7 +17,7 @@ from typing import Any
 from chimera.governance.ledger_tool import fence
 from chimera.governance.sanitize import sanitize_untrusted
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import resolve_for
 
 _MAX_CHARS = 20_000
 _INSTALL_HINT = (
@@ -64,7 +64,7 @@ class ReadDocumentTool(_WorkspaceTool):
 
     def run(self, **kwargs: Any) -> str:
         rel = str(kwargs["path"])
-        path = resolve_in_workspace(self.workspace, rel)
+        path = resolve_for(self, rel, verb="read")
         if not path.is_file():
             return f"error: file not found: {rel}"
         try:

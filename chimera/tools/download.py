@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _INSTALL_HINT = (
@@ -67,7 +67,7 @@ class DownloadMediaTool(Tool):
             return "error: download_media needs a url"
         # The write gate runs BEFORE the network does: a download we are not allowed to save is a
         # fetch nobody wanted, and refusing after it has already happened is the wrong order.
-        out_dir = resolve_in_workspace(self.workspace, str(kwargs.get("out_dir") or "downloads"))
+        out_dir = resolve_for(self, str(kwargs.get("out_dir") or "downloads"), verb="write")
         if err := refuse_write(self.workspace, out_dir, self.write_region):
             return err
         # SSRF guard: the URL is model-/content-supplied and yt-dlp will happily fetch an

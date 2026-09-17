@@ -497,6 +497,17 @@ def assemble_registry(
         write_region=build_write_region(seams.write_region, ws),
         host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
     )
+    # The owner's approver — the object the taint ledger and, since #495, the policy kernel are
+    # handed below — reaches the FILE tools too, on the surface that has a person: a path outside
+    # the project folder becomes a question on the screen instead of a refusal. Only when a screen
+    # is bound (`approval_sink`), for the same reason the kernel gets it only then: headless, a
+    # question announced to nobody is a timeout with a bill, and the jail's refusal is the right
+    # answer. The declared write region is not softened by a yes (`resolve_for` says why).
+    owner = _owner_allows(settings, approval_sink)
+    if approval_sink is not None:
+        for tool in registry.tools():
+            if hasattr(tool, "workspace"):
+                tool.ask_outside = owner  # type: ignore[attr-defined]
     # The configured MCP servers, HERE and not lower down, because everything below this line has to
     # reach them: the denial list, the trust kernel, and the taint ledger that treats their output as
     # untrusted. The chat path learned this the hard way and says so at its own injection point — "a
@@ -652,7 +663,6 @@ def assemble_registry(
     # `observe` in order to MEASURE would silently weaken the surface. Observe adds measurement; it
     # must never subtract protection that was already there. The other direction is the point of
     # `screen`: the owner's approver reaches the kernel only under `enforce`, where a yes is a yes.
-    owner = _owner_allows(settings, approval_sink)
     step = govern_step(
         registry,
         settings=settings,

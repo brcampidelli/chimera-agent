@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resolve_in_workspace
+from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resolve_for, shown_path
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 # Conflict-marker hunk format, familiar to models from git and Aider:
@@ -60,7 +60,7 @@ class EditFileTool(_WorkspaceTool):
     }
 
     def run(self, **kwargs: Any) -> str:
-        path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        path = resolve_for(self, str(kwargs["path"]), verb="edit")
         if err := refuse_write(self.workspace, path, self.write_region):
             return err
         old = str(kwargs["old"])
@@ -136,7 +136,7 @@ class ApplyPatchTool(_WorkspaceTool):
     }
 
     def run(self, **kwargs: Any) -> str:
-        path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        path = resolve_for(self, str(kwargs["path"]), verb="edit")
         if err := refuse_write(self.workspace, path, self.write_region):
             return err
         rel = kwargs["path"]
@@ -258,7 +258,7 @@ class EditBatchTool(_WorkspaceTool):
             if expected < 1:
                 return f"error: edit {index} expects {expected} occurrences — must be >= 1"
 
-            path = resolve_in_workspace(self.workspace, rel)
+            path = resolve_for(self, rel, verb="edit")
             # The per-path guard. Outside the loop this would not run for a payload with no
             # top-level `path`, and the tool would write wherever it was told.
             if err := refuse_write(self.workspace, path, self.write_region):
@@ -299,7 +299,7 @@ class EditBatchTool(_WorkspaceTool):
                 done = ", ".join(written) or "none"
                 return (
                     f"error: PARTIAL WRITE — {exc}. Already written: {done}. "
-                    f"Failed on: {path.relative_to(self.workspace)}. The workspace is inconsistent."
+                    f"Failed on: {shown_path(self.workspace, path)}. The workspace is inconsistent."
                 )
-            written.append(str(path.relative_to(self.workspace)).replace("\\", "/"))
+            written.append(shown_path(self.workspace, path))
         return f"edited {len(written)} file(s) in one batch: {', '.join(written)}"

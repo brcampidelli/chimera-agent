@@ -13,7 +13,7 @@ from typing import Any
 
 from chimera.config import get_settings
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _OPENAI_IMAGES = "https://api.openai.com/v1/images/generations"
@@ -74,7 +74,7 @@ class ImageGenTool(Tool):
 
         settings = get_settings()
         prompt = str(kwargs["prompt"])
-        out = resolve_in_workspace(self.workspace, str(kwargs.get("out") or "generated_image.png"))
+        out = resolve_for(self, str(kwargs.get("out") or "generated_image.png"), verb="write")
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
         size = str(kwargs.get("size") or "1024x1024")
@@ -152,7 +152,7 @@ class TextToSpeechTool(Tool):
 
         # Where the audio would land is settled BEFORE the key check and before the request: a
         # synthesis we are not allowed to save is an API call nobody wanted.
-        out = resolve_in_workspace(self.workspace, str(kwargs.get("out") or "speech.mp3"))
+        out = resolve_for(self, str(kwargs.get("out") or "speech.mp3"), verb="write")
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
         key = get_settings().elevenlabs_api_key
@@ -240,7 +240,7 @@ class TranscribeAudioTool(Tool):
         rel = str(kwargs.get("path", "")).strip()
         if not rel:
             return "error: transcribe_audio needs a 'path'"
-        path = resolve_in_workspace(self.workspace, rel)
+        path = resolve_for(self, rel, verb="read")
         if not path.is_file():
             return f"error: audio file not found: {rel}"
         # `str(None)` is `"None"` — a five-character string that is not empty, so `or None` never

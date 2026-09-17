@@ -2623,6 +2623,31 @@ def resolve_app_workspace(flag: str | None) -> Path:
     return Path(flag or os.environ.get("CHIMERA_WORKSPACE") or ".")
 
 
+def _kernel_observes_unless_told_otherwise() -> None:
+    """The desktop starts with the trust kernel in ``observe`` when nobody chose a mode.
+
+    The kernel shipped ``off`` on every surface, and on the desktop that meant the product's
+    advertised defence — the curl-into-a-shell rule, the force-push rule, the secret-in-a-write
+    rule — judged nothing on the screen most people use, while the Security screen showed an audit
+    log the kernel was not writing. ``observe`` writes that log and refuses the fixed signatures
+    (a BLOCK is applied in every mode that installs the kernel at all — `governance/profile.py`);
+    it approves every REVIEW, so it asks nothing and stops no work. ``enforce``, which asks with a
+    card since 0.58.0, stays a choice.
+
+    A choice already made wins, wherever it was made: a value in the environment or in the home's
+    ``.env`` is in ``model_fields_set`` and is left alone. Only the shipped default is replaced —
+    and it is replaced in the process environment, so the Settings screen shows ``observe``, a
+    PATCH to ``off`` writes ``.env`` and is honoured at the next launch, and ``chimera serve``, the
+    CLI and the VPS are untouched: this is the desktop's default, not the package's.
+    """
+    from chimera.config import get_settings
+
+    if "governance_mode" in get_settings().model_fields_set:
+        return
+    os.environ["CHIMERA_GOVERNANCE"] = "observe"
+    get_settings.cache_clear()
+
+
 @app.command(name="app")
 def desktop_app(
     host: str = typer.Option("127.0.0.1", "--host", help="Bind host (localhost by default)."),
@@ -2674,6 +2699,7 @@ def desktop_app(
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
+    _kernel_observes_unless_told_otherwise()
     settings = get_settings()
     if not settings.can_answer():
         # Unlike run/solve/fuse (which need a model to do their job and stay strict), the desktop app

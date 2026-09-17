@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 # Pinned CDN majors — the client-side render path, no Python dep. jsDelivr serves the latest of each.
@@ -133,7 +133,7 @@ class RenderChartTool(Tool):
         shape_error = _validate_shape(spec)
         if shape_error:
             return f"error: invalid Vega-Lite spec: {shape_error}"
-        out = resolve_in_workspace(self.workspace, str(kwargs.get("out") or f"chart.{fmt}"))
+        out = resolve_for(self, str(kwargs.get("out") or f"chart.{fmt}"), verb="write")
         if err := refuse_write(self.workspace, out, self.write_region):
             return err
         out.parent.mkdir(parents=True, exist_ok=True)

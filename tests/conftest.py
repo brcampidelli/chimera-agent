@@ -145,6 +145,12 @@ def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     # gateway exports `LM_STUDIO_API_BASE` the way it exports Ollama's (see `Settings.lm_studio_base_url`).
     monkeypatch.setenv("LM_STUDIO_API_BASE", "")
     monkeypatch.delenv("LM_STUDIO_API_BASE")
+    # `chimera app` writes CHIMERA_GOVERNANCE=observe into the process environment when nobody
+    # chose a mode (`_kernel_observes_unless_told_otherwise`), and the app-factory tests build that
+    # command for real. Owned the same way, so the desktop's default is a fact those tests can read
+    # and not a change they are blamed for — and so a developer's own shell value never reaches a test.
+    monkeypatch.setenv("CHIMERA_GOVERNANCE", "")
+    monkeypatch.delenv("CHIMERA_GOVERNANCE")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

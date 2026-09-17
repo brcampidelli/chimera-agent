@@ -27,7 +27,7 @@ from typing import Any, Protocol
 
 from chimera.governance.ledger_tool import fence
 from chimera.tools.base import Tool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _MAX_CHARS = 20_000
@@ -274,7 +274,7 @@ class BrowserTool(Tool):
                 raw = str(kwargs.get("path", "")).strip()
                 if not raw:
                     return "error: screenshot needs a path"
-                target = resolve_in_workspace(self.workspace, raw)
+                target = resolve_for(self, raw, verb="write")
                 if err := refuse_write(self.workspace, target, self.write_region):
                     return err
                 path = str(target)
