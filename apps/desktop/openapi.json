@@ -6200,6 +6200,50 @@
         "title": "ModelsOut",
         "type": "object"
       },
+      "NetworkShareIn": {
+        "properties": {
+          "port": {
+            "default": 0,
+            "maximum": 65535.0,
+            "minimum": 0.0,
+            "title": "Port",
+            "type": "integer"
+          }
+        },
+        "title": "NetworkShareIn",
+        "type": "object"
+      },
+      "NetworkShareOut": {
+        "properties": {
+          "open": {
+            "title": "Open",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "required": [
+          "open"
+        ],
+        "title": "NetworkShareOut",
+        "type": "object"
+      },
       "NewSessionOut": {
         "properties": {
           "id": {
@@ -6704,6 +6748,22 @@
           }
         },
         "title": "PostureQuery",
+        "type": "object"
+      },
+      "PresenceOut": {
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "title": "PresenceOut",
         "type": "object"
       },
       "ProfileWorth": {
@@ -7798,6 +7858,72 @@
           "updated_at"
         ],
         "title": "SessionMetaOut",
+        "type": "object"
+      },
+      "ShareIn": {
+        "properties": {
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "title": "ShareIn",
+        "type": "object"
+      },
+      "ShareOut": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "token",
+          "session_id",
+          "created_at"
+        ],
+        "title": "ShareOut",
+        "type": "object"
+      },
+      "SharesOut": {
+        "properties": {
+          "shares": {
+            "items": {
+              "$ref": "#/components/schemas/ShareOut"
+            },
+            "title": "Shares",
+            "type": "array"
+          }
+        },
+        "required": [
+          "shares"
+        ],
+        "title": "SharesOut",
         "type": "object"
       },
       "SkillStatOut": {
@@ -9466,6 +9592,108 @@
         "summary": "Fork Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/live": {
+      "get": {
+        "description": "The owner's own window on a conversation: every frame of every turn, whoever started it.",
+        "operationId": "session_live_api_code_sessions__session_id__live_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "default": "owner",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Server-sent events. Each frame is an `event:` line plus a `data:` line holding a JSON object; the event names depend on the route. NOT application/json \u2014 reading the body with a JSON parser fails on the first line."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Session Live"
+      }
+    },
+    "/api/code/sessions/{session_id}/presence": {
+      "get": {
+        "operationId": "session_presence_api_code_sessions__session_id__presence_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PresenceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Session Presence"
+      }
+    },
     "/api/code/sessions/{session_id}/raw": {
       "get": {
         "description": "The conversation's stored file, verbatim.\n\nEverything else this API returns about a session has been through a parser and a fold into\nexchanges \u2014 which is the right thing to render and the wrong thing to debug with, because a\nmessage the parser dropped is invisible in it. This is the one view where a malformed file\nlooks malformed.",
@@ -9504,6 +9732,232 @@
           }
         },
         "summary": "Raw Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/share": {
+      "post": {
+        "description": "A new token for this conversation. One per person, so one can be revoked alone.",
+        "operationId": "share_session_api_code_sessions__session_id__share_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ShareIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Share Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/shares": {
+      "get": {
+        "operationId": "list_shares_api_code_sessions__session_id__shares_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Shares"
+      }
+    },
+    "/api/code/sessions/{session_id}/shares/{token}": {
+      "delete": {
+        "operationId": "revoke_share_api_code_sessions__session_id__shares__token__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "title": "Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "title": "Response Revoke Share Api Code Sessions  Session Id  Shares  Token  Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Share"
+      }
+    },
+    "/api/code/share/network": {
+      "delete": {
+        "operationId": "network_close_api_code_share_network_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkShareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Network Close"
+      },
+      "get": {
+        "operationId": "network_state_api_code_share_network_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkShareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Network State"
+      },
+      "post": {
+        "description": "Open the LAN door: the guest app, and only it, on every interface.",
+        "operationId": "network_open_api_code_share_network_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NetworkShareIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NetworkShareOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Network Open"
       }
     },
     "/api/code/turn": {

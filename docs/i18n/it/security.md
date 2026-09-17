@@ -1,5 +1,5 @@
 ---
-source_sha256: eeb0e80877d9cd939362a1d6f1b736437c3918f1b24f1fb1b44e18f31aa71e42
+source_sha256: 8223fdcb0c763172564230d3c98bcec05f7c32d5b8c8aa1b5ddda3a9bd1269ca
 ---
 
 # Sicurezza & salvaguardie
@@ -159,6 +159,23 @@ webhook in entrata di WhatsApp, imposta `CHIMERA_WHATSAPP_APP_SECRET` con il sec
 Meta — Chimera verifica quindi l'HMAC `X-Hub-Signature-256` di ogni richiesta e rifiuta un payload
 falsificato con `403`. Entrambi sono opt-in (non impostato = nessuna autenticazione, va bene per
 localhost); un deployment pubblico dovrebbe impostarli (o stare dietro a un proxy che autentica).
+
+### Condividere una conversazione con una seconda persona
+
+L'app desktop può condividere una conversazione di codice tramite un **token che apre solo quella
+conversazione** — mai il token del server. Il proprietario ne emette uno per ospite
+(`POST /api/code/sessions/{id}/share`) e può revocarlo da solo; eliminare la conversazione li revoca
+tutti. Un ospite raggiunge quattro rotte sotto `/guest/api/…`: leggere la conversazione, seguirla dal
+vivo, inviarvi un messaggio, vedere chi c'è. Nient'altro risponde a un token di condivisione, e l'app
+ospite non ha alcuna rotta per rispondere a una scheda di governance — quelle restano sullo schermo del
+proprietario.
+
+L'app ospite è anche l'**unica** cosa servita quando il proprietario apre la porta di rete
+(`POST /api/code/share/network`, richiusa con `DELETE`, mai aperta all'avvio): una macchina sulla LAN
+raggiunge quelle quattro rotte e nulla di ciò che il token del server protegge. Detto chiaramente prima
+di consegnare un link: un ospite può chiedere all'agente qualsiasi cosa chiederebbe il proprietario, nel
+progetto del proprietario, con i suoi strumenti e la sua spesa — sotto le cuciture predefinite della
+richiesta, e senza approvare schede.
 
 ## Limiti onesti
 
