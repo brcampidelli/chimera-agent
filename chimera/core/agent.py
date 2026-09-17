@@ -31,6 +31,22 @@ from chimera.tools.base import is_refusal
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
 from chimera.tools.workspace import resolve_in_workspace
 
+#: The tools a step may run at the same time when it asked for several: they read and never write,
+#: execute or send, so their order cannot matter to the workspace. An explicit list rather than
+#: "everything not in WRITE_TOOLS": an MCP tool's semantics are unknown, `browser` holds one page
+#: across calls, `crawl` and `download_media` write. Anything not named here keeps the one-at-a-time
+#: loop.
+PARALLEL_READ_TOOLS = frozenset(
+    {
+        "read_file", "read_document", "list_dir", "grep", "glob", "transcribe_audio",
+        "http_get", "fetch_url", "web_search", "arxiv_search", "youtube_transcript",
+        "scrape", "extract", "map",
+    }
+)
+#: How many of a step's calls run at once. Four is a fetch batch, not a fan-out: a model asks for a
+#: handful of pages, and more threads than that would only queue on the same provider.
+PARALLEL_READ_WORKERS = 4
+
 if TYPE_CHECKING:
     from chimera.skills.registry import SkillRegistry
 
@@ -747,13 +763,21 @@ class Agent:
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
             answered: set[str] = set()
-            for call in result.tool_calls:
+            # A read-only batch runs together; its observations are then consumed below in the
+            # model's order, exactly as the one-at-a-time path consumes them. `None` is that path.
+            together = self._observations_together(result.tool_calls)
+            if together is not None:
+                record.ran_together = len(together)
+            for index, call in enumerate(result.tool_calls):
                 tool_calls_made += 1
                 tool_names.append(call.name)
                 # Capture the file's real pre-write content (only when a diff sink is attached, so
                 # there is zero overhead — and no extra read — otherwise).
                 edit_before = self._edit_before(call.name, call.arguments) if on_edit is not None else None
-                observation = self._run_tool(call.name, call.arguments)
+                observation = (
+                    together[index] if together is not None
+                    else self._run_tool(call.name, call.arguments)
+                )
                 if on_edit is not None and edit_before is not None:
                     self._emit_edit(edit_before, on_edit)
                 # A refusal is not a success. This read `not startswith("error:")`, so a
@@ -778,7 +802,11 @@ class Agent:
                     verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
                     if verdict.tripped:
                         tripped = verdict.reason
-                        break
+                        # A batch that ran together has already run: its remaining observations
+                        # are real and are recorded as such — the "not run" reply below would be
+                        # false for them. The step still ends on the trip, right after this loop.
+                        if together is None:
+                            break
             # Every declared tool_call needs a `role:"tool"` reply, including the ones the break
             # above skipped. The assistant message announced them all in one go, so a list that
             # answers only some is malformed — and the next request sends it: a provider that
@@ -925,6 +953,49 @@ class Agent:
             route_meta=route_meta,
             steplog=steplog if steplog is not None else StepLog(),
         )
+
+    def _observations_together(self, calls: list[Any]) -> list[str] | None:
+        """The observations for a step's calls, run at the same time — or None, meaning: one at a
+        time, as always.
+
+        Only when the step made MORE than one call and every one of them is in
+        :data:`PARALLEL_READ_TOOLS`. A model that asks for four pages, or four files, in one step
+        used to wait for each in turn: the loop was written one call at a time and never revisited
+        when providers started returning several calls per step. Measured on the desktop's own
+        traces before this existed (2026-09-17, 1,221 steps): 205 steps carried more than one
+        call and 143 of those were read-only throughout — 12% of all steps. What the run-together
+        buys is bounded by the slowest call, so it is real for fetches (seconds each) and nothing
+        for local reads (milliseconds each); the step record says how many ran together so the
+        trace can tell which.
+
+        Read-only is the whole safety argument: nothing in the batch writes, executes or sends, so
+        order cannot matter to the workspace, and the governance wrappers each call passes through
+        keep their own locks (the audit log) or only append (the taint ledger). A mixed batch — one
+        write among reads — runs sequentially, unchanged. Observations come back in the model's
+        order, whatever finished first, because the transcript pairs each tool message with its
+        call id and the model reads them in the order it asked.
+        """
+        if len(calls) < 2 or not all(call.name in PARALLEL_READ_TOOLS for call in calls):
+            return None
+        from chimera.concurrency import run_all_with_deadline
+
+        def unit(name: str, arguments: dict[str, Any]) -> Callable[[], str]:
+            return lambda: self._run_tool(name, arguments)
+
+        units: list[tuple[str, Callable[[], str]]] = [
+            (str(index), unit(call.name, dict(call.arguments))) for index, call in enumerate(calls)
+        ]
+        outcomes = run_all_with_deadline(
+            units, max_workers=min(PARALLEL_READ_WORKERS, len(units)), timeout=None
+        )
+        observations: list[str] = []
+        for index, call in enumerate(calls):
+            outcome = outcomes[str(index)]
+            if outcome.error is not None:  # `_run_tool` catches everything; belt and braces
+                observations.append(f"error: tool {call.name!r} failed: {outcome.error}")
+            else:
+                observations.append(str(outcome.value if outcome.value is not None else ""))
+        return observations
 
     def _run_tool(self, name: str, arguments: dict[str, Any]) -> str:
         _log.debug("tool call %s(%s)", name, arguments)

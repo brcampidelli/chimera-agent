@@ -120,6 +120,11 @@ class StepRecord:
     #: receipt keeps so a streamed step's route can be learned afterwards — see
     #: `chimera.providers.generation`.
     generation_id: str = ""
+    #: How many of this step's tool calls ran at the same time — 0 when they ran one at a time (the
+    #: ordinary case, and every step with a single call). Recorded so a reader of the trace can tell
+    #: a batch that was run together from one that merely could have been: an intervention that
+    #: acts must say how often it acted.
+    ran_together: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -131,6 +136,7 @@ class StepRecord:
             "model": self.model,
             "provider": self.provider,
             "generation_id": self.generation_id,
+            "ran_together": self.ran_together,
             "content": self.content,
             "compacted": self.compacted,
             "tools": [
