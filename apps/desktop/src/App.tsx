@@ -142,7 +142,8 @@ export default function App() {
   const { dark, toggle } = useTheme();
   // The app's one piece of choreography. Runs on cold start only; see useIgnition.
   const ignite = useIgnition();
-  // First-run gate: no provider key => show the Onboarding wizard instead of the app (a keyed user
+  // First-run gate: no way to answer (no provider key AND no local model) => show the Onboarding
+  // wizard instead of the app (a keyed user, or one whose default model runs on this machine,
   // never sees it). Session-local "skip" lets a GUI-first user jump to Settings without a key yet.
   //
   // It is also the app's heartbeat, and that is the second job this one call now does. Without the
@@ -230,7 +231,9 @@ export default function App() {
       </div>
     );
   }
-  if (doctor.data && !doctor.data.has_any_key && !skipOnboarding) {
+  // `can_answer`, not `has_any_key`: a default model that runs on this machine needs no key, and
+  // gating on keys alone showed a keyless Ollama user a wizard demanding one.
+  if (doctor.data && !doctor.data.can_answer && !skipOnboarding) {
     return (
       <Framed banner={outage}>
         <Onboarding

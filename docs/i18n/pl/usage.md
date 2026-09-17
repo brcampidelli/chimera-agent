@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -65,6 +65,8 @@ self-hosted / zgodnego z OpenAI (Ollama, vLLM) ustaw `CHIMERA_API_BASE`
 który nie potrafi wywoływać narzędzi. Ustaw
 `CHIMERA_FALLBACK_MODELS` (rozdzielone przecinkami), by przełączyć się na inny model, gdy
 podstawowy zawiedzie. W `chat`/`tui`, `/model <slug>` przełącza model w trakcie sesji.
+
+**Lokalny model nie potrzebuje klucza.** Z `CHIMERA_DEFAULT_MODEL=ollama_chat/<model>` lub `lm_studio/<model>` każde polecenie działa bez klucza API (LM Studio jest odpytywany pod `CHIMERA_LM_STUDIO_BASE_URL`, domyślnie `http://localhost:1234/v1`), a ekran pierwszego uruchomienia aplikacji desktopowej proponuje modele, które Ollama lub LM Studio już mają — jedno kliknięcie, bez klucza.
 
 **Pule poświadczeń.** Daj providerowi kilka kluczy przez
 `CHIMERA_<PROVIDER>_KEYS` (np. `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). Brama

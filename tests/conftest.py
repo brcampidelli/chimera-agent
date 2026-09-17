@@ -141,6 +141,10 @@ def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     # that nothing was), delenv keeps it out of the test, and the teardown puts that back.
     monkeypatch.setenv("OLLAMA_API_BASE", "")
     monkeypatch.delenv("OLLAMA_API_BASE")
+    # Same export, second runtime: LiteLLM's `lm_studio/` provider has no default base URL, so the
+    # gateway exports `LM_STUDIO_API_BASE` the way it exports Ollama's (see `Settings.lm_studio_base_url`).
+    monkeypatch.setenv("LM_STUDIO_API_BASE", "")
+    monkeypatch.delenv("LM_STUDIO_API_BASE")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

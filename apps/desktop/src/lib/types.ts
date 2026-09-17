@@ -89,6 +89,10 @@ export type InlineCompletion = Schemas["CompletionOut"];
 export type CompletionAcceptance = Schemas["AcceptanceOut"];
 /** What the configured Ollama has pulled. `reachable` and an empty `models` are different answers. */
 export type OllamaModels = Schemas["OllamaModelsOut"];
+/** Every local, keyless runtime this install knows how to ask, asked — Ollama and LM Studio. The
+ *  first-run screen reads it to offer a model that is already on the machine instead of a key. */
+export type LocalRuntimes = Schemas["LocalRuntimesOut"];
+export type LocalRuntime = Schemas["LocalRuntimeOut"];
 /** The models a turn may name, from every catalogue this install can reach. `reason` is set NEXT TO
  *  a non-empty list when the remote index failed and only the curated one answered. */
 export type ModelListing = Schemas["ModelsOut"];

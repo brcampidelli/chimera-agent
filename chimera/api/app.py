@@ -80,6 +80,7 @@ from chimera.api.schemas import (
     HitlOut,
     HitlRequest,
     InjectionReportOut,
+    LocalRuntimesOut,
     MaturityOut,
     McpAddRequest,
     McpCatalogOut,
@@ -807,6 +808,41 @@ def build_api_app(
             "reachable": found.reachable,
             "models": list(found.models),
             "reason": found.reason,
+        }
+
+    @app.get("/api/models/local", dependencies=[guard], response_model=LocalRuntimesOut)
+    def local_runtimes_endpoint() -> dict[str, Any]:
+        """Every local runtime, asked — the answer the first-run screen needs before it asks for a key.
+
+        Beside ``/api/models/ollama`` rather than replacing it: that endpoint is one Settings row's
+        picker and keeps its shape. This one exists because a machine with Ollama or LM Studio
+        already running was shown a wizard demanding an API key — the product asking for a
+        credential it did not need. Both probes are bounded (two seconds each, and much less on the
+        common no-server case) and run concurrently, so a machine with neither answers in about the
+        time of one connect attempt, not two.
+        """
+        from concurrent.futures import ThreadPoolExecutor
+
+        from chimera.providers.lmstudio import PREFIX as LM_PREFIX
+        from chimera.providers.lmstudio import loaded_models
+        from chimera.providers.ollama import installed_models
+
+        current = live_settings()
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            ollama_future = pool.submit(installed_models, current.ollama_base_url)
+            lm_future = pool.submit(loaded_models, current.lm_studio_base_url)
+            ollama, lm = ollama_future.result(), lm_future.result()
+        return {
+            "runtimes": [
+                {
+                    "name": "ollama", "base_url": ollama.base_url, "reachable": ollama.reachable,
+                    "prefix": "ollama_chat/", "models": list(ollama.models), "reason": ollama.reason,
+                },
+                {
+                    "name": "lm_studio", "base_url": lm.base_url, "reachable": lm.reachable,
+                    "prefix": LM_PREFIX, "models": list(lm.models), "reason": lm.reason,
+                },
+            ]
         }
 
     #: Answers to `/api/models`, by what the answer depends on. Per app instance rather than a

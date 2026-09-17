@@ -81,6 +81,8 @@ beforeEach(() => {
   vi.mocked(getConfig).mockResolvedValue(CONFIG as never);
   vi.mocked(getDoctor).mockResolvedValue({
     has_any_key: true,
+    local_model: false,
+    can_answer: true,
     configured_providers: ["openrouter"],
     default_model: "m",
     tiers: { weak: "w", mid: "m", top: "t" },

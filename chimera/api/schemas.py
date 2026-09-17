@@ -317,6 +317,8 @@ class ModelsCfgOut(BaseModel):
     fallback_models: list[str]
     tiers: TiersOut
     ollama_base_url: str = ""
+    #: LM Studio's OpenAI-compatible root (``/v1`` included); what LiteLLM's ``lm_studio/`` needs.
+    lm_studio_base_url: str = ""
     complete_model: str = ""
     """Where the local Ollama server lives.
 
@@ -651,6 +653,31 @@ class AcceptanceOut(BaseModel):
     note: str
 
 
+class LocalRuntimeOut(BaseModel):
+    """One local, keyless model runtime and what it has right now — Ollama or LM Studio.
+
+    Same three-state answer as ``OllamaModelsOut`` (reachable with nothing, unreachable, reachable
+    with models) and for the same reason; ``prefix`` is what turns an entry of ``models`` into the
+    slug a turn runs on, so the client never re-implements which runtime takes which LiteLLM route.
+    """
+
+    #: ``"ollama"`` or ``"lm_studio"`` — a token, translated on the client.
+    name: str
+    base_url: str
+    reachable: bool
+    #: Prepend to a model to get its slug: ``ollama_chat/`` or ``lm_studio/``.
+    prefix: str
+    models: list[str] = Field(default_factory=list)
+    reason: str = ""
+
+
+class LocalRuntimesOut(BaseModel):
+    """Every local runtime this install knows how to ask, asked. The first-run screen reads it to
+    offer a model that is already on the machine instead of demanding a key."""
+
+    runtimes: list[LocalRuntimeOut] = Field(default_factory=list)
+
+
 class OllamaModelsOut(BaseModel):
     """What the configured Ollama has pulled, so a model field stops being a memory test.
 
@@ -784,6 +811,12 @@ class EditorCapabilityOut(BaseModel):
 
 class DoctorOut(BaseModel):
     has_any_key: bool
+    #: The default model runs on this machine and needs no key (``ollama_chat/…``, ``lm_studio/…``).
+    #: Beside ``has_any_key`` rather than folded into it, because the two have different remedies:
+    #: a screen that gates on keys alone showed a keyless Ollama user a wizard demanding one.
+    local_model: bool = False
+    #: ``has_any_key or local_model`` — the question the first-run gate actually asks.
+    can_answer: bool = False
     configured_providers: list[str]
     default_model: str
     tiers: TiersOut

@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera —— 使用指南
@@ -62,6 +62,8 @@ OpenAI 兼容的服务器（Ollama、vLLM），设置 `CHIMERA_API_BASE`（例�
 而不是 `ollama/`：`ollama/` 前缀走的是 Ollama 的 generate 端点，它无法调用工具。设置
 `CHIMERA_FALLBACK_MODELS`（逗号分隔）可以在主模型报错时自动故障转移到另一个模型。在
 `chat`/`tui` 中，`/model <slug>` 可以在会话中途切换模型。
+
+**本地模型不需要密钥。** 设置 `CHIMERA_DEFAULT_MODEL=ollama_chat/<模型>` 或 `lm_studio/<模型>` 后，所有命令都无需 API 密钥即可运行（LM Studio 通过 `CHIMERA_LM_STUDIO_BASE_URL` 询问，默认 `http://localhost:1234/v1`），桌面应用的首次启动界面会直接列出 Ollama 或 LM Studio 已有的模型——一键选用，无需密钥。
 
 **凭据池。** 通过 `CHIMERA_<PROVIDER>_KEYS`（例如
 `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`）为某个 provider 提供多个密钥。网关会在多次调用间

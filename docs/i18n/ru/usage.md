@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — руководство по использованию
@@ -65,6 +65,8 @@ CHIMERA_FUSION_SYNTHESIZER=openrouter/openai/gpt-4o-mini
 не умеет вызывать инструменты. Задайте
 `CHIMERA_FALLBACK_MODELS` (через запятую), чтобы переключаться на другую модель, когда основная даёт
 ошибку. В `chat` и `tui` команда `/model <ярлык>` меняет модель посреди сессии.
+
+**Локальной модели ключ не нужен.** С `CHIMERA_DEFAULT_MODEL=ollama_chat/<модель>` или `lm_studio/<модель>` любая команда работает без API-ключа (LM Studio опрашивается по `CHIMERA_LM_STUDIO_BASE_URL`, по умолчанию `http://localhost:1234/v1`), а экран первого запуска настольного приложения предлагает модели, которые уже есть у Ollama или LM Studio — один клик, без ключа.
 
 **Пулы учётных данных.** Дайте поставщику несколько ключей через `CHIMERA_<ПОСТАВЩИК>_KEYS`
 (например, `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). Шлюз чередует их по кругу между вызовами

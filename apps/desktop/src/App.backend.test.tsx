@@ -81,6 +81,8 @@ const CONFIG = {
 
 const doctorSays = answering({
   has_any_key: true,
+  local_model: false,
+  can_answer: true,
   configured_providers: ["openrouter"],
   default_model: "m",
   tiers: { weak: "w", mid: "m", top: "t" },

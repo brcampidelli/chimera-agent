@@ -60,6 +60,9 @@ _EDITABLE_SETTINGS = {
     # Only reachable by hand-editing .env until now. `api_base` is next to it on the screen and is
     # NOT a substitute: that one is sent on every call, this one only points the Ollama provider.
     "CHIMERA_OLLAMA_BASE_URL",
+    # The second local runtime, editable for the same reason as the first: a server on another port
+    # or another machine should not need a hand-edited .env.
+    "CHIMERA_LM_STUDIO_BASE_URL",
     # The model behind the semantic-memory toggle three rows below. Offering the switch and hiding
     # its dependency is how a control ends up confirming a change it did not make: recall degrades
     # to lexical on any embedder failure, without a word on this screen.
@@ -317,6 +320,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "fallback_models": list(settings.fallback_models),
             "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},
             "ollama_base_url": settings.ollama_base_url,
+            "lm_studio_base_url": settings.lm_studio_base_url,
             "complete_model": settings.complete_model,
         },
         # Panel -> judge -> synthesizer, and how independent the judge actually is from the panel it
@@ -385,10 +389,13 @@ def read_config(settings: Settings) -> dict[str, Any]:
 def doctor(settings: Settings) -> dict[str, Any]:
     """A config-health snapshot (no live provider pings): which providers have keys, the model ladder."""
     from chimera.acp.agents import available_agents
+    from chimera.providers.discovery import is_local_model
 
     ladder = settings.tier_ladder()
     return {
         "has_any_key": settings.has_any_key(),
+        "local_model": is_local_model(settings.default_model),
+        "can_answer": settings.can_answer(),
         "configured_providers": settings.configured_providers(),
         "default_model": settings.default_model,
         "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},

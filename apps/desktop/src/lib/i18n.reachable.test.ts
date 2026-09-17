@@ -39,6 +39,10 @@ const DYNAMIC = [
   "crew.approach.",
   "crew.status.",
   "fusion.role.",
+  // `` t(`onboarding.local.runtime.${o.runtime}`) `` — the first-run screen names the local
+  // runtime a found model belongs to, from the token `/api/models/local` sends (`ollama`,
+  // `lm_studio`), so the client never keeps its own list of runtimes.
+  "onboarding.local.runtime.",
   // `` t(`governance.sandbox.why.${data.reason_code}`) `` — the Security screen says WHY no
   // kernel boundary applies, in the reader's language rather than relaying the server's
   // English. The codes come from `chimera.sandbox.os_sandbox.UnavailableCode` plus the API

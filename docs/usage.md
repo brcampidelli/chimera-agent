@@ -61,6 +61,8 @@ which cannot call tools. Set
 `CHIMERA_FALLBACK_MODELS` (comma-separated) to fail over to another model if the
 primary errors. In `chat`/`tui`, `/model <slug>` switches the model mid-session.
 
+**A local model needs no key.** With `CHIMERA_DEFAULT_MODEL=ollama_chat/<model>` or `lm_studio/<model>` every command runs without an API key (LM Studio is asked at `CHIMERA_LM_STUDIO_BASE_URL`, default `http://localhost:1234/v1`), and the desktop's first-run screen offers the models Ollama or LM Studio already have — one click, no key.
+
 **Credential pools.** Give a provider several keys with
 `CHIMERA_<PROVIDER>_KEYS` (e.g. `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). The
 gateway rotates them round-robin across calls (spreading load / rate limits) and,

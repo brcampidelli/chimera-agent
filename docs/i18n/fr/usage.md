@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — Guide d'utilisation
@@ -67,6 +67,8 @@ ex. `http://127.0.0.1:11434` avec `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`). U
 qui ne peut pas appeler d'outils. Définissez
 `CHIMERA_FALLBACK_MODELS` (séparés par des virgules) pour basculer vers un autre modèle si le
 principal échoue. Dans `chat`/`tui`, `/model <slug>` change de modèle en cours de session.
+
+**Un modèle local n'a pas besoin de clé.** Avec `CHIMERA_DEFAULT_MODEL=ollama_chat/<modèle>` ou `lm_studio/<modèle>`, toutes les commandes fonctionnent sans clé d'API (LM Studio est interrogé sur `CHIMERA_LM_STUDIO_BASE_URL`, par défaut `http://localhost:1234/v1`), et l'écran de premier lancement du bureau propose les modèles qu'Ollama ou LM Studio ont déjà — un clic, sans clé.
 
 **Pools d'identifiants.** Donnez à un fournisseur plusieurs clés avec
 `CHIMERA_<PROVIDER>_KEYS` (par ex. `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). La passerelle

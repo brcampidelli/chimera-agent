@@ -3250,6 +3250,11 @@
             "title": "Cache",
             "type": "boolean"
           },
+          "can_answer": {
+            "default": false,
+            "title": "Can Answer",
+            "type": "boolean"
+          },
           "configured_providers": {
             "items": {
               "type": "string"
@@ -3279,6 +3284,11 @@
           },
           "has_any_key": {
             "title": "Has Any Key",
+            "type": "boolean"
+          },
+          "local_model": {
+            "default": false,
+            "title": "Local Model",
             "type": "boolean"
           },
           "memory_backend": {
@@ -5065,6 +5075,61 @@
         "title": "LifecycleRunIn",
         "type": "object"
       },
+      "LocalRuntimeOut": {
+        "description": "One local, keyless model runtime and what it has right now \u2014 Ollama or LM Studio.\n\nSame three-state answer as ``OllamaModelsOut`` (reachable with nothing, unreachable, reachable\nwith models) and for the same reason; ``prefix`` is what turns an entry of ``models`` into the\nslug a turn runs on, so the client never re-implements which runtime takes which LiteLLM route.",
+        "properties": {
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prefix": {
+            "title": "Prefix",
+            "type": "string"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "base_url",
+          "reachable",
+          "prefix"
+        ],
+        "title": "LocalRuntimeOut",
+        "type": "object"
+      },
+      "LocalRuntimesOut": {
+        "description": "Every local runtime this install knows how to ask, asked. The first-run screen reads it to\noffer a model that is already on the machine instead of demanding a key.",
+        "properties": {
+          "runtimes": {
+            "items": {
+              "$ref": "#/components/schemas/LocalRuntimeOut"
+            },
+            "title": "Runtimes",
+            "type": "array"
+          }
+        },
+        "title": "LocalRuntimesOut",
+        "type": "object"
+      },
       "MaturityOut": {
         "properties": {
           "available": {
@@ -5954,6 +6019,11 @@
             },
             "title": "Fallback Models",
             "type": "array"
+          },
+          "lm_studio_base_url": {
+            "default": "",
+            "title": "Lm Studio Base Url",
+            "type": "string"
           },
           "mid": {
             "title": "Mid",
@@ -11731,6 +11801,25 @@
           }
         },
         "summary": "Models Endpoint"
+      }
+    },
+    "/api/models/local": {
+      "get": {
+        "description": "Every local runtime, asked \u2014 the answer the first-run screen needs before it asks for a key.\n\nBeside ``/api/models/ollama`` rather than replacing it: that endpoint is one Settings row's\npicker and keeps its shape. This one exists because a machine with Ollama or LM Studio\nalready running was shown a wizard demanding an API key \u2014 the product asking for a\ncredential it did not need. Both probes are bounded (two seconds each, and much less on the\ncommon no-server case) and run concurrently, so a machine with neither answers in about the\ntime of one connect attempt, not two.",
+        "operationId": "local_runtimes_endpoint_api_models_local_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocalRuntimesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Local Runtimes Endpoint"
       }
     },
     "/api/models/ollama": {

@@ -36,6 +36,30 @@ from functools import lru_cache
 
 _API_KEY = re.compile(r"^[A-Z][A-Z0-9_]*_API_KEY$")
 
+#: LiteLLM prefixes that route to a runtime on the user's own machine, which needs no key. Ollama
+#: is the common case; LM Studio, vLLM and llamafile are the same situation. Lived in `gateway.py`
+#: as a private tuple while the credential gate was the only reader; it is here, public, because
+#: the answer "does this install need a key at all" is asked by six CLI commands and the desktop's
+#: first-run gate, and every one of them used to answer it by looking for a key alone — refusing a
+#: machine whose only model was `ollama_chat/llama3` with "No provider key configured".
+#:
+#: `ollama_chat/` first, and the order is documentation: it is Ollama's /api/chat with native tool
+#: calling. `ollama/` is /api/generate, which LiteLLM serves without tool calls — still local and
+#: keyless, so it stays listed; `gateway._warn_generate_prefix_with_tools` says the rest.
+LOCAL_MODEL_PREFIXES = (
+    "ollama_chat/",
+    "ollama/",
+    "lm_studio/",
+    "hosted_vllm/",
+    "vllm/",
+    "llamafile/",
+)
+
+
+def is_local_model(model: str | None) -> bool:
+    """True when ``model`` routes to a local, keyless runtime (e.g. ``ollama_chat/llama3``)."""
+    return (model or "").lower().startswith(LOCAL_MODEL_PREFIXES)
+
 # The providers with a typed field, a rotating key pool and a labelled slot in the UI. Excluded here
 # only to avoid reporting them twice — `configured_providers()` lists them first, from their fields.
 FIRST_CLASS: frozenset[str] = frozenset(

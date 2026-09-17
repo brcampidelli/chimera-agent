@@ -2,7 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Onboarding } from "@/components/Onboarding";
-import { getConfig, getModels, patchConfig, testProviderKey } from "@/lib/api";
+import { getConfig, getLocalRuntimes, getModels, patchConfig, testProviderKey } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
@@ -10,6 +10,9 @@ vi.mock("@/lib/api", () => ({
   // The wizard's model field can now be filled from the live catalogue instead of typed. Resolved
   // rather than bare so a suite about provider selection never waits on a list it does not use.
   getModels: vi.fn(async () => ({ default: "", models: [], sources: [], reason: "" })),
+  // The machine has nothing local unless a test says so: the common case, and the one where this
+  // screen must look exactly as it did before local runtimes were asked about.
+  getLocalRuntimes: vi.fn(async () => ({ runtimes: [] })),
   patchConfig: vi.fn(async () => ({ updated: [] })),
   testProviderKey: vi.fn(async () => ({ ok: true, model: "x", error: null })),
 }));
@@ -271,5 +274,89 @@ describe("the first-run wizard", () => {
 
     await user.selectOptions(combo(), "GROQ_API_KEY");
     expect(screen.queryByRole("link")).toBeNull();
+  });
+});
+
+/**
+ * A machine that already runs a model needs no key, and used to be asked for one anyway.
+ *
+ * Measured on 2026-09-16: with `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3` and no key, the gateway
+ * served turns while this wizard sat on screen demanding a key. The section below is the other half
+ * of that fix — the backend's `/api/models/local` says what is running, and one click makes it the
+ * default model; the doctor's `can_answer` then closes the wizard without a key ever being typed.
+ */
+describe("models already on this machine", () => {
+  function runtimes(ollama: string[], lmStudio: string[]) {
+    return {
+      runtimes: [
+        {
+          name: "ollama",
+          base_url: "http://127.0.0.1:11434",
+          reachable: ollama.length > 0,
+          prefix: "ollama_chat/",
+          models: ollama,
+          reason: ollama.length ? "" : "unreachable",
+        },
+        {
+          name: "lm_studio",
+          base_url: "http://localhost:1234/v1",
+          reachable: lmStudio.length > 0,
+          prefix: "lm_studio/",
+          models: lmStudio,
+          reason: lmStudio.length ? "" : "unreachable",
+        },
+      ],
+    };
+  }
+
+  it("says nothing when no local runtime answered with models", async () => {
+    vi.mocked(getLocalRuntimes).mockResolvedValue(runtimes([], []) as never);
+    renderWithProviders(<Onboarding onSkip={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Anthropic" })).toBeTruthy());
+
+    expect(screen.queryByText("Models already on this machine")).toBeNull();
+    expect(screen.queryByRole("button", { name: /no key needed/ })).toBeNull();
+  });
+
+  it("offers every model of every runtime, named by its runtime, and one click makes it the default", async () => {
+    vi.mocked(getLocalRuntimes).mockResolvedValue(
+      runtimes(["llama3:latest", "qwen2.5:7b"], ["gemma-3-4b"]) as never,
+    );
+    renderWithProviders(<Onboarding onSkip={() => {}} />);
+    await waitFor(() => expect(screen.getByText("Models already on this machine")).toBeTruthy());
+
+    const picker = within(screen.getByLabelText("Models already on this machine"));
+    expect(picker.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "Ollama · llama3:latest",
+      "Ollama · qwen2.5:7b",
+      "LM Studio · gemma-3-4b",
+    ]);
+    // The VALUE is the slug a turn runs on — prefix included, so the client never re-implements
+    // which runtime takes which LiteLLM route.
+    expect(picker.getAllByRole("option").map((o) => (o as HTMLOptionElement).value)).toEqual([
+      "ollama_chat/llama3:latest",
+      "ollama_chat/qwen2.5:7b",
+      "lm_studio/gemma-3-4b",
+    ]);
+
+    await userEvent.selectOptions(screen.getByLabelText("Models already on this machine"), "lm_studio/gemma-3-4b");
+    await userEvent.click(screen.getByRole("button", { name: /no key needed/ }));
+
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledTimes(1));
+    expect(patchConfig).toHaveBeenCalledWith({ CHIMERA_DEFAULT_MODEL: "lm_studio/gemma-3-4b" });
+    // No key was written: the whole point.
+    const written = vi.mocked(patchConfig).mock.calls[0][0] as Record<string, string>;
+    expect(Object.keys(written).some((k) => k.endsWith("_API_KEY"))).toBe(false);
+  });
+
+  it("keeps the key form usable while the machine is still being asked", async () => {
+    // A probe that never answers must not hold the wizard hostage — the section is an extra,
+    // never a gate.
+    vi.mocked(getLocalRuntimes).mockReturnValue(new Promise(() => {}) as never);
+    renderWithProviders(<Onboarding onSkip={() => {}} />);
+    await waitFor(() => expect(screen.getByRole("option", { name: "Anthropic" })).toBeTruthy());
+
+    expect(keyField()).toBeTruthy();
+    expect(screen.queryByText("Models already on this machine")).toBeNull();
   });
 });

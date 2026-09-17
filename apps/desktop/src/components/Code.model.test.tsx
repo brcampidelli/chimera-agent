@@ -36,6 +36,8 @@ function renderCode() {
 function doctorWith(agents: { key: string; label: string }[] = []) {
   return {
     has_any_key: true,
+    local_model: false,
+    can_answer: true,
     configured_providers: ["openrouter"],
     default_model: "test/model",
     tiers: { weak: "w", mid: "m", top: "t" },
