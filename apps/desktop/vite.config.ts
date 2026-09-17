@@ -8,7 +8,17 @@ import { fileURLToPath, URL } from "node:url";
 export default defineConfig({
   plugins: [react()],
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  server: { proxy: { "/api": "http://127.0.0.1:8765" } },
+  server: { proxy: { "/api": "http://127.0.0.1:8765", "/guest/api": "http://127.0.0.1:8765" } },
+  // Two pages from one build: the app, and the page a guest opens from a share link. The guest
+  // page is served by the backend's guest listener at its root and under /guest on the owner's.
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL("./index.html", import.meta.url)),
+        guest: fileURLToPath(new URL("./guest.html", import.meta.url)),
+      },
+    },
+  },
   // Component tests (Vitest + Testing Library) run against jsdom and reuse the `@` alias above, so a
   // test imports exactly what the app imports. `setup.ts` wires jest-dom's matchers.
   test: {

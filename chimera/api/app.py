@@ -2085,6 +2085,8 @@ def build_api_app(
         memory=memory,
         graph=graph,
         fuse_backend=fuse_backend,
+        # The built bundle, for the page a guest opens from a share link (`guest.html`).
+        static_dir=static_dir,
     )
     # /api/orchestration/* — the hierarchical orchestrator's plan, run, cancel and ledger.
     # Registered unconditionally: `schema_dump` builds the app through this function, so a route

@@ -393,3 +393,42 @@ def test_the_network_door_opens_a_real_listener_that_serves_only_the_guest_app_a
     assert door.open is False
     with pytest.raises((urllib.error.URLError, ConnectionError, OSError)):
         urllib.request.urlopen(f"http://127.0.0.1:{port}/api/session", timeout=1)  # noqa: S310
+
+
+def test_the_guest_page_is_served_as_a_plain_file_with_no_token_in_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner's page handler injects the server token into `index.html` for a loopback client.
+    The guest page must never go through it: it is opened by people who hold a share token and
+    nothing else, and a page carrying the owner's secret would hand them everything."""
+    import chimera.core
+    from chimera.api import build_api_app
+    from chimera.config import get_settings
+
+    home = tmp_path / "home"
+    monkeypatch.setenv("CHIMERA_HOME", str(home))
+    monkeypatch.setenv("CHIMERA_SERVER_TOKEN", "owner-secret-token")
+    get_settings.cache_clear()
+    monkeypatch.setattr(chimera.core, "Agent", _Agent, raising=True)
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<html><head></head><body>app</body></html>", encoding="utf-8")
+    (dist / "guest.html").write_text("<html><head></head><body>guest</body></html>", encoding="utf-8")
+    (dist / "assets" / "guest.js").write_text("console.log('guest')", encoding="utf-8")
+    settings = Settings(CHIMERA_HOME=str(home), CHIMERA_SERVER_TOKEN="owner-secret-token")  # type: ignore[call-arg]
+    client = TestClient(build_api_app(lambda: ChatSession(_Agent()), workspace=ws, settings=settings, static_dir=dist))
+
+    # The guest page is the file, and only the file. (The owner's page injects the token for a
+    # loopback client — `_index_html` — which the test client's synthetic host does not trigger,
+    # so the contrast is pinned on the guest side: nothing here can put the secret in this page.)
+    page = client.get("/guest/")
+    assert page.status_code == 200 and "guest" in page.text and "owner-secret-token" not in page.text
+    assert client.get("/guest/assets/guest.js").status_code == 200
+    # And a guest token opens the guest routes here too, with the owner's guard untouched.
+    assert client.get("/api/code/sessions").status_code == 401
+    sid = _frames(client.post("/api/code/turn", json={"message": "hi"}, headers={"Authorization": "Bearer owner-secret-token"}).text)["session"]["session_id"]
+    token = client.post(f"/api/code/sessions/{sid}/share", headers={"Authorization": "Bearer owner-secret-token"}).json()["token"]
+    assert client.get("/guest/api/session", headers={"Authorization": f"Bearer {token}"}).status_code == 200
+    assert client.get("/api/code/sessions", headers={"Authorization": f"Bearer {token}"}).status_code == 401

@@ -10,6 +10,9 @@ import type { components } from "@/lib/api-schema";
 type Schemas = components["schemas"];
 
 export type SessionMeta = Schemas["SessionMetaOut"];
+// Sharing a conversation with a second person: the token, and the state of the network door.
+export type ShareInfo = Schemas["ShareOut"];
+export type NetworkShare = Schemas["NetworkShareOut"];
 export type VersionInfo = Schemas["VersionOut"];
 export type ChatTurn = Schemas["TurnOut"];
 export type MemoryItem = Schemas["MemoryItemOut"];

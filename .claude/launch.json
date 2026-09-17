@@ -4,19 +4,44 @@
     {
       "name": "chimera-api",
       "runtimeExecutable": "uv",
-      "runtimeArgs": ["run", "chimera", "app", "--port", "8765"],
+      "runtimeArgs": [
+        "run",
+        "chimera",
+        "app",
+        "--port",
+        "8765"
+      ],
+      "port": 8765
+    },
+    {
+      "name": "chimera-api-scratch",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "export CHIMERA_HOME=\"$LOCALAPPDATA/Temp/chimera-scratch-home\" CHIMERA_APP_CRON=false; exec ./.venv/Scripts/chimera.exe app --port 8765 --no-open --no-cron"
+      ],
       "port": 8765
     },
     {
       "name": "desktop-ui",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "apps/desktop", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "apps/desktop",
+        "run",
+        "dev"
+      ],
       "port": 5173
     },
     {
       "name": "site",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "../chimera-site", "run", "dev"],
+      "runtimeArgs": [
+        "--prefix",
+        "../chimera-site",
+        "run",
+        "dev"
+      ],
       "port": 3000
     }
   ]

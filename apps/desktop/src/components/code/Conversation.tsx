@@ -14,6 +14,7 @@ import {
   Copy,
   Download,
   Eraser,
+  Link2,
   ListChecks,
   Loader2,
   MessageSquare,
@@ -28,8 +29,10 @@ import {
 import {
   deleteCodeSession,
   getCodeSession,
+  listShares,
   revertCodeTurn,
   streamCodeTurn,
+  streamSessionLive,
   type Approval,
   type CodeBrowserFrame,
   CodeToolEvent,
@@ -39,7 +42,7 @@ import {
   type Profile,
   type Reach,
 } from "@/lib/api";
-import type { CodeApprovalEvent } from "@/lib/api";
+import type { CodeApprovalEvent, SessionLiveFrame } from "@/lib/api";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -53,6 +56,7 @@ import {
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { BrowserView } from "@/components/code/BrowserView";
+import { SharePanel } from "@/components/code/SharePanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
 import { VoiceMode, type SpokenAnswer } from "@/components/code/VoiceMode";
 import {
@@ -125,6 +129,12 @@ const MAX_STEPS = 40;
  *  caption — a transcript that shows only the prose is a transcript of the wrong half. */
 interface Exchange {
   you: string;
+  /** Who asked, when it was not the person at this screen: a guest's name, from the turn's
+   *  receipt on a replay or from its opening frame live. Absent for the owner's own turns. */
+  author?: string;
+  /** The turn this exchange is, when it arrived over the conversation's live stream — the key a
+   *  later frame of the same turn is matched by. */
+  turnId?: string;
   answer: string;
   tools: CodeToolEvent[];
   edits: { path: string; patch: string }[];
@@ -567,6 +577,16 @@ export function Conversation({
   // The question the turn is parked on, if any. One at a time by construction: the tool call
   // that raised it is blocked until it is answered, so a second cannot arrive first.
   const [pendingApproval, setPendingApproval] = useState<CodeApprovalEvent | null>(null);
+  // Sharing. How many links this conversation has (the live stream is worth holding open only
+  // when someone could be on the other end), whether the panel is open, and who is here now.
+  const [shareCount, setShareCount] = useState(0);
+  const [showShare, setShowShare] = useState(false);
+  const [presence, setPresence] = useState<string[]>([]);
+  // The turns THIS screen started. Their frames arrive twice — on the turn's own stream and on
+  // the conversation's — and the second copy is dropped here rather than drawn as a guest's turn.
+  const ownTurns = useRef<Set<string>>(new Set());
+  // How far the live stream has been read, so a reconnect asks for what came after.
+  const liveSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   // Follows the stream by writing scrollTop once per frame, and stops the moment the reader scrolls
   // up. Replaces a `scrollIntoView` on every state change, which yanked the reader back mid-read —
@@ -597,6 +617,8 @@ export function Conversation({
         setExchanges(
           session.exchanges.map((e) => ({
             ...e,
+            // A guest's turn names its author on the receipt; the owner's own turns carry none.
+            author: e.done?.author || undefined,
             done: (e.done ?? null) as Exchange["done"],
             verified: (e.verified ?? undefined) as Exchange["verified"],
             // Empty on a replay, for the reason `CodeExchangeOut` already gives about `edits`: the
@@ -617,6 +639,116 @@ export function Conversation({
       live = false;
     };
   }, [resumeSession]);
+
+  useEffect(() => {
+    setShowShare(false);
+    setPresence([]);
+    liveSeq.current = 0;
+    if (!sessionId) {
+      setShareCount(0);
+      return;
+    }
+    let live = true;
+    void listShares(sessionId)
+      .then((r) => {
+        if (live) setShareCount(r.shares.length);
+      })
+      .catch(() => {
+        if (live) setShareCount(0);
+      });
+    return () => {
+      live = false;
+    };
+  }, [sessionId]);
+
+  /** One frame of the conversation's live stream, folded into the exchanges.
+   *
+   *  A turn this screen started is ignored: its own stream already drew it. A turn someone else
+   *  started opens an exchange on `turn_started` — the message and the author travel on that
+   *  frame, because the session file only learns the author when the receipt is written — and
+   *  every later frame of the same turn is matched by its id. An approval a guest's turn raises
+   *  lands on THIS screen's card, which is the whole arrangement: guests cannot answer one.
+   */
+  const applyLive = useCallback((frame: SessionLiveFrame) => {
+    if (frame.session_seq > liveSeq.current) liveSeq.current = frame.session_seq;
+    if (frame.event === "presence") {
+      setPresence(((frame.payload.names as string[] | undefined) ?? []).filter((n) => n !== "owner"));
+      return;
+    }
+    if (!frame.turn_id || ownTurns.current.has(frame.turn_id)) return;
+    const id = frame.turn_id;
+    const data = frame.payload;
+    const patch = (fn: (e: Exchange) => Exchange) =>
+      setExchanges((prev) => prev.map((e) => (e.turnId === id ? fn(e) : e)));
+    switch (frame.event) {
+      case "turn_started":
+        setExchanges((prev) =>
+          prev.some((e) => e.turnId === id)
+            ? prev
+            : [
+                ...prev,
+                {
+                  you: String(data.message ?? ""),
+                  author: frame.author || undefined,
+                  turnId: id,
+                  answer: "",
+                  tools: [],
+                  edits: [],
+                  todos: [],
+                  done: null,
+                },
+              ],
+        );
+        break;
+      case "token":
+        patch((e) => ({ ...e, answer: e.answer + String(data.text ?? "") }));
+        break;
+      case "tool":
+        patch((e) => ({ ...e, tools: [...e.tools, data as unknown as CodeToolEvent] }));
+        break;
+      case "edit":
+        patch((e) => ({
+          ...e,
+          edits: [...e.edits, { path: String(data.path ?? ""), patch: String(data.patch ?? "") }],
+        }));
+        break;
+      case "todo":
+        patch((e) => ({ ...e, todos: ((data.items ?? []) as TodoEntry[]) }));
+        break;
+      case "approval":
+        setPendingApproval(data as unknown as CodeApprovalEvent);
+        break;
+      case "done": {
+        const done = data as unknown as CodeTurnDone;
+        patch((e) => ({ ...e, answer: done.answer || e.answer, done }));
+        break;
+      }
+      case "error":
+        patch((e) => ({ ...e, failed: true, error: String(data.message ?? "") }));
+        break;
+      default:
+        break;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!sessionId || shareCount === 0) return;
+    const controller = new AbortController();
+    let alive = true;
+    void (async () => {
+      while (alive) {
+        const cut = await streamSessionLive(sessionId, liveSeq.current, applyLive, controller.signal);
+        if (!alive || cut === null) break;
+        // Cut, not stopped: come back from where we were. Three seconds, not at once — a server
+        // that is down answers a tight loop with a tight loop.
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+      }
+    })();
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [sessionId, shareCount, applyLive]);
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
@@ -870,7 +1002,8 @@ export function Conversation({
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
         // conversation, and the symptom is only that the agent seems forgetful.
-        onSession: (id) => {
+        onSession: (id, turnId) => {
+          if (turnId) ownTurns.current.add(turnId);
           // Invalidate on the FIRST turn's id, not on every turn: the sidebar lists conversations,
           // and a conversation that already exists in the list has not changed by gaining a message.
           if (id !== sessionId)
@@ -1046,6 +1179,25 @@ export function Conversation({
         </h2>
         {exchanges.length > 0 ? (
           <div className="ml-auto flex min-w-0 items-center gap-1">
+            {/* Who else is in this conversation right now, by the names they gave. */}
+            {presence.length > 0 ? (
+              <span className="text-xs text-muted-foreground" data-testid="presence-line">
+                {t("code.share.here", { names: presence.join(", ") })}
+              </span>
+            ) : null}
+            {sessionId ? (
+              <Button
+                size="sm"
+                variant={shareCount > 0 ? "primary" : "ghost"}
+                aria-pressed={showShare}
+                title={t("code.share.hint")}
+                onClick={() => setShowShare((v) => !v)}
+                data-testid="share-button"
+              >
+                <Link2 className="h-3.5 w-3.5" /> {t("code.share.button")}
+                {shareCount > 0 ? ` · ${shareCount}` : ""}
+              </Button>
+            ) : null}
             {/* A record of what an agent did to a repository should be able to leave the window it
                 happened in. Until this, the only clipboard call in the whole app copied a `pip
                 install` line. */}
@@ -1081,6 +1233,16 @@ export function Conversation({
           </div>
         ) : null}
       </div>
+      {showShare && sessionId ? (
+        <div className="border-b border-hairline px-3 py-2">
+          <SharePanel
+            sessionId={sessionId}
+            presence={presence}
+            onSharesChanged={setShareCount}
+            onClose={() => setShowShare(false)}
+          />
+        </div>
+      ) : null}
       {/* Said out loud rather than logged. "Your export is missing four turns" is exactly the kind
           of thing that must not be discovered later, by someone reading the file. */}
       {exportNote ? (
@@ -1132,6 +1294,16 @@ export function Conversation({
           {exchanges.map((e, i) => (
             <div key={i} className="space-y-2">
               <div className="rounded-chip bg-surface-2 px-2.5 py-1.5 text-sm text-foreground/90">
+                {/* A guest's turn says whose it is. The owner's own turns say nothing, as they
+                    always have — every turn before sharing existed was theirs. */}
+                {e.author ? (
+                  <span
+                    className="mr-1.5 rounded-chip bg-accent/15 px-1.5 text-xs font-medium text-accent-ink"
+                    data-testid="exchange-author"
+                  >
+                    {e.author}
+                  </span>
+                ) : null}
                 {e.you}
               </div>
               {e.tools.length > 0 ? (
