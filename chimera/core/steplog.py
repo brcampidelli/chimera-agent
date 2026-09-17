@@ -116,6 +116,10 @@ class StepRecord:
     #:
     #: Empty on the streaming path, where the chunks carry nothing to read it from.
     provider: str = ""
+    #: The router's id for this call (``gen-…`` on OpenRouter); ``""`` when none was sent. What a
+    #: receipt keeps so a streamed step's route can be learned afterwards — see
+    #: `chimera.providers.generation`.
+    generation_id: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -126,6 +130,7 @@ class StepRecord:
             "elapsed_ms": self.elapsed_ms,
             "model": self.model,
             "provider": self.provider,
+            "generation_id": self.generation_id,
             "content": self.content,
             "compacted": self.compacted,
             "tools": [
@@ -242,6 +247,15 @@ class StepLog:
             if step.provider:
                 return step.provider
         return ""
+
+    @property
+    def generation_ids(self) -> list[str]:
+        """The router's ids for this run's calls, in step order, without the steps that sent none.
+
+        Kept on the receipt beside ``provider`` because on a streamed call the route arrives
+        ~10 s after the call ends (`chimera.providers.generation`) — the ids are what let a receipt
+        learn the route it could not carry when it was written."""
+        return [s.generation_id for s in self.steps if s.generation_id]
 
     @property
     def drift(self) -> DriftReport:

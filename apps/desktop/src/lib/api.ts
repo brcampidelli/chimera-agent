@@ -1111,8 +1111,16 @@ export interface CodeTurnDone {
    *  distinct from `model`, the id that was asked for. Empty when no step named one. A model id
    *  is served by several routes and byte-identical requests differ across them, so the score,
    *  the cost and the cache below belong to the route, not to the id. The autonomous run's
-   *  receipt has carried it since 0.57.0; the turn's did not, on the same install. */
+   *  receipt has carried it since 0.57.0; the turn's did not, on the same install.
+   *
+   *  **Empty on every streamed turn as it finishes** — measured: the chunks carry no route, and the
+   *  router's record of the call appears ~10 s later. The receipt keeps `generation_ids` instead,
+   *  and learns the route when the conversation is reopened (the replay fills it in and stores
+   *  it), so the badge appears on a reopened conversation, not on the live one. */
   provider?: string;
+  /** The router's ids for this turn's calls (`gen-…` on OpenRouter), in step order. What the
+   *  stored receipt uses to learn `provider` above; nothing on screen draws them. */
+  generation_ids?: string[];
   /** Prompt tokens the route served from its cache over the turn. Null when NO step reported cache
    *  usage — a silent route, not a miss; zero is a real answer (a route that switched and cached
    *  nothing), and the two must not be drawn alike. */

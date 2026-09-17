@@ -159,6 +159,18 @@ class CompletionResult(BaseModel):
     reported" — it is "this path cannot see it". Said here rather than left for a reader to infer
     from a field that is always blank on one route."""
 
+    generation_id: str = ""
+    """The router's id for THIS call — ``gen-…`` on OpenRouter — and the key to the route a
+    streamed call cannot name at the time.
+
+    Measured on 2026-09-16 with `litellm` against OpenRouter: a streamed chunk exposes no
+    provider anywhere (not on the chunk, not in ``_hidden_params``, not in
+    ``provider_specific_fields``), while the non-streamed response does. What the chunk does
+    carry is its ``id``, and ``GET /api/v1/generation?id=<id>`` answers with ``provider_name`` —
+    ~9–11 s after the stream ends (404 before that, in 3/3 trials), so nothing on the request
+    path can wait for it. The id is recorded so a receipt can learn its route later
+    (:mod:`chimera.providers.generation`). Empty when the provider sent none."""
+
     truncated: bool = False
     """True when generation stopped because it ran out of room, rather than because it was done.
 
@@ -817,6 +829,7 @@ class LLMGateway:
                 **call_kwargs,
             )
             provider = ""
+            generation_id = ""
             for chunk in response:
                 # Taken from the first chunk that carries one rather than assumed to be on the
                 # first chunk at all. Measured: none of them carry it today, so this stays empty
@@ -825,6 +838,10 @@ class LLMGateway:
                 # to see that the absence was looked for rather than overlooked.
                 if not provider:
                     provider = str(getattr(chunk, "provider", "") or "")
+                # The id every chunk DOES carry, and the only way this path's route is ever
+                # learned — see `CompletionResult.generation_id`.
+                if not generation_id:
+                    generation_id = str(getattr(chunk, "id", "") or "")
                 razao = self._consume_chunk(chunk, content, tool_acc, usage, think, on_delta)
                 if razao:
                     finish_reason = razao
@@ -863,6 +880,7 @@ class LLMGateway:
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
             provider=provider,
+            generation_id=generation_id,
         )
 
     @staticmethod
@@ -959,6 +977,7 @@ class LLMGateway:
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
             provider=str(getattr(response, "provider", "") or ""),
+            generation_id=str(getattr(response, "id", "") or ""),
         )
 
     @staticmethod
