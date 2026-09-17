@@ -143,6 +143,28 @@ def test_an_exotic_format_says_which_extra_it_needs_when_the_converter_is_absent
     assert "documents" in saved.note  # the extra that actually provides it, not `docs`
 
 
+def test_a_recording_is_stored_as_audio_and_never_sent_through_the_document_converter(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The hands-free voice mode uploads an utterance every few seconds. Each one used to be run
+    through the document converter — which answered that it could not read audio, after trying —
+    and the answer was thrown away by the only caller, the transcriber. A converter that RAISES
+    here is the proof it is not consulted."""
+    import chimera.tools.documents as documents
+
+    def _never(_path: str) -> str:
+        raise AssertionError("the converter was asked about a recording")
+
+    monkeypatch.setattr(documents, "_markitdown_convert", _never)
+    for name in ("speech.wav", "speech.webm", "note.ogg"):
+        saved = save(tmp_path, name, b"RIFF....WAVEfmt ")
+        assert saved.kind == "audio", name
+        assert saved.text == "" and saved.note == ""
+        assert saved.path.is_file() and saved.path.suffix == Path(name).suffix
+        again = load(tmp_path, saved.id)
+        assert again is not None and again.kind == "audio"
+
+
 # --- Can this machine turn speech into text at all? -------------------------------------------
 
 

@@ -31,6 +31,12 @@ TEXT_SUFFIXES = frozenset({
     ".c", ".h", ".cpp", ".sh", ".sql", ".xml", ".html", ".css",
 })
 
+#: Recordings. Stored as they are and never pushed through the document converter: the only
+#: reader of a stored recording is the transcriber, and the converter's answer to audio — a note
+#: that it cannot read it, after trying — was being computed and thrown away on every utterance
+#: the hands-free voice mode sends, several a minute.
+AUDIO_SUFFIXES = frozenset({".wav", ".webm", ".ogg", ".mp3", ".m4a", ".flac"})
+
 #: A hard ceiling per file. Images are base64-encoded into the request, so a 40 MB photo is not a big
 #: attachment, it is a failed turn and a bill for it.
 MAX_BYTES = 20 * 1024 * 1024
@@ -42,7 +48,7 @@ class Attachment:
 
     id: str
     name: str
-    kind: str  # "image" | "document"
+    kind: str  # "image" | "document" | "audio"
     path: Path
     text: str = ""
     note: str = ""
@@ -71,6 +77,8 @@ def save(home: Path, name: str, data: bytes) -> Attachment:
 
     if suffix in IMAGE_SUFFIXES:
         return Attachment(id=ident, name=name, kind="image", path=path)
+    if suffix in AUDIO_SUFFIXES:
+        return Attachment(id=ident, name=name, kind="audio", path=path)
 
     from chimera.governance.ledger_tool import fence
     from chimera.governance.sanitize import sanitize_untrusted
@@ -120,9 +128,8 @@ def load(home: Path, ident: str) -> Attachment | None:
     if not matches:
         return None
     path = matches[0]
-    kind = "image" if path.suffix.lower() in IMAGE_SUFFIXES else "document"
-    if kind == "image":
-        return Attachment(id=ident, name=path.name, kind=kind, path=path)
+    suffix = path.suffix.lower()
+    kind = "image" if suffix in IMAGE_SUFFIXES else "audio" if suffix in AUDIO_SUFFIXES else "document"
     return Attachment(id=ident, name=path.name, kind=kind, path=path)
 
 

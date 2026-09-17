@@ -1280,9 +1280,10 @@ export interface Transcript {
   note: string;
 }
 
-export async function transcribe(audio: Blob): Promise<Transcript> {
+export async function transcribe(audio: Blob, filename = "speech.webm"): Promise<Transcript> {
   const body = new FormData();
-  body.append("file", audio, "speech.webm");
+  // The name is how the hosted transcriber tells the format apart; the voice mode uploads WAV.
+  body.append("file", audio, filename);
   const res = await fetch(apiUrl("/api/transcribe"), {
     method: "POST",
     headers: authHeadersNoContentType(),

@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -53,6 +54,7 @@ import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { BrowserView } from "@/components/code/BrowserView";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
+import { VoiceMode, type SpokenAnswer } from "@/components/code/VoiceMode";
 import {
   EMPTY_CAST,
   FusionCast,
@@ -756,6 +758,23 @@ export function Conversation({
     });
   }, []);
 
+  // The answer the voice mode reads aloud: the last finished exchange, keyed by its position so a
+  // new turn is a new answer and a re-render is not. Primitives in the memo, not the exchange:
+  // every streamed token patches the last exchange, and an object rebuilt per token would look
+  // like a new answer per token.
+  let lastDoneAt = -1;
+  for (let i = exchanges.length - 1; i >= 0; i--) {
+    if (exchanges[i].done) {
+      lastDoneAt = i;
+      break;
+    }
+  }
+  const lastDoneText = lastDoneAt >= 0 ? exchanges[lastDoneAt].answer : "";
+  const spokenAnswer = useMemo<SpokenAnswer | null>(
+    () => (lastDoneAt >= 0 ? { seq: lastDoneAt, text: lastDoneText } : null),
+    [lastDoneAt, lastDoneText],
+  );
+
   function send(force = false, override?: string) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
@@ -1366,6 +1385,13 @@ export function Conversation({
             onText={(text) =>
               setDraft((prev) => (prev ? `${prev} ${text}` : text))
             }
+          />
+          {/* Hands-free. `force`: an utterance that names several jobs would otherwise raise the
+              batch proposal card, and a card is a thing to click on — the opposite of hands-free.
+              Spoken requests go out as one message. */}
+          <VoiceMode
+            onUtterance={(text) => sendRef.current(true, text)}
+            answer={spokenAnswer}
           />
           {/* Fusion is a per-turn choice, next to the box you type in — and it turns OFF the
               agent's ability to act, which the tooltip says before the click and `fusedAnswer` says
