@@ -1019,6 +1019,7 @@ def register_code_api(
     from chimera.core.jobs import jobs_for
     from chimera.core.redact import redact
     from chimera.interface.session import recall_facts
+    from chimera.memory.history import files_of_exchange, history_for
     from chimera.memory.models import project_key
 
     # What the injected `memory` IS, so a later turn can tell "the owner changed the backend" from
@@ -1033,6 +1034,11 @@ def register_code_api(
     live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
+    # The index of finished turns (`chimera.memory.history`), one per home, shared with the
+    # `recall_history` tool every registry mounts. The session file is what a conversation is
+    # RESUMED from and trims itself accordingly; this is what a person's question about a turn
+    # from two weeks ago is answered from, and it never trims.
+    history = history_for(settings.home)
     # Beside the conversations, not inside them: a project you have added but not yet worked in
     # has no conversation to hang off, which is the whole reason the list cannot be derived.
     projects = CodeProjectRegistry(settings.home / "code_projects.json")
@@ -1423,6 +1429,30 @@ def register_code_api(
                         store.save(session)
                     except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
+                    # The turn joins the conversation history index — the record that outlives the
+                    # session's own trimming, so "what did we do about the login page two weeks
+                    # ago?" has somewhere to look. Written by this code and not by the model, after
+                    # the transcript is saved, and read off the same fold the replay endpoint shows
+                    # (so the files the index says a turn touched are the files the screen shows
+                    # it touching). A record that will not write must not fail a turn that was
+                    # already paid for; the index logs and the turn goes on.
+                    try:
+                        from chimera.api.code_replay import exchanges_from_messages
+
+                        exchanges = exchanges_from_messages(session.to_dict()["messages"])
+                        history.record(
+                            turn_id=turn_id,
+                            session_id=session_id,
+                            project=project_key(ws),
+                            asked=message,
+                            answered=str(payload.get("answer") or ""),
+                            files=files_of_exchange(exchanges[-1]) if exchanges else [],
+                            edited=list(edited),
+                            tools=[str(t) for t in (payload.get("tool_names") or [])],
+                            tainted=bool(payload.get("tainted")),
+                        )
+                    except Exception as exc:  # noqa: BLE001 — a failed record must not fail the turn
+                        _log.debug("could not index the turn in the history: %s", exc)
                     emit("done", payload)
 
                 # Same swap the chat turn uses, under the same per-session lock: hand the agent the
@@ -1932,9 +1962,13 @@ def register_code_api(
         """Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 — that is
         exactly the state a second click on Clear hits, and it is not an error."""
         try:
-            return {"ok": store.delete(session_id)}
+            gone = store.delete(session_id)
         except ValueError:
             return {"ok": False}
+        # Its rows in the history index go with it: the screen says the conversation is gone, and
+        # an index that still answered questions about it would make that a lie.
+        history.forget_session(session_id)
+        return {"ok": gone}
 
     @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)
     def delete_code_project(workspace: str) -> dict[str, int]:
@@ -1945,7 +1979,12 @@ def register_code_api(
         mean the transcripts — and the count comes back so the screen can say how many went rather
         than reporting a success with no size.
         """
-        return {"deleted": store.delete_project(workspace)}
+        # The ids first, then the files, then the index: the index is keyed by session id, and
+        # the list is the only place the workspace-to-id mapping exists.
+        ids = [str(m["id"]) for m in store.list_meta() if m["workspace"] == workspace]
+        deleted = store.delete_project(workspace)
+        history.forget_sessions(ids)
+        return {"deleted": deleted}
 
     # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is
     # deliberate. `DELETE /api/code/projects` above already means "delete every conversation filed

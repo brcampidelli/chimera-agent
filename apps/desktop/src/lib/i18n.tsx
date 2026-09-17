@@ -96,6 +96,8 @@ const en: Dict = {
     "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled or lost — and the tail of its output. Without a job_id, lists every job.",
   "tools.desc.job_cancel":
     "Stop a background job started by run_shell(background=true): kills the command and everything it started. A job that already ended is reported as it is.",
+  "tools.desc.recall_history":
+    "Search what was asked and answered in this project's earlier coding conversations — turns the current conversation no longer holds. Returns dated excerpts with the files each turn edited or read. This is the conversation history, not the memory store.",
   "tools.desc.http_get":
     "Fetch a URL with an HTTP GET and return status + body text.",
   "tools.desc.execute_code":
@@ -1442,6 +1444,8 @@ const pt: Dict = {
     "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado ou perdido — e o fim da saída dele. Sem job_id, lista todos os jobs.",
   "tools.desc.job_cancel":
     "Para um job em segundo plano iniciado por run_shell(background=true): mata o comando e tudo que ele iniciou. Um job que já terminou é reportado como está.",
+  "tools.desc.recall_history":
+    "Busca o que foi perguntado e respondido nas conversas de código anteriores deste projeto — turnos que a conversa atual já não guarda. Devolve trechos datados com os arquivos que cada turno editou ou leu. É o histórico da conversa, não o armazenamento de memória.",
   "tools.desc.http_get":
     "Busca uma URL com um HTTP GET e devolve o status + o texto do corpo.",
   "tools.desc.execute_code":
@@ -2837,6 +2841,8 @@ const es: Dict = {
     "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado o perdido — y el final de su salida. Sin job_id, lista todos los trabajos.",
   "tools.desc.job_cancel":
     "Detiene un trabajo en segundo plano iniciado por run_shell(background=true): mata el comando y todo lo que inició. Un trabajo que ya terminó se informa tal como está.",
+  "tools.desc.recall_history":
+    "Busca lo que se preguntó y respondió en las conversaciones de código anteriores de este proyecto — turnos que la conversación actual ya no conserva. Devuelve extractos fechados con los archivos que cada turno editó o leyó. Es el historial de conversación, no el almacén de memoria.",
   "tools.desc.http_get":
     "Pide una URL con un HTTP GET y devuelve el estado + el texto del cuerpo.",
   "tools.desc.execute_code":
@@ -4206,6 +4212,8 @@ const fr: Dict = {
     "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée ou perdue — et la fin de sa sortie. Sans job_id, liste toutes les tâches.",
   "tools.desc.job_cancel":
     "Arrête une tâche de fond lancée par run_shell(background=true) : tue la commande et tout ce qu'elle a lancé. Une tâche déjà terminée est rapportée telle quelle.",
+  "tools.desc.recall_history":
+    "Recherche ce qui a été demandé et répondu dans les conversations de code précédentes de ce projet — des tours que la conversation actuelle ne garde plus. Renvoie des extraits datés avec les fichiers que chaque tour a modifiés ou lus. C'est l'historique de conversation, pas la mémoire.",
   "tools.desc.http_get":
     "Récupère une URL par un HTTP GET et renvoie le statut + le texte du corps.",
   "tools.desc.execute_code":
@@ -5585,6 +5593,8 @@ const de: Dict = {
     "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen oder verloren — und das Ende seiner Ausgabe. Ohne job_id werden alle Jobs aufgelistet.",
   "tools.desc.job_cancel":
     "Stoppt einen mit run_shell(background=true) gestarteten Hintergrundjob: beendet den Befehl und alles, was er gestartet hat. Ein bereits beendeter Job wird so gemeldet, wie er ist.",
+  "tools.desc.recall_history":
+    "Durchsucht, was in früheren Code-Gesprächen dieses Projekts gefragt und beantwortet wurde — Züge, die das aktuelle Gespräch nicht mehr enthält. Liefert datierte Auszüge mit den Dateien, die jeder Zug bearbeitet oder gelesen hat. Das ist der Gesprächsverlauf, nicht der Gedächtnisspeicher.",
   "tools.desc.http_get":
     "Ruft eine URL per HTTP GET ab und gibt Status + Body-Text zurück.",
   "tools.desc.execute_code":
@@ -6955,6 +6965,8 @@ const zh: Dict = {
     "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消或已丢失——以及其输出的末尾。不带 job_id 时列出所有任务。",
   "tools.desc.job_cancel":
     "停止由 run_shell(background=true) 启动的后台任务：终止该命令及其启动的一切。已结束的任务按原样报告。",
+  "tools.desc.recall_history":
+    "搜索本项目早先编码对话中问过和答过的内容——当前对话已不再保留的轮次。返回带日期的摘录，以及每轮编辑或读取的文件。这是对话历史，不是记忆库。",
   "tools.desc.http_get": "用 HTTP GET 抓取一个 URL，返回状态码和正文文本。",
   "tools.desc.execute_code":
     "运行一段 Python 3 代码并返回它的 stdout/stderr。它在所配置的沙箱里运行，而默认的沙箱就是这台机器本身 —— 不是隔离环境。",
@@ -8263,6 +8275,8 @@ const ja: Dict = {
     "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、または喪失 — と出力の末尾。job_id を省くと全ジョブを一覧します。",
   "tools.desc.job_cancel":
     "run_shell(background=true) で開始したバックグラウンドジョブを停止します：コマンドとそれが起動したすべてを終了します。すでに終わったジョブはそのまま報告します。",
+  "tools.desc.recall_history":
+    "このプロジェクトの以前のコーディング会話で尋ねられ答えられた内容を検索します — 現在の会話がもう保持していないターンです。各ターンが編集または読み取ったファイルとともに、日付付きの抜粋を返します。これは会話履歴であり、記憶ストアではありません。",
   "tools.desc.http_get":
     "URL を HTTP GET で取得し、ステータスと本文テキストを返します。",
   "tools.desc.execute_code":
@@ -9581,6 +9595,8 @@ const it: Dict = {
     "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato o perso — e la coda del suo output. Senza job_id, elenca tutti i job.",
   "tools.desc.job_cancel":
     "Ferma un job in background avviato da run_shell(background=true): uccide il comando e tutto ciò che ha avviato. Un job già terminato viene riportato così com'è.",
+  "tools.desc.recall_history":
+    "Cerca cosa è stato chiesto e risposto nelle conversazioni di codice precedenti di questo progetto — turni che la conversazione attuale non conserva più. Restituisce estratti datati con i file che ogni turno ha modificato o letto. È la cronologia della conversazione, non l'archivio della memoria.",
   "tools.desc.http_get":
     "Richiede una URL con un HTTP GET e restituisce lo stato + il testo del corpo.",
   "tools.desc.execute_code":
@@ -10952,6 +10968,8 @@ const pl: Dict = {
     "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane lub utracone — oraz końcówka jego wyjścia. Bez job_id wypisuje wszystkie zadania.",
   "tools.desc.job_cancel":
     "Zatrzymuje zadanie w tle uruchomione przez run_shell(background=true): zabija polecenie i wszystko, co uruchomiło. Zadanie już zakończone jest raportowane takie, jakie jest.",
+  "tools.desc.recall_history":
+    "Przeszukuje, o co pytano i co odpowiedziano we wcześniejszych rozmowach o kodzie w tym projekcie — tury, których bieżąca rozmowa już nie przechowuje. Zwraca datowane fragmenty z plikami, które każda tura edytowała lub czytała. To historia rozmowy, nie magazyn pamięci.",
   "tools.desc.http_get":
     "Pobiera URL przez HTTP GET i zwraca status + tekst treści.",
   "tools.desc.execute_code":
@@ -12316,6 +12334,8 @@ const ru: Dict = {
     "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена или потеряна — и конец её вывода. Без job_id выводит все задачи.",
   "tools.desc.job_cancel":
     "Останавливает фоновую задачу, запущенную через run_shell(background=true): убивает команду и всё, что она запустила. Уже завершённая задача сообщается как есть.",
+  "tools.desc.recall_history":
+    "Ищет, о чём спрашивали и что отвечали в прежних беседах о коде этого проекта — ходы, которых текущая беседа уже не хранит. Возвращает датированные выдержки с файлами, которые каждый ход редактировал или читал. Это история беседы, а не хранилище памяти.",
   "tools.desc.http_get":
     "Запрашивает URL через HTTP GET и возвращает статус и текст тела ответа.",
   "tools.desc.execute_code":

@@ -1,5 +1,5 @@
 ---
-source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
+source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -768,6 +768,16 @@ Zuverlässigkeit) — nicht nach einem einzigen Hinweis.
 Die **Graph-Schicht** extrahiert `(Quelle, Relation, Ziel)`-Tripel aus den
 Erinnerungen (`PassaPro uses Supabase`, `Alex prefers TypeScript`), sodass
 Fakten nach Entität abgerufen werden können, nicht nur nach Schlüsselwort.
+
+**Der Gesprächsverlauf ist ein eigener Speicher.** Jeder Code-Zug, der auf dem Code-Bildschirm
+endet, wird indexiert — die Nachricht, die Antwort, die gelesenen oder bearbeiteten Dateien, der
+Zeitpunkt — in `<home>/history.db` (SQLite, FTS5 wenn Ihr Python es mitbringt), und bleibt dort,
+nachdem das Transkript des Gesprächs seine ältesten Züge gekürzt hat. Der Agent durchsucht ihn mit
+dem Werkzeug `recall_history` („was haben wir vor zwei Wochen zur Login-Funktion entschieden?"),
+begrenzt auf das aktuelle Projekt, sofern nicht alle Projekte verlangt werden. Ein Zug, der auf
+nicht vertrauenswürdigem Inhalt lief, wird beim Abruf gekennzeichnet, ein eingefügter
+Zugangsschlüssel wird vor dem Schreiben geschwärzt, und das Löschen eines Gesprächs löscht seine
+Zeilen.
 
 ### `cron` — geplante Jobs & Event-SOPs
 

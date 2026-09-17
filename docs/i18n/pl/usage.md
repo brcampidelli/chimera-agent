@@ -1,5 +1,5 @@
 ---
-source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
+source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -682,6 +682,14 @@ niezawodność) — nie pojedynczej wskazówki.
 **Warstwa grafu** wyciąga trójki `(source, relation, target)` z twoich pamięci
 (`PassaPro uses Supabase`, `Alex prefers TypeScript`), więc fakty można przywoływać wg
 encji, nie tylko wg słowa kluczowego.
+
+**Historia rozmów to osobny magazyn.** Każda tura kodowania zakończona na ekranie Code jest
+indeksowana — wiadomość, odpowiedź, pliki odczytane lub edytowane, kiedy — w `<home>/history.db`
+(SQLite, FTS5 gdy Twój Python je ma) i zostaje tam po tym, jak zapis rozmowy przytnie najstarsze
+tury. Agent przeszukuje ją narzędziem `recall_history` („co ustaliliśmy o funkcji logowania dwa
+tygodnie temu?"), w obrębie bieżącego projektu, chyba że poprosi o wszystkie projekty. Tura
+wykonana na niezaufanej treści jest oznaczana przy przywołaniu, wklejone poświadczenie jest
+zaczerniane przed zapisem, a usunięcie rozmowy usuwa jej wiersze.
 
 ### `cron` — zaplanowane zadania i SOP zdarzeniowe
 
