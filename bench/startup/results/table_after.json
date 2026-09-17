@@ -1,0 +1,120 @@
+{
+  "python": "3.11.15",
+  "platform": "win32",
+  "cold_start": {
+    "runs": [
+      {
+        "spawn_to_bound_s": 1.107,
+        "bound_to_health_s": 0.027,
+        "spawn_to_health_s": 1.133,
+        "rss_mb_after_boot": 87.4
+      },
+      {
+        "spawn_to_bound_s": 1.028,
+        "bound_to_health_s": 0.015,
+        "spawn_to_health_s": 1.043,
+        "rss_mb_after_boot": 87.1
+      },
+      {
+        "spawn_to_bound_s": 1.021,
+        "bound_to_health_s": 0.028,
+        "spawn_to_health_s": 1.049,
+        "rss_mb_after_boot": 86.9
+      },
+      {
+        "spawn_to_bound_s": 0.994,
+        "bound_to_health_s": 0.019,
+        "spawn_to_health_s": 1.013,
+        "rss_mb_after_boot": 86.4
+      },
+      {
+        "spawn_to_bound_s": 0.988,
+        "bound_to_health_s": 0.024,
+        "spawn_to_health_s": 1.012,
+        "rss_mb_after_boot": 87.1
+      }
+    ],
+    "first_run_bound_s": 1.107,
+    "first_run_health_s": 1.133,
+    "warm_median_bound_s": 1.007,
+    "warm_spread_bound_s": [
+      0.988,
+      1.028
+    ],
+    "warm_median_health_s": 1.028
+  },
+  "importtime": [
+    {
+      "cumulative_ms": 891.3,
+      "module": "<every top-level import, summed>"
+    },
+    {
+      "cumulative_ms": 449.7,
+      "module": "chimera.cli.main"
+    },
+    {
+      "cumulative_ms": 131.9,
+      "module": "httpcore"
+    },
+    {
+      "cumulative_ms": 127.6,
+      "module": "fastapi"
+    },
+    {
+      "cumulative_ms": 86.8,
+      "module": "chimera.api.code_api"
+    },
+    {
+      "cumulative_ms": 31.7,
+      "module": "uvicorn"
+    },
+    {
+      "cumulative_ms": 17.9,
+      "module": "site"
+    },
+    {
+      "cumulative_ms": 7.6,
+      "module": "chimera.api.sessions"
+    },
+    {
+      "cumulative_ms": 3.8,
+      "module": "encodings"
+    },
+    {
+      "cumulative_ms": 3.6,
+      "module": "chimera.sandbox.confirm"
+    },
+    {
+      "cumulative_ms": 2.6,
+      "module": "importlib.readers"
+    },
+    {
+      "cumulative_ms": 2.6,
+      "module": "chimera.api.runs"
+    },
+    {
+      "cumulative_ms": 2.2,
+      "module": "chimera.api.governance"
+    },
+    {
+      "cumulative_ms": 2.1,
+      "module": "sse_starlette.sse"
+    },
+    {
+      "cumulative_ms": 1.9,
+      "module": "encodings.idna"
+    },
+    {
+      "cumulative_ms": 1.8,
+      "module": "chimera.api.maturity_api"
+    }
+  ],
+  "turn_overhead": {
+    "turns": 20,
+    "median_ms": 15.0,
+    "p95_ms": 18.1,
+    "min_ms": 14.1,
+    "rss_mb_after_turns": 241.4,
+    "idle_cpu_s_over_10s": 0.0
+  }
+}

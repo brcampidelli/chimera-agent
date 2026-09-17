@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -387,6 +388,29 @@ def test_solve_edit_requires_answer() -> None:
     result = runner.invoke(app, ["solve", "x", "--edit", "T1"])  # no --answer -> would finalize empty
     assert result.exit_code == 1
     assert "--answer" in result.stdout
+
+
+def test_the_app_socket_listens_before_the_port_is_announced() -> None:
+    """A connect made the instant the port file appears must succeed, with nobody accepting yet.
+
+    The sidecar reads the port file and connects at once; before this, the socket was bound but not
+    listening until uvicorn got to it, and on Windows a SYN to a bound-not-listening socket is
+    dropped — the client waited out the 500 ms retransmit timer on every launch (`bench/startup`).
+    The kernel completes the handshake from the backlog, so this connect needs no server at all:
+    with `listen()` missing it is refused (POSIX) or times out (Windows), and either fails the test.
+    """
+    import socket
+
+    from chimera.cli.main import _bind_app_socket
+
+    sock, port = _bind_app_socket("127.0.0.1", 0)
+    try:
+        began = time.monotonic()
+        client = socket.create_connection(("127.0.0.1", port), timeout=2)
+        client.close()
+        assert time.monotonic() - began < 0.4, "the connect waited on a retransmit"
+    finally:
+        sock.close()
 
 
 def test_bind_app_socket_picks_and_falls_back() -> None:
