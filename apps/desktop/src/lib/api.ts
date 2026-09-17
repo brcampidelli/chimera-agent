@@ -39,6 +39,8 @@ import type {
   MemoryProfile,
   ModelListing,
   LocalRuntimes,
+  NetworkShare,
+  ShareInfo,
   OllamaModels,
   PoolWrite,
   ProjectState,
@@ -50,6 +52,7 @@ import type {
   VersionInfo,
 } from "@/lib/types";
 import { apiUrl, token } from "@/lib/server";
+import { parseSseFrame, readSseFrames } from "@/lib/sse";
 
 // Where the request goes and which token it carries both come from `server.ts`: the local sidecar
 // keeps the shipped behaviour exactly (relative path, token from the meta tag the backend injects
@@ -109,30 +112,8 @@ export class ApiError extends Error {
  *  here judges whether a TERMINAL FRAME arrived — that is each caller's contract, not the
  *  transport's.
  */
-async function readFrames(
-  body: ReadableStream<Uint8Array>,
-  onFrame: (frame: string) => void,
-): Promise<string | null> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
-      let sep: number;
-      while ((sep = buffer.indexOf("\n\n")) !== -1) {
-        onFrame(buffer.slice(0, sep));
-        buffer = buffer.slice(sep + 2);
-      }
-    }
-  } catch (err) {
-    return err instanceof Error ? err.message : String(err);
-  }
-  if (buffer.trim()) onFrame(buffer);
-  return null;
-}
+// One reader for every stream in this app, shared with the guest page (`src/guest`).
+const readFrames = readSseFrames;
 
 /** The reason a request was refused, when the server gave one.
  *
@@ -1093,6 +1074,9 @@ export interface CodeToolEvent {
 /** The terminal `done` payload of a coding turn — what it did, what it cost, how close to the wall. */
 export interface CodeTurnDone {
   answer: string;
+  /** Who asked, when it was a guest: their name, on the receipt the conversation keeps. Absent
+   *  for the owner's own turns. */
+  author?: string;
   // Null for an external turn: the steps happened inside somebody else's loop and it did not say
   // how many. Zero would read as "it did nothing".
   steps: number | null;
@@ -1206,7 +1190,9 @@ export interface CodeBrowserFrame {
 }
 
 export interface CodeTurnHandlers {
-  onSession?: (id: string) => void;
+  /** The conversation's id, and this turn's — the second is what lets a screen that also watches
+   *  the conversation live tell its own turn's frames from a guest's. */
+  onSession?: (id: string, turnId?: string) => void;
   onToken?: (text: string) => void;
   onTool?: (e: CodeToolEvent) => void;
   onEdit?: (path: string, patch: string) => void;
@@ -1391,7 +1377,8 @@ function applyCodeTurnFrame(
   const turnId = String(payload.turn_id ?? "");
   if (seq && seq <= seen) return { turnId, seq: 0 };
   const event = String(payload.event ?? "");
-  if (event === "session") h.onSession?.(payload.session_id as string);
+  if (event === "session")
+    h.onSession?.(payload.session_id as string, payload.turn_id as string | undefined);
   else if (event === "token") h.onToken?.(payload.text as string);
   else if (event === "tool") h.onTool?.(payload as unknown as CodeToolEvent);
   else if (event === "edit") h.onEdit?.(payload.path as string, payload.patch as string);
@@ -1619,6 +1606,85 @@ export const getCodeSession = (sessionId: string) =>
       verified: Omit<CodeVerified, "revert_token"> | null;
     }[];
   }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`);
+
+// --- sharing a conversation with a second person (item 3, 2026-09-17) -------------------------
+//
+// A token per shared conversation, never the server token: what a guest holds opens exactly one
+// conversation, and revoking it closes exactly that door. The owner's screen watches the same
+// conversation through `streamSessionLive`, which is how it sees a turn a guest started.
+
+export const shareSession = (sessionId: string, label = "") =>
+  json<ShareInfo>(`/api/code/sessions/${encodeURIComponent(sessionId)}/share`, {
+    method: "POST",
+    body: JSON.stringify({ label }),
+  });
+export const listShares = (sessionId: string) =>
+  json<{ shares: ShareInfo[] }>(`/api/code/sessions/${encodeURIComponent(sessionId)}/shares`);
+export const revokeShare = (sessionId: string, shareToken: string) =>
+  json<{ ok: boolean }>(
+    `/api/code/sessions/${encodeURIComponent(sessionId)}/shares/${encodeURIComponent(shareToken)}`,
+    { method: "DELETE" },
+  );
+export const getNetworkShare = () => json<NetworkShare>("/api/code/share/network");
+export const openNetworkShare = (port = 0) =>
+  json<NetworkShare>("/api/code/share/network", { method: "POST", body: JSON.stringify({ port }) });
+export const closeNetworkShare = () =>
+  json<NetworkShare>("/api/code/share/network", { method: "DELETE" });
+
+/** One frame of a conversation's live stream: a turn's own frame, enveloped with the session's
+ *  number, the turn it belongs to and who started that turn (empty for the owner). */
+export interface SessionLiveFrame {
+  session_seq: number;
+  event: string;
+  turn_id: string;
+  author: string;
+  payload: Record<string, unknown>;
+}
+
+/** Watch a conversation: every frame of every turn, whoever started it, from `since` on.
+ *
+ *  Resolves with null when the stream ended (the caller stopped it) and with the reason when it
+ *  was cut. Frames with no session number — the heartbeat — are dropped here. */
+export async function streamSessionLive(
+  sessionId: string,
+  since: number,
+  onFrame: (frame: SessionLiveFrame) => void,
+  signal?: AbortSignal,
+  name = "owner",
+): Promise<string | null> {
+  const query = `since=${since}&name=${encodeURIComponent(name)}`;
+  let res: Response;
+  try {
+    res = await fetch(apiUrl(`/api/code/sessions/${encodeURIComponent(sessionId)}/live?${query}`), {
+      headers: authHeaders(),
+      signal,
+    });
+  } catch (err) {
+    if (signal?.aborted) return null;
+    return err instanceof Error ? err.message : "network error";
+  }
+  if (!res.ok || !res.body) return await refusal(res);
+  const cut = await readFrames(res.body, (raw) => {
+    const frame = parseSseFrame(raw);
+    if (!frame.data) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(frame.data);
+    } catch {
+      return;
+    }
+    const live = parsed as Partial<SessionLiveFrame>;
+    if (typeof live.session_seq !== "number") return;
+    onFrame({
+      session_seq: live.session_seq,
+      event: String(live.event ?? frame.event),
+      turn_id: String(live.turn_id ?? ""),
+      author: String(live.author ?? ""),
+      payload: (live.payload ?? {}) as Record<string, unknown>,
+    });
+  });
+  return signal?.aborted ? null : cut;
+}
 
 /** Forget a coding conversation. An unknown id is `{ok:false}`, not an error — that is exactly the
  *  state a second click on Clear hits. */

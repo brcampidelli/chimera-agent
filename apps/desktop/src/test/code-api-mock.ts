@@ -105,6 +105,17 @@ export function makeCodeApiMock() {
     // react-query in a suite that does not touch them.
     forkCodeSession: vi.fn(),
     getCodeSessionRaw: vi.fn(),
+    // Sharing. "No links" is the honest starting state of every conversation, and with no links
+    // the screen never opens the live window — so a suite that is not about sharing never sees a
+    // stream it did not ask for. `streamSessionLive` resolves at once (null: stopped), which the
+    // reconnect loop reads as "we ended it" and does not retry.
+    listShares: vi.fn(async () => ({ shares: [] })),
+    shareSession: vi.fn(),
+    revokeShare: vi.fn(async () => ({ ok: true })),
+    getNetworkShare: vi.fn(async () => ({ open: false, port: null, urls: [] })),
+    openNetworkShare: vi.fn(),
+    closeNetworkShare: vi.fn(async () => ({ open: false, port: null, urls: [] })),
+    streamSessionLive: vi.fn(async () => null),
     // The provider picker reads the live catalogue of external agents from here. Resolved by
     // default with an EMPTY list, which is the state of a machine with no adapters installed — so
     // every suite that is not about external agents sees the screen it saw before they existed.

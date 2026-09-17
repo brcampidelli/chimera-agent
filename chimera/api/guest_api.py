@@ -170,11 +170,18 @@ def build_guest_app(
     session_view: Callable[[str], dict[str, Any] | None],
     session_workspace: Callable[[str], str],
     start_turn: Callable[..., Any],
+    static_dir: Path | None = None,
 ) -> FastAPI:
-    """The four routes a share token opens. ``start_turn`` is the coding turn itself, handed in
-    from ``register_code_api`` so a guest's message runs through exactly the machinery the owner's
-    does — one turn, one receipt shape, one bus."""
+    """The four routes a share token opens, and the page that uses them.
+
+    ``start_turn`` is the coding turn itself, handed in from ``register_code_api`` so a guest's
+    message runs through exactly the machinery the owner's does — one turn, one receipt shape,
+    one bus. ``static_dir`` is the built desktop bundle: its ``guest.html`` is served at ``/`` —
+    as a plain file, never through the owner's page handler, which injects the server token into
+    the page for a loopback client — and its ``assets/`` beside it.
+    """
     guest = FastAPI(title="Chimera — shared conversation", docs_url=None, redoc_url=None)
+    _mount_guest_page(guest, static_dir)
 
     def share_of(request: Request) -> Share:
         header = request.headers.get("authorization", "")
@@ -228,6 +235,31 @@ def build_guest_app(
         return await start_turn(req, author=_clean_name(body.name))
 
     return guest
+
+
+def _mount_guest_page(guest: FastAPI, static_dir: Path | None) -> None:
+    """``/`` and ``/assets`` from the built bundle — the two things the guest page needs."""
+    from fastapi.responses import FileResponse
+    from fastapi.staticfiles import StaticFiles
+
+    page = static_dir / "guest.html" if static_dir is not None else None
+    assets = static_dir / "assets" if static_dir is not None else None
+    if assets is not None and assets.is_dir():
+        guest.mount("/assets", StaticFiles(directory=assets), name="guest-assets")
+
+    @guest.get("/", include_in_schema=False)
+    def _page() -> Any:
+        if page is None or not page.is_file():
+            # A build without the page (the API alone) says so rather than serving the owner's app.
+            raise HTTPException(status_code=404, detail="the shared-conversation page is not built")
+        return FileResponse(page, media_type="text/html")
+
+    @guest.get("/chimera-icon.png", include_in_schema=False)
+    def _icon() -> Any:
+        icon = static_dir / "chimera-icon.png" if static_dir is not None else None
+        if icon is None or not icon.is_file():
+            raise HTTPException(status_code=404, detail="not found")
+        return FileResponse(icon)
 
 
 async def live_frames(

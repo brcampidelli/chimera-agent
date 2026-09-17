@@ -997,6 +997,7 @@ def register_code_api(
     memory: Any = None,
     graph: Any = None,
     fuse_backend: Any = None,
+    static_dir: Path | None = None,
 ) -> None:
     """Mount ``POST /api/code/turn`` — a conversational coding turn, streamed.
 
@@ -2109,6 +2110,7 @@ def register_code_api(
         session_view=_session_view,
         session_workspace=_session_workspace,
         start_turn=_start_turn,
+        static_dir=static_dir,
     )
     app.state.guest_server = register_sharing_api(
         app, guard, store=shares, bus=bus, guest=guest_app, session_exists=_session_exists
