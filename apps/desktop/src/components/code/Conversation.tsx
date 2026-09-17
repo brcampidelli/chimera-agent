@@ -30,7 +30,8 @@ import {
   revertCodeTurn,
   streamCodeTurn,
   type Approval,
-  type CodeToolEvent,
+  type CodeBrowserFrame,
+  CodeToolEvent,
   type CodeTurnDone,
   type Attachment,
   type CodeVerified,
@@ -50,6 +51,7 @@ import {
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
+import { BrowserView } from "@/components/code/BrowserView";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
 import {
   EMPTY_CAST,
@@ -128,6 +130,9 @@ interface Exchange {
    *  Replaced wholesale on every frame, because the frame carries the whole list: merging
    *  would build a list out of two snapshots and show one that never existed. */
   todos: TodoEntry[];
+  /** The agent's browser after its last action of this turn, or null. Replaced on every frame
+   *  (a picture of a moment), and never replayed. */
+  browser?: CodeBrowserFrame | null;
   done: CodeTurnDone | null;
   failed?: boolean;
   /** What the server actually said when the turn failed. A wrong API key, a rate limit, a model
@@ -875,6 +880,11 @@ export function Conversation({
           // Replaced, not appended. Unlike `edits`, each frame is the complete list.
           patchLast((e) => ({ ...e, todos: items }));
         },
+        onBrowser: (frame) => {
+          // Replaced too: the panel shows where the browser IS, and the previous frame is a page
+          // it has left.
+          patchLast((e) => ({ ...e, browser: frame }));
+        },
         onVerified: (v) => {
           verifyFailed = v.state === "failed";
           patchLast((e) => ({ ...e, verified: v }));
@@ -1116,6 +1126,7 @@ export function Conversation({
                 </div>
               ) : null}
               <TodoPanel items={e.todos} />
+              <BrowserView frame={e.browser} />
               {e.edits.map((edit, j) => (
                 <div key={j} className="space-y-1">
                   <button
