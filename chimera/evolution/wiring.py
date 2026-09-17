@@ -42,13 +42,17 @@ def semantic_embed(settings: Settings, *, force: bool = False) -> EmbedFn | None
 
 
 def build_memory_manager(settings: Settings) -> MemoryManager:
-    """The long-term memory manager for this home (sqlite or json backend, semantic if configured)."""
-    from chimera.memory import MemoryManager, MemoryStore, SqliteMemoryStore
+    """The long-term memory manager for this home (sqlite or json backend, semantic if configured).
 
-    embed = semantic_embed(settings)
-    if settings.memory_backend == "sqlite":
-        return MemoryManager(SqliteMemoryStore(settings.home / "memory.db"), embed=embed)
-    return MemoryManager(MemoryStore(settings.home / "memory.json"), embed=embed)
+    The store comes from `chimera.memory.backend.open_memory_store` — the one place that resolves
+    the backend, imports an existing `memory.json` into a new `memory.db` once, and refuses to
+    shadow a file it could not read. Every surface that builds a manager goes through here or
+    through that function, so no two screens can read two stores again.
+    """
+    from chimera.memory import MemoryManager
+    from chimera.memory.backend import open_memory_store
+
+    return MemoryManager(open_memory_store(settings), embed=semantic_embed(settings))
 
 
 def playbook_path(settings: Settings) -> Path:

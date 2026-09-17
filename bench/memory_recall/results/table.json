@@ -1,0 +1,695 @@
+{
+  "facts": 4034,
+  "sizes": [
+    200,
+    1000,
+    4034
+  ],
+  "k": 5,
+  "cells": [
+    {
+      "n": 200,
+      "seed": 1,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "partial": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "latency_ms": {
+          "median": 3.26,
+          "p95": 4.07,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "partial": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "latency_ms": {
+          "median": 0.13,
+          "p95": 0.18,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 200,
+      "seed": 2,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "partial": {
+          "recall@1": 0.99,
+          "recall@5": 1.0,
+          "mrr@5": 0.995
+        },
+        "latency_ms": {
+          "median": 3.15,
+          "p95": 3.85,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "partial": {
+          "recall@1": 0.99,
+          "recall@5": 1.0,
+          "mrr@5": 0.995
+        },
+        "latency_ms": {
+          "median": 0.12,
+          "p95": 0.17,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 200,
+      "seed": 3,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "partial": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "latency_ms": {
+          "median": 3.14,
+          "p95": 4.21,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "partial": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "latency_ms": {
+          "median": 0.13,
+          "p95": 0.2,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 1000,
+      "seed": 1,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "noisy": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.983
+        },
+        "partial": {
+          "recall@1": 0.96,
+          "recall@5": 1.0,
+          "mrr@5": 0.98
+        },
+        "latency_ms": {
+          "median": 16.36,
+          "p95": 18.73,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "noisy": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.983
+        },
+        "partial": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "latency_ms": {
+          "median": 0.16,
+          "p95": 0.25,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 1000,
+      "seed": 2,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.985
+        },
+        "noisy": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.985
+        },
+        "partial": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "latency_ms": {
+          "median": 16.34,
+          "p95": 19.09,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.99,
+          "recall@5": 1.0,
+          "mrr@5": 0.995
+        },
+        "noisy": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.983
+        },
+        "partial": {
+          "recall@1": 0.97,
+          "recall@5": 0.99,
+          "mrr@5": 0.98
+        },
+        "latency_ms": {
+          "median": 0.15,
+          "p95": 0.23,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 1,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 1000,
+      "seed": 3,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "partial": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.985
+        },
+        "latency_ms": {
+          "median": 16.39,
+          "p95": 19.45,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "noisy": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "partial": {
+          "recall@1": 0.99,
+          "recall@5": 1.0,
+          "mrr@5": 0.995
+        },
+        "latency_ms": {
+          "median": 0.16,
+          "p95": 0.25,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 4034,
+      "seed": 1,
+      "json": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.91,
+          "recall@5": 1.0,
+          "mrr@5": 0.953
+        },
+        "noisy": {
+          "recall@1": 0.9,
+          "recall@5": 1.0,
+          "mrr@5": 0.945
+        },
+        "partial": {
+          "recall@1": 0.91,
+          "recall@5": 1.0,
+          "mrr@5": 0.953
+        },
+        "latency_ms": {
+          "median": 69.1,
+          "p95": 78.3,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.9,
+          "recall@5": 1.0,
+          "mrr@5": 0.945
+        },
+        "noisy": {
+          "recall@1": 0.88,
+          "recall@5": 1.0,
+          "mrr@5": 0.932
+        },
+        "partial": {
+          "recall@1": 0.89,
+          "recall@5": 1.0,
+          "mrr@5": 0.942
+        },
+        "latency_ms": {
+          "median": 0.17,
+          "p95": 0.37,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 4034,
+      "seed": 2,
+      "json": {
+        "sentence": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "needle": {
+          "recall@1": 0.91,
+          "recall@5": 1.0,
+          "mrr@5": 0.951
+        },
+        "noisy": {
+          "recall@1": 0.89,
+          "recall@5": 1.0,
+          "mrr@5": 0.941
+        },
+        "partial": {
+          "recall@1": 0.9,
+          "recall@5": 1.0,
+          "mrr@5": 0.944
+        },
+        "latency_ms": {
+          "median": 71.18,
+          "p95": 81.3,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 0.98,
+          "recall@5": 1.0,
+          "mrr@5": 0.99
+        },
+        "needle": {
+          "recall@1": 0.9,
+          "recall@5": 1.0,
+          "mrr@5": 0.947
+        },
+        "noisy": {
+          "recall@1": 0.85,
+          "recall@5": 1.0,
+          "mrr@5": 0.918
+        },
+        "partial": {
+          "recall@1": 0.9,
+          "recall@5": 1.0,
+          "mrr@5": 0.947
+        },
+        "latency_ms": {
+          "median": 0.18,
+          "p95": 0.4,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "partial": {
+          "json_only": 0,
+          "sqlite_only": 0
+        }
+      }
+    },
+    {
+      "n": 4034,
+      "seed": 3,
+      "json": {
+        "sentence": {
+          "recall@1": 0.99,
+          "recall@5": 1.0,
+          "mrr@5": 0.995
+        },
+        "needle": {
+          "recall@1": 0.94,
+          "recall@5": 0.99,
+          "mrr@5": 0.965
+        },
+        "noisy": {
+          "recall@1": 0.93,
+          "recall@5": 0.99,
+          "mrr@5": 0.96
+        },
+        "partial": {
+          "recall@1": 0.91,
+          "recall@5": 1.0,
+          "mrr@5": 0.948
+        },
+        "latency_ms": {
+          "median": 71.53,
+          "p95": 82.06,
+          "n": 400
+        }
+      },
+      "sqlite": {
+        "sentence": {
+          "recall@1": 1.0,
+          "recall@5": 1.0,
+          "mrr@5": 1.0
+        },
+        "needle": {
+          "recall@1": 0.97,
+          "recall@5": 1.0,
+          "mrr@5": 0.985
+        },
+        "noisy": {
+          "recall@1": 0.94,
+          "recall@5": 1.0,
+          "mrr@5": 0.97
+        },
+        "partial": {
+          "recall@1": 0.91,
+          "recall@5": 0.99,
+          "mrr@5": 0.95
+        },
+        "latency_ms": {
+          "median": 0.19,
+          "p95": 0.41,
+          "n": 400
+        }
+      },
+      "disagree@k": {
+        "sentence": {
+          "json_only": 0,
+          "sqlite_only": 0
+        },
+        "needle": {
+          "json_only": 0,
+          "sqlite_only": 1
+        },
+        "noisy": {
+          "json_only": 0,
+          "sqlite_only": 1
+        },
+        "partial": {
+          "json_only": 1,
+          "sqlite_only": 0
+        }
+      }
+    }
+  ]
+}

@@ -18,7 +18,7 @@ from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 # NOTE: provenance is a first-class column, not folded into metadata: it is a SECURITY signal
 # (a tainted memory must never launder itself to "clean"), and it must round-trip identically to the
 # JSON store or the guarantee breaks purely by backend choice.
-_COLUMNS = "id, kind, content, key, source, metadata, provenance, project"
+_COLUMNS = "id, kind, content, key, source, metadata, provenance, project, created_at"
 
 
 class SqliteMemoryStore:
@@ -29,17 +29,19 @@ class SqliteMemoryStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self.path))
         self._fts = self._init_schema()
-        # Order matters: provenance first, because it rebuilds from a six-column layout and
-        # the project migration reads the seven-column one.
+        # Order matters: provenance first, because it rebuilds from a six-column layout, the
+        # project migration reads the seven-column one, and the age migration the eight-column one.
         self._migrate_provenance()
         self._migrate_project()
+        self._migrate_created_at()
 
     def _init_schema(self) -> bool:
         try:
             self._conn.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS memories USING fts5("
                 "id UNINDEXED, kind UNINDEXED, content, key UNINDEXED, source UNINDEXED, "
-                "metadata UNINDEXED, provenance UNINDEXED, project UNINDEXED)"
+                "metadata UNINDEXED, provenance UNINDEXED, project UNINDEXED, "
+                "created_at UNINDEXED)"
             )
             self._conn.commit()
             return True
@@ -47,7 +49,7 @@ class SqliteMemoryStore:
             self._conn.execute(
                 "CREATE TABLE IF NOT EXISTS memories ("
                 "id TEXT PRIMARY KEY, kind TEXT, content TEXT, key TEXT, source TEXT, "
-                "metadata TEXT, provenance TEXT DEFAULT 'clean', project TEXT)"
+                "metadata TEXT, provenance TEXT DEFAULT 'clean', project TEXT, created_at REAL)"
             )
             self._conn.commit()
             return False
@@ -70,11 +72,38 @@ class SqliteMemoryStore:
             self._init_schema()
             if rows:
                 self._conn.executemany(
-                    f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)",
+                    f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
                     rows,
                 )
         else:
             self._conn.execute("ALTER TABLE memories ADD COLUMN project TEXT")
+        self._conn.commit()
+
+    def _migrate_created_at(self) -> None:
+        """Add the age column to a store created before it existed (rows stay ageless).
+
+        The JSON store has carried ``created_at`` since the field was added to ``MemoryItem`` and
+        this store silently dropped it: a fact written through SQLite came back with no age, and
+        the round-trip guarantee the ``provenance`` note above insists on was broken for exactly
+        the field whose docstring says an old fact must not be given a plausible age. The rebuild
+        writes NULL for every existing row — they were written before this store recorded the
+        moment, and ``None`` is the honest value, as it is in the JSON store.
+        """
+        cols = {r[1] for r in self._conn.execute("PRAGMA table_info(memories)").fetchall()}
+        if "created_at" in cols:
+            return
+        old = "id, kind, content, key, source, metadata, provenance, project"
+        rows = self._conn.execute(f"SELECT {old} FROM memories").fetchall()
+        if self._fts:
+            self._conn.execute("DROP TABLE memories")
+            self._init_schema()
+            if rows:
+                self._conn.executemany(
+                    f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)",
+                    rows,
+                )
+        else:
+            self._conn.execute("ALTER TABLE memories ADD COLUMN created_at REAL")
         self._conn.commit()
 
     def _migrate_provenance(self) -> None:
@@ -95,13 +124,16 @@ class SqliteMemoryStore:
             self._conn.execute("ALTER TABLE memories ADD COLUMN provenance TEXT DEFAULT 'clean'")
         if rows and self._fts:
             self._conn.executemany(
-                f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, 'clean')", rows
+                f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, 'clean', NULL, NULL)",
+                rows,
             )
         self._conn.commit()
 
     @staticmethod
-    def _to_item(row: tuple[str, str, str, str, str, str, str, str | None]) -> MemoryItem:
-        item_id, kind, content, key, source, metadata, provenance, project = row
+    def _to_item(
+        row: tuple[str, str, str, str, str, str, str, str | None, float | None],
+    ) -> MemoryItem:
+        item_id, kind, content, key, source, metadata, provenance, project, created_at = row
         return MemoryItem(
             id=item_id,
             kind=kind,  # type: ignore[arg-type]
@@ -114,16 +146,23 @@ class SqliteMemoryStore:
             # depending on whether the row predates the column, and a fact scoped to a
             # project named "" is not a thing.
             project=project or None,
+            # NULL for a row written before the column: no age, never a plausible one.
+            created_at=float(created_at) if created_at is not None else None,
         )
 
     def add(self, item: MemoryItem) -> None:
         self._conn.execute("DELETE FROM memories WHERE id = ?", (item.id,))
         self._conn.execute(
-            f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            f"INSERT INTO memories ({_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (item.id, item.kind, item.content, item.key or "", item.source,
-             json.dumps(item.metadata), item.provenance, item.project),
+             json.dumps(item.metadata), item.provenance, item.project, item.created_at),
         )
         self._conn.commit()
+
+    def close(self) -> None:
+        """Release the connection. A store that is replaced (an import writes a new file) or
+        discarded on Windows keeps the file open until this is called or it is collected."""
+        self._conn.close()
 
     def get(self, item_id: str) -> MemoryItem:
         row = self._conn.execute(f"SELECT {_COLUMNS} FROM memories WHERE id = ?", (item_id,)).fetchone()
