@@ -56,6 +56,10 @@ _IDENTIFIERS = frozenset({
     "audio_only",
     "command",
     "cwd",
+    # `run_shell`: whether to start the command as a background job; `job_status`/`job_cancel`:
+    # which job. A flag and an id — both say which thing was acted on, neither carries a body.
+    "background",
+    "job_id",
     "exclude",
     "fields",
     "format",

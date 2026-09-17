@@ -678,6 +678,33 @@ class LocalRuntimesOut(BaseModel):
     runtimes: list[LocalRuntimeOut] = Field(default_factory=list)
 
 
+class JobOut(BaseModel):
+    """One background job — a `run_shell(background=true)` the agent started and did not wait for.
+
+    ``state`` is ``running`` | ``finished`` | ``cancelled`` | ``lost``. ``lost`` is honest about a
+    process this backend did not start (the app restarted): its pid is gone and its exit code was
+    never seen, so "finished" would be a number nobody observed. ``reported`` says whether a turn
+    has already been told it ended.
+    """
+
+    id: str
+    command: str
+    cwd: str
+    pid: int
+    started_at: float
+    log: str
+    state: str
+    exit_code: int | None = None
+    finished_at: float | None = None
+    reported: bool = False
+    #: The last part of the log, for a screen that shows a job without opening its file.
+    tail: str = ""
+
+
+class JobsOut(BaseModel):
+    jobs: list[JobOut] = Field(default_factory=list)
+
+
 class OllamaModelsOut(BaseModel):
     """What the configured Ollama has pulled, so a model field stops being a memory test.
 

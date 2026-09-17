@@ -41,6 +41,8 @@ PARALLEL_READ_TOOLS = frozenset(
         "read_file", "read_document", "list_dir", "grep", "glob", "transcribe_audio",
         "http_get", "fetch_url", "web_search", "arxiv_search", "youtube_transcript",
         "scrape", "extract", "map",
+        # Reads a job's record and log; `job_cancel` kills and is not here.
+        "job_status",
     }
 )
 #: How many of a step's calls run at once. Four is a fetch batch, not a fan-out: a model asks for a

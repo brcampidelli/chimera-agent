@@ -92,6 +92,10 @@ const en: Dict = {
     "Find files by path pattern (e.g. '**/*.py', 'src/**/test_*.py'). Returns relative paths.",
   "tools.desc.run_shell":
     "Run a shell command in the workspace directory and return its output. Use with care: this can modify the system.",
+  "tools.desc.job_status":
+    "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled or lost — and the tail of its output. Without a job_id, lists every job.",
+  "tools.desc.job_cancel":
+    "Stop a background job started by run_shell(background=true): kills the command and everything it started. A job that already ended is reported as it is.",
   "tools.desc.http_get":
     "Fetch a URL with an HTTP GET and return status + body text.",
   "tools.desc.execute_code":
@@ -1431,6 +1435,10 @@ const pt: Dict = {
     "Encontra arquivos por padrão de caminho (ex.: '**/*.py', 'src/**/test_*.py'). Devolve caminhos relativos.",
   "tools.desc.run_shell":
     "Roda um comando de shell no diretório do workspace e devolve a saída. Use com cuidado: isto pode modificar o sistema.",
+  "tools.desc.job_status":
+    "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado ou perdido — e o fim da saída dele. Sem job_id, lista todos os jobs.",
+  "tools.desc.job_cancel":
+    "Para um job em segundo plano iniciado por run_shell(background=true): mata o comando e tudo que ele iniciou. Um job que já terminou é reportado como está.",
   "tools.desc.http_get":
     "Busca uma URL com um HTTP GET e devolve o status + o texto do corpo.",
   "tools.desc.execute_code":
@@ -2819,6 +2827,10 @@ const es: Dict = {
     "Encuentra archivos por patrón de ruta (p. ej. '**/*.py', 'src/**/test_*.py'). Devuelve rutas relativas.",
   "tools.desc.run_shell":
     "Ejecuta un comando de shell en el directorio del workspace y devuelve su salida. Úsalo con cuidado: esto puede modificar el sistema.",
+  "tools.desc.job_status":
+    "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado o perdido — y el final de su salida. Sin job_id, lista todos los trabajos.",
+  "tools.desc.job_cancel":
+    "Detiene un trabajo en segundo plano iniciado por run_shell(background=true): mata el comando y todo lo que inició. Un trabajo que ya terminó se informa tal como está.",
   "tools.desc.http_get":
     "Pide una URL con un HTTP GET y devuelve el estado + el texto del cuerpo.",
   "tools.desc.execute_code":
@@ -4181,6 +4193,10 @@ const fr: Dict = {
     "Trouve des fichiers par motif de chemin (par ex. '**/*.py', 'src/**/test_*.py'). Renvoie des chemins relatifs.",
   "tools.desc.run_shell":
     "Exécute une commande shell dans le répertoire du workspace et renvoie sa sortie. À utiliser avec prudence : cela peut modifier le système.",
+  "tools.desc.job_status":
+    "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée ou perdue — et la fin de sa sortie. Sans job_id, liste toutes les tâches.",
+  "tools.desc.job_cancel":
+    "Arrête une tâche de fond lancée par run_shell(background=true) : tue la commande et tout ce qu'elle a lancé. Une tâche déjà terminée est rapportée telle quelle.",
   "tools.desc.http_get":
     "Récupère une URL par un HTTP GET et renvoie le statut + le texte du corps.",
   "tools.desc.execute_code":
@@ -5553,6 +5569,10 @@ const de: Dict = {
     "Findet Dateien über ein Pfadmuster (z. B. '**/*.py', 'src/**/test_*.py'). Gibt relative Pfade zurück.",
   "tools.desc.run_shell":
     "Führt einen Shell-Befehl im Workspace-Verzeichnis aus und gibt dessen Ausgabe zurück. Mit Vorsicht verwenden: das kann das System verändern.",
+  "tools.desc.job_status":
+    "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen oder verloren — und das Ende seiner Ausgabe. Ohne job_id werden alle Jobs aufgelistet.",
+  "tools.desc.job_cancel":
+    "Stoppt einen mit run_shell(background=true) gestarteten Hintergrundjob: beendet den Befehl und alles, was er gestartet hat. Ein bereits beendeter Job wird so gemeldet, wie er ist.",
   "tools.desc.http_get":
     "Ruft eine URL per HTTP GET ab und gibt Status + Body-Text zurück.",
   "tools.desc.execute_code":
@@ -6916,6 +6936,10 @@ const zh: Dict = {
     "按路径模式查找文件（例如 '**/*.py'、'src/**/test_*.py'）。返回相对路径。",
   "tools.desc.run_shell":
     "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。",
+  "tools.desc.job_status":
+    "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消或已丢失——以及其输出的末尾。不带 job_id 时列出所有任务。",
+  "tools.desc.job_cancel":
+    "停止由 run_shell(background=true) 启动的后台任务：终止该命令及其启动的一切。已结束的任务按原样报告。",
   "tools.desc.http_get": "用 HTTP GET 抓取一个 URL，返回状态码和正文文本。",
   "tools.desc.execute_code":
     "运行一段 Python 3 代码并返回它的 stdout/stderr。它在所配置的沙箱里运行，而默认的沙箱就是这台机器本身 —— 不是隔离环境。",
@@ -8217,6 +8241,10 @@ const ja: Dict = {
     "パスのパターンでファイルを探します（例: '**/*.py'、'src/**/test_*.py'）。相対パスを返します。",
   "tools.desc.run_shell":
     "ワークスペースのディレクトリで shell コマンドを実行し、その出力を返します。注意して使ってください: これはシステムを変更できます。",
+  "tools.desc.job_status":
+    "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、または喪失 — と出力の末尾。job_id を省くと全ジョブを一覧します。",
+  "tools.desc.job_cancel":
+    "run_shell(background=true) で開始したバックグラウンドジョブを停止します：コマンドとそれが起動したすべてを終了します。すでに終わったジョブはそのまま報告します。",
   "tools.desc.http_get":
     "URL を HTTP GET で取得し、ステータスと本文テキストを返します。",
   "tools.desc.execute_code":
@@ -9528,6 +9556,10 @@ const it: Dict = {
     "Trova file per pattern di percorso (es.: '**/*.py', 'src/**/test_*.py'). Restituisce percorsi relativi.",
   "tools.desc.run_shell":
     "Esegue un comando di shell nella directory del workspace e ne restituisce l'output. Usalo con cautela: questo può modificare il sistema.",
+  "tools.desc.job_status":
+    "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato o perso — e la coda del suo output. Senza job_id, elenca tutti i job.",
+  "tools.desc.job_cancel":
+    "Ferma un job in background avviato da run_shell(background=true): uccide il comando e tutto ciò che ha avviato. Un job già terminato viene riportato così com'è.",
   "tools.desc.http_get":
     "Richiede una URL con un HTTP GET e restituisce lo stato + il testo del corpo.",
   "tools.desc.execute_code":
@@ -10892,6 +10924,10 @@ const pl: Dict = {
     "Znajduje pliki po wzorcu ścieżki (np. '**/*.py', 'src/**/test_*.py'). Zwraca ścieżki względne.",
   "tools.desc.run_shell":
     "Uruchamia polecenie powłoki w katalogu workspace i zwraca jego wyjście. Używaj ostrożnie: to może zmienić system.",
+  "tools.desc.job_status":
+    "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane lub utracone — oraz końcówka jego wyjścia. Bez job_id wypisuje wszystkie zadania.",
+  "tools.desc.job_cancel":
+    "Zatrzymuje zadanie w tle uruchomione przez run_shell(background=true): zabija polecenie i wszystko, co uruchomiło. Zadanie już zakończone jest raportowane takie, jakie jest.",
   "tools.desc.http_get":
     "Pobiera URL przez HTTP GET i zwraca status + tekst treści.",
   "tools.desc.execute_code":
@@ -12249,6 +12285,10 @@ const ru: Dict = {
     "Находит файлы по шаблону пути (например, '**/*.py', 'src/**/test_*.py'). Возвращает относительные пути.",
   "tools.desc.run_shell":
     "Выполняет команду оболочки в каталоге рабочей папки и возвращает её вывод. Пользуйтесь осторожно: это может изменить систему.",
+  "tools.desc.job_status":
+    "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена или потеряна — и конец её вывода. Без job_id выводит все задачи.",
+  "tools.desc.job_cancel":
+    "Останавливает фоновую задачу, запущенную через run_shell(background=true): убивает команду и всё, что она запустила. Уже завершённая задача сообщается как есть.",
   "tools.desc.http_get":
     "Запрашивает URL через HTTP GET и возвращает статус и текст тела ответа.",
   "tools.desc.execute_code":
