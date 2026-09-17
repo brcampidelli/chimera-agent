@@ -272,14 +272,26 @@ def test_workers_can_open_files_but_never_change_them(
 
     What must not come with the fix is write access: N workers in one folder with no worktree
     between them is the collision `IsolatedCrew` exists to prevent.
+
+    Reading the web joined on 2026-09-17 (`scrape`, `http_get`, `web_search`): the tab was
+    described by "read these five sites at once" and could not do it. The line this test used to
+    draw — no fetch tools, because the ledgers are per worker — was drawn when nothing carried a
+    worker's taint to the answer. Now the envelope does (`ResultEnvelope.tainted`, read off the
+    worker's own ledger), and per-worker ledgers are the right unit for a read-only set: a worker
+    that fetched a page and then GETs a URL with a query string trips its OWN egress rule, and no
+    worker can send, write or execute, so there is no second worker for tainted content to reach.
+    What stays out: the browser (a session, not a read), `crawl` (a whole site per worker, N
+    workers), and everything that writes or runs.
     """
     from chimera.api.orchestration_api import _WORKER_TOOLS
 
     assert "read_file" in _WORKER_TOOLS, "a worker that cannot read still has to answer"
+    assert {"scrape", "http_get", "web_search"} <= set(_WORKER_TOOLS), "five sites at once"
     forbidden = {
         "write_file", "edit_file", "apply_patch",       # N workers, one folder, no worktree
         "run_shell", "execute_code", "code_interpreter",  # arbitrary effects
-        "http_get", "browser", "crawl", "scrape",       # untrusted content, per-worker ledgers
+        "browser", "crawl",                             # a session; a whole site per worker
+        "send_email", "send_message", "http_post", "post_webhook",  # nothing leaves a worker
     }
     assert not forbidden & set(_WORKER_TOOLS)
 

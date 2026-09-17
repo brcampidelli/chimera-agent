@@ -51,6 +51,17 @@ export function PlanPreview({
             sources are named, because that is the region where the token win is measured rather
             than guessed. Shown so the reasoning is visible, never to stop the run. */}
         {plan.profitable_estimate ? null : <Badge tone="warn">{t("orch.plan.thin")}</Badge>}
+        {/* Seen live on 2026-09-17: five sites named, and the model split the task into four
+            subtasks — the fifth site had no worker, and the answer's last line said so. The count
+            is the classifier's (deterministic) and the split is the model's; where they disagree
+            the person is the one who can fix the plan, and this is the moment to tell them. */}
+        {plan.sources > (plan.subtasks ?? []).length ? (
+          <span data-testid="plan-uncovered">
+            <Badge tone="warn">
+              {t("orch.plan.uncovered", { sources: plan.sources, subtasks: (plan.subtasks ?? []).length })}
+            </Badge>
+          </span>
+        ) : null}
       </div>
 
       <ol className="mt-3 space-y-1.5">
@@ -66,6 +77,16 @@ export function PlanPreview({
 
       <p className="mt-3 text-xs text-muted-foreground">
         {t("orch.plan.budget", { n: plan.workers, tokens: plan.budget_per_worker })}
+      </p>
+      {/* What this project measured about the split, on the screen that offers it — before the
+          run, where it can change a decision. bench/hierarchy_equal_calls (2026-09-11): at the
+          same number of model calls, one agent that re-reads the documents answered as well or
+          better, and the synthesis step is where a weak backbone loses the figures. The split
+          buys fewer tokens (the counterfactual line after the run) and workers that fetch at the
+          same time; it does not buy a better answer, and a plan that implied otherwise would be
+          the screen claiming what the measurement refused. */}
+      <p className="mt-2 text-xs text-muted-foreground" data-testid="plan-measured">
+        {t("orch.plan.measured")}
       </p>
 
       <div className="mt-3">

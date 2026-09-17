@@ -4655,6 +4655,12 @@ export interface components {
              * @default
              */
             shape: string;
+            /**
+             * Tainted
+             * @description Some envelope the answer was synthesised from read untrusted content.
+             * @default false
+             */
+            tainted: boolean;
             /** Total Tokens */
             total_tokens?: number | null;
         };
@@ -6611,6 +6617,11 @@ export interface components {
              */
             stage: string;
             /**
+             * Tainted
+             * @default false
+             */
+            tainted: boolean;
+            /**
              * Task Id
              * @default
              */
@@ -6670,6 +6681,12 @@ export interface components {
              * @default 0
              */
             summary_chars: number;
+            /**
+             * Tainted
+             * @description The worker's taint ledger recorded an untrusted read (a fetched page).
+             * @default false
+             */
+            tainted: boolean;
             /**
              * Task Id
              * @default
