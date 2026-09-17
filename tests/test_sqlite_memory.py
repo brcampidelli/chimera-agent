@@ -69,3 +69,44 @@ def test_manager_delegates_to_backend_search(tmp_path: Path) -> None:
     manager.remember("we deploy on Fridays")
     hits = manager.search("payment", k=5)
     assert any("Stripe" in hit.content for hit in hits)
+
+
+def test_the_store_answers_from_a_thread_it_was_not_made_on(tmp_path: Path) -> None:
+    """Live on 0.59.0-dev, with SQLite the default: a guest's message on a shared conversation ran
+    the turn on the guest listener's thread, recall reached the manager the app had built at
+    boot, and SQLite refused — `ProgrammingError: SQLite objects created in a thread can only be
+    used in that same thread`. The Discord bot recalls from its own thread too, and the desktop's
+    messaging adapters; every one of them was one message away from the same error. The
+    connection is shared under a lock now, and this test is the reproduction: without
+    `check_same_thread=False` it raises on the first statement."""
+    import threading
+
+    store = SqliteMemoryStore(tmp_path / "m.db")
+    store.add(MemoryItem(id="a", content="the login page posts to /api/session"))
+    seen: list[object] = []
+
+    def worker() -> None:
+        try:
+            store.add(MemoryItem(id="b", content="written from another thread"))
+            seen.append([i.content for i in store.search("login")])
+            seen.append(len(store))
+        except Exception as exc:  # noqa: BLE001 — the failure IS the finding
+            seen.append(exc)
+
+    thread = threading.Thread(target=worker)
+    thread.start()
+    thread.join(5)
+    assert seen == [["the login page posts to /api/session"], 2], seen
+    # And many threads at once, each reading and writing, leave a consistent store behind.
+    def hammer(n: int) -> None:
+        for i in range(20):
+            store.add(MemoryItem(id=f"t{n}-{i}", content=f"fact {n} {i} thread"))
+            store.search("thread")
+            store.all()
+
+    threads = [threading.Thread(target=hammer, args=(n,)) for n in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(20)
+    assert len(store) == 2 + 4 * 20

@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 from pathlib import Path
+from typing import Any
 
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 
@@ -21,13 +23,67 @@ from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
 _COLUMNS = "id, kind, content, key, source, metadata, provenance, project, created_at"
 
 
+class _Rows:
+    """What one statement returned, read in full while the lock was held."""
+
+    __slots__ = ("_rows", "rowcount")
+
+    def __init__(self, rows: list[Any], rowcount: int) -> None:
+        self._rows = rows
+        self.rowcount = rowcount
+
+    def fetchall(self) -> list[Any]:
+        return list(self._rows)
+
+    def fetchone(self) -> Any | None:
+        return self._rows[0] if self._rows else None
+
+
+class _Connection:
+    """One SQLite connection, usable from any thread, one statement at a time.
+
+    The module's default refuses a connection created on one thread from another, and this store
+    is reached from several: the desktop builds its memory manager at boot and recalls from the
+    request loop, the Discord bot recalls from its own thread, and a shared conversation's guest
+    listener runs a second event loop. With the SQLite default backend (0.59.0) the refusal was a
+    ``ProgrammingError`` on every message from any of those — the manager the app booted with was
+    the object every surface shared, and only the one thread that made it could use it.
+
+    So: ``check_same_thread=False``, and a lock around every statement, with the rows read in
+    full before the lock is released. A cursor handed across threads is exactly the interleaving
+    the lock exists to prevent; a list is not.
+    """
+
+    def __init__(self, path: str) -> None:
+        self._raw = sqlite3.connect(path, check_same_thread=False)
+        self._lock = threading.RLock()
+
+    def execute(self, sql: str, params: Any = ()) -> _Rows:
+        with self._lock:
+            cursor = self._raw.execute(sql, params)
+            rows = cursor.fetchall() if cursor.description is not None else []
+            return _Rows(rows, cursor.rowcount)
+
+    def executemany(self, sql: str, rows: Any) -> None:
+        with self._lock:
+            self._raw.executemany(sql, rows)
+
+    def commit(self) -> None:
+        with self._lock:
+            self._raw.commit()
+
+    def close(self) -> None:
+        with self._lock:
+            self._raw.close()
+
+
 class SqliteMemoryStore:
-    """A SQLite-backed memory store with FTS5 (or LIKE) search."""
+    """A SQLite-backed memory store with FTS5 (or LIKE) search. Safe to share across threads."""
 
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn = sqlite3.connect(str(self.path))
+        self._conn = _Connection(str(self.path))
         self._fts = self._init_schema()
         # Order matters: provenance first, because it rebuilds from a six-column layout, the
         # project migration reads the seven-column one, and the age migration the eight-column one.
@@ -237,4 +293,5 @@ class SqliteMemoryStore:
         return [self._to_item(row) for row in rows]
 
     def __len__(self) -> int:
-        return int(self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0])
+        row = self._conn.execute("SELECT COUNT(*) FROM memories").fetchone()
+        return int(row[0]) if row else 0
