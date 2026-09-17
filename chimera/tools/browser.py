@@ -21,14 +21,18 @@ Two things are non-negotiable here:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
 from chimera.governance.ledger_tool import fence
+from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
+
+_log = get_logger("tools.browser")
 
 _MAX_CHARS = 20_000
 # Playwright is a CORE dependency, so this only shows on a broken install (the package went missing).
@@ -97,7 +101,41 @@ class BrowserDriver(Protocol):
     def page_html(self) -> str: ...
     def page_text(self) -> str: ...
     def screenshot(self, path: str) -> None: ...  # full-page PNG of the current page, saved to path
+    def frame(self) -> BrowserFrame | None: ...  # the viewport as a small JPEG, for a screen; None if it cannot
     def close(self) -> None: ...
+
+
+@dataclass(frozen=True)
+class BrowserFrame:
+    """What the agent's browser shows right now — the viewport as a JPEG, with the page's address.
+
+    For a person, not for the model: the model reads the page as text (`render_elements`), and
+    this is the picture beside the chat. Measured on 2026-09-17 before it was wired: a viewport
+    (1280×720) JPEG at quality 55 is 13 KB for example.com, 62 KB for a GitHub repo page and 96 KB
+    for a Wikipedia article, taking 24–106 ms to capture — against a PNG at 18/103/232 KB and up
+    to 224 ms. One frame per browser action, never on a timer, so a turn that browsed twenty times
+    costs about a megabyte over the stream and nothing while the browser is idle.
+    """
+
+    jpeg: bytes
+    url: str
+    title: str
+    width: int
+    height: int
+
+
+class FrameAnnouncer:
+    """A late-bound place to announce a browser frame to a screen. Built before the surface that
+    will draw it exists — the tool is constructed with the registry, the turn's ``emit`` a moment
+    later — so this holds the slot; unbound, a frame is dropped, which is what every surface
+    without a screen wants."""
+
+    def __init__(self) -> None:
+        self.emit: Any = None
+
+    def __call__(self, action: str, frame: BrowserFrame) -> None:
+        if self.emit is not None:
+            self.emit(action, frame)
 
 
 def _html_to_markdown(html: str) -> str | None:
@@ -205,6 +243,22 @@ class BrowserTool(Tool):
         # resolve against — so an absolute path wrote a PNG anywhere the process could reach.
         self.workspace = (workspace or Path.cwd()).resolve()
         self.write_region = write_region
+        # Where a frame of the viewport goes after every action — the Code screen's panel, when the
+        # assembly has one (`assemble_registry` sets it; see `FrameAnnouncer`). None drops frames
+        # and never captures them, so a headless run pays nothing for a screen it does not have.
+        self.on_frame: Callable[[str, BrowserFrame], None] | None = None
+
+    def _announce(self, action: str) -> None:
+        """A frame to the screen, best effort: a capture that fails is logged and skipped, never a
+        word in the observation the model reads — the picture is for the person."""
+        if self.on_frame is None or self._driver is None:
+            return
+        try:
+            frame = self._driver.frame()
+            if frame is not None:
+                self.on_frame(action, frame)
+        except Exception as exc:  # noqa: BLE001 — the panel is a courtesy; the action already happened
+            _log.debug("browser frame skipped after %s: %s", action, exc)
 
     def _ensure_driver(self) -> BrowserDriver | None:
         if self._driver is not None:
@@ -228,6 +282,14 @@ class BrowserTool(Tool):
             return f"error: browser unavailable: {exc}"
         if driver is None:
             return _INSTALL_HINT
+        try:
+            return self._act(action, driver, kwargs)
+        finally:
+            # After the action, whatever it returned: a failed click still shows the page it failed
+            # on, which is the frame a person watching would want.
+            self._announce(action)
+
+    def _act(self, action: str, driver: BrowserDriver, kwargs: dict[str, Any]) -> str:
         # SSRF guard: a navigate target is a model-/content-supplied URL, so re-check every hop the
         # same way http_get/download do — reject non-http(s) and hosts that resolve to private IPs.
         from chimera.scrape.ssrf import check_url

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from chimera.tools.browser import Element
+from chimera.tools.browser import BrowserFrame, Element
 
 # JS run in-page: tag each visible interactive element with a stable ref and return its role/name.
 _TAG_SCRIPT = r"""
@@ -87,6 +87,15 @@ class PlaywrightDriver:
 
     def screenshot(self, path: str) -> None:
         self._page.screenshot(path=path, full_page=True)  # a real full-page PNG of the current page
+
+    def frame(self) -> BrowserFrame | None:
+        """The viewport as a JPEG at quality 55 — the size/time trade `BrowserFrame` measured."""
+        size = self._page.viewport_size or {"width": 0, "height": 0}
+        data = self._page.screenshot(type="jpeg", quality=55, full_page=False)
+        return BrowserFrame(
+            jpeg=data, url=self._page.url, title=self._page.title(),
+            width=int(size.get("width", 0)), height=int(size.get("height", 0)),
+        )
 
     def close(self) -> None:
         from contextlib import suppress

@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import type {
   CodeApprovalEvent,
+  CodeBrowserFrame,
   CodeTurnDone,
   CodeTurnHandlers,
   CodeVerified,
@@ -256,6 +257,8 @@ export function scriptTurn(
     done?: Partial<CodeTurnDone>;
     error?: boolean;
     todos?: { task: string; status: string }[][];
+    /** Frames of the agent's browser, one per action, in order. */
+    browser?: CodeBrowserFrame[];
     /** A question the turn parks on. `parked: true` leaves the stream open after it, which is what
      *  the server does — the tool call is blocked on a worker thread waiting for the answer, so a
      *  script that sent `done` straight after would be testing a turn that never actually paused. */
@@ -274,6 +277,7 @@ export function scriptTurn(
     for (const edit of script.edits ?? []) h.onEdit?.(edit.path, edit.patch);
     // Each frame is the WHOLE list, so a script sends snapshots, not additions.
     for (const todo of script.todos ?? []) h.onTodo?.(todo);
+    for (const frame of script.browser ?? []) h.onBrowser?.(frame);
     if (script.error) {
       h.onError?.("boom");
       return;

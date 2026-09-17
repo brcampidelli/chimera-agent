@@ -24,6 +24,7 @@ pressing that button does not change what the agent is allowed to do.
 from __future__ import annotations
 
 import asyncio
+import base64
 import itertools
 import json
 import re
@@ -76,6 +77,7 @@ from chimera.api.worth import WorthReport, summarize_worth
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.telemetry import get_logger
+from chimera.tools.browser import FrameAnnouncer
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
@@ -445,6 +447,7 @@ def assemble_registry(
     shared: Any = None,
     approval_sink: Any = None,
     instruction: str | None = None,
+    frame_sink: Any = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -508,6 +511,14 @@ def assemble_registry(
         for tool in registry.tools():
             if hasattr(tool, "workspace"):
                 tool.ask_outside = owner  # type: ignore[attr-defined]
+    # The browser draws its viewport on the screen after every action — only for a request that
+    # has a screen to draw on (`frame_sink`, bound to the turn's stream the way the approval
+    # announcer is). A headless run never captures a frame: the tool checks the sink before it
+    # asks the driver for a picture.
+    if frame_sink is not None:
+        for tool in registry.tools():
+            if getattr(tool, "name", "") == "browser" and hasattr(tool, "on_frame"):
+                tool.on_frame = frame_sink  # type: ignore[attr-defined]
     # The configured MCP servers, HERE and not lower down, because everything below this line has to
     # reach them: the denial list, the trust kernel, and the taint ledger that treats their output as
     # untrusted. The chat path learned this the hard way and says so at its own injection point — "a
@@ -1040,6 +1051,7 @@ def register_code_api(
         facts: list[str],
         note: str = "",
         approval_sink: Any = None,
+        frame_sink: Any = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
@@ -1055,6 +1067,7 @@ def register_code_api(
         steps = resolve_steps(req.max_steps)
         registry, ledger = assemble_registry(
             req, ws, live(), gateway, steps=steps, surface="api:turn", approval_sink=approval_sink,
+            frame_sink=frame_sink,
             instruction=req.message,
         )
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
@@ -1215,7 +1228,11 @@ def register_code_api(
         # exists. Until then a question announces to nobody — and is still on disk for
         # `chimera approve`, which is the same guarantee the unattended path already had.
         approval_sink = ApprovalAnnouncer()
-        agent, ledger = build_agent(req, ws, facts, note, approval_sink=approval_sink)
+        # Same late binding for the browser's frames: built here, bound to `emit` below.
+        frame_sink = FrameAnnouncer()
+        agent, ledger = build_agent(
+            req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink
+        )
         session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
@@ -1240,10 +1257,32 @@ def register_code_api(
 
         def emit(event: str, payload: Any) -> None:
             numbered = {**payload, "seq": next(seq)} if isinstance(payload, dict) else payload
-            if isinstance(numbered, dict):
+            # A browser frame is a picture of a moment, tens of kilobytes each, and replay is for
+            # the words a dropped connection lost — not for redrawing a page that has moved on.
+            # So frames go to the live stream and never to the run log.
+            if isinstance(numbered, dict) and event != "browser":
                 runlog.append(settings.home, turn_id, event, numbered, area="code")
             loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
 
+        # What the panel draws: the viewport as base64 JPEG, the page's address and title, and
+        # which action produced it. `n` counts frames of this turn so the screen can say "frame 7".
+        frames_sent = itertools.count(1)
+
+        def announce_frame(action: str, frame: Any) -> None:
+            emit(
+                "browser",
+                {
+                    "action": action,
+                    "url": frame.url,
+                    "title": frame.title,
+                    "width": frame.width,
+                    "height": frame.height,
+                    "jpeg": base64.b64encode(frame.jpeg).decode("ascii"),
+                    "n": next(frames_sent),
+                },
+            )
+
+        frame_sink.emit = announce_frame
         approval_sink.emit = lambda question: emit(
             "approval",
             {

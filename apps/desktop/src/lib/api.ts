@@ -1190,6 +1190,21 @@ export interface CodeApprovalEvent {
   decision?: string;
 }
 
+/** One picture of the agent's browser — the viewport after a browser action, as base64 JPEG.
+ *
+ *  Sent on the turn's stream after every `browser` tool action and never replayed: a reopened
+ *  conversation shows no frame rather than a page that has moved on. `n` counts this turn's frames.
+ *  Measured before it was wired: 13–96 KB a frame at quality 55, 24–106 ms to capture. */
+export interface CodeBrowserFrame {
+  action: string;
+  url: string;
+  title: string;
+  width: number;
+  height: number;
+  jpeg: string;
+  n: number;
+}
+
 export interface CodeTurnHandlers {
   onSession?: (id: string) => void;
   onToken?: (text: string) => void;
@@ -1198,6 +1213,7 @@ export interface CodeTurnHandlers {
   onTodo?: (items: { task: string; status: string }[]) => void;
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
+  onBrowser?: (f: CodeBrowserFrame) => void;
   onDone?: (d: CodeTurnDone) => void;
   onError?: (msg: string) => void;
 }
@@ -1382,6 +1398,7 @@ function applyCodeTurnFrame(
     h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "approval") h.onApproval?.(payload as unknown as CodeApprovalEvent);
+  else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string);
   return { turnId, seq };
