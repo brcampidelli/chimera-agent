@@ -925,7 +925,7 @@ def _live_memory(settings: Settings, boot: Any, boot_graph: Any, boot_key: Any) 
 
     if boot is None:
         return None, None
-    key = (str(settings.home), settings.memory_backend, bool(settings.semantic_memory))
+    key = memory_key(settings)
     if key == boot_key:
         return boot, boot_graph
     with _memory_lock:
@@ -948,8 +948,14 @@ def _live_memory(settings: Settings, boot: Any, boot_graph: Any, boot_key: Any) 
 
 
 def memory_key(settings: Settings) -> tuple[str, str, bool]:
-    """What decides WHICH store a memory manager is. Used to tell a boot one from a stale one."""
-    return (str(settings.home), settings.memory_backend, bool(settings.semantic_memory))
+    """What decides WHICH store a memory manager is. Used to tell a boot one from a stale one.
+
+    The RESOLVED backend, not the raw setting: the default is `sqlite` on a build with FTS5 and
+    `json` without, and the key has to name the store that was actually opened.
+    """
+    from chimera.memory.backend import resolve_memory_backend
+
+    return (str(settings.home), resolve_memory_backend(settings), bool(settings.semantic_memory))
 
 
 def _card_retriever(settings: Settings, gateway: Any) -> Any:

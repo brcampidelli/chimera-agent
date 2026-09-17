@@ -305,8 +305,11 @@ class Settings(BaseSettings):
         validation_alias="CHIMERA_IMAGE_MODEL_LOCAL",
     )
 
-    # --- Long-term memory backend: json (default, zero-dep) or sqlite (FTS5 full-text) ---
-    memory_backend: str = Field(default="json", validation_alias="CHIMERA_MEMORY_BACKEND")
+    # --- Long-term memory backend: sqlite (default since 0.59.0: FTS5 full-text, 0.2 ms a search at
+    # any size) or json (one file, re-tokenized on every query: 70 ms a search at 4,000 facts —
+    # bench/memory_recall). Resolved by `chimera.memory.backend`: the default falls back to json
+    # on a Python without FTS5, and an existing memory.json is imported once into the new store. ---
+    memory_backend: str = Field(default="sqlite", validation_alias="CHIMERA_MEMORY_BACKEND")
 
     # --- Opt-in semantic memory recall: embed facts + query and rank by cosine, so a
     # paraphrase with no shared token still retrieves the right fact (the gap memory-bench

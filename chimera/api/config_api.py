@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.config import Settings, get_settings, pinned_by_environment
+from chimera.memory.backend import resolve_memory_backend
 from chimera.providers.catalog import PROVIDERS
 
 # Credential env-vars (secret) and the non-secret settings the UI may edit. Anything outside this set
@@ -336,7 +337,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
             ),
         },
         "memory": {
-            "backend": settings.memory_backend,
+            # Resolved, so the screen names the store the turns actually read — `sqlite` on the
+            # default, `json` when the owner chose it or the build has no FTS5.
+            "backend": resolve_memory_backend(settings),
             "semantic": settings.semantic_memory,
             "auto_consolidate": settings.auto_consolidate,
             "remember_from_chat": settings.remember_from_chat,
@@ -399,7 +402,7 @@ def doctor(settings: Settings) -> dict[str, Any]:
         "configured_providers": settings.configured_providers(),
         "default_model": settings.default_model,
         "tiers": {"weak": ladder.weak, "mid": ladder.mid, "top": ladder.top},
-        "memory_backend": settings.memory_backend,
+        "memory_backend": resolve_memory_backend(settings),
         "cache": settings.cache,
         "sandbox": settings.sandbox,
         # Capability by capability, measured on THIS machine. A frozen sidecar is built by CI on a
