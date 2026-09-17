@@ -51,6 +51,9 @@ export interface WorkerState {
   /** Non-empty means this worker's output did not FIT the summary cap: what the synthesis read
    *  is a head+tail slice, and the whole of it was written to these paths. */
   evidenceRefs: string[];
+  /** The worker's taint ledger recorded an untrusted read — a page it fetched, above all. What it
+   *  summarised may say whatever that page put there, and the card says so. */
+  tainted: boolean;
 }
 
 export interface OrchestrationTotals {
@@ -72,6 +75,9 @@ export interface OrchestrationState {
   cancelled: boolean;
   totals: OrchestrationTotals | null;
   error: string | null;
+  /** Any envelope the answer was synthesised from read untrusted content. Carried on `done`
+   *  because the answer is there, and a sentence made from five pages has no page attached. */
+  tainted: boolean;
 }
 
 export const EMPTY_RUN: OrchestrationState = {
@@ -87,6 +93,7 @@ export const EMPTY_RUN: OrchestrationState = {
   cancelled: false,
   totals: null,
   error: null,
+  tainted: false,
 };
 
 function num(value: unknown): number {
@@ -136,6 +143,7 @@ function blankWorker(taskId: string, objective = ""): WorkerState {
     summaryChars: 0,
     gaps: [],
     evidenceRefs: [],
+    tainted: false,
   };
 }
 
@@ -201,6 +209,7 @@ export function applyFrame(state: OrchestrationState, frame: OrchFrame): Orchest
           summaryChars: num(data.summary_chars),
           gaps: strings(data.gaps),
           evidenceRefs: strings(data.evidence_refs),
+          tainted: data.tainted === true,
         }),
       };
 
@@ -214,6 +223,7 @@ export function applyFrame(state: OrchestrationState, frame: OrchFrame): Orchest
           detail: str(data.detail),
           reason: str(data.reason) as RejectReason,
           tokens: num(data.tokens),
+          tainted: data.tainted === true,
         }),
       };
 
@@ -238,6 +248,7 @@ export function applyFrame(state: OrchestrationState, frame: OrchFrame): Orchest
         stage: "done",
         answer: str(data.answer),
         cancelled: data.cancelled === true,
+        tainted: data.tainted === true,
         totals: {
           tokens: typeof data.total_tokens === "number" ? data.total_tokens : null,
           counterfactual:

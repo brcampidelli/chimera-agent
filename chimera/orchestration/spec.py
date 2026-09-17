@@ -94,6 +94,16 @@ class ResultEnvelope(BaseModel):
     """Self-reported gaps: what the worker could not do or verify."""
     receipt: dict[str, Any] | None = None
     """Delegation receipt (tokens/cost/counterfactual) — attached in M16-A3."""
+    tainted: bool = False
+    """Whether the worker that wrote this consumed untrusted content — a page it fetched, a file
+    a tainted write landed in — as its taint ledger recorded it.
+
+    Carried on the envelope because the envelope is what the synthesis reads: the summary of a
+    fetched page can hold whatever the page put there, and once it is folded into one answer the
+    sentence has no page attached. The flag lets the answer say so, the way a tainted memory is
+    labelled on recall and a tainted coding turn is on its receipt. ``False`` is also what every
+    envelope written before the field existed reads as — those workers had no fetch tools, so it
+    is true of them, not merely a default."""
 
 
 def schema_problem(spec: TaskSpec, envelope: ResultEnvelope) -> str | None:

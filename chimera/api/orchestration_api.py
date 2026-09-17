@@ -66,7 +66,16 @@ _MAX_WORKERS = 8
 #: on: the (D-1)/D saving comes from each worker seeing ONE source instead of every worker seeing
 #: all of them. Tools make that sharper — a worker now fetches its own source rather than being
 #: handed every document up front.
-_WORKER_TOOLS = ("read_file", "read_document", "list_dir", "glob", "grep", "map")
+#: What a hierarchy worker may do: read — files in the project, and pages on the web. Nothing
+#: that writes, executes or sends. `scrape` (a page as clean markdown), `http_get` (the raw body)
+#: and `web_search` joined on 2026-09-17 for the case the tab was described by and could not do:
+#: "read these five sites and compare them" classified as five sources, decomposed into five
+#: subtasks, and handed five workers that could open a file and not a URL. Every fetch passes the
+#: worker's own taint ledger, and the envelope carries the verdict to the answer.
+_WORKER_TOOLS = (
+    "read_file", "read_document", "list_dir", "glob", "grep", "map",
+    "scrape", "http_get", "web_search",
+)
 
 #: Plans the preview produced, keyed by the id it handed back. A run that names one executes THAT
 #: decomposition instead of asking the model for a second one.
@@ -295,6 +304,10 @@ class WorkerVerifiedOut(BaseModel):
     summary_chars: int = 0
     evidence_refs: list[str] = Field(default_factory=list)
     gaps: list[str] = Field(default_factory=list)
+    tainted: bool = Field(
+        default=False,
+        description="The worker's taint ledger recorded an untrusted read (a fetched page).",
+    )
 
 
 class WorkerRejectedOut(BaseModel):
@@ -303,6 +316,7 @@ class WorkerRejectedOut(BaseModel):
     stage: str = ""
     detail: str = ""
     tokens: int = 0
+    tainted: bool = False
 
 
 class FellBackOut(BaseModel):
@@ -321,6 +335,10 @@ class HierarchyDoneOut(BaseModel):
     total_tokens: int | None = None
     counterfactual_tokens: int | None = None
     answer: str = ""
+    tainted: bool = Field(
+        default=False,
+        description="Some envelope the answer was synthesised from read untrusted content.",
+    )
 
 
 class CrewWorkerStartedOut(BaseModel):
@@ -646,12 +664,17 @@ def register_orchestration_api(
         concurrent workers pointed at the same folder.
         """
         from chimera.api.code_api import CodeSeams, assemble_registry
+        from chimera.orchestration.hierarchy import WorkerKit
 
         seams = CodeSeams(allow_tools=list(_WORKER_TOOLS))
-        registry, _ledger = assemble_registry(
+        registry, ledger = assemble_registry(
             seams, ws, read_settings(), gateway, steps=6, surface="api:hierarchy"
         )
-        return registry
+        # The ledger goes WITH the registry: it is what records that a worker fetched a page, and
+        # the orchestrator reads it after the worker acts to mark the envelope. Discarding it, as
+        # this did before the workers could fetch, left the answer unable to say where a sentence
+        # came from.
+        return WorkerKit(registry=registry, ledger=ledger)
 
     def _build(req: HierarchyRunIn | HierarchyPreviewIn, **extra: Any) -> Any:
         from chimera.evolution import build_evolution_context

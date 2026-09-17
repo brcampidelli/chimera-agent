@@ -4207,6 +4207,12 @@
             "title": "Shape",
             "type": "string"
           },
+          "tainted": {
+            "default": false,
+            "description": "Some envelope the answer was synthesised from read untrusted content.",
+            "title": "Tainted",
+            "type": "boolean"
+          },
           "total_tokens": {
             "anyOf": [
               {
@@ -8591,6 +8597,11 @@
             "title": "Stage",
             "type": "string"
           },
+          "tainted": {
+            "default": false,
+            "title": "Tainted",
+            "type": "boolean"
+          },
           "task_id": {
             "default": "",
             "title": "Task Id",
@@ -8666,6 +8677,12 @@
             "default": 0,
             "title": "Summary Chars",
             "type": "integer"
+          },
+          "tainted": {
+            "default": false,
+            "description": "The worker's taint ledger recorded an untrusted read (a fetched page).",
+            "title": "Tainted",
+            "type": "boolean"
           },
           "task_id": {
             "default": "",

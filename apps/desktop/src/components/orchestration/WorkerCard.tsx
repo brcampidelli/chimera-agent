@@ -131,6 +131,14 @@ export function WorkerCard({ worker }: { worker: WorkerState }) {
             </Badge>
           ) : null}
           {worker.reasked ? <Badge tone="warn">{t("orch.worker.reasked")}</Badge> : null}
+          {/* The ledger's verdict, not a guess from the tool names: this worker read something
+              nobody at this screen wrote — a fetched page, most often — and its summary can carry
+              whatever that page put there. Same label a tainted memory gets on recall. */}
+          {worker.tainted ? (
+            <span data-testid="worker-tainted">
+              <Badge tone="warn">{t("orch.worker.tainted")}</Badge>
+            </span>
+          ) : null}
           {worker.tokens > 0 ? (
             <span className="text-xs tabular-nums text-muted-foreground">
               {t("orch.worker.tokens", { n: worker.tokens })}

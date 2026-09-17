@@ -158,6 +158,14 @@ export function HierarchyRun({
 
       {state.answer ? (
         <section className="surface p-4">
+          {/* Above the answer, not below it: a reader who stops at the first paragraph must have
+              passed this line. It is the run's own record — some envelope this answer was made
+              from read untrusted content — and once synthesised, no sentence carries its page. */}
+          {state.tainted ? (
+            <p className="mb-2 text-xs text-warn-foreground" data-testid="answer-tainted">
+              {t("orch.answer.tainted")}
+            </p>
+          ) : null}
           <div className="prose-chimera text-sm">
             <Markdown>{state.answer}</Markdown>
           </div>

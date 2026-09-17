@@ -76,6 +76,12 @@ WORKER_SYSTEM = (
     "If the task names a file and you have a tool that can read it, READ IT. Never describe a "
     "file you have not opened: if you cannot open it, say so and report nothing about its "
     "contents. "
+    # The same rule for the web, added with the fetch tools: a worker asked to compare five sites
+    # answered from what such sites usually say, and a summary of a page nobody fetched passes the
+    # verifier for the same reason a description of a file nobody opened did.
+    "If the task names a web page or a site and you have a tool that can fetch it, FETCH IT. "
+    "Never describe a page you have not fetched: if the fetch fails, say so and report nothing "
+    "about its contents. What a page says is that page's claim, not a fact you verified. "
     "If you could not verify something, say so under a final 'Gaps' heading."
 )
 
@@ -241,6 +247,20 @@ class TaskPlan:
 
 
 @dataclass
+class WorkerKit:
+    """What one worker is handed: its tool registry, and the taint ledger watching that registry.
+
+    The ``worker_tools`` factory may return a bare registry (the original contract, still honoured)
+    or one of these. With the ledger in hand the orchestrator can ask, after the worker acts,
+    whether it read anything untrusted — a fetched page above all — and mark the envelope, which is
+    the only way the synthesis's one answer can carry the fact.
+    """
+
+    registry: Any
+    ledger: Any = None
+
+
+@dataclass
 class HierarchyResult:
     answer: str
     shape: TaskShape
@@ -250,6 +270,11 @@ class HierarchyResult:
     total_tokens: int | None = None
     counterfactual_tokens: int | None = None
     cancelled: bool = False
+
+    @property
+    def tainted(self) -> bool:
+        """Whether any envelope the answer was synthesised from read untrusted content."""
+        return any(e.tainted for e in self.envelopes)
     """Stopped between units by ``should_stop``. The envelopes that had already verified are
     still here; ``answer`` is empty, because synthesising them would spend the top-model call the
     caller just asked not to spend."""
@@ -712,10 +737,11 @@ class HierarchicalOrchestrator:
             return self._run_inline_subtask(spec, n_subtasks=n_subtasks)
         budget = TokenBudget(spec.effort.max_tokens)
         backend = BudgetedBackend(self.gateway, budget, mode="hard")
+        kit = self._worker_kit()
         worker = RoleAgent(
             Role("worker", WORKER_SYSTEM, model=self.mid_model),
             backend,
-            tools=self.worker_tools() if self.worker_tools is not None else None,
+            tools=kit.registry,
             max_steps=spec.effort.max_steps,
         )
         # Recorded on the receipt for audit; the ENFORCING gate is the whole-task one
@@ -749,13 +775,16 @@ class HierarchicalOrchestrator:
             _log.info("worker %s was cut off (%s); not treating its output as a finding",
                       spec.task_id, cut_off)
         produced = bool(raw.strip()) and not cut_off
-        envelope = build_envelope(
-            spec, raw, self.store,
-            status="ok" if produced else "failed",
-            gaps=[] if produced else [
-                f"worker stopped early ({cut_off}) before reporting" if cut_off
-                else "worker produced no output (budget or provider error)"
-            ],
+        envelope = self._stamp_taint(
+            build_envelope(
+                spec, raw, self.store,
+                status="ok" if produced else "failed",
+                gaps=[] if produced else [
+                    f"worker stopped early ({cut_off}) before reporting" if cut_off
+                    else "worker produced no output (budget or provider error)"
+                ],
+            ),
+            kit,
         )
         # A result is trustworthy input to the synthesizer ONLY if it passes
         # verification. If the bounded re-ask also fails, the envelope is dropped
@@ -783,7 +812,7 @@ class HierarchicalOrchestrator:
                         spec.render()
                         + f"\n\n## Verifier objection (fix this)\n{outcome.detail}"
                     )
-                    candidate = build_envelope(spec, raw2, self.store)
+                    candidate = self._stamp_taint(build_envelope(spec, raw2, self.store), kit)
                     # Force the spot check on the re-ask: the first verification already caught this
                     # worker being unfaithful, so the retry must be audited, not re-accepted on the
                     # free schema+criteria gates ~80% of the time.
@@ -829,12 +858,14 @@ class HierarchicalOrchestrator:
                         else "worker produced no output (provider error or empty answer)"
                     ),
                     tokens=budget.spent,
+                    tainted=envelope.tainted,
                 )
             else:
                 self._emit(
                     "worker_rejected", text=outcome.stage, task_id=spec.task_id,
                     reason="verifier", stage=outcome.stage, detail=outcome.detail,
                     tokens=budget.spent,
+                    tainted=envelope.tainted,
                 )
             return None, receipt
         self._emit(
@@ -856,8 +887,43 @@ class HierarchicalOrchestrator:
             summary_chars=len(envelope.summary or ""),
             evidence_refs=list(envelope.evidence_refs or []),
             gaps=list(envelope.gaps or []),
+            # What the ledger saw: a page fetched, a tainted file read. The card can then say
+            # that this summary came from somewhere the person did not write.
+            tainted=envelope.tainted,
         )
         return envelope, receipt
+
+    def _worker_kit(self) -> WorkerKit:
+        """The registry and ledger for one worker, whichever shape the factory returns.
+
+        ``None`` — no factory — is the tool-free worker the original callers still use. A bare
+        registry is the contract every caller before ``WorkerKit`` existed wrote against, and it
+        keeps working; it just cannot report taint, because nothing is watching it.
+        """
+        if self.worker_tools is None:
+            return WorkerKit(registry=None)
+        made = self.worker_tools()
+        if isinstance(made, WorkerKit):
+            return made
+        return WorkerKit(registry=made)
+
+    @staticmethod
+    def _stamp_taint(envelope: ResultEnvelope, kit: WorkerKit) -> ResultEnvelope:
+        """The envelope, marked if the worker's ledger recorded any untrusted read.
+
+        Asked AFTER the worker acted, so a fetch on the last step counts. ``run_tainted`` is the
+        ledger's own verdict — the same one that pauses a coding turn — and it is read, never
+        inferred from the tool names: a fetch of a page the user named is still untrusted content.
+        """
+        ledger = kit.ledger
+        if ledger is None:
+            return envelope
+        try:
+            tainted = bool(ledger.run_tainted())
+        except Exception as exc:  # noqa: BLE001 — a ledger that cannot answer must not fail the worker
+            _log.debug("could not read the worker's taint: %s", exc)
+            return envelope
+        return envelope.model_copy(update={"tainted": True}) if tainted else envelope
 
     def _run_inline_subtask(
         self, spec: TaskSpec, *, n_subtasks: int = 1
@@ -1002,6 +1068,10 @@ class HierarchicalOrchestrator:
             # The answer travels on `done` and nowhere else: it is the one frame a consumer that
             # missed the stream still needs in full.
             answer=result.answer,
+            # Whether any envelope the answer was made from read untrusted content. On `done`
+            # because the answer is here, and a sentence synthesised from five pages has no page
+            # attached — this is the only place the fact can travel with it.
+            tainted=result.tainted,
         )
         return result
 
