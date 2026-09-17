@@ -1076,8 +1076,8 @@ def deliver(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
@@ -1778,8 +1778,8 @@ def chat(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     _check_max_usd(max_usd)
 
@@ -2027,8 +2027,8 @@ def assist(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     _check_max_usd(max_usd)
@@ -2301,8 +2301,8 @@ def tui(
         )
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     _check_max_usd(max_usd)
 
@@ -2460,8 +2460,8 @@ def serve(
     from chimera.tools import default_registry
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     llm = LLMGateway()
@@ -2675,13 +2675,14 @@ def desktop_app(
     from chimera.tools import default_registry
 
     settings = get_settings()
-    if not settings.has_any_key():
+    if not settings.can_answer():
         # Unlike run/solve/fuse (which need a model to do their job and stay strict), the desktop app
         # can BOOT keyless: LLMGateway() below is lazy (no model call), and the UI opens a first-run
-        # setup screen that adds + live-tests a key from the browser. So notify and CONTINUE, don't exit.
+        # setup screen that adds + live-tests a key from the browser — or, since 0.59.0, picks a
+        # model a local runtime already has. So notify and CONTINUE, don't exit.
         console.print(
             "[yellow]No provider key yet[/yellow] — the app opens a setup screen; "
-            "add a key there to start chatting."
+            "add a key there, or pick a local model, to start chatting."
         )
 
     # Learn what models cost, in the background, once per boot. The receipt under every turn prices
@@ -2732,7 +2733,7 @@ def desktop_app(
     run_cron = settings.app_cron if cron is None else cron
     cron_stop = (
         _start_cron_daemon(backend, model, max_steps, workspace_path, 30)
-        if run_cron and settings.has_any_key()
+        if run_cron and settings.can_answer()
         else None
     )
 
@@ -3096,10 +3097,10 @@ def acp_server(
     from chimera.tools import default_registry
 
     settings = get_settings()
-    if not settings.has_any_key():
+    if not settings.can_answer():
         # stderr, not the console: stdout is the wire, and an editor parsing a Rich panel as a
         # JSON-RPC frame reports a hang rather than a missing key.
-        print("No provider key configured. Run 'chimera doctor'.", file=sys.stderr)
+        print("No provider key configured, and the default model is not a local one. Run 'chimera doctor'.", file=sys.stderr)
         raise typer.Exit(code=1)
     workspace_path = Path(workspace).resolve()
     backend = LLMGateway()
@@ -3566,8 +3567,8 @@ def orchestrate(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     ladder = settings.tier_ladder()
     per_delegation = budget or settings.delegation_budget
@@ -3637,8 +3638,8 @@ def brief(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     try:
         loaded = load_brief(Path(recipe))
@@ -3874,8 +3875,8 @@ def hierarchy_bench(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     ladder = settings.tier_ladder()
     mid = model or ladder.mid
@@ -4095,8 +4096,8 @@ def sandbox_bench(
     from chimera.tools import default_registry
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     gateway = LLMGateway()
 
@@ -4334,8 +4335,8 @@ def solve(
         console.print("[red]Provide a task, or use --approve/--deny/--respond/--edit <thread>.[/red]")
         raise typer.Exit(code=1)
 
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     workspace_path = Path(workspace)
@@ -4812,8 +4813,8 @@ def solve_batch(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     gateway = LLMGateway()
@@ -4962,8 +4963,8 @@ def crew_isolated(
     from chimera.tools import default_registry
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     if not worker:
         console.print("[red]give at least one --worker 'name:instruction'[/red]")
@@ -5073,8 +5074,8 @@ def explore(
     from chimera.core import ContextExplorer
     from chimera.providers import LLMGateway, MissingCredentialsError
 
-    if not get_settings().has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not get_settings().can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
     try:
@@ -5566,8 +5567,8 @@ def skills_evolve(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     store = SkillStore(settings.home / "skills.json")
     gateway = LLMGateway()
@@ -5710,8 +5711,8 @@ def playbook_curate(
     from chimera.evolution import BackendDeltaProposer, PlaybookCurator
     from chimera.providers import LLMGateway
 
-    if not get_settings().has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not get_settings().can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     playbook = _load_playbook()
     curator = PlaybookCurator(BackendDeltaProposer(LLMGateway(), model))
@@ -5738,8 +5739,8 @@ def rubric_grade(
     from chimera.eval import Rubric, model_grader
     from chimera.providers import LLMGateway
 
-    if not get_settings().has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not get_settings().can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     try:
         rubric = Rubric.from_dict(json.loads(Path(rubric_file).read_text(encoding="utf-8")))
@@ -6434,8 +6435,8 @@ def kanban_run(
     from chimera.kanban.lanes import CrewLane, SolveLane, runners_for
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     board = _board()
     # The registered agents FIRST, so the two built-in lanes cannot be shadowed by an agent that
@@ -6797,8 +6798,8 @@ def memory_consolidate(
     from chimera.memory.consolidate import model_summarizer
     from chimera.providers import LLMGateway, MissingCredentialsError
 
-    if not get_settings().has_any_key():
-        console.print("[red]no provider API key configured[/red] — set one to summarise")
+    if not get_settings().can_answer():
+        console.print("[red]no provider API key configured, and no local model[/red] — set one to summarise")
         raise typer.Exit(1)
     try:
         removed = _memory_manager().consolidate(
@@ -6890,8 +6891,8 @@ def evolve_refine(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     store = SkillStore(settings.home / "skills.json")
     skill = store.get(skill_name)
@@ -6948,8 +6949,8 @@ def evolve_guard(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
     tasks = list(demo_tasks())
     if limit:
@@ -7121,8 +7122,8 @@ def evolve_tune(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     gateway = LLMGateway()
@@ -7299,8 +7300,8 @@ def bench(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     gateway = LLMGateway()
@@ -7737,8 +7738,8 @@ def evoclaw(
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     gateway = LLMGateway()
@@ -7873,8 +7874,8 @@ def scenarios(
     )
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     suite = daily_scenarios()
@@ -8054,8 +8055,8 @@ def crew(
     from chimera.providers import LLMGateway
 
     settings = get_settings()
-    if not settings.has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not settings.can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     gateway = LLMGateway()
@@ -8095,8 +8096,8 @@ def lifecycle(
     from chimera.orchestration import lifecycle_crew
     from chimera.providers import LLMGateway, MissingCredentialsError
 
-    if not get_settings().has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not get_settings().can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     crew = lifecycle_crew(
@@ -8132,8 +8133,8 @@ def workflow(
     from chimera.workflow import load_workflow, run_workflow
     from chimera.workflow.executors import build_executors
 
-    if not get_settings().has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not get_settings().can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     flow = load_workflow(file)
@@ -8194,8 +8195,8 @@ def meta(
     from chimera.providers import LLMGateway
     from chimera.tools import default_registry
 
-    if not get_settings().has_any_key():
-        console.print("[red]No provider key configured. Run 'chimera doctor'.[/red]")
+    if not get_settings().can_answer():
+        console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
 
     allowed = default_registry().names()

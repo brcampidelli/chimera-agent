@@ -779,6 +779,15 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(
         default="http://127.0.0.1:11434", validation_alias="CHIMERA_OLLAMA_BASE_URL"
     )
+    # LM Studio's OpenAI-compatible server, `/v1` included: it is what LiteLLM's `lm_studio/`
+    # provider needs in `LM_STUDIO_API_BASE` — which has NO default there, so `lm_studio/<model>`
+    # with the variable unset is a request to api.openai.com with a fake key. The gateway exports
+    # this value under that name when it is unset, the way it exports `OLLAMA_API_BASE`; the
+    # discovery probe asks `{base}/models` on it. LM Studio needs no key, and LiteLLM sends a
+    # placeholder when none is set.
+    lm_studio_base_url: str = Field(
+        default="http://localhost:1234/v1", validation_alias="CHIMERA_LM_STUDIO_BASE_URL"
+    )
 
     # Inline completion in the editor: the model asked what comes after the cursor, and the hard
     # cut on how long it may take.
@@ -1100,6 +1109,21 @@ class Settings(BaseSettings):
 
     def has_any_key(self) -> bool:
         return bool(self.configured_providers())
+
+    def can_answer(self) -> bool:
+        """Whether this install has SOME way to run a model: a key, or a default model that runs on
+        this machine and needs none.
+
+        The question every command gate and the desktop's first-run gate actually ask — and they
+        asked :meth:`has_any_key` instead, so a machine whose only model was ``ollama_chat/llama3``
+        was refused with *"No provider key configured"* by six CLI commands and shown a wizard that
+        demanded a key, while the gateway one layer down would have served it (its own credential
+        check has let local models through since the Ollama work). The same defect
+        :mod:`chimera.providers.discovery` fixed for unlisted providers, one step further out.
+        """
+        from chimera.providers.discovery import is_local_model
+
+        return self.has_any_key() or is_local_model(self.default_model)
 
     def credentials(self) -> dict[str, str | None]:
         """All known credential slots keyed by env-var name (value or None)."""

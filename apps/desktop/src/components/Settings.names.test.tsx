@@ -45,7 +45,7 @@ const PROVIDERS = [
 
 function config() {
   return {
-    models: { default: "openrouter/x", weak: "", mid: "", orchestrator: "", cost_mode: "auto", cascade: false, api_base: null, fallback_models: [], complete_model: "", ollama_base_url: "", tiers: { weak: "a", mid: "b", top: "c" } },
+    models: { default: "openrouter/x", weak: "", mid: "", orchestrator: "", cost_mode: "auto", cascade: false, api_base: null, fallback_models: [], complete_model: "", ollama_base_url: "", lm_studio_base_url: "", tiers: { weak: "a", mid: "b", top: "c" } },
     memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false, skill_cards: false, embed_model: "" },
     cache: { completion: false, prompt: false },
     autonomy: {
@@ -86,7 +86,9 @@ describe("Settings — every control has a name", () => {
   beforeEach(() => {
     vi.mocked(getConfig).mockResolvedValue(config() as Awaited<ReturnType<typeof getConfig>>);
     vi.mocked(getDoctor).mockResolvedValue({
-      has_any_key: true, configured_providers: ["openrouter"], default_model: "openrouter/x",
+      has_any_key: true,
+      local_model: false,
+      can_answer: true, configured_providers: ["openrouter"], default_model: "openrouter/x",
       tiers: { weak: "a", mid: "b", top: "c" }, memory_backend: "json", cache: true,
     } as Awaited<ReturnType<typeof getDoctor>>);
     vi.mocked(getInstructions).mockResolvedValue({ instructions: "", language: "", name: "" });

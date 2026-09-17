@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -69,6 +69,8 @@ das Präfix `ollama/` läuft über Ollamas Generate-Endpunkt, der keine Tools au
 (kommagetrennt) setzen, um bei einem Fehler des primären Modells auf ein anderes
 auszuweichen. In `chat`/`tui` wechselt `/model <slug>` das Modell mitten in der
 Sitzung.
+
+**Ein lokales Modell braucht keinen Schlüssel.** Mit `CHIMERA_DEFAULT_MODEL=ollama_chat/<modell>` oder `lm_studio/<modell>` läuft jeder Befehl ohne API-Schlüssel (LM Studio wird unter `CHIMERA_LM_STUDIO_BASE_URL` abgefragt, Standard `http://localhost:1234/v1`), und der Erststart-Bildschirm der Desktop-App bietet die Modelle an, die Ollama oder LM Studio schon haben — ein Klick, kein Schlüssel.
 
 **Credential-Pools.** Einem Provider mehrere Keys geben mit
 `CHIMERA_<PROVIDER>_KEYS` (z. B. `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). Das

@@ -38,6 +38,7 @@ import type {
   MemoryLayers,
   MemoryProfile,
   ModelListing,
+  LocalRuntimes,
   OllamaModels,
   PoolWrite,
   ProjectState,
@@ -185,6 +186,7 @@ export const getDoctor = () => json<DoctorInfo>("/api/doctor");
 /** The Ollama tags this machine has pulled. NOT part of `doctor`: that response is fetched by
  *  several screens, and a round-trip to a server that may be off would make all of them wait. */
 export const getOllamaModels = () => json<OllamaModels>("/api/models/ollama");
+export const getLocalRuntimes = () => json<LocalRuntimes>("/api/models/local");
 /** The models a turn may name — the curated catalogue merged with OpenRouter's live index and
  *  whatever Ollama has pulled, filtered to the keys this install actually has.
  *

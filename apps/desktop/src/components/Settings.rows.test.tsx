@@ -72,6 +72,8 @@ describe("Settings — the controls that were one row away", () => {
     vi.mocked(getConfig).mockResolvedValue(config() as never);
     vi.mocked(getDoctor).mockResolvedValue({
       has_any_key: true,
+      local_model: false,
+      can_answer: true,
       configured_providers: ["openrouter"],
       default_model: "openrouter/x",
       tiers: { weak: "a", mid: "b", top: "c" },

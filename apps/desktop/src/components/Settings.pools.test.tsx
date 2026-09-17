@@ -44,6 +44,7 @@ function config() {
       fallback_models: [],
       tiers: { weak: "a", mid: "b", top: "c" },
       ollama_base_url: "http://localhost:11434",
+      lm_studio_base_url: "http://localhost:1234/v1",
     },
     memory: {
       backend: "json",
@@ -88,6 +89,8 @@ describe("Settings — key pools", () => {
     vi.mocked(getConfig).mockResolvedValue(config() as never);
     vi.mocked(getDoctor).mockResolvedValue({
       has_any_key: true,
+      local_model: false,
+      can_answer: true,
       configured_providers: ["openrouter"],
       default_model: "openrouter/x",
       tiers: { weak: "a", mid: "b", top: "c" },

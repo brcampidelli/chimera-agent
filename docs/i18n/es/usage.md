@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — Guía de uso
@@ -65,6 +65,8 @@ lugar de `ollama/`: el prefijo `ollama/` pasa por el endpoint generate de Ollama
 llamar herramientas. Configura
 `CHIMERA_FALLBACK_MODELS` (separado por comas) para conmutar a otro modelo si el primario
 falla. En `chat`/`tui`, `/model <slug>` cambia el modelo a mitad de sesión.
+
+**Un modelo local no necesita clave.** Con `CHIMERA_DEFAULT_MODEL=ollama_chat/<modelo>` o `lm_studio/<modelo>` todos los comandos funcionan sin clave de API (LM Studio se consulta en `CHIMERA_LM_STUDIO_BASE_URL`, por defecto `http://localhost:1234/v1`), y la pantalla de primer arranque del escritorio ofrece los modelos que Ollama o LM Studio ya tienen — un clic, sin clave.
 
 **Pools de credenciales.** Dale a un proveedor varias claves con `CHIMERA_<PROVIDER>_KEYS`
 (p. ej. `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). El gateway las rota en round-robin entre

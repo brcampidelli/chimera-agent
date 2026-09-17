@@ -57,6 +57,8 @@ describe("Settings — who the agent is", () => {
     vi.mocked(getConfig).mockResolvedValue(CONFIG as never);
     vi.mocked(getDoctor).mockResolvedValue({
       has_any_key: true,
+      local_model: false,
+      can_answer: true,
       configured_providers: ["openrouter"],
       default_model: "openrouter/x",
       tiers: { weak: "a", mid: "b", top: "c" },

@@ -1612,6 +1612,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/models/local": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Local Runtimes Endpoint
+         * @description Every local runtime, asked — the answer the first-run screen needs before it asks for a key.
+         *
+         *     Beside ``/api/models/ollama`` rather than replacing it: that endpoint is one Settings row's
+         *     picker and keeps its shape. This one exists because a machine with Ollama or LM Studio
+         *     already running was shown a wizard demanding an API key — the product asking for a
+         *     credential it did not need. Both probes are bounded (two seconds each, and much less on the
+         *     common no-server case) and run concurrently, so a machine with neither answers in about the
+         *     time of one connect attempt, not two.
+         */
+        get: operations["local_runtimes_endpoint_api_models_local_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/models/ollama": {
         parameters: {
             query?: never;
@@ -4144,6 +4171,11 @@ export interface components {
         DoctorOut: {
             /** Cache */
             cache: boolean;
+            /**
+             * Can Answer
+             * @default false
+             */
+            can_answer: boolean;
             /** Configured Providers */
             configured_providers: string[];
             /** Default Model */
@@ -4160,6 +4192,11 @@ export interface components {
             external_agents: components["schemas"]["ExternalAgentOut"][];
             /** Has Any Key */
             has_any_key: boolean;
+            /**
+             * Local Model
+             * @default false
+             */
+            local_model: boolean;
             /** Memory Backend */
             memory_backend: string;
             /** Sandbox */
@@ -4969,6 +5006,40 @@ export interface components {
             /** Write Region */
             write_region?: string[] | null;
         };
+        /**
+         * LocalRuntimeOut
+         * @description One local, keyless model runtime and what it has right now — Ollama or LM Studio.
+         *
+         *     Same three-state answer as ``OllamaModelsOut`` (reachable with nothing, unreachable, reachable
+         *     with models) and for the same reason; ``prefix`` is what turns an entry of ``models`` into the
+         *     slug a turn runs on, so the client never re-implements which runtime takes which LiteLLM route.
+         */
+        LocalRuntimeOut: {
+            /** Base Url */
+            base_url: string;
+            /** Models */
+            models?: string[];
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /** Reachable */
+            reachable: boolean;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /**
+         * LocalRuntimesOut
+         * @description Every local runtime this install knows how to ask, asked. The first-run screen reads it to
+         *     offer a model that is already on the machine instead of demanding a key.
+         */
+        LocalRuntimesOut: {
+            /** Runtimes */
+            runtimes?: components["schemas"]["LocalRuntimeOut"][];
+        };
         /** MaturityOut */
         MaturityOut: {
             /** Available */
@@ -5318,6 +5389,11 @@ export interface components {
             default: string;
             /** Fallback Models */
             fallback_models: string[];
+            /**
+             * Lm Studio Base Url
+             * @default
+             */
+            lm_studio_base_url: string;
             /** Mid */
             mid: string;
             /**
@@ -9086,6 +9162,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    local_runtimes_endpoint_api_models_local_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LocalRuntimesOut"];
                 };
             };
         };

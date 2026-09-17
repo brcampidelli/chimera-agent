@@ -18,6 +18,8 @@ vi.mock("@/lib/api", () => ({ getDoctor: vi.fn() }));
 function doctor(spend: Record<string, unknown> | null) {
   return {
     has_any_key: true,
+    local_model: false,
+    can_answer: true,
     configured_providers: ["openrouter"],
     default_model: "openrouter/deepseek/deepseek-chat",
     tiers: { weak: "w", mid: "m", top: "t" },

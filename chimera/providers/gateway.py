@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
 from chimera.providers.cache import CompletionCache
+from chimera.providers.discovery import LOCAL_MODEL_PREFIXES, is_local_model
 from chimera.providers.failover import (
     CredentialPool,
     FailoverReason,
@@ -49,35 +50,16 @@ _KEY_ENV_VARS = {
     "deepseek_api_key": "DEEPSEEK_API_KEY",
 }
 
-# LiteLLM prefixes that route to a local, keyless runtime. A model named with one of these runs on
-# the user's machine and needs no API key — the credential gate must let it through. Ollama is the
-# common case; LM Studio, vLLM and llamafile are the same situation and were being refused for a key
-# none of them wants.
-#
-# The code reads this as a set (`startswith` takes the whole tuple), so the ORDER here is
-# documentation — and a reader takes it as the recommendation, which is why `ollama_chat/` comes
-# first. That is Ollama's /api/chat, native tool calling. `ollama/` is /api/generate: LiteLLM
-# pastes the tool catalogue into the prompt as a Python repr and, in stream, hands a call back as
-# the assistant's text, so the loop never sees a tool call (pinned in
-# tests/test_the_adapter_returns_the_tool_call_it_was_given.py). It stays listed because it is
-# still local and keyless; `_warn_generate_prefix_with_tools` says the rest when it matters.
-_LOCAL_MODEL_PREFIXES = (
-    "ollama_chat/",
-    "ollama/",
-    "lm_studio/",
-    "hosted_vllm/",
-    "vllm/",
-    "llamafile/",
-)
+# The local-runtime rule lives in `discovery.py`, beside the key rule: "does this install need a
+# key at all" is asked by the CLI's command gates and the desktop's first-run gate as well as by
+# `_require_credentials` below, and they used to answer it differently. The private names stay for
+# the readers that import them from here.
+_LOCAL_MODEL_PREFIXES = LOCAL_MODEL_PREFIXES
+_is_local_model = is_local_model
 
 #: Ollama's /api/generate route as LiteLLM names it — local and keyless like the rest of the tuple,
 #: and the one prefix in it that has no tool calling.
 _OLLAMA_GENERATE_PREFIX = "ollama/"
-
-
-def _is_local_model(model: str) -> bool:
-    """True when the model routes to a local, keyless runtime (e.g. ``ollama_chat/llama3``)."""
-    return (model or "").lower().startswith(_LOCAL_MODEL_PREFIXES)
 
 
 def _image_to_url(ref: str) -> str:
@@ -414,6 +396,12 @@ class LLMGateway:
         ollama_base = getattr(self.settings, "ollama_base_url", "") or ""
         if ollama_base and not os.environ.get("OLLAMA_API_BASE"):
             os.environ["OLLAMA_API_BASE"] = ollama_base
+        # Same for LM Studio, and here it is load-bearing rather than a convenience: LiteLLM's
+        # `lm_studio/` provider has no default base, so without this a local model was a request to
+        # OpenAI carrying a fake key (see `Settings.lm_studio_base_url`).
+        lm_studio_base = getattr(self.settings, "lm_studio_base_url", "") or ""
+        if lm_studio_base and not os.environ.get("LM_STUDIO_API_BASE"):
+            os.environ["LM_STUDIO_API_BASE"] = lm_studio_base
 
     def _resolve_model(self, model: str | None) -> str:
         return model or self.settings.default_model

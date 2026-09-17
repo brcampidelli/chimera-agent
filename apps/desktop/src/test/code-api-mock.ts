@@ -109,6 +109,8 @@ export function makeCodeApiMock() {
     // every suite that is not about external agents sees the screen it saw before they existed.
     getDoctor: vi.fn(async () => ({
       has_any_key: true,
+      local_model: false,
+      can_answer: true,
       configured_providers: ["openrouter"],
       default_model: "test/model",
       tiers: { weak: "w", mid: "m", top: "t" },

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, KeyRound, List, Loader2, X } from "lucide-react";
-import { getConfig, patchConfig, testProviderKey } from "@/lib/api";
+import { Check, Cpu, ExternalLink, KeyRound, List, Loader2, X } from "lucide-react";
+import { getConfig, getLocalRuntimes, patchConfig, testProviderKey } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ModelDialog } from "@/components/code/ModelPicker";
 import { useT } from "@/lib/i18n";
@@ -36,6 +36,20 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
   // screen forever waiting for a provider that never arrives.
   const cfg = useQuery({ queryKey: ["config"], queryFn: getConfig });
   const choices = useMemo(() => (cfg.data?.providers ?? []).filter((p) => p.llm), [cfg.data]);
+  // What is already running on this machine. Asked here, on the screen that used to demand a key,
+  // because a machine with Ollama or LM Studio serving models needs none — and was shown this
+  // wizard anyway. The probe is bounded server-side; while it runs the key form is usable as
+  // before, and a machine with neither runtime never sees the section.
+  const local = useQuery({ queryKey: ["local-runtimes"], queryFn: getLocalRuntimes });
+  const localOptions = useMemo(
+    () =>
+      (local.data?.runtimes ?? []).flatMap((r) =>
+        (r.models ?? []).map((m) => ({ slug: `${r.prefix}${m}`, runtime: r.name, model: m })),
+      ),
+    [local.data],
+  );
+  const [localSlug, setLocalSlug] = useState("");
+  const chosenLocal = localSlug || localOptions[0]?.slug || "";
   const pick = choices.find((p) => p.env === env);
   const label = pick?.label ?? "";
   // The suggested slug is DATA and goes stale — the catalog says so about itself. Showing it in an
@@ -83,6 +97,14 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
     void qc.invalidateQueries({ queryKey: ["config"] });
   };
 
+  // One click: the local slug becomes the default model, and the doctor — which answers
+  // `can_answer` from the model as well as from keys — closes this screen. No key is written and
+  // none is asked for; the model runs where it already runs.
+  const useLocalMutation = useMutation({
+    mutationFn: () => patchConfig({ CHIMERA_DEFAULT_MODEL: chosenLocal }),
+    onSuccess: finish,
+  });
+
   return (
     <div className="flex h-full flex-1 items-center justify-center overflow-y-auto p-6">
       <div className="surface w-full max-w-lg space-y-5 p-6">
@@ -92,6 +114,42 @@ export function Onboarding({ onSkip }: { onSkip: () => void }) {
         </div>
 
         <p className="text-sm text-muted-foreground">{t("onboarding.intro")}</p>
+
+        {/* Models already on this machine. Rendered only when a local runtime answered WITH models:
+            "reachable and empty" and "nothing answered" both mean the key form is the way in, and
+            a section that says so would be a claim about the user's machine on no evidence. */}
+        {localOptions.length > 0 ? (
+          <div className="space-y-2 rounded-md border border-hairline bg-muted/40 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <Cpu className="h-4 w-4 text-accent" />
+              {t("onboarding.local.title")}
+            </div>
+            <p className="text-xs text-muted-foreground">{t("onboarding.local.intro")}</p>
+            <div className="flex items-center gap-2">
+              <select
+                id="ob-local-model"
+                aria-label={t("onboarding.local.title")}
+                className={inputCls}
+                value={chosenLocal}
+                onChange={(e) => setLocalSlug(e.target.value)}
+              >
+                {localOptions.map((o) => (
+                  <option key={o.slug} value={o.slug}>
+                    {t(`onboarding.local.runtime.${o.runtime}`)} · {o.model}
+                  </option>
+                ))}
+              </select>
+              <Button
+                type="button"
+                disabled={!chosenLocal || useLocalMutation.isPending}
+                onClick={() => useLocalMutation.mutate()}
+              >
+                {useLocalMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                {t("onboarding.local.use")}
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Which provider. Only the ones that serve models — /api/config also lists tool keys. */}
         <div className="space-y-2">

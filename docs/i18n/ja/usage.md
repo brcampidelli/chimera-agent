@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — 利用ガイド
@@ -64,6 +64,8 @@ completionをキャッシュし、繰り返しのAPI呼び出しを省きます)
 プライマリがエラーになった場合に別のモデルへフェイルオーバーするには `CHIMERA_FALLBACK_MODELS`
 (カンマ区切り)を設定してください。`chat`/`tui` では、`/model <slug>` がセッション途中で
 モデルを切り替えます。
+
+**ローカルモデルにキーは不要です。** `CHIMERA_DEFAULT_MODEL=ollama_chat/<モデル>` または `lm_studio/<モデル>` を設定すれば、すべてのコマンドが API キーなしで動きます（LM Studio は `CHIMERA_LM_STUDIO_BASE_URL`、既定 `http://localhost:1234/v1` に問い合わせます）。デスクトップの初回起動画面は Ollama や LM Studio にすでにあるモデルを提示します — ワンクリック、キー不要。
 
 **認証情報プール。** `CHIMERA_<PROVIDER>_KEYS`(例: `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`)
 でプロバイダーに複数のキーを与えられます。ゲートウェイは呼び出しをまたいでラウンドロビンで

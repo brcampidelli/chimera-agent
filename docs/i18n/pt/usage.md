@@ -1,5 +1,5 @@
 ---
-source_sha256: 4504ffb2fec03c1c651f531ab25212f512ab598ea09307542f0526a580d9965c
+source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
 ---
 
 # Chimera — Guia de Uso
@@ -65,6 +65,8 @@ servidor self-hosted / compatível com OpenAI (Ollama, vLLM), defina `CHIMERA_AP
 que não consegue chamar ferramentas. Defina
 `CHIMERA_FALLBACK_MODELS` (separado por vírgula) para trocar para outro modelo se o
 primário der erro. Em `chat`/`tui`, `/model <slug>` troca o modelo no meio da sessão.
+
+**Um modelo local não precisa de chave.** Com `CHIMERA_DEFAULT_MODEL=ollama_chat/<modelo>` ou `lm_studio/<modelo>` todo comando roda sem chave de API (o LM Studio é consultado em `CHIMERA_LM_STUDIO_BASE_URL`, padrão `http://localhost:1234/v1`), e a tela de primeira execução do desktop oferece os modelos que o Ollama ou o LM Studio já têm — um clique, sem chave.
 
 **Pools de credenciais.** Dê a um provedor várias chaves com
 `CHIMERA_<PROVIDER>_KEYS` (ex.: `CHIMERA_OPENROUTER_KEYS=key1,key2,key3`). O
