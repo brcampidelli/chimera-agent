@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import atomic_write_text, resolve_in_workspace
+from chimera.tools.workspace import atomic_write_text, resolve_for, shown_path
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _MAX_READ_CHARS = 20_000
@@ -52,7 +52,7 @@ class ReadFileTool(_WorkspaceTool):
         self.untrusted_output = not trust_workspace
 
     def run(self, **kwargs: Any) -> str:
-        path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        path = resolve_for(self, str(kwargs["path"]), verb="read")
         if not path.is_file():
             return f"error: file not found: {kwargs['path']}"
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -170,7 +170,7 @@ class WriteFileTool(_WorkspaceTool):
     }
 
     def run(self, **kwargs: Any) -> str:
-        path = resolve_in_workspace(self.workspace, str(kwargs["path"]))
+        path = resolve_for(self, str(kwargs["path"]), verb="write")
         if err := refuse_write(self.workspace, path, self.write_region):
             return err
         content = str(kwargs.get("content", ""))
@@ -202,7 +202,7 @@ class WriteFileTool(_WorkspaceTool):
         # Byte-exact atomic write: never OS-translate the model's newlines, and never truncate an
         # existing file if the write is interrupted (temp + replace).
         atomic_write_text(path, content)
-        return f"wrote {len(content)} chars to {path.relative_to(self.workspace)}"
+        return f"wrote {len(content)} chars to {shown_path(self.workspace, path)}"
 
 
 class ListDirTool(_WorkspaceTool):
@@ -219,7 +219,7 @@ class ListDirTool(_WorkspaceTool):
     }
 
     def run(self, **kwargs: Any) -> str:
-        path = resolve_in_workspace(self.workspace, str(kwargs.get("path", ".")))
+        path = resolve_for(self, str(kwargs.get("path", ".")), verb="list")
         if not path.is_dir():
             return f"error: not a directory: {kwargs.get('path', '.')}"
         entries = sorted(f"{p.name}/" if p.is_dir() else p.name for p in path.iterdir())

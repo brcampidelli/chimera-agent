@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.files import _WorkspaceTool
-from chimera.tools.workspace import resolve_in_workspace
+from chimera.tools.workspace import resolve_for, shown_path
 
 _IGNORE_DIRS = frozenset(
     {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
@@ -66,7 +66,7 @@ class GrepTool(_WorkspaceTool):
             regex = re.compile(str(kwargs["pattern"]))
         except re.error as exc:
             return f"error: invalid regex: {exc}"
-        root = resolve_in_workspace(self.workspace, str(kwargs.get("path", ".")))
+        root = resolve_for(self, str(kwargs.get("path", ".")), verb="search")
         if not root.is_dir():
             return f"error: not a directory: {kwargs.get('path', '.')}"
         glob = kwargs.get("glob")
@@ -82,7 +82,7 @@ class GrepTool(_WorkspaceTool):
                 text = file.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue  # binary or unreadable — skip, don't error
-            rel = file.relative_to(self.workspace).as_posix()
+            rel = shown_path(self.workspace, file)
             for lineno, line in enumerate(text.splitlines(), 1):
                 if regex.search(line):
                     hits.append(f"{rel}:{lineno}: {line.strip()[:200]}")
