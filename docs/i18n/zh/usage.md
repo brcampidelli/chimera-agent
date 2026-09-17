@@ -1,5 +1,5 @@
 ---
-source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
+source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
 ---
 
 # Chimera —— 使用指南
@@ -613,6 +613,10 @@ uv run chimera memory prune --max 50        # keep the N highest-value memories 
 **图谱层**会从你的记忆中提取出 `(source, relation, target)`（源、关系、目标）三元组
 （例如 `PassaPro uses Supabase`、`Alex prefers TypeScript`），因此事实不仅能按关键词召回，
 也能按实体召回。
+
+**对话历史是另一个存储。** 在 Code 界面上完成的每一轮编码都会被索引——消息、回答、读取或编辑的文件、时间——存入
+`<home>/history.db`（SQLite，Python 支持时使用 FTS5），并在对话自身的记录裁掉最早的轮次之后仍然保留。代理通过
+`recall_history` 工具搜索它（"两周前我们对登录函数做了什么决定？"），默认限定当前项目，除非要求搜索所有项目。在不可信内容上运行的轮次在召回时会被标注，粘贴的凭据在写入前会被脱敏，删除一段对话会删除它的行。
 
 ### `cron` —— 定时任务与事件 SOP
 

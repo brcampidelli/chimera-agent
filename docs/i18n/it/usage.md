@@ -1,5 +1,5 @@
 ---
-source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
+source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
 ---
 
 # Chimera — Guida all'uso
@@ -697,6 +697,15 @@ affidabilità) — non un singolo criterio.
 Il **livello a grafo** estrae triple `(fonte, relazione, target)` dalle tue memorie
 (`PassaPro uses Supabase`, `Alex prefers TypeScript`), così i fatti possono essere
 richiamati per entità, non solo per parola chiave.
+
+**La cronologia delle conversazioni è un archivio a parte.** Ogni turno di codice che termina
+nella schermata Code viene indicizzato — il messaggio, la risposta, i file letti o modificati,
+quando — in `<home>/history.db` (SQLite, FTS5 quando il tuo Python lo ha), e resta lì dopo che la
+trascrizione della conversazione ha tagliato i turni più vecchi. L'agente lo cerca con lo strumento
+`recall_history` ("cosa abbiamo deciso sulla funzione di login due settimane fa?"), limitato al
+progetto corrente salvo richiesta per tutti i progetti. Un turno eseguito su contenuto non
+attendibile viene etichettato al richiamo, una credenziale incollata viene oscurata prima della
+scrittura, ed eliminare una conversazione elimina le sue righe.
 
 ### `cron` — job pianificati & SOP di evento
 

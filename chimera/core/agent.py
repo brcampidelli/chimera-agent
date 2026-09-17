@@ -43,6 +43,8 @@ PARALLEL_READ_TOOLS = frozenset(
         "scrape", "extract", "map",
         # Reads a job's record and log; `job_cancel` kills and is not here.
         "job_status",
+        # Reads the index of finished turns; writes nothing.
+        "recall_history",
     }
 )
 #: How many of a step's calls run at once. Four is a fetch batch, not a fan-out: a model asks for a

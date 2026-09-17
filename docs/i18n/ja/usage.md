@@ -1,5 +1,5 @@
 ---
-source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
+source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
 ---
 
 # Chimera — 利用ガイド
@@ -672,6 +672,10 @@ uv run chimera memory prune --max 50        # keep the N highest-value memories 
 **グラフ層**は、あなたのメモリから `(source, relation, target)` の三つ組を抽出します
 (`PassaPro uses Supabase`、`Alex prefers TypeScript`)。そのため事実は、キーワードだけ
 でなくエンティティによっても想起できます。
+
+**会話履歴は別のストアです。** Code 画面で完了した各コーディングターン — メッセージ、回答、読み書きしたファイル、日時 — は
+`<home>/history.db`（SQLite、Python が対応していれば FTS5）に索引され、会話自身の記録が古いターンを切り詰めた後も残ります。エージェントは
+`recall_history` ツールで検索します（「2 週間前にログイン関数について何を決めた？」）。指定がなければ現在のプロジェクトに限定されます。信頼できない内容の上で実行されたターンは呼び出し時にラベル付けされ、貼り付けられた資格情報は書き込み前に伏せられ、会話を削除するとその行も削除されます。
 
 ### `cron` — スケジュールされたジョブとイベントSOP
 

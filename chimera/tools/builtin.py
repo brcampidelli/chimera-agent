@@ -131,6 +131,17 @@ def default_registry(
     registry.register(RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs))
     registry.register(JobStatusTool(jobs))
     registry.register(JobCancelTool(jobs))
+    # The conversation history — every coding turn that finished, kept after the session's own
+    # trimming forgot it. Read-only, scoped to THIS workspace by the same key memory is scoped by,
+    # and in the default registry for the reason the task list is: a session the operator scoped
+    # must not quietly gain a tool, so it passes through `restrict_registry` like everything else.
+    from chimera.memory.history import history_for
+    from chimera.memory.models import project_key
+    from chimera.tools.history import RecallHistoryTool
+
+    registry.register(
+        RecallHistoryTool(history_for(settings.home), project=project_key(workspace))
+    )
     registry.register(HttpGetTool())
 
     # Always-on reference tools (no credential needed).

@@ -1,5 +1,5 @@
 ---
-source_sha256: cc6df54e6126e8ea6a8d68dd11af8e2e797b03ed2fdfc7fac65194624d7ece94
+source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
 ---
 
 # Chimera — Guide d'utilisation
@@ -701,6 +701,15 @@ curation, fiabilité) — pas un seul indice.
 La **couche graphe** extrait des triplets `(source, relation, cible)` de vos mémoires
 (`PassaPro uses Supabase`, `Alex prefers TypeScript`), pour que les faits puissent être
 rappelés par entité, pas seulement par mot-clé.
+
+**L'historique des conversations est un autre dépôt.** Chaque tour de code qui se termine sur
+l'écran Code est indexé — le message, la réponse, les fichiers lus ou modifiés, la date — dans
+`<home>/history.db` (SQLite, FTS5 quand votre Python en dispose), et il y reste après que la
+transcription de la conversation a coupé ses tours les plus anciens. L'agent y cherche avec l'outil
+`recall_history` (« qu'avons-nous décidé sur la fonction de login il y a deux semaines ? »), limité
+au projet courant sauf demande pour tous les projets. Un tour exécuté sur du contenu non fiable est
+étiqueté au rappel, un identifiant collé est caviardé avant l'écriture, et supprimer une
+conversation supprime ses lignes.
 
 ### `cron` — tâches planifiées & SOP événementiels
 

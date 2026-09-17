@@ -649,6 +649,15 @@ The **graph layer** extracts `(source, relation, target)` triples from your memo
 (`PassaPro uses Supabase`, `Alex prefers TypeScript`), so facts can be recalled by
 entity, not only by keyword.
 
+**Conversation history is a different store.** Every coding turn that finishes on the Code
+screen is indexed — the message, the answer, the files it read or edited, when — in
+`<home>/history.db` (SQLite, FTS5 when your Python has it), and it stays there after the
+conversation's own transcript trims its oldest turns. The agent searches it with the
+`recall_history` tool ("what did we decide about the login function two weeks ago?"), scoped to
+the current project unless asked for every project. A turn that ran on untrusted content is
+labelled on recall, a pasted credential is redacted before it is written, and deleting a
+conversation deletes its rows.
+
 ### `cron` — scheduled jobs & event SOPs
 
 ```bash
