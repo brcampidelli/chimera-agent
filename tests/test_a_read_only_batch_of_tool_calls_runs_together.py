@@ -56,6 +56,24 @@ class _Backend:
         return CompletionResult(content="done", model="fake")
 
 
+def _overlapping() -> bool:
+    """Whether any two logged calls were in flight at the same time — the fact itself, rather than
+    a wall-clock threshold: `time.sleep` under-sleeps by a scheduler tick on Windows, and a run of
+    three 0.2 s sleeps measured 0.594 s there once, which is what a threshold reads as parallel."""
+    spans = sorted((b, e) for _, b, e, _ in _Slow.log)
+    return any(spans[i + 1][0] < spans[i][1] for i in range(len(spans) - 1))
+
+
+def _most_at_once() -> int:
+    """The largest number of logged calls in flight at one instant."""
+    events = sorted([(b, 1) for _, b, _, _ in _Slow.log] + [(e, -1) for _, _, e, _ in _Slow.log])
+    peak = now = 0
+    for _, delta in events:
+        now += delta
+        peak = max(peak, now)
+    return peak
+
+
 def _registry(*names: str) -> ToolRegistry:
     registry = ToolRegistry()
     for name in names:
@@ -85,16 +103,17 @@ def _run(
 def test_four_read_only_calls_run_together_and_the_step_says_so() -> None:
     result, backend, elapsed = _run(["read_file", "read_file", "http_get", "grep"])
 
-    assert elapsed < 0.5, f"in turn this batch costs 0.8 s; together it took {elapsed:.2f} s"
+    assert _overlapping(), "no two calls were in flight at once — it did not run together"
+    assert elapsed < 0.6, f"in turn this batch costs 0.8 s; together it took {elapsed:.2f} s"
     assert len({t for _, _, _, t in _Slow.log}) > 1, "ran on one thread — it did not run together"
     assert result.steplog.steps[0].ran_together == 4
     assert result.steplog.steps[0].as_dict()["ran_together"] == 4
 
 
 def test_a_batch_with_one_write_in_it_runs_in_turn(monkeypatch: Any) -> None:
-    result, backend, elapsed = _run(["read_file", "write_file", "read_file"])
+    result, backend, _ = _run(["read_file", "write_file", "read_file"])
 
-    assert elapsed >= 0.6, f"a write was in the batch and it still ran together ({elapsed:.2f} s)"
+    assert not _overlapping(), "a write was in the batch and it still ran together"
     assert len({t for _, _, _, t in _Slow.log}) == 1
     assert result.steplog.steps[0].ran_together == 0
 
@@ -102,9 +121,9 @@ def test_a_batch_with_one_write_in_it_runs_in_turn(monkeypatch: Any) -> None:
 def test_an_unlisted_tool_keeps_the_old_loop() -> None:
     """An MCP tool, a `browser` — semantics unknown or stateful. Not on the list, not together."""
     assert "loja_execute_query" not in PARALLEL_READ_TOOLS and "browser" not in PARALLEL_READ_TOOLS
-    result, _, elapsed = _run(["read_file", "loja_execute_query"])
+    result, _, _ = _run(["read_file", "loja_execute_query"])
 
-    assert elapsed >= 0.4
+    assert not _overlapping()
     assert result.steplog.steps[0].ran_together == 0
 
 
@@ -142,11 +161,10 @@ def test_the_batch_is_bounded_to_four_at_once() -> None:
     result, _, elapsed = _run(["read_file"] * 8)
 
     assert result.steplog.steps[0].ran_together == 8
+    assert _overlapping()
+    assert _most_at_once() <= PARALLEL_READ_WORKERS == 4, "more than four in flight at once"
     # Eight fifths of a second in turn; two rounds of four together.
-    assert 0.35 < elapsed < 1.2, (
-        f"{elapsed:.2f} s — neither bounded (>= 1.6 s in turn) nor together"
-    )
-    assert PARALLEL_READ_WORKERS == 4
+    assert elapsed < 1.2, f"{elapsed:.2f} s — not together (>= 1.6 s in turn)"
 
 
 def test_a_failing_call_in_the_batch_is_an_error_observation_for_that_call_only() -> None:
