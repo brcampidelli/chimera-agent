@@ -995,6 +995,7 @@ def register_code_api(
     from chimera.core.events import tool as tool_event
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.redact import redact
     from chimera.interface.session import recall_facts
     from chimera.memory.models import project_key
 
@@ -1483,6 +1484,11 @@ def register_code_api(
                         # `None`, never zero, when no step reported cache usage.
                         "provider": result.steplog.provider,
                         "cache_read_tokens": result.steplog.cache_read_tokens,
+                        # The router's ids for this turn's calls. On a streamed turn `provider`
+                        # above is EMPTY — measured: the chunks carry no route — and these are what
+                        # let the stored receipt learn it when the conversation is reopened
+                        # (`chimera.providers.generation`; the record exists ~10 s after the call).
+                        "generation_ids": result.steplog.generation_ids,
                         "route_meta": result.route_meta,
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.
@@ -1740,11 +1746,48 @@ def register_code_api(
             receipts = [r for r in data.get("receipts", []) if isinstance(r, dict)]
         except (OSError, ValueError):
             return {"id": session_id, "workspace": "", "exchanges": []}
+        # A streamed turn's receipt was written before its route could be known (the router's
+        # record appears ~10 s after the call — `chimera.providers.generation`). This is where the
+        # receipt is read back, so this is where it learns the route: bounded, newest first, and
+        # written down so the next reopen does not ask again. Skipped when nothing is unresolved,
+        # when there is no key to ask with, and — the write, not the lookup — when a turn holds
+        # this session, because its own save would win anyway and the answer keeps.
+        _learn_routes(session_id, data, receipts)
         return {
             "id": session_id,
             "workspace": str(data.get("workspace") or ""),
             "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
         }
+
+    def _learn_routes(session_id: str, data: dict[str, Any], receipts: list[dict[str, Any]]) -> None:
+        from chimera.providers.generation import resolve_missing_routes, wants_route
+
+        if not any(wants_route(r) for r in receipts):
+            return
+        current = live()
+        pool = current.credential_pool("openrouter")
+        key = (pool[0] if pool else None) or current.openrouter_api_key or ""
+        if not key:
+            return
+        try:
+            filled = resolve_missing_routes(receipts, api_key=key)
+        except Exception as exc:  # noqa: BLE001 — a replay must render whatever the router does
+            _log.debug("routes not learned for %s: %s", session_id, exc)
+            return
+        if not filled:
+            return
+        lock = lock_for(session_id)
+        if not lock.acquire(blocking=False):
+            return
+        try:
+            data["receipts"] = receipts
+            store._path(session_id).write_text(
+                redact(json.dumps(data)), encoding="utf-8"
+            )
+        except OSError as exc:
+            _log.debug("routes learned but not stored for %s: %s", session_id, exc)
+        finally:
+            lock.release()
 
     @app.post(
         "/api/code/sessions/{session_id}/fork",

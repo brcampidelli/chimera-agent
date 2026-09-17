@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **A streamed turn's receipt learns which route answered when the conversation is reopened — at the end of the turn it cannot know.** 0.58.0 put `provider` on the Code screen's turn receipt and, tested on the installed build the same day, it came back empty on every turn: the desktop streams, and measured with `litellm` against OpenRouter a streamed chunk exposes no provider anywhere (not on the chunk, not in `_hidden_params`, not in `provider_specific_fields`), while the same request without streaming answers it (`Relace`). What a chunk does carry is its `id`, and the router's generation record (`GET /api/v1/generation?id=…`) names the route — **~9–11 s after the stream ends**, 404 before that in 3/3 trials, and three different routes for three identical calls (`Mancer 2`, `OpenInference`, `Together`). So nothing on the request path waits: `CompletionResult.generation_id` → `StepRecord.generation_id` → `generation_ids` on the turn receipt, and the conversation's replay (`GET /api/code/sessions/{id}`) fills `provider` for the receipts that have ids and no route — one request each, no retry, newest first, 2.5 s for the whole pass, written back so it is asked once, skipped when a turn holds the session or there is no OpenRouter key. Never guessed: a record not there yet stays empty and is tried on the next reopen. The badge #494 added therefore shows on a reopened conversation, not on the live one, and the field means the same thing on both receipts — the route the trajectory was set by. Sabotage-verified: with the replay's fill-in severed, the two end-to-end tests fail. Not done here: the same record carries `total_cost` (what the router actually billed) and `native_tokens_cached`; the receipt's `usd` is still the list-rate estimate.
+
 ## [0.58.0] - 2026-09-16
 
 ### Changed

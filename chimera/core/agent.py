@@ -671,6 +671,7 @@ class Agent:
                 cached_tokens=result.cache_read_tokens,
                 model=result.model,
                 provider=getattr(result, "provider", "") or "",
+                generation_id=getattr(result, "generation_id", "") or "",
                 content=clip(result.content or "", 400),
                 elapsed_ms=call_ms,
             )
