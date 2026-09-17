@@ -80,6 +80,8 @@ from chimera.api.schemas import (
     HitlOut,
     HitlRequest,
     InjectionReportOut,
+    JobOut,
+    JobsOut,
     LocalRuntimesOut,
     MaturityOut,
     McpAddRequest,
@@ -809,6 +811,36 @@ def build_api_app(
             "models": list(found.models),
             "reason": found.reason,
         }
+
+    @app.get("/api/jobs", dependencies=[guard], response_model=JobsOut)
+    def jobs_endpoint() -> dict[str, Any]:
+        """Every background job of this home, newest first, states brought up to date.
+
+        A job is a `run_shell(background=true)` the agent started; it outlives the turn and is not
+        stopped by cancelling the turn, which is why a screen needs a list of them that does not
+        depend on any conversation being open. The tail of each log travels here so a list can
+        show what a job is printing without a second request per row.
+        """
+        from chimera.core.jobs import jobs_for
+
+        registry = jobs_for(live_settings().home)
+        return {
+            "jobs": [
+                {**job.to_dict(), "tail": registry.tail(job.id, 1_000)} for job in registry.all()
+            ]
+        }
+
+    @app.post("/api/jobs/{job_id}/cancel", dependencies=[guard], response_model=JobOut)
+    def cancel_job_endpoint(job_id: str) -> dict[str, Any]:
+        """Kill a background job's whole process tree. 404 for a job this home never had; a job
+        that already ended comes back as it is, since there is nothing left to kill."""
+        from chimera.core.jobs import jobs_for
+
+        registry = jobs_for(live_settings().home)
+        job = registry.cancel(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="no such job")
+        return {**job.to_dict(), "tail": registry.tail(job.id, 1_000)}
 
     @app.get("/api/models/local", dependencies=[guard], response_model=LocalRuntimesOut)
     def local_runtimes_endpoint() -> dict[str, Any]:

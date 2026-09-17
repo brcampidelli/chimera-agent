@@ -122,7 +122,15 @@ def default_registry(
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace, trust_workspace=trust_workspace))
     registry.register(GlobTool(workspace))
-    registry.register(RunShellTool(workspace, get_sandbox(), confirm=confirm))
+    # The job store lives under the home, one per process (`jobs_for`), so the tool that starts a
+    # job, the tools that ask about it, the API and the next turn all hold the same live handles.
+    from chimera.core.jobs import jobs_for
+    from chimera.tools.jobs import JobCancelTool, JobStatusTool
+
+    jobs = jobs_for(settings.home)
+    registry.register(RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs))
+    registry.register(JobStatusTool(jobs))
+    registry.register(JobCancelTool(jobs))
     registry.register(HttpGetTool())
 
     # Always-on reference tools (no credential needed).

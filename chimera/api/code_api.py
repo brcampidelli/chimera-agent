@@ -1005,6 +1005,7 @@ def register_code_api(
     from chimera.core.events import tool as tool_event
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import jobs_for
     from chimera.core.redact import redact
     from chimera.interface.session import recall_facts
     from chimera.memory.models import project_key
@@ -1178,6 +1179,24 @@ def register_code_api(
             if dropped_images
             else ""
         )
+
+        # Background jobs that ended since a turn last looked. Handed to the model here — true for
+        # this turn, absent from the stored transcript, like the image note above — so "the
+        # download finished, exit 0" reaches the person through the agent instead of through
+        # nobody. Each job is reported once (`finished_unreported` marks it), and the model is told
+        # to read the log rather than guess at what the job produced.
+        finished = jobs_for(live().home).finished_unreported()
+        if finished:
+            lines = [
+                f"- job {j.id} {j.state}"
+                + (f" (exit {j.exit_code})" if j.exit_code is not None else "")
+                + f": {j.command[:160]} — log: {j.log}"
+                for j in finished
+            ]
+            note = (note + "\n\n" if note else "") + (
+                "Background jobs that finished since your last turn (read the log with read_file "
+                "before saying what they produced):\n" + "\n".join(lines)
+            )
 
         # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
         # The store the SETTINGS describe, which is not always the one the app booted with.

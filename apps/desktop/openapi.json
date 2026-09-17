@@ -4636,6 +4636,95 @@
         "title": "InjectionReportOut",
         "type": "object"
       },
+      "JobOut": {
+        "description": "One background job \u2014 a `run_shell(background=true)` the agent started and did not wait for.\n\n``state`` is ``running`` | ``finished`` | ``cancelled`` | ``lost``. ``lost`` is honest about a\nprocess this backend did not start (the app restarted): its pid is gone and its exit code was\nnever seen, so \"finished\" would be a number nobody observed. ``reported`` says whether a turn\nhas already been told it ended.",
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "reported": {
+            "default": false,
+            "title": "Reported",
+            "type": "boolean"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "tail": {
+            "default": "",
+            "title": "Tail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "command",
+          "cwd",
+          "pid",
+          "started_at",
+          "log",
+          "state"
+        ],
+        "title": "JobOut",
+        "type": "object"
+      },
+      "JobsOut": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/JobOut"
+            },
+            "title": "Jobs",
+            "type": "array"
+          }
+        },
+        "title": "JobsOut",
+        "type": "object"
+      },
       "KanbanCardIn": {
         "description": "A card as a client files it.",
         "properties": {
@@ -11000,6 +11089,65 @@
           }
         },
         "summary": "Write Instructions Endpoint"
+      }
+    },
+    "/api/jobs": {
+      "get": {
+        "description": "Every background job of this home, newest first, states brought up to date.\n\nA job is a `run_shell(background=true)` the agent started; it outlives the turn and is not\nstopped by cancelling the turn, which is why a screen needs a list of them that does not\ndepend on any conversation being open. The tail of each log travels here so a list can\nshow what a job is printing without a second request per row.",
+        "operationId": "jobs_endpoint_api_jobs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Jobs Endpoint"
+      }
+    },
+    "/api/jobs/{job_id}/cancel": {
+      "post": {
+        "description": "Kill a background job's whole process tree. 404 for a job this home never had; a job\nthat already ended comes back as it is, since there is nothing left to kill.",
+        "operationId": "cancel_job_endpoint_api_jobs__job_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Job Endpoint"
       }
     },
     "/api/kanban": {

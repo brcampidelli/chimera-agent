@@ -1211,6 +1211,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jobs Endpoint
+         * @description Every background job of this home, newest first, states brought up to date.
+         *
+         *     A job is a `run_shell(background=true)` the agent started; it outlives the turn and is not
+         *     stopped by cancelling the turn, which is why a screen needs a list of them that does not
+         *     depend on any conversation being open. The tail of each log travels here so a list can
+         *     show what a job is printing without a second request per row.
+         */
+        get: operations["jobs_endpoint_api_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/{job_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Job Endpoint
+         * @description Kill a background job's whole process tree. 404 for a job this home never had; a job
+         *     that already ended comes back as it is, since there is nothing left to kill.
+         */
+        post: operations["cancel_job_endpoint_api_jobs__job_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/kanban": {
         parameters: {
             query?: never;
@@ -4841,6 +4887,50 @@ export interface components {
             undefended_asr: number;
             /** Undefended Block Rate */
             undefended_block_rate: number;
+        };
+        /**
+         * JobOut
+         * @description One background job — a `run_shell(background=true)` the agent started and did not wait for.
+         *
+         *     ``state`` is ``running`` | ``finished`` | ``cancelled`` | ``lost``. ``lost`` is honest about a
+         *     process this backend did not start (the app restarted): its pid is gone and its exit code was
+         *     never seen, so "finished" would be a number nobody observed. ``reported`` says whether a turn
+         *     has already been told it ended.
+         */
+        JobOut: {
+            /** Command */
+            command: string;
+            /** Cwd */
+            cwd: string;
+            /** Exit Code */
+            exit_code?: number | null;
+            /** Finished At */
+            finished_at?: number | null;
+            /** Id */
+            id: string;
+            /** Log */
+            log: string;
+            /** Pid */
+            pid: number;
+            /**
+             * Reported
+             * @default false
+             */
+            reported: boolean;
+            /** Started At */
+            started_at: number;
+            /** State */
+            state: string;
+            /**
+             * Tail
+             * @default
+             */
+            tail: string;
+        };
+        /** JobsOut */
+        JobsOut: {
+            /** Jobs */
+            jobs?: components["schemas"]["JobOut"][];
         };
         /**
          * KanbanCardIn
@@ -8490,6 +8580,57 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentIdentityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    jobs_endpoint_api_jobs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobsOut"];
+                };
+            };
+        };
+    };
+    cancel_job_endpoint_api_jobs__job_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobOut"];
                 };
             };
             /** @description Validation Error */
