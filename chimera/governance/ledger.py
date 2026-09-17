@@ -301,15 +301,21 @@ class TaintLedger:
         # then. Only a target that occurs in here, whole, is recorded as requested by the user.
         self._instruction: str | None = None
         self._workspace = ""
+        # The event index is `len(self.events)` read and then appended; two read-only tool calls
+        # running together (`Agent._observations_together`) would each take the same index. One
+        # lock around that pair, and nothing else: the sets and lists above are appended, never
+        # read-modify-written, and CPython's GIL keeps each append whole.
+        self._events_lock = threading.Lock()
 
     # --- recording -------------------------------------------------------------------
 
     def _add(self, kind: str, ref: str, *, tainted: bool = False, detail: str = "",
              provenance: list[str] | None = None, requested_by: str = "unknown") -> CapabilityEvent:
-        event = CapabilityEvent(
-            len(self.events), kind, ref, tainted, detail, provenance or [], requested_by
-        )
-        self.events.append(event)
+        with self._events_lock:
+            event = CapabilityEvent(
+                len(self.events), kind, ref, tainted, detail, provenance or [], requested_by
+            )
+            self.events.append(event)
         if tainted and self._shared is not None:
             # Publish to siblings the instant this run consumes untrusted content, so their narrowing
             # arms before they can sink it — the live half of the cross-agent gate.
