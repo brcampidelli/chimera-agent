@@ -8,6 +8,7 @@ add the key. Both save their output to a file and return the path; network I/O i
 from __future__ import annotations
 
 import base64
+import functools
 from pathlib import Path
 from typing import Any
 
@@ -176,15 +177,48 @@ class TextToSpeechTool(Tool):
         return f"saved audio ({len(data)} bytes) to {out}"
 
 
-def _transcribe_faster_whisper(path: str, language: str | None) -> str | None:
-    """Local speech-to-text via faster-whisper (the `stt` extra). None if it isn't installed."""
-    try:
-        from faster_whisper import WhisperModel
-    except ImportError:
-        return None
+@functools.lru_cache(maxsize=2)
+def _whisper_model(size: str) -> Any:
+    """The local model, built once per process and kept.
+
+    It was built on every call, and construction is most of a call: measured on 2026-09-17 (24-core
+    laptop, `base`, CPU) at 0.4–0.85 s to construct against 0.18 s to transcribe a four-second
+    clip — and the desktop's hands-free mode, which transcribes every sentence a person says,
+    showed "heard in 8.1 s" on its first utterance, the model coming off a cold disk each time the
+    page cache had moved on. The constructed model is ~150 MB of memory for `base`; keeping it is
+    what a speech mode costs. CTranslate2 serves concurrent `transcribe` calls, so one instance is
+    shared by dictation, the voice mode and the agent's own tool.
+    """
+    from faster_whisper import WhisperModel
+
+    return WhisperModel(size)
+
+
+def warm_transcriber() -> bool:
+    """Build the local model now, so the first sentence spoken does not pay for it.
+
+    The first transcription of a process imports the runtime and reads the weights off the disk —
+    8.3 s measured cold on 2026-09-17, against 0.3 s for every one after. A person who switches
+    the voice mode on is seconds away from saying something; those seconds are when this runs.
+    False when there is no local model to warm (the hosted route has nothing to load).
+    """
+    import importlib.util
     import os
 
-    model = WhisperModel(os.environ.get("CHIMERA_WHISPER_MODEL", "base"))
+    if importlib.util.find_spec("faster_whisper") is None:
+        return False
+    _whisper_model(os.environ.get("CHIMERA_WHISPER_MODEL", "base"))
+    return True
+
+
+def _transcribe_faster_whisper(path: str, language: str | None) -> str | None:
+    """Local speech-to-text via faster-whisper (the `stt` extra). None if it isn't installed."""
+    import importlib.util
+    import os
+
+    if importlib.util.find_spec("faster_whisper") is None:
+        return None
+    model = _whisper_model(os.environ.get("CHIMERA_WHISPER_MODEL", "base"))
     segments, _info = model.transcribe(path, language=language)
     return " ".join(seg.text.strip() for seg in segments).strip()
 

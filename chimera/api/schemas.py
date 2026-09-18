@@ -83,6 +83,13 @@ class TranscriptOut(BaseModel):
     note: str = ""
 
 
+class TranscriberWarmOut(BaseModel):
+    """Whether a local speech model was loaded ahead of the first utterance, and how long it took."""
+
+    warmed: bool
+    seconds: float
+
+
 class FsMakeDirIn(BaseModel):
     """Where to create a folder, and what to call it.
 

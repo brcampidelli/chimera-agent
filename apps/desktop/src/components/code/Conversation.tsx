@@ -816,7 +816,7 @@ export function Conversation({
   // Send the released follow-up only once `busy` has actually gone false. Doing it inside `onDone`
   // would run before that `setBusy(false)` had landed, so `send()` would take the busy branch and
   // re-queue the very message it was releasing — a queue that never drains.
-  const sendRef = useRef<(force?: boolean, override?: string) => void>(
+  const sendRef = useRef<(force?: boolean, override?: string, spoken?: boolean) => void>(
     () => {},
   );
   useEffect(() => {
@@ -892,22 +892,18 @@ export function Conversation({
 
   // The answer the voice mode reads aloud: the last finished exchange, keyed by its position so a
   // new turn is a new answer and a re-render is not. Primitives in the memo, not the exchange:
-  // every streamed token patches the last exchange, and an object rebuilt per token would look
-  // like a new answer per token.
-  let lastDoneAt = -1;
-  for (let i = exchanges.length - 1; i >= 0; i--) {
-    if (exchanges[i].done) {
-      lastDoneAt = i;
-      break;
-    }
-  }
-  const lastDoneText = lastDoneAt >= 0 ? exchanges[lastDoneAt].answer : "";
+  // every streamed token patches the last exchange; `seq` is the exchange's index, which does not
+  // move while its answer grows, so the voice mode reads the growth of one answer rather than
+  // a new answer per token.
+  const lastAt = exchanges.length - 1;
+  const lastText = lastAt >= 0 ? exchanges[lastAt].answer : "";
+  const lastDone = lastAt >= 0 && (exchanges[lastAt].done !== null || exchanges[lastAt].failed === true);
   const spokenAnswer = useMemo<SpokenAnswer | null>(
-    () => (lastDoneAt >= 0 ? { seq: lastDoneAt, text: lastDoneText } : null),
-    [lastDoneAt, lastDoneText],
+    () => (lastAt >= 0 ? { seq: lastAt, text: lastText, done: lastDone } : null),
+    [lastAt, lastText, lastDone],
   );
 
-  function send(force = false, override?: string) {
+  function send(force = false, override?: string, spoken = false) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
     // the wrong text.
@@ -981,6 +977,12 @@ export function Conversation({
         profile,
         fuse,
         plan_gate: planGate,
+        // The message was heard, not read, and the answer will be read back: the model is told to
+        // answer for the ear, and asked not to think before it does — measured, the thinking is
+        // where the wait before the first spoken word went (2–15 s on the default model), and a
+        // person waiting to hear an answer is the one caller for whom that trade is right. Omitted
+        // when typed — the fields are new, and a typed turn must send exactly what it sent before.
+        ...(spoken ? { spoken: true, thinking: false } : {}),
         // Only with `fuse`: a cast on a turn that is not fused would be a second, invisible way to
         // pick a model. Omitted rather than sent empty, so an unchosen role stays the install's.
         ...(fuse && cast.panel.length ? { fusion_panel: cast.panel } : {}),
@@ -1562,7 +1564,7 @@ export function Conversation({
               batch proposal card, and a card is a thing to click on — the opposite of hands-free.
               Spoken requests go out as one message. */}
           <VoiceMode
-            onUtterance={(text) => sendRef.current(true, text)}
+            onUtterance={(text) => sendRef.current(true, text, true)}
             answer={spokenAnswer}
           />
           {/* Fusion is a per-turn choice, next to the box you type in — and it turns OFF the

@@ -1266,10 +1266,24 @@ export interface Transcript {
   note: string;
 }
 
-export async function transcribe(audio: Blob, filename = "speech.webm"): Promise<Transcript> {
+/** Load the local speech model before the first utterance: 8 s cold, measured, against 0.3 s for
+ *  every transcription after. Called when the voice mode comes on and when a dictation starts.
+ *  Best-effort — a failure here costs the first utterance those seconds, nothing else. */
+export async function warmTranscriber(): Promise<void> {
+  try {
+    await fetch(apiUrl("/api/transcribe/warm"), { method: "POST", headers: authHeaders() });
+  } catch {
+    // the first utterance will warm it instead
+  }
+}
+
+export async function transcribe(audio: Blob, filename = "speech.webm", language = ""): Promise<Transcript> {
   const body = new FormData();
   // The name is how the hosted transcriber tells the format apart; the voice mode uploads WAV.
   body.append("file", audio, filename);
+  // The app's language, as a hint: a two-second clip is little to detect a language from, and a
+  // wrong guess reads Portuguese as something else ("Vou lá todo bem" for "Olá, tudo bem").
+  if (language) body.append("language", language);
   const res = await fetch(apiUrl("/api/transcribe"), {
     method: "POST",
     headers: authHeadersNoContentType(),

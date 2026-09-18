@@ -2646,8 +2646,40 @@ export interface paths {
          *     the API otherwise. Deliberately not a second implementation: a person dictating and an agent
          *     transcribing a recording must not be able to get different answers, or to have one path work
          *     while the other is quietly unconfigured.
+         *
+         *     ``language`` is the app's own language, as a hint: a two-second clip is not much for the
+         *     model to detect a language from, and a wrong guess reads Portuguese as something else. An
+         *     unknown value is ignored rather than refused — the clip still transcribes, detected.
+         *
+         *     Off the event loop: a transcription is a few hundred milliseconds of CPU, and while it ran
+         *     on the loop every stream the app had open — the turn being answered, a shared conversation's
+         *     live window — stood still for exactly that long.
          */
         post: operations["transcribe_audio_api_transcribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/transcribe/warm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Warm Transcriber Route
+         * @description Load the local speech model ahead of the first utterance.
+         *
+         *     Called when the voice mode is switched on or a dictation starts — the moments a person is
+         *     seconds away from speaking. Nothing to load on the hosted route, and nothing is kept that
+         *     a transcription would not have kept anyway. Off the loop like the transcription itself.
+         */
+        post: operations["warm_transcriber_route_api_transcribe_warm_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3289,6 +3321,8 @@ export interface components {
         Body_transcribe_audio_api_transcribe_post: {
             /** File */
             file: string;
+            /** Language */
+            language?: string | null;
         };
         /** Body_upload_attachment_api_attachments_post */
         Body_upload_attachment_api_attachments_post: {
@@ -3711,6 +3745,11 @@ export interface components {
             /** Session Id */
             session_id?: string | null;
             /**
+             * Spoken
+             * @default false
+             */
+            spoken: boolean;
+            /**
              * Stream
              * @default true
              */
@@ -3720,6 +3759,8 @@ export interface components {
              * @default false
              */
             summarise_compaction: boolean;
+            /** Thinking */
+            thinking?: boolean | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -6621,6 +6662,16 @@ export interface components {
             count: number;
             /** Tools */
             tools: components["schemas"]["ToolInfoOut"][];
+        };
+        /**
+         * TranscriberWarmOut
+         * @description Whether a local speech model was loaded ahead of the first utterance, and how long it took.
+         */
+        TranscriberWarmOut: {
+            /** Seconds */
+            seconds: number;
+            /** Warmed */
+            warmed: boolean;
         };
         /**
          * TranscriptOut
@@ -10954,6 +11005,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    warm_transcriber_route_api_transcribe_warm_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TranscriberWarmOut"];
                 };
             };
         };

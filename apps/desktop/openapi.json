@@ -1151,6 +1151,17 @@
             "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
           }
         },
         "required": [
@@ -1918,6 +1929,11 @@
             ],
             "title": "Session Id"
           },
+          "spoken": {
+            "default": false,
+            "title": "Spoken",
+            "type": "boolean"
+          },
           "stream": {
             "default": true,
             "title": "Stream",
@@ -1927,6 +1943,17 @@
             "default": false,
             "title": "Summarise Compaction",
             "type": "boolean"
+          },
+          "thinking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thinking"
           },
           "workspace": {
             "anyOf": [
@@ -8338,6 +8365,25 @@
         "title": "ToolsOut",
         "type": "object"
       },
+      "TranscriberWarmOut": {
+        "description": "Whether a local speech model was loaded ahead of the first utterance, and how long it took.",
+        "properties": {
+          "seconds": {
+            "title": "Seconds",
+            "type": "number"
+          },
+          "warmed": {
+            "title": "Warmed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "warmed",
+          "seconds"
+        ],
+        "title": "TranscriberWarmOut",
+        "type": "object"
+      },
       "TranscriptOut": {
         "description": "Dictated speech, as text. ``note`` is non-empty when transcription could not be done.",
         "properties": {
@@ -13876,7 +13922,7 @@
     },
     "/api/transcribe": {
       "post": {
-        "description": "Speech to text, for dictating a message instead of typing it.\n\nRuns through the same tool the agent uses \u2014 a local model when the `stt` extra is installed,\nthe API otherwise. Deliberately not a second implementation: a person dictating and an agent\ntranscribing a recording must not be able to get different answers, or to have one path work\nwhile the other is quietly unconfigured.",
+        "description": "Speech to text, for dictating a message instead of typing it.\n\nRuns through the same tool the agent uses \u2014 a local model when the `stt` extra is installed,\nthe API otherwise. Deliberately not a second implementation: a person dictating and an agent\ntranscribing a recording must not be able to get different answers, or to have one path work\nwhile the other is quietly unconfigured.\n\n``language`` is the app's own language, as a hint: a two-second clip is not much for the\nmodel to detect a language from, and a wrong guess reads Portuguese as something else. An\nunknown value is ignored rather than refused \u2014 the clip still transcribes, detected.\n\nOff the event loop: a transcription is a few hundred milliseconds of CPU, and while it ran\non the loop every stream the app had open \u2014 the turn being answered, a shared conversation's\nlive window \u2014 stood still for exactly that long.",
         "operationId": "transcribe_audio_api_transcribe_post",
         "requestBody": {
           "content": {
@@ -13911,6 +13957,25 @@
           }
         },
         "summary": "Transcribe Audio"
+      }
+    },
+    "/api/transcribe/warm": {
+      "post": {
+        "description": "Load the local speech model ahead of the first utterance.\n\nCalled when the voice mode is switched on or a dictation starts \u2014 the moments a person is\nseconds away from speaking. Nothing to load on the hosted route, and nothing is kept that\na transcription would not have kept anyway. Off the loop like the transcription itself.",
+        "operationId": "warm_transcriber_route_api_transcribe_warm_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TranscriberWarmOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Warm Transcriber Route"
       }
     },
     "/api/usage": {
