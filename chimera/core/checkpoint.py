@@ -8,6 +8,19 @@ files created since, rewrites changed ones, and recreates deleted ones.
 Binary files are tracked for presence (so they are not deleted) but their contents
 are not snapshotted. Large files and common build/VCS dirs are skipped.
 
+Which files, and how they are found, is what a snapshot costs — and every coding turn
+takes one before it calls the model. Measured on 2026-09-17 on the project's own
+repository (142,000 entries on disk, most of them under ``node_modules``, ``.venv-win``
+and a Rust ``target``): ``rglob("*")`` walked all of them in 5.5 s and then read the
+first 5,000 files it met, 58 MB, for 8.7 s per turn — a spoken "answer with one word"
+reached its first token 9.7 s after the request, with the model's own call at 2.7 s.
+And the 5,000 it kept were whichever came first in walk order, which need not include
+the source at all. Inside a git repository the files are now the ones git considers
+the project's — tracked, and untracked but not ignored — listed by ``git ls-files`` in
+40 ms and read in 0.29 s; that set is also the honest one for an undo, since ignored
+files are build output and data by the repository's own definition. Outside a
+repository the walk prunes the ignored directories instead of entering them.
+
 The "delete files created since" pass is destructive, so it is skipped whenever it
 cannot be done safely: when the snapshot was truncated at the file cap, and when the
 workspace is anywhere inside a git repository (``.git`` at the workspace **or any
@@ -23,6 +36,9 @@ them. Leftover junk is recoverable; deleting a developer's tracked files is not.
 from __future__ import annotations
 
 import hashlib
+import os
+import stat
+import subprocess
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -45,6 +61,40 @@ _IGNORE_DIRS = {
     ".chimera",
 }
 _MAX_FILE_BYTES = 1_000_000
+_GIT_LIST_TIMEOUT = 15.0
+
+
+def _pruned(name: str) -> bool:
+    """A directory the walk does not enter: the ignore list, any virtualenv (``.venv-win``,
+    ``venv311``), egg metadata, and a Rust/Java ``target``."""
+    return (
+        name in _IGNORE_DIRS
+        or name.startswith((".venv", "venv"))
+        or name.endswith(".egg-info")
+        or name == "target"
+    )
+
+
+def git_listed(workspace: Path) -> list[Path] | None:
+    """The files git counts as this directory's — tracked, plus untracked and not ignored — or
+    None when the directory is not in a repository or git is not there to ask.
+
+    Relative to the directory itself (``-C``), so a workspace that is a folder inside a larger
+    repository gets that folder's files and not the repository's. ``-z`` for raw names: no
+    quoting, whatever the file is called.
+    """
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(workspace), "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+            capture_output=True,
+            timeout=_GIT_LIST_TIMEOUT,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if proc.returncode != 0:
+        return None
+    return [workspace / part.decode("utf-8", "surrogateescape") for part in proc.stdout.split(b"\0") if part]
 
 
 @dataclass
@@ -92,17 +142,26 @@ class WorkspaceGuard:
         self.workspace = Path(workspace).resolve()
         self.max_files = max_files
 
+    def _walk(self) -> Iterator[Path]:
+        """Every file under the workspace, never entering a pruned directory. Sorted, so the cap
+        keeps the same files from one snapshot to the next."""
+        for dirpath, dirnames, filenames in os.walk(self.workspace):
+            dirnames[:] = sorted(d for d in dirnames if not _pruned(d))
+            for name in sorted(filenames):
+                yield Path(dirpath) / name
+
     def _iter_files(self) -> Iterator[Path]:
-        for path in self.workspace.rglob("*"):
-            if path.is_dir():
-                continue
+        listed = git_listed(self.workspace)
+        for path in listed if listed is not None else self._walk():
             rel_parts = path.relative_to(self.workspace).parts
             if any(part in _IGNORE_DIRS for part in rel_parts):
                 continue
             try:
-                if path.stat().st_size > _MAX_FILE_BYTES:
-                    continue
+                info = path.stat()
             except OSError:
+                continue
+            # git lists a submodule as a path that is a directory; a walk lists only files.
+            if not stat.S_ISREG(info.st_mode) or info.st_size > _MAX_FILE_BYTES:
                 continue
             yield path
 
