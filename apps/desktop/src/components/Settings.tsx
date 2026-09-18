@@ -29,6 +29,7 @@ import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
 import { Usage } from "@/components/Usage";
 import { VoiceCard } from "@/components/VoiceCard";
+import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type {
   AgentIdentity,
@@ -995,7 +996,46 @@ export function Settings() {
                   </Row>
                 </Card>
 
-                <VoiceCard />
+                <VoiceCard>
+                  {/* The first word is what a listener waits for, and it is where models differ
+                      most: measured 2026-09-17, gemini-2.5-flash-lite at 0.7–0.9 s against the
+                      default's 2.7–8.7 s with reasoning off. Empty keeps the conversation's model;
+                      typed turns never use this one. */}
+                  <Row
+                    label={t("settings.row.voiceModel")}
+                    hint={t("settings.hint.voiceModel")}
+                    env="CHIMERA_VOICE_MODEL"
+                  >
+                    <ModelPicker
+                      value={c.models.voice_model}
+                      onChange={(slug) => save({ CHIMERA_VOICE_MODEL: slug })}
+                      label={null}
+                      name={t("settings.row.voiceModel")}
+                      fallback={t("settings.placeholder.sameModel")}
+                      offerDefault={false}
+                      quickFirst
+                      blurb={t("settings.voice.pickBlurb")}
+                    />
+                  </Row>
+                  {/* The other half of hands-free: the model that does what the voice asked for
+                      — with its thinking, because "fix the login" is answered by the fix. Empty is
+                      the conversation's model, which is what every install has. */}
+                  <Row
+                    label={t("settings.row.voiceWorkModel")}
+                    hint={t("settings.hint.voiceWorkModel")}
+                    env="CHIMERA_VOICE_WORK_MODEL"
+                  >
+                    <ModelPicker
+                      value={c.models.voice_work_model}
+                      onChange={(slug) => save({ CHIMERA_VOICE_WORK_MODEL: slug })}
+                      label={null}
+                      name={t("settings.row.voiceWorkModel")}
+                      fallback={t("settings.placeholder.sameModel")}
+                      offerDefault={false}
+                      blurb={t("settings.voice.pickBlurb")}
+                    />
+                  </Row>
+                </VoiceCard>
 
                 <IdentityCard />
 

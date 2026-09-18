@@ -6163,6 +6163,16 @@
           "tiers": {
             "$ref": "#/components/schemas/TiersOut"
           },
+          "voice_model": {
+            "default": "",
+            "title": "Voice Model",
+            "type": "string"
+          },
+          "voice_work_model": {
+            "default": "",
+            "title": "Voice Work Model",
+            "type": "string"
+          },
           "weak": {
             "title": "Weak",
             "type": "string"

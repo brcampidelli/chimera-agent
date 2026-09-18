@@ -296,6 +296,7 @@ const en: Dict = {
   "settings.hint.voice": "From this machine and its browser; the ones marked Natural are the neural ones.",
   "settings.voice.auto": "Automatic — the best one available",
   "settings.voice.listen": "Listen",
+  "settings.voice.pickBlurb": "Saved in Settings; only spoken turns use it. Typed turns keep the conversation's model.",
   "settings.voice.sample": "This is how I will read your answers.",
   "settings.voice.none": "This window has no voice for the app's language.",
   "settings.row.providersWithKey": "Providers with a key",
@@ -309,6 +310,11 @@ const en: Dict = {
   "settings.hint.roleModels":
     "pin a rung, or leave empty to let the cost mode fill it",
   "settings.placeholder.byCostMode": "by cost mode",
+  "settings.row.voiceModel": "Model for spoken turns",
+  "settings.hint.voiceModel": "Answers what you ask by voice, without thinking first — the first word is where models differ most (gemini-2.5-flash-lite 0.7–0.9 s, the default 2.7–8.7 s, measured). A spoken request for work (create, fix, refactor…) still goes to the conversation's model, thinking. Typed turns never use this one.",
+  "settings.row.voiceWorkModel": "Model for spoken work",
+  "settings.hint.voiceWorkModel": "Does what you ask for by voice — create, fix, refactor… — thinking as it does. Empty keeps the conversation's model.",
+  "settings.placeholder.sameModel": "the conversation's model",
   "settings.row.apiBase": "Custom endpoint",
   "settings.hint.apiBase":
     "any OpenAI-compatible server — Ollama, vLLM, a gateway of your own",
@@ -712,6 +718,7 @@ const en: Dict = {
   "model.pick.noTools": "no tools",
   "model.pick.vision": "images",
   "model.pick.onlyVision": "Only models that read images",
+  "model.pick.quickFirst": "Likely-quick models first — by name (flash, lite, mini, haiku…), not measured.",
   "model.pick.noToolsWarning":
     "Cannot call tools — this turn would describe an edit instead of making it.",
   "model.pick.makeDefault": "Make it the default",
@@ -1696,6 +1703,7 @@ const pt: Dict = {
   "settings.hint.voice": "Vêm desta máquina e do navegador; as marcadas Natural são as neurais.",
   "settings.voice.auto": "Automática — a melhor disponível",
   "settings.voice.listen": "Ouvir",
+  "settings.voice.pickBlurb": "Fica salvo nas Configurações; só os turnos falados usam. Turnos digitados seguem no modelo da conversa.",
   "settings.voice.sample": "É assim que vou ler as suas respostas.",
   "settings.voice.none": "Esta janela não tem voz para o idioma do app.",
   "settings.row.providersWithKey": "Provedores com chave",
@@ -1709,6 +1717,11 @@ const pt: Dict = {
   "settings.hint.roleModels":
     "fixe um degrau, ou deixe vazio para o modo de custo preencher",
   "settings.placeholder.byCostMode": "pelo modo de custo",
+  "settings.row.voiceModel": "Modelo para turnos falados",
+  "settings.hint.voiceModel": "Responde ao que você pergunta por voz, sem pensar antes — a primeira palavra é onde os modelos mais diferem (gemini-2.5-flash-lite 0,7–0,9 s, o padrão 2,7–8,7 s, medido). Um pedido de trabalho falado (criar, corrigir, refatorar…) continua indo para o modelo da conversa, pensando. Turnos digitados nunca usam este.",
+  "settings.row.voiceWorkModel": "Modelo para o trabalho pedido por voz",
+  "settings.hint.voiceWorkModel": "Faz o que você pede por voz — criar, corrigir, refatorar… — pensando como de costume. Vazio mantém o modelo da conversa.",
+  "settings.placeholder.sameModel": "o modelo da conversa",
   "settings.row.apiBase": "Endpoint próprio",
   "settings.hint.apiBase":
     "qualquer servidor compatível com OpenAI — Ollama, vLLM, um gateway seu",
@@ -2119,6 +2132,7 @@ const pt: Dict = {
   "model.pick.noTools": "sem ferramentas",
   "model.pick.vision": "imagens",
   "model.pick.onlyVision": "Só modelos que leem imagens",
+  "model.pick.quickFirst": "Os prováveis rápidos primeiro — pelo nome (flash, lite, mini, haiku…), não medido.",
   "model.pick.noToolsWarning":
     "Não chama ferramentas — este turno descreveria a edição em vez de fazê-la.",
   "model.pick.makeDefault": "Tornar padrão",
@@ -3142,6 +3156,7 @@ const es: Dict = {
   "settings.hint.voice": "Vienen de esta máquina y del navegador; las marcadas Natural son las neuronales.",
   "settings.voice.auto": "Automática — la mejor disponible",
   "settings.voice.listen": "Escuchar",
+  "settings.voice.pickBlurb": "Se guarda en Configuración; solo los turnos hablados lo usan. Los turnos escritos siguen con el modelo de la conversación.",
   "settings.voice.sample": "Así es como leeré tus respuestas.",
   "settings.voice.none": "Esta ventana no tiene voz para el idioma de la app.",
   "settings.row.providersWithKey": "Proveedores con clave",
@@ -3155,6 +3170,11 @@ const es: Dict = {
   "settings.hint.roleModels":
     "fija un peldaño, o déjalo vacío para que lo llene el modo de coste",
   "settings.placeholder.byCostMode": "según el modo de coste",
+  "settings.row.voiceModel": "Modelo para turnos hablados",
+  "settings.hint.voiceModel": "Responde a lo que preguntas por voz, sin pensar antes — la primera palabra es donde más difieren los modelos (gemini-2.5-flash-lite 0,7–0,9 s, el predeterminado 2,7–8,7 s, medido). Un pedido de trabajo hablado (crear, corregir, refactorizar…) sigue yendo al modelo de la conversación, pensando. Los turnos escritos nunca usan este.",
+  "settings.row.voiceWorkModel": "Modelo para el trabajo pedido por voz",
+  "settings.hint.voiceWorkModel": "Hace lo que pides por voz — crear, corregir, refactorizar… — pensando como de costumbre. Vacío mantiene el modelo de la conversación.",
+  "settings.placeholder.sameModel": "el modelo de la conversación",
   "settings.row.apiBase": "Endpoint propio",
   "settings.hint.apiBase":
     "cualquier servidor compatible con OpenAI — Ollama, vLLM, una pasarela tuya",
@@ -3537,6 +3557,7 @@ const es: Dict = {
   "model.pick.noTools": "sin herramientas",
   "model.pick.vision": "imágenes",
   "model.pick.onlyVision": "Solo modelos que leen imágenes",
+  "model.pick.quickFirst": "Primero los probablemente rápidos — por el nombre (flash, lite, mini, haiku…), no medido.",
   "model.pick.noToolsWarning":
     "No llama herramientas: este turno describiría la edición en vez de hacerla.",
   "model.pick.makeDefault": "Hacerlo predeterminado",
@@ -4568,6 +4589,7 @@ const fr: Dict = {
   "settings.hint.voice": "Celles de cette machine et du navigateur ; celles marquées Natural sont les voix neuronales.",
   "settings.voice.auto": "Automatique — la meilleure disponible",
   "settings.voice.listen": "Écouter",
+  "settings.voice.pickBlurb": "Enregistré dans les Paramètres ; seuls les tours parlés l'utilisent. Les tours tapés gardent le modèle de la conversation.",
   "settings.voice.sample": "Voici comment je lirai vos réponses.",
   "settings.voice.none": "Cette fenêtre n'a pas de voix pour la langue de l'app.",
   "settings.row.providersWithKey": "Fournisseurs avec une clé",
@@ -4581,6 +4603,11 @@ const fr: Dict = {
   "settings.hint.roleModels":
     "fixez un échelon, ou laissez vide pour que le mode de coût le remplisse",
   "settings.placeholder.byCostMode": "selon le mode de coût",
+  "settings.row.voiceModel": "Modèle des tours parlés",
+  "settings.hint.voiceModel": "Répond à ce que vous demandez à la voix, sans réfléchir d'abord — le premier mot est là où les modèles diffèrent le plus (gemini-2.5-flash-lite 0,7–0,9 s, celui par défaut 2,7–8,7 s, mesuré). Une demande de travail parlée (créer, corriger, refactoriser…) va toujours au modèle de la conversation, en réfléchissant. Les tours tapés n'utilisent jamais celui-ci.",
+  "settings.row.voiceWorkModel": "Modèle pour le travail demandé à la voix",
+  "settings.hint.voiceWorkModel": "Fait ce que vous demandez à la voix — créer, corriger, refactoriser… — en réfléchissant comme d'habitude. Vide garde le modèle de la conversation.",
+  "settings.placeholder.sameModel": "le modèle de la conversation",
   "settings.row.apiBase": "Point de terminaison personnalisé",
   "settings.hint.apiBase":
     "tout serveur compatible OpenAI — Ollama, vLLM, votre propre passerelle",
@@ -4966,6 +4993,7 @@ const fr: Dict = {
   "model.pick.noTools": "sans outils",
   "model.pick.vision": "images",
   "model.pick.onlyVision": "Uniquement les modèles qui lisent les images",
+  "model.pick.quickFirst": "Les modèles probablement rapides d'abord — d'après le nom (flash, lite, mini, haiku…), non mesuré.",
   "model.pick.noToolsWarning":
     "N'appelle pas d'outils — ce tour décrirait la modification au lieu de la faire.",
   "model.pick.makeDefault": "En faire le modèle par défaut",
@@ -6003,6 +6031,7 @@ const de: Dict = {
   "settings.hint.voice": "Von diesem Rechner und dem Browser; die mit Natural markierten sind die neuronalen.",
   "settings.voice.auto": "Automatisch — die beste verfügbare",
   "settings.voice.listen": "Anhören",
+  "settings.voice.pickBlurb": "In den Einstellungen gespeichert; nur gesprochene Züge nutzen es. Getippte Züge behalten das Modell der Unterhaltung.",
   "settings.voice.sample": "So werde ich Ihre Antworten vorlesen.",
   "settings.voice.none": "Dieses Fenster hat keine Stimme für die Sprache der App.",
   "settings.row.providersWithKey": "Anbieter mit Schlüssel",
@@ -6016,6 +6045,11 @@ const de: Dict = {
   "settings.hint.roleModels":
     "eine Stufe festlegen, oder leer lassen und den Kostenmodus füllen lassen",
   "settings.placeholder.byCostMode": "per Kostenmodus",
+  "settings.row.voiceModel": "Modell für gesprochene Züge",
+  "settings.hint.voiceModel": "Beantwortet, was Sie per Stimme fragen, ohne vorher nachzudenken — beim ersten Wort unterscheiden sich die Modelle am meisten (gemini-2.5-flash-lite 0,7–0,9 s, das Standardmodell 2,7–8,7 s, gemessen). Eine gesprochene Arbeitsanfrage (erstellen, korrigieren, refaktorieren…) geht weiterhin an das Modell der Unterhaltung, mit Nachdenken. Getippte Züge nutzen dieses nie.",
+  "settings.row.voiceWorkModel": "Modell für per Stimme angefragte Arbeit",
+  "settings.hint.voiceWorkModel": "Erledigt, was Sie per Stimme anfragen — erstellen, korrigieren, refaktorieren… — und denkt dabei wie gewohnt. Leer behält das Modell der Unterhaltung.",
+  "settings.placeholder.sameModel": "das Modell der Unterhaltung",
   "settings.row.apiBase": "Eigener Endpunkt",
   "settings.hint.apiBase":
     "jeder OpenAI-kompatible Server — Ollama, vLLM, ein eigenes Gateway",
@@ -6400,6 +6434,7 @@ const de: Dict = {
   "model.pick.noTools": "keine Werkzeuge",
   "model.pick.vision": "Bilder",
   "model.pick.onlyVision": "Nur Modelle, die Bilder lesen",
+  "model.pick.quickFirst": "Wahrscheinlich schnelle Modelle zuerst — nach dem Namen (flash, lite, mini, haiku…), nicht gemessen.",
   "model.pick.noToolsWarning":
     "Ruft keine Werkzeuge auf — dieser Zug würde die Änderung beschreiben statt sie zu machen.",
   "model.pick.makeDefault": "Als Standard setzen",
@@ -7416,6 +7451,7 @@ const zh: Dict = {
   "settings.hint.voice": "来自本机和浏览器；标有 Natural 的是神经网络语音。",
   "settings.voice.auto": "自动 — 可用的最佳语音",
   "settings.voice.listen": "试听",
+  "settings.voice.pickBlurb": "保存在设置中；仅语音回合使用。打字回合仍用对话的模型。",
   "settings.voice.sample": "我会这样朗读你的回答。",
   "settings.voice.none": "此窗口没有应用语言的语音。",
   "settings.row.providersWithKey": "已配置密钥的提供商",
@@ -7428,6 +7464,11 @@ const zh: Dict = {
   "settings.row.orchestratorModel": "高档",
   "settings.hint.roleModels": "指定某一档，或留空由成本模式决定",
   "settings.placeholder.byCostMode": "由成本模式决定",
+  "settings.row.voiceModel": "语音回合使用的模型",
+  "settings.hint.voiceModel": "回答你用语音提出的问题，不先思考——模型间差别最大的是第一个词（gemini-2.5-flash-lite 0.7–0.9 秒，默认模型 2.7–8.7 秒，实测）。语音提出的工作请求（创建、修复、重构……）仍交给对话的模型，并进行思考。打字回合从不使用此模型。",
+  "settings.row.voiceWorkModel": "语音工作使用的模型",
+  "settings.hint.voiceWorkModel": "执行你用语音提出的工作——创建、修复、重构……——并照常思考。留空则沿用对话的模型。",
+  "settings.placeholder.sameModel": "对话的模型",
   "settings.row.apiBase": "自定义端点",
   "settings.hint.apiBase":
     "任何兼容 OpenAI 的服务器——Ollama、vLLM，或你自己的网关",
@@ -7791,6 +7832,7 @@ const zh: Dict = {
   "model.pick.noTools": "不支持工具",
   "model.pick.vision": "图像",
   "model.pick.onlyVision": "只看能读图的模型",
+  "model.pick.quickFirst": "可能较快的模型排在前面——按名称判断（flash、lite、mini、haiku……），未实测。",
   "model.pick.noToolsWarning":
     "不能调用工具 — 这一轮只会描述修改，而不会真正动文件。",
   "model.pick.makeDefault": "设为默认",
@@ -8789,6 +8831,7 @@ const ja: Dict = {
   "settings.hint.voice": "このマシンとブラウザーの音声です。Natural と付いたものがニューラル音声です。",
   "settings.voice.auto": "自動 — 利用できる最良の音声",
   "settings.voice.listen": "聞く",
+  "settings.voice.pickBlurb": "設定に保存され、音声ターンだけが使います。入力したターンは会話のモデルのままです。",
   "settings.voice.sample": "回答はこのように読み上げます。",
   "settings.voice.none": "このウィンドウにはアプリの言語の音声がありません。",
   "settings.row.providersWithKey": "キー設定済みのプロバイダー",
@@ -8802,6 +8845,11 @@ const ja: Dict = {
   "settings.hint.roleModels":
     "段を固定するか、空欄にしてコストモードに任せます",
   "settings.placeholder.byCostMode": "コストモードに任せる",
+  "settings.row.voiceModel": "音声ターンのモデル",
+  "settings.hint.voiceModel": "声で尋ねたことに、先に考えずに答えます。最初の一語で最も差が出ます（gemini-2.5-flash-lite 0.7–0.9 秒、既定モデル 2.7–8.7 秒、実測）。声での作業依頼（作成・修正・リファクタリングなど）は引き続き会話のモデルが考えて応じます。入力したターンはこのモデルを使いません。",
+  "settings.row.voiceWorkModel": "音声での作業に使うモデル",
+  "settings.hint.voiceWorkModel": "声で頼んだ作業（作成・修正・リファクタリングなど）を、いつもどおり考えながらこなします。空欄なら会話のモデルのままです。",
+  "settings.placeholder.sameModel": "会話のモデル",
   "settings.row.apiBase": "独自エンドポイント",
   "settings.hint.apiBase":
     "OpenAI 互換であれば何でも — Ollama、vLLM、自前のゲートウェイ",
@@ -9180,6 +9228,7 @@ const ja: Dict = {
   "model.pick.noTools": "ツール非対応",
   "model.pick.vision": "画像",
   "model.pick.onlyVision": "画像を読めるモデルだけ",
+  "model.pick.quickFirst": "速そうなモデルを先に — 名前で判断（flash、lite、mini、haiku…）、実測ではありません。",
   "model.pick.noToolsWarning":
     "ツールを呼べません — このターンは編集を説明するだけで、実際には変更しません。",
   "model.pick.makeDefault": "既定にする",
@@ -10174,6 +10223,7 @@ const it: Dict = {
   "settings.hint.voice": "Da questa macchina e dal browser; quelle contrassegnate Natural sono le neurali.",
   "settings.voice.auto": "Automatica — la migliore disponibile",
   "settings.voice.listen": "Ascolta",
+  "settings.voice.pickBlurb": "Salvato nelle Impostazioni; solo i turni parlati lo usano. I turni scritti restano sul modello della conversazione.",
   "settings.voice.sample": "Leggerò le tue risposte così.",
   "settings.voice.none": "Questa finestra non ha una voce per la lingua dell'app.",
   "settings.row.providersWithKey": "Fornitori con una chiave",
@@ -10187,6 +10237,11 @@ const it: Dict = {
   "settings.hint.roleModels":
     "fissa un gradino, o lascia vuoto e lo riempie la modalità di costo",
   "settings.placeholder.byCostMode": "dalla modalità di costo",
+  "settings.row.voiceModel": "Modello per i turni parlati",
+  "settings.hint.voiceModel": "Risponde a ciò che chiedi a voce, senza pensare prima — la prima parola è dove i modelli differiscono di più (gemini-2.5-flash-lite 0,7–0,9 s, quello predefinito 2,7–8,7 s, misurato). Una richiesta di lavoro a voce (creare, correggere, refactoring…) va ancora al modello della conversazione, pensando. I turni scritti non usano mai questo.",
+  "settings.row.voiceWorkModel": "Modello per il lavoro chiesto a voce",
+  "settings.hint.voiceWorkModel": "Fa ciò che chiedi a voce — creare, correggere, refactoring… — pensando come di consueto. Vuoto mantiene il modello della conversazione.",
+  "settings.placeholder.sameModel": "il modello della conversazione",
   "settings.row.apiBase": "Endpoint personalizzato",
   "settings.hint.apiBase":
     "qualsiasi server compatibile OpenAI — Ollama, vLLM, un tuo gateway",
@@ -10603,6 +10658,7 @@ const it: Dict = {
   "model.pick.noTools": "senza strumenti",
   "model.pick.vision": "immagini",
   "model.pick.onlyVision": "Solo modelli che leggono immagini",
+  "model.pick.quickFirst": "Prima i modelli probabilmente rapidi — dal nome (flash, lite, mini, haiku…), non misurato.",
   "model.pick.noToolsWarning":
     "Non chiama strumenti — questo turno descriverebbe la modifica invece di farla.",
   "model.pick.makeDefault": "Rendilo predefinito",
@@ -11600,6 +11656,7 @@ const pl: Dict = {
   "settings.hint.voice": "Z tego komputera i przeglądarki; oznaczone Natural to głosy neuronowe.",
   "settings.voice.auto": "Automatycznie — najlepszy dostępny",
   "settings.voice.listen": "Posłuchaj",
+  "settings.voice.pickBlurb": "Zapisane w Ustawieniach; używają go tylko tury mówione. Tury pisane zostają przy modelu rozmowy.",
   "settings.voice.sample": "Tak będę czytać twoje odpowiedzi.",
   "settings.voice.none": "To okno nie ma głosu dla języka aplikacji.",
   "settings.row.providersWithKey": "Dostawcy z kluczem",
@@ -11613,6 +11670,11 @@ const pl: Dict = {
   "settings.hint.roleModels":
     "przypnij szczebel albo zostaw puste, a wypełni go tryb kosztów",
   "settings.placeholder.byCostMode": "wg trybu kosztów",
+  "settings.row.voiceModel": "Model dla tur mówionych",
+  "settings.hint.voiceModel": "Odpowiada na to, o co pytasz głosem, bez wcześniejszego myślenia — pierwsze słowo to miejsce, gdzie modele różnią się najbardziej (gemini-2.5-flash-lite 0,7–0,9 s, domyślny 2,7–8,7 s, zmierzone). Głosowa prośba o pracę (utwórz, popraw, zrefaktoryzuj…) nadal trafia do modelu rozmowy, z myśleniem. Tury pisane nigdy go nie używają.",
+  "settings.row.voiceWorkModel": "Model do pracy zleconej głosem",
+  "settings.hint.voiceWorkModel": "Wykonuje to, o co prosisz głosem — utwórz, popraw, zrefaktoryzuj… — myśląc jak zwykle. Puste zostawia model rozmowy.",
+  "settings.placeholder.sameModel": "model rozmowy",
   "settings.row.apiBase": "Własny endpoint",
   "settings.hint.apiBase":
     "dowolny serwer zgodny z OpenAI — Ollama, vLLM, własna bramka",
@@ -12025,6 +12087,7 @@ const pl: Dict = {
   "model.pick.noTools": "bez narzędzi",
   "model.pick.vision": "obrazy",
   "model.pick.onlyVision": "Tylko modele, które czytają obrazy",
+  "model.pick.quickFirst": "Najpierw modele prawdopodobnie szybkie — po nazwie (flash, lite, mini, haiku…), niezmierzone.",
   "model.pick.noToolsWarning":
     "Nie wywołuje narzędzi — ta tura opisałaby zmianę, zamiast ją wykonać.",
   "model.pick.makeDefault": "Ustaw jako domyślny",
@@ -13023,6 +13086,7 @@ const ru: Dict = {
   "settings.hint.voice": "С этого компьютера и из браузера; отмеченные Natural — нейросетевые.",
   "settings.voice.auto": "Автоматически — лучший из доступных",
   "settings.voice.listen": "Послушать",
+  "settings.voice.pickBlurb": "Сохраняется в настройках; используют только голосовые ходы. Набранные ходы остаются на модели разговора.",
   "settings.voice.sample": "Вот так я буду читать ваши ответы.",
   "settings.voice.none": "В этом окне нет голоса для языка приложения.",
   "settings.row.providersWithKey": "Провайдеры с ключом",
@@ -13036,6 +13100,11 @@ const ru: Dict = {
   "settings.hint.roleModels":
     "закрепите ступень или оставьте пустой, чтобы её заполнил режим расходов",
   "settings.placeholder.byCostMode": "по режиму расходов",
+  "settings.row.voiceModel": "Модель для голосовых ходов",
+  "settings.hint.voiceModel": "Отвечает на то, что вы спрашиваете голосом, не думая заранее — первое слово там, где модели различаются больше всего (gemini-2.5-flash-lite 0,7–0,9 с, модель по умолчанию 2,7–8,7 с, измерено). Голосовая просьба о работе (создать, исправить, отрефакторить…) по-прежнему идёт к модели разговора, с размышлением. Набранные ходы никогда не используют эту модель.",
+  "settings.row.voiceWorkModel": "Модель для работы, запрошенной голосом",
+  "settings.hint.voiceWorkModel": "Делает то, о чём вы просите голосом — создать, исправить, отрефакторить… — размышляя как обычно. Пусто — остаётся модель разговора.",
+  "settings.placeholder.sameModel": "модель разговора",
   "settings.row.apiBase": "Свой адрес сервера",
   "settings.hint.apiBase":
     "любой сервер, совместимый с OpenAI — Ollama, vLLM, ваш собственный шлюз",
@@ -13448,6 +13517,7 @@ const ru: Dict = {
   "model.pick.noTools": "без инструментов",
   "model.pick.vision": "изображения",
   "model.pick.onlyVision": "Только модели, читающие изображения",
+  "model.pick.quickFirst": "Сначала предположительно быстрые модели — по названию (flash, lite, mini, haiku…), не измерено.",
   "model.pick.noToolsWarning":
     "Не вызывает инструменты — этот ход опишет правку вместо того, чтобы её сделать.",
   "model.pick.makeDefault": "Сделать по умолчанию",
