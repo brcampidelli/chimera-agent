@@ -15,10 +15,10 @@
     },
     {
       "name": "chimera-api-scratch",
-      "runtimeExecutable": "bash",
+      "runtimeExecutable": "cmd",
       "runtimeArgs": [
-        "-c",
-        "export CHIMERA_HOME=\"$LOCALAPPDATA/Temp/chimera-scratch-home\" CHIMERA_APP_CRON=false; exec ./.venv/Scripts/chimera.exe app --port 8765 --no-open --no-cron"
+        "/c",
+        "set CHIMERA_HOME=%LOCALAPPDATA%\\Temp\\chimera-scratch-home&& set CHIMERA_APP_CRON=false&& .venv\\Scripts\\chimera.exe app --port 8765 --no-open --no-cron"
       ],
       "port": 8765
     },

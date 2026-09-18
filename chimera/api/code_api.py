@@ -34,7 +34,8 @@ from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, params
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, params
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
@@ -69,6 +70,7 @@ from chimera.api.schemas import (
     CodeTurnFramesOut,
     DeletedCountOut,
     DictationOut,
+    TranscriberWarmOut,
     TranscriptOut,
     VisionOut,
 )
@@ -272,6 +274,23 @@ _MAX_PENDING_REVERTS = 8
 #: FastAPI's upload marker, hoisted out of the signatures so a call in an argument default does not
 #: trip the linter. Same object, same behaviour.
 _UPLOAD = File(...)
+_LANGUAGE_HINT = Form(None)
+_LANGUAGE_CODE = re.compile(r"[a-z]{2,3}")
+
+SPOKEN_NOTE = (
+    "The person said this aloud, and your answer will be read to them by a voice before they see "
+    "it on a screen. Answer for the ear: two to four short sentences of plain prose — no headings, "
+    "no lists, no tables, no code blocks, no Markdown, no emoji. If the answer needs more than "
+    "that (a plan, a list of files, code), say the gist in one or two sentences first, then put a "
+    "line containing only --- and write the rest below it: the voice reads what is above the line, "
+    "and the screen shows all of it."
+)
+"""What a turn that arrived by voice tells the model, in the system prompt and for that turn only.
+
+The first live test of the hands-free mode (2026-09-17) had the agent answer a spoken "are you
+understanding me?" with four paragraphs, two lists and a rocket emoji, and the voice read all of
+it. The model had no way to know it was being heard rather than read. Now it is told, and told
+where to put the part that is for the screen; the reader stops at that line."""
 
 
 #: Provider errors whose text is about the REQUEST rather than about our internals — the user can act
@@ -818,6 +837,14 @@ class CodeTurnRequest(CodeSeams):
     Off by default, and that default is a judgement rather than caution: this adds a model call and
     a wait to the most-used surface in the product, so it has to be asked for. It only ever ADDS a
     stop — every per-action question still happens, and BLOCK is untouched."""
+    spoken: bool = False
+    """The message was spoken and the answer will be read aloud: the model is asked to answer for
+    the ear (``SPOKEN_NOTE``), in the system prompt of this turn and nowhere in the transcript."""
+    thinking: bool | None = None
+    """``False`` asks a reasoning model not to think before it answers — the voice mode sends it,
+    because the thinking is where the wait before the first spoken word was measured to go
+    (``LLMGateway._provider_kwargs``). ``None`` leaves the model as configured; a typed turn sends
+    nothing."""
 
 
 def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> None:
@@ -1103,12 +1130,15 @@ def register_code_api(
         # Same placement, same reason: true for this turn, absent from the stored transcript.
         if note:
             system_prompt += f"\n\n{note}"
+        if req.spoken:
+            system_prompt += f"\n\n{SPOKEN_NOTE}"
         agent = Agent(
             gateway,
             registry,
             AgentConfig(
                 model=req.model,
                 system_prompt=system_prompt,
+                thinking=req.thinking,
                 max_steps=steps,
                 context_budget=req.context_budget,
                 summarise_compaction=req.summarise_compaction,
@@ -1837,24 +1867,53 @@ def register_code_api(
         return DictationOut(support=support, how=how)
 
     @app.post("/api/transcribe", dependencies=[guard], response_model=TranscriptOut)
-    async def transcribe_audio(file: UploadFile = _UPLOAD) -> TranscriptOut:
+    async def transcribe_audio(
+        file: UploadFile = _UPLOAD, language: str | None = _LANGUAGE_HINT
+    ) -> TranscriptOut:
         """Speech to text, for dictating a message instead of typing it.
 
         Runs through the same tool the agent uses — a local model when the `stt` extra is installed,
         the API otherwise. Deliberately not a second implementation: a person dictating and an agent
         transcribing a recording must not be able to get different answers, or to have one path work
         while the other is quietly unconfigured.
+
+        ``language`` is the app's own language, as a hint: a two-second clip is not much for the
+        model to detect a language from, and a wrong guess reads Portuguese as something else. An
+        unknown value is ignored rather than refused — the clip still transcribes, detected.
+
+        Off the event loop: a transcription is a few hundred milliseconds of CPU, and while it ran
+        on the loop every stream the app had open — the turn being answered, a shared conversation's
+        live window — stood still for exactly that long.
         """
         from chimera.api.attachments import save as save_attachment
         from chimera.api.attachments import transcribe
 
+        hint = (language or "").strip().lower()
         saved = save_attachment(settings.home, file.filename or "speech.webm", await file.read())
-        text = transcribe(saved.path)
+        text = await run_in_threadpool(
+            transcribe, saved.path, hint if _LANGUAGE_CODE.fullmatch(hint) else None
+        )
         # The tool reports its own failures as text rather than raising. Passing "error: ..." into
         # the composer as if it were dictation is the one outcome worth intercepting.
         if text.lower().startswith("error"):
             return TranscriptOut(text="", note=text)
         return TranscriptOut(text=text.strip(), note="")
+
+    @app.post("/api/transcribe/warm", dependencies=[guard], response_model=TranscriberWarmOut)
+    async def warm_transcriber_route() -> TranscriberWarmOut:
+        """Load the local speech model ahead of the first utterance.
+
+        Called when the voice mode is switched on or a dictation starts — the moments a person is
+        seconds away from speaking. Nothing to load on the hosted route, and nothing is kept that
+        a transcription would not have kept anyway. Off the loop like the transcription itself.
+        """
+        import time
+
+        from chimera.tools.media import warm_transcriber
+
+        began = time.perf_counter()
+        warmed = await run_in_threadpool(warm_transcriber)
+        return TranscriberWarmOut(warmed=warmed, seconds=round(time.perf_counter() - began, 2))
 
     @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
     def list_code_sessions() -> list[dict[str, Any]]:

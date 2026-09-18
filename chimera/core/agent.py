@@ -180,6 +180,10 @@ class AgentConfig:
     model: str | None = None
     max_steps: int = 8
     temperature: float = field(default_factory=_default_temperature)
+    #: ``False`` asks a reasoning model not to think before answering (the gateway says where
+    #: that reaches the provider); ``None`` leaves the model as it is. Passed to the backend only
+    #: when set, so a backend that never heard of it is called exactly as before.
+    thinking: bool | None = None
     system_prompt: str = DEFAULT_SYSTEM_PROMPT
     # A per-run line at the very FRONT of the system prompt, so no prefix is shared with any other
     # run and the provider's prefix cache cannot serve it. Empty in production; a measurement
@@ -890,14 +894,16 @@ class Agent:
                 # reported "budget" through the agent and "spend" through the backend.
                 raise SpendExceeded(reason)
         result: CompletionResult
+        asked = {} if self.config.thinking is None else {"thinking": self.config.thinking}
         if on_token is not None and hasattr(self.backend, "stream_complete"):
             result = self.backend.stream_complete(  # type: ignore[attr-defined]
                 messages, model=self.config.model, temperature=self.config.temperature,
-                tools=tools, on_delta=on_token,
+                tools=tools, on_delta=on_token, **asked,
             )
         else:
             result = self.backend.complete(
                 messages, model=self.config.model, temperature=self.config.temperature, tools=tools,
+                **asked,
             )
         usage.add(result)
         if spend is not None:

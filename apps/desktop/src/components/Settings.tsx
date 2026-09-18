@@ -28,6 +28,7 @@ import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
 import { Usage } from "@/components/Usage";
+import { VoiceCard } from "@/components/VoiceCard";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type {
   AgentIdentity,
@@ -993,6 +994,8 @@ export function Settings() {
                     <LanguageSelect />
                   </Row>
                 </Card>
+
+                <VoiceCard />
 
                 <IdentityCard />
 

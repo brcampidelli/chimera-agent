@@ -3,12 +3,12 @@ import { Ear, Loader2, Mic, Volume2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { getDictationSupport, transcribe as transcribeAudio, type Transcript } from "@/lib/api";
+import { getDictationSupport, transcribe as transcribeAudio, warmTranscriber, type Transcript } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import { BrowserMicrophone, FRAME_MS, type MicrophoneLike } from "@/lib/voice/microphone";
 import { Segmenter, rmsOf } from "@/lib/voice/segmenter";
 import { BrowserSpeaker, type SpeakerLike } from "@/lib/voice/speaker";
-import { plainForSpeech, speechLocale } from "@/lib/voice/speech-text";
+import { countSentences, firstSentences, plainForSpeech, readyCut, screenPartStart, speechLocale } from "@/lib/voice/speech-text";
 import { encodeWav } from "@/lib/voice/wav";
 
 /**
@@ -18,9 +18,17 @@ import { encodeWav } from "@/lib/voice/wav";
  * The dictation button next door is push-to-talk: record, stop, transcribe, paste. This is the
  * continuous form of the same three parts. The microphone stays open; a segmenter cuts the stream
  * into utterances on silence; each utterance is transcribed through the same endpoint dictation
- * uses and sent as a turn; when the turn's answer lands it is read aloud with the window's own
- * voices; and while it is being read, speech above the agent's own voice cancels the reading —
- * barge-in — and becomes the next message.
+ * uses and sent as a turn — marked as spoken, so the model answers for the ear; the answer is
+ * read aloud with the window's own voices AS IT STREAMS, a sentence at a time; and while it is
+ * being read, speech above the agent's own voice cancels the reading — barge-in — and becomes the
+ * next message.
+ *
+ * Reading as it streams is what the first live test asked for without saying so: the answer was
+ * read only once it was complete, and a complete answer at twenty tokens a second is a quarter of
+ * a minute of silence. Now each sentence is queued the moment it is complete (`readyCut`). The
+ * reading stops at the line the model was told to put between the spoken part and the screen part
+ * (`---`), and, as a net under a model that ignores the instruction, after `MAX_SPOKEN_SENTENCES`
+ * — either way the voice says the rest is on the screen.
  *
  * What the screen says is what the machine is doing: listening, hearing, transcribing (with how
  * long it took, because the local model on a slow machine takes seconds and a status line that
@@ -34,23 +42,48 @@ import { encodeWav } from "@/lib/voice/wav";
 export interface VoiceModeDeps {
   microphone: () => MicrophoneLike;
   speaker: SpeakerLike;
-  transcribe: (audio: Blob, filename: string) => Promise<Transcript>;
+  transcribe: (audio: Blob, filename: string, language: string) => Promise<Transcript>;
+  /** Load the speech model now: the first utterance is seconds away. */
+  warm: () => Promise<void>;
   segmenter: () => Segmenter;
 }
+
+/** The most sentences read from one answer before the voice says the rest is on the screen. A
+ *  net, not the rule: the model is asked (`spoken`) to answer in two to four sentences and to put
+ *  anything longer under a `---` line, where the reading stops on its own. Six sentences is
+ *  thirty to forty seconds of listening. */
+export const MAX_SPOKEN_SENTENCES = 6;
 
 const DEFAULT_DEPS: VoiceModeDeps = {
   microphone: () => new BrowserMicrophone(),
   speaker: new BrowserSpeaker(),
   transcribe: transcribeAudio,
+  warm: warmTranscriber,
   segmenter: () => new Segmenter({ frameMs: FRAME_MS }),
 };
 
 export type VoicePhase = "off" | "listening" | "hearing" | "transcribing" | "speaking";
 
 export interface SpokenAnswer {
-  /** Changes when a new answer lands; the same text twice is two answers. */
+  /** Changes when a new answer begins; the same text twice is two answers. */
   seq: number;
+  /** The answer so far — it grows while the turn streams. */
   text: string;
+  /** Nothing more is coming: the turn ended, however it ended. */
+  done: boolean;
+}
+
+/** How much of the answer being read has been handed to the voice, and what stopped it. */
+interface Reading {
+  seq: number;
+  /** Characters of the raw answer already queued for reading. */
+  queued: number;
+  sentences: number;
+  /** The reading was cut short — by the cap, by the `---` line, or by the person — and nothing
+   *  more of this answer is read. */
+  closed: boolean;
+  /** "The rest is on the screen" was said (or there was no rest to speak of). */
+  restSaid: boolean;
 }
 
 export function VoiceMode({
@@ -76,6 +109,7 @@ export function VoiceMode({
   const phaseRef = useRef<VoicePhase>("off");
   /** The answer seq already spoken (or current when the mode came on): never read old answers. */
   const spokenSeq = useRef<number>(answer?.seq ?? -1);
+  const reading = useRef<Reading | null>(null);
   const onUtteranceRef = useRef(onUtterance);
   onUtteranceRef.current = onUtterance;
   const locale = useMemo(() => speechLocale(lang), [lang]);
@@ -85,14 +119,21 @@ export function VoiceMode({
     setPhase(next);
   }, []);
 
+  /** End the reading of the current answer for good: nothing more of it is queued. */
+  const closeReading = useCallback(() => {
+    deps.speaker.cancel();
+    if (reading.current) reading.current.closed = true;
+    if (segmenter.current) segmenter.current.agentSpeaking = false;
+  }, [deps.speaker]);
+
   const stop = useCallback(() => {
     mic.current?.stop();
     mic.current = null;
-    deps.speaker.cancel();
+    closeReading();
     segmenter.current?.flush();
     segmenter.current = null;
     setPhaseBoth("off");
-  }, [deps.speaker, setPhaseBoth]);
+  }, [closeReading, setPhaseBoth]);
 
   // The mic is released when the screen goes away, whatever the mode said.
   useEffect(() => () => stop(), [stop]);
@@ -102,7 +143,7 @@ export function VoiceMode({
       setPhaseBoth("transcribing");
       const began = performance.now();
       try {
-        const result = await deps.transcribe(encodeWav(samples, sampleRate), "speech.wav");
+        const result = await deps.transcribe(encodeWav(samples, sampleRate), "speech.wav", lang);
         const seconds = Math.round((performance.now() - began) / 100) / 10;
         if (result.text) {
           setHeard({ text: result.text, seconds });
@@ -116,12 +157,14 @@ export function VoiceMode({
       }
       if (phaseRef.current === "transcribing") setPhaseBoth("listening");
     },
-    [deps, setPhaseBoth, t],
+    [deps, lang, setPhaseBoth, t],
   );
 
   const start = useCallback(async () => {
     setNote("");
     setHeard(null);
+    // The model loads while the person draws breath, not on their first sentence.
+    void deps.warm();
     const microphone = deps.microphone();
     const seg = deps.segmenter();
     segmenter.current = seg;
@@ -132,10 +175,11 @@ export function VoiceMode({
         if (!event) return;
         if (event.kind === "start") {
           // Barge-in: the person is talking over the reading. Stop it — the segmenter's floor has
-          // already climbed to the agent's own voice, so this frame was louder than that.
-          if (deps.speaker.speaking()) {
-            deps.speaker.cancel();
-            seg.agentSpeaking = false;
+          // already climbed to the agent's own voice, so this frame was louder than that. The
+          // pause between two sentences of a streaming answer counts as the reading too: a person
+          // who speaks into it does not want the next sentence.
+          if (deps.speaker.speaking() || phaseRef.current === "speaking") {
+            closeReading();
             setNote(t("code.voice.interrupted"));
           }
           setPhaseBoth("hearing");
@@ -153,24 +197,64 @@ export function VoiceMode({
     mic.current = microphone;
     setPhaseBoth("listening");
     if (!deps.speaker.available()) setNote(t("code.voice.noSpeech"));
-  }, [answer?.seq, deps, handleUtterance, setPhaseBoth, t]);
+  }, [answer?.seq, closeReading, deps, handleUtterance, setPhaseBoth, t]);
 
-  // A new answer while the mode is on is read aloud. The segmenter is told, so its floor tracks
-  // the agent's voice and only speech above it counts as an interruption.
+  // An answer that begins while the mode is on is read aloud as it streams: every complete
+  // sentence is queued the moment it is complete, and the remainder when the turn ends. The
+  // segmenter is told, so its floor tracks the agent's voice and only speech above it counts as
+  // an interruption.
   useEffect(() => {
-    if (phaseRef.current === "off" || !answer || answer.seq === spokenSeq.current) return;
-    spokenSeq.current = answer.seq;
-    if (!deps.speaker.available() || !answer.text.trim()) return;
+    if (phaseRef.current === "off" || !answer || !deps.speaker.available()) return;
+    if (answer.seq !== reading.current?.seq) {
+      // An answer that was current when the mode came on is never read.
+      if (answer.seq === spokenSeq.current) return;
+      spokenSeq.current = answer.seq;
+      reading.current = { seq: answer.seq, queued: 0, sentences: 0, closed: false, restSaid: false };
+    }
+    const piece = reading.current;
+    if (piece.closed) return;
     const seg = segmenter.current;
-    void (async () => {
+    const raw = answer.text;
+    // The spoken part ends at the model's own line; the screen part is never read.
+    const screenAt = screenPartStart(raw);
+    const spokenEnd = screenAt >= 0 ? screenAt : raw.length;
+    const cut = answer.done || screenAt >= 0 ? spokenEnd : readyCut(raw, piece.queued);
+    const queue = (text: string) => {
       if (seg) seg.agentSpeaking = true;
       setPhaseBoth("speaking");
-      await deps.speaker.speak(plainForSpeech(answer.text, t("code.voice.codeMarker")), locale);
-      if (seg) seg.agentSpeaking = false;
-      // Still "speaking" means nothing else moved the phase (a stop sets "off", a barge-in
-      // "hearing"); the reading ended on its own and the mode goes back to listening.
-      if (phaseRef.current === "speaking") setPhaseBoth("listening");
-    })();
+      void deps.speaker.speak(text, locale);
+    };
+    const close = (rest: boolean) => {
+      piece.closed = true;
+      if (rest && !piece.restSaid) {
+        piece.restSaid = true;
+        queue(t("code.voice.restOnScreen"));
+      }
+    };
+    if (cut > piece.queued) {
+      const text = plainForSpeech(raw.slice(piece.queued, cut), t("code.voice.codeMarker"));
+      piece.queued = cut;
+      if (text) {
+        const { kept, truncated } = firstSentences(text, MAX_SPOKEN_SENTENCES - piece.sentences);
+        piece.sentences += countSentences(kept);
+        if (kept) queue(kept);
+        // Over the cap: this piece (or what is left of it) is the rest, and nothing more is read.
+        if (truncated) close(true);
+      }
+    }
+    // The rule line itself is not "the rest"; what follows it is.
+    if (!piece.closed && screenAt >= 0) {
+      close(raw.slice(screenAt).split("\n").slice(1).join("\n").trim() !== "");
+    }
+    // Nothing more will be queued for this answer: when the voice falls silent, listen again.
+    if ((answer.done || piece.closed) && phaseRef.current === "speaking") {
+      const seq = piece.seq;
+      void deps.speaker.idle().then(() => {
+        if (reading.current?.seq !== seq || phaseRef.current !== "speaking") return;
+        if (seg) seg.agentSpeaking = false;
+        setPhaseBoth("listening");
+      });
+    }
   }, [answer, deps.speaker, locale, setPhaseBoth, t]);
 
   const on = phase !== "off";

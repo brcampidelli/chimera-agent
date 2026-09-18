@@ -17,10 +17,11 @@ import {
   getVisionSupport,
   transcribe,
   uploadAttachment,
+  warmTranscriber,
   type Attachment,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { useT } from "@/lib/i18n";
+import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
 /** The two ways to put something into a message that is not typing.
@@ -179,7 +180,7 @@ export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) 
 }
 
 export function DictateButton({ onText }: { onText: (text: string) => void }) {
-  const t = useT();
+  const { t, lang } = useI18n();
   const recorder = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const [state, setState] = useState<"idle" | "recording" | "working">("idle");
@@ -214,6 +215,8 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
     recorder.current = rec;
     rec.start();
     setState("recording");
+    // The model loads during the recording, not after it.
+    void warmTranscriber();
   }
 
   async function send(audio: Blob) {
@@ -223,7 +226,7 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
     // this wait exists exactly once and looks identical to a hang if nobody says why.
     setNote(t("code.dictate.working"));
     try {
-      const result = await transcribe(audio);
+      const result = await transcribe(audio, "speech.webm", lang);
       if (result.text) {
         onText(result.text);
         setNote("");

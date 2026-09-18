@@ -61,6 +61,7 @@ export function makeCodeApiMock() {
     answerApproval: vi.fn(async () => ({ ok: true })),
     uploadAttachment: vi.fn(),
     transcribe: vi.fn(),
+    warmTranscriber: vi.fn(async () => {}),
     // Resolved by default so a suite that is not about vision never renders the caveat: the warning
     // must appear because a model cannot see, not because a fixture forgot to say it could.
     getVisionSupport: vi.fn(async () => ({ model: "vendor/model", support: "yes" })),

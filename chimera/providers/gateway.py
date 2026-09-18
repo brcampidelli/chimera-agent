@@ -466,8 +466,17 @@ class LLMGateway:
             resolved.split("/", 1)[1],
         )
 
-    def _provider_kwargs(self) -> dict[str, Any]:
+    def _provider_kwargs(self, resolved: str = "", *, thinking: bool | None = None) -> dict[str, Any]:
         """Extra litellm kwargs — a custom endpoint, plus the per-request deadline.
+
+        ``thinking=False`` asks a reasoning model not to think before it answers. Measured on
+        2026-09-17 with the desktop's default (``deepseek-v4-flash`` through OpenRouter): the
+        model starts streaming 0.5 s in and spends the first 2–15 s of a coding turn on reasoning
+        the person never sees, then answers; with reasoning off the first visible word came at
+        0.6–2.7 s on the same prompt. A spoken turn is the caller that asks — someone waiting to
+        hear an answer — and only through OpenRouter, whose unified ``reasoning`` parameter every
+        model there understands; on any other route the flag changes nothing rather than sending
+        a parameter the provider would refuse. ``None`` is the model's own default.
 
         The timeout lives here so every call site inherits it (sync, async and both streaming
         paths). Without it a provider that accepts the connection and then never answers stalls the
@@ -486,6 +495,8 @@ class LLMGateway:
         if order:
             # `allow_fallbacks: false` is not decoration — see `Settings.provider_order`.
             kwargs["extra_body"] = {"provider": {"order": order, "allow_fallbacks": False}}
+        if thinking is False and resolved.startswith("openrouter/"):
+            kwargs.setdefault("extra_body", {})["reasoning"] = {"enabled": False}
         return kwargs
 
     def _model_candidates(self, resolved: str) -> list[str]:
@@ -522,6 +533,7 @@ class LLMGateway:
         temperature: float = 0.7,
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
+        thinking: bool | None = None,
         **kwargs: Any,
     ) -> CompletionResult:
         """Run a synchronous chat completion (with the fallback chain) and normalize it."""
@@ -778,6 +790,7 @@ class LLMGateway:
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
         on_delta: Callable[[str], None] | None = None,
+        thinking: bool | None = None,
         **kwargs: Any,
     ) -> CompletionResult:
         """Streaming completion that still returns a normalized :class:`CompletionResult`.
@@ -792,7 +805,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        call_kwargs = dict(self._provider_kwargs(), **kwargs)
+        call_kwargs = dict(self._provider_kwargs(resolved, thinking=thinking), **kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
