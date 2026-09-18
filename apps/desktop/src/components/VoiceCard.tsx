@@ -1,5 +1,5 @@
 import { Volume2 } from "lucide-react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/lib/i18n";
@@ -23,8 +23,11 @@ import { speechLocale } from "@/lib/voice/speech-text";
  * is the ranked pick the voice mode makes on its own (`pickVoice`); a name is that voice, as long
  * as the window still has it. The Listen button reads one sentence in the app's language, so the
  * choice is made by ear rather than by name.
+ *
+ * `children` are the rows that belong to the same card but to the server's settings — the model
+ * a spoken turn is answered by — rendered by the Settings screen with its own row and field.
  */
-export function VoiceCard() {
+export function VoiceCard({ children }: { children?: ReactNode }) {
   const { t, lang } = useI18n();
   const headingId = useId();
   const selectId = useId();
@@ -54,6 +57,7 @@ export function VoiceCard() {
       <h2 id={headingId} className="border-b border-hairline px-4 py-2.5 text-sm font-semibold">
         {t("settings.card.voice")}
       </h2>
+      <div className="divide-y divide-hairline">
       <div className="flex items-center justify-between gap-4 px-4 py-3">
         <div className="min-w-0">
           <label htmlFor={selectId} className="text-sm font-medium">
@@ -99,6 +103,8 @@ export function VoiceCard() {
             {t("settings.voice.listen")}
           </Button>
         </div>
+      </div>
+      {children}
       </div>
     </section>
   );

@@ -21,6 +21,15 @@ vi.mock("@/lib/api", () => ({
   // Answers, rather than being left undefined: the Ollama picker asks on mount, and an unresolved
   // query would put every test here through a rejected promise for a control none of them is about.
   getOllamaModels: vi.fn(async () => ({ base_url: "", reachable: false, models: [], reason: "no_url" })),
+  // The two voice pickers open the same catalogue the composer's picker does.
+  getModels: vi.fn(async () => ({
+    default: "openrouter/x/default",
+    models: [
+      { slug: "openrouter/deepseek/deepseek-v4-flash-0731", label: "DeepSeek: V4 Flash", vendor: "deepseek", source: "openrouter", tools: true, vision: false, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
+      { slug: "openrouter/deepseek/deepseek-r1", label: "DeepSeek: R1", vendor: "deepseek", source: "openrouter", tools: true, vision: false, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
+      { slug: "openrouter/google/gemini-2.5-flash-lite", label: "Google: Gemini 2.5 Flash Lite", vendor: "google", source: "openrouter", tools: true, vision: true, free: false, context_k: null, input_per_m: null, output_per_m: null, recommended: false },
+    ],
+  })),
   patchConfig: vi.fn(async () => ({ updated: [] })),
   putInstructions: vi.fn(),
   startMessaging: vi.fn(),
@@ -38,6 +47,8 @@ function config(over: Record<string, unknown> = {}) {
       cascade: false,
       api_base: null,
       fallback_models: ["openrouter/a", "openrouter/b"],
+      voice_model: "",
+      voice_work_model: "",
       tiers: { weak: "a", mid: "b", top: "c" },
     },
     memory: {
@@ -110,6 +121,39 @@ describe("Settings — the controls that were one row away", () => {
     await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
     expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({
       CHIMERA_WEAK_MODEL: "openrouter/cheap",
+    });
+  });
+
+  it("chooses the model that answers spoken talk, quick ones first, and the one that does spoken work", async () => {
+    // Measured 2026-09-17: the first word is where models differ most (gemini-2.5-flash-lite at
+    // 0.7–0.9 s, the default at 2.7–8.7 s with reasoning off), and the owner heard it live; then
+    // asked for two models, one to talk and one to reason. Two pickers, one key each; neither
+    // offers to make its pick the install's default, and the talk one lists likely-quick models
+    // first — by name, and it says so.
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+
+    await user.click(await screen.findByRole("button", { name: /^Model for spoken turns:/ }));
+    const rows = await screen.findAllByRole("button", { name: /DeepSeek|Gemini/ });
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringContaining("Gemini 2.5 Flash Lite"),
+      expect.stringContaining("V4 Flash"),
+      expect.stringContaining("R1"),
+    ]);
+    expect(screen.getByTestId("model-pick-quick-note")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /make it the default/i })).not.toBeInTheDocument();
+    await user.click(screen.getByText("Google: Gemini 2.5 Flash Lite"));
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
+    expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({
+      CHIMERA_VOICE_MODEL: "openrouter/google/gemini-2.5-flash-lite",
+    });
+
+    await user.click(screen.getByRole("button", { name: /^Model for spoken work:/ }));
+    expect(screen.queryByTestId("model-pick-quick-note")).not.toBeInTheDocument();
+    await user.click(screen.getByText("DeepSeek: R1"));
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(patchConfig).mock.calls[1][0]).toEqual({
+      CHIMERA_VOICE_WORK_MODEL: "openrouter/deepseek/deepseek-r1",
     });
   });
 

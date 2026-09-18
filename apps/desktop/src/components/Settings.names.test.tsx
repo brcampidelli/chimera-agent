@@ -45,7 +45,7 @@ const PROVIDERS = [
 
 function config() {
   return {
-    models: { default: "openrouter/x", weak: "", mid: "", orchestrator: "", cost_mode: "auto", cascade: false, api_base: null, fallback_models: [], complete_model: "", ollama_base_url: "", lm_studio_base_url: "", tiers: { weak: "a", mid: "b", top: "c" } },
+    models: { default: "openrouter/x", weak: "", mid: "", orchestrator: "", cost_mode: "auto", cascade: false, api_base: null, fallback_models: [], complete_model: "", voice_model: "", voice_work_model: "", ollama_base_url: "", lm_studio_base_url: "", tiers: { weak: "a", mid: "b", top: "c" } },
     memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false, skill_cards: false, embed_model: "" },
     cache: { completion: false, prompt: false },
     autonomy: {

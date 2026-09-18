@@ -805,6 +805,21 @@ class Settings(BaseSettings):
     )
     complete_budget_ms: int = Field(default=600, validation_alias="CHIMERA_COMPLETE_BUDGET_MS")
 
+    # The model that answers the TALK of a spoken turn on the Code screen — a question, a remark —
+    # empty (the default) meaning the conversation's own. A person waiting to hear an answer cares
+    # about the first word more than anything the model does after it, and the first word is where
+    # models differ most: measured on 2026-09-17 with a coding turn's prompt, `gemini-2.5-flash-lite`
+    # answered at 0.7–0.9 s and the default `deepseek-v4-flash` at 2.7–8.7 s with its reasoning off
+    # (7.4–19.9 s with it on) — the owner tested a Gemini model live and heard the difference. A
+    # spoken request for WORK (create, fix, refactor…) still goes to the conversation's model with
+    # its thinking, and typed turns never use this one (`code_api._model_for`). The receipt under
+    # each answer names the model that answered it.
+    voice_model: str = Field(default="", validation_alias="CHIMERA_VOICE_MODEL")
+    # The model that does the WORK a spoken turn asks for (create, fix, refactor…), with its
+    # thinking; empty (the default) means the conversation's own. The owner's shape for hands-free
+    # use (2026-09-18): one model to talk, one to reason — both chosen by the person.
+    voice_work_model: str = Field(default="", validation_alias="CHIMERA_VOICE_WORK_MODEL")
+
     # Aggregate dollar ceiling for ONE day, across everything that writes to the usage log. Unset
     # (the default) means no daily cap and therefore no new way for a scheduled job to be refused.
     #

@@ -847,6 +847,31 @@ class CodeTurnRequest(CodeSeams):
     nothing."""
 
 
+def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:
+    """Which model answers this turn, and whether it may think first.
+
+    A typed turn: the conversation's model, thinking as the request says. A spoken turn is two
+    things, and the owner asked for them to be two models (2026-09-18): *talk* — a question, a
+    remark — goes to the voice model when one is set, without thinking, because the first word is
+    what a listener waits for and that is where models differ most (`Settings.voice_model`); *work*
+    — a spoken request to create, fix, refactor, install — goes to the work model when one is set
+    (`Settings.voice_work_model`), else the conversation's, with its thinking as configured, because
+    the answer to "fix the login" is the fix, not the first word.
+
+    The split is `classify_task` — deterministic, no model call, the same markers the hierarchy
+    routes by, with the spoken imperatives ("faz", "arruma", "me faça") already in it. Its bias is
+    the safe one for this use: a phrase it is unsure about ("quero entender…") counts as work and
+    takes the slower, stronger road. The receipt under the answer names the model that answered.
+    """
+    if not req.spoken:
+        return req.model, req.thinking
+    from chimera.orchestration.hierarchy import classify_task
+
+    if classify_task(req.message) == "sequential_write":
+        return (settings.voice_work_model or req.model), None
+    return (settings.voice_model or req.model), req.thinking
+
+
 def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> None:
     """Append one coding turn to the usage log.
 
@@ -1132,13 +1157,14 @@ def register_code_api(
             system_prompt += f"\n\n{note}"
         if req.spoken:
             system_prompt += f"\n\n{SPOKEN_NOTE}"
+        model, thinking = _model_for(req, live())
         agent = Agent(
             gateway,
             registry,
             AgentConfig(
-                model=req.model,
+                model=model,
                 system_prompt=system_prompt,
-                thinking=req.thinking,
+                thinking=thinking,
                 max_steps=steps,
                 context_budget=req.context_budget,
                 summarise_compaction=req.summarise_compaction,

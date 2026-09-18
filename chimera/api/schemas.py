@@ -327,6 +327,10 @@ class ModelsCfgOut(BaseModel):
     #: LM Studio's OpenAI-compatible root (``/v1`` included); what LiteLLM's ``lm_studio/`` needs.
     lm_studio_base_url: str = ""
     complete_model: str = ""
+    #: The model that answers spoken TALK; "" is the conversation's own (``Settings.voice_model``).
+    voice_model: str = ""
+    #: The model that does spoken WORK; "" is the conversation's own (``Settings.voice_work_model``).
+    voice_work_model: str = ""
     """Where the local Ollama server lives.
 
     Distinct from ``api_base``, which applies to EVERY call: this one only points LiteLLM's Ollama

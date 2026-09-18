@@ -25,6 +25,21 @@ function shortName(slug: string): string {
   return slug.split("/").pop() ?? slug;
 }
 
+/** How likely a model is to answer quickly, read off its NAME — the vendors' own conventions
+ *  (`flash`, `lite`, `mini`, `nano`, `haiku`, `instant`, `turbo`) against the ones that think
+ *  before they answer (`r1`, `thinking`, `reasoner`, `o1`/`o3`/`o4`). A hint for ordering, not a
+ *  measurement: the catalogue carries no latency, and the dialog says so where it uses this. The
+ *  one measurement behind it (2026-09-17, a coding turn's prompt): gemini-2.5-flash-lite at
+ *  0.7–0.9 s to the first word, deepseek-v4-flash at 2.7–8.7 s with reasoning off. */
+export function quickScore(slug: string): number {
+  const name = shortName(slug).toLowerCase();
+  let score = 0;
+  if (/flash-lite|lite|mini|nano|haiku|instant/.test(name)) score += 2;
+  if (/flash|turbo|fast|small/.test(name)) score += 1;
+  if (/\br1\b|thinking|reasoner|\bo[134]\b|deep-?think/.test(name)) score -= 2;
+  return score;
+}
+
 /**
  * Which model answers the next message.
  *
@@ -51,6 +66,9 @@ export function ModelPicker({
   fallback: fallbackOverride,
   label,
   name,
+  offerDefault = true,
+  quickFirst = false,
+  blurb,
 }: {
   /** The chosen slug, or "" for whatever the install's default is. */
   value: string;
@@ -69,6 +87,16 @@ export function ModelPicker({
    *  Separate from `label`, which controls the visible caption: the roles strip prints the role
    *  beside the button and passes `label={null}`, so the name had nowhere to come from. */
   name?: string;
+  /** Offer to make the pick the install's default. On beside the composer; off where the picker
+   *  already writes a setting of its own (the voice model), where a second button writing a
+   *  different variable would be the confusion the dialog's own comment warns about. */
+  offerDefault?: boolean;
+  /** List the models likely to answer quickly first (`quickScore`) — for the voice, where the
+   *  first word is the whole point. The dialog says the order is by name, not measured. */
+  quickFirst?: boolean;
+  /** What the dialog says under its title. The composer's line ("applies to this conversation…")
+   *  is wrong for a picker that writes a setting; that caller says what its pick is instead. */
+  blurb?: string;
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -143,7 +171,10 @@ export function ModelPicker({
         onOpenChange={setOpen}
         value={value}
         onPick={onChange}
-        offerDefault
+        offerDefault={offerDefault}
+        quickFirst={quickFirst}
+        blurb={blurb}
+        fallbackLabel={fallbackOverride}
       />
     </>
   );
@@ -162,6 +193,9 @@ export function ModelDialog({
   onPick,
   provider,
   offerDefault = false,
+  quickFirst = false,
+  blurb,
+  fallbackLabel,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -175,6 +209,14 @@ export function ModelDialog({
    *  model alongside the key, and two controls writing one variable on one screen is one of them
    *  silently winning. */
   offerDefault?: boolean;
+  /** The models likely to answer quickly first — see `quickScore`. */
+  quickFirst?: boolean;
+  /** Under the title; the composer's line by default. */
+  blurb?: string;
+  /** What "no choice" means for THIS picker, on the way-back row. By default the install's
+   *  default model, which is what the composer's "no choice" resolves to; the voice pickers
+   *  resolve to the conversation's model instead, and the row must not name a slug they never use. */
+  fallbackLabel?: string;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -208,17 +250,21 @@ export function ModelDialog({
     const eligible = seeingOnly
       ? models.filter((m) => m.vision === true)
       : models;
+    // Stable: ties keep the catalogue's order, so the ranking only ever moves the quick ones up.
+    const ordered = quickFirst
+      ? [...eligible].sort((a, b) => quickScore(b.slug) - quickScore(a.slug))
+      : eligible;
     const needle = query.trim().toLowerCase();
-    if (!needle) return eligible;
+    if (!needle) return ordered;
     // Matched against the slug as well as the label: someone pasting `deepseek/deepseek-chat-v3.1`
     // from a terminal is searching with the string they already have.
-    return eligible.filter(
+    return ordered.filter(
       (m) =>
         m.label.toLowerCase().includes(needle) ||
         m.slug.toLowerCase().includes(needle) ||
         m.vendor.toLowerCase().includes(needle),
     );
-  }, [models, query, seeingOnly]);
+  }, [models, query, seeingOnly, quickFirst]);
 
   const shown = filtered.slice(0, MAX_ROWS);
   const hidden = filtered.length - shown.length;
@@ -237,7 +283,7 @@ export function ModelDialog({
       open={open}
       onOpenChange={onOpenChange}
       title={t("model.pick.title")}
-      description={t("model.pick.blurb")}
+      description={blurb ?? t("model.pick.blurb")}
       // The footer holds "Make it the default", and on a short window it was being pushed below the
       // fold — with the list itself scrolling, so nothing hinted there was anything under it. The
       // dialog is bounded to the viewport and the LIST is the only part that scrolls, which puts the
@@ -273,6 +319,11 @@ export function ModelDialog({
           />
           {t("model.pick.onlyVision")}
         </label>
+        {quickFirst ? (
+          <p className="text-xs text-muted-foreground" data-testid="model-pick-quick-note">
+            {t("model.pick.quickFirst")}
+          </p>
+        ) : null}
 
         {/* Why the list is short, when it is short. Said NEXT TO the list rather than instead of it:
             the models below are real and callable, and hiding them behind an error would answer
@@ -289,7 +340,7 @@ export function ModelDialog({
               you can lose by typing is not one. */}
           <Row
             label={t("model.pick.default")}
-            hint={defaultSlug || t("model.pick.defaultUnknown")}
+            hint={fallbackLabel ?? (defaultSlug || t("model.pick.defaultUnknown"))}
             selected={value === ""}
             onPick={() => {
               onPick("");

@@ -22,6 +22,9 @@ from chimera.core.agent import AgentResult
 from chimera.interface import ChatSession
 
 SYSTEM_PROMPTS: list[str] = []
+#: The settings the last client was built with — injected, so frozen: a test that wants a setting
+#: changed sets it on this object rather than through PATCH, which writes .env for a live app.
+BUILT_WITH: list[Settings] = []
 
 
 class _Agent:
@@ -60,6 +63,7 @@ def _client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     ws.mkdir(exist_ok=True)
     settings = Settings(CHIMERA_HOME=str(home))  # type: ignore[call-arg]
     SYSTEM_PROMPTS.clear()
+    BUILT_WITH.append(settings)
     return TestClient(build_api_app(lambda: ChatSession(_Agent()), workspace=ws, settings=settings))
 
 
@@ -237,3 +241,72 @@ def test_the_agent_passes_thinking_to_its_backend_only_when_set() -> None:
     Agent(backend, ToolRegistry(), AgentConfig(max_steps=1, thinking=False)).run("q")
     assert "thinking" not in backend.calls[0]
     assert backend.calls[1]["thinking"] is False
+
+
+# --------------------------------------------------------------------- the voice model
+
+
+def test_spoken_talk_goes_to_the_voice_model_without_thinking_and_spoken_work_to_the_conversations_with_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The owner tested a Gemini model live and heard the difference at the first word, then asked
+    for two models: one to talk, one to reason when the request is work. `classify_task` is the
+    split — a spoken question goes to the voice model with thinking off; a spoken "fix the login"
+    goes to the conversation's model with its thinking; a typed turn is untouched."""
+    import chimera.core
+
+    seen: list[tuple[object, object]] = []
+
+    class _Recording(_Agent):
+        def __init__(self, *args: Any, **kw: Any) -> None:
+            super().__init__(*args, **kw)
+            if len(args) > 2:
+                seen.append((getattr(args[2], "model", "missing"), getattr(args[2], "thinking", "missing")))
+
+    def last() -> tuple[object, object]:
+        return seen[-1]
+
+    client = _client(tmp_path, monkeypatch)
+    monkeypatch.setattr(chimera.core, "Agent", _Recording, raising=True)
+    spoken = {"model": "openrouter/x/slow", "spoken": True, "thinking": False}
+
+    # Nothing set: talk stays on the conversation's model, without thinking; work gets thinking back.
+    client.post("/api/code/turn", json={"message": "o que é este projeto?", **spoken})
+    assert last() == ("openrouter/x/slow", False)
+    client.post("/api/code/turn", json={"message": "corrija o login", **spoken})
+    assert last() == ("openrouter/x/slow", None)
+
+    # The key is one Settings can take from the screen, and the snapshot shows it back. Owning the
+    # name first (the PATCH exports it, and the suite's environment guard wants it put back), and
+    # in a temp cwd: `patch_config` writes `.env` relative to the cwd, which is the developer's own
+    # file when a test forgets this — it did, once, on 2026-09-18.
+    monkeypatch.setenv("CHIMERA_VOICE_MODEL", "")
+    monkeypatch.chdir(tmp_path)
+    saved = client.patch("/api/config", json={"CHIMERA_VOICE_MODEL": "openrouter/google/gemini-2.5-flash-lite"})
+    assert saved.status_code == 200
+    monkeypatch.setattr(BUILT_WITH[-1], "voice_model", "openrouter/google/gemini-2.5-flash-lite")
+    assert client.get("/api/config").json()["models"]["voice_model"] == "openrouter/google/gemini-2.5-flash-lite"
+
+    client.post("/api/code/turn", json={"message": "o que é este projeto?", **spoken})
+    assert last() == ("openrouter/google/gemini-2.5-flash-lite", False)
+    client.post("/api/code/turn", json={"message": "me faça um teste para o login", **spoken})
+    assert last() == ("openrouter/x/slow", None)
+    client.post("/api/code/turn", json={"message": "corrija o login", "model": "openrouter/x/slow"})
+    assert last() == ("openrouter/x/slow", None)
+    client.post("/api/code/turn", json={"message": "o que é este projeto?", "model": "openrouter/x/slow"})
+    assert last() == ("openrouter/x/slow", None)
+    # A spoken question with no model chosen on the conversation still goes to the voice model.
+    client.post("/api/code/turn", json={"message": "e o logout?", "spoken": True, "thinking": False})
+    assert last() == ("openrouter/google/gemini-2.5-flash-lite", False)
+
+    # The other half, chosen too: spoken work goes to the work model, thinking; talk is untouched.
+    monkeypatch.setenv("CHIMERA_VOICE_WORK_MODEL", "")
+    assert client.patch("/api/config", json={"CHIMERA_VOICE_WORK_MODEL": "openrouter/deepseek/deepseek-r1"}).status_code == 200
+    monkeypatch.setattr(BUILT_WITH[-1], "voice_work_model", "openrouter/deepseek/deepseek-r1")
+    assert client.get("/api/config").json()["models"]["voice_work_model"] == "openrouter/deepseek/deepseek-r1"
+    client.post("/api/code/turn", json={"message": "refatore o módulo de login", **spoken})
+    assert last() == ("openrouter/deepseek/deepseek-r1", None)
+    client.post("/api/code/turn", json={"message": "o que é este projeto?", **spoken})
+    assert last() == ("openrouter/google/gemini-2.5-flash-lite", False)
+    client.post("/api/code/turn", json={"message": "refatore o módulo de login", "model": "openrouter/x/slow"})
+    assert last() == ("openrouter/x/slow", None)

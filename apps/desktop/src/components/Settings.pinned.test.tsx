@@ -37,6 +37,8 @@ const CONFIG = {
     ollama_base_url: "http://localhost:11434",
     lm_studio_base_url: "http://localhost:1234/v1",
     complete_model: "",
+    voice_model: "",
+    voice_work_model: "",
   },
   memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false },
   cache: { completion: false, prompt: false },

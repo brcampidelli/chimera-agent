@@ -72,6 +72,8 @@ _EDITABLE_SETTINGS = {
     # ignores the suffix and answers in prose), which is a thing nobody guesses — so the field has
     # to be on the screen, not in a file the user has to be told about.
     "CHIMERA_COMPLETE_MODEL",
+    "CHIMERA_VOICE_MODEL",  # the model that answers spoken TALK; empty = the conversation's
+    "CHIMERA_VOICE_WORK_MODEL",  # the model that does spoken WORK; empty = the conversation's
     "CHIMERA_CACHE",
     "CHIMERA_PROMPT_CACHE",
     "CHIMERA_MEMORY_BACKEND",
@@ -323,6 +325,8 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "ollama_base_url": settings.ollama_base_url,
             "lm_studio_base_url": settings.lm_studio_base_url,
             "complete_model": settings.complete_model,
+            "voice_model": settings.voice_model,
+            "voice_work_model": settings.voice_work_model,
         },
         # Panel -> judge -> synthesizer, and how independent the judge actually is from the panel it
         # grades. `role_kinship` is reported rather than enforced: a user with one provider key has

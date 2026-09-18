@@ -5654,6 +5654,16 @@ export interface components {
             /** Orchestrator */
             orchestrator: string;
             tiers: components["schemas"]["TiersOut"];
+            /**
+             * Voice Model
+             * @default
+             */
+            voice_model: string;
+            /**
+             * Voice Work Model
+             * @default
+             */
+            voice_work_model: string;
             /** Weak */
             weak: string;
         };
