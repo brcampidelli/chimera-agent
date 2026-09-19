@@ -121,6 +121,43 @@ definition that names neither TypeSafe nor MIT; not citable.
   (a linear probe with ECE 0.025 and AUROC **58** exists in the literature); ECE with n < ~200 distinct
   items is noise (Roelofs 2022); in-domain calibration does not transfer (RLCR 0.03 vs 0.21).
 
+### 1.5 A third-party loop test (added 2026-09-19): the router helps a cheap model, skips steps in chains, and never fills an argument
+
+A Brazilian creator's test (YouTube `QWap6zTgIH8`, "JEV: modelo criado pelo co-criador do ChatGPT merece o
+hype?", on the Vercel AI SDK evals; no repository or `n` published — a **hypothesis source**, not a number)
+is the only evidence so far of Jev used as a **tool router inside an agent loop**: scenarios with
+deliberately similar tool names; Gemini Flash, Fable 5.1, GPT-6 Astra, Opus 5, Qwen 27B, DeepSeek V4.1 Flash,
+each plain and with Jev choosing the tool. Reported: the cheap model (Gemini Flash) gains accuracy and its
+cost falls by more than half; the strong model (Fable 5.1) is as good alone; reasoning tokens fall for
+every model; and two trade-offs — in chained flows (find the contact, then schedule) the router **skips
+steps or picks out of order**, and the **mean number of steps rises**. Both fit what §1.3–1.4 predict for a
+classifier that sees the state and not the plan, and the first fits our own #514 (`thinking: false` for
+spoken turns: first token 2.7–8.7 s vs 7.4–19.9 s at equal answers). The demo's hidden simplification:
+`execute_tool(selected_tool)` ignores its `kwargs` — the tools are mocks without arguments. Every Chimera
+tool has arguments (`path`, `command`, `content`), and the expensive and dangerous half of a tool call is
+the argument, not the name; a router picks the name and the LLM still fills the rest.
+
+The explainer that travelled with the video mixes verified facts with claims the primary sources do not
+carry, listed here so they are not repeated: "co-inventor of ChatGPT" (verified: 4th of 20 authors of the
+InstructGPT paper); "when it says 90% the empirical accuracy is 90% … exactly 850 of 1,000" (a promise
+with no published reliability plot; measured by third parties: **72%** correct in the ≥ 0.90 bin, ECE
+0.116/0.040 depending on the question's wording, equal to a verbalized DeepSeek on the same sample — and
+"exactly" is false by definition, calibration being a group property with sampling noise); "RLCD uses
+Brier or KL" (TypeSafe never published its objective — Brier is what MIT's **RLCR** uses; the two are being
+conflated); "zero hallucination: impossible to invent a tool outside the catalogue" (true of the schema;
+the vendor's own FAQ: "it can't invent a category outside that list, but it can choose the wrong one");
+`JevClient.predict(prompt=…, response_model=…)` with a `.confidence` (pseudo-code — the API is `state` +
+`questions`; **Noul has no `confidence`**, and Choice's `confidence` is an unpublished statistic); the
+threshold guide 0.60–0.70 / 0.80–0.85 / 0.95+ (hand-set numbers over an opaque function, and a Choice's
+mass depends on how many options there are — "0.85" over 5 tools is not "0.85" over 40; thresholds come
+from a ROC on a labelled set at the false-allow/false-refuse one tolerates, which the vendor's own docs say:
+"test with your own data"); and "marginal confidence → escalate to the LLM for chain-of-thought" (§1.3
+measures the opposite: a decision after reasoning is extraction — escalate to **another verification** or
+to the human, not to more thinking by the same model). What the explainer gets right and is worth keeping:
+a **per-tool risk matrix with three bands** (auto / escalate / human) — our C1, with `p` measured and the
+band edges read off a ROC rather than a table; and the latency figures, the one claim every third party
+confirmed.
+
 ---
 
 ## 2 · Where this corrects, confirms, or sharpens our own record
@@ -237,6 +274,16 @@ from TF-IDF (0.5996) and the length ceiling (0.6023); random split ≥ 0.90 (lea
 sentence if it clears the original bar (≥ 0.75, IC ≥ 0.65, +0.10 over `self_report`), which nothing has.
 Half a day.
 
+**B4. A "System One" tool router inside our own loop, measured with an oracle (added 2026-09-19).** The
+video's hypothesis, pre-registered: on the 23 `harness_bench` tasks (deterministic oracle, noise floor
+0.073 already measured, k = 3), the current loop × a loop where a cheap **decision-first** model — local
+Qwen3-4B read by logprob over the tool names, or the hosted voice model asked for a verbalized choice —
+picks the **tool name** and the strong model fills the arguments. Metrics, paired by task: oracle pass,
+cost, **steps**, and **skipped steps on the chained tasks** (the two trade-offs the video reports), with the
+effect read against the replica noise floor. Registered prediction: with `deepseek-v4-flash` as the
+executor, a tie inside the floor and +10–20% steps; with a weak executor, a gain. ~US$ 30 (the factorial's
+cost). Jev itself stays out of any published arm under MCA §2.3; a vendor arm enters only with the letter.
+
 ### Tier C — design, only after B1/B2 return numbers
 
 **C1. A two-threshold REVIEW band in the kernel.** `p ≥ τ_hi` → REVIEW (card), `p ≤ τ_lo` → ALLOW,
@@ -324,7 +371,8 @@ re-check instead of a surprise. That is the layer worth building; Jev is one pos
 today the least verifiable one.
 
 **Suggested order:** A1 (hours) → B1 (a day, ~US$ 0.10) → B3 (half a day, US$ 0) → B2 (a day, ~US$ 1)
-→ C1/C2 only with B1/B2 numbers in hand → C3/C4 later. The Jev key and the §2.3 letter can be requested
+→ B4 (~US$ 30, only if B1 shows a decision-first backend worth routing with) → C1/C2 only with B1/B2
+numbers in hand → C3/C4 later. The Jev key and the §2.3 letter can be requested
 in parallel at zero cost; they gate nothing above.
 
 ---
@@ -356,3 +404,5 @@ named above. Not read: `bench/cascade` results (exists, not opened); `csail.mit.
 read on `news.mit.edu`); one nearhere.events comparison (Cloudflare wall); the `awesome-jev` second-hand
 items (listed, not opened). Not done: any call to the Jev API (no key), any latency measurement of a local
 embedder (none exists in the repo; A6's figures are expectations to be measured in the pilot).
+The YouTube test in §1.5 was read from a written summary; the video's data and `n` are not published
+and no repository was found for it.
