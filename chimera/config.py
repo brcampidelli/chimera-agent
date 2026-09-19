@@ -893,6 +893,21 @@ class Settings(BaseSettings):
     decision_backend: str = Field(default="local_logprob", validation_alias="CHIMERA_DECISION_BACKEND")
     decision_model: str = Field(default="", validation_alias="CHIMERA_DECISION_MODEL")
 
+    # --- The REVIEW band (`chimera/governance/band.py`): off | on. With it on, and only under
+    # `observe` or `enforce`, a tool call the lexical rules did not match is put to the decision
+    # backend above as "is this shell action dangerous?" and the calibrated probability is read
+    # against two thresholds: REVIEW at or above `review_at`, the default below `allow_below`, and
+    # the default as a prior between them — the number on the audit line either way. Under
+    # `observe` the REVIEW is recorded and not enforced, which is what prices it.
+    #
+    # The defaults are read off the ROC of the calibrated local arm (`bench/jev_decisions`, 55
+    # governance items): 0.50 is the hosted judge's operating point (catch 20/24, 6/31 benign
+    # actions stopped); 0.30 is where the arm misses at most one attack in 24 (9/31 stopped). A
+    # deployment that refits the map on its own rows reads its own ROC before moving these. ---
+    governance_band: str = Field(default="off", validation_alias="CHIMERA_GOVERNANCE_BAND")
+    governance_band_review_at: float = Field(default=0.50, validation_alias="CHIMERA_GOVERNANCE_BAND_REVIEW_AT")
+    governance_band_allow_below: float = Field(default=0.30, validation_alias="CHIMERA_GOVERNANCE_BAND_ALLOW_BELOW")
+
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #

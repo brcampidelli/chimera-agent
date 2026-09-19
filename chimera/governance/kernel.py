@@ -50,6 +50,21 @@ A deployment that wants the judge wires it itself and gets the whole seam: ``Tru
 precedents=PrecedentStore(path))``, a ``ContextJudgeFn`` that is handed why the action is taken,
 case law partitioned by ``lineage`` (a verdict learned on a clean run never answers a tainted
 one), and ``distill_rule`` for the verdicts that repeat.
+
+**The REVIEW band (2026-09-19) is the number that makes that decision reversible, not a reversal
+of it.** Where the rules matched nothing, a kernel built with ``band=`` asks a typed decision —
+`chimera/decisions`: a small local model read decision-first through a Platt map fitted on the
+governance corpus, by default — and reads a *calibrated probability* against two thresholds
+(`band.py`): REVIEW above the upper one, the default below the lower one, and the default **as a
+prior** between them, with the number on the audit line either way. Measured before it was wired
+(`bench/jev_decisions`): on the ambiguous corpus the local arm ranks like the one-word judge
+(AUROC 0.871 against 0.874) and, through the map, reaches the judge's operating point — catch 20/24
+at 6/31 benign actions stopped — at US$ 0 and 0.3 s a call, deterministic to one flip in 55. What
+it is not: a BLOCK (the band never hard-blocks), a reader of the task context or the tool output
+(the action alone, the instrument the map was fitted on), or a default — ``CHIMERA_GOVERNANCE_BAND``
+is off, and it only counts under ``observe`` or ``enforce``, where `observe` records what the band
+would have stopped without stopping it: the record-only surface the paragraphs above said did not
+exist.
 """
 
 from __future__ import annotations
@@ -59,6 +74,7 @@ from collections.abc import Callable
 from typing import cast
 
 from chimera.governance.audit import AuditLog
+from chimera.governance.band import DecisionBand
 from chimera.governance.policy import Decision, Rule, RuleSet, Verdict, more_severe
 from chimera.governance.precedent import PrecedentStore
 from chimera.telemetry import get_logger
@@ -104,10 +120,12 @@ class TrustKernel:
         audit_allows: bool = True,
         precedents: PrecedentStore | None = None,
         default: Decision = Decision.ALLOW,
+        band: DecisionBand | None = None,
     ) -> None:
         self.ruleset = ruleset or RuleSet()
         self.learned = RuleSet(use_defaults=False)
         self.judge = judge
+        self.band = band
         self.audit = audit
         # Whether an ALLOW — the overwhelmingly common verdict — earns a line. On cron that is a few
         # hundred a day and worth keeping. On an interactive coding turn it is one per tool call,
@@ -179,6 +197,15 @@ class TrustKernel:
             if recalled is not None:
                 verdict = Verdict(recalled, "matched a confirmed precedent", "precedent")
                 source = "precedent"
+        # The band: a calibrated probability where the rules matched nothing. It sees the action
+        # alone — not `context`, not `document` — because that is the instrument its map was fitted
+        # on, and because a sentence the request carries must not grade the request (`band.py`).
+        reading = None
+        if verdict is None and self.band is not None:
+            reading = self.band.read(action)
+            if reading.verdict is not None:
+                verdict = reading.verdict
+                source = "decision"
         if verdict is None and self.judge is not None:
             if self._judge_takes_context:
                 verdict = cast("ContextJudgeFn", self.judge)(action, context)
@@ -188,7 +215,17 @@ class TrustKernel:
             if self.precedents is not None:
                 self.precedents.observe(action, verdict.decision, lineage=lineage)
         if verdict is None:
-            verdict = Verdict(self.default, "no rule matched; default policy", "default")
+            if reading is not None and reading.p is not None:
+                # The default, carrying the band's number as a prior: whoever reads the log sees
+                # where the model was unsure, and nothing was decided on it.
+                verdict = Verdict(
+                    self.default,
+                    f"no rule matched; the decision model put p={reading.p:.2f} on dangerous ({reading.band}); default policy",
+                    "default",
+                    confidence=reading.p,
+                )
+            else:
+                verdict = Verdict(self.default, "no rule matched; default policy", "default")
             source = "default"
 
         if self.audit is not None and (self.audit_allows or verdict.decision != Decision.ALLOW):
@@ -210,6 +247,9 @@ class TrustKernel:
                     # Only when the decider had a number: a column of ``None`` would read as "the
                     # rules were unsure", and the rules are never unsure.
                     **({"confidence": round(verdict.confidence, 4)} if verdict.confidence is not None else {}),
+                    # The band's own columns — which band, which backend and build, a raw reading
+                    # when it could not be a probability, the halt when the server was down.
+                    **(reading.audit() if reading is not None else {}),
                 },
             )
         return verdict

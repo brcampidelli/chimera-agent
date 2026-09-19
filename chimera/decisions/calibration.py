@@ -123,6 +123,9 @@ class PlattMap:
     """The labelled rows it was fitted on — a results file, a corpus name."""
     note: str = ""
     """The held-out numbers that justified it; the shipped ones cite the bench section."""
+    resolved_model: str = ""
+    """The build the rows came from, as the route names it (``qwen3:4b@Q4_K_M``); empty when the
+    rows did not record one. The Decider applies the map only to answers from the same build."""
 
     def apply(self, p: float) -> float:
         return sigmoid(self.a * logit(p) + self.b)
@@ -137,14 +140,14 @@ class PlattMap:
     @classmethod
     def fit(
         cls, pairs: Sequence[tuple[float, int]], *, decision: str, backend: str, model: str,
-        prompt_hash: str, source: str = "", note: str = "", fitted_at: str = "",
+        prompt_hash: str, source: str = "", note: str = "", fitted_at: str = "", resolved_model: str = "",
     ) -> PlattMap:
         a, b = fit_platt(pairs)
         when = fitted_at or time.strftime("%Y-%m-%d")
         return cls(
             id=f"{decision}/{backend}/{model}/{prompt_hash}/{when}", decision=decision, backend=backend,
             model=model, prompt_hash=prompt_hash, a=a, b=b, n=len(pairs), positives=sum(1 for _, y in pairs if y),
-            fitted_at=when, source=source, note=note,
+            fitted_at=when, source=source, note=note, resolved_model=resolved_model,
         )
 
 

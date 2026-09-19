@@ -28,6 +28,9 @@ from chimera.decisions.local import LocalLogprobBackend  # noqa: E402
 
 DEFAULT_ROWS = Path(__file__).resolve().parent / "results" / "2026-09-19-local-L.jsonl"
 MODEL = "qwen3:4b"
+# The rows did not record the build; `/api/tags` on the machine that produced them, 2026-09-19: digest
+# 359d7dd4bcda…, 4.0B, Q4_K_M. A refit on rows from another quantisation names its own.
+RESOLVED_MODEL = "qwen3:4b@Q4_K_M"
 
 
 def calibration_pairs(path: Path) -> list[tuple[float, int]]:
@@ -51,6 +54,7 @@ def fit(path: Path = DEFAULT_ROWS) -> PlattMap:
             "(floor 0.08), catch 20/24 at FR 6/31 at τ = 0.5 — the hosted judge's operating point at US$ 0"
         ),
         fitted_at="2026-09-19",
+        resolved_model=RESOLVED_MODEL,
     )
 
 
