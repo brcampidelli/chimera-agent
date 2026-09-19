@@ -91,8 +91,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- weak: near-free probes. Cheap first drafts, k-sample agreement. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash", "weak", "DeepSeek",
-        0.0886, 0.1772, tools=True, context_k=1024,
-        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo",
+        0.0886, 0.1772, tools=True, context_k=1024, also_seen=((0.04844, 0.09688),),
+        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row); the live check accepts either",
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
@@ -166,8 +166,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- top: orchestrator/judge class. Decompose, adjudicate, synthesize. ---
     CatalogEntry(
         "openrouter/z-ai/glm-5.3", "top", "Zhipu (GLM)",
-        1.40, 4.40, tools=True, context_k=1048,
-        notes="the top rung of `balanced` and `auto` since 2026-09-03, and the reason is the slug below rather than this one: R1 carried a 64k window into a tier that asks for 100k. This has 1310k, a third-party agentic index of 59.1 against R1's 3.1, and wrote a file in 51s against R1's 209s. It costs twice as much per token and buys a working top tier",
+        1.40, 4.40, tools=True, context_k=1048, also_seen=((0.91, 2.86),),
+        notes="the top rung of `balanced` and `auto` since 2026-09-03, and the reason is the slug below rather than this one: R1 carried a 64k window into a tier that asks for 100k. This has 1310k, a third-party agentic index of 59.1 against R1's 3.1, and wrote a file in 51s against R1's 209s. It costs twice as much per token and buys a working top tier. The index read 0.91/2.86 on 2026-09-19 — a second route at two thirds of the price; the live check accepts either",
     ),
     CatalogEntry(
         "openrouter/deepseek/deepseek-r1", "top", "DeepSeek",

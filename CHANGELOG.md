@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Two catalogue rows learn the second route's price, so the live check on `main` is green again.** The merge commit of #516 went red on the one test that runs only on `main` — the live OpenRouter index against the catalogue — because two slugs were being quoted from a route the rows had never seen: `deepseek/deepseek-v4-flash` at 0.04844/0.09688 against the row's 0.0886/0.1772, and `z-ai/glm-5.3` at 0.91/2.86 against 1.40/4.40. Same mechanism as #449 (a slug served by two routes flips between two figures, and the check accepts any price a row has been seen at): both rows carry the new pair in `also_seen`, with the date in the note. Verified against the real index: the check fails on the previous rows and passes on these. Receipts are priced from the live index; these rows are the fallback.
+
 ## [0.59.0] - 2026-09-18
 
 ### Added
