@@ -23,6 +23,13 @@ piece is the way it is, all probed before an item was scored (§2ad):
 the bench read it. Raw, the model is saturated (Brier 0.268, bin 1.00 → 0.91); the shipped map is
 what makes it a probability. A server that is off, or a model that is not pulled, raises — the
 Decider records the halt and the caller keeps its other layers.
+
+Two things study 21 added. **The build on the receipt**: a tag is whatever was last pulled, and
+quantisation moved an open 4B's balanced accuracy by 2.4 points (SemIf, q4 against bf16), so the
+backend asks ``/api/show`` once and names the answer ``<tag>@<quantization_level>`` — the string the
+shipped map was fitted on, and the string the Decider compares before applying it. **One client for
+the backend's lifetime**: the first version opened a connection per call, and the 0.75 s the bench
+measured includes that handshake; the floor is re-read with the client kept.
 """
 
 from __future__ import annotations
@@ -64,7 +71,8 @@ class LocalLogprobBackend:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_s = timeout_s
-        self._client = client
+        self._client = client if client is not None else httpx.Client()
+        self._resolved: str | None = None
 
     # -- the instrument -------------------------------------------------------------------------
     def system_text(self, question: Choice) -> str:
@@ -95,20 +103,31 @@ class LocalLogprobBackend:
         }
 
     # -- the call -------------------------------------------------------------------------------
+    def _budget(self) -> httpx.Timeout:
+        return httpx.Timeout(self.timeout_s, connect=_connect_budget(self.base_url, self.timeout_s))
+
+    def resolved_model(self) -> str:
+        """``<tag>@<quantization_level>`` from ``/api/show``, asked once; ``""`` when the server does
+        not say (an older Ollama, a model without details) — then no build check can be made, and the
+        receipt shows the tag alone."""
+        if self._resolved is None:
+            try:
+                response = self._client.post(f"{self.base_url}/api/show", json={"model": self.model}, timeout=self._budget())
+                response.raise_for_status()
+                details = (response.json() or {}).get("details") or {}
+                quant = str(details.get("quantization_level") or "").strip()
+                self._resolved = f"{self.model}@{quant}" if quant else ""
+            except Exception:  # noqa: BLE001 — the build is a fact for the receipt, never a reason to fail the call
+                self._resolved = ""
+        return self._resolved
+
     def ask(self, state: str, question: Question) -> Reading:
         question = as_choice(question)
-        budget = httpx.Timeout(self.timeout_s, connect=_connect_budget(self.base_url, self.timeout_s))
-        client = self._client or httpx.Client()
-        try:
-            response = client.post(f"{self.base_url}/api/chat", json=self.body(state, question), timeout=budget)
-            response.raise_for_status()
-            data = response.json()
-        finally:
-            if self._client is None:
-                client.close()
-        return self.read(data, question)
+        response = self._client.post(f"{self.base_url}/api/chat", json=self.body(state, question), timeout=self._budget())
+        response.raise_for_status()
+        return self.read(response.json(), question, resolved_model=self.resolved_model())
 
-    def read(self, data: dict[str, Any], question: Choice) -> Reading:
+    def read(self, data: dict[str, Any], question: Choice, *, resolved_model: str = "") -> Reading:
         """The reading off one response body — separable so the bench and the tests share it."""
         message = data.get("message") or {}
         content = str(message.get("content") or "")
@@ -148,4 +167,7 @@ class LocalLogprobBackend:
                 shares, mass = read.shares, read.mass
                 if question.event:
                     p = sum(shares.get(o, 0.0) for o in question.event)
-        return Reading(choice=choice, shares=shares, p=p, mass=mass, usd=0.0, raw=content[:200], logprobs_came=bool(logprobs))
+        return Reading(
+            choice=choice, shares=shares, p=p, mass=mass, usd=0.0, raw=content[:200], logprobs_came=bool(logprobs),
+            resolved_model=resolved_model,
+        )
