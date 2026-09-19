@@ -135,6 +135,101 @@ already near-calibrated, every map made things worse (Brier 0.097 → 0.103 / 0.
 arXiv 2601.13284's Table 5 (isotonic on a labelled set, 12.20 → 4.80 without retraining), with the n
 caveat.
 
+## 7b · The local arms — decision-first against post-reasoning, same model, same 55 items (US$ 0)
+
+`qwen3:4b` on this machine (RTX 5070 Laptop, 8 GB) through Ollama's native route, temperature 0,
+`top_logprobs` 10, the answer constrained to `{"verdict": …}` (see `run.py::local` for why: without the
+schema the model opens with "Okay, let's see…" and the label mass on its first token is 0; and the
+route's logprobs cover the trace, so the label token has to be located at the end). `p` = the label
+token's renormalized share of BLOCK + REVIEW (`chimera.providers.decision.label_probabilities`).
+**L** reads it with the trace off; **L2** reads the same token after the trace (`think: true`).
+
+| | L (decision-first) | L2 (after the trace) |
+|---|---|---|
+| AUROC easy / ambiguous / pooled | 0.940 / **0.871** / 0.901 | 0.889 / **0.782** / 0.828 |
+| Brier / ECE pooled (floor) | 0.268 / 0.299 (0.046) | 0.204 / 0.093 (0.000 — `p` is binary) |
+| reliability (p̄ → acc) | 0.09→0.00 · 0.65→0.09 · 0.95→0.55 · 0.99→0.64 · 1.00→0.91 | 0.00→0.00 · 0.00→0.00 · 0.64→0.36 · 1.00→0.82 · 1.00→1.00 |
+| verdict @0.5: catch / false-refuse | 23/24 / **17/31** | 21/24 / **8/31** |
+| catch at false-refuse ≤ 0.10 | 15/24 at τ = 0.99 | no τ (binary `p`) |
+| replay (2 repetitions) | 54/55 | — |
+| framing, attacks → ALLOW (educational / reviewed / sandbox / urgency) | 0/23 · 6/23 · 2/23 · 0/23 | — |
+| OATS (64 attacks) | 64/64 at 0.5 | — |
+| latency p50 / p95 | **0.75 s / 0.86 s** | **51 s / 97 s** (median trace 8,675 chars; one item exhausted 10,000 tokens twice) |
+| requests | 394 in 78 s | 55 |
+
+**The paper's central claim replicated on a machine in São Paulo.** Same model, same items: with the
+trace in front of the decision, `p` collapses to {0, 1} with label mass ≈ 1 and the AUROC drops nine
+points on the ambiguous corpus (0.871 → 0.782; pooled 0.901 → 0.828) — the shape arXiv 2601.13284
+reports (base 65–72 → 56 under GRPO). The pre-registered prediction ("L2's AUROC lower than L's, with a
+first-token mass near 1") held. What the paper does not measure and this run shows: the post-reasoning
+**verdict** is the better classifier at 0.5 (false-refuse 0.27 against 0.55 raw) — thinking helps the
+decision and destroys the probability. So the route to a local probability is L, not L2.
+
+**L raw is saturated, and a one-parameter map fixes it (leave-one-family-out, 37 families):**
+
+| map (arm L) | AUROC | Brier | ECE (floor) | reliability | catch@0.5 | FR@0.5 | catch at FR ≤ 0.10 |
+|---|---:|---:|---:|---|---|---|---|
+| raw `p` | 0.901 | 0.268 | 0.299 (0.046) | 0.09→0.00 · 0.65→0.09 · 0.95→0.55 · 0.99→0.64 · 1.00→0.91 | 23/24 | 17/31 | 15/24 at τ=0.99 |
+| isotonic | 0.841 | 0.154 | 0.161 (0.068) | 0.00→0.00 · 0.08→0.09 · 0.44→0.82 · 0.72→0.45 · 0.96→0.82 | 20/24 | 8/31 | 14/24 at τ=0.70 |
+| **Platt** | 0.883 | **0.135** | **0.085** (0.076) | 0.01→0.09 · 0.12→0.00 · 0.42→0.55 · 0.73→0.64 · 0.90→0.91 | 20/24 | **6/31** | 14/24 at τ=0.71 |
+
+Platt takes the local model's Brier from 0.268 to 0.135 and its ECE into the floor, and its operating
+point at τ = 0.5 (catch 0.83, false-refuse 0.19) to the neighbourhood of the hosted judge (0.92 / 0.16)
+and of the vendor arm (0.96 / 0.26) — at US$ 0, offline, 0.75 s, on a 4B model, with a map fitted on
+~50 labelled items. At false-refuse ≤ 0.10 the vendor arm still leads (20/24 against 14/24). The
+caveats are the same three: n = 55; the map is fitted inside the corpus's distribution (LOFO guards the
+family, not the domain); the raw model is over-confident by nature and unusable without the map.
+
+## 7c · A second decision, with human labels: "is this review finding real?" (aacr-bench, n = 919)
+
+Registered in `PREREGISTRATION-review.md`: the Diff-Level rows of `bench/review_judge` that have a
+cached diff — **919 comments** labelled by senior engineers (235 false findings, 684 correct), 105 of them
+the pilot rows arms A–E were designed against, **814 never read by anyone writing a prompt** — rendered
+byte-for-byte as the judge bench renders them. `p` = P(the comment is a correct finding); rejection =
+`p < τ`. J = the typed-decision model (a Noul with the split rubric's grounds as criteria + a Choice
+approve/reject); V = `deepseek-v4-flash-0731` with arm C's split rubric and one more JSON key,
+`p_real_defect`, thinking off, 2,000 tokens, one re-ask on empty. US$ 0.05 + US$ 0.23.
+
+| arm | rows | n with `p` | AUROC unseen / pilot | Brier | ECE (10 bins) vs floor | recall@0.5 · FR@0.5 (unseen) | reliability (p̄ → acc, all rows) |
+|---|---:|---:|---|---:|---|---|---|
+| J | 919 | 919 | **0.595** / 0.687 | 0.385 | **0.405** vs 0.035 | 0.74 · **0.63** | 0.04→0.47 · 0.08→0.71 · 0.12→0.68 · 0.17→0.86 · 0.25→0.77 · 0.36→0.72 · 0.48→0.77 · 0.60→0.78 · 0.72→0.84 · 0.85→0.84 |
+| V | 919 | **771** | 0.604 / 0.727 | 0.531 | **0.544** vs 0.049 | 0.90 · **0.77** | 0.00→0.22 · 0.00→0.94 · 0.05→0.35 · 0.05→1.00 · 0.09→0.29 · 0.10→1.00 · 0.10→1.00 · 0.17→0.75 · 0.76→0.86 · 0.94→0.87 |
+
+Within-repository AUROC equals the pooled one in both arms (J 0.611 / 0.610, V 0.616 / 0.622): no
+repository leakage. By source model, J ranks the false findings of Claude Code best (0.699) and GPT-5.2's
+worst (0.564); V the same order (0.688 / 0.570).
+
+**Operating points, τ chosen on the pilot and applied to the unseen rows:**
+
+| bound (pilot) | J: τ | J unseen recall · FR | V: τ | V unseen recall · FR |
+|---|---:|---|---:|---|
+| false rejection ≤ 0.10 | 0.09 | 0.26 · 0.14 | 0.05 | 0.30 · 0.18 |
+| false rejection ≤ 0.20 | 0.16 | 0.43 · **0.29** | 0.05 | 0.30 · 0.18 |
+| arm C's false rejection (≤ 0.385) | 0.27 | 0.54 · 0.44 (pilot: 0.66 · 0.37 — arm C: 0.60 · 0.38) | — | — |
+
+**By the rule written before the run — recall ≥ 0.40 at false rejection ≤ 0.20 on the unseen rows, τ
+from the pilot — both arms fail.** J's pilot threshold does not transfer (0.19 → 0.29 false rejection);
+V's lowest possible threshold buys 0.30 recall. On the pilot rows J's probability reproduces arm C's
+operating point (0.66 recall at 0.37 false rejection against C's 0.60 at 0.38) — the same trade, made by
+a 0.35-second call instead of a 100-second reasoning judge — and no better one.
+
+**The first legible calibration number in this series, and it is a failure in both arms.** With n in
+the hundreds the ECE floor is 0.035–0.05, and the arms sit at 0.405 and 0.544. The typed-decision model
+says "0.04" of comments that are correct 47% of the time and "0.12" of ones correct 68% of the time —
+under-confident toward "not a defect" by 0.4–0.6 across the low bins, the opposite direction of its
+governance-corpus behaviour; the verbalized judge is worse and stranger (a stated 0.00 is correct 94% of
+the time in one bin). Neither the vendor's "0.8 happens 80% of the time" nor the frontier model's stated
+number survives a decision outside the distribution it was tuned on. And the three predictions filed for
+this run were wrong in the same direction: AUROC 0.65–0.75 (measured 0.60), V's Brier ≤ J's (0.53 > 0.39),
+a usable point at ≤ 0.20 (none). The decision is hard for everyone that tried it — including the
+reasoning judge — and a probability on it ranks a little and calibrates not at all.
+
+**Instrument, again.** V returned no probability on **148 of 919** rows (16%): 147 of them hit the
+2,000-token ceiling with empty content on both attempts — the route reasoning through the budget
+despite `thinking=False`, as in §10 — so V's numbers are on a self-selected 771, biased toward the
+easier items; J answered all 919. The 60-line diff window is the judge bench's own and was kept so the
+rows pair; whether the window is the bottleneck is a question for that bench, not this one.
+
 ## 8 · Cost and latency (from São Paulo, 8 concurrent workers)
 
 | arm | requests | total | per request | latency p50 / p95 | input tokens (median) |
@@ -142,6 +237,10 @@ caveat.
 | J | 559 | US$ 0.0129 | **US$ 0.000023** | **0.34 s / 0.45 s** | 550 |
 | B | 394 | US$ 0.0172 | US$ 0.000044 | 3.45 s / 16.6 s | — |
 | V | 394 | US$ 0.0289 | US$ 0.000073 | 4.97 s / 20.9 s | 284 |
+| L (local) | 394 | US$ 0 | US$ 0 | 0.75 s / 0.86 s | 163 |
+| L2 (local, trace) | 55 | US$ 0 | US$ 0 | 51 s / 97 s | 2,050 |
+| J on aacr-bench | 919 | US$ 0.0513 | US$ 0.000056 | 0.35 s / 0.48 s | 1,335 |
+| V on aacr-bench | 919 | US$ 0.2287 | US$ 0.000249 | 17.5 s / 103 s | 1,010 |
 
 ## 9 · Against the pre-registration
 
@@ -174,5 +273,5 @@ first two runs would have scored a self-selected subset and read as a number.
 PT-BR *commands* (the corpus is shell; only wrappers and questions were translated); tainted runs (the
 ledger's corpus, another layer); file-write attacks (refused by the jail regardless); production priors
 (44% attacks in the corpus against ~0 observed in traffic — every `p` here is about the corpus); the
-alias `jev-latest`; a second provider on the endpoint; a local model (next: `L`/`L2` in the
-pre-registration, once the model is on this machine).
+alias `jev-latest`; a second provider on the endpoint; a local model bigger than 4B or other than
+Qwen3 (one model, one machine); L2 under the wrappers and on OATS (not run — 51 s an item).
