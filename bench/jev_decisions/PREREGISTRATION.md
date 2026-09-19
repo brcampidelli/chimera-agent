@@ -11,7 +11,9 @@ local decision-first model and a verbalized hosted one without changing the corp
 this run goes through OpenRouter's Decisions API under OpenRouter's terms, whose reading on that point is
 not done. So: the numbers are **measured to decide, held privately** (session scratchpad, memory), and
 enter `RESULTS.md` only once the governing terms are read. The pre-registration is published because it
-contains no result.
+contains no result. *(Read later the same day — `RESULTS.md` opens with the reading: the terms OpenRouter
+binds a customer to for this provider are the vendor's website Terms of Use, which carry no such clause;
+the MCA binds the vendor's direct customers. Published on that basis, with the owner's word.)*
 
 ## Corpus — the instrument the project already measured
 
@@ -113,3 +115,30 @@ alias `jev-latest` (pinned on purpose); a second provider on the endpoint (none 
    has — `max_tokens=2000` and one re-ask on empty — and completed 394/394 with a probability, 0 halts,
    US$ 0.029. The report uses J and B from run 1 and V from run 3; runs 1–2 of V are kept as instrument
    evidence, not scored.
+
+## Follow-ups (exploratory — run after the registered design, no numeric prediction filed)
+
+Three cheap follow-ups on the same 55 two-sided items, added to `run.py` as `--wrapper-set urgency4`,
+`--wrapper-set ptbr` and `--questions ptbr`, and read by `report_followup.py` against the registered
+run's unwrapped first repetition. They were motivated by the registered run's own findings (the
+"urgency" wrapper moving benign actions on the vendor arm; the vendor's "English is the primary
+training language") and are reported as exploratory: the hypotheses were stated in study 20's plan,
+the numbers were not predicted in advance. Wrapper sets: **urgency4** = the registered urgency
+sentence, one urgent sentence without the word "production" (a customer waiting), one deadline, and
+the word "production" without any urgency; **ptbr** = the four registered wrappers in Brazilian
+Portuguese; **questions ptbr** = the vendor arm's two questions in Portuguese, unwrapped and under
+the Portuguese wrappers. ~1,600 requests, held with the other results.
+
+## Local arms (added after A1 landed the reader, `chimera.providers.decision.label_probabilities`)
+
+**L** — `qwen3:4b` through Ollama's OpenAI-compatible route (logprobs from v0.12.11), the judge's
+system prompt plus Qwen3's `/no_think` switch, temperature 0, `top_logprobs` 10; `p` is the
+renormalized share of BLOCK+REVIEW on the **first** token, with the label mass beside it. **L2** — the
+same call with the trace on: Ollama returns it in `reasoning`, so the first *content* token is the
+post-reasoning decision token — the quantity arXiv 2601.13284 measured as extraction. Two repetitions
+each (T = 0 is deterministic; the second is the replay check). `--probe-local` prints, before any item
+is scored, whether logprobs came back at all and whether `/no_think` emptied the trace (§2ad: the
+route's semantics are a variable of the experiment). Prediction, filed before running: L's AUROC on
+the ambiguous corpus 0.75–0.88, below J and V; L2's AUROC **lower than L's** on the same items, with a
+first-token mass near 1 (the paper's saturation) — if L2 ≥ L, the paper's central claim did not
+replicate here and that is the finding.
