@@ -11,7 +11,9 @@ local decision-first model and a verbalized hosted one without changing the corp
 this run goes through OpenRouter's Decisions API under OpenRouter's terms, whose reading on that point is
 not done. So: the numbers are **measured to decide, held privately** (session scratchpad, memory), and
 enter `RESULTS.md` only once the governing terms are read. The pre-registration is published because it
-contains no result.
+contains no result. *(Read later the same day — `RESULTS.md` opens with the reading: the terms OpenRouter
+binds a customer to for this provider are the vendor's website Terms of Use, which carry no such clause;
+the MCA binds the vendor's direct customers. Published on that basis, with the owner's word.)*
 
 ## Corpus — the instrument the project already measured
 
