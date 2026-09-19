@@ -874,6 +874,25 @@ class Settings(BaseSettings):
     # gets discovered in production instead of in a report.
     governance_mode: str = Field(default="off", validation_alias="CHIMERA_GOVERNANCE")
 
+    # --- Typed decisions (`chimera.decisions`): which backend answers a Noul / Choice / Score, and
+    # which model. Nothing consumes a decision on a default install yet — the kernel's REVIEW band,
+    # the verifier, the voice router each arrive with their own measurement — so these choose the
+    # instrument, not whether one is used.
+    #
+    # `local_logprob` (the default): a small instruct model through Ollama, decision-first, read by
+    # logprobs and passed through the map the package ships. Measured on the governance corpus
+    # (`bench/jev_decisions/RESULTS.md` §7b): the hosted judge's operating point at US$ 0 and 0.75 s.
+    # `hosted_verbalized`: the fusion judge model asked for a verbalized probability, reasoning off
+    # (§4–§6: AUROC 0.886, ECE 0.051 raw, 4–5 s). `openrouter_decisions`: OpenRouter's Decisions
+    # API with a typed-decision model behind it — deterministic and 0.34 s, over-confident mid-scale
+    # without a map, refuses benign work under pressure framing (§8) — opt-in, fails closed per call.
+    #
+    # The model is the backend's measured default when empty: `qwen3:4b`, the fusion judge, or
+    # `typesafe/jev-1.13`. A different model is a different instrument: the shipped map is keyed on
+    # the model and does not apply to another, and the receipt says so (`calibrated: false`).
+    decision_backend: str = Field(default="local_logprob", validation_alias="CHIMERA_DECISION_BACKEND")
+    decision_model: str = Field(default="", validation_alias="CHIMERA_DECISION_MODEL")
+
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.
     #
