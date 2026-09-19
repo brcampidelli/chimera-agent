@@ -1028,12 +1028,19 @@ app.add_typer(measure_app, name="measure")
 def guard(action: str = typer.Argument(..., help="The action/command to evaluate.")) -> None:
     """Show the governance verdict (allow/warn/review/block) for an action."""
     from chimera.governance import TrustKernel
+    from chimera.governance.band import band_enabled, build_band
 
-    verdict = TrustKernel().evaluate(action)
+    # The band when the deployment turned it on — the one place to see the number an action gets
+    # before any surface enforces it: `CHIMERA_GOVERNANCE=observe CHIMERA_GOVERNANCE_BAND=on chimera
+    # guard "docker system prune -af"`.
+    settings = get_settings()
+    kernel = TrustKernel(band=build_band(settings) if band_enabled(settings) else None)
+    verdict = kernel.evaluate(action)
     colors = {"allow": "green", "warn": "yellow", "review": "yellow", "block": "red"}
     color = colors[verdict.decision.value]
     detail = f" (rule: {verdict.rule})" if verdict.rule else ""
-    console.print(f"[{color}]{verdict.decision.value.upper()}[/{color}] {verdict.reason}{detail}")
+    number = f" p={verdict.confidence:.2f}" if verdict.confidence is not None else ""
+    console.print(f"[{color}]{verdict.decision.value.upper()}[/{color}]{number} {verdict.reason}{detail}")
 
 
 @app.command()

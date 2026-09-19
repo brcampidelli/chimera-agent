@@ -70,6 +70,7 @@ class HostedVerbalizedBackend:
 
         usd = 0.0
         text = ""
+        resolved = ""
         for _attempt in range(2):
             result = self.gateway.complete(
                 [{"role": "system", "content": self.system_text(question)}, {"role": "user", "content": state}],
@@ -79,11 +80,12 @@ class HostedVerbalizedBackend:
             if not cost.unpriced:
                 usd += cost.usd
             text = result.content or ""
+            resolved = str(getattr(result, "model", "") or "")
             if text.strip():
                 break
-        return self.read(text, question, usd=usd)
+        return self.read(text, question, usd=usd, resolved_model=resolved)
 
-    def read(self, text: str, question: Choice, *, usd: float | None = None) -> Reading:
+    def read(self, text: str, question: Choice, *, usd: float | None = None, resolved_model: str = "") -> Reading:
         p: float | None = None
         choice: str | None = None
         written = ""
@@ -107,4 +109,4 @@ class HostedVerbalizedBackend:
             if found:
                 last = found[-1].casefold()
                 choice = next((o for o in question.options if o.casefold() == last), None)
-        return Reading(choice=choice, shares=None, p=p, usd=usd, raw=text[:200], logprobs_came=None)
+        return Reading(choice=choice, shares=None, p=p, usd=usd, raw=text[:200], logprobs_came=None, resolved_model=resolved_model)

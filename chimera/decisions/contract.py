@@ -127,6 +127,11 @@ class Reading:
     """The first 200 characters the model wrote, for the reader who checks."""
     logprobs_came: bool | None = None
     """Whether the route returned token log-probabilities — ``None`` where the question is moot."""
+    resolved_model: str = ""
+    """The build that actually answered, as the route names it — ``jev-1.13-20260917`` behind the
+    alias ``typesafe/jev-1.13``, ``qwen3:4b@Q4_K_M`` behind the tag ``qwen3:4b``. Empty when the
+    route does not say (every gateway in study 21 hid it). A map is fitted on one build; the Decider
+    refuses to apply it to another."""
 
 
 @runtime_checkable
@@ -170,6 +175,10 @@ class Answer:
     halt: str | None = None
     raw: str = ""
     logprobs_came: bool | None = None
+    resolved_model: str = ""
+    """The build that answered, when the route names it (see :attr:`Reading.resolved_model`)."""
+    note: str = ""
+    """Why a map that exists was not applied — the build differs from the one it was fitted on."""
 
     @property
     def answered(self) -> bool:
@@ -204,6 +213,10 @@ class Answer:
             out["logprobs_came"] = self.logprobs_came
         if self.usd is not None:
             out["usd"] = self.usd
+        if self.resolved_model:
+            out["resolved_model"] = self.resolved_model
+        if self.note:
+            out["note"] = self.note
         if self.halt:
             out["halt"] = self.halt
         return out
@@ -231,13 +244,23 @@ class Decider:
         raw_p = reading.p
         if raw_p is not None:
             raw_p = min(max(float(raw_p), 0.0), 1.0)
-        p = found.apply(raw_p) if (found is not None and raw_p is not None) else raw_p
+        # A map fitted on one build does not apply to another. The alias the map is keyed on can move
+        # (the vendor's ``jev-1.13`` resolved to ``jev-1.13-20260917`` on 09-19; an Ollama tag is
+        # whatever was last pulled), and every gateway in study 21 hid the build — so when both sides
+        # name one and they differ, the number is a prior, not a calibrated probability, and the
+        # receipt says so (§2ad: the API's semantics are part of the experiment).
+        note = ""
+        usable = found
+        if found is not None and found.resolved_model and reading.resolved_model and found.resolved_model != reading.resolved_model:
+            note = f"map fitted on {found.resolved_model}, this answer came from {reading.resolved_model}"
+            usable = None
+        p = usable.apply(raw_p) if (usable is not None and raw_p is not None) else raw_p
         return Answer(
             decision=decision, key=choice.key, backend=self.backend.name, model=self.backend.model,
             prompt_hash=digest, choice=reading.choice, shares=reading.shares, raw_p=raw_p, p=p,
-            calibrated=found is not None and raw_p is not None, map=found.id if found is not None else None,
+            calibrated=usable is not None and raw_p is not None, map=found.id if found is not None else None,
             mass=reading.mass, seconds=seconds, usd=reading.usd, halt=halt, raw=reading.raw,
-            logprobs_came=reading.logprobs_came,
+            logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
         )
 
     def has_map(self, decision: str, question: Question) -> bool:

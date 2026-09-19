@@ -176,6 +176,7 @@ def govern_step(
         deliverer_for,
         nobody_is_at_a_terminal,
     )
+    from chimera.governance.band import band_enabled, build_band
     from chimera.governance.governed_tool import govern_registry
 
     resolved = (mode or settings.governance_mode or "off").strip().lower()
@@ -250,9 +251,15 @@ def govern_step(
             # to reason about twice.
             approve = approver_for(wanted, approvals, home=home, deliver=deliver)
 
+    # The REVIEW band, when the deployment turned it on (`band.py`): built here, once per assembly,
+    # for the same reason the kernel is — every surface goes through this function, and a band
+    # whose decider held a client per surface would open one per tool call. Under `observe` its
+    # REVIEWs reach the allow-everything approver above and land in `approvals.granted`: recorded,
+    # not enforced — the price of the band, measured on the deployment's own traffic.
+    band = build_band(settings) if band_enabled(settings) else None
     registry = govern_registry(
         registry,
-        TrustKernel(audit=audit, audit_allows=audit_allows),
+        TrustKernel(audit=audit, audit_allows=audit_allows, band=band),
         approve=approve,
         ledger=approvals,
         no_approver=no_approver,

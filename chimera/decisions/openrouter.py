@@ -45,7 +45,9 @@ class OpenRouterDecisionsBackend:
         self.model = model
         self.url = url
         self.timeout_s = timeout_s
-        self._client = client
+        # Kept for the backend's lifetime: a connection per call paid a TLS handshake per decision,
+        # and the ecosystem's 167–196 ms medians (study 21) were all measured over a kept connection.
+        self._client = client if client is not None else httpx.Client()
 
     @staticmethod
     def question_body(question: Question) -> dict[str, Any]:
@@ -71,15 +73,9 @@ class OpenRouterDecisionsBackend:
         return {"model": self.model, "state": state, "questions": {key: self.question_body(question)}}
 
     def ask(self, state: str, question: Question) -> Reading:
-        client = self._client or httpx.Client()
-        try:
-            response = client.post(self.url, json=self.body(state, question), headers=self._headers, timeout=self.timeout_s)
-            response.raise_for_status()
-            data = response.json()
-        finally:
-            if self._client is None:
-                client.close()
-        return self.read(data, question)
+        response = self._client.post(self.url, json=self.body(state, question), headers=self._headers, timeout=self.timeout_s)
+        response.raise_for_status()
+        return self.read(response.json(), question)
 
     def read(self, data: dict[str, Any], question: Question) -> Reading:
         choice_q = as_choice(question)
@@ -87,9 +83,16 @@ class OpenRouterDecisionsBackend:
         answer = answers.get(question.key) or {}
         usage = data.get("usage") or {}
         usd = usage.get("cost")
+        # The build that answered — `typesafe/jev-1.13-20260917` behind the alias on 09-19. The bench
+        # stored it from the first run; the product did not until study 21 found every gateway hiding
+        # it. Empty when the route sends none.
+        resolved = str(data.get("model") or "").strip()
         if "noul" in answer:
             yes = min(max(float(answer["noul"]), 0.0), 1.0)
-            return Reading(choice="yes" if yes >= 0.5 else "no", shares={"yes": yes, "no": 1.0 - yes}, p=yes, usd=usd, raw=json.dumps(answer)[:200])
+            return Reading(
+                choice="yes" if yes >= 0.5 else "no", shares={"yes": yes, "no": 1.0 - yes}, p=yes, usd=usd,
+                raw=json.dumps(answer)[:200], resolved_model=resolved,
+            )
         probs = answer.get("probabilities") or {}
         shares: dict[str, float] | None = {o: float(probs.get(o, 0.0)) for o in choice_q.options} if probs else None
         written = str(answer.get("choice") or "")
@@ -99,4 +102,4 @@ class OpenRouterDecisionsBackend:
         p: float | None = None
         if shares is not None and choice_q.event:
             p = min(max(sum(shares.get(o, 0.0) for o in choice_q.event), 0.0), 1.0)
-        return Reading(choice=choice, shares=shares, p=p, usd=usd, raw=json.dumps(answer)[:200])
+        return Reading(choice=choice, shares=shares, p=p, usd=usd, raw=json.dumps(answer)[:200], resolved_model=resolved)
