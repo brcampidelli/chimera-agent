@@ -56,6 +56,10 @@ class OpenRouterDecisionsBackend:
             return {"type": "noul", "instructions": question.instructions, "criteria": dict(question.criteria)}
         choice = as_choice(question)
         body: dict[str, Any] = {"type": "choice", "instructions": choice.instructions}
+        # The API wants a criterion per option. A question that carries none (the governance
+        # question keeps its criteria inside the judge text, so the model backends' instrument
+        # stays the measured one) sends the option's name as its own criterion — a placeholder,
+        # and a reason a deployment that turns this backend on writes the question with criteria.
         body["criteria"] = {o: choice.criteria.get(o, o) for o in choice.options}
         return body
 
