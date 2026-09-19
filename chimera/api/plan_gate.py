@@ -127,6 +127,7 @@ def gate(
     on_asked: Any = None,
     wait_seconds: float,
     ask: Any = None,
+    facts: dict[str, Any] | None = None,
 ) -> PlanVerdict:
     """Propose a plan, show it, and wait for a person. Returns what was decided.
 
@@ -160,6 +161,9 @@ def gate(
             on_asked=on_asked,
             wait_seconds=wait_seconds,
             decision="review",
+            # Only when the caller named any: the injected `ask` of the tests takes the same
+            # keywords the durable one does, and a `facts=None` it never asked for is noise.
+            **({"facts": facts} if facts else {}),
         )
     )
     return PlanVerdict(

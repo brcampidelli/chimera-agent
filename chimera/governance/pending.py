@@ -160,11 +160,20 @@ def ask_durably(
     clock: Any = time.monotonic,
     sleep: Any = time.sleep,
     decision: str = "review",
+    facts: dict[str, Any] | None = None,
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
 
     ``decision`` is the level of the verdict that raised it; it orders the queue (:func:`pending`)
     and is kept on the record, so the answer rate can be read per level.
+
+    ``facts`` are the keys of :data:`FACTS` the caller can name — which run asked, on which surface,
+    which tool, which rule or which tainted sources raised the question — and they go on the record
+    line untouched. Without them the history could not be joined to anything: measured on one
+    installed copy on 2026-09-18, 43 lines of ``history.jsonl`` held an action, a reason and an
+    outcome, and nothing that said which turn they belonged to or what the run went on to do, so
+    "the person said yes in 8 s" could not be put beside "and the turn verified", which is the only
+    pairing that turns an answer into a label (`bench/PLAN-study20-calibrated-decisions.md` §2.6).
 
     Returns False on timeout, on an unreadable answer, and on any failure to write the question —
     every path that is not an explicit yes. That is the same rule the terminal prompt follows, and
@@ -232,7 +241,7 @@ def ask_durably(
                 outcome = "unreadable"
             _record(
                 directory, request_id, action, reason, asked_at, outcome, answered_at,
-                decision=decision,
+                decision=decision, facts=facts,
             )
             _cleanup(directory, request_id)
             return decidido
@@ -242,7 +251,10 @@ def ask_durably(
         "approval request %s went unanswered for %.0fs; refusing. Action: %s",
         request_id, wait_seconds, action[:200],
     )
-    _record(directory, request_id, action, reason, asked_at, "timeout", None, decision=decision)
+    _record(
+        directory, request_id, action, reason, asked_at, "timeout", None,
+        decision=decision, facts=facts,
+    )
     _cleanup(directory, request_id)
     return False
 
@@ -256,6 +268,14 @@ HISTORY = "history.jsonl"
 #: one on call as a night of careful refusals.
 OUTCOMES = ("approved", "refused", "timeout", "unreadable")
 
+#: The facts a caller may attach to a record line, and the only ones written: which run asked
+#: (``run_id``, joins ``traces.jsonl`` and ``runs.jsonl``), on which surface (``surface``), which tool
+#: (``tool``), which lexical rule raised it (``rule``, a `Verdict`), whether the run was tainted
+#: (``lineage``) and where the taint came from (``sources``, a `SequenceAssessment`). Anything else a
+#: caller passes is dropped: the line is a record, not a bag, and a key that is not named here has
+#: no reader.
+FACTS = ("run_id", "surface", "tool", "rule", "lineage", "sources")
+
 
 def _record(
     directory: Path,
@@ -267,9 +287,10 @@ def _record(
     answered_at: float | None,
     *,
     decision: str = "review",
+    facts: dict[str, Any] | None = None,
 ) -> None:
     resolved_at = time.time()
-    line = {
+    line: dict[str, Any] = {
         "id": request_id,
         "action": action[:200],
         "reason": reason[:300],
@@ -284,6 +305,11 @@ def _record(
         "waited_seconds": max(0.0, resolved_at - asked_at),
         "outcome": outcome,
     }
+    for key in FACTS:
+        value = (facts or {}).get(key)
+        if value in (None, "", [], ()):
+            continue
+        line[key] = [str(v)[:200] for v in value][:8] if isinstance(value, (list, tuple)) else str(value)[:200]
     try:
         with (directory / HISTORY).open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(line, ensure_ascii=False) + "\n")

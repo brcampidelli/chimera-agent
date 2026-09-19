@@ -161,6 +161,24 @@ class CompletionResult(BaseModel):
     for an empty-argument failure, or for "describing a plan instead of acting", when the sentence
     was severed mid-word."""
 
+    logprobs: list[dict[str, Any]] | None = Field(default=None, repr=False)
+    """The token log-probabilities the route returned, one entry per generated token, as plain
+    dicts: ``{"token": str, "logprob": float, "top_logprobs": [{"token", "logprob"}, …]}``.
+
+    ``None`` means **none came** — and that is the reading to keep, because the request may have
+    asked for them: `complete(..., logprobs=True, top_logprobs=5)` reaches the provider through the
+    kwargs already, and OpenRouter forwards a request to a provider that does not support the
+    parameter and **drops it in silence** (its routing docs say so in as many words). A reasoning
+    route returns none either. So a caller that wants a probability out of a decision reads this
+    field, and reads ``None`` as *no signal* — never as 0.5, never as "the model was unsure". The
+    reader that turns the first token into a probability over a set of labels is
+    :func:`chimera.providers.decision.label_probabilities`; it says how much of the mass was on the
+    labels at all, which is the number that separates "the model chose ALLOW at 0.9" from "the
+    model was about to write a sentence and ALLOW was the likeliest first word".
+
+    Kept off ``repr`` like ``raw``: a decision call asks for the top five per token and a long
+    answer would drown a log line."""
+
     route_meta: dict[str, Any] | None = Field(default=None, repr=False)
     """Optional per-call fusion/cascade trace (UI-ready JSON). None for a plain single-model call."""
     raw: dict[str, Any] | None = Field(default=None, repr=False)
@@ -967,6 +985,11 @@ class LLMGateway:
             prompt_tokens = getattr(usage, "prompt_tokens", None)
             completion_tokens = getattr(usage, "completion_tokens", None)
             cache_read_tokens, cache_write_tokens = LLMGateway._extract_cache_tokens(usage)
+        logprobs: list[dict[str, Any]] | None = None
+        try:
+            logprobs = LLMGateway._extract_logprobs(response.choices[0])
+        except (AttributeError, IndexError, TypeError):
+            logprobs = None
         return CompletionResult(
             content=content,
             model=model,
@@ -979,7 +1002,45 @@ class LLMGateway:
             truncated=finish_reason == "length",
             provider=str(getattr(response, "provider", "") or ""),
             generation_id=str(getattr(response, "id", "") or ""),
+            logprobs=logprobs,
         )
+
+    @staticmethod
+    def _extract_logprobs(choice: Any) -> list[dict[str, Any]] | None:
+        """The choice's token logprobs as plain dicts, or ``None`` when the route sent none.
+
+        litellm hands them back as objects (``ChoiceLogprobs`` → ``content`` → token entries with
+        ``top_logprobs``) or, from some routes, as the raw dicts of the OpenAI shape. Both are read;
+        an entry without a numeric ``logprob`` is skipped rather than guessed. An empty ``content``
+        list is treated as none: a route that answered "logprobs: {content: []}" gave no signal."""
+        holder = getattr(choice, "logprobs", None)
+        if holder is None and isinstance(choice, dict):
+            holder = choice.get("logprobs")
+        if holder is None:
+            return None
+        content = getattr(holder, "content", None)
+        if content is None and isinstance(holder, dict):
+            content = holder.get("content")
+        if not content:
+            return None
+
+        def _field(obj: Any, name: str) -> Any:
+            return obj.get(name) if isinstance(obj, dict) else getattr(obj, name, None)
+
+        out: list[dict[str, Any]] = []
+        for entry in content:
+            token = _field(entry, "token")
+            logprob = _field(entry, "logprob")
+            if token is None or not isinstance(logprob, (int, float)):
+                continue
+            tops: list[dict[str, Any]] = []
+            for alt in _field(entry, "top_logprobs") or []:
+                alt_token = _field(alt, "token")
+                alt_logprob = _field(alt, "logprob")
+                if alt_token is not None and isinstance(alt_logprob, (int, float)):
+                    tops.append({"token": str(alt_token), "logprob": float(alt_logprob)})
+            out.append({"token": str(token), "logprob": float(logprob), "top_logprobs": tops})
+        return out or None
 
     @staticmethod
     def _extract_cache_tokens(usage: Any) -> tuple[int | None, int | None]:
