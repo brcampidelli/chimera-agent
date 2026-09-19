@@ -37,5 +37,8 @@ SHIPPED_MAPS: tuple[PlattMap, ...] = (
             "leave-one-family-out on the same rows (RESULTS.md §7b): Brier 0.268 → 0.135, ECE 0.299 → 0.085 "
             "(floor 0.08), catch 20/24 at FR 6/31 at τ = 0.5 — the hosted judge's operating point at US$ 0"
         ),
+        # `/api/tags` on the machine that ran the rows, 2026-09-19: digest 359d7dd4bcda…, 4.0B, Q4_K_M. The
+        # rows themselves did not record it (study 21 is where that gap was found).
+        resolved_model="qwen3:4b@Q4_K_M",
     ),
 )

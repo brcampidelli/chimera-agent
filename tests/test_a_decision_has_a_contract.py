@@ -195,11 +195,15 @@ def test_the_local_backend_reads_the_label_token_from_the_end_renormalized() -> 
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
+        if request.url.path == "/api/show":
+            return httpx.Response(200, json={"details": {"quantization_level": "Q4_K_M", "parameter_size": "4.0B"}})
         return httpx.Response(200, json=_ollama_body('{\n  "verdict": "ALLOW"\n}', "ALLOW", tops))
 
     backend = LocalLogprobBackend("http://127.0.0.1:11434", client=httpx.Client(transport=httpx.MockTransport(handler)))
     reading = backend.ask("rm -f /tmp/*.lock", DANGER)
-    assert seen[0].url.path == "/api/chat"
+    backend.ask("rm -f /tmp/*.lock", DANGER)
+    assert [r.url.path for r in seen] == ["/api/chat", "/api/show", "/api/chat"]  # the build asked once
+    assert reading.resolved_model == "qwen3:4b@Q4_K_M"
     assert reading.choice == "ALLOW" and reading.logprobs_came is True
     assert reading.shares is not None
     assert reading.shares["ALLOW"] == pytest.approx(0.90 / 0.97)
@@ -281,6 +285,7 @@ def test_the_openrouter_backend_keeps_a_noul_a_noul_and_reads_a_choice_s_probabi
     reading = backend.ask("rm -rf /", noul)
     assert seen[0] == {"model": "typesafe/jev-1.13", "state": "rm -rf /", "questions": {"danger": {"type": "noul", "instructions": "Would executing it be dangerous?", "criteria": {"true": "yes when…", "false": "no when…"}}}}
     assert reading.p == pytest.approx(0.73) and reading.choice == "yes" and reading.usd == 2.3e-5
+    assert reading.resolved_model == "typesafe/jev-1.13-20260917"  # the build behind the alias, when the route says
     reading = backend.ask("git push -f", DANGER)
     assert seen[1]["questions"]["verdict"]["type"] == "choice"
     assert reading.shares == {"BLOCK": 0.2, "REVIEW": 0.5, "ALLOW": 0.3} and reading.choice == "REVIEW"
@@ -327,6 +332,25 @@ def test_the_decider_applies_the_shipped_map_only_to_the_matching_instrument() -
     other_decision = Decider(same, CalibrationMaps.shipped())
     assert other_decision.decide("review.real_defect", "x", DANGER).calibrated is False
     assert other_decision.has_map(DECISION, DANGER) is True and other_decision.has_map("review.real_defect", DANGER) is False
+
+
+def test_a_map_fitted_on_one_build_is_not_applied_to_another_and_the_receipt_says_so() -> None:
+    """The alias a map is keyed on can move — `typesafe/jev-1.13` resolved to a dated build, an Ollama
+    tag is whatever was last pulled — and every gateway in study 21 hid the build. When both sides
+    name one and they differ, the number stays a prior."""
+    real = LocalLogprobBackend("http://127.0.0.1:11434", "qwen3:4b")
+    same_build = Reading(choice="BLOCK", shares=None, p=0.95, logprobs_came=True, resolved_model="qwen3:4b@Q4_K_M")
+    other_build = Reading(choice="BLOCK", shares=None, p=0.95, logprobs_came=True, resolved_model="qwen3:4b@Q8_0")
+    unnamed = Reading(choice="BLOCK", shares=None, p=0.95, logprobs_came=True)
+    maps = CalibrationMaps.shipped()
+    assert SHIPPED_MAPS[0].resolved_model == "qwen3:4b@Q4_K_M"
+    a = Decider(_Backend("local_logprob", "qwen3:4b", same_build, real.instrument(DANGER)), maps).decide(DECISION, "x", DANGER)
+    assert a.calibrated is True and a.receipt()["resolved_model"] == "qwen3:4b@Q4_K_M" and "note" not in a.receipt()
+    b = Decider(_Backend("local_logprob", "qwen3:4b", other_build, real.instrument(DANGER)), maps).decide(DECISION, "x", DANGER)
+    assert b.calibrated is False and b.p == b.raw_p == pytest.approx(0.95) and b.map == SHIPPED_MAPS[0].id
+    assert "Q8_0" in b.note and "Q4_K_M" in b.note and b.receipt()["note"] == b.note
+    c = Decider(_Backend("local_logprob", "qwen3:4b", unnamed, real.instrument(DANGER)), maps).decide(DECISION, "x", DANGER)
+    assert c.calibrated is True  # a route that names no build cannot be checked; the tag is what the map is keyed on
 
 
 def test_a_backend_that_raises_is_a_halt_on_the_answer_never_a_verdict() -> None:
@@ -399,9 +423,15 @@ def test_build_decider_reads_the_settings_and_a_user_s_refit_beats_the_shipped_m
 
 PACKAGE = pathlib.Path(__file__).resolve().parents[1] / "chimera"
 
-#: Sites allowed to build a Decider, each with the measurement that justified it. Empty is the
-#: decision: the kernel's REVIEW band, the verifier and the voice router each arrive with theirs.
-ALLOWED: dict[str, str] = {}
+#: Sites allowed to build a Decider, each with the measurement that justified it. The verifier and
+#: the voice router arrive with theirs.
+ALLOWED: dict[str, str] = {
+    "chimera/governance/band.py": (
+        "the REVIEW band (study 20 C1): on the 55-item governance corpus the calibrated local arm reaches the "
+        "hosted judge's operating point — catch 20/24 at 6/31 benign actions stopped, leave-one-family-out — at "
+        "US$ 0 and 0.3 s a call; off unless CHIMERA_GOVERNANCE_BAND=on under observe/enforce"
+    ),
+}
 
 
 def _decider_builders() -> list[tuple[str, int]]:
