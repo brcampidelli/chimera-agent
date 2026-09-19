@@ -30,7 +30,7 @@ import json
 import re
 import threading
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -73,12 +73,15 @@ from chimera.api.schemas import (
     TranscriberWarmOut,
     TranscriptOut,
     VisionOut,
+    WorkActionOut,
+    WorksOut,
 )
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.telemetry import get_logger
+from chimera.tools.base import Tool
 from chimera.tools.browser import FrameAnnouncer
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -277,6 +280,14 @@ _UPLOAD = File(...)
 _LANGUAGE_HINT = Form(None)
 _LANGUAGE_CODE = re.compile(r"[a-z]{2,3}")
 
+#: What a spoken sentence about the works looks like — the verbs the talking model has tools for.
+_WORK_CONTROL = re.compile(
+    r"\b(par[ae]|parar|pare|cancel[ae]r?|interromp[ae]r?|desfa[zç]|desfazer|revert[ae]r?|"
+    r"stop|cancel|undo|revert|status|andamento|terminou|acabou|como (est[aá]|vai|anda))\b",
+    re.IGNORECASE,
+)
+_ABOUT_WORKS = re.compile(r"\b(trabalhos?|works?|tarefas?|tasks?)\b", re.IGNORECASE)
+
 SPOKEN_NOTE = (
     "The person said this aloud, and your answer will be read to them by a voice before they see "
     "it on a screen. Answer for the ear: two to four short sentences of plain prose — no headings, "
@@ -467,6 +478,7 @@ def assemble_registry(
     approval_sink: Any = None,
     instruction: str | None = None,
     frame_sink: Any = None,
+    extra_tools: Sequence[Tool] | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -621,6 +633,11 @@ def assemble_registry(
         registry.register(
             ExploreRepositoryTool(gateway, ws, model=explore_model, max_turns=steps)
         )
+    # Tools the caller brings for THIS turn — the talking model's handles on the conversation's
+    # background works — registered here, before the kernel and the ledger wrap the registry, so
+    # they are governed and audited like every other tool rather than bolted on outside.
+    for extra in extra_tools or ():
+        registry.register(extra, replace=True)
     # `shared` binds several workers to ONE ledger. Independent tasks must not share it — that
     # would block a worker for something a sibling read — but workers collaborating on a single
     # task and merging into a single workspace must, because untrusted content one of them read
@@ -1093,6 +1110,13 @@ def register_code_api(
     live: Callable[[], Settings] = live_settings or (lambda: settings)
 
     store = CodeSessionStore(settings.home / "code_sessions")
+    # Background works (`chimera.api.works`): each runs on its own session record, kept apart from
+    # the conversations so the sidebar lists conversations and a work's transcript is reachable by
+    # its id. The manager is built once the launcher exists, below.
+    from chimera.api.works import WORKS_FILE, Work, WorkManager, WorkStore, work_tools
+
+    work_sessions = CodeSessionStore(settings.home / "code_works")
+    work_store = WorkStore(settings.home / WORKS_FILE)
     # A conversation shared with a second person (`chimera.api.sharing`): the tokens that open one
     # conversation each, and the bus every turn's frames go out on so the owner's screen and a
     # guest's both see a turn whoever started it.
@@ -1124,6 +1148,7 @@ def register_code_api(
         note: str = "",
         approval_sink: Any = None,
         frame_sink: Any = None,
+        extra_tools: Sequence[Tool] | None = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
@@ -1141,6 +1166,7 @@ def register_code_api(
             req, ws, live(), gateway, steps=steps, surface="api:turn", approval_sink=approval_sink,
             frame_sink=frame_sink,
             instruction=req.message,
+            extra_tools=extra_tools,
         )
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
         # drops system messages when it stores the transcript, so the recall is refreshed each turn
@@ -1207,6 +1233,10 @@ def register_code_api(
         through exactly the machinery the owner's does: one turn, one receipt shape, one bus. The
         author reaches the receipt — so a reopened conversation still says who asked — and every
         frame the turn emits, so a screen watching live can label it as it happens.
+
+        A SPOKEN request for work does not run here: it becomes a background work
+        (`chimera.api.works`) and this stream says so and ends, so the conversation — and the
+        person talking — stay free while the work runs.
         """
         # SAFETY POSTURE: identical to the run endpoint — file writes and shell inside ``ws``, behind
         # the bearer guard and the localhost bind, scoped by whatever seams the caller declared.
@@ -1220,6 +1250,136 @@ def register_code_api(
                 raise HTTPException(status_code=400, detail="workspace not found")
         else:
             ws = workspace
+        if (
+            req.spoken
+            and not (req.provider or "").strip()
+            and _is_work(req.message, has_works=bool(req.session_id and work_store.for_parent(req.session_id)))
+        ):
+            return EventSourceResponse(await _spoken_work_frames(req, ws, author=author))
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
+        session_id, turn_id = _launch_turn(req, ws, author=author, loop=loop, queue=queue)
+
+        async def events() -> AsyncIterator[dict[str, str]]:
+            # The session id first, so a client that minted a new conversation can address it from
+            # the very first frame rather than after the turn it is already watching.
+            yield {
+                "event": "session",
+                # The turn id rides with the session id because a client that loses the stream needs
+                # both: the session to reopen the conversation, and the turn to ask what it missed.
+                "data": json.dumps({"session_id": session_id, "turn_id": turn_id}),
+            }
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                event, payload = item
+                yield {"event": event, "data": json.dumps(payload)}
+
+        return EventSourceResponse(events())
+
+    def _is_work(message: str, *, has_works: bool = False) -> bool:
+        """A spoken request for work — create, fix, refactor, install — by the deterministic
+        classifier the hierarchy routes by (`_model_for` says why its bias is the right one).
+
+        Not when the sentence is ABOUT the works: "stop work one", "undo what it did", "how is it
+        going" are for the talking model and its tools, and the classifier's substring markers
+        would read "mudei de ideia" (mude) and "desfaz" (faz) as new work — measured live on
+        2026-09-18: both sentences started a work instead of stopping one. So a control verb in a
+        conversation that has works, or beside the word "work", is talk.
+        """
+        from chimera.orchestration.hierarchy import classify_task
+
+        if _WORK_CONTROL.search(message) and (has_works or _ABOUT_WORKS.search(message)):
+            return False
+        return classify_task(message) == "sequential_write"
+
+    async def _spoken_work_frames(
+        req: CodeTurnRequest, ws: Path, *, author: str
+    ) -> AsyncIterator[dict[str, str]]:
+        """Start the work in the background and hand back the three frames that say it started.
+
+        The route (`_start_turn`) wraps them in the stream; this is the half that acts.
+
+        The conversation's transcript gets one compact exchange — the request, and "started as
+        work N" — so the next turn's history knows what was asked; the work's own transcript lives
+        on its own session. The screen turns the pending exchange into the work's card from the
+        `work_started` frame, and the voice says it started without a model call.
+        """
+        from fastapi.concurrency import run_in_threadpool
+
+        # The parent conversation: loaded or minted now, so the work has something to attach to.
+        parent = store.load(req.session_id, None) if req.session_id else CodeSession(None)  # type: ignore[arg-type]
+        if not parent.workspace:
+            parent.workspace = req.workspace or ""
+        parent_id = parent.session_id
+        template = req.model_dump(mode="json")
+        # The work is not a spoken answer: it acts on the strong model, thinking as configured.
+        template.update(
+            {"spoken": False, "thinking": None, "session_id": None, "workspace": str(ws), "attachments": []}
+        )
+        work = await run_in_threadpool(
+            lambda: works.create(
+                parent=parent_id, workspace=ws, title=req.message,
+                model=live().voice_work_model or req.model or "", author=author, request=template,
+            )
+        )
+        with lock_for(parent_id):
+            parent.messages.append({"role": "user", "content": req.message})
+            parent.messages.append({
+                "role": "assistant",
+                "content": f"[started background work {work.number}: {work.title[:120]}]",
+            })
+            store.save(parent)
+
+        async def events() -> AsyncIterator[dict[str, str]]:
+            yield {"event": "session", "data": json.dumps({"session_id": parent_id, "turn_id": work.turn_id})}
+            yield {"event": "work_started", "data": json.dumps({"seq": 1, "work": work.to_dict()})}
+            yield {
+                "event": "done",
+                "data": json.dumps({
+                    "seq": 2, "answer": "", "steps": 0, "stopped_reason": "work_started",
+                    "tool_names": [], "model": "", "prompt_tokens": 0, "completion_tokens": 0,
+                    "usd": None, "tainted": False, "memory_facts_used": 0, "memory_layer": "",
+                    "fused": False, "work_id": work.id,
+                }),
+            }
+
+        return events()
+
+    def _launch_work(work: Work) -> None:
+        """Run a work: the same turn machinery, in the background, on the work's own session."""
+        template = dict(work.request)
+        template.update({"message": work.title, "session_id": None, "workspace": work.workspace})
+        if work.model:
+            template["model"] = work.model
+        req = CodeTurnRequest(**template)
+        _launch_turn(req, Path(work.workspace), author=work.author, background=work)
+
+    works = WorkManager(
+        work_store,
+        launch=_launch_work,
+        publish=lambda parent, event, payload: bus.publish(parent, event, payload),
+        revert=lambda token: _revert(token),
+    )
+    app.state.work_manager = works
+
+    def _launch_turn(
+        req: CodeTurnRequest,
+        ws: Path,
+        *,
+        author: str = "",
+        loop: asyncio.AbstractEventLoop | None = None,
+        queue: asyncio.Queue[tuple[str, Any] | None] | None = None,
+        background: Work | None = None,
+    ) -> tuple[str, str]:
+        """Build the turn and start its thread; return ``(session_id, turn_id)``.
+
+        With a ``loop`` and ``queue`` the frames also feed a stream (the endpoint above). With a
+        ``background`` work they feed the work's record and the parent conversation's bus instead,
+        and the turn runs on the work's own session — its own lock, so the parent stays free.
+        """
+        store_for = work_sessions if background is not None else store
         # Attachments: images the model looks at, documents it reads. Resolved here rather than in
         # the request so a stale or forged id is simply skipped instead of reaching the model.
         from chimera.api.attachments import load as load_attachment
@@ -1297,6 +1457,15 @@ def register_code_api(
                 "before saying what they produced):\n" + "\n".join(lines)
             )
 
+        # What this conversation's background works are up to, for the model that is talking —
+        # and the handles to stop or undo one. Only for a conversation that exists: a first message
+        # has no works to ask about, and a work's own turn is not told about its siblings.
+        extra_tools: list[Tool] = []
+        if background is None and req.session_id:
+            works_note = works.note(req.session_id)
+            if works_note:
+                note = (note + "\n\n" if note else "") + works_note
+                extra_tools = work_tools(works, req.session_id)
         # Read memory BEFORE building the agent: the facts go into this turn's system prompt.
         # The store the SETTINGS describe, which is not always the one the app booted with.
         turn_memory, turn_graph = _live_memory(live(), memory, graph, boot_memory_key)
@@ -1317,9 +1486,14 @@ def register_code_api(
         # Same late binding for the browser's frames: built here, bound to `emit` below.
         frame_sink = FrameAnnouncer()
         agent, ledger = build_agent(
-            req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink
+            req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
+            extra_tools=extra_tools or None,
         )
-        session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
+        if background is not None:
+            session = CodeSession(agent, session_id=background.session_id)
+            session.workspace = str(ws)
+        else:
+            session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
@@ -1329,8 +1503,6 @@ def register_code_api(
             session.workspace = req.workspace or ""
         session_id = session.session_id
 
-        loop = asyncio.get_running_loop()
-        queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         # This turn's durable identity, and the counter that makes replay safe. The orchestration
         # route has had both since it landed; the coding turn — the most expensive route in the
         # product — emitted frames with no number and kept none of them, so a dropped connection
@@ -1338,7 +1510,7 @@ def register_code_api(
         # number is the load-bearing part: a client that has seen up to `seq` asks for what came
         # after, and a reducer that ignores what it has makes replay-then-live and live-only
         # converge on the same state.
-        turn_id = uuid.uuid4().hex
+        turn_id = background.turn_id if background is not None else uuid.uuid4().hex
         seq = itertools.count(1)
 
         def emit(event: str, payload: Any) -> None:
@@ -1348,7 +1520,13 @@ def register_code_api(
             # So frames go to the live stream and never to the run log.
             if isinstance(numbered, dict) and event != "browser":
                 runlog.append(settings.home, turn_id, event, numbered, area="code")
-            loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+            if loop is not None and queue is not None:
+                loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
+            if background is not None:
+                # The parent conversation hears about the work in compact frames — its state, the
+                # tools it ran, the files it edited, a card it raised — never its every token.
+                _work_frame(background, event, numbered if isinstance(numbered, dict) else {})
+                return
             # And onto the session's bus, for everyone watching this conversation — the owner's
             # own screen when a guest asked, a guest's when the owner did. The browser picture goes
             # live and is not kept, for the reason the run log does not keep it.
@@ -1361,10 +1539,11 @@ def register_code_api(
         # The turn's opening frame on the bus: what was asked and by whom, before any work. A
         # viewer who did not send this message needs both to draw the row the answer will land
         # under; the session file only learns the author when the receipt is written at the end.
-        bus.publish(
-            session_id, "turn_started", {"message": req.message, "author": author},
-            turn_id=turn_id, author=author,
-        )
+        if background is None:
+            bus.publish(
+                session_id, "turn_started", {"message": req.message, "author": author},
+                turn_id=turn_id, author=author,
+            )
 
         # What the panel draws: the viewport as base64 JPEG, the page's address and title, and
         # which action produced it. `n` counts frames of this turn so the screen can say "frame 7".
@@ -1439,6 +1618,9 @@ def register_code_api(
 
                 guard = WorkspaceGuard(ws)
                 before = guard.snapshot()
+                # What a background work's record keeps of the turn's end: the undo offer and the
+                # verifier's verdict, minted inside `_verify_and_finish` and read after it.
+                outcome: dict[str, str] = {}
 
                 def _verify_and_finish(payload: dict[str, Any]) -> None:
                     """Judge what the turn wrote and close the stream.
@@ -1482,28 +1664,31 @@ def register_code_api(
                         _pending_reverts[token] = (guard, before)
                         while len(_pending_reverts) > _MAX_PENDING_REVERTS:
                             _pending_reverts.pop(next(iter(_pending_reverts)))
+                        outcome["token"] = token
                         command, source = resolve_verify(None, ws)
                         if command is None:
+                            outcome["verified"] = "none"
                             emit("verified", {
                                 "command": None, "source": source, "state": "none",
                                 "revert_token": token,
                             })
                         else:
-                            outcome = CommandVerifier(
+                            verified_run = CommandVerifier(
                                 command, ws, source=verifier_source(source)
                             ).verify()
                             state = (
-                                "abstained" if outcome.abstained
-                                else "passed" if outcome.passed
+                                "abstained" if verified_run.abstained
+                                else "passed" if verified_run.passed
                                 else "failed"
                             )
+                            outcome["verified"] = state
                             emit("verified", {
                                 "command": command, "source": source, "state": state,
-                                "output": outcome.output[:4000], "revert_token": token,
+                                "output": verified_run.output[:4000], "revert_token": token,
                             })
                             verdict = {
                                 "command": command, "source": source, "state": state,
-                                "output": outcome.output[:4000],
+                                "output": verified_run.output[:4000],
                             }
                     # Stored before it is announced, and stored HERE for the same reason usage is:
                     # every path out of a turn comes through this function. The receipt is this
@@ -1527,7 +1712,7 @@ def register_code_api(
                         receipt["author"] = author
                     session.remember_receipt(receipt)
                     try:
-                        store.save(session)
+                        store_for.save(session)
                     except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
                     # The turn joins the conversation history index — the record that outlives the
@@ -1555,6 +1740,14 @@ def register_code_api(
                     except Exception as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not index the turn in the history: %s", exc)
                     emit("done", payload)
+                    if background is not None:
+                        works.finished(
+                            background.id, payload,
+                            revert_token=outcome.get("token", ""), verified=outcome.get("verified", ""),
+                        )
+                    elif req.session_id:
+                        # The news of ended works reached the person through this turn's prompt.
+                        works.mark_reported(req.session_id)
 
                 # Same swap the chat turn uses, under the same per-session lock: hand the agent the
                 # fusion engine for this call and restore it in `finally`. Fusion ignores tools, so
@@ -1636,7 +1829,7 @@ def register_code_api(
                         # sidebar would show an untitled, empty session for work that really happened.
                         session.messages.append({"role": "user", "content": message})
                         session.messages.append({"role": "assistant", "content": acp_result.answer})
-                        store.save(session)
+                        store_for.save(session)
                     _verify_and_finish(
                         done_payload(acp_result, provider=external, tainted=bool(ledger.run_tainted()))
                     )
@@ -1652,10 +1845,11 @@ def register_code_api(
                         on_edit=on_edit,
                         on_todo=on_todo,
                         images=images or None,
+                        should_stop=works.should_stop(background.id) if background is not None else None,
                     )
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
-                    store.save(session)
+                    store_for.save(session)
                 _verify_and_finish(
                     {
                         "answer": result.answer,
@@ -1745,28 +1939,85 @@ def register_code_api(
                     else _native_failure(exc)
                 )
                 emit("error", {"message": message_out})
+                if background is not None:
+                    works.fail(background.id, message_out)
             finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
+                if loop is not None and queue is not None:
+                    loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
         threading.Thread(target=work, daemon=True).start()
+        return session_id, turn_id
 
-        async def events() -> AsyncIterator[dict[str, str]]:
-            # The session id first, so a client that minted a new conversation can address it from
-            # the very first frame rather than after the turn it is already watching.
-            yield {
-                "event": "session",
-                # The turn id rides with the session id because a client that loses the stream needs
-                # both: the session to reopen the conversation, and the turn to ask what it missed.
-                "data": json.dumps({"session_id": session_id, "turn_id": turn_id}),
-            }
-            while True:
-                item = await queue.get()
-                if item is None:
-                    break
-                event, payload = item
-                yield {"event": event, "data": json.dumps(payload)}
+    def _work_frame(work: Work, event: str, payload: dict[str, Any]) -> None:
+        """What the parent conversation hears of a work's turn: state, tools, edits, cards."""
+        if event == "tool":
+            works.progress(work.id, tool=str(payload.get("name") or ""))
+        elif event == "edit":
+            works.progress(work.id, edit=str(payload.get("path") or ""))
+        elif event == "approval":
+            # The card itself goes to the owner's screen, under the work's turn id, so answering
+            # it reaches the work's approver like any other card.
+            works.waiting(work.id, True)
+            bus.publish(work.parent, "approval", payload, turn_id=work.turn_id, author=work.author)
 
-        return EventSourceResponse(events())
+    def _revert(token: str) -> dict[str, Any]:
+        """Undo through the same single-use offer the receipt makes (`revert_turn`)."""
+        pending = _pending_reverts.pop(token, None)
+        if pending is None:
+            return {"ok": False, "restored": 0}
+        workspace_guard, snapshot = pending
+        return {
+            "ok": True,
+            "restored": workspace_guard.restore(snapshot),
+            "left_new_files": not workspace_guard.deletes_new_files(snapshot),
+        }
+
+    # ------------------------------------------------------------------ the works, from the screen
+
+    @app.get("/api/code/sessions/{session_id}/works", dependencies=[guard], response_model=WorksOut)
+    def list_works(session_id: str) -> dict[str, Any]:
+        """This conversation's background works, oldest first — what the Works panel draws."""
+        return {"works": [w.to_dict() for w in work_store.for_parent(session_id)]}
+
+    @app.post("/api/code/works/{work_id}/stop", dependencies=[guard], response_model=WorkActionOut)
+    def stop_work(work_id: str) -> dict[str, Any]:
+        """Stop a work: a queued one now, a running one at its next step (a model call in flight
+        ends first). What it did so far stays, and can then be undone."""
+        work = works.stop(work_id)
+        if work is None:
+            raise HTTPException(status_code=404, detail="no such work")
+        return {"ok": True, "work": work.to_dict()}
+
+    @app.post("/api/code/works/{work_id}/undo", dependencies=[guard], response_model=WorkActionOut)
+    def undo_work(work_id: str) -> dict[str, Any]:
+        """Undo a finished work's edits through the same offer the receipt makes. `ok: false`
+        with the reason when there is nothing to undo — a second click is not an error."""
+        result = works.undo(work_id)
+        work = work_store.get(work_id)
+        if work is None:
+            raise HTTPException(status_code=404, detail="no such work")
+        return {"ok": bool(result.get("ok")), "work": work.to_dict(), "reason": str(result.get("reason") or "")}
+
+    @app.get("/api/code/works/{work_id}/session", dependencies=[guard], response_model=CodeSessionOut)
+    def work_session(work_id: str) -> dict[str, Any]:
+        """The work's own transcript, folded like a conversation's — what "see it" opens."""
+        from chimera.api.code_replay import attach_receipts, exchanges_from_messages
+
+        work = work_store.get(work_id)
+        if work is None:
+            raise HTTPException(status_code=404, detail="no such work")
+        try:
+            path = work_sessions._path(work.session_id)
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        except (OSError, ValueError):
+            data = {}
+        messages = [m for m in data.get("messages", []) if isinstance(m, dict)]
+        receipts = [r for r in data.get("receipts", []) if isinstance(r, dict)]
+        return {
+            "id": work.session_id,
+            "workspace": work.workspace,
+            "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
+        }
 
     @app.get(
         "/api/code/turns/{turn_id}", dependencies=[guard], response_model=CodeTurnFramesOut
@@ -2086,19 +2337,11 @@ def register_code_api(
         A token is single-use and dies with the process. An unknown one is ``{ok: false}`` rather
         than a 404 — that is the state a second click hits, and a stale offer is not an error.
         """
-        pending = _pending_reverts.pop(token, None)
-        if pending is None:
-            return {"ok": False, "restored": 0}
-        workspace_guard, snapshot = pending
         # Whether files this turn CREATED go away with it. Inside a git repository the delete pass
         # is skipped unconditionally — deliberately, since a path bug once let a revert wipe a repo
         # — so "Edits undone." over surviving new files reported something that did not happen.
-        left_new = not workspace_guard.deletes_new_files(snapshot)
-        return {
-            "ok": True,
-            "restored": workspace_guard.restore(snapshot),
-            "left_new_files": left_new,
-        }
+        # (`left_new_files` says so.) Shared with a work's undo, which takes the same offer.
+        return _revert(token)
 
     @app.delete("/api/code/sessions/{session_id}", dependencies=[guard])
     def delete_code_session(session_id: str) -> dict[str, bool]:
@@ -2113,6 +2356,7 @@ def register_code_api(
         # tokens: a link into a deleted conversation must open nothing.
         history.forget_session(session_id)
         shares.revoke_session(session_id)
+        work_store.forget_parent(session_id)
         return {"ok": gone}
 
     @app.delete("/api/code/projects", dependencies=[guard], response_model=DeletedCountOut)

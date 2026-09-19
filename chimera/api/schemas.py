@@ -265,6 +265,45 @@ class CodeTurnFramesOut(BaseModel):
     seq: int
 
 
+class WorkOut(BaseModel):
+    """A background work of a conversation (``chimera.api.works``): a coding turn run on the
+    strong model while the conversation goes on."""
+
+    id: str
+    parent: str
+    session_id: str
+    turn_id: str
+    workspace: str
+    title: str
+    model: str = ""
+    state: str
+    """``queued`` | ``running`` | ``waiting`` (a card is up) | ``done`` | ``failed`` | ``stopped`` | ``undone``."""
+    created_at: float
+    started_at: float | None = None
+    finished_at: float | None = None
+    edits: list[str] = Field(default_factory=list)
+    tools: int = 0
+    steps: int = 0
+    usd: float | None = None
+    answer: str = ""
+    error: str = ""
+    verified: str = ""
+    can_undo: bool = False
+    reported: bool = False
+    author: str = ""
+    number: int = 0
+
+
+class WorksOut(BaseModel):
+    works: list[WorkOut]
+
+
+class WorkActionOut(BaseModel):
+    ok: bool
+    work: WorkOut
+    reason: str = ""
+
+
 class CodeSessionOut(BaseModel):
     id: str
     workspace: str

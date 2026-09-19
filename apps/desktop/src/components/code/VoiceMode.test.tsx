@@ -292,6 +292,30 @@ describe("hands-free voice", () => {
     expect(speaker.spoken).toEqual(["First sentence."]);
   });
 
+  it("says a work's news when it arrives, after what is being read, and never one from before the mode came on", async () => {
+    const { mic, speaker, deps } = harness();
+    const user = userEvent.setup();
+    const { rerender } = renderWithProviders(
+      <VoiceMode onUtterance={vi.fn()} answer={null} announce={{ seq: 1, text: "old news" }} deps={deps} />,
+    );
+    await user.click(screen.getByTestId("voice-mode"));
+    await waitFor(() => expect(mic.started).toBe(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(speaker.spoken).toEqual([]);
+
+    rerender(<VoiceMode onUtterance={vi.fn()} answer={null} announce={{ seq: 2, text: "Started work 1: fix the login." }} deps={deps} />);
+    await waitFor(() => expect(speaker.spoken).toEqual(["Started work 1: fix the login."]));
+    expect(screen.getByTestId("voice-status")).toHaveTextContent(/reading the answer aloud/i);
+    act(() => speaker.finish());
+    await waitFor(() => expect(screen.getByTestId("voice-status")).toHaveTextContent(/listening/i));
+
+    // The same announcement again is not said twice; a new one is.
+    rerender(<VoiceMode onUtterance={vi.fn()} answer={null} announce={{ seq: 2, text: "Started work 1: fix the login." }} deps={deps} />);
+    rerender(<VoiceMode onUtterance={vi.fn()} answer={null} announce={{ seq: 3, text: "Work 1 is done." }} deps={deps} />);
+    await waitFor(() => expect(speaker.spoken).toHaveLength(2));
+    expect(speaker.spoken[1]).toBe("Work 1 is done.");
+  });
+
   it("never reads an answer that landed before the mode came on", async () => {
     const { mic, speaker, deps } = harness();
     const user = userEvent.setup();

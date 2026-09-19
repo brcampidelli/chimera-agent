@@ -111,6 +111,10 @@ export function makeCodeApiMock() {
     // stream it did not ask for. `streamSessionLive` resolves at once (null: stopped), which the
     // reconnect loop reads as "we ended it" and does not retry.
     listShares: vi.fn(async () => ({ shares: [] })),
+    // Background works (`chimera.api.works`): none, until a test says otherwise.
+    listWorks: vi.fn(async () => ({ works: [] })),
+    stopWork: vi.fn(),
+    undoWork: vi.fn(),
     shareSession: vi.fn(),
     revokeShare: vi.fn(async () => ({ ok: true })),
     getNetworkShare: vi.fn(async () => ({ open: false, port: null, urls: [] })),

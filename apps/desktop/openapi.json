@@ -8761,6 +8761,167 @@
         "title": "VisionOut",
         "type": "object"
       },
+      "WorkActionOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "work": {
+            "$ref": "#/components/schemas/WorkOut"
+          }
+        },
+        "required": [
+          "ok",
+          "work"
+        ],
+        "title": "WorkActionOut",
+        "type": "object"
+      },
+      "WorkOut": {
+        "description": "A background work of a conversation (``chimera.api.works``): a coding turn run on the\nstrong model while the conversation goes on.",
+        "properties": {
+          "answer": {
+            "default": "",
+            "title": "Answer",
+            "type": "string"
+          },
+          "author": {
+            "default": "",
+            "title": "Author",
+            "type": "string"
+          },
+          "can_undo": {
+            "default": false,
+            "title": "Can Undo",
+            "type": "boolean"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "edits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Edits",
+            "type": "array"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          },
+          "number": {
+            "default": 0,
+            "title": "Number",
+            "type": "integer"
+          },
+          "parent": {
+            "title": "Parent",
+            "type": "string"
+          },
+          "reported": {
+            "default": false,
+            "title": "Reported",
+            "type": "boolean"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "steps": {
+            "default": 0,
+            "title": "Steps",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "tools": {
+            "default": 0,
+            "title": "Tools",
+            "type": "integer"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          },
+          "verified": {
+            "default": "",
+            "title": "Verified",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "parent",
+          "session_id",
+          "turn_id",
+          "workspace",
+          "title",
+          "state",
+          "created_at"
+        ],
+        "title": "WorkOut",
+        "type": "object"
+      },
       "WorkerRejectedOut": {
         "properties": {
           "detail": {
@@ -8878,6 +9039,22 @@
           }
         },
         "title": "WorkerVerifiedOut",
+        "type": "object"
+      },
+      "WorksOut": {
+        "properties": {
+          "works": {
+            "items": {
+              "$ref": "#/components/schemas/WorkOut"
+            },
+            "title": "Works",
+            "type": "array"
+          }
+        },
+        "required": [
+          "works"
+        ],
+        "title": "WorksOut",
         "type": "object"
       },
       "WorthReport": {
@@ -9938,6 +10115,46 @@
         "summary": "Revoke Share"
       }
     },
+    "/api/code/sessions/{session_id}/works": {
+      "get": {
+        "description": "This conversation's background works, oldest first \u2014 what the Works panel draws.",
+        "operationId": "list_works_api_code_sessions__session_id__works_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorksOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Works"
+      }
+    },
     "/api/code/share/network": {
       "delete": {
         "operationId": "network_close_api_code_share_network_delete",
@@ -10105,6 +10322,126 @@
           }
         },
         "summary": "Code Turn Frames"
+      }
+    },
+    "/api/code/works/{work_id}/session": {
+      "get": {
+        "description": "The work's own transcript, folded like a conversation's \u2014 what \"see it\" opens.",
+        "operationId": "work_session_api_code_works__work_id__session_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_id",
+            "required": true,
+            "schema": {
+              "title": "Work Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Session"
+      }
+    },
+    "/api/code/works/{work_id}/stop": {
+      "post": {
+        "description": "Stop a work: a queued one now, a running one at its next step (a model call in flight\nends first). What it did so far stays, and can then be undone.",
+        "operationId": "stop_work_api_code_works__work_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_id",
+            "required": true,
+            "schema": {
+              "title": "Work Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkActionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop Work"
+      }
+    },
+    "/api/code/works/{work_id}/undo": {
+      "post": {
+        "description": "Undo a finished work's edits through the same offer the receipt makes. `ok: false`\nwith the reason when there is nothing to undo \u2014 a second click is not an error.",
+        "operationId": "undo_work_api_code_works__work_id__undo_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_id",
+            "required": true,
+            "schema": {
+              "title": "Work Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkActionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Work"
       }
     },
     "/api/code/workspaces": {

@@ -1035,7 +1035,21 @@ class Agent:
             if not isinstance(raw, str) or not raw:
                 return None
             tool = self.tools.get(name)
+            # Through the governance wrappers: on the desktop every write tool arrives as
+            # `LedgeredTool(GovernedTool(WriteFileTool))`, and the wrappers carry no `workspace`
+            # — so this read None, returned None, and the Code screen showed no diff and offered
+            # no undo for any governed turn (found live on 2026-09-18, a file created in plain
+            # sight with no `edit` frame and no `verified` frame after it). The workspace is the
+            # innermost tool's.
             workspace = getattr(tool, "workspace", None)
+            for _ in range(6):
+                if isinstance(workspace, Path):
+                    break
+                inner = getattr(tool, "inner", None)
+                if inner is None:
+                    break
+                tool = inner
+                workspace = getattr(tool, "workspace", None)
             if not isinstance(workspace, Path):
                 return None
             resolved = resolve_in_workspace(workspace, raw)

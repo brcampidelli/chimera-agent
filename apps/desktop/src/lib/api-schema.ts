@@ -524,6 +524,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/works": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Works
+         * @description This conversation's background works, oldest first — what the Works panel draws.
+         */
+        get: operations["list_works_api_code_sessions__session_id__works_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/share/network": {
         parameters: {
             query?: never;
@@ -587,6 +607,68 @@ export interface paths {
         get: operations["code_turn_frames_api_code_turns__turn_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/works/{work_id}/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Work Session
+         * @description The work's own transcript, folded like a conversation's — what "see it" opens.
+         */
+        get: operations["work_session_api_code_works__work_id__session_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/works/{work_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Stop Work
+         * @description Stop a work: a queued one now, a running one at its next step (a model call in flight
+         *     ends first). What it did so far stays, and can then be undone.
+         */
+        post: operations["stop_work_api_code_works__work_id__stop_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/works/{work_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Work
+         * @description Undo a finished work's edits through the same offer the receipt makes. `ok: false`
+         *     with the reason when there is nothing to undo — a second click is not an error.
+         */
+        post: operations["undo_work_api_code_works__work_id__undo_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -6823,6 +6905,98 @@ export interface components {
             /** Support */
             support: string;
         };
+        /** WorkActionOut */
+        WorkActionOut: {
+            /** Ok */
+            ok: boolean;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            work: components["schemas"]["WorkOut"];
+        };
+        /**
+         * WorkOut
+         * @description A background work of a conversation (``chimera.api.works``): a coding turn run on the
+         *     strong model while the conversation goes on.
+         */
+        WorkOut: {
+            /**
+             * Answer
+             * @default
+             */
+            answer: string;
+            /**
+             * Author
+             * @default
+             */
+            author: string;
+            /**
+             * Can Undo
+             * @default false
+             */
+            can_undo: boolean;
+            /** Created At */
+            created_at: number;
+            /** Edits */
+            edits?: string[];
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /** Finished At */
+            finished_at?: number | null;
+            /** Id */
+            id: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
+            /**
+             * Number
+             * @default 0
+             */
+            number: number;
+            /** Parent */
+            parent: string;
+            /**
+             * Reported
+             * @default false
+             */
+            reported: boolean;
+            /** Session Id */
+            session_id: string;
+            /** Started At */
+            started_at?: number | null;
+            /** State */
+            state: string;
+            /**
+             * Steps
+             * @default 0
+             */
+            steps: number;
+            /** Title */
+            title: string;
+            /**
+             * Tools
+             * @default 0
+             */
+            tools: number;
+            /** Turn Id */
+            turn_id: string;
+            /** Usd */
+            usd?: number | null;
+            /**
+             * Verified
+             * @default
+             */
+            verified: string;
+            /** Workspace */
+            workspace: string;
+        };
         /** WorkerRejectedOut */
         WorkerRejectedOut: {
             /**
@@ -6922,6 +7096,11 @@ export interface components {
              * @default 0
              */
             tokens: number;
+        };
+        /** WorksOut */
+        WorksOut: {
+            /** Works */
+            works: components["schemas"]["WorkOut"][];
         };
         /**
          * WorthReport
@@ -7742,6 +7921,37 @@ export interface operations {
             };
         };
     };
+    list_works_api_code_sessions__session_id__works_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     network_state_api_code_share_network_get: {
         parameters: {
             query?: never;
@@ -7869,6 +8079,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeTurnFramesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    work_session_api_code_works__work_id__session_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    stop_work_api_code_works__work_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkActionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_work_api_code_works__work_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                work_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkActionOut"];
                 };
             };
             /** @description Validation Error */
