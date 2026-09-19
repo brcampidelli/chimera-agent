@@ -26,10 +26,18 @@ RLHF" is the site's phrase, not the record) launched `jev-1.13.0` on 2026-09-15:
 a `state` (text/JSON, ≤ 32k tokens) plus typed questions — **Noul** (P(yes)), **Choice** (≤ 255 options,
 `probabilities` + an unpublished `confidence` statistic), **Score** (2–10 ordered levels, expectation over
 levels) — answered in one request, questions independent of each other. US$ 0.042/MTok input, output
-free, no streaming, no seed, no temperature, no logprobs, no batch endpoint. Early access by waitlist,
-US-hosted, API-only, not on OpenRouter (0/447 models), present on the Vercel AI Gateway. "English is the
-primary training language… Other languages… are handled but not equally well"; Portuguese is not
-mentioned anywhere in 109 doc pages.
+free, no streaming, no seed, no temperature, no logprobs, no batch endpoint. Early access by waitlist
+at the vendor, US-hosted, API-only, present on the Vercel AI Gateway — and, **since 2026-09-18, on
+OpenRouter** (`typesafe/jev-1.13`, alias `~typesafe/jev-latest`; single provider, p50 0.20 s on the
+page, US$ 0.042 / 0) through a **new alpha endpoint of OpenRouter's own, the Decisions API**
+(`POST https://openrouter.ai/api/alpha/decisions`, `{model, state, questions}` mirroring `/v1/systemone`;
+the answers are TypeSafe's plus `usage.cost`, `id`, `provider`; "OpenRouter normalizes requests and
+responses across providers for this endpoint"). It is **not** a chat-completions model, so LiteLLM cannot
+call it and the public `/api/v1/models` index does not list it (0/447 on 09-19 — the agents' "not on
+OpenRouter" of 09-18 was that index, one day early); a probe that reads that index will not see it.
+Practical consequence: the OpenRouter key this project already holds reaches Jev today, with a ~30-line
+`httpx` client and none of the vendor's waitlist. "English is the primary training language… Other
+languages… are handled but not equally well"; Portuguese is not mentioned anywhere in 109 doc pages.
 
 **What "RLCD" is.** Everything the vendor says fits in two sentences: "Reinforcement Learning for Calibrated
 Decisions", "0.8 should occur about 80% of the time". No paper, no architecture, no parameter count, no
@@ -59,7 +67,11 @@ only (mini-jev: letters-as-logits on a frozen Qwen3-4B — same accuracy as JSON
 the Services", "(b) … train a model to imitate the output", "(h) … conduct any security or vulnerability
 test". Telemetry ("summary statistics and classifications … learnings") may be processed "without
 restriction". `jev-latest` "moves when a new release ships". For a project whose method is *published,
-pre-registered, sabotage-checked benches*, (f) and (h) are a wall, not a footnote.
+pre-registered, sabotage-checked benches*, (f) and (h) are a wall, not a footnote — **when the contract
+is TypeSafe's**. Through OpenRouter the customer's contract is OpenRouter's; whether the vendor's
+benchmark clause travels with the provider's terms is not stated on the model page and has to be read
+in OpenRouter's provider policy before any number is published. Measuring privately, to decide, is a
+different act from publishing.
 
 ### 1.2 The LangChain harness is a thin gate — and the code says less than the post
 
@@ -310,19 +322,24 @@ on every route/model change (exchangeability). After B1.
 **C4. A typed-decision contract of our own, with two backends and an optional third.** `Noul / Choice /
 Score → distribution` as a small module behind the kernel, the envelope verifier, the Manager and the
 route log: backend *local-logprob* (Ollama, decision-first, isotonic on our slice), backend
-*hosted-verbalized* (recipe + Platt), and — **only** after a PT-BR calibration test with a real key and a
-written answer from TypeSafe on §2.3(f)/(h) — Jev as a third backend behind a flag, pinned to a version,
-fail-closed **per call** (refuse this call, keep the run), never the only layer, never fed tool output
-or the assistant's own prose. The interface is what transfers from Jev; the vendor is optional.
+*hosted-verbalized* (recipe + Platt), and — **only** after a PT-BR calibration test on our own corpora
+(now runnable through OpenRouter's Decisions API with the key we hold: 200 items ≈ US$ 0.02–0.27 per
+pass, ≤ US$ 1.34 with five repetitions for the noise floor) and a clear reading of which terms govern
+publication — Jev as a third backend behind a flag, pinned to `jev-1.13`, fail-closed **per call**
+(refuse this call, keep the run), never the only layer, never fed tool output or the assistant's own
+prose. The interface is what transfers from Jev; the vendor is optional. OpenRouter's endpoint is itself
+the interface made public: `state + questions → answers with probabilities`, provider-normalized — if
+a second provider ever lands on it, the contract outlives the vendor.
 
 ---
 
 ## 4 · Do **not** build these
 
-- **Jev as a dependency of any decision path.** Closed, three days old, English-first, US-only, alias that
-  moves, contract that forbids publishing the numbers we would need to justify it, and no independent
-  evidence of better calibration than a verbalized frontier model on the same sample (Lindfors: 0.116 /
-  0.040 vs 0.096). A third backend behind a flag is the ceiling, and only after §3 C4's two conditions.
+- **Jev as a dependency of any decision path.** Closed, four days old, English-first, US-only, alias that
+  moves, a vendor contract that forbids publishing the numbers we would need to justify it (and an
+  OpenRouter route whose terms on that point are still to be read), and no independent evidence of better
+  calibration than a verbalized frontier model on the same sample (Lindfors: 0.116 / 0.040 vs 0.096). A
+  third backend behind a flag is the ceiling, and only after §3 C4's two conditions.
 - **A classifier fed the last 30 messages with unredacted arguments.** That is the LangChain design and
   the exact surface #488 measured as framing-sensitive; the trilemma paper gives the theorem. Only the
   user's instruction and the rendered action authorize; tool output and assistant prose never enter the
@@ -372,8 +389,9 @@ today the least verifiable one.
 
 **Suggested order:** A1 (hours) → B1 (a day, ~US$ 0.10) → B3 (half a day, US$ 0) → B2 (a day, ~US$ 1)
 → B4 (~US$ 30, only if B1 shows a decision-first backend worth routing with) → C1/C2 only with B1/B2
-numbers in hand → C3/C4 later. The Jev key and the §2.3 letter can be requested
-in parallel at zero cost; they gate nothing above.
+numbers in hand → C3/C4 later. **B1 can carry a Jev arm from day one** now that OpenRouter's Decisions
+API answers to the key we hold — measured privately for our own decision at ~US$ 0.02 per pass, and
+published only once the governing terms are read; it gates nothing above.
 
 ---
 
@@ -406,3 +424,5 @@ items (listed, not opened). Not done: any call to the Jev API (no key), any late
 embedder (none exists in the repo; A6's figures are expectations to be measured in the pilot).
 The YouTube test in §1.5 was read from a written summary; the video's data and `n` are not published
 and no repository was found for it.
+The OpenRouter listing was read on 2026-09-19 in the browser (model page, playground, pricing table,
+apps list) and in the Go SDK's Decisions README; no request was sent to the endpoint.
