@@ -43,6 +43,17 @@ JEV_MODEL = "typesafe/jev-1.13"  # pinned on purpose; the alias moves
 JUDGE_MODEL = "openrouter/deepseek/deepseek-v4-flash-0731"
 TIMEOUT = 30.0
 
+# The local arms (study 20 §3 B1, the "does it work without a vendor, offline, on the VPS" half):
+# a small instruct model on this machine through Ollama's OpenAI-compatible route, which returns
+# token logprobs from v0.12.11. L reads the decision FIRST (no reasoning, the paper's SFT-without-
+# reasoning shape); L2 lets the model think and reads the first token AFTER the trace — the exact
+# quantity arXiv 2601.13284 measured as extraction (AUROC 56 under GRPO). Both through
+# `chimera.providers.decision.label_probabilities`, renormalized over the three labels.
+OLLAMA_URL = "http://localhost:11434/v1/chat/completions"
+LOCAL_MODEL = "qwen3:4b"
+LABELS = ("BLOCK", "REVIEW", "ALLOW")
+LOCAL_SYSTEM = JUDGE_SYSTEM + " Your reply is that single word and nothing else."
+
 # The two questions, worded from the judge's own system prompt so the arms ask the same thing.
 QUESTIONS: dict[str, Any] = {
     "danger": {
@@ -177,6 +188,63 @@ def judge(gateway: Any, state: str) -> dict[str, Any]:
     return {"p": None, "verdict": word, "usd": usd, "seconds": round(time.perf_counter() - t0, 3)}
 
 
+def local(client: httpx.Client, state: str, *, think: bool) -> dict[str, Any]:
+    """One local call; `p` is the renormalized share of BLOCK+REVIEW on the first content token.
+
+    Qwen3's soft switch (`/no_think` in the system prompt) turns the trace off for L; L2 keeps it
+    and Ollama returns the trace in `reasoning`, so the first *content* token is the post-reasoning
+    decision token. `mass` (how much of the token's probability was on the labels at all) travels
+    with the row: a low mass is the model not choosing among the labels, and the report reads it.
+    """
+    from chimera.providers.decision import label_probabilities
+
+    from chimera.providers.gateway import CompletionResult, LLMGateway
+
+    system = LOCAL_SYSTEM + ("" if think else " /no_think")
+    body = {
+        "model": LOCAL_MODEL, "temperature": 0.0, "max_tokens": 4000 if think else 8,
+        "logprobs": True, "top_logprobs": 10,
+        "messages": [{"role": "system", "content": system}, {"role": "user", "content": state}],
+    }
+    t0 = time.perf_counter()
+    r = client.post(OLLAMA_URL, json=body, timeout=180.0)
+    r.raise_for_status()
+    data = r.json()
+    elapsed = time.perf_counter() - t0
+    choice = data["choices"][0]
+    logprobs = LLMGateway._extract_logprobs(choice)
+    content = (choice.get("message") or {}).get("content") or ""
+    reasoning = (choice.get("message") or {}).get("reasoning") or ""
+    result = CompletionResult(content=content, model=LOCAL_MODEL, logprobs=logprobs)
+    read = label_probabilities(result, list(LABELS))
+    p = None if read is None else read.shares["BLOCK"] + read.shares["REVIEW"]
+    found = _WORD.findall(content)
+    return {
+        "p": p, "verdict": found[-1].upper() if found else None,
+        "probs": None if read is None else read.shares, "mass": None if read is None else read.mass,
+        "first_token": None if read is None else read.first_token,
+        "logprobs_came": logprobs is not None, "reasoning_chars": len(reasoning),
+        "usd": 0.0, "in_tokens": (data.get("usage") or {}).get("prompt_tokens"),
+        "out_tokens": (data.get("usage") or {}).get("completion_tokens"),
+        "seconds": round(elapsed, 3), "raw": content[:200],
+    }
+
+
+def probe_local(client: httpx.Client) -> None:
+    """Before a single item is scored: is the server up, is the model there, do logprobs come back,
+    does `/no_think` empty the trace — printed so the instrument is read before the phenomenon."""
+    tags = client.get("http://localhost:11434/api/tags", timeout=10).json()
+    names = [m.get("name") for m in tags.get("models", [])]
+    print("ollama models:", names)
+    assert any(n and n.startswith(LOCAL_MODEL.split(":")[0]) for n in names), f"{LOCAL_MODEL} not pulled"
+    item = two_sided_items()[0]
+    for think in (False, True):
+        res = local(client, item["state"], think=think)
+        print(f"think={think}: logprobs_came={res['logprobs_came']} first_token={res['first_token']!r} "
+              f"mass={res['mass']} p={res['p']} verdict={res['verdict']} reasoning_chars={res['reasoning_chars']} "
+              f"out_tokens={res['out_tokens']} seconds={res['seconds']}")
+
+
 def two_sided_items() -> list[dict[str, Any]]:
     items = []
     for name, corpus in (("easy", corpus_easy), ("ambiguous", corpus_ambiguous)):
@@ -221,17 +289,17 @@ def _tasks(reps_j: int, reps_bv: int, arms: str = "JBV") -> list[dict[str, Any]]
     rng.shuffle(order)
     tasks: list[dict[str, Any]] = []
     for item in order:
-        for arm, n in (("J", reps_j), ("B", reps_bv), ("V", reps_bv)):
+        for arm, n in (("J", reps_j), ("B", reps_bv), ("V", reps_bv), ("L", 2), ("L2", 2)):
             for rep in range(n):
                 tasks.append({"arm": arm, "wrapper": None, "rep": rep, "item": item, "state": item["state"]})
     for name in WRAPPERS:
         for item in order:
-            for arm in ("J", "B", "V"):
+            for arm in ("J", "B", "V", "L", "L2"):
                 tasks.append({"arm": arm, "wrapper": name, "rep": 0, "item": item, "state": wrap(name, item["state"])})
     for item in oats_items():
-        for arm in ("J", "B", "V"):
+        for arm in ("J", "B", "V", "L", "L2"):
             tasks.append({"arm": arm, "wrapper": None, "rep": 0, "item": item, "state": item["state"]})
-    return [t for t in tasks if t["arm"] in arms]
+    return [t for t in tasks if t["arm"] in arms.split(",")]
 
 
 def _one(task: dict[str, Any], client: httpx.Client, gateway: Any) -> dict[str, Any]:
@@ -243,6 +311,10 @@ def _one(task: dict[str, Any], client: httpx.Client, gateway: Any) -> dict[str, 
             res = jev(client, task["state"])
         elif arm == "B":
             res = judge(gateway, task["state"])
+        elif arm == "L":
+            res = local(client, task["state"], think=False)
+        elif arm == "L2":
+            res = local(client, task["state"], think=True)
         else:
             res = verbalized(gateway, task["state"])
     except Exception as exc:  # noqa: BLE001 — recorded as a halt, never a verdict
@@ -257,7 +329,7 @@ def run(out: Path, client: httpx.Client, gateway: Any, *, reps_j: int = 5, reps_
 
     tasks = _tasks(reps_j, reps_bv, arms)
     print(f"  {len(tasks)} requests registered", file=sys.stderr)
-    spent = {"J": 0.0, "B": 0.0, "V": 0.0, "halts": 0}
+    spent = {"J": 0.0, "B": 0.0, "V": 0.0, "L": 0.0, "L2": 0.0, "halts": 0}
     lock = threading.Lock()
     done = 0
     t0 = time.perf_counter()
@@ -287,15 +359,20 @@ def main() -> None:
     ap.add_argument("--reps-j", type=int, default=5)
     ap.add_argument("--reps-bv", type=int, default=2)
     ap.add_argument("--workers", type=int, default=8)
-    ap.add_argument("--arms", default="JBV", help="which arms to run, e.g. V to re-run one arm")
+    ap.add_argument("--arms", default="J,B,V", help="comma-separated arms: J,B,V,L,L2")
+    ap.add_argument("--probe-local", action="store_true", help="check the local route before scoring")
     args = ap.parse_args()
+    if args.probe_local:
+        probe_local(httpx.Client())
+        return
+    local_only = set(args.arms.split(",")) <= {"L", "L2"}
     key = os.environ.get("OPENROUTER_API_KEY", "")
-    if not key:
+    if not key and not local_only:
         raise SystemExit("OPENROUTER_API_KEY is not set")
     from chimera.providers import LLMGateway
 
     gateway = LLMGateway()
-    client = httpx.Client(headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    client = httpx.Client(headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"} if key else {})
     if args.smoke:
         smoke(client, gateway)
         return
