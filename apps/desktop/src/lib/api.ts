@@ -41,6 +41,7 @@ import type {
   LocalRuntimes,
   NetworkShare,
   ShareInfo,
+  WorkInfo,
   OllamaModels,
   PoolWrite,
   ProjectState,
@@ -1200,6 +1201,9 @@ export interface CodeTurnHandlers {
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
   onBrowser?: (f: CodeBrowserFrame) => void;
+  /** A spoken request for work became a background work instead of running here; the stream
+   *  ends right after with a `done` whose `stopped_reason` is `work_started`. */
+  onWorkStarted?: (w: WorkInfo) => void;
   onDone?: (d: CodeTurnDone) => void;
   onError?: (msg: string) => void;
 }
@@ -1401,6 +1405,7 @@ function applyCodeTurnFrame(
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "approval") h.onApproval?.(payload as unknown as CodeApprovalEvent);
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
+  else if (event === "work_started") h.onWorkStarted?.(payload.work as WorkInfo);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string);
   return { turnId, seq };
@@ -1644,6 +1649,20 @@ export const openNetworkShare = (port = 0) =>
   json<NetworkShare>("/api/code/share/network", { method: "POST", body: JSON.stringify({ port }) });
 export const closeNetworkShare = () =>
   json<NetworkShare>("/api/code/share/network", { method: "DELETE" });
+
+// Background works (`chimera.api.works`): the conversation's list, and the two things a person
+// (or the voice, through the talking model's tools) does to one. State changes arrive on the
+// conversation's live stream as `work_state` frames; the list is what a reopen draws from.
+export const listWorks = (sessionId: string) =>
+  json<{ works: WorkInfo[] }>(`/api/code/sessions/${encodeURIComponent(sessionId)}/works`);
+export const stopWork = (workId: string) =>
+  json<{ ok: boolean; work: WorkInfo; reason: string }>(`/api/code/works/${encodeURIComponent(workId)}/stop`, {
+    method: "POST",
+  });
+export const undoWork = (workId: string) =>
+  json<{ ok: boolean; work: WorkInfo; reason: string }>(`/api/code/works/${encodeURIComponent(workId)}/undo`, {
+    method: "POST",
+  });
 
 /** One frame of a conversation's live stream: a turn's own frame, enveloped with the session's
  *  number, the turn it belongs to and who started that turn (empty for the owner). */

@@ -73,6 +73,12 @@ export interface SpokenAnswer {
   done: boolean;
 }
 
+/** One sentence the voice says on its own — a work started, ended, stopped — not an answer. */
+export interface SpokenAnnouncement {
+  seq: number;
+  text: string;
+}
+
 /** How much of the answer being read has been handed to the voice, and what stopped it. */
 interface Reading {
   seq: number;
@@ -89,12 +95,15 @@ interface Reading {
 export function VoiceMode({
   onUtterance,
   answer,
+  announce = null,
   deps = DEFAULT_DEPS,
 }: {
   /** What the person said, transcribed — the caller sends it as a turn. */
   onUtterance: (text: string) => void;
   /** The latest finished answer, or null. Read aloud when its `seq` moves while the mode is on. */
   answer: SpokenAnswer | null;
+  /** A sentence to say now — a work's news — queued after whatever is being read. */
+  announce?: SpokenAnnouncement | null;
   deps?: VoiceModeDeps;
 }) {
   const { t, lang } = useI18n();
@@ -110,6 +119,8 @@ export function VoiceMode({
   /** The answer seq already spoken (or current when the mode came on): never read old answers. */
   const spokenSeq = useRef<number>(answer?.seq ?? -1);
   const reading = useRef<Reading | null>(null);
+  /** The announcement seq already spoken (or current when the mode came on). */
+  const announcedSeq = useRef<number>(announce?.seq ?? -1);
   const onUtteranceRef = useRef(onUtterance);
   onUtteranceRef.current = onUtterance;
   const locale = useMemo(() => speechLocale(lang), [lang]);
@@ -169,6 +180,7 @@ export function VoiceMode({
     const seg = deps.segmenter();
     segmenter.current = seg;
     spokenSeq.current = answer?.seq ?? -1;
+    announcedSeq.current = announce?.seq ?? -1;
     try {
       await microphone.start((frame) => {
         const event = seg.feed(rmsOf(frame), frame);
@@ -197,7 +209,26 @@ export function VoiceMode({
     mic.current = microphone;
     setPhaseBoth("listening");
     if (!deps.speaker.available()) setNote(t("code.voice.noSpeech"));
-  }, [answer?.seq, closeReading, deps, handleUtterance, setPhaseBoth, t]);
+  }, [answer?.seq, announce?.seq, closeReading, deps, handleUtterance, setPhaseBoth, t]);
+
+  // A work's news is one sentence, said when it arrives — after whatever is being read, and
+  // interruptible like it. It does not touch the answer being read: a work ending in the middle
+  // of an answer is heard after that answer's sentence, and the answer goes on.
+  useEffect(() => {
+    if (phaseRef.current === "off" || !announce || announce.seq === announcedSeq.current) return;
+    announcedSeq.current = announce.seq;
+    if (!deps.speaker.available() || !announce.text.trim()) return;
+    const seg = segmenter.current;
+    if (seg) seg.agentSpeaking = true;
+    setPhaseBoth("speaking");
+    void deps.speaker.speak(announce.text, locale);
+    void deps.speaker.idle().then(() => {
+      // Nothing else is being read: back to listening. (An answer mid-read keeps the phase.)
+      if (phaseRef.current !== "speaking" || reading.current?.closed === false) return;
+      if (seg) seg.agentSpeaking = false;
+      setPhaseBoth("listening");
+    });
+  }, [announce, deps.speaker, locale, setPhaseBoth]);
 
   // An answer that begins while the mode is on is read aloud as it streams: every complete
   // sentence is queued the moment it is complete, and the remainder when the turn ends. The

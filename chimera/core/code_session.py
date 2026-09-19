@@ -157,8 +157,13 @@ class CodeSession:
         on_edit: Callable[[str, str], None] | None = None,
         on_todo: Callable[[list[dict[str, str]]], None] | None = None,
         images: list[str] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> AgentResult:
         """Run one turn with the previous turns as history, and absorb the result.
+
+        ``should_stop`` is the agent loop's own cooperative stop, polled once per step — what a
+        background work is stopped by from the screen or by the voice. Forwarded only when given
+        and only to an agent whose ``run`` declares it, like ``on_todo`` below.
 
         ``images`` belong to THIS turn only. They are not stored with the conversation: the
         transcript keeps the text of what was said, and re-sending a picture on every later turn
@@ -181,6 +186,8 @@ class CodeSession:
         extra: dict[str, Any] = {"images": images} if images else {}
         if on_todo is not None and _accepts(self.agent.run, "on_todo"):
             extra["on_todo"] = on_todo
+        if should_stop is not None and _accepts(self.agent.run, "should_stop"):
+            extra["should_stop"] = should_stop
         result = self.agent.run(
             task,
             on_token=on_token,

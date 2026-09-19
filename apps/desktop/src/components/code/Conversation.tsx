@@ -30,9 +30,12 @@ import {
   deleteCodeSession,
   getCodeSession,
   listShares,
+  listWorks,
   revertCodeTurn,
+  stopWork,
   streamCodeTurn,
   streamSessionLive,
+  undoWork,
   type Approval,
   type CodeBrowserFrame,
   CodeToolEvent,
@@ -43,6 +46,7 @@ import {
   type Reach,
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame } from "@/lib/api";
+import type { WorkInfo } from "@/lib/types";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -57,8 +61,9 @@ import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { BrowserView } from "@/components/code/BrowserView";
 import { SharePanel } from "@/components/code/SharePanel";
+import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
-import { VoiceMode, type SpokenAnswer } from "@/components/code/VoiceMode";
+import { VoiceMode, type SpokenAnswer, type SpokenAnnouncement } from "@/components/code/VoiceMode";
 import {
   EMPTY_CAST,
   FusionCast,
@@ -135,6 +140,9 @@ interface Exchange {
   /** The turn this exchange is, when it arrived over the conversation's live stream — the key a
    *  later frame of the same turn is matched by. */
   turnId?: string;
+  /** The background work this spoken request became (`chimera.api.works`): the answer to it is
+   *  the work's, drawn on the works panel, not here. */
+  workId?: string;
   answer: string;
   tools: CodeToolEvent[];
   edits: { path: string; patch: string }[];
@@ -582,6 +590,34 @@ export function Conversation({
   const [shareCount, setShareCount] = useState(0);
   const [showShare, setShowShare] = useState(false);
   const [presence, setPresence] = useState<string[]>([]);
+  // Background works (`chimera.api.works`): what a spoken request for work became. Listed on a
+  // reopen, moved by `work_state` frames on the live stream while the screen is open; the voice
+  // announces the transitions — started, done, stopped, failed — with one sentence each.
+  const [works, setWorks] = useState<WorkInfo[]>([]);
+  const [announce, setAnnounce] = useState<SpokenAnnouncement | null>(null);
+  const announceSeq = useRef(0);
+  const say = useCallback((text: string) => {
+    announceSeq.current += 1;
+    setAnnounce({ seq: announceSeq.current, text });
+  }, []);
+  /** A work's new state, folded into the list; the transitions worth a sentence are spoken. */
+  const applyWork = useCallback(
+    (work: WorkInfo) => {
+      setWorks((prev) => {
+        const before = prev.find((w) => w.id === work.id);
+        const wasActive = before ? ["queued", "running", "waiting"].includes(before.state) : true;
+        if (before && before.state !== work.state && wasActive) {
+          const gist = (work.answer.split(/(?<=[.!?…])\s+/)[0] ?? "").slice(0, 200);
+          if (work.state === "done") say(t("code.works.say.done", { n: work.number, gist }));
+          else if (work.state === "stopped") say(t("code.works.say.stopped", { n: work.number }));
+          else if (work.state === "failed") say(t("code.works.say.failed", { n: work.number }));
+          else if (work.state === "waiting") say(t("code.works.say.waiting", { n: work.number }));
+        }
+        return before ? prev.map((w) => (w.id === work.id ? work : w)) : [...prev, work];
+      });
+    },
+    [say, t],
+  );
   // The turns THIS screen started. Their frames arrive twice — on the turn's own stream and on
   // the conversation's — and the second copy is dropped here rather than drawn as a guest's turn.
   const ownTurns = useRef<Set<string>>(new Set());
@@ -643,6 +679,7 @@ export function Conversation({
   useEffect(() => {
     setShowShare(false);
     setPresence([]);
+    setWorks([]);
     liveSeq.current = 0;
     if (!sessionId) {
       setShareCount(0);
@@ -656,10 +693,19 @@ export function Conversation({
       .catch(() => {
         if (live) setShareCount(0);
       });
+    void listWorks(sessionId)
+      .then((r) => {
+        if (live) setWorks(r.works);
+      })
+      .catch(() => {
+        // a conversation whose works cannot be listed still opens; the panel simply stays empty
+      });
     return () => {
       live = false;
     };
   }, [sessionId]);
+
+  const worksActive = works.some((w) => w.state === "queued" || w.state === "running" || w.state === "waiting");
 
   /** One frame of the conversation's live stream, folded into the exchanges.
    *
@@ -673,6 +719,10 @@ export function Conversation({
     if (frame.session_seq > liveSeq.current) liveSeq.current = frame.session_seq;
     if (frame.event === "presence") {
       setPresence(((frame.payload.names as string[] | undefined) ?? []).filter((n) => n !== "owner"));
+      return;
+    }
+    if (frame.event === "work_state" || frame.event === "work_progress") {
+      applyWork(frame.payload.work as WorkInfo);
       return;
     }
     if (!frame.turn_id || ownTurns.current.has(frame.turn_id)) return;
@@ -729,10 +779,12 @@ export function Conversation({
       default:
         break;
     }
-  }, []);
+  }, [applyWork]);
 
+  // The live stream is held open while someone could be on the other end — or while a work
+  // could report: its state changes travel on the same stream, and a card it raises lands here.
   useEffect(() => {
-    if (!sessionId || shareCount === 0) return;
+    if (!sessionId || (shareCount === 0 && !worksActive)) return;
     const controller = new AbortController();
     let alive = true;
     void (async () => {
@@ -748,7 +800,7 @@ export function Conversation({
       alive = false;
       controller.abort();
     };
-  }, [sessionId, shareCount, applyLive]);
+  }, [sessionId, shareCount, worksActive, applyLive]);
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
@@ -1046,7 +1098,25 @@ export function Conversation({
         onApproval: (q) => {
           setPendingApproval(q);
         },
+        onWorkStarted: (work) => {
+          // The request went to the background: this exchange's answer is the fact that it did,
+          // and the work itself is drawn on the panel, spoken as it moves.
+          patchLast((e) => ({ ...e, workId: work.id, answer: t("code.works.started", { n: work.number, title: work.title }) }));
+          applyWork(work);
+          say(
+            work.state === "queued"
+              ? t("code.works.say.queued", { n: work.number, title: work.title })
+              : t("code.works.say.started", { n: work.number, title: work.title }),
+          );
+        },
         onDone: (done) => {
+          if (done.stopped_reason === "work_started") {
+            // Not a turn's receipt: nothing ran here. The exchange keeps the sentence above.
+            publish({ status: "done", busy: false, report: null });
+            setBusy(false);
+            releaseQueued(false);
+            return;
+          }
           // The streamed tokens and the final answer are the same text; prefer the final one, which
           // is complete even when the backend never streamed (a non-streaming model, `stream:false`).
           patchLast((e) => ({ ...e, answer: done.answer || e.answer, done }));
@@ -1242,6 +1312,28 @@ export function Conversation({
             presence={presence}
             onSharesChanged={setShareCount}
             onClose={() => setShowShare(false)}
+          />
+        </div>
+      ) : null}
+      {works.length > 0 ? (
+        <div className="border-b border-hairline px-3 py-2">
+          <WorksPanel
+            works={works}
+            onStop={async (work) => {
+              try {
+                applyWork((await stopWork(work.id)).work);
+              } catch {
+                // the next state frame says what happened
+              }
+            }}
+            onUndo={async (work) => {
+              try {
+                applyWork((await undoWork(work.id)).work);
+                void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+              } catch {
+                // likewise
+              }
+            }}
           />
         </div>
       ) : null}
@@ -1566,6 +1658,7 @@ export function Conversation({
           <VoiceMode
             onUtterance={(text) => sendRef.current(true, text, true)}
             answer={spokenAnswer}
+            announce={announce}
           />
           {/* Fusion is a per-turn choice, next to the box you type in — and it turns OFF the
               agent's ability to act, which the tooltip says before the click and `fusedAnswer` says

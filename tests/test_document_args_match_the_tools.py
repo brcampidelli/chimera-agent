@@ -60,6 +60,10 @@ _IDENTIFIERS = frozenset({
     # which job. A flag and an id — both say which thing was acted on, neither carries a body.
     "background",
     "job_id",
+    # `work_status`/`work_stop`/`work_undo`: which background work — its number, its id or a word
+    # of its title. The identity of the thing acted on; the work's request and answer live on its
+    # own record, not in this argument.
+    "work",
     # `recall_history`: a window in days, how many hits, and whether to leave this project. Three
     # scalars that narrow a search; the search terms themselves are `query`, below.
     "days",
