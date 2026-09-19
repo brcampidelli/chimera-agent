@@ -207,6 +207,9 @@ class TrustKernel:
                     # grow a column of empty strings for the callers that have no context to give.
                     **({"context": context[:200]} if context else {}),
                     **({"lineage": lineage} if lineage else {}),
+                    # Only when the decider had a number: a column of ``None`` would read as "the
+                    # rules were unsure", and the rules are never unsure.
+                    **({"confidence": round(verdict.confidence, 4)} if verdict.confidence is not None else {}),
                 },
             )
         return verdict

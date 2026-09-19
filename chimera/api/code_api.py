@@ -479,6 +479,7 @@ def assemble_registry(
     instruction: str | None = None,
     frame_sink: Any = None,
     extra_tools: Sequence[Tool] | None = None,
+    run_id: str | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -537,7 +538,7 @@ def assemble_registry(
     # is bound (`approval_sink`), for the same reason the kernel gets it only then: headless, a
     # question announced to nobody is a timeout with a bill, and the jail's refusal is the right
     # answer. The declared write region is not softened by a yes (`resolve_for` says why).
-    owner = _owner_allows(settings, approval_sink)
+    owner = _owner_allows(settings, approval_sink, run_id=run_id, surface=surface)
     if approval_sink is not None:
         for tool in registry.tools():
             if hasattr(tool, "workspace"):
@@ -749,8 +750,13 @@ def assemble_registry(
     ), ledger
 
 
-def _owner_allows(settings: Settings, sink: Any = None) -> Any:
+def _owner_allows(
+    settings: Settings, sink: Any = None, *, run_id: str | None = None, surface: str = ""
+) -> Any:
     """The approver this deployment chose — and for the default, `ask`, one that actually asks.
+
+    ``run_id`` and ``surface`` are written on every question's record line (`pending.FACTS`): they
+    are what joins an answer to the turn that asked and to what that turn went on to do.
 
     For ``allow`` and ``deny`` this is what it always was. For ``ask`` it used to return ``None``,
     which `LedgeredTool` reads as *refuse*: the setting whose name is *ask* asked nobody, and one
@@ -800,6 +806,7 @@ def _owner_allows(settings: Settings, sink: Any = None) -> Any:
         deliver=deliverer_for(settings),
         on_asked=sink,
         wait_seconds=wait_for_the_screen,
+        facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
     )
 
 
@@ -1149,6 +1156,7 @@ def register_code_api(
         approval_sink: Any = None,
         frame_sink: Any = None,
         extra_tools: Sequence[Tool] | None = None,
+        run_id: str | None = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
@@ -1167,6 +1175,7 @@ def register_code_api(
             frame_sink=frame_sink,
             instruction=req.message,
             extra_tools=extra_tools,
+            run_id=run_id,
         )
         # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
         # drops system messages when it stores the transcript, so the recall is refreshed each turn
@@ -1485,9 +1494,13 @@ def register_code_api(
         approval_sink = ApprovalAnnouncer()
         # Same late binding for the browser's frames: built here, bound to `emit` below.
         frame_sink = FrameAnnouncer()
+        # The turn's id is minted here, before the agent, because the registry's approver writes it
+        # on every question it asks (`pending.FACTS`): a record line that names its run can be
+        # joined to the run's trace and receipt; one that does not is a sentence in a file.
+        turn_id = background.turn_id if background is not None else uuid.uuid4().hex
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
-            extra_tools=extra_tools or None,
+            extra_tools=extra_tools or None, run_id=turn_id,
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
@@ -1510,7 +1523,6 @@ def register_code_api(
         # number is the load-bearing part: a client that has seen up to `seq` asks for what came
         # after, and a reducer that ignores what it has makes replay-then-live and live-only
         # converge on the same state.
-        turn_id = background.turn_id if background is not None else uuid.uuid4().hex
         seq = itertools.count(1)
 
         def emit(event: str, payload: Any) -> None:
@@ -1773,6 +1785,7 @@ def register_code_api(
                         on_plan=lambda p: emit("plan", {"steps": p.steps, "raw": p.raw}),
                         on_asked=approval_sink.emit,
                         wait_seconds=float(settings.approval_wait),
+                        facts={"run_id": turn_id, "surface": "api:turn", "tool": "plan"},
                     )
                     if not verdict.approved:
                         # Through `_verify_and_finish` like every other way out, so a gated turn is

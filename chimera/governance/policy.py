@@ -30,6 +30,15 @@ class Verdict:
     decision: Decision
     reason: str = ""
     rule: str | None = None
+    confidence: float | None = None
+    """How sure the decider was, in [0, 1], when it had a number — a judge read through
+    :func:`chimera.providers.decision.label_probabilities`, a typed-decision backend, a
+    calibrated classifier. ``None`` for every rule and every judge that answers in one word,
+    which is all of them today: a regex has no opinion about its own odds, and a word is not a
+    probability. Recorded on the audit line when present (`TrustKernel.evaluate`), so the number
+    travels with the decision it explains and a screen can show it beside the verdict; never read
+    by the kernel itself — a threshold on it is a policy, and policies are chosen on a measured
+    curve, not defaulted here."""
 
     @property
     def allowed(self) -> bool:

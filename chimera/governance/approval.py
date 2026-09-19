@@ -95,6 +95,31 @@ def _decision_of(*args: Any) -> str:
     return str(value or "review")
 
 
+def _facts_of(*args: Any) -> dict[str, Any]:
+    """What the question's own objects say about it, for the record (:data:`pending.FACTS`).
+
+    Two call shapes, two sources: a `Verdict` (``(verdict, action)``) names the lexical ``rule`` that
+    raised it; a `SequenceAssessment` (``(assessment,)``) names the tainted ``sources`` and, by having
+    any, the ``lineage``. Both name the ``tool``, read off the action's first line — the rendering
+    every surface already uses (``<tool>\n<command>`` or ``<tool>: <path>``). Nothing here is
+    inferred from text a model wrote; an assessment with no sources records no lineage.
+    """
+    action, _reason = _describe(*args)
+    first = action.split("\n", 1)[0].split(":", 1)[0].strip()
+    facts: dict[str, Any] = {"tool": first} if first else {}
+    head = args[0] if args else None
+    rule = getattr(head, "rule", None)
+    if isinstance(rule, str) and rule:
+        facts["rule"] = rule
+    sources = getattr(head, "sources", None)
+    if isinstance(sources, (list, tuple)) and sources:
+        facts["sources"] = list(sources)
+        facts["lineage"] = "tainted"
+    elif getattr(head, "tainted_refs", None):
+        facts["lineage"] = "tainted"
+    return facts
+
+
 def deny(ledger: ApprovalLedger | None = None) -> Approver:
     """Refuse everything, and say so — the honest headless default.
 
@@ -313,6 +338,7 @@ def ask_elsewhere(
     deliver: Any = None,
     on_asked: Any = None,
     wait_seconds: float | Callable[[], float] | None = None,
+    facts: dict[str, Any] | None = None,
 ) -> Approver:
     """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no.
 
@@ -325,6 +351,9 @@ def ask_elsewhere(
     wait is not known when the approver is built: the desktop constructs it with the tool registry
     and binds the screen a moment later. A screen that is bound is worth waiting for; one that never
     was is nobody, and waiting for nobody is the timeout this whole design exists to avoid.
+
+    ``facts`` are what the surface knows and the question's objects do not — the ``run_id`` and the
+    ``surface`` name — merged under what the objects say (:func:`_facts_of`) onto every record line.
     """
     from chimera.governance.pending import ask_durably
 
@@ -336,7 +365,7 @@ def ask_elsewhere(
             extra["wait_seconds"] = float(wait)
         approved = ask_durably(
             home, action, reason, deliver=deliver, on_asked=on_asked,
-            decision=_decision_of(*args), **extra,
+            decision=_decision_of(*args), facts={**(facts or {}), **_facts_of(*args)}, **extra,
         )
         if ledger is not None:
             ledger.record(action or reason, approved=approved)
