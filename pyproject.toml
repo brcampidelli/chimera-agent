@@ -76,7 +76,7 @@ mcp = [
     # so this ceiling costs the client nothing and is what keeps the server working.
     #
     # Lift it by porting `ChimeraMCP.build` to the 2.x handler API, not by widening the range.
-    "mcp>=1.0,<2",
+    "mcp>=1.0,<3",
 ]
 # Native messaging platform adapters. Install to run `chimera serve --discord/--slack`;
 # the core agent never requires it. (Telegram needs no extra — it is plain HTTP.)
