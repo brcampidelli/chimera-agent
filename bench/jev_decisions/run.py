@@ -134,15 +134,23 @@ def jev(client: httpx.Client, state: str) -> dict[str, Any]:
 
 def verbalized(gateway: Any, state: str) -> dict[str, Any]:
     t0 = time.perf_counter()
-    # thinking off (#514's switch): the -0731 route reasons by default and, at 400 tokens, spent the
-    # whole budget thinking and returned an empty content on 155/394 requests in the first run.
-    result = gateway.complete(
-        [{"role": "system", "content": VERBALIZED_SYSTEM}, {"role": "user", "content": state}],
-        model=JUDGE_MODEL, temperature=0.3, max_tokens=600, thinking=False,
-    )
+    # thinking off (#514's switch) AND a budget the routes that ignore it can still finish in, AND one
+    # re-ask on empty — the same three things `_judge_word` does. Run 1 (400 tokens): 155/394 empty;
+    # run 2 (600 tokens, thinking off): still 79/394 empty on the routes that reason regardless.
+    usd = 0.0
+    text = ""
+    for _attempt in range(2):
+        result = gateway.complete(
+            [{"role": "system", "content": VERBALIZED_SYSTEM}, {"role": "user", "content": state}],
+            model=JUDGE_MODEL, temperature=0.3, max_tokens=2000, thinking=False,
+        )
+        cost = price_completion(result)
+        if not cost.unpriced:
+            usd += cost.usd
+        text = result.content or ""
+        if text.strip():
+            break
     elapsed = time.perf_counter() - t0
-    cost = price_completion(result)
-    text = result.content or ""
     p: float | None = None
     verdict: str | None = None
     m = _JSON.search(text)
@@ -157,7 +165,7 @@ def verbalized(gateway: Any, state: str) -> dict[str, Any]:
         found = _WORD.findall(text)
         verdict = found[-1].upper() if found else None
     return {
-        "p": p, "verdict": verdict, "usd": None if cost.unpriced else cost.usd,
+        "p": p, "verdict": verdict, "usd": usd or None,
         "in_tokens": result.prompt_tokens, "out_tokens": result.completion_tokens,
         "seconds": round(elapsed, 3), "raw": text[:400],
     }

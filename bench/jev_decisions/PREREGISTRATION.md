@@ -108,3 +108,8 @@ alias `jev-latest` (pinned on purpose); a second provider on the endpoint (none 
    V rows are kept and not used.
 2. **Cost of the first run, for the record:** 1,347 requests, 0 halts, J US$ 0.0129 · B US$ 0.0172 ·
    V US$ 0.0205; J latency from São Paulo p50 0.34 s / p95 0.45 s; J resolved to `typesafe/jev-1.13-20260917`.
+3. **Run 2 still left 79/394 V requests empty** (`out_tokens = 600`): the `reasoning: {enabled: false}`
+   request is not honoured by every route that serves the `-0731` slug. Run 3 gives V what `_judge_word`
+   has — `max_tokens=2000` and one re-ask on empty — and completed 394/394 with a probability, 0 halts,
+   US$ 0.029. The report uses J and B from run 1 and V from run 3; runs 1–2 of V are kept as instrument
+   evidence, not scored.
