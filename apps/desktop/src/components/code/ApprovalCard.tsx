@@ -179,7 +179,7 @@ export function ApprovalCard({
             they were grading. */}
         {question.p != null ? (
           <span
-            className="rounded-full border border-border/40 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            className="rounded-full border border-border/40 bg-muted/30 px-1.5 py-0.5 font-mono text-xs text-muted-foreground"
             title={
               question.model
                 ? t("code.approval.p.byModel", { model: question.model })
