@@ -35,7 +35,7 @@ def test_a_window_by_line_returns_exactly_those_lines_and_says_where_the_next_on
 def test_a_truncated_read_names_the_next_window_instead_of_only_the_total(tmp_path: Path) -> None:
     tool = ReadFileTool(_big(tmp_path))
     out = tool.run(path="big.py")
-    assert "[truncated: lines 1–" in out and "continue with start_line=" in out
+    assert "[truncated, lines 1–" in out and "continue with start_line=" in out
     next_line = int(out.rsplit("start_line=", 1)[1].rstrip("]"))
     assert 200 < next_line < 400  # ~70 chars a line against a 20,000-char ceiling
     rest = tool.run(path="big.py", start_line=next_line)

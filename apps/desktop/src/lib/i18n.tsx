@@ -76,7 +76,7 @@ const en: Dict = {
   "tools.desc.search_files": "Search file contents by regular expression.",
   "tools.desc.read_text": "Read a text file.",
   "tools.desc.skill_view": "Read a file that came with an installed skill — its SKILL.md, or something under references/, scripts/ or templates/. Args: name (the skill), file_path (default SKILL.md).",
-  "tools.desc.read_file": "Read a UTF-8 text file from the workspace.",
+  "tools.desc.read_file": "Read a UTF-8 text file from the workspace. A large file is returned in windows: pass `start_line` (1-based) and `max_lines` to read a part of it; the truncation notice says where the window ended and how to ask for the next one.",
   "tools.desc.write_file":
     "Write (create or overwrite) a UTF-8 text file in the workspace.",
   "tools.desc.edit_file":
@@ -1510,7 +1510,7 @@ const pt: Dict = {
   "tools.desc.search_files": "Busca no conteúdo dos arquivos por expressão regular.",
   "tools.desc.read_text": "Lê um arquivo de texto.",
   "tools.desc.skill_view": "Lê um arquivo que veio junto com uma habilidade instalada.",
-  "tools.desc.read_file": "Lê um arquivo de texto UTF-8 do workspace.",
+  "tools.desc.read_file": "Lê um arquivo de texto UTF-8 do workspace. Um arquivo grande volta em janelas: passe `start_line` (a partir de 1) e `max_lines` para ler uma parte; o aviso de corte diz onde a janela terminou e como pedir a próxima.",
   "tools.desc.write_file":
     "Escreve (cria ou sobrescreve) um arquivo de texto UTF-8 no workspace.",
   "tools.desc.edit_file":
@@ -2993,7 +2993,7 @@ const es: Dict = {
   "tools.desc.search_files": "Busca en el contenido de los archivos por expresión regular.",
   "tools.desc.read_text": "Lee un archivo de texto.",
   "tools.desc.skill_view": "Lee un archivo que vino con una habilidad instalada.",
-  "tools.desc.read_file": "Lee un archivo de texto UTF-8 del workspace.",
+  "tools.desc.read_file": "Lee un archivo de texto UTF-8 del workspace. Un archivo grande se devuelve por ventanas: pasa `start_line` (desde 1) y `max_lines` para leer una parte; el aviso de corte dice dónde terminó la ventana y cómo pedir la siguiente.",
   "tools.desc.write_file":
     "Escribe (crea o sobrescribe) un archivo de texto UTF-8 en el workspace.",
   "tools.desc.edit_file":
@@ -4450,7 +4450,7 @@ const fr: Dict = {
   "tools.desc.search_files": "Cherche dans le contenu des fichiers par expression régulière.",
   "tools.desc.read_text": "Lit un fichier texte.",
   "tools.desc.skill_view": "Lit un fichier livré avec une compétence installée.",
-  "tools.desc.read_file": "Lit un fichier texte UTF-8 du workspace.",
+  "tools.desc.read_file": "Lit un fichier texte UTF-8 du workspace. Un fichier volumineux est renvoyé par fenêtres : passez `start_line` (à partir de 1) et `max_lines` pour en lire une partie ; l'avis de troncature indique où la fenêtre s'est arrêtée et comment demander la suivante.",
   "tools.desc.write_file":
     "Écrit (crée ou écrase) un fichier texte UTF-8 dans le workspace.",
   "tools.desc.edit_file":
@@ -5916,7 +5916,7 @@ const de: Dict = {
   "tools.desc.search_files": "Durchsucht Dateiinhalte per regulärem Ausdruck.",
   "tools.desc.read_text": "Liest eine Textdatei.",
   "tools.desc.skill_view": "Liest eine Datei, die mit einer installierten Fähigkeit kam.",
-  "tools.desc.read_file": "Liest eine UTF-8-Textdatei aus dem Workspace.",
+  "tools.desc.read_file": "Liest eine UTF-8-Textdatei aus dem Workspace. Eine große Datei kommt in Fenstern zurück: `start_line` (ab 1) und `max_lines` lesen einen Teil; der Kürzungshinweis sagt, wo das Fenster endete und wie das nächste angefordert wird.",
   "tools.desc.write_file":
     "Schreibt (erstellt oder überschreibt) eine UTF-8-Textdatei im Workspace.",
   "tools.desc.edit_file":
@@ -7376,7 +7376,7 @@ const zh: Dict = {
   "tools.desc.search_files": "用正则表达式搜索文件内容。",
   "tools.desc.read_text": "读取一个文本文件。",
   "tools.desc.skill_view": "读取随已安装技能一起提供的文件。",
-  "tools.desc.read_file": "从工作区读取一个 UTF-8 文本文件。",
+  "tools.desc.read_file": "从工作区读取一个 UTF-8 文本文件。大文件按窗口返回：传入 `start_line`（从 1 起）和 `max_lines` 读取其中一段；截断提示会说明窗口在哪里结束、如何请求下一段。",
   "tools.desc.write_file": "在工作区写入（新建或覆盖）一个 UTF-8 文本文件。",
   "tools.desc.edit_file":
     "替换工作区文件中的一段精确子串（精准编辑——要改动已有文件，优先用它而不是 write_file）。'old' 必须完全匹配；除非 replace_all 为 true，否则只能出现一次。匹配不到或有歧义时会被拒绝。",
@@ -8771,7 +8771,7 @@ const ja: Dict = {
   "tools.desc.read_text": "テキストファイルを読みます。",
   "tools.desc.skill_view": "インストール済みスキルに同梱されたファイルを読みます。",
   "tools.desc.read_file":
-    "ワークスペースから UTF-8 のテキストファイルを読みます。",
+    "ワークスペースから UTF-8 のテキストファイルを読みます。大きなファイルはウィンドウ単位で返ります：`start_line`（1 始まり）と `max_lines` を渡すと一部を読めます。切り詰めの注記は、ウィンドウがどこで終わったか、次をどう求めるかを示します。",
   "tools.desc.write_file":
     "ワークスペースに UTF-8 のテキストファイルを書きます（新規作成または上書き）。",
   "tools.desc.edit_file":
@@ -10177,7 +10177,7 @@ const it: Dict = {
   "tools.desc.search_files": "Cerca nel contenuto dei file con un'espressione regolare.",
   "tools.desc.read_text": "Legge un file di testo.",
   "tools.desc.skill_view": "Legge un file arrivato con un'abilità installata.",
-  "tools.desc.read_file": "Legge un file di testo UTF-8 dal workspace.",
+  "tools.desc.read_file": "Legge un file di testo UTF-8 dal workspace. Un file grande torna a finestre: passa `start_line` (da 1) e `max_lines` per leggerne una parte; l'avviso di troncamento dice dove è finita la finestra e come chiedere la successiva.",
   "tools.desc.write_file":
     "Scrive (crea o sovrascrive) un file di testo UTF-8 nel workspace.",
   "tools.desc.edit_file":
@@ -11636,7 +11636,7 @@ const pl: Dict = {
   "tools.desc.search_files": "Przeszukuje zawartość plików wyrażeniem regularnym.",
   "tools.desc.read_text": "Czyta plik tekstowy.",
   "tools.desc.skill_view": "Czyta plik, który przyszedł z zainstalowaną umiejętnością.",
-  "tools.desc.read_file": "Czyta plik tekstowy UTF-8 z workspace.",
+  "tools.desc.read_file": "Czyta plik tekstowy UTF-8 z workspace. Duży plik wraca oknami: podaj `start_line` (od 1) i `max_lines`, by przeczytać fragment; komunikat o obcięciu mówi, gdzie okno się skończyło i jak poprosić o następne.",
   "tools.desc.write_file":
     "Zapisuje (tworzy albo nadpisuje) plik tekstowy UTF-8 w workspace.",
   "tools.desc.edit_file":
@@ -13088,7 +13088,7 @@ const ru: Dict = {
   "tools.desc.search_files": "Ищет по содержимому файлов регулярным выражением.",
   "tools.desc.read_text": "Читает текстовый файл.",
   "tools.desc.skill_view": "Читает файл, пришедший вместе с установленным навыком.",
-  "tools.desc.read_file": "Читает текстовый файл в UTF-8 из рабочей папки.",
+  "tools.desc.read_file": "Читает текстовый файл в UTF-8 из рабочей папки. Большой файл возвращается окнами: передайте `start_line` (с 1) и `max_lines`, чтобы прочитать часть; уведомление об обрезке говорит, где окно закончилось и как запросить следующее.",
   "tools.desc.write_file":
     "Записывает текстовый файл в UTF-8 в рабочей папке (создаёт или перезаписывает).",
   "tools.desc.edit_file":

@@ -84,7 +84,7 @@ class ReadFileTool(_WorkspaceTool):
             stop = start - 1 + max(1, int(max_lines))
             window = "".join(lines[start - 1:stop])
             if stop < len(lines):
-                window += f"\n... [lines {start}–{stop} of {len(lines)}; continue with start_line={stop + 1}]"
+                window += f"\n... [truncated, lines {start}–{stop} of {len(lines)} shown; continue with start_line={stop + 1}]"
             return window
         if start > 1:
             text = "".join(lines[start - 1:])
@@ -92,9 +92,12 @@ class ReadFileTool(_WorkspaceTool):
             cut = text[:_MAX_READ_CHARS]
             shown = cut.count("\n")
             next_line = start + shown
+            # `[truncated,` stays the prefix: `chimera/eval/scenario_traps.py` matches it as the
+            # sign that a read came back short, and the daily suite's oracle keys its second look
+            # on the same six characters.
             return (
                 cut
-                + f"\n... [truncated: lines {start}–{next_line - 1} of {len(lines)} shown, {len(text)} chars"
+                + f"\n... [truncated, lines {start}–{next_line - 1} of {len(lines)} shown, {len(text)} chars"
                 + f" from here; continue with start_line={next_line}]"
             )
         return text
