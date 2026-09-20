@@ -941,6 +941,9 @@ const en: Dict = {
   "code.chat.notify.label": "notify",
   "code.chat.notify.hint":
     "Show a system notification when a turn ends and this window is not focused",
+  "code.chat.autoContinue.label": "auto-continue",
+  "code.chat.autoContinue.hint":
+    'Automatically send "continue" when a turn stops at the step limit (up to 3 times)',
   "code.chat.notify.title": "Turn finished",
   "code.chat.notify.failed": "Turn failed",
   "code.chat.empty":
@@ -2380,6 +2383,9 @@ const pt: Dict = {
   "code.chat.notify.label": "avisar",
   "code.chat.notify.hint":
     "Mostrar notificação do sistema quando um turno terminar e esta janela não estiver em foco",
+  "code.chat.autoContinue.label": "continuar sozinho",
+  "code.chat.autoContinue.hint":
+    'Enviar "continue" automaticamente quando o turno parar no limite de passos (até 3 vezes)',
   "code.chat.notify.title": "Turno terminado",
   "code.chat.notify.failed": "O turno falhou",
   "code.chat.empty":
@@ -3831,6 +3837,9 @@ const es: Dict = {
   "code.chat.notify.label": "avisar",
   "code.chat.notify.hint":
     "Mostrar una notificación del sistema cuando termine un turno y esta ventana no esté enfocada",
+  "code.chat.autoContinue.label": "continuar solo",
+  "code.chat.autoContinue.hint":
+    'Enviar "continue" automáticamente cuando el turno se detenga en el límite de pasos (hasta 3 veces)',
   "code.chat.notify.title": "Turno terminado",
   "code.chat.notify.failed": "El turno falló",
   "code.chat.empty":
@@ -5296,6 +5305,9 @@ const fr: Dict = {
   "code.chat.notify.label": "notifier",
   "code.chat.notify.hint":
     "Afficher une notification système quand un tour se termine et que cette fenêtre n'a pas le focus",
+  "code.chat.autoContinue.label": "continuer seul",
+  "code.chat.autoContinue.hint":
+    "Envoyer automatiquement « continue » quand le tour s'arrête à la limite d'étapes (jusqu'à 3 fois)",
   "code.chat.notify.title": "Tour terminé",
   "code.chat.notify.failed": "Le tour a échoué",
   "code.chat.empty":
@@ -6760,6 +6772,9 @@ const de: Dict = {
   "code.chat.notify.label": "melden",
   "code.chat.notify.hint":
     "Systembenachrichtigung anzeigen, wenn ein Durchgang endet und dieses Fenster nicht im Fokus ist",
+  "code.chat.autoContinue.label": "automatisch fortsetzen",
+  "code.chat.autoContinue.hint":
+    "Automatisch „continue“ senden, wenn ein Durchgang das Schrittlimit erreicht (bis zu 3 Mal)",
   "code.chat.notify.title": "Durchgang beendet",
   "code.chat.notify.failed": "Durchgang fehlgeschlagen",
   "code.chat.empty":
@@ -8169,6 +8184,8 @@ const zh: Dict = {
   "code.chat.copyAnswer": "以 Markdown 复制此轮对话",
   "code.chat.notify.label": "通知",
   "code.chat.notify.hint": "当一个回合结束且此窗口未获得焦点时，显示系统通知",
+  "code.chat.autoContinue.label": "自动继续",
+  "code.chat.autoContinue.hint": "当回合达到步数上限停止时自动发送 \"continue\"（最多 3 次）",
   "code.chat.notify.title": "回合已结束",
   "code.chat.notify.failed": "回合失败",
   "code.chat.empty": "这段对话会保留工具调用，所以下一条消息不会从零开始。",
@@ -9601,6 +9618,9 @@ const ja: Dict = {
   "code.chat.notify.label": "通知",
   "code.chat.notify.hint":
     "ターンが終了し、このウィンドウがフォーカスされていないときにシステム通知を表示",
+  "code.chat.autoContinue.label": "自動継続",
+  "code.chat.autoContinue.hint":
+    "ターンがステップ上限で停止したときに自動で「continue」を送信（最大3回）",
   "code.chat.notify.title": "ターンが終了しました",
   "code.chat.notify.failed": "ターンが失敗しました",
   "code.chat.empty":
@@ -11057,6 +11077,9 @@ const it: Dict = {
   "code.chat.notify.label": "notifica",
   "code.chat.notify.hint":
     "Mostra una notifica di sistema quando un turno finisce e questa finestra non è a fuoco",
+  "code.chat.autoContinue.label": "continua da solo",
+  "code.chat.autoContinue.hint":
+    'Invia automaticamente "continue" quando il turno si ferma al limite di passi (fino a 3 volte)',
   "code.chat.notify.title": "Turno terminato",
   "code.chat.notify.failed": "Turno fallito",
   "code.chat.empty":
@@ -12510,6 +12533,9 @@ const pl: Dict = {
   "code.chat.notify.label": "powiadom",
   "code.chat.notify.hint":
     "Pokaż powiadomienie systemowe, gdy tura się kończy, a to okno nie jest aktywne",
+  "code.chat.autoContinue.label": "kontynuuj samoczynnie",
+  "code.chat.autoContinue.hint":
+    "Automatycznie wysyłaj „continue”, gdy tura zatrzyma się na limicie kroków (do 3 razy)",
   "code.chat.notify.title": "Tura zakończona",
   "code.chat.notify.failed": "Tura nie powiodła się",
   "code.chat.empty":
@@ -13965,6 +13991,9 @@ const ru: Dict = {
   "code.chat.notify.label": "уведомлять",
   "code.chat.notify.hint":
     "Показывать системное уведомление, когда ход завершается и это окно не в фокусе",
+  "code.chat.autoContinue.label": "продолжать самому",
+  "code.chat.autoContinue.hint":
+    "Автоматически отправлять «continue», когда ход останавливается на лимите шагов (до 3 раз)",
   "code.chat.notify.title": "Ход завершён",
   "code.chat.notify.failed": "Ход завершился ошибкой",
   "code.chat.empty":
