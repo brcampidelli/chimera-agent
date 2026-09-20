@@ -45,6 +45,9 @@ from chimera.tools.base import Tool
 #: accident, which is the criterion `_DOCUMENT_ARGS` exists to serve.
 _IDENTIFIERS = frozenset({
     "action",
+    # `read_file`: which window of the file — two integers, no body.
+    "start_line",
+    "max_lines",
     # `mcp_call`/`mcp_describe`: which server tool. The identity of the action — an audit line
     # reading "called <120 chars>" would record that something happened and nothing about what.
     "tool",

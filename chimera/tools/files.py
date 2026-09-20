@@ -27,11 +27,23 @@ class _WorkspaceTool(Tool):
 
 class ReadFileTool(_WorkspaceTool):
     name = "read_file"
-    description = "Read a UTF-8 text file from the workspace."
+    description = (
+        "Read a UTF-8 text file from the workspace. A large file is returned in windows: pass "
+        "`start_line` (1-based) and `max_lines` to read a part of it; the truncation notice says "
+        "where the window ended and how to ask for the next one."
+    )
     parameters = {
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "Path relative to the workspace."}
+            "path": {"type": "string", "description": "Path relative to the workspace."},
+            "start_line": {
+                "type": "integer",
+                "description": "First line to return, 1-based (default 1). Use it to read past a truncation.",
+            },
+            "max_lines": {
+                "type": "integer",
+                "description": "How many lines to return from `start_line` (default: as many as fit).",
+            },
         },
         "required": ["path"],
     }
@@ -56,8 +68,35 @@ class ReadFileTool(_WorkspaceTool):
         if not path.is_file():
             return f"error: file not found: {kwargs['path']}"
         text = path.read_text(encoding="utf-8", errors="replace")
+        # A window, when one was asked for. Before this, a file over the ceiling was cut at 20,000
+        # characters with a notice that named the total and no way to reach the rest: measured on
+        # 2026-09-19 in the desktop agent's own transcript, a 137k-character module was the one it
+        # had to edit, and it spent the turn's steps on greps that could not see the region either.
+        # The notice now names the next window, so reading on is one call, not a guess.
+        start = int(kwargs["start_line"]) if kwargs.get("start_line") is not None else 1
+        max_lines = kwargs.get("max_lines")
+        lines = text.splitlines(keepends=True)
+        if start < 1:
+            return "error: start_line is 1-based"
+        if start > len(lines):
+            return f"error: start_line {start} is past the end ({len(lines)} lines)"
+        if max_lines is not None:
+            stop = start - 1 + max(1, int(max_lines))
+            window = "".join(lines[start - 1:stop])
+            if stop < len(lines):
+                window += f"\n... [lines {start}–{stop} of {len(lines)}; continue with start_line={stop + 1}]"
+            return window
+        if start > 1:
+            text = "".join(lines[start - 1:])
         if len(text) > _MAX_READ_CHARS:
-            return text[:_MAX_READ_CHARS] + f"\n... [truncated, {len(text)} chars total]"
+            cut = text[:_MAX_READ_CHARS]
+            shown = cut.count("\n")
+            next_line = start + shown
+            return (
+                cut
+                + f"\n... [truncated: lines {start}–{next_line - 1} of {len(lines)} shown, {len(text)} chars"
+                + f" from here; continue with start_line={next_line}]"
+            )
         return text
 
 
