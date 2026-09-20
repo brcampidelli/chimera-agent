@@ -39,6 +39,14 @@ class Verdict:
     travels with the decision it explains and a screen can show it beside the verdict; never read
     by the kernel itself — a threshold on it is a policy, and policies are chosen on a measured
     curve, not defaulted here."""
+    band: str | None = None
+    """Which band of the REVIEW band the number fell in (`governance/band.py`) — ``review`` on
+    the one verdict the band returns. Travels with ``confidence`` to the approval question, so
+    the card can say where the number sits and the record can keep it beside the answer."""
+    model: str | None = None
+    """The build that produced ``confidence`` (``qwen3:4b@Q4_K_M``), when a decider did — the
+    receipt's `resolved_model`, or the backend's name when the route did not say. A refit of the
+    calibration map is keyed on it, so a record line without it could not be used for one."""
 
     @property
     def allowed(self) -> bool:

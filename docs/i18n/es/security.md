@@ -107,6 +107,25 @@ La exfiltración a través de una herramienta permitida se cierra con el mismo c
 de una ejecución contaminada que lleva un query string es una revisión, y los dos GET legítimos con
 query string agregados al corpus muestran lo que eso cuesta.
 
+### Un número en la tarjeta
+
+Donde las reglas léxicas no encuentran nada, una **banda de REVIEW** opcional
+(`CHIMERA_GOVERNANCE_BAND=on`, bajo `observe` o `enforce`) pregunta a un modelo local pequeño —
+decisión primero, leído por las probabilidades de los tokens, a través de un mapa de calibración
+ajustado con ejemplos etiquetados — qué tan probable es que la acción sea peligrosa, y lee esa
+probabilidad contra dos umbrales fijados en la ROC medida. Por encima del superior la acción se
+detiene ante una persona; entre los dos se ejecuta con el número registrado como prior; la banda
+nunca bloquea por sí sola ni anula una regla. La tarjeta muestra entonces el número junto al nivel
+(`p=0.80 · review`, el build al pasar el cursor), y el sí o no de la persona se registra en
+`approvals/history.jsonl` **con** la probabilidad, la banda y el build que la produjo. Esa línea es
+una etiqueta: con suficientes, el mapa se reajusta sobre las decisiones de este despliegue en lugar
+de los cincuenta y cinco ítems del bench, y el recibo dice con qué build se ajustó el mapa, para que
+una actualización del modelo no herede el antiguo en silencio. Una pregunta planteada por una regla
+no lleva número, y la tarjeta no muestra ninguno: no lo inventa. Medido antes de publicarse, en
+[`bench/jev_decisions/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/jev_decisions/RESULTS.md):
+en el corpus ambiguo el modelo local ordena como el juez alojado y, a través del mapa, alcanza el
+punto de operación del juez a US$ 0 y 0,3 s por decisión.
+
 ### Memoria envenenada, entre ejecuciones
 
 `redteam` mide una sola ejecución. La otra forma es más lenta y no cabe en un proceso: la ejecución

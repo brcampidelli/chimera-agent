@@ -1585,6 +1585,12 @@ def register_code_api(
                 "asked_at": question.asked_at,
                 "decision": question.decision,
                 "wait_seconds": float(settings.approval_wait),
+                # The band's number, band and decider, when the question came from one (item 3 of
+                # the study-20 program): the card shows them, and the person's answer is recorded
+                # beside them — the label a refit on this deployment's own rows is made of.
+                "p": question.p,
+                "band": question.band,
+                "model": question.model,
             },
         )
 

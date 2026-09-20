@@ -1536,6 +1536,9 @@ class ApprovalOut(BaseModel):
     asked_at: float
     age_seconds: float
     decision: str = "review"  # the level of the verdict that raised it: block | review | warn
+    p: float | None = None
+    band: str | None = None
+    model: str | None = None
 
 
 class ApprovalAnswerIn(BaseModel):

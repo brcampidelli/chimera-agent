@@ -5903,8 +5903,11 @@ def approve(
             for p in aguardando:
                 # Forty characters of `why` used to be the whole question. The reason now names the
                 # page and who asked for it; cutting it back to the tool name would undo that.
+                # A question the REVIEW band raised carries its number; one a rule raised does not,
+                # and the column stays the level alone rather than showing a made-up "p=".
+                level = f"{p.decision} · p={p.p:.2f}" if p.p is not None else p.decision
                 tabela.add_row(
-                    p.id, p.decision, f"{p.age_seconds / 60:.0f} min", p.reason[:160], p.action[:120]
+                    p.id, level, f"{p.age_seconds / 60:.0f} min", p.reason[:160], p.action[:120]
                 )
             console.print(tabela)
             console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")

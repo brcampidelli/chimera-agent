@@ -93,6 +93,15 @@ class PendingApproval:
     asked_at: float
     decision: str = "review"
     """The level of the verdict that raised the question — ``block`` | ``review`` | ``warn``."""
+    p: float | None = None
+    """The calibrated probability the REVIEW band put on "dangerous", when the question came from
+    it (`governance/band.py`); ``None`` for a question a lexical rule or the taint ledger raised —
+    those have no number, and a card must not show one."""
+    band: str | None = None
+    """``review`` when the band raised it; the band's own name for where the number fell."""
+    model: str | None = None
+    """The build that produced ``p`` (``qwen3:4b@Q4_K_M``), so the answer can later refit the map
+    for exactly that build and no other."""
 
     @property
     def age_seconds(self) -> float:
@@ -124,6 +133,7 @@ def pending(home: Path) -> list[PendingApproval]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
+        p_val = data.get("p")
         out.append(
             PendingApproval(
                 id=str(data.get("id") or path.name.split(".")[0]),
@@ -131,6 +141,9 @@ def pending(home: Path) -> list[PendingApproval]:
                 reason=str(data.get("reason") or ""),
                 asked_at=float(data.get("asked_at") or 0.0),
                 decision=str(data.get("decision") or "review"),
+                p=float(p_val) if p_val is not None else None,
+                band=str(data["band"]) if data.get("band") is not None else None,
+                model=str(data["model"]) if data.get("model") is not None else None,
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -184,17 +197,27 @@ def ask_durably(
     # One clock reading for the file, the announcement and the record. There used to be one per
     # site, and a time-to-answer measured between two of them carried their difference.
     asked_at = time.time()
+    p = (facts or {}).get("p")
+    band = (facts or {}).get("band")
+    model = (facts or {}).get("model")
+    payload: dict[str, Any] = {
+        "id": request_id,
+        "action": action,
+        "reason": reason,
+        "asked_at": asked_at,
+        "decision": decision,
+    }
+    if p is not None:
+        payload["p"] = p
+    if band is not None:
+        payload["band"] = band
+    if model is not None:
+        payload["model"] = model
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
         (directory / f"{request_id}.ask.json").write_text(
-            json.dumps(
-                {
-                    "id": request_id, "action": action, "reason": reason, "asked_at": asked_at,
-                    "decision": decision,
-                },
-                ensure_ascii=False,
-            ),
+            json.dumps(payload, ensure_ascii=False),
             encoding="utf-8",
         )
     except OSError as exc:
@@ -210,8 +233,14 @@ def ask_durably(
         try:
             on_asked(
                 PendingApproval(
-                    id=request_id, action=action, reason=reason, asked_at=asked_at,
+                    id=request_id,
+                    action=action,
+                    reason=reason,
+                    asked_at=asked_at,
                     decision=decision,
+                    p=float(p) if p is not None else None,
+                    band=str(band) if band is not None else None,
+                    model=str(model) if model is not None else None,
                 )
             )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
@@ -271,10 +300,11 @@ OUTCOMES = ("approved", "refused", "timeout", "unreadable")
 #: The facts a caller may attach to a record line, and the only ones written: which run asked
 #: (``run_id``, joins ``traces.jsonl`` and ``runs.jsonl``), on which surface (``surface``), which tool
 #: (``tool``), which lexical rule raised it (``rule``, a `Verdict`), whether the run was tainted
-#: (``lineage``) and where the taint came from (``sources``, a `SequenceAssessment`). Anything else a
-#: caller passes is dropped: the line is a record, not a bag, and a key that is not named here has
+#: (``lineage``) and where the taint came from (``sources``, a `SequenceAssessment`), and, when raised
+#: by a calibrated decision band, the score and provenance (``p``, ``band``, ``model``). Anything else
+#: a caller passes is dropped: the line is a record, not a bag, and a key that is not named here has
 #: no reader.
-FACTS = ("run_id", "surface", "tool", "rule", "lineage", "sources")
+FACTS = ("run_id", "surface", "tool", "rule", "lineage", "sources", "p", "band", "model")
 
 
 def _record(
@@ -309,7 +339,14 @@ def _record(
         value = (facts or {}).get(key)
         if value in (None, "", [], ()):
             continue
-        line[key] = [str(v)[:200] for v in value][:8] if isinstance(value, (list, tuple)) else str(value)[:200]
+        if isinstance(value, (list, tuple)):
+            line[key] = [str(v)[:200] for v in value][:8]
+        elif isinstance(value, (int, float)) and not isinstance(value, bool):
+            # A number stays a number: `p` is the label's x-axis, and a refit that had to parse
+            # "0.8012" back out of a string would be one more place to get it wrong.
+            line[key] = round(float(value), 4)
+        else:
+            line[key] = str(value)[:200]
     try:
         with (directory / HISTORY).open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(line, ensure_ascii=False) + "\n")

@@ -109,6 +109,26 @@ Die Exfiltration über ein erlaubtes Tool schließt dieselbe Änderung: das `htt
 kontaminierten Laufs mit Query-String ist eine Review, und die zwei legitimen Query-String-GETs,
 die dem Corpus hinzugefügt wurden, zeigen, was das kostet.
 
+### Eine Zahl auf der Karte
+
+Wo die lexikalischen Regeln nichts finden, fragt ein optionales **REVIEW-Band**
+(`CHIMERA_GOVERNANCE_BAND=on`, unter `observe` oder `enforce`) ein kleines lokales Modell —
+Entscheidung zuerst, aus den Token-Wahrscheinlichkeiten gelesen, durch eine auf gelabelten
+Beispielen angepasste Kalibrierungskarte —, wie wahrscheinlich die Aktion gefährlich ist, und liest
+diese Wahrscheinlichkeit gegen zwei auf der gemessenen ROC gesetzte Schwellen. Über der oberen hält
+die Aktion vor einer Person an; zwischen beiden läuft sie, die Zahl wird als Prior aufgezeichnet;
+das Band blockiert nie von sich aus und setzt nie eine Regel außer Kraft. Die Karte zeigt die Zahl
+dann neben der Stufe (`p=0.80 · review`, der Build beim Überfahren), und das Ja oder Nein der Person
+wird in `approvals/history.jsonl` **mit** Wahrscheinlichkeit, Band und dem Build, der sie erzeugt
+hat, festgehalten. Diese Zeile ist ein Label: genug davon passen die Karte an die Entscheidungen
+dieser Installation an statt an die fünfundfünfzig Items des Benchmarks, und der Beleg nennt den
+Build, auf dem die Karte angepasst wurde, damit ein Modell-Update die alte nicht stillschweigend
+erbt. Eine von einer Regel gestellte Frage trägt keine Zahl, und die Karte zeigt keine — sie erfindet
+keine. Vor der Auslieferung gemessen, in
+[`bench/jev_decisions/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/jev_decisions/RESULTS.md):
+auf dem mehrdeutigen Korpus ordnet das lokale Modell wie der gehostete Richter und erreicht über die
+Karte dessen Arbeitspunkt bei 0 US$ und 0,3 s pro Entscheidung.
+
 ### Vergiftetes Gedächtnis, über Läufe hinweg
 
 `redteam` misst einen Lauf. Die andere Form ist langsamer und passt nicht in einen Prozess: Lauf A

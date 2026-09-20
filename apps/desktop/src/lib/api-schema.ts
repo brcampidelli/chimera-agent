@@ -3162,6 +3162,8 @@ export interface components {
             age_seconds: number;
             /** Asked At */
             asked_at: number;
+            /** Band */
+            band?: string | null;
             /**
              * Decision
              * @default review
@@ -3169,6 +3171,10 @@ export interface components {
             decision: string;
             /** Id */
             id: string;
+            /** Model */
+            model?: string | null;
+            /** P */
+            p?: number | null;
             /** Reason */
             reason: string;
         };

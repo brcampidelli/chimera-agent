@@ -1341,6 +1341,9 @@ def build_api_app(
                 "asked_at": q.asked_at,
                 "age_seconds": q.age_seconds,
                 "decision": q.decision,
+                "p": q.p,
+                "band": q.band,
+                "model": q.model,
             }
             for q in pending(live_settings().home)
         ]

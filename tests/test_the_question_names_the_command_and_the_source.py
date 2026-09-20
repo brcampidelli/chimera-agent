@@ -297,3 +297,56 @@ def test_the_line_stays_short_when_there_is_one_level(tmp_path: Path) -> None:
     pending.ask_durably(tmp_path, "a", "r", wait_seconds=5.0, poll_seconds=1.0,
                         clock=clock, sleep=clock.sleep)
     assert "by level" not in approval_stats_line(pending.answer_stats(tmp_path))
+
+
+def test_the_band_s_number_travels_with_the_question_into_the_queue_and_the_record(tmp_path: Path) -> None:
+    """Item 3 of the study-20 program: a question the REVIEW band raised carries its calibrated
+    probability, its band and the build that produced it — on the file the queue reads, on the
+    announcement a screen draws, and on the record line the person's answer lands on. That line is
+    the label a refit of the calibration map on this deployment's own rows is made of, so a row
+    without the build could not be used for one."""
+    clock = _Clock()
+    announced: list[pending.PendingApproval] = []
+    queued: list[pending.PendingApproval] = []
+
+    def on_asked(q: pending.PendingApproval) -> None:
+        announced.append(q)
+        queued.extend(pending.pending(tmp_path))
+        assert pending.answer(tmp_path, q.id, True)
+
+    facts = {"run_id": "turn-7", "surface": "api:turn", "tool": "run_shell", "rule": "decision_band",
+             "p": 0.8012, "band": "review", "model": "qwen3:4b@Q4_K_M"}
+    assert pending.ask_durably(
+        tmp_path, "run_shell\npython -c 'import shutil; shutil.rmtree(\"/home/bruno\")'",
+        "the decision model put p=0.80 on dangerous", wait_seconds=30.0, poll_seconds=1.0,
+        clock=clock, sleep=clock.sleep, on_asked=on_asked, decision="review", facts=facts,
+    ) is True
+    [q] = announced
+    assert (q.p, q.band, q.model) == (0.8012, "review", "qwen3:4b@Q4_K_M")
+    [read_back] = queued
+    assert (read_back.p, read_back.band, read_back.model) == (0.8012, "review", "qwen3:4b@Q4_K_M")
+    [row] = pending.history(tmp_path)
+    assert row["outcome"] == "approved"
+    assert (row["p"], row["band"], row["model"]) == (0.8012, "review", "qwen3:4b@Q4_K_M")
+    assert row["rule"] == "decision_band" and row["run_id"] == "turn-7"
+
+
+def test_a_question_a_rule_raised_carries_no_number(tmp_path: Path) -> None:
+    """A lexical rule has no opinion about its own odds: the queue file, the announcement and the
+    record carry no ``p`` — a card that showed one would be inventing it."""
+    clock = _Clock()
+    announced: list[pending.PendingApproval] = []
+
+    def on_asked(q: pending.PendingApproval) -> None:
+        announced.append(q)
+        assert pending.answer(tmp_path, q.id, False)
+
+    pending.ask_durably(
+        tmp_path, "run_shell\ngit push --force origin main", "force push", wait_seconds=30.0,
+        poll_seconds=1.0, clock=clock, sleep=clock.sleep, on_asked=on_asked, decision="review",
+        facts={"rule": "git_force_push", "tool": "run_shell"},
+    )
+    [q] = announced
+    assert q.p is None and q.band is None and q.model is None
+    [row] = pending.history(tmp_path)
+    assert "p" not in row and "band" not in row and "model" not in row and row["rule"] == "git_force_push"

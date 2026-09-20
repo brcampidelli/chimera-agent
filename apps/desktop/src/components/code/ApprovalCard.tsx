@@ -49,6 +49,13 @@ export interface ApprovalQuestionLike {
    * is shown as nothing rather than guessed into `review`. */
   decision?: string;
   wait_seconds?: number;
+  /** The REVIEW band's calibrated probability of "dangerous", its band and the build that produced
+   *  it (`chimera/governance/band.py`) — present only when the band raised the question. A question
+   *  a lexical rule or the taint ledger raised has no number, and the card shows none rather than
+   *  inventing one. */
+  p?: number | null;
+  band?: string | null;
+  model?: string | null;
   /** When the call parked, in the SERVER's epoch seconds. Both wire shapes carry it — the stream
    *  frame (`chimera/api/code_api.py`) and `ApprovalOut` — and it is what lets a card that mounts
    *  LATE show the time that is actually left rather than the time the question started with. */
@@ -163,6 +170,25 @@ export function ApprovalCard({
         {level ? (
           <span className={cn("rounded-full border px-1.5 py-0.5 text-xs font-medium", level.tone)}>
             {t(level.key)}
+          </span>
+        ) : null}
+        {/* The band's number, beside the level, when the band is what raised the question: the
+            person deciding sees how sure the model was, in the same "p=0.80" the audit line and
+            `chimera guard` print. The tooltip names the build, because a refit of the map is
+            keyed on it and a screen that hid it would leave the person no way to know which model
+            they were grading. */}
+        {question.p != null ? (
+          <span
+            className="rounded-full border border-border/40 bg-muted/30 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            title={
+              question.model
+                ? t("code.approval.p.byModel", { model: question.model })
+                : t("code.approval.p.hint")
+            }
+            data-testid="approval-p"
+          >
+            p={question.p.toFixed(2)}
+            {question.band ? ` · ${question.band}` : ""}
           </span>
         ) : null}
       </div>

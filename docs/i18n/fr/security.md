@@ -109,6 +109,26 @@ L'exfiltration via un outil autorisé est fermée par le même changement : le `
 contaminé portant une query string est une révision, et les deux GET légitimes avec query string
 ajoutés au corpus montrent ce que cela coûte.
 
+### Un nombre sur la carte
+
+Là où les règles lexicales ne trouvent rien, une **bande de REVIEW** optionnelle
+(`CHIMERA_GOVERNANCE_BAND=on`, sous `observe` ou `enforce`) demande à un petit modèle local —
+décision d'abord, lue dans les probabilités des tokens, à travers une carte de calibration ajustée
+sur des exemples étiquetés — à quel point l'action est probablement dangereuse, et lit cette
+probabilité contre deux seuils fixés sur la ROC mesurée. Au-dessus du seuil haut l'action s'arrête
+devant une personne ; entre les deux elle s'exécute avec le nombre enregistré comme prior ; la bande
+ne bloque jamais d'elle-même et ne supplante jamais une règle. La carte affiche alors le nombre à
+côté du niveau (`p=0.80 · review`, le build au survol), et le oui ou non de la personne est
+enregistré dans `approvals/history.jsonl` **avec** la probabilité, la bande et le build qui l'a
+produite. Cette ligne est une étiquette : avec assez d'entre elles, la carte de calibration est
+réajustée sur les décisions de ce déploiement plutôt que sur les cinquante-cinq items du bench, et
+le reçu indique sur quel build elle a été ajustée, pour qu'une mise à jour du modèle n'hérite pas
+silencieusement de l'ancienne. Une question levée par une règle ne porte aucun nombre, et la carte
+n'en montre aucun — elle n'en invente pas. Mesuré avant la sortie, dans
+[`bench/jev_decisions/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/jev_decisions/RESULTS.md) :
+sur le corpus ambigu le modèle local classe comme le juge hébergé et, via la carte, atteint le point
+de fonctionnement du juge à 0 US$ et 0,3 s par décision.
+
 ### Mémoire empoisonnée, d'un run à l'autre
 
 `redteam` mesure un seul run. L'autre forme est plus lente et ne tient pas dans un processus : le

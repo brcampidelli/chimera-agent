@@ -101,6 +101,18 @@ describe("ApprovalCard — the other half of a pause", () => {
     expect(screen.queryByText(/needs review/i)).not.toBeInTheDocument();
   });
 
+  it("a question the REVIEW band raised shows its number, its band and — on hover — the build", () => {
+    mount(() => {}, { ...question, decision: "review", p: 0.8012, band: "review", model: "qwen3:4b@Q4_K_M" });
+    const chip = screen.getByTestId("approval-p");
+    expect(chip).toHaveTextContent("p=0.80 · review");
+    expect(chip).toHaveAttribute("title", expect.stringContaining("qwen3:4b@Q4_K_M"));
+  });
+
+  it("a question a rule raised shows no number — the card does not invent one", () => {
+    mount(() => {}, { ...question, decision: "review" });
+    expect(screen.queryByTestId("approval-p")).not.toBeInTheDocument();
+  });
+
   it("a stale click still clears the card: a verdict on a resolved question has nowhere to go", async () => {
     answerApproval.mockResolvedValueOnce({ ok: false });
     const onAnswered = vi.fn();

@@ -95,6 +95,24 @@ The exfiltration through an allowed tool is closed by the same change: a tainted
 carrying a query string is a review, and the two legitimate query-string GETs added to the
 corpus show what that costs.
 
+### A number on the card
+
+Where the lexical rules match nothing, an opt-in **REVIEW band** (`CHIMERA_GOVERNANCE_BAND=on`,
+under `observe` or `enforce`) asks a small local model — decision-first, read by token
+probabilities, through a calibration map fitted on labelled examples — how likely the action is
+to be dangerous, and reads that probability against two thresholds set on the measured ROC. Above
+the upper one the action stops for a person; between the two it runs with the number recorded as
+a prior; the band never hard-blocks and never overrides a rule. The card then shows the number
+beside the level (`p=0.80 · review`, the build on hover), and the person's yes or no is recorded
+in `approvals/history.jsonl` **with** the probability, the band and the build that produced it.
+That line is a label: enough of them refit the map on this deployment's own decisions instead of
+the bench's fifty-five, and the receipt says which build the map was fitted on, so a model update
+cannot silently inherit the old one. A question a rule raised carries no number, and the card
+shows none — it does not invent one. Measured before it shipped, in
+[`bench/jev_decisions/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/jev_decisions/RESULTS.md):
+on the ambiguous corpus the local model ranks like the hosted judge and, through the map, reaches
+the judge's operating point at US$ 0 and 0.3 s a decision.
+
 ### Poisoned memory, across runs
 
 `redteam` measures one run. The other shape is slower and does not fit in a process: run A reads a

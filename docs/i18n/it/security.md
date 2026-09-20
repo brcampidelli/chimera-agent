@@ -109,6 +109,26 @@ L'esfiltrazione tramite un tool consentito è chiusa dallo stesso cambiamento: l
 un'esecuzione contaminata che porta con sé una query string è una review, e i due GET legittimi con
 query string aggiunti al corpus mostrano quanto costa.
 
+### Un numero sulla scheda
+
+Dove le regole lessicali non trovano nulla, una **banda di REVIEW** opzionale
+(`CHIMERA_GOVERNANCE_BAND=on`, sotto `observe` o `enforce`) chiede a un piccolo modello locale —
+decisione per prima, letta dalle probabilità dei token, attraverso una mappa di calibrazione
+adattata su esempi etichettati — quanto è probabile che l'azione sia pericolosa, e legge quella
+probabilità contro due soglie fissate sulla ROC misurata. Sopra la superiore l'azione si ferma
+davanti a una persona; tra le due prosegue con il numero registrato come prior; la banda non blocca
+mai da sola e non scavalca mai una regola. La scheda mostra allora il numero accanto al livello
+(`p=0.80 · review`, il build al passaggio del mouse), e il sì o no della persona viene registrato in
+`approvals/history.jsonl` **con** la probabilità, la banda e il build che l'ha prodotta. Quella riga
+è un'etichetta: con abbastanza righe, la mappa viene riadattata sulle decisioni di questa
+installazione invece che sui cinquantacinque item del bench, e la ricevuta dice su quale build la
+mappa è stata adattata, perché un aggiornamento del modello non erediti in silenzio quella vecchia.
+Una domanda sollevata da una regola non porta numero, e la scheda non ne mostra alcuno — non lo
+inventa. Misurato prima del rilascio, in
+[`bench/jev_decisions/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/jev_decisions/RESULTS.md):
+sul corpus ambiguo il modello locale ordina come il giudice ospitato e, attraverso la mappa,
+raggiunge il punto operativo del giudice a 0 US$ e 0,3 s per decisione.
+
 ### Memoria avvelenata, attraverso le esecuzioni
 
 `redteam` misura una sola esecuzione. L'altra forma è più lenta e non entra in un processo:

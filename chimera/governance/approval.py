@@ -111,6 +111,15 @@ def _facts_of(*args: Any) -> dict[str, Any]:
     rule = getattr(head, "rule", None)
     if isinstance(rule, str) and rule:
         facts["rule"] = rule
+    confidence = getattr(head, "confidence", None)
+    if isinstance(confidence, (int, float)):
+        facts["p"] = round(float(confidence), 4)
+    band = getattr(head, "band", None)
+    if isinstance(band, str) and band:
+        facts["band"] = band
+    model = getattr(head, "model", None)
+    if isinstance(model, str) and model:
+        facts["model"] = model
     sources = getattr(head, "sources", None)
     if isinstance(sources, (list, tuple)) and sources:
         facts["sources"] = list(sources)

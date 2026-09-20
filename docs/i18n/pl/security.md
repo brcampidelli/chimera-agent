@@ -106,6 +106,25 @@ Eksfiltracja przez dozwolone narzędzie zostaje zamknięta tą samą zmianą: `h
 przebiegu niosący query string trafia do przeglądu, a dwa legalne GET-y z query stringiem dodane
 do korpusu pokazują, ile to kosztuje.
 
+### Liczba na karcie
+
+Tam, gdzie reguły leksykalne nic nie znajdują, opcjonalne **pasmo REVIEW**
+(`CHIMERA_GOVERNANCE_BAND=on`, pod `observe` lub `enforce`) pyta mały lokalny model — decyzja
+najpierw, odczytana z prawdopodobieństw tokenów, przez mapę kalibracji dopasowaną na oznaczonych
+przykładach — jak prawdopodobne jest, że akcja jest niebezpieczna, i odczytuje to prawdopodobieństwo
+względem dwóch progów ustawionych na zmierzonej krzywej ROC. Powyżej górnego akcja zatrzymuje się
+przed człowiekiem; między progami wykonuje się z liczbą zapisaną jako prior; pasmo nigdy nie blokuje
+samo z siebie i nigdy nie uchyla reguły. Karta pokazuje wtedy liczbę obok poziomu (`p=0.80 · review`,
+build po najechaniu), a tak lub nie osoby zapisywane jest w `approvals/history.jsonl` **wraz** z
+prawdopodobieństwem, pasmem i buildem, który je wytworzył. Ta linia jest etykietą: dość takich linii
+dopasowuje mapę do decyzji tego wdrożenia zamiast do pięćdziesięciu pięciu elementów benchmarku, a
+pokwitowanie mówi, na którym buildzie mapa została dopasowana, żeby aktualizacja modelu nie
+odziedziczyła starej po cichu. Pytanie podniesione przez regułę nie niesie liczby, a karta żadnej
+nie pokazuje — nie wymyśla jej. Zmierzone przed wydaniem, w
+[`bench/jev_decisions/RESULTS.md`](https://github.com/brcampidelli/chimera-agent/blob/main/bench/jev_decisions/RESULTS.md):
+na korpusie niejednoznacznym model lokalny porządkuje jak hostowany sędzia i przez mapę osiąga jego
+punkt pracy za 0 USD i 0,3 s na decyzję.
+
 ### Zatruta pamięć, między przebiegami
 
 `redteam` mierzy jeden przebieg. Drugi kształt jest wolniejszy i nie mieści się w jednym procesie:

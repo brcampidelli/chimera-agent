@@ -607,6 +607,17 @@
             "title": "Asked At",
             "type": "number"
           },
+          "band": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band"
+          },
           "decision": {
             "default": "review",
             "title": "Decision",
@@ -615,6 +626,28 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P"
           },
           "reason": {
             "title": "Reason",

@@ -148,7 +148,14 @@ class DecisionBand:
                 + (f" (still above the band's exit at {self.band.exit_at:.2f})" if p < self.band.review_at else f" (≥ {self.band.review_at:.2f})")
                 + "; a person should approve it before it runs"
             )
-            return BandReading(Verdict(Decision.REVIEW, reason, RULE, confidence=p), "review", p, answer.raw_p, answer)
+            model_id = answer.resolved_model or answer.backend
+            return BandReading(
+                Verdict(Decision.REVIEW, reason, RULE, confidence=p, band="review", model=model_id),
+                "review",
+                p,
+                answer.raw_p,
+                answer,
+            )
         self._in_review.pop(action, None)
         band = "allow" if p < self.band.allow_below else "uncertain"
         return BandReading(None, band, p, answer.raw_p, answer)
