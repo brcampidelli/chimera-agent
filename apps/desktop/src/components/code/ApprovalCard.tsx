@@ -125,7 +125,7 @@ const LEVEL_LABEL: Record<string, { key: string; tone: string } | undefined> = {
 /** The bands of the REVIEW band, and the word each is shown as.
  *
  * Closed set, mirroring `chimera/governance/band.py::BandReading.band` — the same reason
- * `LEVEL_LABEL` above is a literal map rather than an interpolated key: `i18n.reachable.test`
+ * `LEVEL_LABEL` above is a literal map rather than an interpolated one — `i18n.reachable.test`
  * proves every key is rendered somewhere by searching the source for the key as a string, and an
  * interpolated key is invisible to it.
  *
