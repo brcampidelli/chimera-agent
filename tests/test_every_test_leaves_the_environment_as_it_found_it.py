@@ -104,6 +104,11 @@ _IMPORT_PROBE = (
 
 
 def _import_and_read_env(module: str, names: tuple[str, ...]) -> list[str]:
+    # torch and scikit-learn live in the opt-in `media`/data-analysis extras, and CI installs only
+    # `--extra dev --extra desktop` — so the probe is skipped where the library is absent rather
+    # than failing on an ImportError that says nothing about the environment. The entry is proven
+    # on the machines that import the library, which is the only place it can be set at all.
+    pytest.importorskip(module.split(".")[0])
     env = {k: v for k, v in os.environ.items() if k not in names}
     out = subprocess.run(
         [sys.executable, "-c", _IMPORT_PROBE, module],
