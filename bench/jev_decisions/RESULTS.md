@@ -344,15 +344,54 @@ instrument — a different prompt hash, no map until one is fitted on it.
 
 ### B4 — claim-versus-diff as a Noul
 
-**Not run.** `run_claim_noul.py` is written and `--check` refuses cleanly: the 547 solves live in
-`~/hb-homes` and `~/harness-bench` on the machine that ran the factorial, and neither is present here
-(`usable solves 0`). The arm is registered, the runner exists, and the corpus is absent — recorded as
-such rather than run on invented rows. The ruler it will be read against is `bench/claim_vs_diff`'s own
-`overlap` at AUROC 0.6643 [0.532, 0.792].
+**Run.** `results/2026-09-19-tier-b-b4-local.jsonl` — arm `L`, 385 requests, US$ 0, 0 halts, 328 s.
+The corpus was found: the 547 solves live in `~/hb-homes` and `~/harness-bench` **inside the WSL2
+distro** that ran the factorial, not in the Windows home the runner defaulted to. `--check` reads
+`usable solves 547 · dropped {'no receipt': 5, 'not a factorial arm': 4}` and the leak check passes
+(the task id does not appear in the state). The runner now falls back to the WSL copy when the default
+`~` is empty, and takes `--homes`/`--bench-home` for an explicit path.
+
+| arm | rows | tasks | pairs | within-task AUROC | 95% CI | prediction |
+|---|---:|---:|---:|---:|---|---|
+| `L` (local Noul) | 385 | 10 | 557 | **0.5368** | [0.4223, 0.6559] | 0.60–0.70 — **OUTSIDE** |
+| `overlap` (the ruler, lexical) | 385 | 10 | 557 | 0.6643 | [0.532, 0.792] | — |
+
+Same population, same 10 tasks, same 557 discordant pairs as `bench/claim_vs_diff`'s primary — the two
+numbers are read on one ruler. Mean `p` is 0.736 on the passes and 0.579 on the failures, so the
+reading is oriented as the question asks (higher `p` where the claim matched the diff); the AUROC is
+below it because the ordering inside a task barely separates the two.
+
+**By the rule written before the run — AUROC ≥ 0.6643 → the Noul is a usable second reading for C2 —
+the arm fails.** 0.5368 is below the lexical signal and its interval spans 0.5. The number to read
+beside it: `bench/claim_vs_diff`'s own **negative control** — `overlap` with the labels shuffled within
+task — is **0.5368**, the same value to four decimals. A Noul that reads the claim and the diff lands
+where a lexical signal lands when its labels are destroyed. **Consequence, as registered:** the lexical
+signal stands alone; C2 combines what it already has, and this arm adds a call and no information.
+
+Per task (pairs): 040-test-coverage-fill 1.000 (20) · 082-compose-config-repair 0.950 (20) ·
+085-flaky-test-root-cause 0.750 (56) · 080-schema-roundtrip-conversion 0.609 (110) ·
+022-local-rest-api-summary 0.600 (70) · 041-frontend-state-bug 0.500 (12) · 044-ci-config-repair 0.489
+(88) · 089-ab-test-caveat-analysis 0.456 (57) · 094-metric-definition-migration-diff 0.308 (91) ·
+043-db-migration-safety 0.182 (33). The spread is wide and the two tasks that carry the most pairs
+(080, 094) sit at 0.61 and 0.31 — the pooled number is not one task's.
+
+**Two defects in the runner were found and fixed before this number existed, and both would have
+produced a confident wrong answer.** (1) The local arm raised `KeyError: 'BLOCK'` on **every** row: the
+shared `local()` computed `p` as `shares["BLOCK"] + shares["REVIEW"]`, hardcoded to the governance
+labels, while B4 asks a yes/no question. The arm would have recorded 385 halts and no measurement. It
+now reads the event by name — everything that is not `ALLOW` when those labels are present (so B1(a)'s
+reversed order still reads the same event), else the first label. (2) The report scored `p` on
+`overlap`'s axis without flipping the sign: `p` is P(the claim describes the diff), high for a **true**
+success, while `overlap` targets 1.0 on a **false** success. Read as written, a perfect Noul scores
+**0.0** — the arm would have been reported as worse than chance when it was perfect. The sign is now
+flipped once, the axis is printed, and the mean-`p`-by-label line above is the check that catches it.
 
 ### What Tier B does not show
 
 The vendor arms ran on the same day as the registered run but are paired against it, not re-run beside
 it; a vendor build that moved between the two would show as an instrument effect. B2's ten-state
-partition is one fixed grouping — a different grouping is a different experiment. B4's corpus is
-absent here. One local model (Qwen3 4B, Q4_K_M), one machine.
+partition is one fixed grouping — a different grouping is a different experiment. B4 ran the **local**
+arm only: the vendor arm (`J`, US$ 0.05) needs `OPENROUTER_API_KEY` and the governing terms read, and
+is registered and not run. B4's corpus is one agent, one model (`deepseek-v3.2`), 23 tasks of one
+benchmark, and carries no test output anywhere — the half of arXiv 2605.29442 that compares the summary
+against a test result is not reproduced. One local model (Qwen3 4B, Q4_K_M), one machine.

@@ -117,9 +117,33 @@ def _row(solve: claims.Solve, arm: str, client: Any, gateway: Any) -> dict[str, 
     return row
 
 
-def check() -> None:
+#: Where the factorial's corpus lives when the host is not the machine that ran it. On Windows the
+#: WSL2 distro's home is a UNC path, so `~/hb-homes` — correct on the box that ran it — resolves to
+#: nothing and the runner refuses. The default stays `~/hb-homes`; this is the override that makes
+#: the registered arm runnable on the machine that holds the corpus rather than the one that read
+#: the pre-registration.
+WSL_HOMES = Path(r"\\wsl.localhost\Ubuntu\home\brcamp\hb-homes")
+WSL_BENCH = Path(r"\\wsl.localhost\Ubuntu\home\brcamp\harness-bench")
+
+
+def _corpus(homes: Path | None, bench_home: Path | None) -> tuple[list[claims.Solve], dict[str, int]]:
+    """Load with the given roots, falling back to the WSL copy when the default `~` has nothing.
+
+    The fallback is only taken when the DEFAULT was asked for and it is empty — an explicit path
+    that yields nothing is an error the caller should see, not something to paper over.
+    """
+    explicit = homes is not None or bench_home is not None
+    solves, dropped = claims.load(homes, bench_home)
+    if solves or explicit:
+        return solves, dropped
+    if WSL_HOMES.is_dir():
+        return claims.load(WSL_HOMES, WSL_BENCH if WSL_BENCH.is_dir() else None)
+    return solves, dropped
+
+
+def check(homes: Path | None = None, bench_home: Path | None = None) -> None:
     """Print the corpus and one rendered state before anything is spent (PROTOCOL §1)."""
-    solves, dropped = claims.load()
+    solves, dropped = _corpus(homes, bench_home)
     claimed = [s for s in solves if s.self_report]
     print(f"usable solves {len(solves)} · dropped {dropped}")
     print(f"claimed successes {len(claimed)} · false {sum(1 for s in claimed if not s.passed)}")
@@ -133,13 +157,13 @@ def check() -> None:
     print("ok: the task id does not appear in the state")
 
 
-def run(out: Path, arms: str, workers: int) -> None:
+def run(out: Path, arms: str, workers: int, homes: Path | None = None, bench_home: Path | None = None) -> None:
     import threading
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     import httpx
 
-    solves, _dropped = claims.load()
+    solves, _dropped = _corpus(homes, bench_home)
     claimed = [s for s in solves if s.self_report]
     if not claimed:
         raise SystemExit("no claimed successes — is ~/hb-homes present?")
@@ -179,12 +203,29 @@ def report(path: Path) -> None:
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     rows = [r for r in rows if r.get("arm") != "meta" and not r.get("halt") and r.get("p") is not None]
     print(f"# claim-vs-diff as a Noul — {path.name}\n")
+    print("axis: positive = FALSE SUCCESS, higher score = more false-success-like — `overlap`'s own axis")
     print(f"rows {len(rows)} · the lexical ruler: overlap AUROC 0.6643 [0.532, 0.792]\n")
     for arm in sorted({r["arm"] for r in rows}):
         sub = [r for r in rows if r["arm"] == arm]
-        auroc, pairs = within_task_auroc([(r["task"], float(r["p"]), not r["label"]) for r in sub])
-        print(f"- **{arm}** ({len(sub)} rows, {pairs} pairs): within-task AUROC {auroc:.4f}")
+        # `p` is P(the claim describes the diff) — high for a TRUE success, which is the OPPOSITE
+        # direction from `overlap`'s score (its `_Counts.fit` targets 1.0 on a false success). Read
+        # as-is on `overlap`'s axis the number comes out at 1 − the truth, so the sign is flipped
+        # here, once, and the axis is printed above so it is not flipped back by accident.
+        auroc, per_task = within_task_auroc([(r["task"], -float(r["p"]), not r["label"]) for r in sub])
+        n_pairs = sum(pairs for _concordant, pairs in per_task.values())
+        n_tasks = len(per_task)
+        print(f"- **{arm}** ({len(sub)} rows, {n_tasks} tasks, {n_pairs} pairs): within-task AUROC {auroc:.4f}")
         print(f"  prediction filed: 0.60–0.70 · {'inside' if 0.60 <= auroc <= 0.70 else 'OUTSIDE'} the registered band")
+        # The sanity read, and the one that catches a flipped axis: the model says p is HIGH when the
+        # claim matches the diff, and a true success is one whose claim matched. So mean p must be
+        # higher on the passes. Printed on every run because a perfect signal read backwards scores
+        # 0.0, which looks like a finding rather than a mistake.
+        means = {}
+        for label in (1, 0):
+            vals = [float(r["p"]) for r in sub if r["label"] == label]
+            means[label] = sum(vals) / len(vals) if vals else float("nan")
+        print(f"  mean p: passed {means[1]:.3f} · failed {means[0]:.3f}"
+              f" · {'oriented as expected (higher on passes)' if means[1] > means[0] else 'INVERTED — check the sign'}")
 
 
 def main() -> None:
@@ -195,16 +236,18 @@ def main() -> None:
     ap.add_argument("--arms", default="L")
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--out", type=Path)
+    ap.add_argument("--homes", type=Path, help="the factorial's hb-homes (default ~/hb-homes)")
+    ap.add_argument("--bench-home", type=Path, help="the harness-bench clone (default ~/harness-bench)")
     args = ap.parse_args()
     if args.check:
-        check()
+        check(args.homes, args.bench_home)
     elif args.report:
         report(args.report)
     elif args.run:
         if not args.out:
             raise SystemExit("--out is required")
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        run(args.out, args.arms, args.workers)
+        run(args.out, args.arms, args.workers, args.homes, args.bench_home)
     else:
         ap.print_help()
 

@@ -342,7 +342,17 @@ def local(
     read = None
     if idx is not None:
         read = label_probabilities(CompletionResult(content=content, model=LOCAL_MODEL, logprobs=logprobs), list(labels), position=idx)
-    p = None if read is None else read.shares["BLOCK"] + read.shares["REVIEW"]
+    # `p` is the mass on the event the question asks about. For the governance labels that event is
+    # "dangerous" — everything that is not ALLOW, found BY NAME so B1(a)'s reversed order still reads
+    # the same event. Any other label set (B4's yes/no) has no such name, and its positive event is
+    # the first label. Hardcoding `shares["BLOCK"]` is what made B4 raise `KeyError: 'BLOCK'` on
+    # every row: the arm asks yes/no, and the reading is the share of "yes".
+    if read is None:
+        p = None
+    elif "ALLOW" in read.shares:
+        p = sum(v for k, v in read.shares.items() if k != "ALLOW")
+    else:
+        p = read.shares[labels[0]]
     usage = {"prompt_eval_count": data.get("prompt_eval_count"), "eval_count": data.get("eval_count")}
     return {
         "p": p, "verdict": verdict,
