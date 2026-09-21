@@ -2083,7 +2083,10 @@ def build_api_app(
     from chimera.api.orchestration_api import register_orchestration_api
 
     # `workspace` is where a dispatched Kanban card works when the request names none.
-    register_features(app, guard, workspace=workspace)
+    # `settings_override` (None unless one was injected) rather than the launch photograph: the
+    # feature routes read `home`, and an injected settings must win — the same contract
+    # `live_settings()` states above, and what keeps a test out of the developer's real home.
+    register_features(app, guard, workspace=workspace, settings=settings_override)
     # POST /api/code/turn — a conversational coding turn that keeps the previous turn's tool calls.
     register_code_api(
         app,

@@ -131,22 +131,29 @@ def _state_dict(state: Any) -> dict[str, Any]:
 
 
 # --- helpers --------------------------------------------------------------------------------------
-def _cron_store() -> Any:
+# Every helper takes the settings it should read, rather than reaching for the process settings.
+# `build_api_app(settings=...)` configures the app, and these endpoints used to ignore it and read
+# `get_settings()` directly — so an injected settings object pointed the routes at the real user's
+# home. Harmless in the product (the process settings ARE the real ones) and a trap in tests, which
+# is where it was found: `test_the_scheduled_gate_is_reachable` wrote its job into the developer's
+# own crontab and then read a different job back out of it. The caller now passes the settings it
+# was built with; see `register_features`.
+def _cron_store(settings: Any) -> Any:
     from chimera.scheduler import CronStore
 
-    return CronStore(get_settings().home / "scheduler" / "jobs.json")
+    return CronStore(settings.home / "scheduler" / "jobs.json")
 
 
-def _memory_manager() -> Any:
+def _memory_manager(settings: Any) -> Any:
     from chimera.evolution.wiring import build_memory_manager
 
-    return build_memory_manager(get_settings())
+    return build_memory_manager(settings)
 
 
-def _skill_store() -> Any:
+def _skill_store(settings: Any) -> Any:
     from chimera.evolution import SkillStore
 
-    return SkillStore(get_settings().home / "skills.json")
+    return SkillStore(settings.home / "skills.json")
 
 
 def _library_card_dict(card: Any, *, owned: set[str], body: str = "") -> dict[str, Any]:
@@ -165,14 +172,14 @@ def _library_card_dict(card: Any, *, owned: set[str], body: str = "") -> dict[st
     }
 
 
-def _load_project(project_id: str) -> Any:
+def _load_project(project_id: str, settings: Any) -> Any:
     """Rebuild the orchestrator from disk for an HITL write. Constructing the solve lane makes NO
     model call — the LLM only runs inside step()/run(), which the approve/deny endpoints never call.
     """
     from chimera.kanban.lanes import SolveLane
     from chimera.orchestration.project import ProjectOrchestrator, ProjectState
 
-    home = get_settings().home
+    home = settings.home
     state_path = ProjectOrchestrator.project_dir(home, project_id) / "project.json"
     if not state_path.exists():
         raise HTTPException(status_code=404, detail="project not found")
@@ -245,21 +252,35 @@ class BundleStatusIn(BaseModel):
 
 
 def register_features(
-    app: FastAPI, guard: params.Depends, *, workspace: Path | None = None
+    app: FastAPI,
+    guard: params.Depends,
+    *,
+    workspace: Path | None = None,
+    settings: Any = None,
 ) -> None:
     """Attach the Fase C feature routes to ``app``. ``guard`` enforces the bearer token on mutations.
 
     ``workspace`` is where a dispatched card works when the request names none. Optional so every
     existing caller keeps working; absent, it falls back to the process directory, which is what the
     board did before it could be dispatched from here at all.
+
+    ``settings`` is the settings the app was built with. Absent, the routes read the process settings
+    — which is what they always did, and correct for the product. Passing one means "use THIS", the
+    same contract ``build_api_app`` states for its own ``settings`` argument, and it is what stops a
+    test from writing into the developer's real home. Read through a callable rather than captured,
+    so a route that runs after ``PATCH /api/config`` sees the change, exactly as ``live_settings()``
+    in ``app.py`` does.
     """
     default_workspace = workspace or Path.cwd()
+
+    def _settings() -> Any:
+        return settings or get_settings()
 
     # ---- Memory -----------------------------------------------------------------------------------
     @app.get("/api/memory", dependencies=[guard], response_model=list[MemoryItemOut])
     def list_memory(q: str = "", k: int = 30) -> list[dict[str, Any]]:
         k = max(1, min(k, 200))  # clamp: a negative/huge k must not dump the whole store
-        mgr = _memory_manager()
+        mgr = _memory_manager(_settings())
         items = mgr.search(q, k=k) if q.strip() else mgr.store.all()
         return [_item_dict(it) for it in items]
 
@@ -267,15 +288,15 @@ def register_features(
     def memory_layers() -> dict[str, Any]:
         from chimera.api.memory_layers import summarize_memory_layers
 
-        settings = get_settings()
+        settings = _settings()
         return summarize_memory_layers(
-            _memory_manager().store.all(),
+            _memory_manager(_settings()).store.all(),
             semantic_embeddings_enabled=settings.semantic_memory,
         )
 
     @app.get("/api/memory/profile", dependencies=[guard], response_model=MemoryProfileOut)
     def memory_profile() -> dict[str, Any]:
-        mgr = _memory_manager()
+        mgr = _memory_manager(_settings())
         return {
             # The FACTS, not the prompt block. `profile()` opens with "What you know about the
             # user:" — an instruction addressed to a model — and the screen was rendering that
@@ -289,7 +310,7 @@ def register_features(
     def add_memory(body: MemoryAdd) -> dict[str, Any]:
         if body.kind not in _MEMORY_KINDS:
             raise HTTPException(status_code=400, detail=f"kind must be one of {sorted(_MEMORY_KINDS)}")
-        mgr = _memory_manager()
+        mgr = _memory_manager(_settings())
         # `project` omitted means everywhere, and that is right for this route: a fact typed
         # by hand into the Memory screen is the owner stating something, not the agent noting
         # what it learned while working in a folder.
@@ -300,30 +321,30 @@ def register_features(
 
     @app.delete("/api/memory/{item_id}", dependencies=[guard], response_model=DeletedOut)
     def delete_memory(item_id: str) -> dict[str, bool]:
-        _memory_manager().delete(item_id)
+        _memory_manager(_settings()).delete(item_id)
         return {"deleted": True}
 
     # ---- Skills -----------------------------------------------------------------------------------
     @app.get("/api/skills", dependencies=[guard], response_model=SkillsOut)
     def list_skills() -> dict[str, Any]:
-        store = _skill_store()
+        store = _skill_store(_settings())
         return {
             "stats": store.stats(),
             "retirement_candidates": store.retirement_candidates(),
             # Live, not the process default: this is a setting a person can change, and a screen
             # explaining why a count is zero must explain the state the app is actually in.
-            "cards_read": bool(getattr(get_settings(), "skill_cards", False)),
+            "cards_read": bool(getattr(_settings(), "skill_cards", False)),
         }
 
     @app.post("/api/skills/{name}/approve", dependencies=[guard], response_model=ApprovedOut)
     def approve_skill(name: str) -> dict[str, bool]:
-        if not _skill_store().approve(name):
+        if not _skill_store(_settings()).approve(name):
             raise HTTPException(status_code=404, detail="skill not found")
         return {"approved": True}
 
     @app.post("/api/skills/{name}/retire", dependencies=[guard], response_model=RetiredOut)
     def retire_skill(name: str) -> dict[str, bool]:
-        if not _skill_store().retire(name):
+        if not _skill_store(_settings()).retire(name):
             raise HTTPException(status_code=404, detail="skill not found")
         return {"retired": True}
 
@@ -335,7 +356,7 @@ def register_features(
     def _bundle_dicts() -> dict[str, str]:
         from chimera.skills.bundles import installed as installed_bundles
 
-        return {b.name: b.status for b in installed_bundles(get_settings().home)}
+        return {b.name: b.status for b in installed_bundles(_settings().home)}
 
     @app.get("/api/skills/catalog", dependencies=[guard], response_model=list[CatalogEntryOut])
     def list_catalog() -> list[dict[str, Any]]:
@@ -371,7 +392,7 @@ def register_features(
         """What is installed on this machine, read from the disk rather than from an index."""
         from chimera.skills.bundles import installed as installed_bundles
 
-        return [BundleOut(**b.to_dict()).model_dump() for b in installed_bundles(get_settings().home)]
+        return [BundleOut(**b.to_dict()).model_dump() for b in installed_bundles(_settings().home)]
 
     @app.post("/api/skills/catalog/{name}/install", dependencies=[guard], response_model=BundleOut)
     def install_bundle(name: str, force: bool = False) -> dict[str, Any]:
@@ -389,7 +410,7 @@ def register_features(
         if entry is None:
             raise HTTPException(status_code=404, detail=f"no skill named {name!r} in the catalogue")
         try:
-            record = install(entry, get_settings().home, force=force)
+            record = install(entry, _settings().home, force=force)
         except BundleError as exc:
             # The message is written to be read by a person: which limit, which file, which host.
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -402,12 +423,12 @@ def register_features(
         from chimera.skills.bundles import installed as installed_bundles
 
         try:
-            found = set_status(name, get_settings().home, body.status)
+            found = set_status(name, _settings().home, body.status)
         except BundleError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         if not found:
             raise HTTPException(status_code=404, detail="no such installed bundle")
-        current = {b.name: b for b in installed_bundles(get_settings().home)}
+        current = {b.name: b for b in installed_bundles(_settings().home)}
         return BundleOut(**current[name].to_dict()).model_dump()
 
     @app.delete("/api/skills/bundles/{name}", dependencies=[guard], response_model=RetiredOut)
@@ -415,7 +436,7 @@ def register_features(
         """Delete an installed bundle and its files."""
         from chimera.skills.bundles import remove
 
-        if not remove(name, get_settings().home):
+        if not remove(name, _settings().home):
             raise HTTPException(status_code=404, detail="no such installed bundle")
         return {"retired": True}
 
@@ -429,7 +450,7 @@ def register_features(
         """The curated cards, metadata only — enough to browse, not enough to read."""
         from chimera.skills.library import load_library
 
-        owned = set(_skill_store().names())
+        owned = set(_skill_store(_settings()).names())
         return [_library_card_dict(card, owned=owned) for card in load_library()]
 
     @app.get("/api/skills/library/{name}", dependencies=[guard], response_model=LibraryCardOut)
@@ -440,7 +461,7 @@ def register_features(
         card = load_card(name)
         if card is None:
             raise HTTPException(status_code=404, detail="no such curated skill card")
-        owned = set(_skill_store().names())
+        owned = set(_skill_store(_settings()).names())
         return _library_card_dict(card, owned=owned, body=card.instructions)
 
     @app.post(
@@ -465,13 +486,13 @@ def register_features(
         verdict = SkillValidator().validate(skill.to_dict())
         if not verdict.accepted:
             raise HTTPException(status_code=400, detail="; ".join(verdict.reasons))
-        _skill_store().add(skill)
+        _skill_store(_settings()).add(skill)
         return {"imported": True, "name": skill.name, "status": skill.status}
 
     # ---- Cron -------------------------------------------------------------------------------------
     @app.get("/api/cron", dependencies=[guard], response_model=list[CronJobOut])
     def list_cron() -> list[dict[str, Any]]:
-        return [_job_dict(j) for j in _cron_store().list()]
+        return [_job_dict(j) for j in _cron_store(_settings()).list()]
 
     @app.get("/api/cron/results", dependencies=[guard], response_model=list[CronResultOut])
     def cron_results(job_id: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
@@ -487,7 +508,7 @@ def register_features(
         """
         from chimera.scheduler.results import load_results
 
-        caminho = get_settings().home / "scheduler" / "cron_results.jsonl"
+        caminho = _settings().home / "scheduler" / "cron_results.jsonl"
         return [
             {
                 "at": r.at,
@@ -525,7 +546,7 @@ def register_features(
         from chimera.scheduler.engine import Scheduler
 
         grace = max(0.0, grace_minutes) * 60
-        sched = Scheduler(_cron_store())
+        sched = Scheduler(_cron_store(_settings()))
         now = time.time()
         return {
             "overdue": [
@@ -558,7 +579,7 @@ def register_features(
         from chimera.scheduler import Scheduler
 
         try:
-            job = Scheduler(_cron_store()).schedule_cron(
+            job = Scheduler(_cron_store(_settings())).schedule_cron(
                 body.name,
                 body.schedule,
                 body.action,
@@ -577,7 +598,7 @@ def register_features(
     def enable_cron(job_id: str) -> dict[str, Any]:
         from chimera.scheduler import Scheduler
 
-        store = _cron_store()
+        store = _cron_store(_settings())
         if job_id not in store:
             raise HTTPException(status_code=404, detail="job not found")
         return _job_dict(Scheduler(store).enable(job_id, now=time.time()))
@@ -586,14 +607,14 @@ def register_features(
     def disable_cron(job_id: str) -> dict[str, Any]:
         from chimera.scheduler import Scheduler
 
-        store = _cron_store()
+        store = _cron_store(_settings())
         if job_id not in store:
             raise HTTPException(status_code=404, detail="job not found")
         return _job_dict(Scheduler(store).disable(job_id))
 
     @app.delete("/api/cron/{job_id}", dependencies=[guard], response_model=DeletedOut)
     def delete_cron(job_id: str) -> dict[str, bool]:
-        store = _cron_store()
+        store = _cron_store(_settings())
         existed = job_id in store
         store.remove(job_id)
         return {"deleted": existed}
@@ -604,14 +625,14 @@ def register_features(
         from chimera.kanban import KanbanBoard
         from chimera.kanban.models import COLUMNS
 
-        board = KanbanBoard(get_settings().home / "kanban.json")
+        board = KanbanBoard(_settings().home / "kanban.json")
         return {col: [_card_dict(c) for c in board.cards(col)] for col in COLUMNS}
 
     @app.post("/api/kanban/cards", dependencies=[guard], response_model=TaskCardOut)
     def add_kanban_card(card: KanbanCardIn) -> dict[str, Any]:
         from chimera.kanban import KanbanBoard
 
-        board = KanbanBoard(get_settings().home / "kanban.json")
+        board = KanbanBoard(_settings().home / "kanban.json")
         # Action falls back to the title, matching the CLI: a one-line card should not have to say
         # the same sentence twice to be worth filing.
         created = board.add(
@@ -626,7 +647,7 @@ def register_features(
 
         if move.column not in COLUMNS:
             raise HTTPException(status_code=400, detail=f"unknown column {move.column!r}")
-        board = KanbanBoard(get_settings().home / "kanban.json")
+        board = KanbanBoard(_settings().home / "kanban.json")
         if board.get(card_id) is None:
             raise HTTPException(status_code=404, detail="card not found")
         return _card_dict(board.move(card_id, move.column))  # type: ignore[arg-type]
@@ -635,7 +656,7 @@ def register_features(
     def remove_kanban_card(card_id: str) -> dict[str, bool]:
         from chimera.kanban import KanbanBoard
 
-        board = KanbanBoard(get_settings().home / "kanban.json")
+        board = KanbanBoard(_settings().home / "kanban.json")
         return {"deleted": board.remove(card_id)}
 
     @app.post("/api/kanban/run", dependencies=[guard], responses=SSE_RESPONSE)
@@ -654,7 +675,7 @@ def register_features(
         from chimera.kanban import KanbanBoard, LaneRunner, dispatch
         from chimera.kanban.lanes import CrewLane, SolveLane, runners_for
 
-        settings = get_settings()
+        settings = _settings()
         ws = Path(req.workspace).expanduser().resolve() if req.workspace else default_workspace
         board = KanbanBoard(settings.home / "kanban.json")
         # Registered agents first, so an agent named after a built-in cannot take over the cards
@@ -808,7 +829,7 @@ def register_features(
             proj = ProjectOrchestrator.start(
                 spec,
                 ws,
-                home=get_settings().home,
+                home=_settings().home,
                 # Constructing the lane makes NO model call — the LLM runs inside step()/run(), and
                 # this endpoint calls neither.
                 solve_card=SolveLane(workspace=ws),
@@ -836,14 +857,14 @@ def register_features(
         Runs on a worker thread: a step calls models, and holding the event loop for it would freeze
         every other request for as long as a card takes.
         """
-        proj = _load_project(project_id)
+        proj = _load_project(project_id, _settings())
         return _state_dict(await run_in_threadpool(proj.step))
 
     @app.get("/api/projects", dependencies=[guard], response_model=list[ProjectStateOut])
     def list_projects() -> list[dict[str, Any]]:
         from chimera.orchestration.project import ProjectState
 
-        root = get_settings().home / "projects"
+        root = _settings().home / "projects"
         out: list[dict[str, Any]] = []
         if root.exists():
             for state_path in sorted(root.glob("*/project.json")):
@@ -859,7 +880,7 @@ def register_features(
         from chimera.kanban.models import COLUMNS
         from chimera.orchestration.project import ProjectOrchestrator, ProjectState
 
-        home = get_settings().home
+        home = _settings().home
         state_path = ProjectOrchestrator.project_dir(home, project_id) / "project.json"
         if not state_path.exists():
             raise HTTPException(status_code=404, detail="project not found")
@@ -870,7 +891,7 @@ def register_features(
 
     @app.post("/api/projects/{project_id}/approve", dependencies=[guard], response_model=ProjectStateOut)
     def approve_project(project_id: str, body: ApproveBody) -> dict[str, Any]:
-        orch = _load_project(project_id)
+        orch = _load_project(project_id, _settings())
         state = orch.approve_card(body.card) if body.card else orch.approve_plan()
         return _state_dict(state)
 
@@ -878,4 +899,4 @@ def register_features(
     def deny_project(project_id: str, body: ApproveBody) -> dict[str, Any]:
         if not body.card:
             raise HTTPException(status_code=400, detail="card id required to deny")
-        return _state_dict(_load_project(project_id).deny_card(body.card))
+        return _state_dict(_load_project(project_id, _settings()).deny_card(body.card))
