@@ -21,7 +21,12 @@ vi.mock("@/lib/api", () => ({
 }));
 
 /** What `GET /api/approvals` returns per parked question. `ApprovalOut` carries `asked_at` and
- *  `age_seconds` and NO `wait_seconds` — the list does not say how long the turn will wait. */
+ *  `age_seconds` and NO `wait_seconds` — the list does not say how long the turn will wait.
+ *
+ *  It DOES carry `p`, `band` and `decider_model` (study 20 §2.6): the number that raised the
+ *  question and what it was read against, read back off the question file so a card that mounts
+ *  late shows the same number the first one did. `p` is `null` for a rule-raised question — those
+ *  have no probability, and the card shows nothing rather than a `0.00` it would be inventing. */
 function question(id = "q1") {
   return {
     id,
@@ -30,6 +35,9 @@ function question(id = "q1") {
     asked_at: Math.floor(Date.now() / 1000) - 12,
     age_seconds: 12,
     decision: "review",
+    p: null,
+    band: "",
+    decider_model: "",
   };
 }
 

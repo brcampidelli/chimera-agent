@@ -40,6 +40,26 @@ class Verdict:
     by the kernel itself — a threshold on it is a policy, and policies are chosen on a measured
     curve, not defaulted here."""
 
+    band: str = ""
+    """Which band of the REVIEW band produced this verdict — ``review`` | ``uncertain`` | ``allow``
+    | ``uncalibrated`` | ``halt`` | ``none``, the values of :class:`~chimera.governance.band.BandReading`.
+
+    Empty for every verdict that did not come from the band, which is every rule, every precedent
+    and every judge. It travels beside ``confidence`` because the two are only meaningful together:
+    a number without its band cannot be read (0.45 is a confident ALLOW below ``allow_below`` and an
+    uncertain one between the thresholds), and the approval card is the surface where a person has
+    to read both at once to answer. Study 20 §2.6: the card showed the reason and nothing else, so
+    the answer it collected could not be joined to the number that produced it."""
+
+    decider_model: str = ""
+    """The build that answered, when the band asked a model — ``qwen3:4b@Q4_K_M``, the dated vendor
+    build. Empty for a rule.
+
+    On the verdict rather than only on the audit line because the card is where the number is read,
+    and a probability whose model is not named is a probability about nothing in particular: the
+    map is keyed on the build (study 21 §2ad), so the same 0.80 means different things under
+    different builds. The card shows it; the record keeps it."""
+
     @property
     def allowed(self) -> bool:
         """True if the action may proceed without human review (allow/warn)."""

@@ -607,6 +607,16 @@
             "title": "Asked At",
             "type": "number"
           },
+          "band": {
+            "default": "",
+            "title": "Band",
+            "type": "string"
+          },
+          "decider_model": {
+            "default": "",
+            "title": "Decider Model",
+            "type": "string"
+          },
           "decision": {
             "default": "review",
             "title": "Decision",
@@ -615,6 +625,17 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P"
           },
           "reason": {
             "title": "Reason",

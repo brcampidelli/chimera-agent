@@ -1536,6 +1536,27 @@ class ApprovalOut(BaseModel):
     asked_at: float
     age_seconds: float
     decision: str = "review"  # the level of the verdict that raised it: block | review | warn
+    p: float | None = None
+    """The calibrated probability that raised the question, when the REVIEW band produced it.
+
+    ``None`` for a question a lexical rule or the taint ledger raised — those have no number, and a
+    card that rendered ``p=0.00`` for them would be inventing one. The card shows the number only
+    when it is here; the record writes the column only then too."""
+
+    band: str = ""
+    """Which band of the REVIEW band it fell in — ``review`` | ``uncertain`` | ``allow`` |
+    ``uncalibrated`` | ``halt`` | ``none``. Empty when no band was consulted.
+
+    Sent beside ``p`` because the two are only readable together: 0.45 is a confident ALLOW below
+    ``allow_below`` and an uncertain one between the thresholds, and the card is where a person has
+    to read both at once to answer."""
+
+    decider_model: str = ""
+    """The build that answered, when a model did — ``qwen3:4b@Q4_K_M``, the dated vendor build.
+
+    On the wire because the map is keyed on the build (study 21 §2ad): the same 0.80 means different
+    things under different builds, so a probability whose model is not named is a probability about
+    nothing in particular."""
 
 
 class ApprovalAnswerIn(BaseModel):

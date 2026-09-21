@@ -3,7 +3,7 @@ import { ShieldQuestion, ShieldX } from "lucide-react";
 import { answerApproval } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { useP, useT } from "@/lib/i18n";
 
 /**
  * The question a turn is parked on, with the two answers.
@@ -48,6 +48,16 @@ export interface ApprovalQuestionLike {
    * Optional because a question replayed from an older run may not carry one, and an absent level
    * is shown as nothing rather than guessed into `review`. */
   decision?: string;
+  /** The calibrated probability that raised the question, when the REVIEW band produced it.
+   *
+   * `null`/absent for a question a lexical rule or the taint ledger raised — those have no number,
+   * and the card shows nothing rather than a `p=0.00` it would be inventing. */
+  p?: number | null;
+  /** Which band of the REVIEW band it fell in — `review` | `uncertain` | `allow` | `uncalibrated`
+   *  | `halt` | `none`. Empty when no band was consulted. */
+  band?: string;
+  /** The build that answered, when a model did — `qwen3:4b@Q4_K_M`. Empty for a rule. */
+  decider_model?: string;
   wait_seconds?: number;
   /** When the call parked, in the SERVER's epoch seconds. Both wire shapes carry it — the stream
    *  frame (`chimera/api/code_api.py`) and `ApprovalOut` — and it is what lets a card that mounts
@@ -112,6 +122,25 @@ const LEVEL_LABEL: Record<string, { key: string; tone: string } | undefined> = {
   warn: { key: "code.approval.level.warn", tone: "border-warn/40 text-warn-foreground" },
 };
 
+/** The bands of the REVIEW band, and the word each is shown as.
+ *
+ * Closed set, mirroring `chimera/governance/band.py::BandReading.band` — the same reason
+ * `LEVEL_LABEL` above is a literal map rather than an interpolated key: `i18n.reachable.test`
+ * proves every key is rendered somewhere by searching the source for the key as a string, and an
+ * interpolated key is invisible to it.
+ *
+ * `review` is the only band that raises a card, so it is the only one a person normally sees here.
+ * The rest are drawn for completeness of the wire shape: a question replayed from a run whose band
+ * was `uncertain` should say so rather than show a bare number with no word for what it meant. */
+const BAND_LABEL: Record<string, string | undefined> = {
+  review: "code.approval.band.review",
+  uncertain: "code.approval.band.uncertain",
+  allow: "code.approval.band.allow",
+  uncalibrated: "code.approval.band.uncalibrated",
+  halt: "code.approval.band.halt",
+  none: "code.approval.band.none",
+};
+
 export function ApprovalCard({
   question,
   onAnswered,
@@ -120,6 +149,7 @@ export function ApprovalCard({
   onAnswered: () => void;
 }) {
   const t = useT();
+  const pct = useP();
   const [busy, setBusy] = useState(false);
   const left = useSecondsLeft(question);
   const expired = left === 0;
@@ -133,6 +163,14 @@ export function ApprovalCard({
   // three are a closed set fixed by `pending.LEVEL_RANK`, so spelling them out keeps the guard
   // working instead of buying an exemption from it.
   const level = LEVEL_LABEL[(question.decision ?? "").trim().toLowerCase()];
+  // The number, and only when there is one. A rule-raised question has no probability, and a card
+  // that rendered `p=0.00` for it would be inventing a very confident ALLOW that a person
+  // nonetheless had to answer — the exact confusion this line exists to remove.
+  //
+  // `useP` and not `toFixed(2)`: the two print the same thing in English and differ in Portuguese,
+  // where the decimal separator is a comma — and this line sits inside a translated sentence.
+  const p = typeof question.p === "number" ? pct(question.p) : null;
+  const bandKey = BAND_LABEL[(question.band ?? "").trim().toLowerCase()];
   const answer = async (approved: boolean) => {
     setBusy(true);
     try {
@@ -167,6 +205,20 @@ export function ApprovalCard({
         ) : null}
       </div>
       <p className="mt-1 text-muted-foreground">{question.reason}</p>
+      {/* The number that raised the question, and what it was read against: `p=0.80 · band REVIEW ·
+          qwen3:4b`. This is the line study 20 §2.6 named as the bottleneck — the card showed a
+          reason and nothing else, so the answer it collected could not be joined to the probability
+          that asked, and every card answered is one real label for a map refitted on the
+          deployment's own data.
+          Rendered only when a number came: a rule-raised question has none, and the band and the
+          model are shown only when they are there, so the line never reads as a half-filled form. */}
+      {p !== null ? (
+        <p className="mt-1 font-mono text-xs text-muted-foreground">
+          {t("code.approval.p", { p })}
+          {bandKey ? ` · ${t("code.approval.band", { band: t(bandKey) })}` : ""}
+          {question.decider_model ? ` · ${question.decider_model}` : ""}
+        </p>
+      ) : null}
       {/* `whitespace-pre-wrap`: the action is one line for a tool call and a numbered list for a
           plan-gate question (`chimera/api/plan_gate.py`), and a plan collapsed onto one line is a
           plan nobody can refuse on. */}

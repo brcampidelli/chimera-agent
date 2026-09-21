@@ -748,6 +748,14 @@ const en: Dict = {
   "code.approval.level.block": "Blocked",
   "code.approval.level.review": "Needs review",
   "code.approval.level.warn": "Warning",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "band {band}",
+  "code.approval.band.review": "REVIEW",
+  "code.approval.band.uncertain": "UNCERTAIN",
+  "code.approval.band.allow": "ALLOW",
+  "code.approval.band.uncalibrated": "UNCALIBRATED",
+  "code.approval.band.halt": "HALTED",
+  "code.approval.band.none": "NO NUMBER",
   "approvals.waiting": "Waiting on you: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "No file open",
@@ -2190,6 +2198,14 @@ const pt: Dict = {
   "code.approval.level.block": "Bloqueado",
   "code.approval.level.review": "Precisa de revisão",
   "code.approval.level.warn": "Aviso",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "banda {band}",
+  "code.approval.band.review": "REVISÃO",
+  "code.approval.band.uncertain": "INCERTA",
+  "code.approval.band.allow": "PERMITIR",
+  "code.approval.band.uncalibrated": "SEM CALIBRAÇÃO",
+  "code.approval.band.halt": "INTERROMPIDA",
+  "code.approval.band.none": "SEM NÚMERO",
   "approvals.waiting": "Aguardando você: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Nenhum arquivo aberto",
@@ -3644,6 +3660,14 @@ const es: Dict = {
   "code.approval.level.block": "Bloqueado",
   "code.approval.level.review": "Requiere revisión",
   "code.approval.level.warn": "Advertencia",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "banda {band}",
+  "code.approval.band.review": "REVISIÓN",
+  "code.approval.band.uncertain": "INCIERTA",
+  "code.approval.band.allow": "PERMITIR",
+  "code.approval.band.uncalibrated": "SIN CALIBRAR",
+  "code.approval.band.halt": "INTERRUMPIDA",
+  "code.approval.band.none": "SIN NÚMERO",
   "approvals.waiting": "Esperando por ti: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Ningún archivo abierto",
@@ -5108,6 +5132,14 @@ const fr: Dict = {
   "code.approval.level.block": "Bloqué",
   "code.approval.level.review": "À examiner",
   "code.approval.level.warn": "Avertissement",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "bande {band}",
+  "code.approval.band.review": "EXAMEN",
+  "code.approval.band.uncertain": "INCERTAINE",
+  "code.approval.band.allow": "AUTORISER",
+  "code.approval.band.uncalibrated": "NON CALIBRÉE",
+  "code.approval.band.halt": "INTERROMPUE",
+  "code.approval.band.none": "AUCUN NOMBRE",
   "approvals.waiting": "En attente de vous : {n}",
   "nav.edit": "Éditeur",
   "edit.empty.title": "Aucun fichier ouvert",
@@ -6575,6 +6607,14 @@ const de: Dict = {
   "code.approval.level.block": "Blockiert",
   "code.approval.level.review": "Prüfung nötig",
   "code.approval.level.warn": "Warnung",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "Band {band}",
+  "code.approval.band.review": "PRÜFUNG",
+  "code.approval.band.uncertain": "UNSICHER",
+  "code.approval.band.allow": "ERLAUBEN",
+  "code.approval.band.uncalibrated": "UNKALIBRIERT",
+  "code.approval.band.halt": "ANGEHALTEN",
+  "code.approval.band.none": "KEINE ZAHL",
   "approvals.waiting": "Warten auf dich: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Keine Datei geöffnet",
@@ -7999,6 +8039,14 @@ const zh: Dict = {
   "code.approval.level.review": "需要审查",
   "code.approval.level.warn": "警告",
   "approvals.waiting": "等你决定：{n}",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "区间 {band}",
+  "code.approval.band.review": "需审查",
+  "code.approval.band.uncertain": "不确定",
+  "code.approval.band.allow": "允许",
+  "code.approval.band.uncalibrated": "未校准",
+  "code.approval.band.halt": "已中断",
+  "code.approval.band.none": "无数字",
   "nav.edit": "编辑器",
   "edit.empty.title": "未打开文件",
   "edit.empty.hint": "在左侧选择一个文件即可开始编辑。",
@@ -9425,6 +9473,14 @@ const ja: Dict = {
   "code.approval.level.review": "要確認",
   "code.approval.level.warn": "警告",
   "approvals.waiting": "あなた待ち: {n}",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "バンド {band}",
+  "code.approval.band.review": "要確認",
+  "code.approval.band.uncertain": "不確実",
+  "code.approval.band.allow": "許可",
+  "code.approval.band.uncalibrated": "未校准",
+  "code.approval.band.halt": "停止",
+  "code.approval.band.none": "数値なし",
   "nav.edit": "エディタ",
   "edit.empty.title": "開いているファイルはありません",
   "edit.empty.hint": "左側でファイルを選ぶと編集を始められます。",
@@ -10883,6 +10939,14 @@ const it: Dict = {
   "code.approval.level.block": "Bloccato",
   "code.approval.level.review": "Da rivedere",
   "code.approval.level.warn": "Avviso",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "banda {band}",
+  "code.approval.band.review": "REVISIONE",
+  "code.approval.band.uncertain": "INCERTA",
+  "code.approval.band.allow": "CONSENTIRE",
+  "code.approval.band.uncalibrated": "NON CALIBRATA",
+  "code.approval.band.halt": "INTERROTTA",
+  "code.approval.band.none": "NESSUN NUMERO",
   "approvals.waiting": "In attesa di te: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Nessun file aperto",
@@ -12340,6 +12404,14 @@ const pl: Dict = {
   "code.approval.level.block": "Zablokowane",
   "code.approval.level.review": "Wymaga przeglądu",
   "code.approval.level.warn": "Ostrzeżenie",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "pasmo {band}",
+  "code.approval.band.review": "PRZEGLĄD",
+  "code.approval.band.uncertain": "NIEPEWNE",
+  "code.approval.band.allow": "ZEZWÓL",
+  "code.approval.band.uncalibrated": "BEZ KALIBRACJI",
+  "code.approval.band.halt": "WSTRZYMANE",
+  "code.approval.band.none": "BRAK LICZBY",
   "approvals.waiting": "Czeka na Ciebie: {n}",
   "nav.edit": "Edytor",
   "edit.empty.title": "Nie otwarto żadnego pliku",
@@ -13798,6 +13870,14 @@ const ru: Dict = {
   "code.approval.level.block": "Заблокировано",
   "code.approval.level.review": "Нужна проверка",
   "code.approval.level.warn": "Предупреждение",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "полоса {band}",
+  "code.approval.band.review": "ПРОВЕРКА",
+  "code.approval.band.uncertain": "НЕОПРЕДЕЛЁННО",
+  "code.approval.band.allow": "РАЗРЕШИТЬ",
+  "code.approval.band.uncalibrated": "БЕЗ КАЛИБРОВКИ",
+  "code.approval.band.halt": "ОСТАНОВЛЕНО",
+  "code.approval.band.none": "НЕТ ЧИСЛА",
   "approvals.waiting": "Ждут вашего решения: {n}",
   "nav.edit": "Редактор",
   "edit.empty.title": "Нет открытых файлов",
@@ -14627,5 +14707,31 @@ export function useNum(): (n: number) => string {
   return useMemo(() => {
     const fmt = new Intl.NumberFormat(lang);
     return (n: number) => fmt.format(n);
+  }, [lang]);
+}
+
+/** A probability, to two decimals, in the CHOSEN language — `0.80` in English, `0,80` in Portuguese.
+ *
+ *  Separate from `useNum` because the two answer different questions and only one of them is a
+ *  formatting choice. `useNum` groups an integer the way the reader's language groups digits;
+ *  this fixes the PRECISION as well, and the precision is a decision about the number rather than
+ *  about the language: the calibration map's own resolution is coarser than two decimals, and
+ *  `0.8000000000000001` on a card reads as a precision the number does not have.
+ *
+ *  `toFixed(2)` would be one line and would print `0.80` on a pt-BR machine inside a Portuguese
+ *  sentence — the same thousandfold-misread class `useNum` exists for, one decimal place smaller.
+ *  A probability read as a count is exactly the misreading this project has already been bitten by.
+ *
+ *  The formatter is memoised per language for the same reason `useNum`'s is: this renders inside a
+ *  card that can be mounted for every parked tool call of a fan-out.
+ */
+export function useP(): (p: number) => string {
+  const { lang } = useI18n();
+  return useMemo(() => {
+    const fmt = new Intl.NumberFormat(lang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return (p: number) => fmt.format(p);
   }, [lang]);
 }
