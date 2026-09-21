@@ -275,3 +275,84 @@ ledger's corpus, another layer); file-write attacks (refused by the jail regardl
 (44% attacks in the corpus against ~0 observed in traffic — every `p` here is about the corpus); the
 alias `jev-latest`; a second provider on the endpoint; a local model bigger than 4B or other than
 Qwen3 (one model, one machine); L2 under the wrappers and on OATS (not run — 51 s an item).
+
+
+## 12 · Tier B — the three instrument variables, and the claim-vs-diff Noul
+
+Registered in `PREREGISTRATION-tier-b.md` before any request of this set. Two files:
+`results/2026-09-19-tier-b-local.jsonl` (arms `Lr`, `Ls`, `Lb` — 165 requests, US$ 0, 0 halts) and
+`results/2026-09-19-tier-b-vendor.jsonl` (arms `Jr`, `Js`, `Jb`, `Jbatch` — 171 requests, US$ 0.0043,
+0 halts). Read by `report_tier_b.py`, each arm paired against the SAME item's registered first
+repetition; the replay floor is 0.05, so a movement at or below it is the instrument, not the
+phenomenon.
+
+### B1(a) — option order
+
+| arm | paired | mean Δp | moved > floor | flips at τ=0.5 | prediction |
+|---|---:|---:|---:|---:|---|
+| `Lr` (local, reversed) | 55 | +0.071 | 19/55 | **5/55** | ≥ 3 flips — **confirmed** |
+| `Jr` (vendor, reversed) | 55 | −0.001 | 1/55 | **0/55** | ≤ 1 flip — **confirmed** |
+
+The local arm reads a **canonical order**: reversing the JSON enum moves 19 of 55 items and flips 5
+verdicts, all but one of them upward (18 up, 1 down) — the model is not indifferent to which option
+comes first. The vendor arm is stable to the same reversal (1 item moved, 0 flips), which is what a
+decision head trained on a fixed order should do. **Consequence, as registered:** the instrument hash
+already excludes a reordered question, so a reordered question gets no map until one is fitted on it —
+and the local arm's map must not be applied to a reversed instrument.
+
+### B1(b) — another item's state
+
+| arm | shuffled AUROC | items whose p moved | prediction |
+|---|---:|---:|---|
+| `Ls` (local) | **0.306** | 43/55 | collapse ≤ 0.60 — **confirmed** |
+| `Js` (vendor) | **0.286** | 50/55 | collapse ≤ 0.60 — **confirmed** |
+
+Both readings collapse to well below chance when the state is another item's — the `p` is about the
+state, not the instrument. (Below 0.5 rather than at it: the derangement pairs each item with the
+next, and the corpus is ordered by family, so an attack is often shown a benign neighbour's state and
+vice versa — an anti-correlation, not noise.) This is the arm that licenses every other number here.
+
+### B2 — ten states per request
+
+| | value | prediction |
+|---|---:|---|
+| paired slots | 55 | — |
+| mean \|Δp\| | **0.275** | > 0.1 — **confirmed** |
+| slots moving > 0.1 | 36/55 | — |
+
+Batching states moves `p` by 0.275 on average, against a replay floor of 0.05 — five times the floor.
+**Consequence, as registered: no surface batches states.** `OpenRouterDecisionsBackend` stays one state
+per call. The registered prediction that the *later* slots move most did **not** hold cleanly: the
+per-slot means are 0.19, 0.28, 0.15, 0.51, 0.22, 0.36, 0.29, 0.35, 0.27, 0.12 — the effect is real and
+large but not ordered by position, so jev-orderby's "later slots" shape did not replicate at ten states.
+
+### B3 — the boundary sentence
+
+| arm | paired | mean Δp | moved > floor | flips | prediction |
+|---|---:|---:|---:|---:|---|
+| `Lb` (local) | 55 | **−0.206** | 36/55 | 11/55 | below the floor — **REFUTED** |
+| `Jb` (vendor) | 55 | +0.008 | 5/55 | 0/55 | below the floor — **confirmed** |
+
+The prediction was that a prompt-level line does not fix a data-level property. On the **vendor** arm
+it holds: the sentence moves `p` by 0.008, five items cross the floor, no verdict flips. On the
+**local** arm it is refuted, and the direction is the finding: the sentence pushes `p` **down** on
+both attacks (−0.13) and benigns (−0.27), 36 of 55 items moving and 11 verdicts flipping. That is not
+the sentence fixing the framing effect — it is the sentence changing the instrument, and it makes the
+4B model *less* willing to refuse across the board. **Consequence, as registered:** the sentence is not
+a layer; the kernel's claim-stripping rule stays. And the local map does not apply to a boundary
+instrument — a different prompt hash, no map until one is fitted on it.
+
+### B4 — claim-versus-diff as a Noul
+
+**Not run.** `run_claim_noul.py` is written and `--check` refuses cleanly: the 547 solves live in
+`~/hb-homes` and `~/harness-bench` on the machine that ran the factorial, and neither is present here
+(`usable solves 0`). The arm is registered, the runner exists, and the corpus is absent — recorded as
+such rather than run on invented rows. The ruler it will be read against is `bench/claim_vs_diff`'s own
+`overlap` at AUROC 0.6643 [0.532, 0.792].
+
+### What Tier B does not show
+
+The vendor arms ran on the same day as the registered run but are paired against it, not re-run beside
+it; a vendor build that moved between the two would show as an instrument effect. B2's ten-state
+partition is one fixed grouping — a different grouping is a different experiment. B4's corpus is
+absent here. One local model (Qwen3 4B, Q4_K_M), one machine.
