@@ -143,6 +143,14 @@ def main() -> None:
     print(f"seed={args.seed} queue={len(queue)} already-done={len(queue) - len(pending)} pending={len(pending)} "
           f"concurrency={args.concurrency} max_usd={args.max_usd}", flush=True)
 
+    # Amendment 5: a cell that comes back bad is resubmitted ONCE inside this run, and only a cell
+    # that fails TWICE counts toward the stop rule. Every failure so far has been a provider stall
+    # hitting the concurrent calls at once (4 within 4s, then 2 within 1s), so the rule as written
+    # measured how many solves were in flight during an outage and halted the run every ~22 solves.
+    # The retry budget is unchanged — two attempts, then frozen — it is just spent here instead of
+    # across relaunches.
+    retried: set[tuple[str, str]] = set()
+
     lock = threading.Lock()
     spent = sum(solve_usd(h, t) or 0.0 for (h, t) in queue if result_exists(h, t))
     done = rc_err = receiptless = 0
@@ -172,18 +180,21 @@ def main() -> None:
                 with lock:
                     done += 1
                     spent += r["usd"] or 0.0
+                    bad_now = r["rc"] != 0 or r["receiptless"]
+                    if bad_now and (r["task"], r["hid"]) not in retried:
+                        # First failure: put it back once, and do not count it yet.
+                        retried.add((r["task"], r["hid"]))
+                        done -= 1
+                        futs.add(ex.submit(run_one, r["hid"], r["task"]))
+                        print(f"    resubmitting once: {r['task']} {r['hid']}", flush=True)
+                        fh.write(json.dumps(r) + "\n")
+                        fh.flush()
+                        continue
+                    if bad_now:
+                        freeze(r["task"], r["hid"])
+                        print(f"    frozen after 2 failures: {r['task']} {r['hid']}", flush=True)
                     rc_err += int(r["rc"] != 0)
                     receiptless += int(r["receiptless"])
-                    # Amendment 4: a cell that fails twice is frozen, not retried for a third time.
-                    if r["rc"] != 0 or r["receiptless"]:
-                        seen = sum(
-                            1 for line in DRIVER_LOG.read_text(encoding="utf-8").splitlines()
-                            if line.strip() and (lambda d: d["task"] == r["task"] and d["hid"] == r["hid"]
-                                                 and (d["rc"] != 0 or d["receiptless"]))(json.loads(line))
-                        )
-                        if seen >= 2 and (r["task"], r["hid"]) not in frozen():
-                            freeze(r["task"], r["hid"])
-                            print(f"    frozen after {seen} failures: {r['task']} {r['hid']}", flush=True)
                     fh.write(json.dumps(r) + "\n")
                     fh.flush()
                     bad = rc_err + receiptless

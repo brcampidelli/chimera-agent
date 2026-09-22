@@ -162,3 +162,11 @@ Separated, and implemented rather than promised:
 * **The results report both**: how many halts, their causes, and how many cells are frozen — with the frozen cells named.
 
 The fifth halt's cause is the third amendment's again: 2 solves dying on a provider timeout **one second apart**. Every timeout in this run so far has come in such a cluster.
+
+## Amendment 5 — the retry is spent inside the run, so an outage does not halt the queue (2026-09-22)
+
+Sixth halt, same cause. The rule as written counts a failed solve against a 20-solve window, and every failure in this run has been a provider stall hitting the concurrent calls at once — **4 within 4 s**, then **2 within 1 s**. At concurrency 6 one stall is therefore always above 5%, so the run halted every ~22 solves and 168 cells were going to need eight more relaunches, each preceded by a drain.
+
+The retry budget is **not** changed: two attempts, then frozen. What changes is where it is spent — a bad cell is **resubmitted once inside the same run**, and only a cell that fails **twice** counts toward the stop rule. So the rule now fires on what it was written to detect (a cell that cannot complete) rather than on how many solves happened to be in flight when a provider stalled.
+
+Nothing about the arms, the tasks, the executors, the router, the outcomes or the predictions changed. The results report every halt, its cause, and every frozen cell by name.
