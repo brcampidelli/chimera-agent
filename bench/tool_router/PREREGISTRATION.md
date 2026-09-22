@@ -150,3 +150,15 @@ The fourth halt (4 bad in 24) looked like a 17% failure rate. It is not a rate. 
 Two `off-weak`, one `on-weak`, one `on-strong`: every arm in flight at that moment, and nothing since. That is an upstream stall hitting the concurrent calls at once, so "5% of solves" is measuring how many solves happened to be in flight during an outage, not how often the apparatus fails.
 
 Recorded rather than acted on: the threshold stays, the four cells are re-run by the resume pass, and **the clustering goes in the results** beside the missing-cell count. A failure rate quoted from correlated failures is a number about the concurrency, not about the thing that failed.
+
+## Amendment 4 — the retry budget is a freeze list, and a relaunch continues the queue (2026-09-22)
+
+Amendment 3 said "at most two more passes" and that sentence conflated two different things, which the fifth halt made obvious: **re-running a failed cell** and **continuing the queue**. The run is at 26 of 193 because each halt stops new submissions and a relaunch is needed to go on; freezing the whole run after two relaunches would leave 167 cells that were never attempted once, which is not a retry budget — it is an unfinished experiment.
+
+Separated, and implemented rather than promised:
+
+* **A cell that fails twice is written to `~/hb-frozen-b4.txt` and never run again** (`run_b4.py::freeze`). Running a cell until it succeeds selects for the solves that happen to be fast, and a mean over those is a mean over the easy half.
+* **A relaunch continues the queue.** Cells never attempted keep running; frozen cells are skipped and printed at startup.
+* **The results report both**: how many halts, their causes, and how many cells are frozen — with the frozen cells named.
+
+The fifth halt's cause is the third amendment's again: 2 solves dying on a provider timeout **one second apart**. Every timeout in this run so far has come in such a cluster.

@@ -46,6 +46,30 @@ HIDS = [f"sys1-{s}-{e}-r{k}" for e in ("strong", "weak") for s in ("off", "on") 
 the same executor and replica is the comparison; everything else about them is identical."""
 
 
+FROZEN = Path(os.path.expanduser("~/hb-frozen-b4.txt"))
+"""Cells that spent their retry budget (amendment 4). One `<task> <hid>` per line.
+
+A cell is frozen after two failed attempts and is never run again — running a cell until it
+succeeds selects for the solves that happen to be fast, and a mean over those is a mean over the
+easy half of the distribution. A frozen cell is MISSING, and missing is reported."""
+
+
+def frozen() -> set[tuple[str, str]]:
+    if not FROZEN.is_file():
+        return set()
+    out = set()
+    for line in FROZEN.read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) == 2:
+            out.add((parts[0], parts[1]))
+    return out
+
+
+def freeze(task: str, hid: str) -> None:
+    with FROZEN.open("a", encoding="utf-8") as fh:
+        fh.write(f"{task} {hid}\n")
+
+
 def result_exists(hid: str, task: str) -> bool:
     """Done means graded AND priced (amendment 2).
 
@@ -112,7 +136,10 @@ def main() -> None:
     if args.limit:
         queue = queue[: args.limit]
     # Resume: drop solves already scored.
-    pending = [(h, t) for (h, t) in queue if not result_exists(h, t)]
+    cold = frozen()
+    pending = [(h, t) for (h, t) in queue if not result_exists(h, t) and (t, h) not in cold]
+    if cold:
+        print(f"frozen cells skipped (retry budget spent): {len(cold)}")
     print(f"seed={args.seed} queue={len(queue)} already-done={len(queue) - len(pending)} pending={len(pending)} "
           f"concurrency={args.concurrency} max_usd={args.max_usd}", flush=True)
 
@@ -147,6 +174,16 @@ def main() -> None:
                     spent += r["usd"] or 0.0
                     rc_err += int(r["rc"] != 0)
                     receiptless += int(r["receiptless"])
+                    # Amendment 4: a cell that fails twice is frozen, not retried for a third time.
+                    if r["rc"] != 0 or r["receiptless"]:
+                        seen = sum(
+                            1 for line in DRIVER_LOG.read_text(encoding="utf-8").splitlines()
+                            if line.strip() and (lambda d: d["task"] == r["task"] and d["hid"] == r["hid"]
+                                                 and (d["rc"] != 0 or d["receiptless"]))(json.loads(line))
+                        )
+                        if seen >= 2 and (r["task"], r["hid"]) not in frozen():
+                            freeze(r["task"], r["hid"])
+                            print(f"    frozen after {seen} failures: {r['task']} {r['hid']}", flush=True)
                     fh.write(json.dumps(r) + "\n")
                     fh.flush()
                     bad = rc_err + receiptless
