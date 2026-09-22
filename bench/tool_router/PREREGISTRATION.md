@@ -127,3 +127,13 @@ One provider call exceeded `CHIMERA_REQUEST_TIMEOUT` (600 s, the default), the C
 4. The stop rule now counts solves that remain bad **after** the re-run. The threshold (5%) and everything else are unchanged.
 
 Nothing about the arms, the tasks, the router, the outcomes or the predictions changed.
+
+## Amendment 3 — the request timeout is 900 s, and every halt is recorded rather than waived (2026-09-22)
+
+Amendment 2 traded one failure for another, and this is the record of it. At 1800 s a single hung provider call can eat most of the wrapper's 2400 s budget, and then the whole solve is killed with neither a receipt nor an outcome: `043-db-migration-safety` on `sys1-on-strong-r0` ran 2400.3 s and produced nothing, while the median solve in that window took **107 s** and the 90th percentile **448 s**.
+
+`CHIMERA_REQUEST_TIMEOUT=900` — above the 600 s that flaked, far enough below 2400 s that a hung call fails with time left for the solve to finish or for the retry to happen.
+
+**The stop rule is not being loosened.** It has now fired three times, each time on something real (a rate-limited model; upstream timeouts; a hung call), and each halt is investigated, amended and relaunched rather than waived. What the results will carry instead of a moved threshold: **every halt, with its cause, and the number of (task, arm, replica) cells that never produced a receipt** — a cell missing from a cost mean must be visible in the same table as the mean.
+
+**Retries are bounded:** the resume pass is run at most twice more. A cell still missing after that stays missing and is counted; it is not run until it succeeds, which would select for the solves that happen to be fast.
