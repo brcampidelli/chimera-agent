@@ -1,0 +1,76 @@
+{
+  "catch": {
+    "10%": {
+      "band_calls": 36,
+      "calls": 36,
+      "calls_per_extra": 71.3,
+      "ci95_extra": [
+        -2.69,
+        3.88
+      ],
+      "extra": 0.51,
+      "null_extra_mean": 0.035,
+      "oracle_ceiling": 22,
+      "overlap_band": 15,
+      "overlap_low": 13,
+      "permutation_p": 0.5095,
+      "random_expected": 12.49
+    },
+    "20%": {
+      "band_calls": 78,
+      "calls": 78,
+      "calls_per_extra": 66.1,
+      "ci95_extra": [
+        -3.75,
+        6.16
+      ],
+      "extra": 1.18,
+      "null_extra_mean": 0.042,
+      "oracle_ceiling": 45,
+      "overlap_band": 34,
+      "overlap_low": 30,
+      "permutation_p": 0.392,
+      "random_expected": 28.82
+    },
+    "30%": {
+      "band_calls": 115,
+      "calls": 115,
+      "calls_per_extra": 19.7,
+      "ci95_extra": [
+        0.16,
+        12.43
+      ],
+      "extra": 5.85,
+      "null_extra_mean": 0.015,
+      "oracle_ceiling": 63,
+      "overlap_band": 48,
+      "overlap_low": 48,
+      "permutation_p": 0.0205,
+      "random_expected": 42.15
+    }
+  },
+  "corpus": {
+    "claimed": 385,
+    "dropped": {
+      "no receipt": 5,
+      "not a factorial arm": 4
+    },
+    "false": 139,
+    "solves": 547
+  },
+  "draws": 2000,
+  "positive_control_auroc": 1.0,
+  "predictions": {
+    "P0_shipped_covers_zero": true,
+    "P1_ci_includes_zero_at_30": false,
+    "P2_band_below_low_every_budget": false,
+    "P3_null": true
+  },
+  "seed": 20260913,
+  "shipped_trigger": {
+    "calls": 0,
+    "catch": 0,
+    "covers": 0
+  },
+  "verdict": "NULL -- D9 stays as it is"
+}
