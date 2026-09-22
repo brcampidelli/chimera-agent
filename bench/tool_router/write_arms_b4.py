@@ -24,8 +24,9 @@ EXECUTORS = {
     # The factorial's model: #453's noise floor (SD 0.073 on the same 23 tasks) is about THIS
     # executor, so the effect here is read against a floor that was measured, not assumed.
     "strong": "openrouter/deepseek/deepseek-v3.2",
-    # The other half of the registered prediction: "with a weak executor, a gain".
-    "weak": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+    # The other half of the registered prediction: "with a weak executor, a gain". Amendment 1:
+    # the registered mistral-small is 429 upstream on the shared pool and cannot run.
+    "weak": "openrouter/openai/gpt-oss-20b",
 }
 
 
