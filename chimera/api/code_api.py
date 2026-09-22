@@ -76,6 +76,7 @@ from chimera.api.schemas import (
     WorkActionOut,
     WorksOut,
 )
+from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.governance.approval import ApprovalAnnouncer
@@ -1259,12 +1260,21 @@ def register_code_api(
                 raise HTTPException(status_code=400, detail="workspace not found")
         else:
             ws = workspace
-        if (
-            req.spoken
-            and not (req.provider or "").strip()
-            and _is_work(req.message, has_works=bool(req.session_id and work_store.for_parent(req.session_id)))
-        ):
-            return EventSourceResponse(await _spoken_work_frames(req, ws, author=author))
+        if req.spoken and not (req.provider or "").strip():
+            has_works = bool(req.session_id and work_store.for_parent(req.session_id))
+            is_work = _is_work(req.message, has_works=has_works)
+            # The label is written down BEFORE it routes anything: a spoken request with the
+            # verdict the regex gave it is one row of the corpus the voice router's typed decision
+            # will be measured on (`chimera/api/spoken_log.py`). Nothing reads the file yet.
+            record_spoken_request(
+                Path(live().home),
+                req.message,
+                "work" if is_work else "talk",
+                session_id=req.session_id,
+                has_works=has_works,
+            )
+            if is_work:
+                return EventSourceResponse(await _spoken_work_frames(req, ws, author=author))
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[tuple[str, Any] | None] = asyncio.Queue()
         session_id, turn_id = _launch_turn(req, ws, author=author, loop=loop, queue=queue)
