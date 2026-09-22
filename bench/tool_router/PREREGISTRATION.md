@@ -137,3 +137,16 @@ Amendment 2 traded one failure for another, and this is the record of it. At 180
 **The stop rule is not being loosened.** It has now fired three times, each time on something real (a rate-limited model; upstream timeouts; a hung call), and each halt is investigated, amended and relaunched rather than waived. What the results will carry instead of a moved threshold: **every halt, with its cause, and the number of (task, arm, replica) cells that never produced a receipt** — a cell missing from a cost mean must be visible in the same table as the mean.
 
 **Retries are bounded:** the resume pass is run at most twice more. A cell still missing after that stays missing and is counted; it is not run until it succeeds, which would select for the solves that happen to be fast.
+
+### Amendment 3a — the failures are one outage, not a rate (2026-09-22)
+
+The fourth halt (4 bad in 24) looked like a 17% failure rate. It is not a rate. Every solve that has ever died on a provider timeout in this run — **all four of them** — ended within **four seconds of each other**:
+
+```
+4 solves that died on a provider timeout
+  cluster of 4 within 4s
+```
+
+Two `off-weak`, one `on-weak`, one `on-strong`: every arm in flight at that moment, and nothing since. That is an upstream stall hitting the concurrent calls at once, so "5% of solves" is measuring how many solves happened to be in flight during an outage, not how often the apparatus fails.
+
+Recorded rather than acted on: the threshold stays, the four cells are re-run by the resume pass, and **the clustering goes in the results** beside the missing-cell count. A failure rate quoted from correlated failures is a number about the concurrency, not about the thing that failed.
