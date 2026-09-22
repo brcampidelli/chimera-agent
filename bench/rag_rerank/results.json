@@ -1,0 +1,51 @@
+{
+  "ceiling": 219,
+  "headroom": 50,
+  "meta": {
+    "arm": "meta",
+    "chunks": 4177,
+    "embedder": "openrouter/openai/text-embedding-3-small",
+    "k": 10,
+    "model": "qwen3:4b",
+    "probes": 400,
+    "quantization": "Q4_K_M",
+    "seed": 20260922,
+    "wide": 30
+  },
+  "model_minutes": 52.4,
+  "n": 400,
+  "paired_noul_vs_hybrid": {
+    "a": 104,
+    "b": 63,
+    "c": 32,
+    "d": 201,
+    "delta": -0.0775,
+    "p": 0.001924347777526304
+  },
+  "paired_noul_vs_hybrid30": {
+    "b": 59,
+    "c": 26,
+    "delta": -0.0825
+  },
+  "paired_noul_vs_random": {
+    "b": 35,
+    "c": 93,
+    "delta": 0.145
+  },
+  "predictions": {
+    "P1_below_5pp": true,
+    "P2_beats_random_by_5pp": true,
+    "P3_hybrid30_equals_hybrid_95pct": false,
+    "control_random_le_hybrid30_plus_0.02": true
+  },
+  "recall": {
+    "hybrid": 0.4175,
+    "hybrid30": 0.4225,
+    "noul": 0.34,
+    "oracle": 0.5475,
+    "random": 0.195
+  },
+  "sent": 219,
+  "target_top_by_p": 27,
+  "verdict": "NULL"
+}
