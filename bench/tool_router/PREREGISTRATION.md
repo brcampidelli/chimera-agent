@@ -170,3 +170,30 @@ Sixth halt, same cause. The rule as written counts a failed solve against a 20-s
 The retry budget is **not** changed: two attempts, then frozen. What changes is where it is spent — a bad cell is **resubmitted once inside the same run**, and only a cell that fails **twice** counts toward the stop rule. So the rule now fires on what it was written to detect (a cell that cannot complete) rather than on how many solves happened to be in flight when a provider stalled.
 
 Nothing about the arms, the tasks, the executors, the router, the outcomes or the predictions changed. The results report every halt, its cause, and every frozen cell by name.
+
+## Amendment 6 — a third executor: `openai/gpt-6-sol` (2026-09-22, approved at US$ 38, before any Sol solve)
+
+The partials raised a question the two registered executors cannot answer — *what does the router do to a model that is actually good?* — and the frontier prices moved the same day, so it is answerable for the price of the run itself.
+
+**Executor:** `openrouter/openai/gpt-6-sol`, $2 / $10 per 1M, **cache read $0.20/M**, 1.1M context, **released 2026-09-22** — the day of this run. Standard routing (not `Exacto`, OpenRouter's tool-calling-accuracy mode), so it is the same routing the other arms got.
+
+**Cost, from the token counts this run measured** (279,954 prompt / 8,460 completion / 223,244 cache-read per solve on `off`; 131,369 / 14,549 / 51,642 on `on`), at the posted cache price rather than an assumed discount:
+
+| | US$/solve |
+|---|---:|
+| `off` | 0.243 |
+| `on` | 0.315 |
+| **138 solves** | **US$ 38** |
+
+Everything else is the registered design: the same 23 tasks, the same two arms, k = 3, the same flags, the same router model, the same freeze rule.
+
+### Predictions for this arm, written before it ran
+
+- **S1 — the sign of the cost effect INVERTS.** On `deepseek-v3.2` the router cut cost 58%; here the `on` arm should cost **more** per solve (0.315 against 0.243). The mechanism is in the numbers above and not in the model: the control reuses **223k cached tokens per solve**, the router arm only **52k**, and at $2/M fresh against $0.20/M cached the lost cache outweighs the saved steps. If this is wrong, my account of *why* the router looked cheap is wrong too.
+- **S2 — steps still fall, by less than 37%.** The mechanism (the router says `ANSWER`, the loop stops early) does not depend on the executor; but Sol's own card claims it "completes comparable tasks in fewer steps and with fewer tokens", so the control arm starts closer to the floor and there is less to cut.
+- **S3 — the outcome effect is no better than the strong arm's.** A better executor loses more by being interrupted, not less; and the control's absolute score should sit **above** `deepseek-v3.2`'s 0.714, which is also the check that the arm is really running a better model.
+
+### Two risks, named rather than discovered later
+
+1. **The model is one day old.** OpenRouter shows "not enough performance data" for it, and this bench has already been halted six times by provider stalls. The freeze rule (amendment 4/5) is what keeps that from becoming a silent hole; the frozen count goes in the results.
+2. **A third executor is a third comparison, not a factor.** It is read as its own paired off/on contrast, never pooled with the other two — three executors averaged into one number is the §2y shape this project has already been bitten by.

@@ -1,4 +1,4 @@
-"""Drive B4 (study 20): 2 arms x 2 executors x 23 tasks x k=3 = 276 solves, 6 concurrent.
+"""Drive B4 (study 20): 2 arms x 3 executors x 23 tasks x k=3 = 414 solves, 6 concurrent.
 
 Run in WSL, from a shell that has sourced .env for OPENROUTER_API_KEY:
   ~/hb-venv-b4/bin/python run_b4.py [--concurrency 6] [--max-usd 400] [--seed 20260912]
@@ -41,8 +41,8 @@ TASKS = [
     "086-sql-migration-preflight-rollback", "087-cli-parser-bug-tests",
     "089-ab-test-caveat-analysis", "092-schema-drift-audit", "094-metric-definition-migration-diff",
 ]  # 078 and 088 dropped: they require a public tunnel (cloudflared) absent here — see PREREGISTRATION amendment 2
-HIDS = [f"sys1-{s}-{e}-r{k}" for e in ("strong", "weak") for s in ("off", "on") for k in (0, 1, 2)]
-"""Twelve arms: router off/on x strong/weak executor x three replicas. The pair (off, on) at
+HIDS = [f"sys1-{s}-{e}-r{k}" for e in ("strong", "weak", "sol") for s in ("off", "on") for k in (0, 1, 2)]
+"""Eighteen arms: router off/on x three executors (strong, weak, sol) x three replicas. The pair (off, on) at
 the same executor and replica is the comparison; everything else about them is identical."""
 
 

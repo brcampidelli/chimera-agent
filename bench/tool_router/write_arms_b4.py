@@ -1,4 +1,4 @@
-"""Write the B4 arm entries (2 arms x 2 executors x 3 replicas = 12) into the harness config.
+"""Write the B4 arm entries (2 arms x 3 executors x 3 replicas = 18) into the harness config.
 
 Run in WSL:  ~/hb-venv-b4/bin/python write_arms_b4.py [config_path]
 
@@ -27,6 +27,9 @@ EXECUTORS = {
     # The other half of the registered prediction: "with a weak executor, a gain". Amendment 1:
     # the registered mistral-small is 429 upstream on the shared pool and cannot run.
     "weak": "openrouter/openai/gpt-oss-20b",
+    # Amendment 6 (approved at US$ 38): what the router does to a model that is actually good.
+    # Released the day of this run; read as its own paired contrast, never pooled with the others.
+    "sol": "openrouter/openai/gpt-6-sol",
 }
 
 

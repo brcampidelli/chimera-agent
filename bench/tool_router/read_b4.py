@@ -31,7 +31,7 @@ TASKS = [
     "086-sql-migration-preflight-rollback", "087-cli-parser-bug-tests",
     "089-ab-test-caveat-analysis", "092-schema-drift-audit", "094-metric-definition-migration-diff",
 ]
-EXECUTORS = ("strong", "weak")
+EXECUTORS = ("strong", "weak", "sol")
 ARMS = ("off", "on")
 REPLICAS = (0, 1, 2)
 CHAINED = {"011-code-debug"}
