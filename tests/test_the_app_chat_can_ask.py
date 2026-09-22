@@ -438,7 +438,15 @@ def test_the_posture_line_still_admits_an_unguarded_chat(
 
 #: Exactly the keys `chimera/api/code_api.py` emits for an `approval` frame. The client renders ONE
 #: card for both surfaces, so a key here that is not there — or missing — is a second card.
-APPROVAL_KEYS = {"id", "action", "reason", "asked_at", "wait_seconds", "decision"}
+#:
+#: `p`, `band` and `decider_model` joined on 2026-09-19 (study 20 §2.6): the card showed a reason and
+#: nothing else, so the answer it collected could not be joined to the probability that asked. They
+#: are on the frame because the card is where a person reads the number, and the record line joins
+#: that same `p` to the yes/no — which is the only pairing that turns an answer into a label.
+APPROVAL_KEYS = {
+    "id", "action", "reason", "asked_at", "wait_seconds", "decision",
+    "p", "band", "decider_model",
+}
 
 
 def _announcing_client(tmp_path: Path) -> tuple[TestClient, ApprovalAnnouncer]:

@@ -44,7 +44,7 @@ class GrepTool(_WorkspaceTool):
         "properties": {
             "pattern": {"type": "string", "description": "Python regular expression to search for."},
             "glob": {"type": "string", "description": "Optional filename glob filter, e.g. '*.py'."},
-            "path": {"type": "string", "description": "Optional subdirectory to search (default '.')."},
+            "path": {"type": "string", "description": "Optional subdirectory or single file to search (default '.')."},
             "max_results": {"type": "integer", "description": f"Max matches (default {_MAX_RESULTS})."},
         },
         "required": ["pattern"],
@@ -67,13 +67,21 @@ class GrepTool(_WorkspaceTool):
         except re.error as exc:
             return f"error: invalid regex: {exc}"
         root = resolve_for(self, str(kwargs.get("path", ".")), verb="search")
-        if not root.is_dir():
-            return f"error: not a directory: {kwargs.get('path', '.')}"
+        # A path that names one file searches that file. `path` was documented as a directory and
+        # a file answered "error: not a directory" — which a model reads as "try again", and did:
+        # measured on 2026-09-19 in the desktop agent's own transcript, eleven of one turn's forty
+        # steps were that error on the same three files. Searching the file is what it meant.
+        if root.is_file():
+            files = [root]
+        elif root.is_dir():
+            files = _walk_files(root)
+        else:
+            return f"error: no such file or directory: {kwargs.get('path', '.')}"
         glob = kwargs.get("glob")
         limit = int(kwargs.get("max_results") or _MAX_RESULTS)
 
         hits: list[str] = []
-        for file in _walk_files(root):
+        for file in files:
             if glob and not file.match(str(glob)):
                 continue
             try:

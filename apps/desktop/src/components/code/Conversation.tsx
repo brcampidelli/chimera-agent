@@ -830,6 +830,24 @@ export function Conversation({
   const [notifyOnFinish, setNotifyOnFinish] = useState(
     () => localStorage.getItem("chimera.notifyOnFinish") === "1",
   );
+  /** Off by default, same reason as the notifications toggle: a chat that keeps sending turns on
+   *  its own is a chat that keeps SPENDING on its own, and that is a decision the user makes, not
+   *  the app. When on, a turn that stopped at the step ceiling is continued automatically — the
+   *  model asked for more steps, not for permission. Stored per install, like the toggle beside it. */
+  const [autoContinue, setAutoContinue] = useState(
+    () => localStorage.getItem("chimera.autoContinue") === "1",
+  );
+  /** How many automatic continuations THIS user message has already spent. A ref, not state: it is
+   *  read and written inside `onDone`, which runs in the same tick as the `setBusy(false)` above,
+   *  and a state read there would see the previous turn's value — the same trap `verifyFailed`
+   *  documents. The ceiling is hard: three continuations is the difference between "the task
+   *  needed more room" and "the task will never end", and the second one spends real money. */
+  const autoContinueCountRef = useRef(0);
+  /** The continuation to send once `busy` has actually gone false. Same mechanism as the queued
+   *  follow-up below — the effect on `[busy]` is the only thing that sends after `setBusy(false)`
+   *  has landed — so an automatic "continue" rides the exact path a typed message does, and no
+   *  second send path exists to drift from the first one. */
+  const autoContinueRef = useRef<string | null>(null);
   const [exportNote, setExportNote] = useState("");
   /** A follow-up typed while a turn was still running. Shown, never silent — a message that
    *  disappeared into a queue nobody can see is indistinguishable from one that was dropped. */
@@ -868,7 +886,7 @@ export function Conversation({
   // Send the released follow-up only once `busy` has actually gone false. Doing it inside `onDone`
   // would run before that `setBusy(false)` had landed, so `send()` would take the busy branch and
   // re-queue the very message it was releasing — a queue that never drains.
-  const sendRef = useRef<(force?: boolean, override?: string, spoken?: boolean) => void>(
+  const sendRef = useRef<(force?: boolean, override?: string, spoken?: boolean, auto?: boolean) => void>(
     () => {},
   );
   useEffect(() => {
@@ -877,6 +895,18 @@ export function Conversation({
     if (!text) return;
     queuedToSendRef.current = null;
     sendRef.current(false, text);
+  }, [busy]);
+
+  // The automatic continuation rides the same gate: it is only sent once `busy` has actually gone
+  // false, through the same `sendRef`, so it cannot race the turn it follows and cannot take a path
+  // a typed message does not take. Checked after the queued follow-up so a message the user typed
+  // while the turn ran always goes first — the user outranks the automation.
+  useEffect(() => {
+    if (busy) return;
+    const text = autoContinueRef.current;
+    if (!text) return;
+    autoContinueRef.current = null;
+    sendRef.current(false, text, false, true);
   }, [busy]);
 
   /** Write the conversation to a Markdown file the user chooses.
@@ -955,12 +985,24 @@ export function Conversation({
     [lastAt, lastText, lastDone],
   );
 
-  function send(force = false, override?: string, spoken = false) {
+  function send(force = false, override?: string, spoken = false, auto = false) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
     // the wrong text.
     const message = (override ?? draft).trim();
     if (busyElsewhere) return;
+    // A message the user typed is a new instruction, not a continuation of the old one: whatever
+    // automatic budget the previous task had left belongs to that task, so it is spent back to
+    // zero here. An automatic continuation is the same task, so it preserves the counter; a typed
+    // message starts a new task and clears both the budget and any pending automation.
+    //
+    // Keyed on the `auto` flag, not on the text: a user who types the word "continue" themselves
+    // has started a new task, and matching on the string would silently hand them the previous
+    // task's leftover budget.
+    if (!auto) {
+      autoContinueCountRef.current = 0;
+      autoContinueRef.current = null;
+    }
     // Busy is no longer a wall. Losing a thought because a turn is still running is the whole
     // complaint; the message waits, visibly, and goes out when the turn ends.
     if (busy) {
@@ -1147,6 +1189,27 @@ export function Conversation({
             void qc.invalidateQueries({ queryKey: ["git-status"] });
             onEdited();
           }
+          // Auto-continue, and the guards that make it safe to have on by default-able.
+          //
+          // `max_steps` is the ONE stop that means "the task was going fine and ran out of room":
+          // the model was working, the ceiling cut it, and the work is incomplete by arithmetic
+          // rather than by failure. Every other reason is a verdict — `tool_loop` says the model
+          // was repeating itself (continuing would repeat it again, on the user's money),
+          // `budget`/`spend` say the run has already cost what the user capped, `cancelled` says
+          // the user stopped it ON PURPOSE. Continuing past any of those would override a
+          // decision someone already made, so the counter is spent back to zero and nothing is
+          // sent.
+          if (done.stopped_reason === "max_steps") {
+            if (autoContinue && autoContinueCountRef.current < 3) {
+              autoContinueCountRef.current += 1;
+              // Sent by the `[busy]` effect above, once `busy` has actually gone false — the same
+              // gate the queued follow-up waits behind, so the continuation cannot fire into a
+              // turn that is still running.
+              autoContinueRef.current = "continue";
+            }
+          } else {
+            autoContinueCountRef.current = 0;
+          }
         },
         // The parameter is the whole fix. This read `onError: () => {…}` — the message arrives
         // (api.ts passes `payload.message`) and was discarded by the signature itself, while
@@ -1179,6 +1242,11 @@ export function Conversation({
   function abandon() {
     abortRef.current?.abort();
     abortRef.current = null;
+    // A stop the user pressed is a stop the user decided: whatever continuations were armed for
+    // this task are cancelled with it, and the pending one is dropped rather than sent — otherwise
+    // the button would stop the turn and the automation would immediately start another one.
+    autoContinueCountRef.current = 0;
+    autoContinueRef.current = null;
     publish({ status: "idle", busy: false });
     setBusy(false);
     // Say so on the turn itself. Aborting the fetch means no `done` frame ever arrives, so the
@@ -1298,6 +1366,29 @@ export function Conversation({
               }}
             >
               {t("code.chat.notify.label")}
+            </Button>
+            {/* Same shape as the notifications toggle beside it: off by default, remembered per
+                install, and honest about being on — a chat that continues itself is a chat that
+                spends by itself, so the button reads as active while it does. */}
+            <Button
+              size="sm"
+              variant={autoContinue ? "primary" : "ghost"}
+              aria-pressed={autoContinue}
+              title={t("code.chat.autoContinue.hint")}
+              onClick={() => {
+                const next = !autoContinue;
+                setAutoContinue(next);
+                // Turning it OFF also cancels a continuation already armed for the turn in
+                // flight: the user changed their mind about the automation, not about the task,
+                // and a "continue" sent after the click would be the app overruling them.
+                if (!next) {
+                  autoContinueCountRef.current = 0;
+                  autoContinueRef.current = null;
+                }
+                localStorage.setItem("chimera.autoContinue", next ? "1" : "0");
+              }}
+            >
+              {t("code.chat.autoContinue.label")}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => void clear()}>
               <Eraser className="h-3.5 w-3.5" /> {t("code.chat.clear")}

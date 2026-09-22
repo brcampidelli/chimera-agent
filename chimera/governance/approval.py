@@ -117,6 +117,24 @@ def _facts_of(*args: Any) -> dict[str, Any]:
         facts["lineage"] = "tainted"
     elif getattr(head, "tainted_refs", None):
         facts["lineage"] = "tainted"
+    # The number that raised the question, when a band produced the verdict. Read off the `Verdict`
+    # rather than passed in a second time: the verdict is the object the kernel already built, and a
+    # caller that had to remember to forward `p` separately would eventually forget — which is the
+    # defect this whole item exists to fix (the card showed a reason and no number, so the answer it
+    # collected could not be joined to the probability that asked).
+    #
+    # `confidence` is the calibrated probability the band put on the verdict; `band` and
+    # `decider_model` are the two fields that make it readable. A rule-raised verdict has none of
+    # the three, and none is written.
+    confidence = getattr(head, "confidence", None)
+    if isinstance(confidence, (int, float)):
+        facts["p"] = float(confidence)
+    band = getattr(head, "band", "")
+    if isinstance(band, str) and band:
+        facts["band"] = band
+    model = getattr(head, "decider_model", "")
+    if isinstance(model, str) and model:
+        facts["decider_model"] = model
     return facts
 
 

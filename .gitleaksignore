@@ -1,0 +1,28 @@
+# One entry, and the reasoning is the reason it is short.
+#
+# `generic-api-key` fired on a doc comment in ApprovalCard.tsx that wrote an i18n key as an EXAMPLE of
+# a literal map's entry. The rule matches a keyword, a separator and a quoted token, then keeps the
+# match only when the captured value's Shannon entropy is >= 3.5 — and that example scores 3.6818807.
+# It is not a credential; it is the name of a test file, `src/lib/i18n.reachable.test.ts`.
+#
+# This file deliberately does NOT quote the offending text. Writing it out to explain it would
+# reproduce the same shape one file over — which is what happened on the first attempt at this
+# comment, and the scanner reported THIS file for it, at its own line 4.
+#
+# Rewording the comment (487dc73) cleans the TREE, which is necessary and not sufficient: the action
+# scans a range of COMMITS (`--no-merges --first-parent base^..head`), so the finding still lives in
+# 7190c2f, and that commit is inside the pull request's range. The `supply-chain` job goes red on the
+# history, not on the tree.
+#
+# A fingerprint carries the commit SHA, so this exempts one finding in one commit. Measured against
+# the pinned binary (8.30.1), each case with its own control:
+#
+#   synthetic leak, no entry           -> flagged   (the payload really is detectable)
+#   synthetic leak, entry present      -> flagged   (the entry is NOT commit-wide)
+#   same commit, other line            -> flagged   (the entry is NOT line-wide)
+#   the historical finding, entry      -> silenced
+#
+# A new key-shaped string in this file is therefore still reported as usual. The test that pins this
+# shape and this reason is tests/test_the_secret_scanner_is_told_which_finding_is_not_a_secret.py —
+# an allowlist entry is silent, and that test is the only thing that will notice it going stale.
+7190c2f9c663febb2b9ef4ed6207b12ee2bc41b4:apps/desktop/src/components/code/ApprovalCard.tsx:generic-api-key:128

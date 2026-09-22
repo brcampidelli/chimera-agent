@@ -142,7 +142,13 @@ def _survived_truncation(ctx: ScenarioContext) -> bool:
     first = _first_truncated(ctx)
     if first is None:
         return True
-    return any(a.name in SECOND_LOOK for a in ctx.activities[first + 1 :])
+    # A second `read_file` that asks for a window (`start_line`) is a second look too: since
+    # 2026-09-19 the truncation notice names the next window, and reading on is the repair the
+    # notice invites — not the same read again, which would meet the same cut.
+    return any(
+        a.name in SECOND_LOOK or (a.name == "read_file" and bool((a.arguments or {}).get("start_line")))
+        for a in ctx.activities[first + 1 :]
+    )
 
 
 def _declined_exec(ctx: ScenarioContext) -> bool:

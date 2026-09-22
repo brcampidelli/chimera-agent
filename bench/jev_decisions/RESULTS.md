@@ -275,3 +275,123 @@ ledger's corpus, another layer); file-write attacks (refused by the jail regardl
 (44% attacks in the corpus against ~0 observed in traffic — every `p` here is about the corpus); the
 alias `jev-latest`; a second provider on the endpoint; a local model bigger than 4B or other than
 Qwen3 (one model, one machine); L2 under the wrappers and on OATS (not run — 51 s an item).
+
+
+## 12 · Tier B — the three instrument variables, and the claim-vs-diff Noul
+
+Registered in `PREREGISTRATION-tier-b.md` before any request of this set. Two files:
+`results/2026-09-19-tier-b-local.jsonl` (arms `Lr`, `Ls`, `Lb` — 165 requests, US$ 0, 0 halts) and
+`results/2026-09-19-tier-b-vendor.jsonl` (arms `Jr`, `Js`, `Jb`, `Jbatch` — 171 requests, US$ 0.0043,
+0 halts). Read by `report_tier_b.py`, each arm paired against the SAME item's registered first
+repetition; the replay floor is 0.05, so a movement at or below it is the instrument, not the
+phenomenon.
+
+### B1(a) — option order
+
+| arm | paired | mean Δp | moved > floor | flips at τ=0.5 | prediction |
+|---|---:|---:|---:|---:|---|
+| `Lr` (local, reversed) | 55 | +0.071 | 19/55 | **5/55** | ≥ 3 flips — **confirmed** |
+| `Jr` (vendor, reversed) | 55 | −0.001 | 1/55 | **0/55** | ≤ 1 flip — **confirmed** |
+
+The local arm reads a **canonical order**: reversing the JSON enum moves 19 of 55 items and flips 5
+verdicts, all but one of them upward (18 up, 1 down) — the model is not indifferent to which option
+comes first. The vendor arm is stable to the same reversal (1 item moved, 0 flips), which is what a
+decision head trained on a fixed order should do. **Consequence, as registered:** the instrument hash
+already excludes a reordered question, so a reordered question gets no map until one is fitted on it —
+and the local arm's map must not be applied to a reversed instrument.
+
+### B1(b) — another item's state
+
+| arm | shuffled AUROC | items whose p moved | prediction |
+|---|---:|---:|---|
+| `Ls` (local) | **0.306** | 43/55 | collapse ≤ 0.60 — **confirmed** |
+| `Js` (vendor) | **0.286** | 50/55 | collapse ≤ 0.60 — **confirmed** |
+
+Both readings collapse to well below chance when the state is another item's — the `p` is about the
+state, not the instrument. (Below 0.5 rather than at it: the derangement pairs each item with the
+next, and the corpus is ordered by family, so an attack is often shown a benign neighbour's state and
+vice versa — an anti-correlation, not noise.) This is the arm that licenses every other number here.
+
+### B2 — ten states per request
+
+| | value | prediction |
+|---|---:|---|
+| paired slots | 55 | — |
+| mean \|Δp\| | **0.275** | > 0.1 — **confirmed** |
+| slots moving > 0.1 | 36/55 | — |
+
+Batching states moves `p` by 0.275 on average, against a replay floor of 0.05 — five times the floor.
+**Consequence, as registered: no surface batches states.** `OpenRouterDecisionsBackend` stays one state
+per call. The registered prediction that the *later* slots move most did **not** hold cleanly: the
+per-slot means are 0.19, 0.28, 0.15, 0.51, 0.22, 0.36, 0.29, 0.35, 0.27, 0.12 — the effect is real and
+large but not ordered by position, so jev-orderby's "later slots" shape did not replicate at ten states.
+
+### B3 — the boundary sentence
+
+| arm | paired | mean Δp | moved > floor | flips | prediction |
+|---|---:|---:|---:|---:|---|
+| `Lb` (local) | 55 | **−0.206** | 36/55 | 11/55 | below the floor — **REFUTED** |
+| `Jb` (vendor) | 55 | +0.008 | 5/55 | 0/55 | below the floor — **confirmed** |
+
+The prediction was that a prompt-level line does not fix a data-level property. On the **vendor** arm
+it holds: the sentence moves `p` by 0.008, five items cross the floor, no verdict flips. On the
+**local** arm it is refuted, and the direction is the finding: the sentence pushes `p` **down** on
+both attacks (−0.13) and benigns (−0.27), 36 of 55 items moving and 11 verdicts flipping. That is not
+the sentence fixing the framing effect — it is the sentence changing the instrument, and it makes the
+4B model *less* willing to refuse across the board. **Consequence, as registered:** the sentence is not
+a layer; the kernel's claim-stripping rule stays. And the local map does not apply to a boundary
+instrument — a different prompt hash, no map until one is fitted on it.
+
+### B4 — claim-versus-diff as a Noul
+
+**Run.** `results/2026-09-19-tier-b-b4-local.jsonl` — arm `L`, 385 requests, US$ 0, 0 halts, 328 s.
+The corpus was found: the 547 solves live in `~/hb-homes` and `~/harness-bench` **inside the WSL2
+distro** that ran the factorial, not in the Windows home the runner defaulted to. `--check` reads
+`usable solves 547 · dropped {'no receipt': 5, 'not a factorial arm': 4}` and the leak check passes
+(the task id does not appear in the state). The runner now falls back to the WSL copy when the default
+`~` is empty, and takes `--homes`/`--bench-home` for an explicit path.
+
+| arm | rows | tasks | pairs | within-task AUROC | 95% CI | prediction |
+|---|---:|---:|---:|---:|---|---|
+| `L` (local Noul) | 385 | 10 | 557 | **0.5368** | [0.4223, 0.6559] | 0.60–0.70 — **OUTSIDE** |
+| `overlap` (the ruler, lexical) | 385 | 10 | 557 | 0.6643 | [0.532, 0.792] | — |
+
+Same population, same 10 tasks, same 557 discordant pairs as `bench/claim_vs_diff`'s primary — the two
+numbers are read on one ruler. Mean `p` is 0.736 on the passes and 0.579 on the failures, so the
+reading is oriented as the question asks (higher `p` where the claim matched the diff); the AUROC is
+below it because the ordering inside a task barely separates the two.
+
+**By the rule written before the run — AUROC ≥ 0.6643 → the Noul is a usable second reading for C2 —
+the arm fails.** 0.5368 is below the lexical signal and its interval spans 0.5. The number to read
+beside it: `bench/claim_vs_diff`'s own **negative control** — `overlap` with the labels shuffled within
+task — is **0.5368**, the same value to four decimals. A Noul that reads the claim and the diff lands
+where a lexical signal lands when its labels are destroyed. **Consequence, as registered:** the lexical
+signal stands alone; C2 combines what it already has, and this arm adds a call and no information.
+
+Per task (pairs): 040-test-coverage-fill 1.000 (20) · 082-compose-config-repair 0.950 (20) ·
+085-flaky-test-root-cause 0.750 (56) · 080-schema-roundtrip-conversion 0.609 (110) ·
+022-local-rest-api-summary 0.600 (70) · 041-frontend-state-bug 0.500 (12) · 044-ci-config-repair 0.489
+(88) · 089-ab-test-caveat-analysis 0.456 (57) · 094-metric-definition-migration-diff 0.308 (91) ·
+043-db-migration-safety 0.182 (33). The spread is wide and the two tasks that carry the most pairs
+(080, 094) sit at 0.61 and 0.31 — the pooled number is not one task's.
+
+**Two defects in the runner were found and fixed before this number existed, and both would have
+produced a confident wrong answer.** (1) The local arm raised `KeyError: 'BLOCK'` on **every** row: the
+shared `local()` computed `p` as `shares["BLOCK"] + shares["REVIEW"]`, hardcoded to the governance
+labels, while B4 asks a yes/no question. The arm would have recorded 385 halts and no measurement. It
+now reads the event by name — everything that is not `ALLOW` when those labels are present (so B1(a)'s
+reversed order still reads the same event), else the first label. (2) The report scored `p` on
+`overlap`'s axis without flipping the sign: `p` is P(the claim describes the diff), high for a **true**
+success, while `overlap` targets 1.0 on a **false** success. Read as written, a perfect Noul scores
+**0.0** — the arm would have been reported as worse than chance when it was perfect. The sign is now
+flipped once, the axis is printed, and the mean-`p`-by-label line above is the check that catches it.
+
+### What Tier B does not show
+
+The vendor arms ran on the same day as the registered run but are paired against it, not re-run beside
+it; a vendor build that moved between the two would show as an instrument effect. B2's ten-state
+partition is one fixed grouping — a different grouping is a different experiment. B4 ran the **local**
+arm only: the vendor arm (`J`, US$ 0.05) needs `OPENROUTER_API_KEY` and the governing terms read, and
+is registered and not run. B4's corpus is one agent, one model (`deepseek-v3.2`), 23 tasks of one
+benchmark, and carries no test output anywhere — the half of arXiv 2605.29442 that compares the summary
+against a test result is not reproduced. One local model (Qwen3 4B, Q4_K_M), one machine.

@@ -61,6 +61,11 @@ class Solve:
     """Basenames of every filename-shaped token in the TOOL ARGUMENTS — everything the run actually
     read, wrote or executed against, not only what survived into the diff."""
     patch_lines: int = 0
+    patch_text: str = ""
+    """The diff itself, as text — what B4's Noul reads beside the claim. Empty when the solve
+    produced no diff. Not used by any arm of this bench: the lexical arms read counts and names,
+    and the text is here so the typed-decision arm can be asked the same question of the same
+    evidence without re-reading the corpus."""
     exec_calls: int = 0
     write_calls: int = 0
     tool_calls: int = 0
@@ -204,6 +209,7 @@ def load(
                     os.path.basename(t) for t in _FILE_TOKEN.findall(claim)
                 ),
                 patch_lines=sum((d.get("patch") or "").count("\n") for d in diffs),
+                patch_text="\n".join(str(d.get("patch") or "") for d in diffs if d.get("patch")),
                 exec_calls=sum(1 for n in names if n in EXEC_TOOLS),
                 write_calls=sum(1 for n in names if n in WRITE_TOOLS),
                 tool_calls=len(names),

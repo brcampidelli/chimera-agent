@@ -111,6 +111,76 @@ describe("ApprovalCard — the other half of a pause", () => {
 });
 
 /**
+ * The number that raised the question, and what it was read against.
+ *
+ * Study 20 §2.6: the card showed a reason and nothing else, so the answer it collected could not be
+ * joined to the probability that asked — and the probability is the only thing that turns an answer
+ * into a LABEL for a map refitted on the deployment's own data, where today the map comes from 55
+ * bench items.
+ *
+ * Three things are held here, and each fails a different way: the number is shown when there is one,
+ * it is NOT invented when there is not, and it is formatted the way the reader's language formats a
+ * decimal — `0.80` in English and `0,80` in Portuguese, because this line sits inside a translated
+ * sentence and a probability read as a count is the misread `useNum` exists to prevent.
+ */
+describe("ApprovalCard — the number that asked", () => {
+  it("shows p, the band and the build that answered, on one line", () => {
+    mount(() => {}, { ...question, decision: "review", p: 0.8, band: "review", decider_model: "qwen3:4b@Q4_K_M" });
+    expect(screen.getByText(/p=0\.80/)).toBeInTheDocument();
+    expect(screen.getByText(/band REVIEW/)).toBeInTheDocument();
+    expect(screen.getByText(/qwen3:4b@Q4_K_M/)).toBeInTheDocument();
+  });
+
+  it("a question with no number shows no number — 0.00 would be an invented ALLOW", () => {
+    // A lexical rule has no opinion about its own odds, and a card that rendered `p=0.00` for it
+    // would show a very confident ALLOW that a person nonetheless had to answer.
+    mount(() => {}, { ...question, decision: "review" });
+    expect(screen.queryByText(/p=/)).not.toBeInTheDocument();
+    expect(screen.getByText(question.reason)).toBeInTheDocument();
+  });
+
+  it("shows the band only when there is a number to read it against", () => {
+    // The band without a number is a word about nothing; the model without either is a build that
+    // answered a question nobody can see.
+    mount(() => {}, { ...question, band: "review", decider_model: "qwen3:4b@Q4_K_M" });
+    expect(screen.queryByText(/band REVIEW/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/qwen3:4b@Q4_K_M/)).not.toBeInTheDocument();
+  });
+
+  it("formats the decimal the way the chosen language does, not the way the machine does", () => {
+    // `toFixed(2)` prints `0.80` on every machine. The sentence around this number is translated, so
+    // on a pt-BR machine set to Portuguese that reads as a count of eighty, not a probability.
+    localStorage.setItem("chimera.lang", "pt");
+    try {
+      mount(() => {}, { ...question, decision: "review", p: 0.8, band: "review" });
+      expect(screen.getByText(/p=0,80/)).toBeInTheDocument();
+    } finally {
+      localStorage.removeItem("chimera.lang");
+    }
+  });
+
+  it("an unknown band is shown as nothing, never raw and never guessed", () => {
+    // Same rule the level chip follows: an unrecognised string on a risk line is worse than no line.
+    mount(() => {}, { ...question, p: 0.8, band: "escalated" });
+    expect(screen.getByText(/p=0\.80/)).toBeInTheDocument();
+    expect(screen.queryByText(/escalated/i)).not.toBeInTheDocument();
+  });
+
+  it("rounds to the two decimals the map actually resolves", () => {
+    // `0.8000000000000001` on a card reads as a precision the number does not have.
+    mount(() => {}, { ...question, p: 0.8000000000000001, band: "review" });
+    expect(screen.getByText(/p=0\.80/)).toBeInTheDocument();
+    expect(screen.queryByText(/0\.8000000000000001/)).not.toBeInTheDocument();
+  });
+
+  it("a number with no band still renders — the band is the only thing missing", () => {
+    mount(() => {}, { ...question, p: 0.8 });
+    expect(screen.getByText(/p=0\.80/)).toBeInTheDocument();
+    expect(screen.queryByText(/band /)).not.toBeInTheDocument();
+  });
+});
+
+/**
  * The deadline was a sentence printed once, and a sentence printed once is only true once.
  *
  * `wait_seconds` was read at render and never read again, so the card went on saying "silence

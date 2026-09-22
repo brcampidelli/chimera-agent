@@ -3163,12 +3163,24 @@ export interface components {
             /** Asked At */
             asked_at: number;
             /**
+             * Band
+             * @default
+             */
+            band: string;
+            /**
+             * Decider Model
+             * @default
+             */
+            decider_model: string;
+            /**
              * Decision
              * @default review
              */
             decision: string;
             /** Id */
             id: string;
+            /** P */
+            p?: number | null;
             /** Reason */
             reason: string;
         };

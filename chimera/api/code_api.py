@@ -1584,6 +1584,13 @@ def register_code_api(
                 "reason": question.reason,
                 "asked_at": question.asked_at,
                 "decision": question.decision,
+                # The number that raised the question and what it was read against — the calibrated
+                # probability, its band and the build that answered. The card is where a person
+                # reads it, and it is the only surface that can turn the answer into a label: the
+                # record line joins this `p` to the yes/no the person gives.
+                "p": question.p,
+                "band": question.band,
+                "decider_model": question.decider_model,
                 "wait_seconds": float(settings.approval_wait),
             },
         )

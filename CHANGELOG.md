@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A large file is read in windows, and `grep` pointed at a file searches that file.** Measured on 2026-09-19 in the desktop agent's own transcript, working on this repository: `read_file` cut a 137k-character module at 20,000 characters with a notice that named the total and no way to reach the rest, and `grep` with a file as `path` answered `not a directory` — which the model read as "try again", eleven times in one forty-step turn; the turn ended on the step ceiling with the region it had to edit unread, and the next four turns the same way. `read_file` takes `start_line` (1-based) and `max_lines`, and its truncation notice now names the next window (`continue with start_line=N`); `grep`'s `path` may be a file. The 20,000-character ceiling is unchanged. Five tests, the two new arguments classified as identifiers.
+
 - **Two catalogue rows learn the second route's price, so the live check on `main` is green again.** The merge commit of #516 went red on the one test that runs only on `main` — the live OpenRouter index against the catalogue — because two slugs were being quoted from a route the rows had never seen: `deepseek/deepseek-v4-flash` at 0.04844/0.09688 against the row's 0.0886/0.1772, and `z-ai/glm-5.3` at 0.91/2.86 against 1.40/4.40. Same mechanism as #449 (a slug served by two routes flips between two figures, and the check accepts any price a row has been seen at): both rows carry the new pair in `also_seen`, with the date in the note. Verified against the real index: the check fails on the previous rows and passes on these. Receipts are priced from the live index; these rows are the fallback.
 
 ## [0.59.0] - 2026-09-18

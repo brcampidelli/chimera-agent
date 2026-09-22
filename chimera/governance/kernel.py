@@ -206,6 +206,14 @@ class TrustKernel:
             if reading.verdict is not None:
                 verdict = reading.verdict
                 source = "decision"
+                # The band and the build travel ON the verdict, not only on the audit line: the
+                # approval card is the surface where a person reads the number, and it is handed a
+                # `Verdict` and nothing else (`governed_tool.py`). A number without its band cannot
+                # be read — 0.45 is a confident ALLOW below `allow_below` and an uncertain one
+                # between the thresholds — and a probability whose build is unnamed is a probability
+                # about nothing in particular, since the map is keyed on the build.
+                verdict.band = reading.band
+                verdict.decider_model = reading.answer.resolved_model
         if verdict is None and self.judge is not None:
             if self._judge_takes_context:
                 verdict = cast("ContextJudgeFn", self.judge)(action, context)
@@ -223,6 +231,11 @@ class TrustKernel:
                     f"no rule matched; the decision model put p={reading.p:.2f} on dangerous ({reading.band}); default policy",
                     "default",
                     confidence=reading.p,
+                    # The prior carries its band and build too. It is not a REVIEW — nothing was
+                    # decided on the number — but a screen that shows the number must be able to say
+                    # which band it fell in, or "0.45" reads as a verdict it never was.
+                    band=reading.band,
+                    decider_model=reading.answer.resolved_model,
                 )
             else:
                 verdict = Verdict(self.default, "no rule matched; default policy", "default")

@@ -15,14 +15,34 @@ layer got there first.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 import pytest
 
 from chimera.core.agent import Agent, AgentConfig
+from chimera.fusion.receipts import ModelPrice, set_price
 from chimera.orchestration.budget import SpendBudget
 from chimera.providers.gateway import ToolCall
 from chimera.tools.registry import Tool, ToolRegistry
+
+#: The model these tests price against, and its price, PINNED rather than borrowed.
+#:
+#: `resolve_price` consults the provider's live index (the `model-prices.json` the picker writes)
+#: BEFORE the hand-maintained family table, and that is deliberate — the provider's number for the
+#: exact slug is better evidence than our substring guess about its family. The consequence for a
+#: test is that the arithmetic below depends on a file on the machine running it: on a developer
+#: whose picker had fetched the index, `deepseek-chat` resolved to $0.32/$0.89 and the $0.42 this
+#: file asserts came out as $1.21. Registering the price here makes the number this file's own, the
+#: same reason `test_a_conversation_has_a_ceiling_and_it_does_not_reset` registers its own.
+PRICED = "openrouter/deepseek/deepseek-chat"
+PRICE = ModelPrice(input_per_m=0.14, output_per_m=0.28)  # 1M in + 1M out = $0.42
+
+
+@pytest.fixture(autouse=True)
+def _pinned_price() -> Iterator[None]:
+    set_price(PRICED, PRICE)
+    yield
 
 
 class _Result:

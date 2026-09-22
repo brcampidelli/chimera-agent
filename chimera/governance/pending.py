@@ -94,6 +94,20 @@ class PendingApproval:
     decision: str = "review"
     """The level of the verdict that raised the question — ``block`` | ``review`` | ``warn``."""
 
+    p: float | None = None
+    """The calibrated probability that raised it, when the band produced the verdict.
+
+    ``None`` for a question a lexical rule or the taint ledger raised — those have no number, and a
+    card that showed ``p=0.00`` for them would be inventing one. The card shows the number only when
+    there is one; the record writes the column only then too."""
+
+    band: str = ""
+    """Which band of the REVIEW band it fell in — ``review`` | ``uncertain`` | ``allow`` |
+    ``uncalibrated`` | ``halt`` | ``none``. Empty when no band was consulted."""
+
+    decider_model: str = ""
+    """The build that answered, when a model did — ``qwen3:4b@Q4_K_M``. Empty for a rule."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -131,6 +145,12 @@ def pending(home: Path) -> list[PendingApproval]:
                 reason=str(data.get("reason") or ""),
                 asked_at=float(data.get("asked_at") or 0.0),
                 decision=str(data.get("decision") or "review"),
+                # Read back off the question file, so a card that mounts LATE — a reload, a second
+                # client — shows the same number the first one did. A question asked before this
+                # field existed has none, and `None` is the honest answer for it.
+                p=(float(data["p"]) if isinstance(data.get("p"), (int, float)) else None),
+                band=str(data.get("band") or ""),
+                decider_model=str(data.get("decider_model") or ""),
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -161,11 +181,21 @@ def ask_durably(
     sleep: Any = time.sleep,
     decision: str = "review",
     facts: dict[str, Any] | None = None,
+    p: float | None = None,
+    band: str = "",
+    decider_model: str = "",
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
 
     ``decision`` is the level of the verdict that raised it; it orders the queue (:func:`pending`)
     and is kept on the record, so the answer rate can be read per level.
+
+    ``p``, ``band`` and ``decider_model`` are the number that raised the question and what it was
+    read against — the calibrated probability, which band of the REVIEW band it fell in, and the
+    build that answered. They are written to the question file (so a card that mounts late shows the
+    same number), carried on the announcement (so the card can render it) and merged into the record
+    line (so the answer becomes a label). ``p`` is ``None`` for a question a lexical rule or the
+    taint ledger raised: those have no number, and writing ``0.0`` for them would invent one.
 
     ``facts`` are the keys of :data:`FACTS` the caller can name — which run asked, on which surface,
     which tool, which rule or which tainted sources raised the question — and they go on the record
@@ -181,6 +211,17 @@ def ask_durably(
     """
     directory = _dir(home)
     request_id = uuid.uuid4().hex[:12]
+    # The number may arrive either way — as its own argument, or inside `facts` where
+    # `approval._facts_of` reads it off the `Verdict`. Resolved ONCE, here, so the question file,
+    # the announcement and the record line cannot disagree about it: three sites reading three
+    # sources is how a card shows 0.80 while the record says nothing.
+    named: dict[str, Any] = facts or {}
+    if p is None and isinstance(named.get("p"), (int, float)):
+        p = float(named["p"])
+    if not band:
+        band = str(named.get("band") or "")
+    if not decider_model:
+        decider_model = str(named.get("decider_model") or "")
     # One clock reading for the file, the announcement and the record. There used to be one per
     # site, and a time-to-answer measured between two of them carried their difference.
     asked_at = time.time()
@@ -192,6 +233,13 @@ def ask_durably(
                 {
                     "id": request_id, "action": action, "reason": reason, "asked_at": asked_at,
                     "decision": decision,
+                    # The number goes on the QUESTION, not only on the record: a card that mounts
+                    # late — a reload, a second client, `GET /api/approvals` — reads it back from
+                    # here, and a number that lived only in the announcement would be missing
+                    # exactly when the first screen was not the one that answered.
+                    **({"p": round(float(p), 4)} if p is not None else {}),
+                    **({"band": band} if band else {}),
+                    **({"decider_model": decider_model} if decider_model else {}),
                 },
                 ensure_ascii=False,
             ),
@@ -211,7 +259,7 @@ def ask_durably(
             on_asked(
                 PendingApproval(
                     id=request_id, action=action, reason=reason, asked_at=asked_at,
-                    decision=decision,
+                    decision=decision, p=p, band=band, decider_model=decider_model,
                 )
             )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
@@ -241,7 +289,7 @@ def ask_durably(
                 outcome = "unreadable"
             _record(
                 directory, request_id, action, reason, asked_at, outcome, answered_at,
-                decision=decision, facts=facts,
+                decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
             )
             _cleanup(directory, request_id)
             return decidido
@@ -253,7 +301,7 @@ def ask_durably(
     )
     _record(
         directory, request_id, action, reason, asked_at, "timeout", None,
-        decision=decision, facts=facts,
+        decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
     )
     _cleanup(directory, request_id)
     return False
@@ -274,7 +322,20 @@ OUTCOMES = ("approved", "refused", "timeout", "unreadable")
 #: (``lineage``) and where the taint came from (``sources``, a `SequenceAssessment`). Anything else a
 #: caller passes is dropped: the line is a record, not a bag, and a key that is not named here has
 #: no reader.
-FACTS = ("run_id", "surface", "tool", "rule", "lineage", "sources")
+FACTS: tuple[str, ...] = ("run_id", "surface", "tool", "rule", "lineage", "sources")
+
+#: The number that raised the question, and what it was read against: the calibrated probability
+#: (``p``), which band of the REVIEW band it fell in (``band``) and the build that answered
+#: (``decider_model``). Written as a NUMBER, not a string — this is the one column a deployment
+#: refits its own map on, and a map fitted on ``"0.8"`` is a map fitted on nothing.
+#:
+#: This is the join study 20 §2.6 named as the bottleneck: the approval stream existed and was
+#: durable, and the line it wrote held an action, a reason and an outcome — so "the person said yes
+#: in 8 s" could not be put beside "and the number that asked was 0.80", which is the only pairing
+#: that turns an answer into a LABEL. Every card answered is one real row for a map refitted on the
+#: deployment's own data, where today the map comes from 55 bench items.
+NUMERIC_FACTS = ("p",)
+FACTS = FACTS + NUMERIC_FACTS + ("band", "decider_model")
 
 
 def _record(
@@ -288,6 +349,9 @@ def _record(
     *,
     decision: str = "review",
     facts: dict[str, Any] | None = None,
+    p: float | None = None,
+    band: str = "",
+    decider_model: str = "",
 ) -> None:
     resolved_at = time.time()
     line: dict[str, Any] = {
@@ -305,9 +369,29 @@ def _record(
         "waited_seconds": max(0.0, resolved_at - asked_at),
         "outcome": outcome,
     }
+    # The number and what it was read against, merged under whatever the caller named in `facts` —
+    # so a caller that passes them either way lands the same column. `p` is written only when there
+    # is one: a rule-raised question has no probability, and a `0.0` column would read as a very
+    # confident ALLOW that a person nonetheless had to answer.
+    merged: dict[str, Any] = dict(facts or {})
+    if p is not None:
+        merged["p"] = p
+    if band:
+        merged["band"] = band
+    if decider_model:
+        merged["decider_model"] = decider_model
     for key in FACTS:
-        value = (facts or {}).get(key)
+        value = merged.get(key)
         if value in (None, "", [], ()):
+            continue
+        if key in NUMERIC_FACTS:
+            # A number stays a number. `str(0.8)` would make the one column a refit reads a string,
+            # and a map fitted on strings is a map fitted on nothing — the same defect as a schema
+            # assumed instead of read (study 21 §2ad).
+            try:
+                line[key] = round(float(value), 4)
+            except (TypeError, ValueError):
+                continue
             continue
         line[key] = [str(v)[:200] for v in value][:8] if isinstance(value, (list, tuple)) else str(value)[:200]
     try:

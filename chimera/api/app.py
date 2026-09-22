@@ -1341,6 +1341,13 @@ def build_api_app(
                 "asked_at": q.asked_at,
                 "age_seconds": q.age_seconds,
                 "decision": q.decision,
+                # The number and what it was read against, read back off the question file. A card
+                # that mounts late — a reload, a second window — is exactly the case this route
+                # exists for, and it is the case where a number that lived only in the live
+                # announcement would be missing.
+                "p": q.p,
+                "band": q.band,
+                "decider_model": q.decider_model,
             }
             for q in pending(live_settings().home)
         ]
@@ -1991,6 +1998,12 @@ def build_api_app(
                     "reason": question.reason,
                     "asked_at": question.asked_at,
                     "decision": question.decision,
+                    # The number that raised it, so the card can show what the person is answering
+                    # about. Same three fields as the coding turn's frame below, because the client
+                    # renders one card for both.
+                    "p": question.p,
+                    "band": question.band,
+                    "decider_model": question.decider_model,
                     "wait_seconds": float(live_settings().approval_wait),
                 },
             )
@@ -2070,7 +2083,10 @@ def build_api_app(
     from chimera.api.orchestration_api import register_orchestration_api
 
     # `workspace` is where a dispatched Kanban card works when the request names none.
-    register_features(app, guard, workspace=workspace)
+    # `settings_override` (None unless one was injected) rather than the launch photograph: the
+    # feature routes read `home`, and an injected settings must win — the same contract
+    # `live_settings()` states above, and what keeps a test out of the developer's real home.
+    register_features(app, guard, workspace=workspace, settings=settings_override)
     # POST /api/code/turn — a conversational coding turn that keeps the previous turn's tool calls.
     register_code_api(
         app,

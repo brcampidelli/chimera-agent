@@ -59,8 +59,12 @@ describe("Tools", () => {
     // The shipped English text for read_file, which is the schema itself — pinned to the registry
     // by tests/test_tool_descriptions_reach_the_user.py. The fixture's own description is ignored
     // for a tool the app has a description of, and that is the behaviour, not an accident.
+    //
+    // Matched on the opening sentence rather than the whole string: the description now goes on to
+    // explain windowed reads (`start_line`/`max_lines`), and pinning the full paragraph here would
+    // make every future wording change to the schema fail a test about the SCREEN.
     expect(
-      screen.getByText("Read a UTF-8 text file from the workspace."),
+      screen.getByText(/^Read a UTF-8 text file from the workspace\./),
     ).toBeInTheDocument();
     expect(screen.getByText("read")).toBeInTheDocument();
     expect(screen.getByText("exec")).toBeInTheDocument();

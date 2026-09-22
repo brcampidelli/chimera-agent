@@ -76,7 +76,7 @@ const en: Dict = {
   "tools.desc.search_files": "Search file contents by regular expression.",
   "tools.desc.read_text": "Read a text file.",
   "tools.desc.skill_view": "Read a file that came with an installed skill — its SKILL.md, or something under references/, scripts/ or templates/. Args: name (the skill), file_path (default SKILL.md).",
-  "tools.desc.read_file": "Read a UTF-8 text file from the workspace.",
+  "tools.desc.read_file": "Read a UTF-8 text file from the workspace. A large file is returned in windows: pass `start_line` (1-based) and `max_lines` to read a part of it; the truncation notice says where the window ended and how to ask for the next one.",
   "tools.desc.write_file":
     "Write (create or overwrite) a UTF-8 text file in the workspace.",
   "tools.desc.edit_file":
@@ -748,6 +748,14 @@ const en: Dict = {
   "code.approval.level.block": "Blocked",
   "code.approval.level.review": "Needs review",
   "code.approval.level.warn": "Warning",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "band {band}",
+  "code.approval.band.review": "REVIEW",
+  "code.approval.band.uncertain": "UNCERTAIN",
+  "code.approval.band.allow": "ALLOW",
+  "code.approval.band.uncalibrated": "UNCALIBRATED",
+  "code.approval.band.halt": "HALTED",
+  "code.approval.band.none": "NO NUMBER",
   "approvals.waiting": "Waiting on you: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "No file open",
@@ -941,6 +949,9 @@ const en: Dict = {
   "code.chat.notify.label": "notify",
   "code.chat.notify.hint":
     "Show a system notification when a turn ends and this window is not focused",
+  "code.chat.autoContinue.label": "auto-continue",
+  "code.chat.autoContinue.hint":
+    'Automatically send "continue" when a turn stops at the step limit (up to 3 times)',
   "code.chat.notify.title": "Turn finished",
   "code.chat.notify.failed": "Turn failed",
   "code.chat.empty":
@@ -1510,7 +1521,7 @@ const pt: Dict = {
   "tools.desc.search_files": "Busca no conteúdo dos arquivos por expressão regular.",
   "tools.desc.read_text": "Lê um arquivo de texto.",
   "tools.desc.skill_view": "Lê um arquivo que veio junto com uma habilidade instalada.",
-  "tools.desc.read_file": "Lê um arquivo de texto UTF-8 do workspace.",
+  "tools.desc.read_file": "Lê um arquivo de texto UTF-8 do workspace. Um arquivo grande volta em janelas: passe `start_line` (a partir de 1) e `max_lines` para ler uma parte; o aviso de corte diz onde a janela terminou e como pedir a próxima.",
   "tools.desc.write_file":
     "Escreve (cria ou sobrescreve) um arquivo de texto UTF-8 no workspace.",
   "tools.desc.edit_file":
@@ -2187,6 +2198,14 @@ const pt: Dict = {
   "code.approval.level.block": "Bloqueado",
   "code.approval.level.review": "Precisa de revisão",
   "code.approval.level.warn": "Aviso",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "banda {band}",
+  "code.approval.band.review": "REVISÃO",
+  "code.approval.band.uncertain": "INCERTA",
+  "code.approval.band.allow": "PERMITIR",
+  "code.approval.band.uncalibrated": "SEM CALIBRAÇÃO",
+  "code.approval.band.halt": "INTERROMPIDA",
+  "code.approval.band.none": "SEM NÚMERO",
   "approvals.waiting": "Aguardando você: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Nenhum arquivo aberto",
@@ -2380,6 +2399,9 @@ const pt: Dict = {
   "code.chat.notify.label": "avisar",
   "code.chat.notify.hint":
     "Mostrar notificação do sistema quando um turno terminar e esta janela não estiver em foco",
+  "code.chat.autoContinue.label": "continuar sozinho",
+  "code.chat.autoContinue.hint":
+    'Enviar "continue" automaticamente quando o turno parar no limite de passos (até 3 vezes)',
   "code.chat.notify.title": "Turno terminado",
   "code.chat.notify.failed": "O turno falhou",
   "code.chat.empty":
@@ -2993,7 +3015,7 @@ const es: Dict = {
   "tools.desc.search_files": "Busca en el contenido de los archivos por expresión regular.",
   "tools.desc.read_text": "Lee un archivo de texto.",
   "tools.desc.skill_view": "Lee un archivo que vino con una habilidad instalada.",
-  "tools.desc.read_file": "Lee un archivo de texto UTF-8 del workspace.",
+  "tools.desc.read_file": "Lee un archivo de texto UTF-8 del workspace. Un archivo grande se devuelve por ventanas: pasa `start_line` (desde 1) y `max_lines` para leer una parte; el aviso de corte dice dónde terminó la ventana y cómo pedir la siguiente.",
   "tools.desc.write_file":
     "Escribe (crea o sobrescribe) un archivo de texto UTF-8 en el workspace.",
   "tools.desc.edit_file":
@@ -3638,6 +3660,14 @@ const es: Dict = {
   "code.approval.level.block": "Bloqueado",
   "code.approval.level.review": "Requiere revisión",
   "code.approval.level.warn": "Advertencia",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "banda {band}",
+  "code.approval.band.review": "REVISIÓN",
+  "code.approval.band.uncertain": "INCIERTA",
+  "code.approval.band.allow": "PERMITIR",
+  "code.approval.band.uncalibrated": "SIN CALIBRAR",
+  "code.approval.band.halt": "INTERRUMPIDA",
+  "code.approval.band.none": "SIN NÚMERO",
   "approvals.waiting": "Esperando por ti: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Ningún archivo abierto",
@@ -3831,6 +3861,9 @@ const es: Dict = {
   "code.chat.notify.label": "avisar",
   "code.chat.notify.hint":
     "Mostrar una notificación del sistema cuando termine un turno y esta ventana no esté enfocada",
+  "code.chat.autoContinue.label": "continuar solo",
+  "code.chat.autoContinue.hint":
+    'Enviar "continue" automáticamente cuando el turno se detenga en el límite de pasos (hasta 3 veces)',
   "code.chat.notify.title": "Turno terminado",
   "code.chat.notify.failed": "El turno falló",
   "code.chat.empty":
@@ -4450,7 +4483,7 @@ const fr: Dict = {
   "tools.desc.search_files": "Cherche dans le contenu des fichiers par expression régulière.",
   "tools.desc.read_text": "Lit un fichier texte.",
   "tools.desc.skill_view": "Lit un fichier livré avec une compétence installée.",
-  "tools.desc.read_file": "Lit un fichier texte UTF-8 du workspace.",
+  "tools.desc.read_file": "Lit un fichier texte UTF-8 du workspace. Un fichier volumineux est renvoyé par fenêtres : passez `start_line` (à partir de 1) et `max_lines` pour en lire une partie ; l'avis de troncature indique où la fenêtre s'est arrêtée et comment demander la suivante.",
   "tools.desc.write_file":
     "Écrit (crée ou écrase) un fichier texte UTF-8 dans le workspace.",
   "tools.desc.edit_file":
@@ -5099,6 +5132,14 @@ const fr: Dict = {
   "code.approval.level.block": "Bloqué",
   "code.approval.level.review": "À examiner",
   "code.approval.level.warn": "Avertissement",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "bande {band}",
+  "code.approval.band.review": "EXAMEN",
+  "code.approval.band.uncertain": "INCERTAINE",
+  "code.approval.band.allow": "AUTORISER",
+  "code.approval.band.uncalibrated": "NON CALIBRÉE",
+  "code.approval.band.halt": "INTERROMPUE",
+  "code.approval.band.none": "AUCUN NOMBRE",
   "approvals.waiting": "En attente de vous : {n}",
   "nav.edit": "Éditeur",
   "edit.empty.title": "Aucun fichier ouvert",
@@ -5296,6 +5337,9 @@ const fr: Dict = {
   "code.chat.notify.label": "notifier",
   "code.chat.notify.hint":
     "Afficher une notification système quand un tour se termine et que cette fenêtre n'a pas le focus",
+  "code.chat.autoContinue.label": "continuer seul",
+  "code.chat.autoContinue.hint":
+    "Envoyer automatiquement « continue » quand le tour s'arrête à la limite d'étapes (jusqu'à 3 fois)",
   "code.chat.notify.title": "Tour terminé",
   "code.chat.notify.failed": "Le tour a échoué",
   "code.chat.empty":
@@ -5916,7 +5960,7 @@ const de: Dict = {
   "tools.desc.search_files": "Durchsucht Dateiinhalte per regulärem Ausdruck.",
   "tools.desc.read_text": "Liest eine Textdatei.",
   "tools.desc.skill_view": "Liest eine Datei, die mit einer installierten Fähigkeit kam.",
-  "tools.desc.read_file": "Liest eine UTF-8-Textdatei aus dem Workspace.",
+  "tools.desc.read_file": "Liest eine UTF-8-Textdatei aus dem Workspace. Eine große Datei kommt in Fenstern zurück: `start_line` (ab 1) und `max_lines` lesen einen Teil; der Kürzungshinweis sagt, wo das Fenster endete und wie das nächste angefordert wird.",
   "tools.desc.write_file":
     "Schreibt (erstellt oder überschreibt) eine UTF-8-Textdatei im Workspace.",
   "tools.desc.edit_file":
@@ -6563,6 +6607,14 @@ const de: Dict = {
   "code.approval.level.block": "Blockiert",
   "code.approval.level.review": "Prüfung nötig",
   "code.approval.level.warn": "Warnung",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "Band {band}",
+  "code.approval.band.review": "PRÜFUNG",
+  "code.approval.band.uncertain": "UNSICHER",
+  "code.approval.band.allow": "ERLAUBEN",
+  "code.approval.band.uncalibrated": "UNKALIBRIERT",
+  "code.approval.band.halt": "ANGEHALTEN",
+  "code.approval.band.none": "KEINE ZAHL",
   "approvals.waiting": "Warten auf dich: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Keine Datei geöffnet",
@@ -6760,6 +6812,9 @@ const de: Dict = {
   "code.chat.notify.label": "melden",
   "code.chat.notify.hint":
     "Systembenachrichtigung anzeigen, wenn ein Durchgang endet und dieses Fenster nicht im Fokus ist",
+  "code.chat.autoContinue.label": "automatisch fortsetzen",
+  "code.chat.autoContinue.hint":
+    "Automatisch „continue“ senden, wenn ein Durchgang das Schrittlimit erreicht (bis zu 3 Mal)",
   "code.chat.notify.title": "Durchgang beendet",
   "code.chat.notify.failed": "Durchgang fehlgeschlagen",
   "code.chat.empty":
@@ -7376,7 +7431,7 @@ const zh: Dict = {
   "tools.desc.search_files": "用正则表达式搜索文件内容。",
   "tools.desc.read_text": "读取一个文本文件。",
   "tools.desc.skill_view": "读取随已安装技能一起提供的文件。",
-  "tools.desc.read_file": "从工作区读取一个 UTF-8 文本文件。",
+  "tools.desc.read_file": "从工作区读取一个 UTF-8 文本文件。大文件按窗口返回：传入 `start_line`（从 1 起）和 `max_lines` 读取其中一段；截断提示会说明窗口在哪里结束、如何请求下一段。",
   "tools.desc.write_file": "在工作区写入（新建或覆盖）一个 UTF-8 文本文件。",
   "tools.desc.edit_file":
     "替换工作区文件中的一段精确子串（精准编辑——要改动已有文件，优先用它而不是 write_file）。'old' 必须完全匹配；除非 replace_all 为 true，否则只能出现一次。匹配不到或有歧义时会被拒绝。",
@@ -7984,6 +8039,14 @@ const zh: Dict = {
   "code.approval.level.review": "需要审查",
   "code.approval.level.warn": "警告",
   "approvals.waiting": "等你决定：{n}",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "区间 {band}",
+  "code.approval.band.review": "需审查",
+  "code.approval.band.uncertain": "不确定",
+  "code.approval.band.allow": "允许",
+  "code.approval.band.uncalibrated": "未校准",
+  "code.approval.band.halt": "已中断",
+  "code.approval.band.none": "无数字",
   "nav.edit": "编辑器",
   "edit.empty.title": "未打开文件",
   "edit.empty.hint": "在左侧选择一个文件即可开始编辑。",
@@ -8169,6 +8232,8 @@ const zh: Dict = {
   "code.chat.copyAnswer": "以 Markdown 复制此轮对话",
   "code.chat.notify.label": "通知",
   "code.chat.notify.hint": "当一个回合结束且此窗口未获得焦点时，显示系统通知",
+  "code.chat.autoContinue.label": "自动继续",
+  "code.chat.autoContinue.hint": "当回合达到步数上限停止时自动发送 \"continue\"（最多 3 次）",
   "code.chat.notify.title": "回合已结束",
   "code.chat.notify.failed": "回合失败",
   "code.chat.empty": "这段对话会保留工具调用，所以下一条消息不会从零开始。",
@@ -8771,7 +8836,7 @@ const ja: Dict = {
   "tools.desc.read_text": "テキストファイルを読みます。",
   "tools.desc.skill_view": "インストール済みスキルに同梱されたファイルを読みます。",
   "tools.desc.read_file":
-    "ワークスペースから UTF-8 のテキストファイルを読みます。",
+    "ワークスペースから UTF-8 のテキストファイルを読みます。大きなファイルはウィンドウ単位で返ります：`start_line`（1 始まり）と `max_lines` を渡すと一部を読めます。切り詰めの注記は、ウィンドウがどこで終わったか、次をどう求めるかを示します。",
   "tools.desc.write_file":
     "ワークスペースに UTF-8 のテキストファイルを書きます（新規作成または上書き）。",
   "tools.desc.edit_file":
@@ -9408,6 +9473,14 @@ const ja: Dict = {
   "code.approval.level.review": "要確認",
   "code.approval.level.warn": "警告",
   "approvals.waiting": "あなた待ち: {n}",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "バンド {band}",
+  "code.approval.band.review": "要確認",
+  "code.approval.band.uncertain": "不確実",
+  "code.approval.band.allow": "許可",
+  "code.approval.band.uncalibrated": "未校准",
+  "code.approval.band.halt": "停止",
+  "code.approval.band.none": "数値なし",
   "nav.edit": "エディタ",
   "edit.empty.title": "開いているファイルはありません",
   "edit.empty.hint": "左側でファイルを選ぶと編集を始められます。",
@@ -9601,6 +9674,9 @@ const ja: Dict = {
   "code.chat.notify.label": "通知",
   "code.chat.notify.hint":
     "ターンが終了し、このウィンドウがフォーカスされていないときにシステム通知を表示",
+  "code.chat.autoContinue.label": "自動継続",
+  "code.chat.autoContinue.hint":
+    "ターンがステップ上限で停止したときに自動で「continue」を送信（最大3回）",
   "code.chat.notify.title": "ターンが終了しました",
   "code.chat.notify.failed": "ターンが失敗しました",
   "code.chat.empty":
@@ -10177,7 +10253,7 @@ const it: Dict = {
   "tools.desc.search_files": "Cerca nel contenuto dei file con un'espressione regolare.",
   "tools.desc.read_text": "Legge un file di testo.",
   "tools.desc.skill_view": "Legge un file arrivato con un'abilità installata.",
-  "tools.desc.read_file": "Legge un file di testo UTF-8 dal workspace.",
+  "tools.desc.read_file": "Legge un file di testo UTF-8 dal workspace. Un file grande torna a finestre: passa `start_line` (da 1) e `max_lines` per leggerne una parte; l'avviso di troncamento dice dove è finita la finestra e come chiedere la successiva.",
   "tools.desc.write_file":
     "Scrive (crea o sovrascrive) un file di testo UTF-8 nel workspace.",
   "tools.desc.edit_file":
@@ -10863,6 +10939,14 @@ const it: Dict = {
   "code.approval.level.block": "Bloccato",
   "code.approval.level.review": "Da rivedere",
   "code.approval.level.warn": "Avviso",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "banda {band}",
+  "code.approval.band.review": "REVISIONE",
+  "code.approval.band.uncertain": "INCERTA",
+  "code.approval.band.allow": "CONSENTIRE",
+  "code.approval.band.uncalibrated": "NON CALIBRATA",
+  "code.approval.band.halt": "INTERROTTA",
+  "code.approval.band.none": "NESSUN NUMERO",
   "approvals.waiting": "In attesa di te: {n}",
   "nav.edit": "Editor",
   "edit.empty.title": "Nessun file aperto",
@@ -11057,6 +11141,9 @@ const it: Dict = {
   "code.chat.notify.label": "notifica",
   "code.chat.notify.hint":
     "Mostra una notifica di sistema quando un turno finisce e questa finestra non è a fuoco",
+  "code.chat.autoContinue.label": "continua da solo",
+  "code.chat.autoContinue.hint":
+    'Invia automaticamente "continue" quando il turno si ferma al limite di passi (fino a 3 volte)',
   "code.chat.notify.title": "Turno terminato",
   "code.chat.notify.failed": "Turno fallito",
   "code.chat.empty":
@@ -11636,7 +11723,7 @@ const pl: Dict = {
   "tools.desc.search_files": "Przeszukuje zawartość plików wyrażeniem regularnym.",
   "tools.desc.read_text": "Czyta plik tekstowy.",
   "tools.desc.skill_view": "Czyta plik, który przyszedł z zainstalowaną umiejętnością.",
-  "tools.desc.read_file": "Czyta plik tekstowy UTF-8 z workspace.",
+  "tools.desc.read_file": "Czyta plik tekstowy UTF-8 z workspace. Duży plik wraca oknami: podaj `start_line` (od 1) i `max_lines`, by przeczytać fragment; komunikat o obcięciu mówi, gdzie okno się skończyło i jak poprosić o następne.",
   "tools.desc.write_file":
     "Zapisuje (tworzy albo nadpisuje) plik tekstowy UTF-8 w workspace.",
   "tools.desc.edit_file":
@@ -12317,6 +12404,14 @@ const pl: Dict = {
   "code.approval.level.block": "Zablokowane",
   "code.approval.level.review": "Wymaga przeglądu",
   "code.approval.level.warn": "Ostrzeżenie",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "pasmo {band}",
+  "code.approval.band.review": "PRZEGLĄD",
+  "code.approval.band.uncertain": "NIEPEWNE",
+  "code.approval.band.allow": "ZEZWÓL",
+  "code.approval.band.uncalibrated": "BEZ KALIBRACJI",
+  "code.approval.band.halt": "WSTRZYMANE",
+  "code.approval.band.none": "BRAK LICZBY",
   "approvals.waiting": "Czeka na Ciebie: {n}",
   "nav.edit": "Edytor",
   "edit.empty.title": "Nie otwarto żadnego pliku",
@@ -12510,6 +12605,9 @@ const pl: Dict = {
   "code.chat.notify.label": "powiadom",
   "code.chat.notify.hint":
     "Pokaż powiadomienie systemowe, gdy tura się kończy, a to okno nie jest aktywne",
+  "code.chat.autoContinue.label": "kontynuuj samoczynnie",
+  "code.chat.autoContinue.hint":
+    "Automatycznie wysyłaj „continue”, gdy tura zatrzyma się na limicie kroków (do 3 razy)",
   "code.chat.notify.title": "Tura zakończona",
   "code.chat.notify.failed": "Tura nie powiodła się",
   "code.chat.empty":
@@ -13088,7 +13186,7 @@ const ru: Dict = {
   "tools.desc.search_files": "Ищет по содержимому файлов регулярным выражением.",
   "tools.desc.read_text": "Читает текстовый файл.",
   "tools.desc.skill_view": "Читает файл, пришедший вместе с установленным навыком.",
-  "tools.desc.read_file": "Читает текстовый файл в UTF-8 из рабочей папки.",
+  "tools.desc.read_file": "Читает текстовый файл в UTF-8 из рабочей папки. Большой файл возвращается окнами: передайте `start_line` (с 1) и `max_lines`, чтобы прочитать часть; уведомление об обрезке говорит, где окно закончилось и как запросить следующее.",
   "tools.desc.write_file":
     "Записывает текстовый файл в UTF-8 в рабочей папке (создаёт или перезаписывает).",
   "tools.desc.edit_file":
@@ -13772,6 +13870,14 @@ const ru: Dict = {
   "code.approval.level.block": "Заблокировано",
   "code.approval.level.review": "Нужна проверка",
   "code.approval.level.warn": "Предупреждение",
+  "code.approval.p": "p={p}",
+  "code.approval.band": "полоса {band}",
+  "code.approval.band.review": "ПРОВЕРКА",
+  "code.approval.band.uncertain": "НЕОПРЕДЕЛЁННО",
+  "code.approval.band.allow": "РАЗРЕШИТЬ",
+  "code.approval.band.uncalibrated": "БЕЗ КАЛИБРОВКИ",
+  "code.approval.band.halt": "ОСТАНОВЛЕНО",
+  "code.approval.band.none": "НЕТ ЧИСЛА",
   "approvals.waiting": "Ждут вашего решения: {n}",
   "nav.edit": "Редактор",
   "edit.empty.title": "Нет открытых файлов",
@@ -13965,6 +14071,9 @@ const ru: Dict = {
   "code.chat.notify.label": "уведомлять",
   "code.chat.notify.hint":
     "Показывать системное уведомление, когда ход завершается и это окно не в фокусе",
+  "code.chat.autoContinue.label": "продолжать самому",
+  "code.chat.autoContinue.hint":
+    "Автоматически отправлять «continue», когда ход останавливается на лимите шагов (до 3 раз)",
   "code.chat.notify.title": "Ход завершён",
   "code.chat.notify.failed": "Ход завершился ошибкой",
   "code.chat.empty":
@@ -14598,5 +14707,31 @@ export function useNum(): (n: number) => string {
   return useMemo(() => {
     const fmt = new Intl.NumberFormat(lang);
     return (n: number) => fmt.format(n);
+  }, [lang]);
+}
+
+/** A probability, to two decimals, in the CHOSEN language — `0.80` in English, `0,80` in Portuguese.
+ *
+ *  Separate from `useNum` because the two answer different questions and only one of them is a
+ *  formatting choice. `useNum` groups an integer the way the reader's language groups digits;
+ *  this fixes the PRECISION as well, and the precision is a decision about the number rather than
+ *  about the language: the calibration map's own resolution is coarser than two decimals, and
+ *  `0.8000000000000001` on a card reads as a precision the number does not have.
+ *
+ *  `toFixed(2)` would be one line and would print `0.80` on a pt-BR machine inside a Portuguese
+ *  sentence — the same thousandfold-misread class `useNum` exists for, one decimal place smaller.
+ *  A probability read as a count is exactly the misreading this project has already been bitten by.
+ *
+ *  The formatter is memoised per language for the same reason `useNum`'s is: this renders inside a
+ *  card that can be mounted for every parked tool call of a fan-out.
+ */
+export function useP(): (p: number) => string {
+  const { lang } = useI18n();
+  return useMemo(() => {
+    const fmt = new Intl.NumberFormat(lang, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+    return (p: number) => fmt.format(p);
   }, [lang]);
 }

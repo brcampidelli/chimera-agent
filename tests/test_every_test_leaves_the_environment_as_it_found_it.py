@@ -38,7 +38,7 @@ _PROBE = (
 def _import_litellm_beside_a_dotenv(tmp_path: Path, mode: str | None) -> tuple[str, str]:
     """Import litellm in a fresh interpreter whose cwd holds a ``.env``; return what it ended up with."""
     (tmp_path / ".env").write_text("CHIMERA_LEAK_PROBE=from-the-file\n", encoding="utf-8")
-    scrubbed = ("TIKTOKEN_CACHE_DIR", "LITELLM_MODE", "CHIMERA_LEAK_PROBE")
+    scrubbed = ("TIKTOKEN_CACHE_DIR", "LITELLM_MODE", "CHIMERA_LEAK_PROBE", "PYTHON_DOTENV_DISABLED")
     env = {k: v for k, v in os.environ.items() if k not in scrubbed}
     if mode is not None:
         env["LITELLM_MODE"] = mode
@@ -81,4 +81,50 @@ def test_without_the_setting_the_dotenv_does_reach_the_environment(tmp_path: Pat
 
 
 def test_the_allowlist_names_nothing_this_file_does_not_check() -> None:
-    assert {"PYTEST_CURRENT_TEST", "TIKTOKEN_CACHE_DIR"} == _CHANGES_NOBODY_OWNS
+    assert {
+        "PYTEST_CURRENT_TEST",
+        "TIKTOKEN_CACHE_DIR",
+        "KMP_DUPLICATE_LIB_OK",
+        "KMP_INIT_AT_FORK",
+        "TORCHINDUCTOR_CACHE_DIR",
+    } == _CHANGES_NOBODY_OWNS
+
+
+# The three below are the same claim as the litellm one above, made the same way: a fresh
+# interpreter, the names scrubbed from its environment, and the import that is supposed to write
+# them. An entry nothing sets any more would excuse a real leak forever, so each is checked against
+# the library that makes it rather than trusted.
+_IMPORT_PROBE = (
+    "import os, sys; "
+    "__import__('sklearn' if sys.argv[1] == 'sklearn' else 'torch._dynamo.package'); "
+    "print(os.environ.get('KMP_DUPLICATE_LIB_OK', '')); "
+    "print(os.environ.get('KMP_INIT_AT_FORK', '')); "
+    "print(os.environ.get('TORCHINDUCTOR_CACHE_DIR', ''))"
+)
+
+
+def _import_and_read_env(module: str, names: tuple[str, ...]) -> list[str]:
+    # torch and scikit-learn live in the opt-in `media`/data-analysis extras, and CI installs only
+    # `--extra dev --extra desktop` — so the probe is skipped where the library is absent rather
+    # than failing on an ImportError that says nothing about the environment. The entry is proven
+    # on the machines that import the library, which is the only place it can be set at all.
+    pytest.importorskip(module.split(".")[0])
+    env = {k: v for k, v in os.environ.items() if k not in names}
+    out = subprocess.run(
+        [sys.executable, "-c", _IMPORT_PROBE, module],
+        capture_output=True, text=True, env=env, check=True,
+    ).stdout
+    return out.splitlines()[-3:]
+
+
+def test_sklearn_really_sets_the_two_openmp_names() -> None:
+    duplicate_lib_ok, init_at_fork, _ = _import_and_read_env(
+        "sklearn", ("KMP_DUPLICATE_LIB_OK", "KMP_INIT_AT_FORK")
+    )
+    assert duplicate_lib_ok, "sklearn no longer sets KMP_DUPLICATE_LIB_OK — drop the entry"
+    assert init_at_fork, "sklearn no longer sets KMP_INIT_AT_FORK — drop the entry"
+
+
+def test_torch_really_sets_the_inductor_cache_dir() -> None:
+    _, _, cache_dir = _import_and_read_env("torch", ("TORCHINDUCTOR_CACHE_DIR",))
+    assert cache_dir, "torch no longer sets TORCHINDUCTOR_CACHE_DIR — drop the entry"

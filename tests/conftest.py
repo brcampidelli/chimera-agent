@@ -51,6 +51,15 @@ def _model_provider_keys() -> list[str]:
 # tests/test_every_test_leaves_the_environment_as_it_found_it.py.
 os.environ["LITELLM_MODE"] = "PRODUCTION"
 
+# The same leak, a second library, and this one has no switch of its own: importing ``markitdown``
+# (the ``documents`` extra, reached through ``chimera.scrape.clean``) imports ``magika``, whose
+# ``__init__`` calls ``dotenv.load_dotenv(dotenv.find_dotenv())`` outright — no mode to set, no
+# ``env_file`` to override. python-dotenv's own kill switch covers every library at once, so it is
+# set here rather than chasing each one that decides to load a ``.env``. Without it the suite
+# carried the developer's ``OPENROUTER_API_KEY`` and ``CHIMERA_CHAT_MEMORY`` from the first test
+# that touched the scrape path. Proven, with its control, by the same file as the line above.
+os.environ["PYTHON_DOTENV_DISABLED"] = "1"
+
 
 # Changes to ``os.environ`` that no test owns, so the guard below must not blame a test for them.
 # Every entry is proven live by tests/test_every_test_leaves_the_environment_as_it_found_it.py: an
@@ -63,6 +72,15 @@ _CHANGES_NOBODY_OWNS: frozenset[str] = frozenset(
         # litellm assigns it at import (litellm_core_utils/default_encoding.py), once per process,
         # inside whichever test happens to import litellm first.
         "TIKTOKEN_CACHE_DIR",
+        # sklearn's ``__init__`` calls ``os.environ.setdefault`` for both (sklearn/__init__.py:56,60)
+        # to let two OpenMP runtimes coexist. Reached through ``chimera.tools.media``, which imports
+        # torch/diffusers lazily for image generation — so the first test that touches that path
+        # writes them, and no test owns them.
+        "KMP_DUPLICATE_LIB_OK",
+        "KMP_INIT_AT_FORK",
+        # torch's inductor cache, assigned at import (torch/_dynamo/package.py) the same way and for
+        # the same reason: a per-user cache directory, decided once per process.
+        "TORCHINDUCTOR_CACHE_DIR",
     }
 )
 
@@ -151,6 +169,15 @@ def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     # and not a change they are blamed for — and so a developer's own shell value never reaches a test.
     monkeypatch.setenv("CHIMERA_GOVERNANCE", "")
     monkeypatch.delenv("CHIMERA_GOVERNANCE")
+    # The desktop app exports the owner's posture into the process environment, so a developer who
+    # has run it carries `CHIMERA_REACH=workspace_shell` in their shell — and pydantic-settings reads
+    # it into every `Settings(...)` a test builds, including the ones that assert the STOCK default.
+    # `test_read_config_reports_autonomy_as_configured` failed exactly there: it asked for
+    # `Settings(CHIMERA_HOME=...)` and got the developer's reach back, so the assertion read
+    # `workspace_shell` where it expected `""`. Owned the same way as the governance flag above, so
+    # the shipped default is a fact a test can read rather than a property of whose machine ran it.
+    monkeypatch.setenv("CHIMERA_REACH", "")
+    monkeypatch.delenv("CHIMERA_REACH")
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()
