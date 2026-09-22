@@ -79,3 +79,28 @@ Four pilot solves on the strong executor cost **US$ 0.05** (US$ 0.0060–0.0177 
 - A comparison of absolute pass rates with #453 — different grading environment (§4).
 - Whether a *better* cheap model routes better: one router model, named above.
 - Anything about the twelve tasks #453 found unable to distinguish any arm; they are kept so the task list is the registered one, and a null on them is expected.
+
+---
+
+## Amendment 1 — the weak executor is `gpt-oss-20b`, not `mistral-small-3.2-24b` (2026-09-22, before any weak-arm result was read)
+
+The registered weak executor is **rate-limited upstream and cannot run**. The stop rule of §7 fired on its own at 2 bad solves in 22 — both on the weak arm, both dead in ~6 s with no receipt — and the log says why:
+
+```
+mistralai/mistral-small-3.2-24b-instruct is temporarily rate-limited upstream …
+provider_name: Parasail, limit_source: upstream_provider_shared_pool   (HTTP 429)
+```
+
+Reproduced deliberately before changing anything, one call each through our own gateway:
+
+| model | probe |
+|---|---|
+| `openrouter/openai/gpt-oss-20b` | **ok** |
+| `openrouter/meta-llama/llama-3.3-70b-instruct` | **ok** |
+| `openrouter/mistralai/mistral-small-3.2-24b-instruct` | **CredentialRejectedError** — every key rate-limited |
+
+**The replacement is `openrouter/openai/gpt-oss-20b`** (weak tier, 0.03 / 0.13 per 1M, tools). Chosen over the 70B because the prediction under test (P3) is about a model that *chooses badly*, and a 70B is not that model; chosen before any weak-arm outcome was looked at, which is the only thing that keeps this an amendment rather than a result.
+
+**What this costs the design:** P3 is now a prediction about `gpt-oss-20b`. The 12 weak-arm solves that ran before this amendment are discarded, not reused — a mixed arm is two executors averaged and reported as one (§2aa). The strong executor is untouched: its 16 scored solves stand, and the arm that produced them did not change.
+
+**What did not change:** the router model, the tasks, k, the flags, the outcomes, the decision rule, and every prediction about the strong executor.
