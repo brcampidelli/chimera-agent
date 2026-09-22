@@ -71,7 +71,32 @@ def _install_chromium() -> None:
         file=sys.stderr,
         flush=True,
     )
-    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+    subprocess.run(_install_command("chromium"), env=_driver_env(), check=True)
+
+
+def _install_command(browser: str) -> list[str]:
+    """The Playwright driver invoked directly — what ``python -m playwright install`` does inside.
+
+    ``[sys.executable, "-m", "playwright", ...]`` was the previous route, and it is wrong in exactly
+    one place: the frozen desktop sidecar. There ``sys.executable`` is ``chimera-backend.exe``, whose
+    argv goes to the ``app`` subcommand — ``-m playwright install chromium`` reached Typer as extra
+    arguments and the install failed with exit 2 (measured 2026-09-21 in the desktop's own
+    transcript, and the fix made in the venv did not reach the sidecar because ``-m`` was never a
+    thing it had). ``playwright.__main__`` is nothing but ``[driver, cli, *argv]`` with the driver's
+    env, so calling the driver here is the same install in a venv and the only one that exists in
+    a freeze — the driver ships inside the bundle with the package (the same driver the launch
+    already uses), and no Python interpreter is asked for.
+    """
+    from playwright._impl._driver import compute_driver_executable
+
+    driver_executable, driver_cli = compute_driver_executable()
+    return [str(driver_executable), str(driver_cli), "install", browser]
+
+
+def _driver_env() -> dict[str, str]:
+    from playwright._impl._driver import get_driver_env
+
+    return dict(get_driver_env())
 
 
 def _new_playwright_driver(headless: bool) -> BrowserDriver:

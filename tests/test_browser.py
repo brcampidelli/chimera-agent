@@ -257,6 +257,30 @@ def test_auto_installs_chromium_on_first_use(monkeypatch: pytest.MonkeyPatch) ->
     assert FENCE_OPEN in out  # then the driver worked
 
 
+def test_the_install_never_asks_sys_executable_to_run_a_module(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The frozen sidecar IS `sys.executable`, and it has no `-m`: `chimera-backend.exe -m playwright
+    install chromium` handed Typer three extra arguments and exited 2 (desktop transcript,
+    2026-09-21). The install goes through the Playwright driver directly — the same binary the
+    launch uses — so it is one command in a venv and in a freeze."""
+    import subprocess
+    import sys
+
+    seen: list[tuple[list[str], dict[str, str] | None]] = []
+
+    def fake_run(argv: list[str], **kwargs: object) -> None:
+        seen.append((list(argv), kwargs.get("env")))  # type: ignore[arg-type]
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    browser_mod._install_chromium()
+    assert len(seen) == 1
+    argv, env = seen[0]
+    assert argv[0] != sys.executable, "the sidecar cannot run itself as an interpreter"
+    assert "-m" not in argv
+    assert argv[-2:] == ["install", "chromium"]
+    assert argv[1].endswith("cli.js")  # the driver's CLI, not a module name
+    assert env is not None and "PW_LANG_NAME" in env  # the driver's own env, as playwright.__main__ sets it
+
+
 def test_auto_install_can_be_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHIMERA_BROWSER_AUTO_INSTALL", "0")
     installs: list[int] = []
