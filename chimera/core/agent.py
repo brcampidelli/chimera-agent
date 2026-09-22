@@ -205,6 +205,10 @@ class AgentConfig:
     # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
     # nothing matches. This is what connects the built-in skill library to the running loop.
     inject_skill_context: bool = True
+    # A cheap model picks the tool NAME before each step and the executor is given only that tool
+    # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
+    # (study 20 B4), it spends money of its own, and nothing outside `bench/tool_router` asks for it.
+    tool_router: Any | None = None
     # Context budget. None (the default) keeps the historical behaviour: the message list only grows
     # and an overflow is terminal. A fraction spends that share of the model's advertised window on
     # the prompt, compacting once the prompt crosses `trigger` of it. Off by default because
@@ -635,7 +639,19 @@ class Agent:
             # and report a shell command as slow generation.
             call_started = time.monotonic()
             try:
-                result = self._step(messages, tools=tool_schema, on_token=on_token, usage=usage, spend=spend)
+                # "System One": a cheap model names the tool, and the executor is handed that one
+                # tool to fill in. It NARROWS — a router that cannot decide leaves the full list,
+                # so the step is what it would have been without one, and the fallback is counted.
+                step_tools = tool_schema
+                if self.config.tool_router is not None and tool_schema:
+                    from chimera.core.tool_router import narrow
+
+                    picked = self.config.tool_router.pick(
+                        task, messages, tool_schema, usage=usage, spend=spend
+                    )
+                    if picked is not None:
+                        step_tools = narrow(tool_schema, picked)
+                result = self._step(messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend)
             except BudgetExceeded as exc:
                 # Not an error: the run did what it was told to do with the money it was given. The
                 # partial answer is kept — the transcript up to here is the work already paid for,
