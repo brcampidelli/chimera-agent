@@ -104,3 +104,26 @@ Reproduced deliberately before changing anything, one call each through our own 
 **What this costs the design:** P3 is now a prediction about `gpt-oss-20b`. The 12 weak-arm solves that ran before this amendment are discarded, not reused — a mixed arm is two executors averaged and reported as one (§2aa). The strong executor is untouched: its 16 scored solves stand, and the arm that produced them did not change.
 
 **What did not change:** the router model, the tasks, k, the flags, the outcomes, the decision rule, and every prediction about the strong executor.
+
+## Amendment 2 — a receiptless solve is re-run, not counted (2026-09-22, before any arm's totals were read)
+
+The stop rule fired a second time: 5 of the last 25 solves returned **rc = 0 with no receipt**. Investigated rather than waived, and the cause is upstream, not ours — the solve log ends:
+
+```
+Timeout: litellm.Timeout: Timeout Error: OpenrouterException -
+  litellm.Timeout: Connection timed out after 600.0 seconds.
+=== rc=1 end=… ===
+```
+
+One provider call exceeded `CHIMERA_REQUEST_TIMEOUT` (600 s, the default), the CLI died, and `runs.jsonl` was never written — while the harness had already graded the workspace, so the row carries an outcome and no cost. It hit both arms and both executors (`on-strong`, `on-weak` ×2, `off-strong` ×2), so it is noise on the apparatus, not an effect.
+
+**A second defect it exposed, worth more than the first:** the driver reads `proc.returncode` of `harnessbench.cli`, which exits **0** even when the command it ran died — so `rc=1` inside the wrapper reached the driver as `rc=0`. The receiptless count is the only reason these solves were noticed at all. That is the same shape the original pre-registration warned about (`; echo rc=$?` making bash exit 0) in a place it had not been checked.
+
+**Changes, all before any total was read:**
+
+1. `CHIMERA_REQUEST_TIMEOUT=1800` for the run — three times the default, still bounded.
+2. **Resume now requires a receipt**, not just a result file: a receiptless solve is re-run instead of being counted as done. Without this, a solve that timed out was "finished" forever, and its arm silently lost a cost and a step count.
+3. A solve still receiptless after the re-run is **excluded from the cost and step comparisons and counted in the results**; its outcome is reported separately. A cost mean over solves whose cost is missing is a mean over the solves that happened to succeed.
+4. The stop rule now counts solves that remain bad **after** the re-run. The threshold (5%) and everything else are unchanged.
+
+Nothing about the arms, the tasks, the router, the outcomes or the predictions changed.

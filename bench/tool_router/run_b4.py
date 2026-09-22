@@ -47,7 +47,14 @@ the same executor and replica is the comparison; everything else about them is i
 
 
 def result_exists(hid: str, task: str) -> bool:
-    return bool(glob.glob(str(HB / "data_try6" / "results" / hid / "*" / f"{task}.json")))
+    """Done means graded AND priced (amendment 2).
+
+    A provider timeout kills the CLI after the harness has already graded the workspace: the result
+    file exists, `runs.jsonl` does not, and a resume that looked only at the result file counted the
+    solve as finished forever — its arm silently losing a cost and a step count. Requiring the
+    receipt makes a receiptless solve re-run instead."""
+    graded = bool(glob.glob(str(HB / "data_try6" / "results" / hid / "*" / f"{task}.json")))
+    return graded and solve_usd(hid, task) is not None
 
 
 def solve_usd(hid: str, task: str) -> float | None:
