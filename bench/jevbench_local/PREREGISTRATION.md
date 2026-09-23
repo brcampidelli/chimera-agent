@@ -30,6 +30,11 @@ the item's `criteria` (noul `true`/`false` mapped to `yes`/`no`), instructions v
 end, shares over the options). Probabilities are the shares, renormalised over the labels. No calibration map (none
 exists for these questions): **raw** probabilities, labelled as such.
 
+Clarified with the runner, still before any call: a noul goes through the product's `Noul`, which asks
+`yes`/`no` in that order (JevBench lists `no`/`yes` — the same two words, so the shares map one to one); a
+score's levels are the item's labels (`"0"`…) with its criteria list attached level by level; the JSON key is
+`answer` for every item.
+
 Our question linter is **bypassed** for the measurement (these are someone else's questions) and run separately:
 how many of the 231 it would refuse is reported, because it is a fact about the linter.
 
