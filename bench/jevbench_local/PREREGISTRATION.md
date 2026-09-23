@@ -12,7 +12,7 @@ backend on its public items gives the first number about `chimera decide` that s
 
 ## What is measured, and what is not
 
-* **Only the Intelligence and Calibration axes, on the 231 public items.** Not the composite JevBench Score: it
+* **Accuracy and calibration on the 231 public items only.** Not the composite JevBench Score: it
   puts 25% each on Speed and Cost, which a local free model wins by construction (the lesson of study 23), and its
   Intelligence axis blends in 308 sealed items we cannot see. So **this is not a leaderboard entry and will not be
   reported as one.**
@@ -44,7 +44,9 @@ how many of the 231 it would refuse is reported, because it is a fact about the 
 
 * **Primary:** accuracy (argmax = gold) on all 231, A_ctx, with a Wilson 95% interval; per file (original / easy /
   hard).
-* Calibration: top-label ECE (the benchmark's 10-bin function) and Brier, A_ctx.
+* Calibration: top-label ECE (the benchmark's 10-bin function) and Brier, A_ctx. **This is not JevBench's
+  Calibration axis**, which is ECE plus fidelity to exact gold distributions on the hard tier; we report the two
+  functions, not the axis.
 * A_ship − A_ctx accuracy on `hard` (paired by item), and how many A_ship prompts hit the context ceiling.
 * Items the backend could not read (no choice / no mass on the labels): counted as wrong, as JevBench counts them.
 * Linter refusals among the 231.
@@ -66,7 +68,7 @@ No product change is decided by accuracy alone. Two things are decided here:
 * **If A_ship loses ≥ 5 points on `hard` against A_ctx**, `LocalLogprobBackend` gains a context setting sized
   to the request (the default path of `chimera decide` must not truncate), in its own PR.
 * The accuracy and ECE go into the `chimera decide` documentation as **the independent number**, with the
-  references beside it and the caveat that only two of JevBench's four axes were measured.
+  references beside it and the caveat that none of JevBench's four axes was measured as the benchmark defines it.
 
 ## What this cannot show
 
