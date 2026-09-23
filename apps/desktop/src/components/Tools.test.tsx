@@ -32,7 +32,7 @@ function tool(over: Partial<ToolInfo> = {}): ToolInfo {
 }
 
 function toolsOut(tools: ToolInfo[]): ToolsOut {
-  return { count: tools.length, tools };
+  return { count: tools.length, tools, unavailable: [] };
 }
 
 describe("Tools", () => {

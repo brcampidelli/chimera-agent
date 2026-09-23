@@ -1001,9 +1001,10 @@ def build_api_app(
         # (the browser's Chromium binary downloads on first USE, not registration).
         from chimera.api.tools_api import list_tools
         from chimera.tools.builtin import default_registry
+        from chimera.tools.conditional import unavailable
 
         tools = list_tools(default_registry(workspace))
-        return {"tools": tools, "count": len(tools)}
+        return {"tools": tools, "count": len(tools), "unavailable": unavailable({t["name"] for t in tools})}
 
     @app.get("/api/mcp", dependencies=[guard], response_model=McpServersOut)
     def mcp_list_endpoint() -> dict[str, Any]:

@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import type { ToolInfo } from "@/lib/types";
+import type { ToolInfo, Tools as ToolsData } from "@/lib/types";
 
 /** Tag → badge tone. Higher-blast-radius capabilities read louder: write/exec (bad), network/
  *  side-effect (warn), read (muted). Kept in sync with the governance-derived tag set. */
@@ -38,7 +38,7 @@ const TAG_TONE: Record<string, "muted" | "warn" | "bad"> = {
  * else's server and cannot be known in advance. A tool added in a later version behaves the same
  * way: it reads in English until someone translates it, never as a blank.
  */
-function describe(tool: ToolInfo, t: TFunc): string {
+function describe(tool: Pick<ToolInfo, "name" | "description">, t: TFunc): string {
   const key = `tools.desc.${tool.name}`;
   const translated = t(key);
   return translated === key ? tool.description : translated;
@@ -110,6 +110,65 @@ function ToolRow({
   );
 }
 
+type Unavailable = ToolsData["unavailable"][number];
+
+/** Why a conditional tool is absent — a closed set, spelled out so `i18n.reachable.test` can see
+ *  every key (an interpolated key is invisible to it). */
+const REASON_KEY: Record<string, string> = {
+  setting: "tools.unavailable.offByDefault",
+  key: "tools.unavailable.needsKey",
+  package: "tools.unavailable.needsPackage",
+};
+
+/**
+ * A tool the registry holds only under a condition that is not met right now.
+ *
+ * The screen used to list only registered tools, so a tool behind a setting was invisible exactly
+ * when it was off: the switch above could turn a tool OFF (the denylist) and nothing could turn one
+ * ON. Here the condition is named, and a switch is offered only where turning it on is a setting —
+ * a key or a package is something the person has to supply, and a switch for it could not work.
+ */
+function UnavailableRow({
+  tool,
+  onEnable,
+  busy,
+  t,
+}: {
+  tool: Unavailable;
+  onEnable: () => void;
+  busy: boolean;
+  t: TFunc;
+}) {
+  const vars = tool.variables.join(", ");
+  return (
+    <div className="flex items-start gap-3 border-b border-border py-2 last:border-b-0">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="font-mono text-sm font-semibold">{tool.name}</span>
+          <Badge tone="muted">
+            {tool.default_on
+              ? t("tools.unavailable.switchedOff")
+              : t(REASON_KEY[tool.kind] ?? "tools.unavailable.offByDefault")}
+          </Badge>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {describe(tool, t)}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {tool.kind === "setting"
+            ? t("tools.unavailable.setting", { vars })
+            : tool.kind === "key"
+              ? t("tools.unavailable.set", { vars })
+              : t("tools.unavailable.install", { pkg: tool.requires })}
+        </p>
+      </div>
+      {tool.switchable ? (
+        <Switch checked={false} onChange={() => !busy && onEnable()} label={tool.name} />
+      ) : null}
+    </div>
+  );
+}
+
 export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
@@ -125,6 +184,17 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
     mutationFn: (names: string[]) =>
       patchConfig({ CHIMERA_TOOL_DENYLIST: names.join(",") }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["config"] }),
+  });
+  // Turning a conditional tool ON is writing "1" to the setting that registers it. The turn builds
+  // its registry fresh, so it takes effect from the next message — and the screen says so.
+  const [enabled, setEnabled] = useState<string | null>(null);
+  const enable = useMutation({
+    mutationFn: (variable: string) => patchConfig({ [variable]: "1" }),
+    onSuccess: (_data, variable) => {
+      setEnabled(variable);
+      void qc.invalidateQueries({ queryKey: ["tools"] });
+      void qc.invalidateQueries({ queryKey: ["config"] });
+    },
   });
   // Denied names are kept even for tools this build does not have: a denylist naming a tool that
   // arrives with a later version should still deny it, and silently dropping unknown names would
@@ -208,6 +278,24 @@ export function Tools({ embedded = false }: { embedded?: boolean } = {}) {
           ))
         )}
       </Panel>
+      {(q.data.unavailable ?? []).length > 0 ? (
+        <Panel title={t("tools.unavailable.title")}>
+          {(q.data.unavailable ?? []).map((tool) => (
+            <UnavailableRow
+              key={tool.name}
+              tool={tool}
+              busy={enable.isPending}
+              onEnable={() => enable.mutate(tool.variables[0])}
+              t={t}
+            />
+          ))}
+          {enabled ? (
+            <p role="status" className="pt-2 text-xs text-muted-foreground">
+              {t("tools.unavailable.nextTurn")}
+            </p>
+          ) : null}
+        </Panel>
+      ) : null}
       <p className="px-1 text-xs text-muted-foreground">{t("tools.note")}</p>
       {/* Why every row above is English even when the app is not. A tool's description and its
           parameter names are not our copy about the agent — they ARE the function schema sent to

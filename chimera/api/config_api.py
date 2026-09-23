@@ -124,6 +124,11 @@ _EDITABLE_SETTINGS = {
     # would make the blunt answer the only discoverable one.
     "CHIMERA_EGRESS_ALLOW",
 }
+# The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
+# Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
+from chimera.tools.conditional import SWITCHABLE_SETTINGS  # noqa: E402
+
+_EDITABLE_SETTINGS |= SWITCHABLE_SETTINGS
 ALLOWED_KEYS = _SECRET_KEYS | _EDITABLE_SETTINGS
 
 

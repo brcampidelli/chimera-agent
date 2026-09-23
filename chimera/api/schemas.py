@@ -1855,9 +1855,26 @@ class ToolInfoOut(BaseModel):
     untrusted_output: bool  # True only for MCP/OpenAPI-imported tools; False for native tools (read as-is)
 
 
+class UnavailableToolOut(BaseModel):
+    """A tool the registry holds only under a condition that is not met right now."""
+
+    name: str
+    description: str
+    kind: Literal["setting", "key", "package"]
+    variables: list[str]
+    """``setting``: the variable the screen writes ``"1"`` to. ``key``: the credential(s) it needs."""
+    requires: str = ""
+    switchable: bool
+    """Only a ``setting`` can be turned on from the screen; a key or a package cannot be invented."""
+    default_on: bool = False
+    """A setting that is on unless the owner switched it off — absent means someone turned it off."""
+
+
 class ToolsOut(BaseModel):
     tools: list[ToolInfoOut]
     count: int
+    unavailable: list[UnavailableToolOut] = []
+    """Conditional tools absent right now, with what would turn each on (`chimera/tools/conditional.py`)."""
 
 
 # --- MCP / Integrations (configured servers + live test) ------------------------------------------

@@ -6880,6 +6880,11 @@ export interface components {
             count: number;
             /** Tools */
             tools: components["schemas"]["ToolInfoOut"][];
+            /**
+             * Unavailable
+             * @default []
+             */
+            unavailable: components["schemas"]["UnavailableToolOut"][];
         };
         /**
          * TranscriberWarmOut
@@ -6910,6 +6915,35 @@ export interface components {
             assistant: string;
             /** User */
             user: string;
+        };
+        /**
+         * UnavailableToolOut
+         * @description A tool the registry holds only under a condition that is not met right now.
+         */
+        UnavailableToolOut: {
+            /**
+             * Default On
+             * @default false
+             */
+            default_on: boolean;
+            /** Description */
+            description: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "setting" | "key" | "package";
+            /** Name */
+            name: string;
+            /**
+             * Requires
+             * @default
+             */
+            requires: string;
+            /** Switchable */
+            switchable: boolean;
+            /** Variables */
+            variables: string[];
         };
         /** UpdatedOut */
         UpdatedOut: {
