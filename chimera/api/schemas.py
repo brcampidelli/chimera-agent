@@ -1578,6 +1578,30 @@ class DecisionLabelIn(BaseModel):
     dangerous. Not whether it was approved: a person approves a dangerous action they meant to run."""
 
 
+class DecideQuestionIn(BaseModel):
+    type: Literal["noul", "choice", "score"]
+    instructions: str
+    criteria: dict[str, str] = {}
+    """noul: ``true``/``false``; choice: option -> meaning, in order; score: level -> meaning, lowest first."""
+
+
+class DecideIn(BaseModel):
+    """The open System One request (study 22, phase 4) — the Decisions API's own shape."""
+
+    state: str
+    questions: dict[str, DecideQuestionIn]
+    decision: str = ""
+    """Optional name the calibration map is found by; empty = ad hoc, never calibrated."""
+
+
+class DecideOut(BaseModel):
+    model: str
+    answers: dict[str, dict[str, Any]]
+    """Per key: ``{"noul": p}`` | ``{"choice", "probabilities", "confidence"}`` |
+    ``{"score", "probabilities", "legend", "confidence"}`` | ``{"error"}``."""
+    receipts: dict[str, dict[str, Any]]
+
+
 class DecisionLabelOut(BaseModel):
     ok: bool  # False when the log has no answer with that id — a stale card, 200, not a 404
 

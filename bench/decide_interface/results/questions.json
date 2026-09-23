@@ -1,0 +1,16 @@
+{
+  "questions": {
+    "kind": {
+      "type": "choice",
+      "instructions": "You read the subject line of a commit in a software repository. What kind of change does the commit make?",
+      "criteria": {
+        "feature": "adds a capability, a command, a screen or an option that did not exist",
+        "fix": "corrects behaviour that was wrong",
+        "docs": "changes documentation only",
+        "test": "changes tests only",
+        "other": "anything else: a benchmark, a refactor, a build or release chore, a dependency bump"
+      }
+    }
+  },
+  "decision": "demo.commit_kind"
+}

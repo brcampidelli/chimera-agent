@@ -2993,6 +2993,95 @@
         "title": "CronSilenceOut",
         "type": "object"
       },
+      "DecideIn": {
+        "description": "The open System One request (study 22, phase 4) \u2014 the Decisions API's own shape.",
+        "properties": {
+          "decision": {
+            "default": "",
+            "title": "Decision",
+            "type": "string"
+          },
+          "questions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DecideQuestionIn"
+            },
+            "title": "Questions",
+            "type": "object"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "questions"
+        ],
+        "title": "DecideIn",
+        "type": "object"
+      },
+      "DecideOut": {
+        "properties": {
+          "answers": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Answers",
+            "type": "object"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "receipts": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Receipts",
+            "type": "object"
+          }
+        },
+        "required": [
+          "model",
+          "answers",
+          "receipts"
+        ],
+        "title": "DecideOut",
+        "type": "object"
+      },
+      "DecideQuestionIn": {
+        "properties": {
+          "criteria": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Criteria",
+            "type": "object"
+          },
+          "instructions": {
+            "title": "Instructions",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "noul",
+              "choice",
+              "score"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "instructions"
+        ],
+        "title": "DecideQuestionIn",
+        "type": "object"
+      },
       "DecisionLabelIn": {
         "properties": {
           "event": {
@@ -11215,6 +11304,45 @@
           }
         },
         "summary": "Enable Cron"
+      }
+    },
+    "/api/decide": {
+      "post": {
+        "description": "Typed questions over a state \u2014 the open System One interface (study 22, phase 4).\n\nThe same function as `chimera decide` and the agent's `decide` tool. A question the linter\nrejects is a 422 naming it; a backend that fails on a question is that question's `error`,\nand the others are still answered. The decider is built once and kept: it holds one client\nand the cache of readings.",
+        "operationId": "decide_route_api_decide_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecideIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecideOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decide Route"
       }
     },
     "/api/decisions/{decision_id}/label": {

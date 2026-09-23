@@ -432,6 +432,14 @@ ALLOWED: dict[str, str] = {
         "hosted judge's operating point — catch 20/24 at 6/31 benign actions stopped, leave-one-family-out — at "
         "US$ 0 and 0.3 s a call; off unless CHIMERA_GOVERNANCE_BAND=on under observe/enforce"
     ),
+    # The open interface (study 22, phase 4). Not a decision surface in the guard's sense: a person or
+    # an agent asks a question on purpose and reads the number back — nothing is gated, allowed or
+    # accepted on it. What it had to earn is the contract, not an operating point:
+    # `tests/test_decide_speaks_the_decisions_shape.py` (the request our own OpenRouter client sends is
+    # accepted, and the response it reads comes back as the same reading) and the 1 000-item local run
+    # in `bench/decide_interface/RESULTS.md`.
+    "chimera/cli/decide_cmd.py": "the open interface's CLI (study 22 phase 4) — asked on purpose, gates nothing",
+    "chimera/api/app.py": "POST /api/decide (study 22 phase 4) — asked on purpose, gates nothing",
 }
 
 
