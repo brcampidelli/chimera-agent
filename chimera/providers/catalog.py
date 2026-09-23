@@ -185,6 +185,11 @@ CATALOG: tuple[CatalogEntry, ...] = (
         notes="frontier; this repo's default_model until 2026-08-18, and the reason it changed",
     ),
     CatalogEntry(
+        "openrouter/openai/gpt-6-sol", "top", "OpenAI",
+        2.00, 10.00, tools=True, context_k=1100,
+        notes="the cost-efficient high end of the GPT-6 line (below Astra, above Luna), released 2026-09-22 and priced off the index the same day: 2.00/10.00 with cache read at 0.20. Added because `bench/tool_router` needs it as its third executor and a model with no price cannot run under a dollar cap at all — `--max-usd` refuses fail-closed, which is correct and is why the row exists rather than the cap being removed. Unmeasured in this repo",
+    ),
+    CatalogEntry(
         "openrouter/google/gemini-3.8-flash", "top", "Google",
         0.75, 3.75, tools=True, context_k=1048,
         notes="the Google seat on the default fusion panel since 2026-09-03, replacing the -preview slug below there. A -preview in a DEFAULT is a default that can be withdrawn without notice, and there is no stable Gemini 3.x pro to move to: only the flash line ships non-preview. Cheaper (0.75/3.75 against 2.00/12.00) AND the better third-party agentic index (50 against 23)",

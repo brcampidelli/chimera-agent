@@ -5055,6 +5055,16 @@
           "type": "boolean"
         },
         {
+          "help": "EXPERIMENT (study 20 B4): a cheap MODEL names the tool before each step and the executor is given only that tool. Reads a shallow context on purpose. Narrows only \u2014 an undecided router leaves the full list, and the run's receipt counts how often that happened.",
+          "kind": "option",
+          "name": "tool_router",
+          "opts": [
+            "--tool-router"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
           "help": "After a failed attempt, run a structured self-check that steers the retry (helps weak models).",
           "kind": "option",
           "name": "progress_ledger",

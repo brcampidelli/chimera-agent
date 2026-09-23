@@ -4166,6 +4166,19 @@ def sandbox_bench(
     )
 
 
+def _append_json_line(path: Path, row: dict[str, Any]) -> None:
+    """One JSON object per line, best-effort. Used by `--tool-router` to record how much the
+    router acted; a measurement that fails to persist must not fail the run it measured."""
+    import json
+
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+    except OSError:
+        pass
+
+
 @app.command()
 def solve(
     task: str = typer.Argument(None, help="The task to solve autonomously (omit with --approve/--deny)."),
@@ -4221,6 +4234,10 @@ def solve(
     ),
     repo_map: bool = typer.Option(
         False, "--repo-map", help="Prepend a structural map of the workspace (files + top-level symbols) to the agent's context."
+    ),
+    tool_router: str = typer.Option(
+        None, "--tool-router",
+        help="EXPERIMENT (study 20 B4): a cheap MODEL names the tool before each step and the executor is given only that tool. Reads a shallow context on purpose. Narrows only — an undecided router leaves the full list, and the run's receipt counts how often that happened.",
     ),
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
@@ -4336,6 +4353,7 @@ def solve(
         WorkspaceGuard,
     )
     from chimera.core.failure_class import RECOVERY_MODES
+    from chimera.core.tool_router import ToolRouter as _ToolRouter
     from chimera.core.verify import CommandVerifier
     from chimera.evolution import build_evolution_context
     from chimera.fusion.probe_log import ProbeLog as _ProbeLog
@@ -4544,6 +4562,13 @@ def solve(
             # `assist` carry a per-conversation budget, and the agent loop names the dollar ceiling
             # `spend` rather than borrowing the token ceiling's label.)
             max_usd=max_usd,
+            # --tool-router: the System One experiment. Built here rather than inside the loop so
+            # the router's spend goes through the SAME gateway (and the same spend ceiling) as the
+            # step it precedes — pricing one arm's calls and not the other's would make the cost
+            # comparison the experiment is about meaningless.
+            tool_router=(
+                _ToolRouter(backend, tool_router) if tool_router else None
+            ),
         )
         worker = Agent(backend, registry, _worker_cfg)
         escalate_worker = (
@@ -4662,6 +4687,13 @@ def solve(
             ),
         )
         outcome = auto.run(task, thread_id=thread)
+        if _worker_cfg.tool_router is not None:
+            # How much the intervention ACTED, beside what it cost (§2r). Written by the surface
+            # that built the router, because that is the object that knows when the run ended.
+            _append_json_line(
+                settings.home / "tool_router.jsonl",
+                {"task": task[:200], "model": tool_router, **_worker_cfg.tool_router.stats.as_dict()},
+            )
         if ledger is not None:
             ledger.dump(settings.home / "ledger.jsonl")
             summary = ledger.capability_summary()
