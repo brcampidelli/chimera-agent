@@ -105,3 +105,14 @@ A detached driver (`nohup`, then `setsid`) died with the launching `wsl` session
 session is open. The driver runs in the foreground in 50-minute chunks (`timeout 3000`) and resumes: done cells are
 skipped; a solve cut by a chunk's end has no result and is re-run in the next chunk. A first 40-second probe
 started 6 solves that died with it; they left no result and are re-run like any other.
+
+## Amendment 6 — chunk 3 ran without the graders' tools (2026-09-23)
+
+Chunk 3 was launched from a non-login shell, which lacks `~/.local/bin`; the graders shell out to `pytest` and
+`node`, and two tasks (016, 084) failed with `FileNotFoundError` twice each, were frozen, and tripped the 5% stop
+rule after 25 solves. Any other solve of that chunk may have been graded without its tools and come back low
+without an error (§2c #4), so **every cell the chunk touched** — 21 graded plus the 4 frozen — was moved, not
+deleted, to `~/b4b-quarantine-chunk3/` with its home (its `runs.jsonl` sums every round, so a rerun must start
+from an empty receipt), and the freeze list moved with it. They are re-run from chunk 4 on. The chunk script now
+prepends `~/.local/bin` and refuses to start without `pytest` and `node`. The US$ 2.60 the chunk spent is real
+money outside the run's own accounting; the cap is unchanged.
