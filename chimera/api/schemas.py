@@ -1602,6 +1602,73 @@ class DecideOut(BaseModel):
     receipts: dict[str, dict[str, Any]]
 
 
+class DecisionSpecOut(BaseModel):
+    name: str
+    escalation: str
+    mode: str
+    bench: str
+    threshold: float | None = None
+    surfaces: list[str] = []
+    description: str = ""
+
+
+class ReliabilityBinOut(BaseModel):
+    lo: float
+    hi: float
+    n: int
+    mean_p: float | None = None
+    observed: float | None = None
+
+
+class DecisionGroupOut(BaseModel):
+    """One instrument — decision, backend, model, wording, build — and what its log holds."""
+
+    decision: str
+    backend: str
+    model: str
+    prompt_hash: str
+    resolved_model: str
+    answers: int
+    halts: int
+    cached: int
+    calibrated: int
+    regions: dict[str, int]
+    review_per_100: float | None = None
+    labelled: int
+    positives: int
+    labelled_by_region: dict[str, int]
+    catch: list[int] | None = None
+    false_refusal: list[int] | None = None
+    brier: float | None = None
+    ece: float | None = None
+    reliability: list[ReliabilityBinOut]
+
+
+class DecisionRowOut(BaseModel):
+    id: str
+    at: float
+    decision: str
+    p: float | None = None
+    calibrated: bool = False
+    choice: str | None = None
+    halt: str = ""
+    cached: bool = False
+    state: str = ""
+    label: int | None = None
+    source: str | None = None
+
+
+class DecisionsOut(BaseModel):
+    """The Decisions screen: the declared decision points, what each instrument's log holds, and the
+    latest answers with their labels (study 22, phase 4)."""
+
+    review_at: float
+    allow_below: float
+    specs: list[DecisionSpecOut]
+    groups: list[DecisionGroupOut]
+    recent: list[DecisionRowOut]
+
+
 class DecisionLabelOut(BaseModel):
     ok: bool  # False when the log has no answer with that id — a stale card, 200, not a 404
 

@@ -27,6 +27,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
+import { Decisions } from "@/components/Decisions";
 import { Usage } from "@/components/Usage";
 import { VoiceCard } from "@/components/VoiceCard";
 import { ModelPicker } from "@/components/code/ModelPicker";
@@ -918,7 +919,7 @@ export function MessagingCard({
   );
 }
 
-type SettingsTab = "general" | "connections" | "usage" | "security";
+type SettingsTab = "general" | "connections" | "usage" | "security" | "decisions";
 
 export function Settings() {
   const t = useT();
@@ -958,6 +959,7 @@ export function Settings() {
     { value: "connections" as const, label: t("settings.tab.connections") },
     { value: "usage" as const, label: t("nav.usage") },
     { value: "security" as const, label: t("settings.tab.security") },
+    { value: "decisions" as const, label: t("settings.tab.decisions") },
   ];
 
   return (
@@ -985,6 +987,7 @@ export function Settings() {
             {tab === "connections" && <Connections />}
             {tab === "usage" && <Usage embedded />}
             {tab === "security" && <Governance embedded />}
+            {tab === "decisions" && <Decisions embedded />}
             {tab === "general" && (
               <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
                 <Card title={t("settings.card.appearance")}>

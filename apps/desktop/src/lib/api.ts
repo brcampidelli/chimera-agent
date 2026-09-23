@@ -49,6 +49,7 @@ import type {
   SkillsResponse,
   TaskCard,
   Tools,
+  Decisions,
   UsageSummary,
   VersionInfo,
 } from "@/lib/types";
@@ -250,6 +251,8 @@ export const answerApproval = (id: string, approved: boolean) =>
   });
 /** The card's second question — was the action dangerous? — as the label of the decision that raised
  *  it. Separate from `answerApproval`: approving says "may it run", not "was it dangerous". */
+/** The Decisions screen's read model: declared points, a report per instrument, the latest answers. */
+export const getDecisions = (limit = 50) => json<Decisions>(`/api/decisions?limit=${limit}`);
 export const labelDecision = (decisionId: string, event: boolean) =>
   json<{ ok: boolean }>(`/api/decisions/${encodeURIComponent(decisionId)}/label`, {
     method: "POST",

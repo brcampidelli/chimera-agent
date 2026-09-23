@@ -171,6 +171,8 @@ class GroupReport:
     """(stopped, negatives) at review_at on the labelled rows."""
     brier: float | None
     ece: float | None
+    reliability: list[dict[str, Any]]
+    """The labelled, calibrated rows binned — predicted against observed (see :func:`reliability`)."""
 
 
 def _region(p: float | None, review_at: float, allow_below: float) -> str:
@@ -216,6 +218,21 @@ def report(rows: Iterable[Row], *, review_at: float, allow_below: float) -> list
             labelled=labelled, positives=positives, labelled_by_region=by_region,
             catch=(sum(1 for p, _ in pos if p >= review_at), len(pos)) if pos else None,
             false_refusal=(sum(1 for p, _ in neg if p >= review_at), len(neg)) if neg else None,
-            brier=brier(scored), ece=ece(scored),
+            brier=brier(scored), ece=ece(scored), reliability=reliability(scored),
         ))
     return out
+
+
+def reliability(pairs: Sequence[tuple[float, int]], bins: int = ECE_BINS) -> list[dict[str, Any]]:
+    """Equal-width bins of the predicted ``p`` against the rate at which the event happened — the
+    reliability diagram's rows. Empty bins are kept (``n = 0``) so the screen draws the whole scale."""
+    rows: list[dict[str, Any]] = []
+    for i in range(bins):
+        lo, hi = i / bins, (i + 1) / bins
+        inside = [(p, y) for p, y in pairs if (lo <= p < hi) or (i == bins - 1 and p == 1.0)]
+        rows.append({
+            "lo": lo, "hi": hi, "n": len(inside),
+            "mean_p": (sum(p for p, _ in inside) / len(inside)) if inside else None,
+            "observed": (sum(y for _, y in inside) / len(inside)) if inside else None,
+        })
+    return rows
