@@ -15,6 +15,9 @@ whose stated scope is the website and which contain no benchmark, publication or
 Nothing that reaches this project through the channel it used forbids this file. The model is named as
 what the channel resolved it to: `typesafe/jev-1.13`, build `jev-1.13-20260917`, single provider.
 
+> **Correction, 2026-09-23 (study 22).** The clause quoted here was real when read: the MCA dated 2026-08-27 (Wayback, captured 2026-09-16) carried §2.3(f) on publishing benchmarks or performance information. The MCA updated on 2026-09-19 (captured 2026-09-21) **no longer contains it** — (f) now reads "interfere with the operation of the Services". What remains and binds is §2.3(b): no distillation, no training a model to imitate the output, no developing a similar or competing product with the Services or their Output. See `bench/PLAN-study22-system-one.md` §4.
+
+
 ## 1 · What was asked, in one line each
 
 - **J** — the typed-decision model, one request per item carrying a **Noul** (`P(dangerous)`) and a
