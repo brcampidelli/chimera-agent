@@ -106,6 +106,12 @@ def probs_of(shares: dict[str, float] | None, labels: list[str]) -> dict[str, fl
     return {label: float(shares.get(label, 0.0)) for label in labels}
 
 
+def state_text(state: Any) -> str:
+    """JevBench's own convention (every adapter in ``jevbench/adapters``): a structured state is sent
+    as ``json.dumps(state, ensure_ascii=False)``."""
+    return state if isinstance(state, str) else json.dumps(state, ensure_ascii=False)
+
+
 def body_of(backend: LocalLogprobBackend, state: str, question: Choice, arm: str) -> dict[str, Any]:
     body = backend.body(state, question)
     if arm == "ctx":
@@ -146,7 +152,7 @@ def main() -> None:
             choice = as_choice(question)
             labels = [str(x) for x in item["labels"]]
             started = time.perf_counter()
-            response = client.post(f"{backend.base_url}/api/chat", json=body_of(backend, item["state"], choice, args.arm), timeout=300.0)
+            response = client.post(f"{backend.base_url}/api/chat", json=body_of(backend, state_text(item["state"]), choice, args.arm), timeout=300.0)
             response.raise_for_status()
             data = response.json()
             seconds = time.perf_counter() - started
@@ -160,6 +166,8 @@ def main() -> None:
             row = {
                 "id": item["id"], "file": item["file"], "family": item.get("family"), "type": item["question"]["type"],
                 "arm": args.arm, "expected": item["expected"], "labels": labels,
+                # ``choice`` is the label the model WROTE, kept apart from ``predicted``: a first-token
+                # collision between two options (study 21 A4) leaves no reading even when it is right
                 "choice": reading.choice, "shares": reading.shares, "mass": reading.mass,
                 "valid": bool(scored.get("valid")), "correct": bool(scored.get("correct")), "predicted": scored.get("predicted"),
                 "confidence": max(scored["probs"].values()) if scored.get("probs") else None,

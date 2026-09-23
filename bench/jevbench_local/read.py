@@ -46,6 +46,8 @@ def summary(arm: str, rows: list[dict[str, Any]], ece_top_label: Any, brier_scor
     print(f"chance baseline   : {chance:.3f}")
     invalid = [r for r in rows if not r["valid"]]
     print(f"no reading / invalid (counted wrong): {len(invalid)}")
+    rescued = [r for r in invalid if r.get("choice") is not None and str(r["choice"]) == str(r["expected"])]
+    print(f"  of which the WRITTEN label was right: {len(rescued)}  (first-token collision, study 21 A4 — exploratory)")
     valid = [r for r in rows if r["valid"] and r["confidence"] is not None]
     if valid:
         ece = ece_top_label([(r["confidence"], r["correct"]) for r in valid])["ece"]

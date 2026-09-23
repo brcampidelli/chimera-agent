@@ -79,3 +79,17 @@ No product change is decided by accuracy alone. Two things are decided here:
 
 The sealed items (and so any official score); speed/cost against the benchmark's other systems (different
 hardware); any calibrated number (no map for these questions); other local models.
+
+## Amendment 1 — after the first 141 items, before the rest (2026-09-23)
+
+The first pass stopped at item 142: some hard items carry a **structured** `state` (an object, not a string).
+It is now sent the way every adapter in `jevbench/adapters` sends it, `json.dumps(state, ensure_ascii=False)`
+— the benchmark's convention, not a choice of ours; the 141 string-state rows already written are unchanged.
+
+Reading those rows by eye before going on found no apparatus defect in the hard misses (clean JSON, a label the
+schema allows, and in `temporal_numeric-12` exactly the item's recorded surface answer). It found one fact about
+the **product**: 6 items had no reading although the model wrote a label, because the first token of two options is
+the same (`deny_…`, `sep_…`, and `coding` / `coding_agent`, where one option is a prefix of the other and so can
+never be read) and the backend refuses to read a collided token (study 21 A4); 4 of the 6 had the right label written. They stay **wrong**,
+as registered; how many of them had the right label written is added as an exploratory line, never folded into the
+primary number.
