@@ -4243,6 +4243,10 @@ def solve(
         None, "--tool-router",
         help="EXPERIMENT (study 20 B4): a cheap MODEL names the tool before each step and the executor is given only that tool. Reads a shallow context on purpose. Narrows only — an undecided router leaves the full list, and the run's receipt counts how often that happened.",
     ),
+    tool_router_mode: str = typer.Option(
+        "narrow", "--tool-router-mode",
+        help="EXPERIMENT (study 22 B4b): 'narrow' gives the executor only the routed tool (B4, measured worse); 'hint' keeps every tool and only suggests one for the step, with no ANSWER.",
+    ),
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
@@ -4571,7 +4575,7 @@ def solve(
             # step it precedes — pricing one arm's calls and not the other's would make the cost
             # comparison the experiment is about meaningless.
             tool_router=(
-                _ToolRouter(backend, tool_router) if tool_router else None
+                _ToolRouter(backend, tool_router, mode=tool_router_mode) if tool_router else None
             ),
         )
         worker = Agent(backend, registry, _worker_cfg)

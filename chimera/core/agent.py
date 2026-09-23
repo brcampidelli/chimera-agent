@@ -643,15 +643,26 @@ class Agent:
                 # tool to fill in. It NARROWS — a router that cannot decide leaves the full list,
                 # so the step is what it would have been without one, and the fallback is counted.
                 step_tools = tool_schema
+                step_messages = messages
+                hinted: str | None = None
                 if self.config.tool_router is not None and tool_schema:
-                    from chimera.core.tool_router import narrow
+                    from chimera.core.tool_router import hint_message, narrow
 
                     picked = self.config.tool_router.pick(
                         task, messages, tool_schema, usage=usage, spend=spend
                     )
-                    if picked is not None:
+                    if picked is not None and getattr(self.config.tool_router, "mode", "narrow") == "hint":
+                        # B4b: every tool stays, and the hint rides on this step only — a copy of
+                        # the history, so the suggestion is never read back as something that happened.
+                        step_messages = [*messages, hint_message(picked)]
+                        hinted = picked
+                    elif picked is not None:
                         step_tools = narrow(tool_schema, picked)
-                result = self._step(messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend)
+                result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend)
+                router = self.config.tool_router
+                if hinted is not None and router is not None:
+                    calls = getattr(result, "tool_calls", None) or []
+                    router.record_follow(hinted, calls[0].name if calls else None)
             except BudgetExceeded as exc:
                 # Not an error: the run did what it was told to do with the money it was given. The
                 # partial answer is kept — the transcript up to here is the work already paid for,
