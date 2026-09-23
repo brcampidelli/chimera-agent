@@ -41,12 +41,13 @@ def test_error_degrades_to_pass() -> None:
         def complete(self, messages: object, **kwargs: object) -> CompletionResult:
             raise RuntimeError("judge down")
 
-    assert StrongVerifier(_Boom()).verify("t", "a") == (True, 1.0)  # fail-open
+    # Fail-open (never blocks on its own outage), and no invented grade: None, not 1.0.
+    assert StrongVerifier(_Boom()).verify("t", "a") == (True, None)
 
 
 def test_parse_grade() -> None:
     assert _parse_grade("8") == 0.8 and _parse_grade("10/10") == 1.0
-    assert _parse_grade("no number") == 1.0  # unparseable -> don't block
+    assert _parse_grade("no number") is None  # unparseable -> an abstention, not a 10/10
 
 
 # --- integration: gated to hard turns ---------------------------------------------------

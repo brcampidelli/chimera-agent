@@ -50,7 +50,9 @@ def test_grade_empty_when_no_requirements() -> None:
 
 def test_grade_neutral_on_error() -> None:
     reqs = [Requirement(text="A")]
-    assert RequirementChecklist(_Backend(["garbage"])).grade("t", "a", reqs) == []  # no false miss
+    graded = RequirementChecklist(_Backend(["garbage"])).grade("t", "a", reqs)
+    assert not graded  # no false miss: a grader that could not grade does not block
+    assert graded is None  # and says it abstained rather than "all met" (study 22, phase 0)
 
 
 # --- integration with the solve loop ----------------------------------------------------

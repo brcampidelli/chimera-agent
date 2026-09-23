@@ -145,6 +145,15 @@ def absent_critical(findings: str, verdicts: str) -> list[str]:
     return out
 
 
+_VERDICT_TOKEN = re.compile(r"\b(?:PASS|FAIL|FAITHFUL|UNFAITHFUL)\b", re.IGNORECASE)
+
+
+def _readable_verdict(text: str) -> bool:
+    """Whether the auditor's reply carries a verdict at all — a PASS/FAIL line or the legacy
+    FAITHFUL/UNFAITHFUL word. Without one there is nothing to grade, and the check abstains."""
+    return bool(_VERDICT_TOKEN.search(text or ""))
+
+
 def _grade_faithfulness(text: str) -> bool:
     """True if the auditor's reply indicates faithfulness. Handles the decomposed and legacy formats.
 
@@ -185,6 +194,11 @@ class VerifyOutcome:
     """Critical findings the blind audit found in the raw output and not in the summary. Never a
     reason to fail: the orchestrator appends them to the summary so the synthesis can see what the
     distillation cut. Empty when the audit did not run or found nothing absent."""
+    spot_abstained: bool = False
+    """The spot check was due and gave no verdict — the model call failed, or the reply carried no
+    PASS/FAIL to read. The envelope still passes (a sampler layered on deterministic gates must not
+    block on its own outage), but ``"spot"`` is then absent from ``checks_run``: the gate did not
+    check anything, and the card must not say it did. Study 22, phase 0."""
 
 
 class EnvelopeVerifier:
@@ -266,8 +280,16 @@ class EnvelopeVerifier:
         # Gate 3 — spot check (probabilistic; forced when the worker admits gaps or on a re-ask).
         should_spot = force_spot or bool(envelope.gaps) or self.rng.random() < self.spot_rate
         if should_spot and envelope.evidence_refs and self._spot_backend is not None:
-            ran.append("spot")
             outcome = self._spot_check(spec, envelope)
+            if outcome is None or outcome.spot_abstained:
+                # Due, and no verdict came back. `"spot"` used to be appended BEFORE the call, so an
+                # outage or an unreadable reply still reached the card as "checked by spot check" —
+                # the one field whose contract is "which gates actually EXECUTED" (study 22).
+                return VerifyOutcome(
+                    passed=True, stage="accepted", checks_run=tuple(ran), spot_abstained=True,
+                    detail=outcome.detail if outcome is not None else "spot check unavailable",
+                )
+            ran.append("spot")
             if outcome is not None:
                 if outcome.passed and self.recover_dropped and self.blind_audit and not outcome.recovered:
                     # The one-call check named nothing and the caller asked for the two-call audit
@@ -344,6 +366,15 @@ class EnvelopeVerifier:
             _log.warning("spot check unavailable (%s) — passing through un-spotted", exc)
             return None
         content = (result.content or "").strip()
+        if not _readable_verdict(content):
+            # An empty or verdict-less reply is no verdict. `_grade_faithfulness` reads it as
+            # "faithful" — the right default for a sampler that must not block — but recording it
+            # as a PASS of the spot check was a claim the auditor never made.
+            _log.info("spot check reply carried no PASS/FAIL verdict — abstaining")
+            return VerifyOutcome(
+                passed=True, stage="spot", detail=f"spot check abstained: {content[:120]!r}",
+                spot_abstained=True,
+            )
         if _grade_faithfulness(content):
             return VerifyOutcome(passed=True, stage="spot", detail=content)
         if self.recover_dropped:

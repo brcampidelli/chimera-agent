@@ -879,6 +879,9 @@ class HierarchicalOrchestrator:
             # 8000-char cap. A badge reading "verificado · accepted" over a one-gate verdict is the
             # screen making a claim the data does not carry.
             checks_run=list(outcome.checks_run) if outcome else [],
+            # The spot check was due and gave no verdict (outage or unreadable reply): the envelope
+            # passed on the deterministic gates alone, and `checks_run` no longer claims otherwise.
+            spot_abstained=bool(outcome.spot_abstained) if outcome else False,
             reasked=reasked,
             tokens=budget.spent,
             # The summary's SIZE, not the summary. This is a progress frame; the envelope carries

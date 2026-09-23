@@ -31,9 +31,10 @@ with human labels (aacr-bench, 919 rows): the vendor's own calibration does not 
 decision it was not trained on (ECE 0.405 against a floor of 0.035), and neither does the verbalized
 model's (0.544). A map fitted on one decision, one backend, one model and one wording of the question
 applies to exactly that — :class:`~chimera.decisions.calibration.CalibrationMaps` keys on all four —
-and an answer says ``calibrated=False`` rather than pretending. No surface in this package wires a
-:class:`Decider` yet; the kernel's REVIEW band, the strong verifier, the voice router are each their
-own change with their own measurement, on top of this one.
+and an answer says ``calibrated=False`` rather than pretending. One surface builds a :class:`Decider`
+today — the kernel's REVIEW band (``chimera/governance/band.py``, off by default); every other surface
+is its own change with its own measurement, and the AST guard in
+``tests/test_a_decision_has_a_contract.py`` holds the list (``ALLOWED``).
 """
 
 from chimera.decisions.calibration import CalibrationMaps, PlattMap, fit_platt, prompt_hash

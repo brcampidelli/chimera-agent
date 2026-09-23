@@ -11,6 +11,11 @@ It composes with completion contracts but is different: a contract checks declar
 *artifacts* (file exists, regex matches); this checks *coverage* of the task's own requirements,
 which the model extracts. Both are opt-in AND-gates on success. Like the progress ledger, any
 model/parse error degrades to "no misses" so the checklist can only help, never falsely block.
+
+"No misses" and "no verdict" are nonetheless different answers, and ``grade`` now says which: an
+empty list means the grader read the work and found every requirement met; ``None`` means it
+abstained (study 22, phase 0). Both are falsy, so a caller that only asks "anything missing?" is
+unchanged — and one that records the outcome can no longer write "all met" for an outage.
 """
 
 from __future__ import annotations
@@ -102,8 +107,9 @@ class RequirementChecklist:
         requirements: list[Requirement],
         *,
         evidence: str = "",
-    ) -> list[str]:
-        """Return the texts of the requirements the work does NOT meet (empty on failure).
+    ) -> list[str] | None:
+        """Return the texts of the requirements the work does NOT meet — ``[]`` when all are met,
+        ``None`` when the grader abstained (unusable reply or failed call).
 
         ``evidence`` is what the attempt changed on disk. Without it this graded the answer's
         **prose**, which is the same blindness the reviewer had and it cost the same thing:
@@ -135,12 +141,12 @@ class RequirementChecklist:
             )
             raw = json.loads(_strip_fence(result.content))
             if not isinstance(raw, dict):
-                return []
+                return None
             graded = _Grade.model_validate(raw)
             return [item.text for item in graded.items if not item.met]
         except (json.JSONDecodeError, ValueError, ValidationError) as exc:
-            _log.debug("checklist grade: unusable response (%s)", exc)
-            return []
+            _log.debug("checklist grade: unusable response (%s) — abstaining", exc)
+            return None
         except Exception as exc:  # noqa: BLE001 — a grader must never break the run
-            _log.warning("checklist grade failed, continuing without it: %s", exc)
-            return []
+            _log.warning("checklist grade failed, abstaining: %s", exc)
+            return None

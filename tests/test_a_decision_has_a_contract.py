@@ -13,7 +13,8 @@ floor of 0.035). What is held here, each with the failure it is against:
 * the map applies only to its own decision, backend, model and instrument hash, and the receipt says
   ``calibrated`` either way;
 * a backend that raises is a halt on the answer, never a verdict; and no shipped surface builds a
-  Decider yet (an AST walk, like the judge's).
+  Decider unless it is listed in ``ALLOWED`` with its measurement (an AST walk, like the judge's) —
+  today that is the REVIEW band alone.
 """
 
 from __future__ import annotations

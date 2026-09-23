@@ -10,6 +10,11 @@ only on attempts that already needed a retry (the observed-difficulty signal Chi
 trusts for fusion escalation), not on every easy first-pass success. A below-threshold grade
 fails the attempt and feeds a revise-back. A verifier error degrades to "pass" — an independent
 check can only add a gate, never falsely block a run because the judge call flaked.
+
+What it may NOT do is report that pass as a grade. Until study 22 (phase 0) an unreadable reply or a
+failed call came back as ``(True, 1.0)`` — a perfect 10/10 from a judge that said nothing — and any
+reader of the score could not tell a verdict from an outage. Now the score is ``None`` when the
+judge abstained: the attempt still passes, and the number is not invented.
 """
 
 from __future__ import annotations
@@ -30,10 +35,11 @@ _VERIFY_SYSTEM = (
 )
 
 
-def _parse_grade(text: str) -> float:
+def _parse_grade(text: str) -> float | None:
+    """The grade in [0, 1], or None when the reply carries no number — an abstention, not a 10."""
     match = _NUM.search(text)
     if not match:
-        return 1.0  # unparseable grade -> don't block (fail-open, like the other gates)
+        return None
     return max(0.0, min(1.0, float(match.group()) / 10.0))
 
 
@@ -45,8 +51,9 @@ class StrongVerifier:
         self.model = model
         self.threshold = threshold
 
-    def verify(self, task: str, answer: str) -> tuple[bool, float]:
-        """Return (meets_threshold, score in [0,1]). Degrades to (True, 1.0) on any error."""
+    def verify(self, task: str, answer: str) -> tuple[bool, float | None]:
+        """Return (meets_threshold, score in [0,1]). On an unreadable reply or any error the
+        attempt is not blocked — ``(True, None)``: passed, and no grade was given."""
         try:
             result = self.backend.complete(
                 [
@@ -57,7 +64,10 @@ class StrongVerifier:
                 temperature=0.0,
             )
             score = _parse_grade(result.content)
+            if score is None:
+                _log.warning("strong verifier reply carried no grade — abstaining (not blocking)")
+                return (True, None)
             return (score >= self.threshold, score)
         except Exception as exc:  # noqa: BLE001 — a flaky judge must not fail the run
-            _log.warning("strong verifier failed, treating as pass: %s", exc)
-            return (True, 1.0)
+            _log.warning("strong verifier failed, abstaining (not blocking): %s", exc)
+            return (True, None)
