@@ -43,12 +43,15 @@ from chimera.decisions.contract import (
     Choice,
     Decider,
     DecisionBackend,
+    DecisionCache,
+    NeutralChoice,
     Noul,
     Question,
     Reading,
     Score,
     as_choice,
 )
+from chimera.decisions.spec import REGISTRY, DecisionSpec, Escalation, Mode, register
 
 __all__ = [
     "Answer",
@@ -56,7 +59,13 @@ __all__ = [
     "Choice",
     "DecisionBackend",
     "Decider",
+    "DecisionCache",
+    "DecisionSpec",
+    "Escalation",
+    "Mode",
+    "NeutralChoice",
     "Noul",
+    "REGISTRY",
     "PlattMap",
     "Question",
     "Reading",
@@ -64,4 +73,5 @@ __all__ = [
     "as_choice",
     "fit_platt",
     "prompt_hash",
+    "register",
 ]

@@ -16,9 +16,12 @@ model server is down.
 
 from __future__ import annotations
 
+import string
+import threading
 import time
-from collections.abc import Sequence
-from dataclasses import dataclass, field
+from collections import OrderedDict
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
 from chimera.decisions.calibration import CalibrationMaps, prompt_hash
@@ -65,6 +68,42 @@ class Choice:
     @property
     def p_name(self) -> str:
         return self.event_name or self.key
+
+    def neutral(self) -> NeutralChoice:
+        """This question with neutral option identifiers — ``A``, ``B``, ``C``… — and the meaning
+        moved into the criteria (study 22, I3). Under polar labels a model reads the label, not the
+        rubric: "Type-Safe Is Not Error-Free" (arXiv 2609.26758) swapped rubrics under yes/no and
+        changed 76.9% of answers, and 6.5% under neutral 0/1. The neutral form is a different
+        instrument — a different hash, no map until a bench fits one — and
+        :meth:`NeutralChoice.restore` names the answer in the original options again."""
+        if len(self.options) > len(string.ascii_uppercase):
+            raise ValueError(f"neutral labels cover at most {len(string.ascii_uppercase)} options")
+        letters = tuple(string.ascii_uppercase[: len(self.options)])
+        to_original = dict(zip(letters, self.options, strict=True))
+        to_letter = {o: letter for letter, o in to_original.items()}
+        criteria = {
+            to_letter[o]: (f"{o} — {self.criteria[o]}" if self.criteria.get(o) else o) for o in self.options
+        }
+        choice = Choice(
+            key=self.key, instructions=self.instructions, options=letters, criteria=criteria,
+            event=tuple(to_letter[e] for e in self.event), event_name=self.event_name,
+        )
+        return NeutralChoice(choice=choice, to_original=to_original)
+
+
+@dataclass(frozen=True)
+class NeutralChoice:
+    """A :class:`Choice` asked under neutral letters, and the way back to its own options."""
+
+    choice: Choice
+    to_original: dict[str, str]
+
+    def restore(self, answer: Answer) -> Answer:
+        """The answer with its choice and shares named in the original options. ``p`` needs no
+        change: the event was carried over letter for letter."""
+        shares = {self.to_original.get(k, k): v for k, v in answer.shares.items()} if answer.shares else answer.shares
+        choice = self.to_original.get(answer.choice, answer.choice) if answer.choice is not None else None
+        return replace(answer, choice=choice, shares=shares)
 
 
 @dataclass(frozen=True)
@@ -179,10 +218,27 @@ class Answer:
     """The build that answered, when the route names it (see :attr:`Reading.resolved_model`)."""
     note: str = ""
     """Why a map that exists was not applied — the build differs from the one it was fitted on."""
+    cached: bool = False
+    """The reading came from the :class:`DecisionCache`, not from a call made for this answer."""
 
     @property
     def answered(self) -> bool:
         return self.halt is None and (self.p is not None or self.choice is not None)
+
+    @property
+    def confidence(self) -> float | None:
+        """How peaked the shares are: ``(K*p_max - 1)/(K - 1)`` — 0 for uniform, 1 for all mass on
+        one option. A **shape statistic**, never a probability of being right and never a threshold
+        (study 22, I5: study 21 measured the Choice mass +0.11 above the Noul, ECE 0.221 vs 0.120;
+        only a calibrated ``p`` crosses a line). ``None`` without shares."""
+        if not self.shares:
+            return None
+        k = len(self.shares)
+        total = sum(self.shares.values())
+        if k < 2 or total <= 0:
+            return None
+        p_max = max(self.shares.values()) / total
+        return max(0.0, min(1.0, (k * p_max - 1.0) / (k - 1.0)))
 
     def expectation(self, question: Score) -> float | None:
         """The expected level index under the shares, for a Score; ``None`` without shares."""
@@ -217,28 +273,92 @@ class Answer:
             out["resolved_model"] = self.resolved_model
         if self.note:
             out["note"] = self.note
+        if self.cached:
+            out["cached"] = True
         if self.halt:
             out["halt"] = self.halt
         return out
 
 
+CacheKey = tuple[str, str, str, str]
+
+
+class DecisionCache:
+    """Readings already paid for, keyed on (backend, model, instrument hash, state) — LRU, per
+    process, thread-safe.
+
+    Repeated shell commands are the common case on the governance surface, and a reading at
+    ``temperature 0`` of the same text under the same instrument is the reading. The key is the
+    state **exactly as sent**: normalizing whitespace would return a reading for a text the model
+    never saw (inside quotes, ``a  b`` and ``a b`` are different commands). Only a reading that
+    chose an option is stored — a halt is an exception and never reaches the cache, and a reading
+    with no choice may be a transient truncation the next call does not repeat.
+
+    What the cache cannot see: a model re-pulled under the same tag mid-process. The reading keeps
+    the build it was read on (``resolved_model``), so the receipt still names it and the Decider
+    still refuses a map fitted on another build.
+    """
+
+    def __init__(self, max_entries: int = 1024) -> None:
+        if max_entries < 1:
+            raise ValueError("a cache needs room for at least one reading")
+        self.max_entries = max_entries
+        self._entries: OrderedDict[CacheKey, Reading] = OrderedDict()
+        self._lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: CacheKey) -> Reading | None:
+        with self._lock:
+            reading = self._entries.get(key)
+            if reading is None:
+                self.misses += 1
+                return None
+            self._entries.move_to_end(key)
+            self.hits += 1
+            return reading
+
+    def put(self, key: CacheKey, reading: Reading) -> None:
+        if reading.choice is None:
+            return
+        with self._lock:
+            self._entries[key] = reading
+            self._entries.move_to_end(key)
+            while len(self._entries) > self.max_entries:
+                self._entries.popitem(last=False)
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+
 class Decider:
     """A backend plus the maps: asks, calibrates when a map for exactly this instrument exists."""
 
-    def __init__(self, backend: DecisionBackend, maps: CalibrationMaps | None = None) -> None:
+    def __init__(
+        self, backend: DecisionBackend, maps: CalibrationMaps | None = None, *, cache: DecisionCache | None = None,
+    ) -> None:
         self.backend = backend
         self.maps = maps if maps is not None else CalibrationMaps()
+        self.cache = cache
 
     def decide(self, decision: str, state: str, question: Question) -> Answer:
         choice = as_choice(question)
         digest = prompt_hash(self.backend.name, self.backend.model, self.backend.instrument(question))
         t0 = time.perf_counter()
         halt: str | None = None
-        try:
-            reading = self.backend.ask(state, question)
-        except Exception as exc:  # noqa: BLE001 — a halt, recorded as one, never a verdict
-            halt = f"{type(exc).__name__}: {str(exc)[:200]}"
-            reading = Reading(choice=None, shares=None, p=None)
+        key: CacheKey = (self.backend.name, self.backend.model, digest, state)
+        cached = self.cache.get(key) if self.cache is not None else None
+        if cached is not None:
+            reading = cached
+        else:
+            try:
+                reading = self.backend.ask(state, question)
+            except Exception as exc:  # noqa: BLE001 — a halt, recorded as one, never a verdict
+                halt = f"{type(exc).__name__}: {str(exc)[:200]}"
+                reading = Reading(choice=None, shares=None, p=None)
+            else:
+                if self.cache is not None:
+                    self.cache.put(key, reading)
         seconds = time.perf_counter() - t0
         found = self.maps.find(decision, self.backend.name, self.backend.model, digest)
         raw_p = reading.p
@@ -261,7 +381,23 @@ class Decider:
             calibrated=usable is not None and raw_p is not None, map=found.id if found is not None else None,
             mass=reading.mass, seconds=seconds, usd=reading.usd, halt=halt, raw=reading.raw,
             logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
+            cached=cached is not None,
         )
+
+    def decide_many(self, decision: str, state: str, questions: Iterable[Question]) -> dict[str, Answer]:
+        """One state, several atomic questions (study 22, I6), each read **in isolation** — its own
+        call, its own instrument, its own map. Sequential: a local server serves one request at a
+        time by default, and a hosted backend's cost is per call either way. The questions do not
+        share a prompt prefix — the state sits after each question's instructions, as the bench
+        measured it — so N questions cost N full reads; putting the state first to share the prefix
+        is a different instrument and needs its own bench before a map applies to it."""
+        answers: dict[str, Answer] = {}
+        for question in questions:
+            key = as_choice(question).key
+            if key in answers:
+                raise ValueError(f"two questions share the key {key!r}")
+            answers[key] = self.decide(decision, state, question)
+        return answers
 
     def has_map(self, decision: str, question: Question) -> bool:
         """Whether a map exists for this decision on this backend — knowable before asking."""
