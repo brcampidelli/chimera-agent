@@ -64,6 +64,7 @@ from chimera.api.schemas import (
     DecideOut,
     DecisionLabelIn,
     DecisionLabelOut,
+    DecisionsOut,
     DeletedOut,
     DiagnosticsOut,
     DoctorOut,
@@ -1369,6 +1370,50 @@ def build_api_app(
         from chimera.governance.pending import answer
 
         return {"ok": answer(live_settings().home, request_id, bool(req.approved))}
+
+    @app.get("/api/decisions", dependencies=[guard], response_model=DecisionsOut)
+    def decisions_route(limit: int = 50) -> dict[str, Any]:
+        """What the decision log holds (study 22, phases 2 and 4): the declared decision points, a
+        report per instrument — review budget, label coverage by band region, catch and false refusal
+        on the labelled rows, the reliability bins — and the latest answers with their labels.
+        Read-only; a label is written through `POST /api/decisions/{id}/label`."""
+        import chimera.decisions.governance  # noqa: F401 — registers the governance spec
+        from chimera.decisions.labels import report
+        from chimera.decisions.log import log_path, read
+        from chimera.decisions.spec import REGISTRY
+
+        current = live_settings()
+        review_at = float(current.governance_band_review_at)
+        allow_below = float(current.governance_band_allow_below)
+        rows = read(log_path(Path(current.home)))
+        groups = []
+        for g in report(rows, review_at=review_at, allow_below=allow_below):
+            decision, backend, model, digest, build = g.key
+            groups.append({
+                "decision": decision, "backend": backend, "model": model, "prompt_hash": digest,
+                "resolved_model": build, "answers": g.answers, "halts": g.halts, "cached": g.cached,
+                "calibrated": g.calibrated, "regions": g.regions, "review_per_100": g.review_per_100,
+                "labelled": g.labelled, "positives": g.positives, "labelled_by_region": g.labelled_by_region,
+                "catch": list(g.catch) if g.catch else None,
+                "false_refusal": list(g.false_refusal) if g.false_refusal else None,
+                "brier": g.brier, "ece": g.ece, "reliability": g.reliability,
+            })
+        recent = []
+        for row in rows[-max(1, min(limit, 500)):][::-1]:
+            a = row.answer
+            p = a.get("p")
+            recent.append({
+                "id": row.id, "at": float(a.get("at") or 0.0), "decision": str(a.get("decision") or ""),
+                "p": float(p) if isinstance(p, (int, float)) else None, "calibrated": bool(a.get("calibrated")),
+                "choice": a.get("choice"), "halt": str(a.get("halt") or ""), "cached": bool(a.get("cached")),
+                "state": str(a.get("state") or "")[:300], "label": row.label, "source": row.source,
+            })
+        specs = [
+            {"name": s.name, "escalation": s.escalation.value, "mode": s.mode.value, "bench": s.bench,
+             "threshold": s.threshold, "surfaces": list(s.surfaces), "description": s.description}
+            for s in REGISTRY.values()
+        ]
+        return {"review_at": review_at, "allow_below": allow_below, "specs": specs, "groups": groups, "recent": recent}
 
     _decide_state: dict[str, Any] = {}
 

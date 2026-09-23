@@ -118,6 +118,7 @@ export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 export type SandboxState = Schemas["SandboxStateOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];
 export type Tools = Schemas["ToolsOut"];
+export type Decisions = Schemas["DecisionsOut"];
 export type Maturity = Schemas["MaturityOut"];
 export type MaturitySurface = Schemas["MaturitySurfaceOut"];
 export type Benchmarks = Schemas["BenchmarksOut"];
