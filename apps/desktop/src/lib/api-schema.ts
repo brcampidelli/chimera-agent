@@ -1032,6 +1032,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Decisions Route
+         * @description What the decision log holds (study 22, phases 2 and 4): the declared decision points, a
+         *     report per instrument — review budget, label coverage by band region, catch and false refusal
+         *     on the labelled rows, the reliability bins — and the latest answers with their labels.
+         *     Read-only; a label is written through `POST /api/decisions/{id}/label`.
+         */
+        get: operations["decisions_route_api_decisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/decisions/{decision_id}/label": {
         parameters: {
             query?: never;
@@ -4419,6 +4442,54 @@ export interface components {
              */
             type: "noul" | "choice" | "score";
         };
+        /**
+         * DecisionGroupOut
+         * @description One instrument — decision, backend, model, wording, build — and what its log holds.
+         */
+        DecisionGroupOut: {
+            /** Answers */
+            answers: number;
+            /** Backend */
+            backend: string;
+            /** Brier */
+            brier?: number | null;
+            /** Cached */
+            cached: number;
+            /** Calibrated */
+            calibrated: number;
+            /** Catch */
+            catch?: number[] | null;
+            /** Decision */
+            decision: string;
+            /** Ece */
+            ece?: number | null;
+            /** False Refusal */
+            false_refusal?: number[] | null;
+            /** Halts */
+            halts: number;
+            /** Labelled */
+            labelled: number;
+            /** Labelled By Region */
+            labelled_by_region: {
+                [key: string]: number;
+            };
+            /** Model */
+            model: string;
+            /** Positives */
+            positives: number;
+            /** Prompt Hash */
+            prompt_hash: string;
+            /** Regions */
+            regions: {
+                [key: string]: number;
+            };
+            /** Reliability */
+            reliability: components["schemas"]["ReliabilityBinOut"][];
+            /** Resolved Model */
+            resolved_model: string;
+            /** Review Per 100 */
+            review_per_100?: number | null;
+        };
         /** DecisionLabelIn */
         DecisionLabelIn: {
             /** Event */
@@ -4428,6 +4499,83 @@ export interface components {
         DecisionLabelOut: {
             /** Ok */
             ok: boolean;
+        };
+        /** DecisionRowOut */
+        DecisionRowOut: {
+            /** At */
+            at: number;
+            /**
+             * Cached
+             * @default false
+             */
+            cached: boolean;
+            /**
+             * Calibrated
+             * @default false
+             */
+            calibrated: boolean;
+            /** Choice */
+            choice?: string | null;
+            /** Decision */
+            decision: string;
+            /**
+             * Halt
+             * @default
+             */
+            halt: string;
+            /** Id */
+            id: string;
+            /** Label */
+            label?: number | null;
+            /** P */
+            p?: number | null;
+            /** Source */
+            source?: string | null;
+            /**
+             * State
+             * @default
+             */
+            state: string;
+        };
+        /** DecisionSpecOut */
+        DecisionSpecOut: {
+            /** Bench */
+            bench: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Escalation */
+            escalation: string;
+            /** Mode */
+            mode: string;
+            /** Name */
+            name: string;
+            /**
+             * Surfaces
+             * @default []
+             */
+            surfaces: string[];
+            /** Threshold */
+            threshold?: number | null;
+        };
+        /**
+         * DecisionsOut
+         * @description The Decisions screen: the declared decision points, what each instrument's log holds, and the
+         *     latest answers with their labels (study 22, phase 4).
+         */
+        DecisionsOut: {
+            /** Allow Below */
+            allow_below: number;
+            /** Groups */
+            groups: components["schemas"]["DecisionGroupOut"][];
+            /** Recent */
+            recent: components["schemas"]["DecisionRowOut"][];
+            /** Review At */
+            review_at: number;
+            /** Specs */
+            specs: components["schemas"]["DecisionSpecOut"][];
         };
         /** DecomposedOut */
         DecomposedOut: {
@@ -6291,6 +6439,19 @@ export interface components {
             name: string;
             /** Set */
             set: boolean;
+        };
+        /** ReliabilityBinOut */
+        ReliabilityBinOut: {
+            /** Hi */
+            hi: number;
+            /** Lo */
+            lo: number;
+            /** Mean P */
+            mean_p?: number | null;
+            /** N */
+            n: number;
+            /** Observed */
+            observed?: number | null;
         };
         /**
          * RequirementOut
@@ -8930,6 +9091,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decisions_route_api_decisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionsOut"];
                 };
             };
             /** @description Validation Error */

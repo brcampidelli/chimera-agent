@@ -3082,6 +3082,155 @@
         "title": "DecideQuestionIn",
         "type": "object"
       },
+      "DecisionGroupOut": {
+        "description": "One instrument \u2014 decision, backend, model, wording, build \u2014 and what its log holds.",
+        "properties": {
+          "answers": {
+            "title": "Answers",
+            "type": "integer"
+          },
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "brier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Brier"
+          },
+          "cached": {
+            "title": "Cached",
+            "type": "integer"
+          },
+          "calibrated": {
+            "title": "Calibrated",
+            "type": "integer"
+          },
+          "catch": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Catch"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "ece": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ece"
+          },
+          "false_refusal": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "False Refusal"
+          },
+          "halts": {
+            "title": "Halts",
+            "type": "integer"
+          },
+          "labelled": {
+            "title": "Labelled",
+            "type": "integer"
+          },
+          "labelled_by_region": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Labelled By Region",
+            "type": "object"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "positives": {
+            "title": "Positives",
+            "type": "integer"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          },
+          "regions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Regions",
+            "type": "object"
+          },
+          "reliability": {
+            "items": {
+              "$ref": "#/components/schemas/ReliabilityBinOut"
+            },
+            "title": "Reliability",
+            "type": "array"
+          },
+          "resolved_model": {
+            "title": "Resolved Model",
+            "type": "string"
+          },
+          "review_per_100": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Per 100"
+          }
+        },
+        "required": [
+          "decision",
+          "backend",
+          "model",
+          "prompt_hash",
+          "resolved_model",
+          "answers",
+          "halts",
+          "cached",
+          "calibrated",
+          "regions",
+          "labelled",
+          "positives",
+          "labelled_by_region",
+          "reliability"
+        ],
+        "title": "DecisionGroupOut",
+        "type": "object"
+      },
       "DecisionLabelIn": {
         "properties": {
           "event": {
@@ -3106,6 +3255,188 @@
           "ok"
         ],
         "title": "DecisionLabelOut",
+        "type": "object"
+      },
+      "DecisionRowOut": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "number"
+          },
+          "cached": {
+            "default": false,
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "calibrated": {
+            "default": false,
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Choice"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "halt": {
+            "default": "",
+            "title": "Halt",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "state": {
+            "default": "",
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "decision"
+        ],
+        "title": "DecisionRowOut",
+        "type": "object"
+      },
+      "DecisionSpecOut": {
+        "properties": {
+          "bench": {
+            "title": "Bench",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "escalation": {
+            "title": "Escalation",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "surfaces": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Surfaces",
+            "type": "array"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "name",
+          "escalation",
+          "mode",
+          "bench"
+        ],
+        "title": "DecisionSpecOut",
+        "type": "object"
+      },
+      "DecisionsOut": {
+        "description": "The Decisions screen: the declared decision points, what each instrument's log holds, and the\nlatest answers with their labels (study 22, phase 4).",
+        "properties": {
+          "allow_below": {
+            "title": "Allow Below",
+            "type": "number"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionRowOut"
+            },
+            "title": "Recent",
+            "type": "array"
+          },
+          "review_at": {
+            "title": "Review At",
+            "type": "number"
+          },
+          "specs": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionSpecOut"
+            },
+            "title": "Specs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "review_at",
+          "allow_below",
+          "specs",
+          "groups",
+          "recent"
+        ],
+        "title": "DecisionsOut",
         "type": "object"
       },
       "DecomposedOut": {
@@ -7172,6 +7503,51 @@
           "hint"
         ],
         "title": "ProviderOut",
+        "type": "object"
+      },
+      "ReliabilityBinOut": {
+        "properties": {
+          "hi": {
+            "title": "Hi",
+            "type": "number"
+          },
+          "lo": {
+            "title": "Lo",
+            "type": "number"
+          },
+          "mean_p": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean P"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "observed": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Observed"
+          }
+        },
+        "required": [
+          "lo",
+          "hi",
+          "n"
+        ],
+        "title": "ReliabilityBinOut",
         "type": "object"
       },
       "RequirementOut": {
@@ -11403,6 +11779,47 @@
           }
         },
         "summary": "Decide Route"
+      }
+    },
+    "/api/decisions": {
+      "get": {
+        "description": "What the decision log holds (study 22, phases 2 and 4): the declared decision points, a\nreport per instrument \u2014 review budget, label coverage by band region, catch and false refusal\non the labelled rows, the reliability bins \u2014 and the latest answers with their labels.\nRead-only; a label is written through `POST /api/decisions/{id}/label`.",
+        "operationId": "decisions_route_api_decisions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Decisions Route"
       }
     },
     "/api/decisions/{decision_id}/label": {
