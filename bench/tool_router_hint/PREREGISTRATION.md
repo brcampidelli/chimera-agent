@@ -67,3 +67,17 @@ bootstrap 95% CI over tasks, beside the `off` arm's own replica SD.
 
 Hint content other than one tool name; a deep router (whole transcript); retries (`--max-attempts 1`); tasks
 outside the 23.
+
+## Amendment 1 — approval, executors, cap and pilot (2026-09-23, before any solve)
+
+**Approved by the owner: options (a) and (b) — all three executors** (strong `deepseek-v3.2`, weak `gpt-oss-20b`,
+Sol `gpt-6-sol`), estimated ≈ US$ 37. The driver's own cap is **US$ 40**; reaching it halts new submissions and
+the result is reported with the missing cells named.
+
+**The ruler is frozen:** the arms run from a dedicated worktree at `e5bbc845` (the merge that shipped the hint
+mode), installed into its own venv `hb-venv-b4b` — not the B4 venv, which points at a working tree someone else
+edits (§2aa). Arm names `sys1h-{off,on}-{exec}-r{k}`, so no B4 result or home is reused.
+
+**Pilot, unscored:** one `on` solve on `044-ci-config-repair` for the strong and the weak executor, read only for
+the positive control — the router's receipt must show `hinted > 0` and no fallback storm — and deleted before the
+scored run. If the pilot shows the hint never reaches the executor, the run does not start.
