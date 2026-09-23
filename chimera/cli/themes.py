@@ -115,7 +115,7 @@ THEMES: tuple[Theme, ...] = (
         # `approve` answers a decision the kernel is waiting on, from anywhere — shipped in 0.48.0,
         # because without a terminal the approval gate had been collapsing to a refusal. It belongs
         # with the kernel it answers to, not with setup.
-        ("guard", "redteam", "approve", "decisions"),
+        ("guard", "redteam", "approve", "decisions", "decide"),
     ),
     Theme(
         "cli.themeBench",

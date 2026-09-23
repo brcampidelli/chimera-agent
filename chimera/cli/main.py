@@ -5899,6 +5899,9 @@ def migrate(
 from chimera.cli.decisions_cmd import decisions_app  # noqa: E402
 
 app.add_typer(decisions_app, name="decisions")
+from chimera.cli.decide_cmd import decide as _decide  # noqa: E402
+
+app.command("decide")(_decide)
 
 
 # --- cron subcommands ---------------------------------------------------------

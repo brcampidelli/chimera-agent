@@ -1284,6 +1284,91 @@
       "path": "cron"
     },
     {
+      "deprecated": false,
+      "help": "Ask typed questions \u2014 yes/no, a choice, a score \u2014 and get probabilities back.\n\nEvery question is read on its own, decision-first; a question the linter rejects is refused before\nany call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a\nprobability of being right. A number is calibrated only where a map exists for exactly this question.",
+      "hidden": false,
+      "name": "decide",
+      "params": [
+        {
+          "help": "JSON file: the questions (request shape, no state).",
+          "kind": "option",
+          "name": "questions",
+          "opts": [
+            "--questions",
+            "-q"
+          ],
+          "required": true,
+          "type": "str"
+        },
+        {
+          "default": "''",
+          "help": "The state to ask about.",
+          "kind": "option",
+          "name": "state",
+          "opts": [
+            "--state",
+            "-s"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Ask about every line of this JSONL file instead.",
+          "kind": "option",
+          "name": "jsonl",
+          "opts": [
+            "--jsonl"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'state'",
+          "help": "With --jsonl: the field that holds the state.",
+          "kind": "option",
+          "name": "field",
+          "opts": [
+            "--field"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "With --jsonl: write results here (default: stdout).",
+          "kind": "option",
+          "name": "out",
+          "opts": [
+            "--out",
+            "-o"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "''",
+          "help": "Name the decision (the key a calibration map is found by).",
+          "kind": "option",
+          "name": "decision",
+          "opts": [
+            "--decision"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Do not write the answers to the decision log.",
+          "kind": "option",
+          "name": "no_log",
+          "opts": [
+            "--no-log"
+          ],
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "path": "decide"
+    },
+    {
       "commands": [
         {
           "deprecated": false,

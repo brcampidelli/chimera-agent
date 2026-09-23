@@ -60,6 +60,8 @@ from chimera.api.schemas import (
     CompletionOut,
     ConfigOut,
     ConfigTestOut,
+    DecideIn,
+    DecideOut,
     DecisionLabelIn,
     DecisionLabelOut,
     DeletedOut,
@@ -1366,6 +1368,27 @@ def build_api_app(
         from chimera.governance.pending import answer
 
         return {"ok": answer(live_settings().home, request_id, bool(req.approved))}
+
+    _decide_state: dict[str, Any] = {}
+
+    @app.post("/api/decide", dependencies=[guard], response_model=DecideOut)
+    def decide_route(req: DecideIn) -> dict[str, Any]:
+        """Typed questions over a state — the open System One interface (study 22, phase 4).
+
+        The same function as `chimera decide` and the agent's `decide` tool. A question the linter
+        rejects is a 422 naming it; a backend that fails on a question is that question's `error`,
+        and the others are still answered. The decider is built once and kept: it holds one client
+        and the cache of readings."""
+        from chimera.decisions.factory import build_decider
+        from chimera.decisions.interface import RequestError
+        from chimera.decisions.interface import decide as ask
+
+        if "decider" not in _decide_state:
+            _decide_state["decider"] = build_decider(live_settings())
+        try:
+            return ask(_decide_state["decider"], req.model_dump())
+        except RequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     @app.post("/api/decisions/{decision_id}/label", dependencies=[guard], response_model=DecisionLabelOut)
     def label_decision(decision_id: str, req: DecisionLabelIn) -> dict[str, Any]:
