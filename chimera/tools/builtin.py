@@ -66,6 +66,8 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "search_files",
     "read_text",
     "skill_view",
+    # Switched on by `CHIMERA_DECIDE_TOOL` (a schema in every prompt; off by default).
+    "decide",
 })
 
 
@@ -119,6 +121,11 @@ def default_registry(
         from chimera.tools.todo import TodoWriteTool
 
         registry.register(TodoWriteTool())
+    # Off by default (`CHIMERA_DECIDE_TOOL`): a schema in every prompt, earned only when used.
+    if settings.decide_tool:
+        from chimera.tools.decide import DecideTool
+
+        registry.register(DecideTool())
     registry.register(ListDirTool(workspace))
     registry.register(GrepTool(workspace, trust_workspace=trust_workspace))
     registry.register(GlobTool(workspace))

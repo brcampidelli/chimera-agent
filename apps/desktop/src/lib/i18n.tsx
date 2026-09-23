@@ -29,6 +29,7 @@ export type Lang = (typeof LANGS)[number]["code"];
 type Dict = Record<string, string>;
 
 const en: Dict = {
+  "tools.desc.decide": "Ask typed questions about text and get probabilities back instead of prose. Each question is 'noul' (yes/no -> P(yes)), 'choice' (pick one option -> probabilities) or 'score' (ordered levels, lowest first -> expected level). Give 'state' for one text or 'states' for up to 50. Ask one condition per question (no 'A and B'); put the meaning of each option in its criteria. Answers are uncalibrated estimates for your own use — they decide nothing by themselves.",
   "nav.agentRegistry": "Agents",
   "registry.title": "Agent registry",
   "registry.blurb":
@@ -1478,6 +1479,7 @@ const en: Dict = {
 };
 
 const pt: Dict = {
+  "tools.desc.decide": "Faz perguntas tipadas sobre um texto e devolve probabilidades em vez de prosa. Cada pergunta é 'noul' (sim/não -> P(sim)), 'choice' (escolher uma opção -> probabilidades) ou 'score' (níveis ordenados, do menor ao maior -> nível esperado). Dê 'state' para um texto ou 'states' para até 50. Uma condição por pergunta (nada de 'A e B'); o significado de cada opção vai nos critérios. As respostas são estimativas não calibradas para uso do próprio agente — sozinhas, não decidem nada.",
   "nav.agentRegistry": "Agentes",
   "registry.title": "Registro de agentes",
   "registry.blurb":
@@ -2937,6 +2939,7 @@ const pt: Dict = {
 };
 
 const es: Dict = {
+  "tools.desc.decide": "Hace preguntas tipadas sobre un texto y devuelve probabilidades en lugar de prosa. Cada pregunta es 'noul' (sí/no -> P(sí)), 'choice' (elegir una opción -> probabilidades) o 'score' (niveles ordenados, de menor a mayor -> nivel esperado). Da 'state' para un texto o 'states' para hasta 50. Una condición por pregunta (nada de 'A y B'); el significado de cada opción va en los criterios. Las respuestas son estimaciones sin calibrar para uso del propio agente — por sí solas no deciden nada.",
   "nav.agentRegistry": "Agentes",
   "registry.title": "Registro de agentes",
   "registry.blurb":
@@ -4407,6 +4410,7 @@ const es: Dict = {
 };
 
 const fr: Dict = {
+  "tools.desc.decide": "Pose des questions typées sur un texte et renvoie des probabilités au lieu de prose. Chaque question est 'noul' (oui/non -> P(oui)), 'choice' (choisir une option -> probabilités) ou 'score' (niveaux ordonnés, du plus bas au plus haut -> niveau attendu). Donnez 'state' pour un texte ou 'states' pour 50 au plus. Une condition par question (pas de 'A et B') ; le sens de chaque option va dans ses critères. Les réponses sont des estimations non calibrées à l'usage de l'agent — seules, elles ne décident rien.",
   "nav.agentRegistry": "Agents",
   "registry.title": "Registre des agents",
   "registry.blurb":
@@ -5890,6 +5894,7 @@ const fr: Dict = {
 };
 
 const de: Dict = {
+  "tools.desc.decide": "Stellt typisierte Fragen zu einem Text und liefert Wahrscheinlichkeiten statt Prosa. Jede Frage ist 'noul' (ja/nein -> P(ja)), 'choice' (eine Option wählen -> Wahrscheinlichkeiten) oder 'score' (geordnete Stufen, niedrigste zuerst -> erwartete Stufe). 'state' für einen Text oder 'states' für bis zu 50. Eine Bedingung pro Frage (kein 'A und B'); die Bedeutung jeder Option steht in ihren Kriterien. Die Antworten sind unkalibrierte Schätzungen für den Agenten selbst — allein entscheiden sie nichts.",
   "nav.agentRegistry": "Agenten",
   "registry.title": "Agentenverzeichnis",
   "registry.blurb":
@@ -7370,6 +7375,7 @@ const de: Dict = {
 };
 
 const zh: Dict = {
+  "tools.desc.decide": "对文本提出类型化问题，返回概率而不是文字。每个问题是 'noul'（是/否 -> P(是)）、'choice'（选一个选项 -> 概率）或 'score'（有序等级，从低到高 -> 期望等级）。一个文本用 'state'，最多 50 个用 'states'。每个问题只问一个条件（不要“A 且 B”）；每个选项的含义写在它的标准里。答案是未经校准的估计，仅供智能体自己使用——它们本身不做任何决定。",
   "nav.agentRegistry": "智能体",
   "registry.title": "智能体注册表",
   "registry.blurb": "看板可以派活给这些智能体。卡片的泳道就是其中一个 id。",
@@ -8772,6 +8778,7 @@ const zh: Dict = {
 };
 
 const ja: Dict = {
+  "tools.desc.decide": "テキストについて型付きの質問をし、文章ではなく確率を返します。各質問は 'noul'（はい/いいえ -> P(はい)）、'choice'（選択肢を一つ選ぶ -> 確率）、'score'（低い順の段階 -> 期待段階）のいずれかです。一つのテキストには 'state'、最大 50 件には 'states' を指定します。一つの質問に条件は一つ（「A かつ B」は不可）。各選択肢の意味は基準に書きます。回答はエージェント自身が使う未較正の推定値で、それだけでは何も決めません。",
   "nav.agentRegistry": "エージェント",
   "registry.title": "エージェント登録",
   "registry.blurb":
@@ -10234,6 +10241,7 @@ const ja: Dict = {
 };
 
 const it: Dict = {
+  "tools.desc.decide": "Pone domande tipizzate su un testo e restituisce probabilità invece di prosa. Ogni domanda è 'noul' (sì/no -> P(sì)), 'choice' (scegliere un'opzione -> probabilità) o 'score' (livelli ordinati, dal più basso -> livello atteso). Usa 'state' per un testo o 'states' per al massimo 50. Una condizione per domanda (niente 'A e B'); il significato di ogni opzione va nei suoi criteri. Le risposte sono stime non calibrate a uso dell'agente — da sole non decidono nulla.",
   "nav.agentRegistry": "Agenti",
   "registry.title": "Registro degli agenti",
   "registry.blurb":
@@ -11708,6 +11716,7 @@ const it: Dict = {
 };
 
 const pl: Dict = {
+  "tools.desc.decide": "Zadaje typowane pytania o tekst i zwraca prawdopodobieństwa zamiast prozy. Każde pytanie to 'noul' (tak/nie -> P(tak)), 'choice' (wybór jednej opcji -> prawdopodobieństwa) albo 'score' (uporządkowane poziomy, od najniższego -> oczekiwany poziom). Podaj 'state' dla jednego tekstu lub 'states' dla maksymalnie 50. Jeden warunek na pytanie (bez 'A i B'); znaczenie każdej opcji trafia do jej kryteriów. Odpowiedzi to nieskalibrowane szacunki na użytek agenta — same niczego nie rozstrzygają.",
   "nav.agentRegistry": "Agenci",
   "registry.title": "Rejestr agentów",
   "registry.blurb":
@@ -13175,6 +13184,7 @@ const pl: Dict = {
 };
 
 const ru: Dict = {
+  "tools.desc.decide": "Задаёт типизированные вопросы о тексте и возвращает вероятности вместо прозы. Каждый вопрос — 'noul' (да/нет -> P(да)), 'choice' (выбор одного варианта -> вероятности) или 'score' (упорядоченные уровни, от низшего -> ожидаемый уровень). 'state' — для одного текста, 'states' — для не более 50. Одно условие на вопрос (никаких «A и B»); смысл каждого варианта — в его критериях. Ответы — некалиброванные оценки для самого агента; сами по себе они ничего не решают.",
   "nav.agentRegistry": "Агенты",
   "registry.title": "Реестр агентов",
   "registry.blurb":

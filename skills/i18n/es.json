@@ -92,6 +92,10 @@
     "warn-before-the-thing-you-are-warning-about": {
       "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea",
       "text": "Una advertencia colocada después de la acción a la que se refiere llega cuando el lector ya decidió. Ponla arriba y, cuando importa, haz que no se pueda descartar."
+    },
+    "system-one-design": {
+      "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
+      "text": "Convierte un paso de preguntar-y-extraer en preguntas tipadas — una condición cada una, nombres de opción que no llevan el veredicto, un número de vuelta — y nunca dejes que ese número detenga el trabajo por sí solo."
     }
   },
   "sections": {
@@ -278,6 +282,14 @@
       "Risk": "Anteponer advertencias hace que una página se sienta más pesada y puede espantar a un usuario para quien el riesgo nunca fue real. Ese costo es genuino y vale la pena pagarlo solo donde la sorpresa es genuina.\n\nEl modo de fallo de aplicar esto en exceso es un producto que se lee como nervioso de sí mismo. Si cada pantalla abre con un descargo de responsabilidad, los descargos se vuelven decoración y el lector se los salta — lo cual te deja de vuelta donde empezaste, con peor redacción.",
       "Trigger": "Algo que un usuario está a punto de hacer tiene una consecuencia que no esperará: un instalador sin firmar que su sistema operativo bloqueará, un comando que reescribe el historial, un ajuste que elimina a un humano de un ciclo, una exportación que sale del sandbox.\n\nNo aplica a consecuencias que son obvias por la etiqueta. «Eliminar» no necesita un párrafo explicando que elimina.",
       "source_sha256": "4f250b6116c616ce24fb306c223edd701c96323c735ec69a3a9d33d305c65d7c"
+    },
+    "system-one-design": {
+      "source_sha256": "1032031526f9ef881e5793b291ff16d78eb3be6f6dd0821ec74ff9a66a25e5d3",
+      "Trigger": "Un paso hace a un modelo una pregunta cuya respuesta es uno de pocos valores conocidos — sí o no, una de cinco\netiquetas, un nivel de bajo a alto — y luego lee ese valor en la prosa que escribió. O la misma\npregunta se hace a cientos de elementos. Es una decisión tipada disfrazada de chat.",
+      "Do": "1. Hazla como pregunta tipada (`chimera decide`, `POST /api/decide` o la herramienta `decide`): `noul`\n   para sí/no, `choice` para una de un conjunto, `score` para niveles ordenados. Vuelve una probabilidad.\n2. Una condición por pregunta. \"¿Es un error y viene de la base de datos?\" son dos preguntas; haz las dos y\n   combina las respuestas en el código, donde la regla se ve.\n3. Da a las opciones nombres que no lleven el veredicto (nada de \"yes\", \"safe\", \"pass\") y pon el significado\n   en los criterios. Una opción comodín (\"other\") es adonde va la lectura insegura — dale un criterio\n   estrecho o déjala fuera.\n4. Muestra al modelo solo lo que se juzga: no la salida de herramienta alrededor, no una frase que\n   defiende una respuesta.\n5. Elige cualquier umbral a partir de ejemplos etiquetados, nunca de una suposición, y guarda el número junto\n   a la decisión que alimentó.",
+      "Avoid": "Dejar que el número termine, salte o apruebe trabajo. Una decisión puede añadir escrutinio — una revisión, un aviso, una\nsegunda comprobación — y nada más: la única decisión de este proyecto que podía decir \"para aquí\" empeoró\ntodos los modelos que guió, y más cuanto mejor era el modelo.\n\nEvita también leer la respuesta tras un razonamiento (el número colapsa a 0 o 1), dividir un\njuicio en átomos que describen algo que ambas clases comparten (un átomo \"¿destruye datos?\" marcó\nlimpiezas legítimas tanto como ataques) y tratar una probabilidad cruda como calibrada.",
+      "Check": "- El linter acepta cada pregunta (una pregunta rechazada nunca llega a un modelo).\n- Cada pregunta responde en ambos sentidos a lo largo de tus elementos; una que siempre dice lo mismo está leyendo\n  el formato, no el texto.\n- Con un estado largo y un modelo local, el prompt cabe en la ventana de contexto — un corte silencioso pasa por\n  resultado del modelo.\n- En algún sitio, una muestra etiquetada muestra que el número separa los casos que importan.",
+      "Risk": "Una respuesta tipada parece más segura que la prosa, y no lo es: un modelo pequeño puede ordenar bien y aun así\nequivocarse con confianza en el medio de su escala. Trata un número sin calibrar como una pista, regístralo y\ncalibra con tus propias etiquetas antes de que un umbral signifique algo."
     }
   },
   "triggers": {
@@ -494,6 +506,15 @@
         "agregando una acción destructiva",
         "documentando una trampa",
         "dónde va esta advertencia"
+      ]
+    },
+    "system-one-design": {
+      "source_sha256": "a962eeee248b3ef180708dfd8d5e30331d3b0e5489acd204a01628ea6dd52bbc",
+      "text": [
+        "extraer un sí o un no de la prosa de un modelo",
+        "clasificar muchos elementos con un modelo",
+        "pedir a un modelo que puntúe algo",
+        "la respuesta de un modelo decide lo que pasa después"
       ]
     }
   }

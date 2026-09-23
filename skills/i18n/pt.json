@@ -92,6 +92,10 @@
     "warn-before-the-thing-you-are-warning-about": {
       "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea",
       "text": "Um alerta colocado depois da ação a que se refere chega quando o leitor já decidiu. Ponha-o acima e, quando importa, torne-o impossível de dispensar."
+    },
+    "system-one-design": {
+      "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
+      "text": "Transforme um passo de perguntar-e-extrair em perguntas tipadas — uma condição cada, nomes de opção que não carregam o veredito, um número de volta — e nunca deixe esse número parar o trabalho sozinho."
     }
   },
   "sections": {
@@ -278,6 +282,14 @@
       "Risk": "Colocar os avisos logo no início faz a página parecer mais pesada e pode espantar um usuário para\nquem o risco nunca foi real. Esse custo é genuíno e só vale a pena pagar onde a surpresa também é\ngenuína.\n\nO modo de falha de aplicar isso em excesso é um produto que soa nervoso consigo mesmo. Se toda tela\nabre com um aviso legal, os avisos viram enfeite (chrome) e o leitor passa direto por eles — o que\nte devolve ao ponto de partida, só que com um texto pior.",
       "Trigger": "Algo que um usuário está prestes a fazer tem uma consequência que ele não vai esperar: um\ninstalador não assinado que o sistema operacional vai bloquear, um comando que reescreve o\nhistórico, uma configuração que remove um humano de um loop, uma exportação que sai da sandbox.\n\nNão se aplica a consequências óbvias a partir do rótulo. \"Excluir\" não precisa de um parágrafo\nexplicando que exclui.",
       "source_sha256": "4f250b6116c616ce24fb306c223edd701c96323c735ec69a3a9d33d305c65d7c"
+    },
+    "system-one-design": {
+      "source_sha256": "1032031526f9ef881e5793b291ff16d78eb3be6f6dd0821ec74ff9a66a25e5d3",
+      "Trigger": "Um passo faz a um modelo uma pergunta cuja resposta é um de poucos valores conhecidos — sim ou não, um de cinco\nrótulos, um nível de baixo a alto — e depois lê esse valor na prosa que ele escreveu. Ou a mesma\npergunta é feita a centenas de itens. Isso é uma decisão tipada fantasiada de chat.",
+      "Do": "1. Faça-a como pergunta tipada (`chimera decide`, `POST /api/decide` ou a ferramenta `decide`): `noul`\n   para sim/não, `choice` para um de um conjunto, `score` para níveis ordenados. Volta uma probabilidade.\n2. Uma condição por pergunta. \"É um erro e vem do banco de dados?\" são duas perguntas; faça as duas e\n   combine as respostas no código, onde a regra fica visível.\n3. Dê às opções nomes que não carregam o veredito (nada de \"yes\", \"safe\", \"pass\") e ponha o significado\n   nos critérios. Uma opção coringa (\"other\") é para onde vai a leitura insegura — dê a ela um critério\n   estreito ou deixe-a de fora.\n4. Mostre ao modelo só a coisa que está sendo julgada: não a saída de ferramenta em volta, não uma frase\n   que defende uma resposta.\n5. Escolha qualquer limiar a partir de exemplos rotulados, nunca de um palpite, e guarde o número ao lado\n   da decisão que ele alimentou.",
+      "Avoid": "Deixar o número encerrar, pular ou aprovar trabalho. Uma decisão pode acrescentar escrutínio — uma revisão, um aviso, uma\nsegunda checagem — e nada mais: a única decisão deste projeto que podia dizer \"pare aqui\" piorou\ntodo modelo que conduziu, e piorou mais quanto melhor era o modelo.\n\nEvite também ler a resposta depois de um raciocínio (o número colapsa para 0 ou 1), dividir um\njulgamento em átomos que descrevem algo que as duas classes têm (um átomo \"destrói dados?\" marcou\nlimpezas legítimas tanto quanto ataques) e tratar uma probabilidade crua como calibrada.",
+      "Check": "- O linter aceita cada pergunta (uma pergunta recusada nunca chega a um modelo).\n- Cada pergunta responde nos dois sentidos ao longo dos seus itens; uma que diz sempre a mesma coisa está lendo\n  o formato, não o texto.\n- Com estado longo e modelo local, o prompt cabe na janela de contexto — um corte silencioso passa por\n  resultado do modelo.\n- Em algum lugar, uma amostra rotulada mostra que o número separa os casos que importam.",
+      "Risk": "Uma resposta tipada parece mais certa que prosa, e não é: um modelo pequeno pode ordenar bem e ainda assim errar\ncom confiança no meio da escala. Trate um número não calibrado como pista, registre-o e\ncalibre com seus próprios rótulos antes que qualquer limiar signifique algo."
     }
   },
   "triggers": {
@@ -494,6 +506,15 @@
         "adicionando uma ação destrutiva",
         "documentando uma armadilha",
         "onde colocar esse aviso"
+      ]
+    },
+    "system-one-design": {
+      "source_sha256": "a962eeee248b3ef180708dfd8d5e30331d3b0e5489acd204a01628ea6dd52bbc",
+      "text": [
+        "extraindo um sim ou não da prosa de um modelo",
+        "classificando muitos itens com um modelo",
+        "pedindo a um modelo que dê uma nota",
+        "a resposta de um modelo decide o que acontece depois"
       ]
     }
   }
