@@ -46,6 +46,11 @@ def decide(
     Every question is read on its own, decision-first; a question the linter rejects is refused before
     any call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a
     probability of being right. A number is calibrated only where a map exists for exactly this question.
+
+    Measured on a ruler we did not build (`bench/jevbench_local`, the 231 public JevBench items): the
+    default local backend answers 0.619 of them right (Jev 1.13: 0.866), 0.324 on the hard tier, with a
+    raw top-label ECE of 0.218. Options that share a first token cannot be read locally: name them so
+    their first words differ.
     """
     from chimera.config import get_settings
     from chimera.decisions.factory import build_decider
