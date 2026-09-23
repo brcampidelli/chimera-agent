@@ -73,6 +73,9 @@ benchmark clause travels with the provider's terms is not stated on the model pa
 in OpenRouter's provider policy before any number is published. Measuring privately, to decide, is a
 different act from publishing.
 
+> **Correction, 2026-09-23 (study 22).** The clause quoted here was real when read: the MCA dated 2026-08-27 (Wayback, captured 2026-09-16) carried §2.3(f) on publishing benchmarks or performance information. The MCA updated on 2026-09-19 (captured 2026-09-21) **no longer contains it** — (f) now reads "interfere with the operation of the Services". What remains and binds is §2.3(b): no distillation, no training a model to imitate the output, no developing a similar or competing product with the Services or their Output. See `bench/PLAN-study22-system-one.md` §4.
+
+
 ### 1.2 The LangChain harness is a thin gate — and the code says less than the post
 
 `langchain-typesafe 0.0.1a2` (MIT, public source, 17 commits, largely agent-written and human-reviewed).
