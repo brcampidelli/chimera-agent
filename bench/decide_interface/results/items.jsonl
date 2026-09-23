@@ -1,0 +1,1000 @@
+{"id": "5573dfc8", "state": "phase 3 — the overseer battery and a local spot-check Noul, two pre-registered nulls", "truth": "other"}
+{"id": "93a63090", "state": "the label loop - a decision log, a danger label apart from the approval, refit and report (study 22, phase 2)", "truth": "feature"}
+{"id": "34aa5211", "state": "contract v2 — a decision is declared once and may only escalate (study 22, phase 1)", "truth": "feature"}
+{"id": "8d05f817", "state": "an abstention is never recorded as a verdict (study 22, phase 0)", "truth": "fix"}
+{"id": "a6cac011", "state": "System One in Chimera — what the evidence allows, and the architecture that follows", "truth": "other"}
+{"id": "a263fa95", "state": "B4 — a System One tool router makes every executor worse, and worse the better it is", "truth": "other"}
+{"id": "79471580", "state": "a Noul per chunk as a reranker makes retrieval worse — -7.8 pp paired, and it prefers a different chunk to the definition on 192 of 219", "truth": "other"}
+{"id": "9550a90f", "state": "every spoken request is written down with the label the classifier gave it", "truth": "feature"}
+{"id": "4a0104f6", "state": "facts in the state — the block lowers p everywhere, and a column of \"no\" is a wrapper of its own", "truth": "other"}
+{"id": "8224d19a", "state": "fire D9 by uncertainty — real, and not worth its price; the shipped trigger covers 0 of 385", "truth": "other"}
+{"id": "13effcb4", "state": "0.60.0", "truth": "other"}
+{"id": "4371af4a", "state": "the first-use Chromium install calls the Playwright driver, not `sys.executable -m`", "truth": "fix"}
+{"id": "2756ec2a", "state": "bump the npm-runtime group across 1 directory with 8 updates", "truth": "other"}
+{"id": "b8412cb0", "state": "bump the npm-dev group across 1 directory with 3 updates", "truth": "other"}
+{"id": "02870c2c", "state": "bump astral-sh/setup-uv", "truth": "other"}
+{"id": "773b6f8a", "state": "auto-continue at the step limit, the number on the approval card, and a suite that owns its own leaks", "truth": "feature"}
+{"id": "72964612", "state": "the kernel has a REVIEW band — a calibrated probability from a typed decision read against two thresholds, and the receipt names the build the map was fitted on", "truth": "feature"}
+{"id": "356ca893", "state": "study 21 — sixteen repositories of the Jev ecosystem read against the tree; Noul against Choice mass re-read on our own rows", "truth": "other"}
+{"id": "b7362259", "state": "a typed decision has a contract — Noul, Choice and Score asked of a backend that returns a distribution, calibrated by a map fitted on our own labels, with a receipt", "truth": "feature"}
+{"id": "867431ed", "state": "results — vendor, judge, verbalized and local arms on the governance corpora; a second decision with human labels (aacr-bench); published after the terms were read", "truth": "other"}
+{"id": "e5a16383", "state": "a decision can carry its number — logprobs on the result, confidence on the verdict and the audit line, the run and the rule on every approval record", "truth": "feature"}
+{"id": "df26d1df", "state": "a typed-decision model on the governance corpora through OpenRouter's Decisions API — pre-registration, runner and report, no results", "truth": "other"}
+{"id": "fc6a47fe", "state": "study 20 — System One decision models, calibrated-decision RL, and what a harness can use", "truth": "other"}
+{"id": "9fd2fbb6", "state": "two rows learn the second route's price, so the live check on main is green again", "truth": "fix"}
+{"id": "6cd9e09f", "state": "0.59.0", "truth": "other"}
+{"id": "06af1c99", "state": "it talks while it works — a spoken request for work runs in the background on the work model, stoppable and undoable by voice", "truth": "feature"}
+{"id": "80d60ec0", "state": "two models for hands-free voice, both chosen by you — one that talks, one that does the work", "truth": "feature"}
+{"id": "7cd544b1", "state": "hands-free voice, second pass — a natural voice, the first sentence while the answer streams, an answer for the ear, and the model asked not to think first", "truth": "feature"}
+{"id": "75c2902c", "state": "a turn no longer walks the whole disk before calling the model — the undo snapshot lists the project's files instead", "truth": "other"}
+{"id": "8a66b6d2", "state": "the screens for a shared conversation — Share on the Code screen, the guest's page, and both windows drawing the same turn", "truth": "feature"}
+{"id": "7c143e45", "state": "the SQLite store answers from any thread — the default backend refused every recall off the boot thread", "truth": "fix"}
+{"id": "37d5d17b", "state": "a conversation can be shared with a second person, by a token that reaches only it", "truth": "feature"}
+{"id": "87604683", "state": "hands-free voice — it listens, sends what you say, reads the answer aloud, and stops when you speak over it", "truth": "feature"}
+{"id": "461ceb4e", "state": "five sites at once — the workers read the web, and the answer says what it read", "truth": "feature"}
+{"id": "7c331e2a", "state": "the backend listens before it announces its port — a launch stops paying half a second", "truth": "other"}
+{"id": "5af9c81a", "state": "the backend defaults to SQLite/FTS5, and an existing memory.json is imported once", "truth": "feature"}
+{"id": "649a7abf", "state": "a coding turn from two weeks ago can still be found, after the conversation forgot it", "truth": "feature"}
+{"id": "5a6bed36", "state": "the agent's browser draws on the Code screen after every action", "truth": "feature"}
+{"id": "de5bc445", "state": "run_shell can start a background job the turn does not wait for, and the next turn hears how it ended", "truth": "feature"}
+{"id": "46d3b0e1", "state": "a step that asks for several read-only tools gets them at the same time", "truth": "feature"}
+{"id": "0b52cf7d", "state": "a path outside the project asks the person at the screen, and the desktop starts the kernel in observe", "truth": "feature"}
+{"id": "497ad696", "state": "a local model needs no key, and the first-run screen finds it itself", "truth": "feature"}
+{"id": "41a14faa", "state": "a streamed turn learns its route when the conversation is reopened", "truth": "fix"}
+{"id": "ff22ebb0", "state": "0.58.0 names and dates the two entries", "truth": "docs"}
+{"id": "8fdca8b4", "state": "0.58.0", "truth": "other"}
+{"id": "945b5f20", "state": "a policy review on the Code screen asks with the card the taint ledger already had", "truth": "feature"}
+{"id": "e78bfd1c", "state": "the turn receipt names the route that answered and what its cache served", "truth": "fix"}
+{"id": "ed53040b", "state": "0.57.0 names and dates the six entries", "truth": "docs"}
+{"id": "fbfc6752", "state": "0.57.0", "truth": "other"}
+{"id": "94531b73", "state": "the receipt's route and cache fields, and the curl rule that steps over a substitution, get their entries before 0.57.0", "truth": "docs"}
+{"id": "3f4141ae", "state": "a diff rule measured on its false alarms before it reviews; the generated test measured on both sides before it governs", "truth": "feature"}
+{"id": "0a61603e", "state": "the compaction summariser is a seam on every coding request and the Code screen sends it — 25/30 conventions survive against 6/30 with the note alone", "truth": "feature"}
+{"id": "44e11a44", "state": "one unverifiable sentence before the action talks the governance judge down — 4 of 10 easy attacks, 8–9 of 14 ambiguous ones, toward ALLOW", "truth": "other"}
+{"id": "932d247e", "state": "out of sample on the 64-case corpus of 2609.12001 — the lexical layer stops 30% by their count, 52% on the classes it claims; one mechanical miss fixed", "truth": "other"}
+{"id": "2bb3a0f8", "state": "the route that served a solve is on the artefact — a census per arm in the factorial reader, and the judge runners record it", "truth": "other"}
+{"id": "e38bc9e1", "state": "an LLM grader reads one item per call — census finds no batched grading anywhere, so nothing to re-grade", "truth": "docs"}
+{"id": "0bbcfdcd", "state": "the route and the cache go on the receipt; the cache confound closes as not isolable on a hosted route", "truth": "other"}
+{"id": "8e33cce2", "state": "the prose judge's 0/180 gets the resolution number it lacked — 180/180 committed, a resolved null", "truth": "other"}
+{"id": "cc0b3a72", "state": "the factorial's null read within two declared partitions — one interaction fires by the letter and not after the correction the registration lacked", "truth": "other"}
+{"id": "6e64689e", "state": "study 19 — the arXiv sweep of 2026-09-14, read against the three surfaces", "truth": "other"}
+{"id": "4b868152", "state": "a query-string GET can be allowed for destinations you name, and for no others", "truth": "feature"}
+{"id": "89c093eb", "state": "0.56.0", "truth": "other"}
+{"id": "570e7eb3", "state": "0.56.0 names and dates the two entries", "truth": "docs"}
+{"id": "d1f5272a", "state": "the projects you work in belong to the installation, not to one browser", "truth": "feature"}
+{"id": "6a212330", "state": "0.55.0", "truth": "other"}
+{"id": "9813ec84", "state": "the twelve commits the release would have shipped unmentioned — and the cut to 0.55.0", "truth": "docs"}
+{"id": "e5634cea", "state": "087 re-graded with pytest present — 19 of 24 pass where the run recorded 0, and #453's effects move by at most 0.001", "truth": "other"}
+{"id": "eac3e747", "state": "retract the \"twelve live items\" claim — the threshold was mine, not the factorial's", "truth": "docs"}
+{"id": "2260b4c2", "state": "three agreeing models are one and a half votes — and the grader that could not run scored the agent for our missing pytest", "truth": "other"}
+{"id": "91949b99", "state": "eleven of twenty-three factorial tasks could not tell any arm from any other — and the 2PL that was meant to rank the rest fails its own control", "truth": "other"}
+{"id": "a0d564b0", "state": "a fence inside the payload is content — MULTILINE was deleting every ``` in the reply", "truth": "fix"}
+{"id": "7986399e", "state": "two spaces turned a BLOCK into a REVIEW — the floor PROTOCOL §5 required, finally measured", "truth": "other"}
+{"id": "924aaa76", "state": "an allowlist keeping code_interpreter is not a boundary, and now says so", "truth": "other"}
+{"id": "4ef68b07", "state": "our intra-task correlation is 0.706, worse than the paper's — and it prices replicas rather than correcting any interval we publish", "truth": "other"}
+{"id": "4cb88dad", "state": "the claim against its own diff is the only leak-free signal either bench found — 0.6643, and still not enough", "truth": "other"}
+{"id": "1743ad40", "state": "stop on the PLAN before a coding turn touches anything — an extra gate, never a permission", "truth": "feature"}
+{"id": "9afbfe61", "state": "the approval card had the fail-safe backwards — refuse is the default, and the risk level stops being hidden", "truth": "fix"}
+{"id": "4c0fedff", "state": "the published false-success AUROC is a task-identity leak — 0.93 random-split, 0.60 held-out, on our own 547 solves", "truth": "other"}
+{"id": "ccc9d215", "state": "the lexical rules are 60% bypassable — harden two destructive rules, pin the secret scanner, document the rest", "truth": "other"}
+{"id": "698a3962", "state": "close 6 of 8 alerts — the critical and all three highs — and document the two that stay open", "truth": "other"}
+{"id": "274353c5", "state": "study 18 — the arXiv sweep read against the three surfaces (11 agents, ~5,000 titles)", "truth": "other"}
+{"id": "b25588c5", "state": "the 2³ factorial — a null with power; none of repo-map/checklist/planner beats the noise floor, each costs 3–16%", "truth": "other"}
+{"id": "1de9aca6", "state": "the ambiguous corpus — a boundary pass, not a mandate; library decision stands with a measured cost", "truth": "other"}
+{"id": "612ed991", "state": "the prose question the judge-blind series could not ask — source-faithful, unbiased, 0/180", "truth": "other"}
+{"id": "cdb44dd3", "state": "the corpus that would reverse the judge-is-a-library decision — built, judge passed the easy regime, decision stands", "truth": "other"}
+{"id": "876d7805", "state": "a row knows every price the index has quoted for it, and the live check stops reddening on the flip", "truth": "fix"}
+{"id": "a3f510b9", "state": "0.54.0", "truth": "other"}
+{"id": "8bc0f150", "state": "the second sample — the blind panel's one-run lead did not replicate, and the judge series ends on two nulls", "truth": "other"}
+{"id": "899be8ac", "state": "the semantic judge and the precedent store are a library, not a shipped surface — decided with the numbers, and guarded by the build", "truth": "docs"}
+{"id": "d6cac9b3", "state": "the read-heavy corpus goes from ten tasks to thirty — the primary interval excludes zero for the first time, and the verbatim sentence's +26 pp on ten is +3 pp on thirty", "truth": "other"}
+{"id": "a39456d1", "state": "a runaway is bounded at the gateway and read at the judge — 342 runs at US$ 0.09 against 0.63, empty analyses 14 → 2, accuracy kept", "truth": "feature"}
+{"id": "d8dfd7b8", "state": "the default model's price reads today's index — 0.04/0.08, where the row said 0.065/0.18", "truth": "fix"}
+{"id": "09c5b0aa", "state": "on facts the judge cannot recall, its verdict followed neither the vendor name nor the position — a null on the corpus the last attempt priced", "truth": "other"}
+{"id": "e564ad51", "state": "on the production synthesiser the verbatim sentence costs nothing measurable and saves 15% of the synthesis tokens", "truth": "other"}
+{"id": "72945fa8", "state": "the two-call blind audit leaves the default path — behind the one-call check it recovered 0 of the 3 clause plants missed and grew 11 of 23 clean summaries", "truth": "feature"}
+{"id": "5aba3ba3", "state": "the corpus the judge cannot solve could not be built — on what it fails, the writers return nothing; a null about the instrument, with the next one priced", "truth": "other"}
+{"id": "cfc8d5f1", "state": "the spec-test generator asks twice, bounds a runaway, and its abstain says why — every empty reply was a runaway to the provider's 131k ceiling", "truth": "feature"}
+{"id": "84db50a0", "state": "the spot check grades what a slice can do — 4/23 → 23/23 dropped findings caught, recovered rather than re-asked", "truth": "feature"}
+{"id": "24e63228", "state": "case law keyed on the action and its lineage — a precedent learned clean never answers a tainted run", "truth": "feature"}
+{"id": "b9be8ebc", "state": "the synthesis asks for the figures verbatim — +26 pp pass@1 on the 3B backbone that was dropping them, adopted by the registered rule", "truth": "feature"}
+{"id": "b6865146", "state": "the study-17 plan, with what happened", "truth": "docs"}
+{"id": "218c17b7", "state": "the spot-check auditor passed 19 of 23 summaries that dropped the critical finding — a blind audit now recovers what the distillation cut", "truth": "feature"}
+{"id": "5a100e85", "state": "the judge reads letters, not vendors — blind by default, measured at zero cost", "truth": "feature"}
+{"id": "f06fb1fc", "state": "a generated spec test is evidence only if it could have failed before the change", "truth": "feature"}
+{"id": "fdf02bdd", "state": "at equal calls the hierarchy did not beat one agent, and its synthesiser is where the needles went", "truth": "other"}
+{"id": "63810ab7", "state": "a halt is not a failure; bench/PROTOCOL.md", "truth": "feature"}
+{"id": "d8662bd6", "state": "the spec search spends one error budget across all its rounds", "truth": "feature"}
+{"id": "d36ce2f3", "state": "installing a package by name is a question", "truth": "feature"}
+{"id": "62194adb", "state": "prune evicts a short fact written early, whatever else is true about it — 7 of 144 profiles survive a 20% budget", "truth": "other"}
+{"id": "c8b8e74e", "state": "the question names the command, the page that tainted the run and who asked — and the queue puts the highest level first", "truth": "feature"}
+{"id": "2fcf4bce", "state": "how every question ended is remembered, and `chimera approve` reports the answer rate and the wait", "truth": "feature"}
+{"id": "4ad7038a", "state": "the shape of a refusal did not change what the model said, because it did not narrate at all", "truth": "other"}
+{"id": "9dc98860", "state": "the page catches up with six releases — six claims the code no longer supports, in ten languages", "truth": "docs"}
+{"id": "b084133f", "state": "three entries said what the index said on another day", "truth": "fix"}
+{"id": "89222aa5", "state": "0.53.0", "truth": "other"}
+{"id": "eaf83d85", "state": "solve-batch had a gate with nobody behind it — five of eight legitimate rows refused", "truth": "fix"}
+{"id": "e0535dad", "state": "a parked question is visible from every screen, not only Governance", "truth": "feature"}
+{"id": "3f21212b", "state": "the chat surface is guarded by default, and the two surfaces that shared a registry are separated", "truth": "feature"}
+{"id": "2c22012a", "state": "the approval card counts down, and at zero says so instead of offering dead buttons", "truth": "fix"}
+{"id": "608091ab", "state": "the four gaps #405 named — memory scoped, sessions kept, identity read, write region", "truth": "feature"}
+{"id": "2397e92d", "state": "the tuning objective excludes the validity gate and the holdout, and reports both", "truth": "fix"}
+{"id": "c8831fb4", "state": "bump h2 in the uv group across 1 directory", "truth": "other"}
+{"id": "18934e5d", "state": "the design is dead against the new model, not dead — arm 2, answered", "truth": "other"}
+{"id": "4a778497", "state": "serve and the platform tell their ledger whose turn it is — worth 9 rows with governance on, 0 without", "truth": "feature"}
+{"id": "a2e7bc05", "state": "suite v3, and the pilot that refuted it for two cents", "truth": "other"}
+{"id": "76d01514", "state": "withdraw \"every suite we can author lands at 84-92%\" — one of them landed in band", "truth": "docs"}
+{"id": "88a2787b", "state": "the tuning gate decides on evidence, and its table says what it actually kept", "truth": "fix"}
+{"id": "b537243c", "state": "the chat tells its taint ledger whose turn it is, so the authority mode acts", "truth": "fix"}
+{"id": "c1c415f7", "state": "a command's output arrives as the child wrote it, not as the machine's locale guessed", "truth": "fix"}
+{"id": "712a95e9", "state": "the six steps of the right-hand plan, each with what shipped and what did not", "truth": "docs"}
+{"id": "03ac8f69", "state": "the full-screen app can draw its own question — 123.8 s of silence becomes 4.8 s, and the surface is governed too", "truth": "feature"}
+{"id": "4f539039", "state": "a run stopped by the dollar ceiling says so, instead of borrowing the token ceiling's label", "truth": "fix"}
+{"id": "1a3f293b", "state": "the terminal gets a spend ceiling, the verified loop and the servers the app already had", "truth": "feature"}
+{"id": "a29a6d74", "state": "the page for the terminal right-hand says what the three surfaces actually do, and a guard keeps it that way", "truth": "docs"}
+{"id": "c6493c65", "state": "a restored turn says so, a chat recalls its own folder, and the transcript stops losing its own beginning", "truth": "feature"}
+{"id": "fdcabed4", "state": "the terminal is governed too — 0 of 7 attacks blocked becomes 7 of 7, and the approver finally asks the person who is sitting there", "truth": "feature"}
+{"id": "4ebb6616", "state": "a ruler that measures the right-hand instead of the key — and that reports missing its own band", "truth": "feature"}
+{"id": "f6cfc193", "state": "a refused command no longer passes for a successful one, and a reply with a bracket no longer kills the REPL", "truth": "fix"}
+{"id": "77821192", "state": "the terminal blocks none of the seven attacks the governed path blocks, and no external read arrives inside the fence its own prompt promises", "truth": "other"}
+{"id": "473cd3dc", "state": "the terminal right-hand, studied from five angles — no governance by exemption, a fabricated result after a refusal, and a ruler that never touches it", "truth": "docs"}
+{"id": "d90bed82", "state": "close 0.52.0 — the version bump does not do this, and the previous release did it by hand", "truth": "docs"}
+{"id": "2f59d0db", "state": "0.52.0", "truth": "other"}
+{"id": "27310807", "state": "tests leave the environment as they found it, and the suite stops loading the developer's .env", "truth": "test"}
+{"id": "1ebcf761", "state": "the selftest runs its task-file command through the sandbox, and the guard's exemption for it is gone", "truth": "fix"}
+{"id": "cb9ad26b", "state": "a link in a translated page resolves from where the translation lives, and 63 copied from the English did not", "truth": "fix"}
+{"id": "14a038fe", "state": "the five remaining pages catch up — a retracted precision figure was still published in nine languages", "truth": "docs"}
+{"id": "3d319655", "state": "the nine security translations catch up, and a ratchet stops the next drift from being silent", "truth": "docs"}
+{"id": "3ed11c1f", "state": "ollama_chat/ is the local default, because ollama/ is the generate endpoint and cannot call tools", "truth": "fix"}
+{"id": "7daae872", "state": "the verify command runs where the agent's own shell runs, and a string from a file is gated like one", "truth": "fix"}
+{"id": "67ce99e3", "state": "the ledger records who asked for a read — and the measurement says not to believe it, so the mode ships off", "truth": "feature"}
+{"id": "1ac19b70", "state": "the adapter returns the tool call it was given, measured offline on every route — and ollama/ is not tool calling", "truth": "test"}
+{"id": "2d3fedfb", "state": "a failure has a class before it has a retry, and --recovery can brief the retry on it", "truth": "feature"}
+{"id": "d7d4c6cd", "state": "the legitimate tool flow is blocked identically to the attack — the gate measures provenance, not authority", "truth": "other"}
+{"id": "49cee996", "state": "three sentences the code contradicted — no build-error route, I1 not I2, and offline is not free", "truth": "docs"}
+{"id": "dd47286d", "state": "the second attempt is not an independent draw, and the third is too small to read", "truth": "other"}
+{"id": "a3b0dd05", "state": "pre-register the 2^3 factorial before a paid solve — two intended factors were inert under one attempt", "truth": "other"}
+{"id": "88a95b91", "state": "the sleeper channels, traced to the line — two are open by the trust model", "truth": "docs"}
+{"id": "d5f1d407", "state": "the recognition probe finds a yes-bias, not recognition", "truth": "other"}
+{"id": "d4fdce04", "state": "bump tailwind-merge from 2.6.1 to 3.6.0 in /apps/desktop", "truth": "other"}
+{"id": "ea1f3eec", "state": "bump vitest from 3.2.7 to 5.0.0 in /apps/desktop", "truth": "other"}
+{"id": "d4958654", "state": "bump lucide-react from 0.408.0 to 1.40.0 in /apps/desktop", "truth": "other"}
+{"id": "418d0b2f", "state": "bump Swatinem/rust-cache", "truth": "other"}
+{"id": "7ad5a774", "state": "bump @codemirror/view", "truth": "other"}
+{"id": "666e8aba", "state": "bump postcss in /apps/desktop in the npm-dev group", "truth": "other"}
+{"id": "336a1a35", "state": "a single run is a sample — pass^k, flip rate, ICC(1), mechanism-active scoring", "truth": "feature"}
+{"id": "caf32cb3", "state": "the first ruler we did not write, and the −5% that does not replicate", "truth": "other"}
+{"id": "e6c51201", "state": "a run says how it ended, what it paid per change, and can stop at a number", "truth": "feature"}
+{"id": "41c903f6", "state": "the screen half, observed in the packaged app", "truth": "docs"}
+{"id": "8a4714e6", "state": "Tailwind 4 — the config becomes CSS", "truth": "other"}
+{"id": "b712bb53", "state": "React 19, all four packages in lockstep", "truth": "other"}
+{"id": "bfe0737d", "state": "0.51.0", "truth": "other"}
+{"id": "b4118379", "state": "a prerelease cannot be promoted, and the step tried anyway", "truth": "fix"}
+{"id": "914430ce", "state": "0.51.0rc1", "truth": "other"}
+{"id": "d728120b", "state": "the setting named `ask` asked nobody", "truth": "fix"}
+{"id": "e57161f6", "state": "0.50.0", "truth": "other"}
+{"id": "c145f7b4", "state": "bump @testing-library/jest-dom in /apps/desktop", "truth": "other"}
+{"id": "c1ca3359", "state": "bump @vitejs/plugin-react in /apps/desktop", "truth": "other"}
+{"id": "69240222", "state": "bump the npm-dev group in /apps/desktop with 2 updates", "truth": "other"}
+{"id": "80d49587", "state": "bump astral-sh/setup-uv from 5.4.2 to 10.0.1", "truth": "other"}
+{"id": "1b62425e", "state": "bump actions/checkout from 4.4.0 to 7.0.1", "truth": "other"}
+{"id": "b660118c", "state": "bump gitleaks/gitleaks-action from 2.3.9 to 3.0.0", "truth": "other"}
+{"id": "1782fa62", "state": "there is no knee, and there is a bad endpoint", "truth": "other"}
+{"id": "639ccdc1", "state": "the ignore that would have outlived its reason", "truth": "other"}
+{"id": "1489d0a8", "state": "bump softprops/action-gh-release from 2.6.2 to 3.0.3", "truth": "other"}
+{"id": "62bbde38", "state": "bump actions/upload-artifact from 4.6.2 to 7.0.1", "truth": "other"}
+{"id": "5c10c892", "state": "bump vite from 6.4.3 to 8.2.2 in /apps/desktop", "truth": "other"}
+{"id": "abe2d76c", "state": "the window of a model nobody catalogued", "truth": "fix"}
+{"id": "ace1d9b6", "state": "the 23-point spread was between backends, not between families", "truth": "other"}
+{"id": "a6d854ad", "state": "no knee, because a slug is not a machine", "truth": "other"}
+{"id": "b793626f", "state": "deliver the search the bench adopted, and fix the price it was priced with", "truth": "feature"}
+{"id": "a4c5e956", "state": "per-model edit-format tailoring has nothing to tailor", "truth": "other"}
+{"id": "40a7a07e", "state": "a summariser for the compaction that has never fired", "truth": "feature"}
+{"id": "79014e9d", "state": "what a parallel tool call would buy, and why it is not built", "truth": "other"}
+{"id": "122bb97b", "state": "the semantic half earns its place, and it is the fusion that earns it", "truth": "other"}
+{"id": "85b30ffb", "state": "the approver three unattended surfaces thought they had", "truth": "fix"}
+{"id": "abdac420", "state": "the task list the agent keeps, and the measurement that decides its default", "truth": "feature"}
+{"id": "18139639", "state": "0.49.3", "truth": "other"}
+{"id": "886ca9d6", "state": "bump actions/setup-python from 5.6.0 to 7.0.0", "truth": "other"}
+{"id": "be097324", "state": "bump the npm-runtime group across 1 directory with 6 updates", "truth": "other"}
+{"id": "94eba2c3", "state": "bump the npm-dev group across 1 directory with 5 updates", "truth": "other"}
+{"id": "13a3fa15", "state": "bump actions/setup-node from 4.4.0 to 7.0.0", "truth": "other"}
+{"id": "f76234fc", "state": "bump actions/download-artifact from 4.3.0 to 8.0.1", "truth": "other"}
+{"id": "9b7a54e6", "state": "stop proposing the one pin we hold on purpose", "truth": "other"}
+{"id": "f11c5e07", "state": "bump browserslist in /apps/desktop", "truth": "other"}
+{"id": "8777f853", "state": "the defaults were a generation behind, and one could vanish", "truth": "fix"}
+{"id": "0d648d34", "state": "lift the litellm ceiling, and put a floor where the guard now belongs", "truth": "other"}
+{"id": "78bff76f", "state": "keep majors out of the weekly batch", "truth": "other"}
+{"id": "2b4354d0", "state": "the refusal never named the taint, or the way out", "truth": "fix"}
+{"id": "91bb25a6", "state": "three surfaces that said more than they knew", "truth": "fix"}
+{"id": "18d89078", "state": "two refusals that named a remedy the code could not reach", "truth": "fix"}
+{"id": "51f695ad", "state": "0.49.2", "truth": "other"}
+{"id": "a9610b9c", "state": "an app left open never learned about a release", "truth": "fix"}
+{"id": "d5aded89", "state": "the cost-mode fix ships in 0.49.1, so it is filed there", "truth": "docs"}
+{"id": "eabaeba3", "state": "the cost modes spoke English on a Portuguese wizard", "truth": "fix"}
+{"id": "8bc87e29", "state": "0.49.1", "truth": "other"}
+{"id": "def58623", "state": "an update left the old version behind, and the app believed it", "truth": "fix"}
+{"id": "25a4d6c2", "state": "a release is not \"latest\" until it can be updated to", "truth": "fix"}
+{"id": "ed8cf776", "state": "0.49.0", "truth": "other"}
+{"id": "ade5a6e7", "state": "the failure dialogs speak your language, the diagnostics do not", "truth": "feature"}
+{"id": "055794c0", "state": "the one screen that asks permission now speaks your language", "truth": "feature"}
+{"id": "4346dcf0", "state": "say the console is in 0.48.1, because it is", "truth": "docs"}
+{"id": "66d689cb", "state": "four ways to run a task, and one box to type it in", "truth": "feature"}
+{"id": "4561b254", "state": "0.48.1", "truth": "other"}
+{"id": "6a055717", "state": "open 0.48.1 with what the audit found in the shipped app", "truth": "docs"}
+{"id": "b7fd88c8", "state": "the server had nobody to ask, so every review was a refusal", "truth": "fix"}
+{"id": "0400d99d", "state": "reach the eighteen unused tools instead of declaring them", "truth": "feature"}
+{"id": "b5c66334", "state": "an empty variable stopped the app from starting", "truth": "fix"}
+{"id": "000de3d3", "state": "the button never adopted the ring it was extracted from", "truth": "fix"}
+{"id": "7e3bf6f6", "state": "the cost meter went quiet on exactly the expensive models", "truth": "fix"}
+{"id": "538184fa", "state": "the reference gate fires on the pull request, not on the deploy", "truth": "feature"}
+{"id": "47d6910b", "state": "the wheel gate read what gitleaks had already read", "truth": "fix"}
+{"id": "d6e88890", "state": "the wheel scanner could not run where it is run", "truth": "fix"}
+{"id": "fece945a", "state": "0.48.0", "truth": "other"}
+{"id": "681f14e0", "state": "close 0.48.0 with the audit that read the code", "truth": "docs"}
+{"id": "fa6fbb40", "state": "put credentials in the operating system's own vault", "truth": "feature"}
+{"id": "d9aaac79", "state": "a coding turn survives a dropped connection", "truth": "feature"}
+{"id": "12c55984", "state": "ask a person who is not at the keyboard, once per run", "truth": "feature"}
+{"id": "0acdbc0c", "state": "stop asking about commands that cannot change anything", "truth": "feature"}
+{"id": "067119bb", "state": "read what a diff brings in, what a wheel ships, and whether a key works", "truth": "feature"}
+{"id": "49742b00", "state": "a stop is not a run that never happened, and a cut is not an end", "truth": "fix"}
+{"id": "4b6aa474", "state": "tell a format change from a corrupt file, and stamp the home", "truth": "fix"}
+{"id": "1eac7468", "state": "a secret is given away by its place, not only by its shape", "truth": "fix"}
+{"id": "14f0f6dc", "state": "read the stop reason, and give the stream a second chance", "truth": "fix"}
+{"id": "65856cb3", "state": "a brake, a dispatcher, and a schedule that stops stacking", "truth": "fix"}
+{"id": "a60cefb1", "state": "five values the code already had and never read", "truth": "fix"}
+{"id": "efe4feeb", "state": "what a failed call carried out of the process", "truth": "fix"}
+{"id": "acd0c7e4", "state": "a refused tool and a capped turn both read as fine", "truth": "fix"}
+{"id": "ef53d032", "state": "0.48.0rc50", "truth": "other"}
+{"id": "daa2253a", "state": "refuse a file whose accents arrived as `u00ed`", "truth": "fix"}
+{"id": "85f32158", "state": "0.48.0rc49", "truth": "other"}
+{"id": "66608b7e", "state": "the default names an address, not a name", "truth": "other"}
+{"id": "7bd148a0", "state": "0.48.0rc48", "truth": "other"}
+{"id": "f743c883", "state": "budget connecting apart from answering", "truth": "other"}
+{"id": "0714e360", "state": "0.48.0rc47", "truth": "other"}
+{"id": "2dd48eb7", "state": "make the scheduled dispatch testable; fix the prerelease update check", "truth": "feature"}
+{"id": "f0dbc581", "state": "cache the model catalogue, and bound the folder of reverted work", "truth": "other"}
+{"id": "70238411", "state": "0.48.0rc46", "truth": "other"}
+{"id": "bb9cc8c7", "state": "connect the verdict, and finish the join that was half done", "truth": "fix"}
+{"id": "506f9a37", "state": "0.48.0rc45", "truth": "other"}
+{"id": "f40e09d0", "state": "the cap hid its own spending, and the schedule hid its own failures", "truth": "fix"}
+{"id": "a8542cf5", "state": "0.48.0rc44", "truth": "other"}
+{"id": "04901873", "state": "four things the screens knew and did not say", "truth": "fix"}
+{"id": "fe9e9339", "state": "the money is the run's, and the screen counts it", "truth": "fix"}
+{"id": "62802ed0", "state": "0.48.0rc43", "truth": "other"}
+{"id": "c3a71c0c", "state": "should a gated task route to the cheap tier? — registered, not run", "truth": "other"}
+{"id": "12116dda", "state": "keep the work a revert throws away", "truth": "fix"}
+{"id": "62c4fb87", "state": "a crashed run said four words and left no row; nine routes lied about SSE", "truth": "fix"}
+{"id": "0a834e19", "state": "stop paying to mint skills nothing in the loop can read", "truth": "fix"}
+{"id": "6e6cab04", "state": "the Security screen says whether commands are isolated", "truth": "feature"}
+{"id": "a6dca3fd", "state": "0.48.0rc42", "truth": "other"}
+{"id": "9c855ef3", "state": "a sentence that named the wrong cause, and a gate nothing could arm", "truth": "fix"}
+{"id": "b4fa45ac", "state": "0.48.0rc41", "truth": "other"}
+{"id": "95b05dcd", "state": "reach the servers' tools on demand instead of declaring them all", "truth": "feature"}
+{"id": "a4156e37", "state": "the surface that runs most often is governed too, and require_diff is armable", "truth": "feature"}
+{"id": "1f0a68bb", "state": "the kernel holds the boundary, where there is a kernel that will", "truth": "feature"}
+{"id": "191f3b59", "state": "the crew's bill never reached the Cost screen", "truth": "fix"}
+{"id": "44e99666", "state": "the paired experiment, pre-registered and not yet run", "truth": "other"}
+{"id": "c155fff8", "state": "a black-box holdout for auto-evolution", "truth": "feature"}
+{"id": "cf0ff439", "state": "a successful run could leave no receipt, and say so only at debug", "truth": "fix"}
+{"id": "c847736e", "state": "the coverage checklist graded prose too, and reverted the work", "truth": "fix"}
+{"id": "b0bd3d5e", "state": "0.48.0rc40", "truth": "other"}
+{"id": "6859b3cd", "state": "the reviewer judged a paragraph and called it judging the work", "truth": "fix"}
+{"id": "b3a52a21", "state": "two more found by using rc39 — a missing tool, and a spec that vouched for itself", "truth": "fix"}
+{"id": "34093aef", "state": "a judge that could not read is not a judge that refused", "truth": "fix"}
+{"id": "561769bb", "state": "the app hung forever on the first command the agent ran", "truth": "fix"}
+{"id": "0e537ac6", "state": "0.48.0rc39", "truth": "other"}
+{"id": "2157b03c", "state": "the judge held work to things nobody agreed to", "truth": "fix"}
+{"id": "6cf9e577", "state": "0.48.0rc38", "truth": "other"}
+{"id": "450746a2", "state": "four defects found by using the installed rc37", "truth": "fix"}
+{"id": "0cdca5a6", "state": "0.48.0rc37", "truth": "other"}
+{"id": "4a0fdf2b", "state": "waves 2 and 3 — thirteen capabilities that were built, tested, and had no door", "truth": "feature"}
+{"id": "f92dfc55", "state": "0.48.0rc36", "truth": "other"}
+{"id": "fa91c798", "state": "wave 1 — the plan gate, the preview, and commands per project", "truth": "feature"}
+{"id": "313884f8", "state": "wave 0 — nine things the app already had and did not use", "truth": "feature"}
+{"id": "88bc6de3", "state": "0.48.0rc35", "truth": "other"}
+{"id": "b9e7dd71", "state": "a scheduled job can finally tell you what it found", "truth": "feature"}
+{"id": "1d2484db", "state": "0.48.0rc34", "truth": "other"}
+{"id": "56e58d52", "state": "the agent's root was the app's own install folder", "truth": "fix"}
+{"id": "bb77d26e", "state": "four prices had drifted, and one of them by seven times", "truth": "fix"}
+{"id": "bed4a299", "state": "0.48.0rc33", "truth": "other"}
+{"id": "c85b1bed", "state": "a lost update was being written, confirmed, then silently overwritten", "truth": "fix"}
+{"id": "3f1a8c2d", "state": "a fact knows which project it was learned in", "truth": "feature"}
+{"id": "de452d25", "state": "merging and nudges spoke one language between them", "truth": "fix"}
+{"id": "15ee7465", "state": "0.48.0rc32", "truth": "other"}
+{"id": "25e8188c", "state": "recall could not read three of the ten languages it ships in", "truth": "fix"}
+{"id": "74bd2716", "state": "0.48.0rc31", "truth": "other"}
+{"id": "d37bd57f", "state": "a command whose output is not ASCII took the cut down", "truth": "fix"}
+{"id": "86ee1267", "state": "one configured server was becoming two connections", "truth": "fix"}
+{"id": "7f2c8013", "state": "a lock five releases stale, and a message its only reader threw away", "truth": "fix"}
+{"id": "91b29533", "state": "the SDK never shipped, and the failure said the wrong thing", "truth": "fix"}
+{"id": "905de42c", "state": "the servers you connect now reach the coding surface", "truth": "feature"}
+{"id": "e19221e7", "state": "0.48.0rc29", "truth": "other"}
+{"id": "7828cd1a", "state": "the catalogue spoke English, and one card sat on its own border", "truth": "fix"}
+{"id": "376814eb", "state": "0.48.0rc28", "truth": "other"}
+{"id": "86aeda8f", "state": "a catalogue, so GitHub is a click instead of a transcription", "truth": "feature"}
+{"id": "07443baa", "state": "0.48.0rc27", "truth": "other"}
+{"id": "b841fb4e", "state": "the shell cache grew by a release, every release", "truth": "fix"}
+{"id": "bd7d98e2", "state": "0.48.0rc26", "truth": "other"}
+{"id": "46dd513f", "state": "three things a walk through rc25 turned up", "truth": "fix"}
+{"id": "63d38dc0", "state": "0.48.0rc25", "truth": "other"}
+{"id": "f6232786", "state": "eight defects found by using the app, and three gaps closed", "truth": "fix"}
+{"id": "ac36fbab", "state": "0.48.0rc24", "truth": "other"}
+{"id": "0bb05620", "state": "the four findings from the rc23 sweep", "truth": "fix"}
+{"id": "2f38ba8b", "state": "0.48.0rc23", "truth": "other"}
+{"id": "618060bf", "state": "code comments were below AA in both themes", "truth": "fix"}
+{"id": "65769fed", "state": "0.48.0rc22", "truth": "other"}
+{"id": "e50ae822", "state": "nine more labels, in the shape neither earlier rule could see", "truth": "fix"}
+{"id": "2133f8dc", "state": "0.48.0rc21", "truth": "other"}
+{"id": "94399565", "state": "the accent had no ink, and the guard could not see a variant map", "truth": "fix"}
+{"id": "6af70839", "state": "0.48.0rc20", "truth": "other"}
+{"id": "b258f3d3", "state": "58 labels painted in a fill colour, and the guard that could not see them", "truth": "fix"}
+{"id": "9735ed00", "state": "0.48.0rc19", "truth": "other"}
+{"id": "b4c5f004", "state": "a toolbar that overflowed its column, and text nobody could read", "truth": "fix"}
+{"id": "6787e3e5", "state": "0.48.0rc18", "truth": "other"}
+{"id": "d211eee2", "state": "two defects in the role picker, found by using it", "truth": "fix"}
+{"id": "6f389cec", "state": "0.48.0rc17", "truth": "other"}
+{"id": "bfd4d348", "state": "the columns overlapped at 1280, and the model-per-role picker did nothing where it stood", "truth": "fix"}
+{"id": "3aadccf2", "state": "0.48.0rc16", "truth": "other"}
+{"id": "449b0c74", "state": "a column that would not shrink painted over the activity panel", "truth": "fix"}
+{"id": "ff993f04", "state": "0.48.0rc15", "truth": "other"}
+{"id": "a15d0fde", "state": "os achados restantes do teste do rc14 — seis consertados, dois retratados", "truth": "fix"}
+{"id": "b29c97b4", "state": "três defeitos que o teste do rc14 encontrou", "truth": "fix"}
+{"id": "188f1352", "state": "0.48.0rc14", "truth": "other"}
+{"id": "94adca18", "state": "os seis defeitos que o teste do rc13 encontrou", "truth": "fix"}
+{"id": "fa448bf5", "state": "0.48.0rc13", "truth": "other"}
+{"id": "2488a6bf", "state": "the worker picker said which one is chosen only in colour", "truth": "fix"}
+{"id": "5ef530c0", "state": "0.48.0rc12", "truth": "other"}
+{"id": "69718424", "state": "advice that sent you to the wrong environment, and a race that dropped frames", "truth": "fix"}
+{"id": "fa80befa", "state": "openai/gpt-oss-20b:free was withdrawn and we were still offering it", "truth": "fix"}
+{"id": "2e73b709", "state": "0.48.0rc11", "truth": "other"}
+{"id": "94803123", "state": "a run that was paid for now survives the tab that started it", "truth": "feature"}
+{"id": "74ee05db", "state": "a 288px column showed clipped slugs and three of the engine's wire values", "truth": "fix"}
+{"id": "cb0c03eb", "state": "the 33 commands that appeared in no README and no doc", "truth": "docs"}
+{"id": "c2ab6f6e", "state": "`embedded` reached one branch of three, and it was the error one", "truth": "fix"}
+{"id": "71a50234", "state": "a default the app applied was recorded as a decision somebody made", "truth": "fix"}
+{"id": "812bd1c7", "state": "a failed request rendered as a fact, and two controls only a mouse could find", "truth": "fix"}
+{"id": "3d2a8de3", "state": "the Memory screen and the chat were reading different stores", "truth": "fix"}
+{"id": "c7109284", "state": "a failed stream reported success, and Profile rendered a prompt at the user", "truth": "fix"}
+{"id": "5d310727", "state": "learned cards never reached the Code screen, and CHIMERA_MODEL is not a thing", "truth": "fix"}
+{"id": "6fc4b59c", "state": "the installed app said it had no updater, and it has a signed one", "truth": "fix"}
+{"id": "84f61510", "state": "three rows the screen confirmed and the next request ignored", "truth": "fix"}
+{"id": "5472dc64", "state": "40 keys that no screen renders, and the guard that finds them", "truth": "fix"}
+{"id": "fd5d3b88", "state": "174 instructions named a command that cannot do the thing, and a guard", "truth": "fix"}
+{"id": "5d3655f9", "state": "the undo existed on one branch of four, and overstated what it did", "truth": "fix"}
+{"id": "f34a188b", "state": "both Stop buttons latched permanently on a failed cancel", "truth": "fix"}
+{"id": "24f00a08", "state": "a check that never ran was picking the winner, and Stop was skippable", "truth": "fix"}
+{"id": "a2e7a6dd", "state": "a stopped run reported \"nothing was spent\", and Cost counted one path", "truth": "fix"}
+{"id": "08494238", "state": "a request could lower the owner's taint floor; two honesty fixes", "truth": "fix"}
+{"id": "ad89daa3", "state": "the guard that recorded nothing, and the chain nobody walked", "truth": "fix"}
+{"id": "ef8e0153", "state": "a remote server's output reached the model raw in every default config", "truth": "fix"}
+{"id": "faea4a63", "state": "two Settings toggles that fired nothing from the app", "truth": "fix"}
+{"id": "79efd4c7", "state": "an agent configured in Portuguese answered in English on two screens", "truth": "fix"}
+{"id": "fb4f90d2", "state": "the spend ceiling counted $0.00 on the app's most expensive turn", "truth": "fix"}
+{"id": "5a7bfaf1", "state": "four things the catalogue rendered wrong", "truth": "fix"}
+{"id": "110d9dbe", "state": "a card in the solve lane ran outside the owner's governance (#148)", "truth": "fix"}
+{"id": "bb757635", "state": "the push hung instead of failing, and gh was checked too late", "truth": "fix"}
+{"id": "09cb25eb", "state": "0.48.0rc10", "truth": "other"}
+{"id": "7166d5c4", "state": "o bump reformatava um arquivo que só devia bumpar", "truth": "fix"}
+{"id": "3cf0471f", "state": "the guard refused on scratch files, so it refused on every real checkout", "truth": "fix"}
+{"id": "7cf7ff70", "state": "cortar release abrindo PR, não empurrando no main", "truth": "other"}
+{"id": "281f4c3e", "state": "falar o vocabulário das skills, e dizer o que não temos", "truth": "feature"}
+{"id": "ee6270e0", "state": "82 habilidades instaláveis, e uma forma que consegue guardá-las", "truth": "feature"}
+{"id": "93ae40b5", "state": "roles you pick, and an honest account of what each one wrote", "truth": "feature"}
+{"id": "26af6e42", "state": "the crew gets a screen", "truth": "feature"}
+{"id": "9d8fcc52", "state": "the cost dashboard could not fill up, and two sets of raw labels", "truth": "fix"}
+{"id": "5787f481", "state": "arm A over the full slice — 17.9%, and the prediction held", "truth": "other"}
+{"id": "2c33c3c3", "state": "three things a session with the app turned up", "truth": "fix"}
+{"id": "1a31d4e9", "state": "0.48.0rc9", "truth": "other"}
+{"id": "b0e2f43b", "state": "answer in the language asked, and write down what tools cost", "truth": "fix"}
+{"id": "935e9175", "state": "the workers can open what they were asked about", "truth": "fix"}
+{"id": "7af9ce2b", "state": "0.48.0rc8", "truth": "other"}
+{"id": "e224de74", "state": "the three gates the local run does not have", "truth": "fix"}
+{"id": "1aa340dc", "state": "a timeout is not a verdict, and a job needs a ceiling", "truth": "fix"}
+{"id": "9ca5b220", "state": "the orchestrator gets a face, and a way in", "truth": "feature"}
+{"id": "34be839e", "state": "the full slice, and enough concurrency to afford it", "truth": "other"}
+{"id": "31cbfc99", "state": "pre-register the full-slice run, and label arm C's numbers in-sample", "truth": "docs"}
+{"id": "4cb666e8", "state": "arms D and E — neither ground ships, and one made the judge worse", "truth": "other"}
+{"id": "639e4577", "state": "pre-register arms D and E, and name this the last variant", "truth": "docs"}
+{"id": "029e89f6", "state": "arm C — the rubric WAS the bottleneck, and the naive fix costs too much", "truth": "other"}
+{"id": "6c2691e9", "state": "a way to ask whether the site token still works, without cutting a release", "truth": "other"}
+{"id": "249f42fa", "state": "pre-register arm C, with the prediction as a number", "truth": "docs"}
+{"id": "6f60fd09", "state": "read the 41 misses — context was not the bottleneck, our rubric was", "truth": "other"}
+{"id": "3ba341bf", "state": "the neutral arm, and why it cannot settle the question", "truth": "other"}
+{"id": "2bfca844", "state": "pre-register the second arm before running it", "truth": "docs"}
+{"id": "1bc8d944", "state": "the fusion judge measured, and it does not discriminate", "truth": "other"}
+{"id": "1fdde11c", "state": "pre-register the judge bench before the first model call", "truth": "docs"}
+{"id": "0ddc9e42", "state": "0.48.0rc7", "truth": "other"}
+{"id": "4475dbc8", "state": "prove the suite discriminates before spending on it", "truth": "test"}
+{"id": "1bab6074", "state": "0.48.0rc6", "truth": "other"}
+{"id": "1dec8228", "state": "choose who answers, who grades and who writes", "truth": "feature"}
+{"id": "3aa3d619", "state": "0.48.0rc5", "truth": "other"}
+{"id": "224afe26", "state": "an installed app was permanently one release behind", "truth": "fix"}
+{"id": "ccf60b18", "state": "0.48.0rc4", "truth": "other"}
+{"id": "fae4175d", "state": "the dialog was never centred, and half the screen only spoke English", "truth": "fix"}
+{"id": "e507c9d3", "state": "0.48.0rc3", "truth": "other"}
+{"id": "36992e86", "state": "installing over a running Chimera failed on a locked DLL", "truth": "fix"}
+{"id": "2edee63e", "state": "the attached image never reached the model, and the provider answered 500", "truth": "fix"}
+{"id": "b59cc91b", "state": "the website was never told a release existed", "truth": "other"}
+{"id": "af6144f0", "state": "0.48.0rc2", "truth": "other"}
+{"id": "d9587e84", "state": "attaching an image killed the turn, and said nothing useful", "truth": "fix"}
+{"id": "b2010298", "state": "0.48.0rc1", "truth": "other"}
+{"id": "c2d5ec9f", "state": "choose the model from the composer", "truth": "feature"}
+{"id": "1fab206d", "state": "0.47.0", "truth": "other"}
+{"id": "3280f6da", "state": "the safety kernel did not check every action", "truth": "docs"}
+{"id": "19b02674", "state": "observe applied the refusals it promised to only measure", "truth": "fix"}
+{"id": "758d3e7b", "state": "an edit's body was judged as a shell command and written to the log", "truth": "fix"}
+{"id": "5a7c6b26", "state": "the Security screen called the audit tampered when nobody had touched it", "truth": "fix"}
+{"id": "af0b6162", "state": "a two-line script passed every rule, a markdown file did not", "truth": "fix"}
+{"id": "ea9c124c", "state": "one stuck worker held the whole batch, forever", "truth": "fix"}
+{"id": "02a342a3", "state": "a refused tool call reported itself as a successful one", "truth": "fix"}
+{"id": "e99e0cdc", "state": "we documented a --context-budget flag that did not exist", "truth": "feature"}
+{"id": "8aba3666", "state": "the backend comes back on its own, and the screen admits when it is down", "truth": "feature"}
+{"id": "d0c5d194", "state": "the run restored its plan inside the field labelled \"the task\"", "truth": "fix"}
+{"id": "22233500", "state": "a dollar ceiling for a run, and a denominator on the bar", "truth": "feature"}
+{"id": "58964a22", "state": "take the conversation out, and be told when it ends", "truth": "feature"}
+{"id": "8ac471ce", "state": "the map walked into agent worktrees and lost the entry point", "truth": "fix"}
+{"id": "9903d1f6", "state": "the curated library never reached anyone, and could not", "truth": "feature"}
+{"id": "f506b6e1", "state": "three knobs the screen could not honestly show", "truth": "feature"}
+{"id": "ac7570f0", "state": "show the chart we drew, and offer the git init we tell people to run", "truth": "feature"}
+{"id": "ba932cf5", "state": "the Rust job was not flaky, it was timing out on apt", "truth": "fix"}
+{"id": "931c0a6f", "state": "three places the screen had the answer and did not say it", "truth": "feature"}
+{"id": "5b3ae2bb", "state": "a full overwrite that does not parse is never what anyone meant", "truth": "feature"}
+{"id": "84313891", "state": "a killed run left its litter in the user's repository", "truth": "feature"}
+{"id": "210d8ab0", "state": "the container had one limit, and no way to set it", "truth": "feature"}
+{"id": "76c6dcaa", "state": "reasoning tags reached the answer, and the terminal, and the app", "truth": "feature"}
+{"id": "5b65b44b", "state": "the rule set never looked at data leaving the machine", "truth": "feature"}
+{"id": "296bdb16", "state": "the CVE gate audited one of three lockfiles", "truth": "fix"}
+{"id": "e2ee93d9", "state": "the composer takes a pasted screenshot, and a follow-up typed mid-turn", "truth": "feature"}
+{"id": "6162e2bc", "state": "a failing scheduled job looked exactly like a working one", "truth": "fix"}
+{"id": "75da3fc5", "state": "Stop meant \"finish this attempt first\"", "truth": "fix"}
+{"id": "44d580a9", "state": "the conversation showed less than the backend knew", "truth": "fix"}
+{"id": "20d64464", "state": "the app used to fail to start by doing nothing", "truth": "fix"}
+{"id": "2a8dd0b0", "state": "the guard that covered four callers of five", "truth": "fix"}
+{"id": "c1562e6e", "state": "the judge was on the panel it graded", "truth": "fix"}
+{"id": "31b86d31", "state": "0.46.0", "truth": "other"}
+{"id": "8a3aa154", "state": "sixteen claims the code does not support, in ten languages", "truth": "docs"}
+{"id": "fef92fd2", "state": "every card current in nine languages, and a gate that says so", "truth": "feature"}
+{"id": "5d10d422", "state": "nine languages, and a hub grouped by stage", "truth": "feature"}
+{"id": "1511ee3c", "state": "thirteen official chimera-* cards, and one deleted for being generic", "truth": "feature"}
+{"id": "e1248553", "state": "the last three from the scope audit", "truth": "fix"}
+{"id": "660a25f9", "state": "the single gate had three of eight callers", "truth": "fix"}
+{"id": "ecc8a9f0", "state": "the skill a run learned, erased by the run that learned it", "truth": "fix"}
+{"id": "d4a14d0b", "state": "the fence nobody could switch on without killing the CLI", "truth": "fix"}
+{"id": "d28dfd3a", "state": "three defects that each undermined something load-bearing", "truth": "fix"}
+{"id": "6b6cd8e5", "state": "measure what a poisoned memory costs a LATER run", "truth": "feature"}
+{"id": "b20f29fa", "state": "an explicit fence needs no rollout", "truth": "fix"}
+{"id": "22f4b178", "state": "the workspace rooted the tools and not the conventions", "truth": "fix"}
+{"id": "11da96f1", "state": "one env var meant two things, so all six of its values were broken", "truth": "fix"}
+{"id": "803556ad", "state": "the app's Discord bot ran unfenced, and the gate could not see it", "truth": "fix"}
+{"id": "ae67989b", "state": "the three stores that lost data without saying so", "truth": "fix"}
+{"id": "cff978c8", "state": "the gateway must boot without the desktop extra", "truth": "fix"}
+{"id": "e9380337", "state": "0.45.0", "truth": "other"}
+{"id": "dd8f1647", "state": "Chimera as somebody else's agent", "truth": "feature"}
+{"id": "814bcef9", "state": "the five unattended surfaces, and the state that comes before enforcing", "truth": "feature"}
+{"id": "1f89608f", "state": "refuse to serve an unauthenticated agent to the internet", "truth": "fix"}
+{"id": "8ef47c42", "state": "someone on the other side of the gate", "truth": "feature"}
+{"id": "1950a5f2", "state": "the second axis on two benches that could only report the flattering half", "truth": "feature"}
+{"id": "b427e694", "state": "four guards that existed and did not cover the default path", "truth": "fix"}
+{"id": "a4fb4956", "state": "the context curve, and the answer that there is no data yet", "truth": "feature"}
+{"id": "886fd6f8", "state": "a run the log can name, on the path that runs the most", "truth": "feature"}
+{"id": "ade59fd4", "state": "the other two ceilings — one dispatch, and one day", "truth": "feature"}
+{"id": "e908f79e", "state": "a dollar ceiling that stops on a price it does not know", "truth": "feature"}
+{"id": "99c1042f", "state": "the published numbers catch up with the runs that produced them", "truth": "docs"}
+{"id": "a4b32fcd", "state": "0.44.0", "truth": "other"}
+{"id": "e4704800", "state": "the editor's new capabilities are configurable and discoverable", "truth": "feature"}
+{"id": "783ce959", "state": "commands beside the file, and a Stop that reaches the process tree", "truth": "feature"}
+{"id": "6c393023", "state": "grey text ahead of the cursor, and the request that must not outlive it", "truth": "feature"}
+{"id": "3fbde551", "state": "diagnostics from ruff server, and the column that is only wrong on emoji", "truth": "feature"}
+{"id": "be9225ef", "state": "retrieval over a repository, and a bench that caught three of my own errors", "truth": "feature"}
+{"id": "2c303fcb", "state": "the task survives compaction, because it did not", "truth": "fix"}
+{"id": "a4a42a64", "state": "find a string across the project, and say what the machine is spending", "truth": "feature"}
+{"id": "a90d8c4c", "state": "the abstention asked about the wrong directory, and kept work whose tests failed", "truth": "fix"}
+{"id": "d4927d77", "state": "Chimera drives somebody else's coding agent, and says what that costs in guarantees", "truth": "feature"}
+{"id": "ad5c628d", "state": "the editor gets an address of its own, and the tree comes back where it belongs", "truth": "feature"}
+{"id": "80909a98", "state": "the screen lives in the URL (P0)", "truth": "feature"}
+{"id": "bde60829", "state": "Windows has no exit code for \"command not found\" (P0)", "truth": "fix"}
+{"id": "64e4f532", "state": "the ten pages in Russian, and the generator learns the language (#47 follow-up)", "truth": "feature"}
+{"id": "7f880cde", "state": "Russian, and the forgotten step becomes a failing test (#47)", "truth": "feature"}
+{"id": "18bfaea2", "state": "grep was the same bypass, one tool over (#5)", "truth": "fix"}
+{"id": "14cb7099", "state": "a malformed path gets the app, not a 500", "truth": "fix"}
+{"id": "6cda0f6e", "state": "record the outcome, and let somebody ask what never ran", "truth": "feature"}
+{"id": "3a1f8f96", "state": "the board works several cards at once, each in its own worktree", "truth": "feature"}
+{"id": "69873663", "state": "point the app at a Chimera you run yourself", "truth": "feature"}
+{"id": "52667301", "state": "v0.43.0", "truth": "other"}
+{"id": "421ae8cf", "state": "the donation link moves to the new Stripe payment link", "truth": "other"}
+{"id": "4aff035c", "state": "cite by number, because a headline mid-sentence is unreadable", "truth": "fix"}
+{"id": "1061bf46", "state": "the blog generator becomes a writer, and stops writing URLs", "truth": "other"}
+{"id": "6876d517", "state": "the five sections in eight languages, beside the card and not in it", "truth": "other"}
+{"id": "96a9b7f8", "state": "our own text, in nine languages, from one call per item", "truth": "feature"}
+{"id": "7011a0d6", "state": "bring the blog generator into the repository, and stop it merging its own unchecked posts", "truth": "other"}
+{"id": "b0e4a385", "state": "translated descriptions, in a sidecar that leaves the card untouched", "truth": "other"}
+{"id": "03cdb3bd", "state": "the documentation in nine languages, with a hash that says when it drifted", "truth": "docs"}
+{"id": "198924b1", "state": "a key for any provider LiteLLM understands — plus the settings and uploads that were out of reach", "truth": "feature"}
+{"id": "8d15ad0e", "state": "the agent registry gets a screen", "truth": "feature"}
+{"id": "37d8d3e8", "state": "the terminal conversation outlives the terminal", "truth": "feature"}
+{"id": "96547bcc", "state": "the dumper typed its way around Click, and the snapshot said 0.41.0", "truth": "fix"}
+{"id": "248c7223", "state": "point at the site, in nine languages and on PyPI", "truth": "docs"}
+{"id": "1b247ad3", "state": "nine cards, each written from something this project got wrong", "truth": "feature"}
+{"id": "fe3133cd", "state": "the command surface becomes data, so a reference cannot go stale", "truth": "feature"}
+{"id": "64ae0548", "state": "retire the MkDocs setup that was never published", "truth": "other"}
+{"id": "d24261f5", "state": "stamp the shipped snapshots with 0.42.0", "truth": "other"}
+{"id": "42fc7ca1", "state": "v0.42.0", "truth": "other"}
+{"id": "167525ef", "state": "a project can be started from the app, and made to move", "truth": "feature"}
+{"id": "939f0eee", "state": "the board stops being a display case", "truth": "feature"}
+{"id": "ca15219f", "state": "a card can name one of your agents, and that agent works it", "truth": "feature"}
+{"id": "da1e346f", "state": "the agents you dispatch to become things that exist between runs", "truth": "feature"}
+{"id": "7ad15977", "state": "the controls that were one row away, and the switch that closes the learning loop", "truth": "feature"}
+{"id": "4357dc8c", "state": "projects you can add before you have used them, called what you call them", "truth": "feature"}
+{"id": "63fe746f", "state": "a run records which project it came from", "truth": "feature"}
+{"id": "ddfde862", "state": "the conversation followed you into the wrong project, and one run froze all of them", "truth": "fix"}
+{"id": "63f2580d", "state": "how much your agent may do stops being a decision someone else made", "truth": "feature"}
+{"id": "ad8a8281", "state": "you can finally tell it who it is, and it answers in your language", "truth": "feature"}
+{"id": "065867b5", "state": "the Telegram card asked for a Discord bot token", "truth": "fix"}
+{"id": "aad506c7", "state": "the Security screen scored one layer and read as a verdict on all of them", "truth": "fix"}
+{"id": "dd867748", "state": "the tool allowlist was a fence in .env that the app did not have", "truth": "fix"}
+{"id": "782c8dd2", "state": "three more settings stop needing a relaunch, and the last two say they do", "truth": "fix"}
+{"id": "c02b8e84", "state": "a setting you saved took effect on the next launch, not the next call", "truth": "fix"}
+{"id": "c307fd10", "state": "v0.41.0 — attaching a PDF and dictating work out of the box", "truth": "other"}
+{"id": "9d7ebb62", "state": "the size step's printf broke the workflow file", "truth": "other"}
+{"id": "20bbea06", "state": "measure both extras honestly, on every platform", "truth": "other"}
+{"id": "4eca5226", "state": "measure what a user downloads, not the build's leftovers", "truth": "other"}
+{"id": "7547f211", "state": "the speech stack leaves the bundle, and the button says why", "truth": "other"}
+{"id": "1f10367e", "state": "the resolver path was relative, so it pointed at nothing", "truth": "other"}
+{"id": "88d79116", "state": "tell the AppImage bundler where the wheels keep their libraries", "truth": "other"}
+{"id": "8b0d96de", "state": "make the Linux bundler's actual error visible", "truth": "other"}
+{"id": "f0b968e4", "state": "the Linux bundler choked on the speech model's native libraries", "truth": "other"}
+{"id": "ba122047", "state": "two tests were passing because a dependency was missing", "truth": "test"}
+{"id": "03e410be", "state": "ship the document reader and the speech model with the app", "truth": "other"}
+{"id": "147ab8fb", "state": "v0.40.1 — attaching a text file needed no converter", "truth": "other"}
+{"id": "f1c16517", "state": "a plain .txt asked you to install a document converter", "truth": "fix"}
+{"id": "ade75bee", "state": "v0.40.0 — say whether the model can actually look", "truth": "other"}
+{"id": "98b1b5bb", "state": "attach an image or a document, and dictate instead of typing", "truth": "feature"}
+{"id": "76b9267c", "state": "a packaged install had no fixed place to keep its own data", "truth": "fix"}
+{"id": "2adb89b1", "state": "the merge, the guard that was missing, and what did not survive", "truth": "docs"}
+{"id": "2e572bde", "state": "the surface that does the most work starts learning from it", "truth": "feature"}
+{"id": "b4ef2711", "state": "the send hint still promised Cmd+Enter", "truth": "fix"}
+{"id": "7513bfcd", "state": "the third door to the run, and the field that protected nothing", "truth": "other"}
+{"id": "ea27efc3", "state": "one conversation, and the door without a guard closes", "truth": "feature"}
+{"id": "5b5f88c2", "state": "the protection stops being exclusive to one screen", "truth": "other"}
+{"id": "96f6de75", "state": "a fused turn answered about files it never opened", "truth": "fix"}
+{"id": "8899e778", "state": "v0.39.0 — the screen stops asking, and says what it did instead", "truth": "other"}
+{"id": "19d2825d", "state": "what the Code screen stopped asking, and what it started saying", "truth": "docs"}
+{"id": "296bae36", "state": "running several agents stops being a place you go", "truth": "feature"}
+{"id": "87ea54d2", "state": "the default button stops being the weaker one", "truth": "feature"}
+{"id": "7b43f1eb", "state": "the screen stops asking, and the browser screenshot takes an SSRF exception with it", "truth": "feature"}
+{"id": "346de7b3", "state": "regenerate the API types the drift gate caught", "truth": "fix"}
+{"id": "189e3c71", "state": "the Code screen becomes a conversation, and the system stops asking first", "truth": "feature"}
+{"id": "2777502b", "state": "stop main from losing verdicts, and say which kind of red this is", "truth": "other"}
+{"id": "935faaae", "state": "the workspace was chosen every launch and remembered never", "truth": "fix"}
+{"id": "40ef230c", "state": "an assertion that depended on ANSI styling, and the lock that was missing", "truth": "fix"}
+{"id": "c1062636", "state": "the max profile could not finish, and the pilot that found it", "truth": "fix"}
+{"id": "d9b56af8", "state": "retract the 40% floor, which I imported from an argument for a ceiling", "truth": "docs"}
+{"id": "f7f9bb87", "state": "price the parts that are not the worker", "truth": "fix"}
+{"id": "1836c003", "state": "a fused role was convening three frontier models nobody chose", "truth": "fix"}
+{"id": "c1551eae", "state": "role flags on `solve`, so the role bench can express its own arms", "truth": "feature"}
+{"id": "256d5740", "state": "\"was it worth it?\" — and the four things it refuses to do", "truth": "feature"}
+{"id": "971705e9", "state": "close the 18 Dependabot alerts, and say which ones were real", "truth": "other"}
+{"id": "440b8a1b", "state": "a model per role, and the pre-registration that decides if it earns its keep", "truth": "feature"}
+{"id": "a2e30601", "state": "reach and approval as two axes, and a status line that tells the truth", "truth": "feature"}
+{"id": "3fdc7b7d", "state": "the Code screen becomes a conversation that edits", "truth": "feature"}
+{"id": "c44f4555", "state": "a coding conversation that keeps what it did", "truth": "feature"}
+{"id": "3ce9f4e0", "state": "a deadline nothing could actually walk away from", "truth": "fix"}
+{"id": "e9475dcf", "state": "the agent reads AGENTS.md — starting with this project's own", "truth": "feature"}
+{"id": "f74e40ac", "state": "the map was dropping the code it existed to point at", "truth": "fix"}
+{"id": "fa455bfc", "state": "the run endpoint stops being a ceiling, and a run becomes watchable", "truth": "feature"}
+{"id": "d2ba36c1", "state": "give contribution somewhere to land, and make it self-verifying", "truth": "feature"}
+{"id": "31a50bd4", "state": "say where the boundary is, and stop the app being closed to outsiders", "truth": "docs"}
+{"id": "d20a1e59", "state": "a gate that could not pass, a bound that over-accepted, and an auditable log", "truth": "fix"}
+{"id": "cd8d24f0", "state": "the injection number needed its precondition, and 100% is not a measurement", "truth": "docs"}
+{"id": "5dd9b5f1", "state": "declare least privilege, bound every job, pin every action", "truth": "other"}
+{"id": "a4c08458", "state": "close an A2A auth bypass and a taint marker dropped by wrapper order", "truth": "other"}
+{"id": "d511216d", "state": "version strings agree on the version, not on the text", "truth": "docs"}
+{"id": "13e00657", "state": "the provenance label was dying at the serialization boundary", "truth": "fix"}
+{"id": "95c5654e", "state": "Italian and Polish — and the 110 strings five languages never had", "truth": "feature"}
+{"id": "6c6990f0", "state": "nine languages, and the six that had lost the benchmarks", "truth": "docs"}
+{"id": "f4c0a7d5", "state": "v0.38.0 — the loop can be measured, and says when it stops going anywhere", "truth": "other"}
+{"id": "2e91a9c3", "state": "detect context drift, and finally write the trace", "truth": "feature"}
+{"id": "7b13efd2", "state": "the cache hit rate", "truth": "docs"}
+{"id": "a251e76d", "state": "record the cache hit rate, the loop's real cost number", "truth": "feature"}
+{"id": "4110b158", "state": "sync uv.lock to the released version", "truth": "other"}
+{"id": "ac2cc736", "state": "the harness work", "truth": "docs"}
+{"id": "fb04ca38", "state": "a cockpit, not a launch button", "truth": "feature"}
+{"id": "5feec403", "state": "a paragraph is no longer a solve", "truth": "feature"}
+{"id": "a198500c", "state": "context as a budget, and compaction that keeps the thread", "truth": "feature"}
+{"id": "a7b76e4c", "state": "measure the context, and keep a trace worth reading", "truth": "feature"}
+{"id": "ff9ee266", "state": "v0.37.0 — the desktop app becomes an agent workspace", "truth": "other"}
+{"id": "3729cbb7", "state": "the desktop redesign", "truth": "docs"}
+{"id": "1b0175c4", "state": "two strings that pointed at a screen that no longer exists", "truth": "fix"}
+{"id": "761c2a62", "state": "command palette, shortcuts, and the orphaned features", "truth": "feature"}
+{"id": "a699c07b", "state": "fifteen rail destinations become five", "truth": "feature"}
+{"id": "42800912", "state": "Automation and Work, and one run launcher instead of three", "truth": "feature"}
+{"id": "e1a70248", "state": "Knowledge groups memory, profile and skills", "truth": "feature"}
+{"id": "d1596e08", "state": "the agent stops disappearing when you navigate", "truth": "feature"}
+{"id": "5c6e231f", "state": "the primitive layer the README already claimed", "truth": "feature"}
+{"id": "9767d98c", "state": "the motion system, and the launch sequence", "truth": "feature"}
+{"id": "c5a4aca6", "state": "design tokens, a persisted theme, and a gate that enforces both", "truth": "feature"}
+{"id": "5ca8a992", "state": "two failures that sent users to fix the wrong thing", "truth": "fix"}
+{"id": "6f9a316b", "state": "a run that called no tool did not do the work", "truth": "fix"}
+{"id": "2b63b6c5", "state": "v0.36.2 also carries the three-way decomposition", "truth": "docs"}
+{"id": "9443b60e", "state": "surface the three-way decomposition — the delta alone invites the wrong inference", "truth": "feature"}
+{"id": "fa196f0b", "state": "run 4 — both components contribute, and our prediction was wrong", "truth": "other"}
+{"id": "18da2623", "state": "v0.36.2 — the shipped snapshot carries the replicated SWE-bench result", "truth": "other"}
+{"id": "48069120", "state": "pre-register run 4 — restore the middle arm, settle the attribution", "truth": "other"}
+{"id": "ad65685d", "state": "lead with the replicated SWE-bench result — and keep the honest label on it", "truth": "docs"}
+{"id": "94ee4fd7", "state": "run 3 — the replication held on 41 instances we had never seen", "truth": "other"}
+{"id": "98fc4fe7", "state": "v0.36.1 — fix the citation defects, close retry-lift, freeze run 3's slice", "truth": "other"}
+{"id": "787695ab", "state": "pre-register run 3 — replicate run 2 on instances we have never seen", "truth": "other"}
+{"id": "372c1655", "state": "publish the SWE-bench result everywhere — and fix two citation defects v0.36.0 shipped", "truth": "docs"}
+{"id": "90073d9e", "state": "v0.36.0 — the grading hole, the number that grew when fixed, and a first external score", "truth": "other"}
+{"id": "9aaaffa5", "state": "SWE-bench Verified, o grader endurecido e o número que subiu ao ser corrigido", "truth": "other"}
+{"id": "6b990f8a", "state": "v0.36.0rc1 — first prerelease, carrying the boot-time work", "truth": "other"}
+{"id": "3de830bd", "state": "stop four package __init__ files from importing the world", "truth": "other"}
+{"id": "a90eae25", "state": "v0.35.0 — the desktop app wakes up, remembers, and can reach you", "truth": "other"}
+{"id": "c9737868", "state": "reduz spinner longo — retry rápido, portão de prontidão e estado de erro", "truth": "fix"}
+{"id": "22cc6495", "state": "the agent can reach you on Discord — configured and run from the UI", "truth": "feature"}
+{"id": "03ece493", "state": "the \"Remember from chat\" toggle couldn't save — key wasn't editable", "truth": "fix"}
+{"id": "6e68afda", "state": "the chat can build durable memory — opt-in, explicit-only", "truth": "feature"}
+{"id": "2162b7ac", "state": "create schedules from the UI — no terminal", "truth": "feature"}
+{"id": "d2a7f324", "state": "run the cron daemon inside `chimera app` so it can be proactive", "truth": "feature"}
+{"id": "8db9d19b", "state": "gate the host-exec decision, not just the credibility modules", "truth": "test"}
+{"id": "fde08938", "state": "SWE-bench Verified — the scoreboard the project has no number on", "truth": "other"}
+{"id": "90bcd705", "state": "name the bus factor and remove the excuses for it", "truth": "docs"}
+{"id": "d35f0222", "state": "close three gaps between what Chimera advertises and what it ships", "truth": "docs"}
+{"id": "ab260a16", "state": "nothing in the autonomous stack could break a hang", "truth": "fix"}
+{"id": "dbe52e41", "state": "make the shipped defence real instead of opt-in", "truth": "other"}
+{"id": "05cd6521", "state": "mark main as 0.35.0-dev so it stops claiming a released version", "truth": "other"}
+{"id": "f566ccec", "state": "declare the real Python range (3.11–3.13), not an open \">=3.11\"", "truth": "fix"}
+{"id": "955b6317", "state": "regenerate the desktop API types + give the integration job FastAPI", "truth": "fix"}
+{"id": "504aa141", "state": "the host-exec gate test asserted a different thing depending on the machine", "truth": "fix"}
+{"id": "c8bd8c6d", "state": "record the v0.34.1 patch on main", "truth": "docs"}
+{"id": "369212e5", "state": "commit the lockfile + cap litellm below its manylinux-only rewrite", "truth": "other"}
+{"id": "2d8e9aeb", "state": "the wheel forced-included a gitignored path, so no clone could install", "truth": "fix"}
+{"id": "02e8747b", "state": "Amendment 1 — three harness bugs found by the smoke; all smoke data discarded", "truth": "other"}
+{"id": "a4d25439", "state": "HumanEval + GSM8K harness, paired, with the grader out of reach", "truth": "other"}
+{"id": "28c6efbd", "state": "standard LLM benchmarks across the model ladder — design before data", "truth": "other"}
+{"id": "ed36750b", "state": "OpenAI-compatible /v1/chat/completions — benchmark the agent, not the model", "truth": "feature"}
+{"id": "44dc6dc4", "state": "code_interpreter was an ungated host-exec door", "truth": "fix"}
+{"id": "95117fd2", "state": "four defects an adversarial review found in this session's own work", "truth": "fix"}
+{"id": "40b2c1db", "state": "live cross-agent gate (shared view) + taint on the API path", "truth": "other"}
+{"id": "ff15c67d", "state": "close three untrusted-content source gaps + make the claims honest", "truth": "other"}
+{"id": "c7ee9316", "state": "repair the 4 regressions my n=100 + snapshot changes pushed to main", "truth": "fix"}
+{"id": "c3e488f8", "state": "first-class local models (Ollama) — run keyless, fully local", "truth": "feature"}
+{"id": "5a74713b", "state": "a curated \"good first issues\" on-ramp + issue template", "truth": "docs"}
+{"id": "1395bf09", "state": "opt-in OpenTelemetry — traces for tool calls, metrics for tokens/cost", "truth": "feature"}
+{"id": "4e0ed95a", "state": "confirm before the agent runs a command on your host", "truth": "feature"}
+{"id": "84fdb6b6", "state": "note the verify-or-revert repo-root guard", "truth": "docs"}
+{"id": "890bd60a", "state": "verify-or-revert must never delete files inside a git repo root", "truth": "fix"}
+{"id": "92338b24", "state": "weekly mutation-testing job on the five critical modules", "truth": "other"}
+{"id": "8c33f5e0", "state": "mutation-testing gate on the five modules that, if wrong, make Chimera lie", "truth": "test"}
+{"id": "234df101", "state": "publish the n=100 headline — weak-model lift is now significant", "truth": "other"}
+{"id": "55bee19b", "state": "the 85 new tasks — n=100, committed before the run", "truth": "other"}
+{"id": "ad8f25f5", "state": "resumable paired run — finished pairs are never re-run", "truth": "other"}
+{"id": "af4622ef", "state": "pre-register the n=100 weak-model-lift run (before authoring tasks, before any model call)", "truth": "other"}
+{"id": "0a94157f", "state": "let the updater manifest be dry-run without cutting a release", "truth": "other"}
+{"id": "61905dfb", "state": "a release policy — weekly stable, rc for daily work", "truth": "docs"}
+{"id": "5320b378", "state": "v0.34.0 — Agent Manager cancel + the Code screen's remaining tests", "truth": "other"}
+{"id": "ddc4612d", "state": "cover the Code screen's remaining sub-components (57 -> 91)", "truth": "test"}
+{"id": "46b39cba", "state": "per-task + whole-batch cancel in the Agent Manager", "truth": "feature"}
+{"id": "d179b081", "state": "v0.33.0 — Intel Mac support + frontend test suite", "truth": "other"}
+{"id": "895dc634", "state": "run the frontend component tests in the desktop job", "truth": "other"}
+{"id": "e10c3b3e", "state": "frontend component suite (Vitest + Testing Library) — 51 tests", "truth": "test"}
+{"id": "2a5e8a10", "state": "build for Intel Macs (macos-15-intel) — they literally couldn't install", "truth": "feature"}
+{"id": "5e1f0369", "state": "v0.32.2 — fix the Linux updater url in latest.json", "truth": "other"}
+{"id": "cac947cd", "state": "Linux updater url must be the AppImage, not the .deb", "truth": "fix"}
+{"id": "a9071705", "state": "v0.32.1 — publish the updater latest.json (macOS app,dmg CI fix)", "truth": "other"}
+{"id": "f84021b9", "state": "macOS updater artifact needs the `app` bundle target", "truth": "fix"}
+{"id": "24bfe6e5", "state": "v0.32.0 — native in-place auto-update (signed, consent-prompted)", "truth": "other"}
+{"id": "3dcee6d3", "state": "sign updater artifacts + publish latest.json for the in-place updater", "truth": "other"}
+{"id": "9229f9bc", "state": "Tauri in-place auto-updater — signed, consent-prompted", "truth": "feature"}
+{"id": "de125901", "state": "v0.31.0 — Stop a run, browser-verify artifact, update signal", "truth": "other"}
+{"id": "a7630a38", "state": "update-available signal + prompt (honest, GitHub-checked)", "truth": "feature"}
+{"id": "27dc63af", "state": "browser screenshot verification artifact (honest MVP)", "truth": "feature"}
+{"id": "4f3c394b", "state": "cooperative Stop for a coding run (honest — halts between attempts)", "truth": "feature"}
+{"id": "334199be", "state": "Agent Manager — parallel git-worktree-isolated multi-task runs (v0.30.0)", "truth": "feature"}
+{"id": "6589f756", "state": "Code screen — plan-mode preview, real verify output, per-run model/mode (v0.29.0)", "truth": "feature"}
+{"id": "47c8350a", "state": "v0.28.0 — native desktop app (Tauri installers) + honest README repositioning", "truth": "other"}
+{"id": "ca0c5054", "state": "matrix that builds unsigned installers (nsis/dmg/appimage/deb)", "truth": "other"}
+{"id": "2930ef6a", "state": "Tauri native shell — window + tray over the frozen backend sidecar", "truth": "feature"}
+{"id": "d7274822", "state": "port-discovery fix + frozen-backend sidecar recipe (Tauri foundation)", "truth": "feature"}
+{"id": "7b2c6bc5", "state": "publish the n=15 pre-registered lift (60→73.3%, +13.3pp, not significant)", "truth": "other"}
+{"id": "05dfe180", "state": "pre-register +9 neutral tasks (n 6→15) for a paired re-run", "truth": "other"}
+{"id": "6e66f418", "state": "publish the honest benchmark numbers (weak-model lift + Terminal-Bench)", "truth": "feature"}
+{"id": "f572a46e", "state": "smoke-test a clean pip install across OS × Python (catch transitive-build friction)", "truth": "other"}
+{"id": "f1857f06", "state": "honest \"install trouble?\" note (upgrade pip; use Python 3.12/3.13 for widest wheels)", "truth": "docs"}
+{"id": "643cfa17", "state": "v0.27.0 — Code screen completed (git panel, accept/discard, live per-edit diffs)", "truth": "other"}
+{"id": "38498be3", "state": "live per-edit diffs — stream the real diff of each file the agent edits", "truth": "feature"}
+{"id": "5b4a496e", "state": "Code screen — git panel + accept/discard a run's changes (git-backed)", "truth": "feature"}
+{"id": "0d44a158", "state": "v0.26.0 — Code screen (the verify-or-revert coding front)", "truth": "other"}
+{"id": "e17c2c16", "state": "Code screen Phase 2 — editable file save + streaming command-runner", "truth": "feature"}
+{"id": "5bec9cb9", "state": "Code screen (Phase 1) — workspace tree/viewer + verify-or-revert coding runner with real diffs", "truth": "feature"}
+{"id": "1432ccf2", "state": "v0.25.0 — 4 more desktop screens (Tools, Maturity, Onboarding, MCP)", "truth": "other"}
+{"id": "f620e411", "state": "MCP / Integrations — configure, persist, live-test & optionally load MCP servers", "truth": "feature"}
+{"id": "0bce7db8", "state": "first-run onboarding — boot keyless + add & live-test a key from the UI", "truth": "feature"}
+{"id": "b622d366", "state": "Maturity screen — coverage scorecard by surface (live or shipped snapshot)", "truth": "feature"}
+{"id": "3c3e0420", "state": "ship coverage-scorecard snapshot as the pip fallback", "truth": "other"}
+{"id": "80baad8d", "state": "Tools screen — the agent's registered tools with honest capability tags", "truth": "feature"}
+{"id": "cb6f99b2", "state": "v0.24.0 — 5 desktop screens exposing Chimera's pillars with honest, real data", "truth": "other"}
+{"id": "e8f0c375", "state": "richer Memory screen — layers (by kind) + provenance + by-source", "truth": "feature"}
+{"id": "054142cb", "state": "Governance/Security screen — injection red-team scoreboard + audit log", "truth": "feature"}
+{"id": "bc50cf4a", "state": "trigger autonomous runs from the app, streamed live (step 3b)", "truth": "feature"}
+{"id": "1db1eb34", "state": "Runs screen — verify-or-revert receipts (step 3a)", "truth": "feature"}
+{"id": "4ac7cf96", "state": "Cost & Usage dashboard — the agent's spend, honestly", "truth": "feature"}
+{"id": "edc6af39", "state": "Fusion & Cascade screen — see how an answer was composed", "truth": "feature"}
+{"id": "11fbcc6b", "state": "isolate `npm ci` in an unprivileged job (harden OIDC surface)", "truth": "other"}
+{"id": "4ba5a193", "state": "interface language selector — 7 languages (v0.23.0)", "truth": "feature"}
+{"id": "255d638c", "state": "v0.22.1 — real Chimera brand icon in the desktop app", "truth": "other"}
+{"id": "c3fb056a", "state": "use the real Chimera brand icon (drop the placeholder triangle)", "truth": "other"}
+{"id": "6d23d24d", "state": "keep the built desktop UI in the sdist so wheel-from-sdist works", "truth": "fix"}
+{"id": "910b941b", "state": "build the desktop UI before packaging so the wheel bundles it", "truth": "other"}
+{"id": "ce4aee44", "state": "neumorphic soft-UI redesign + ship the UI in the wheel (v0.22.0)", "truth": "other"}
+{"id": "c72bc1c0", "state": "v0.21.2 — desktop API hardening + drift-proof typed client", "truth": "other"}
+{"id": "1ebf9897", "state": "8 fixes from the 17th adversarial review of chimera/api", "truth": "other"}
+{"id": "74247f49", "state": "install the desktop extra in the quality job", "truth": "other"}
+{"id": "2d97a7d6", "state": "fail if the desktop API TypeScript types drift from the backend schema", "truth": "other"}
+{"id": "d14b8c0c", "state": "typed responses + frontend types generated from OpenAPI (kills contract drift)", "truth": "feature"}
+{"id": "56e411ad", "state": "v0.21.1 — desktop app installable as a PWA (M21 Fase D)", "truth": "other"}
+{"id": "21b0d51f", "state": "installable PWA (M21 Fase D)", "truth": "feature"}
+{"id": "b08d0930", "state": "v0.21.0 — desktop app Settings + Memory/Skills/Schedule/Tasks (M21 Fase B+C)", "truth": "other"}
+{"id": "2bc272d1", "state": "Memory / Skills / Schedule / Tasks screens + feature API (M21 Fase C)", "truth": "feature"}
+{"id": "e1d74205", "state": "make the corrupt-jobs reload test clock-independent", "truth": "test"}
+{"id": "4ee3c7f8", "state": "Settings screen + config API (M21 Fase B)", "truth": "feature"}
+{"id": "ca32b1ab", "state": "v0.20.0 — Chimera Desktop app (React + HTTP/SSE, M21 Fase A)", "truth": "other"}
+{"id": "e1391fdf", "state": "React UI (Chat + Sessions) over HTTP+SSE (M21 Fase A)", "truth": "feature"}
+{"id": "804b69e9", "state": "desktop app backend — FastAPI HTTP+SSE (M21 Fase A)", "truth": "feature"}
+{"id": "822040ef", "state": "v0.19.8 — provider-gateway hardening", "truth": "other"}
+{"id": "572d10d9", "state": "stage 16th-review gateway fixes under Unreleased", "truth": "docs"}
+{"id": "cbe53ebf", "state": "4 gateway fixes from 16th adversarial review", "truth": "fix"}
+{"id": "910310fb", "state": "v0.19.7 — scheduler & migration hardening", "truth": "other"}
+{"id": "ff2644d4", "state": "8 fixes from 15th adversarial review", "truth": "other"}
+{"id": "35722689", "state": "self-reporting McNemar flip gate + n=24 power A/B", "truth": "other"}
+{"id": "51e5340a", "state": "v0.19.6 — cheaper skill-card injection", "truth": "other"}
+{"id": "6d3a9802", "state": "make skill-card injection ~7-9x cheaper (M19-A1 cost reduction)", "truth": "feature"}
+{"id": "27ab87e9", "state": "v0.19.5 — CLI honesty + safe prune", "truth": "other"}
+{"id": "b34f4af8", "state": "5 fixes from 14th adversarial review (cli/main.py 2nd pass)", "truth": "fix"}
+{"id": "7cfa86b5", "state": "v0.19.4 — crew resilience", "truth": "other"}
+{"id": "e4c620d7", "state": "3 fixes from 13th adversarial review (roles/crew orchestration)", "truth": "fix"}
+{"id": "63b30fce", "state": "v0.19.3 — self-evolution flywheel hardening", "truth": "other"}
+{"id": "41c9e150", "state": "6 fixes from 12th adversarial review (flywheel internals)", "truth": "fix"}
+{"id": "d540ace6", "state": "v0.19.2 — file-edit data integrity", "truth": "other"}
+{"id": "a9e4d88f", "state": "4 data-integrity fixes from 11th adversarial review (file edits)", "truth": "fix"}
+{"id": "dde3cfe6", "state": "v0.19.1 — streaming-TUI hardening + memory-layer label", "truth": "other"}
+{"id": "06cbd126", "state": "4 fixes from 10th adversarial review (streaming surface)", "truth": "fix"}
+{"id": "fc23ecb6", "state": "name the memory layer that contributed to recall", "truth": "feature"}
+{"id": "7fd727d8", "state": "v0.19.0 — live, instrumented terminal UI", "truth": "other"}
+{"id": "89537a0b", "state": "live streaming + activity panel + ergonomics", "truth": "feature"}
+{"id": "bc74e7eb", "state": "v0.18.8 — project-orchestrator hardening + verify-or-revert demo", "truth": "other"}
+{"id": "3c350f6b", "state": "6 fixes from 9th adversarial review", "truth": "fix"}
+{"id": "71af494e", "state": "v0.18.7 — skills, memory-graph & native-tools hardening", "truth": "other"}
+{"id": "6a57a170", "state": "11 fixes from 8th adversarial review", "truth": "other"}
+{"id": "dc1ead6c", "state": "v0.18.6 — migration, provider & sandbox hardening", "truth": "other"}
+{"id": "e5e9964e", "state": "15 fixes from 7th adversarial review", "truth": "other"}
+{"id": "6b83911e", "state": "v0.18.5 — data-integrity & server-security hardening", "truth": "other"}
+{"id": "b9a51ae9", "state": "opt-in bearer auth + WhatsApp HMAC (deferred S2/S3 findings)", "truth": "other"}
+{"id": "f78cbc6f", "state": "14 fixes from adversarial review of 4 surfaces", "truth": "fix"}
+{"id": "411497c3", "state": "v0.18.4 — loop, scheduler & connector hardening", "truth": "other"}
+{"id": "f563bfd4", "state": "10 fixes from adversarial review of loop/scheduler/MCP", "truth": "fix"}
+{"id": "30e27a6a", "state": "v0.18.3 — flywheel honesty", "truth": "other"}
+{"id": "cee83954", "state": "4 flywheel honesty fixes from an adversarial review of the differentiator", "truth": "fix"}
+{"id": "7830247a", "state": "v0.18.2 — adversarial-review hardening", "truth": "other"}
+{"id": "6848120a", "state": "contributor onboarding — Makefile, refreshed architecture map, strict-clean docs", "truth": "docs"}
+{"id": "361c528a", "state": "report p50/p95/p99/max tail cost in cascade-bench, not just the mean", "truth": "feature"}
+{"id": "b8bbf477", "state": "4 cost-honesty fixes from an adversarial review of orchestration", "truth": "fix"}
+{"id": "cfc5ce8a", "state": "6 fixes from an adversarial review of the security surface", "truth": "other"}
+{"id": "c0da8150", "state": "v0.18.1 — fusion honesty + orchestration guards", "truth": "other"}
+{"id": "eeb621a6", "state": "5 honesty/cost bugs from adversarial review of the fusion surface", "truth": "fix"}
+{"id": "3dc2958f", "state": "close the M19-A1 flip — measured, default stays OFF", "truth": "other"}
+{"id": "26d672f7", "state": "pre-register the M19-A1 default-flip prediction (before running)", "truth": "other"}
+{"id": "e136cda4", "state": "media_digest — a real video/podcast → transcript → summary pipeline", "truth": "docs"}
+{"id": "43fe272a", "state": "add a runnable `chimera project` example (the flagship feature)", "truth": "docs"}
+{"id": "3f4ac8aa", "state": "3 verified findings from an adversarial review of the M19 surface", "truth": "fix"}
+{"id": "b6407083", "state": "make `chimera features` a complete, accurate capability mirror", "truth": "feature"}
+{"id": "106a33bf", "state": "beginner guide to add your own tool, skill, or recipe", "truth": "docs"}
+{"id": "3705708a", "state": "v0.18.0 — \"Batteries included\"", "truth": "other"}
+{"id": "6d2f796c", "state": "beginner \"what can it do & how to enable each feature\" section, all 7 languages", "truth": "docs"}
+{"id": "9e715fbe", "state": "[full] extra + batteries-included Docker image", "truth": "feature"}
+{"id": "10030f2c", "state": "v0.17.1 — chimera project resume fix", "truth": "other"}
+{"id": "029c8ee8", "state": "persist plan approval past the gate — resume no longer re-asks (M19)", "truth": "fix"}
+{"id": "21756f76", "state": "v0.17.0 draft — \"Flywheel & Project\" (M19)", "truth": "other"}
+{"id": "a921eeb2", "state": "GEPA refine bridge + auto-rollback — close the evolution loop (M19-A5, A6)", "truth": "feature"}
+{"id": "6d4d59b5", "state": "chimera project — run a project start-to-finish against a Spec (M19 Track B)", "truth": "feature"}
+{"id": "9a2c8d23", "state": "A1 flip-point — couple skill reading to skill evolving (M19-A1, default off)", "truth": "feature"}
+{"id": "ad0568ce", "state": "turn the flywheel on across every autonomous path (M19-A4)", "truth": "feature"}
+{"id": "be41639b", "state": "diff-gate the learning + memory readback (M19-A2, A3)", "truth": "feature"}
+{"id": "98867f3d", "state": "shared EvolutionContext factory — flywheel as a stack property (M19-A0)", "truth": "other"}
+{"id": "3c2a0dbc", "state": "v0.16.3 — \"Show me you're listening\"", "truth": "other"}
+{"id": "96e62b5f", "state": "typing/working indicators on every transport (Discord/Telegram/Signal/Slack)", "truth": "feature"}
+{"id": "8032f68e", "state": "show a typing indicator while the bot works on a turn", "truth": "feature"}
+{"id": "226a043c", "state": "v0.16.2 — \"Nothing shipped stays unreachable\"", "truth": "other"}
+{"id": "b2aeceb6", "state": "expose the 3 orphan eval modules — hierarchy-bench --multistep + transfer-gate", "truth": "feature"}
+{"id": "58444a4b", "state": "v0.16.1 — \"Audit hardening\" (P2-cascade + P3 + version cut)", "truth": "other"}
+{"id": "41ff9da7", "state": "hierarchy-bench command (P2) + aggregate monitor always-on for fan-out (P1)", "truth": "feature"}
+{"id": "2ec06707", "state": "wire aggregate monitor into fan-out, honest feature catalog, graceful missing-key", "truth": "fix"}
+{"id": "13af11d8", "state": "resolve 3 mypy narrowing errors — mypy now fully green (219 files)", "truth": "fix"}
+{"id": "969e6ac3", "state": "v0.16.0 — \"Task-Typed Fusion & Fan-Out Safety\"", "truth": "other"}
+{"id": "b8b4e6ce", "state": "aggregate cross-agent monitor + collusion red-team (FakeLab, arXiv 2607.07368)", "truth": "feature"}
+{"id": "4bf2b68d", "state": "bug-report task normalizer before planning (solve --normalize-task, arXiv 2607.07593)", "truth": "feature"}
+{"id": "742e49c5", "state": "TraceProbe anti-pattern detectors as failure retry signals (arXiv 2607.06184)", "truth": "feature"}
+{"id": "21eb83be", "state": "panel-independence metric + blind-panel regression guard (MALLM/blind panel)", "truth": "feature"}
+{"id": "dc1bbd51", "state": "task-typed aggregation — vote on logic tasks, synthesize on knowledge (MALLM)", "truth": "feature"}
+{"id": "80bdefe6", "state": "wire PROBE into the live solve loop — record (arm, proxy, reward) per attempt", "truth": "feature"}
+{"id": "20ecc064", "state": "v0.15.0 — Trustworthy Verifier & Write Security (M18 Tier-1)", "truth": "other"}
+{"id": "7e8e3be8", "state": "PROBE best-arm identification with a cheap-proxy control variate (M18-5)", "truth": "feature"}
+{"id": "d9ab651b", "state": "measured skill-lifecycle loop — provisional tier + auto promote/demote (M18-4)", "truth": "feature"}
+{"id": "caae5530", "state": "declared write-region for the file-writers (M18-3)", "truth": "feature"}
+{"id": "e4a5fbe9", "state": "gate A/B result — gen-tests 3/6 vs coverage 0/6, with an honest retraction", "truth": "other"}
+{"id": "8708da1f", "state": "cross-provider decomposed envelope auditing (M18-2) + M18-1 gate A/B runner", "truth": "feature"}
+{"id": "1c327c87", "state": "spec-grounded test generation for the fitness gate (M18-1)", "truth": "feature"}
+{"id": "496378e1", "state": "drop orphan quarantine_extract tool wrapper", "truth": "other"}
+{"id": "114e9b74", "state": "reflect today's capabilities across all 7 languages", "truth": "docs"}
+{"id": "2620d557", "state": "wire built-in skills into the agent loop + close download_media taint hole (v0.14.0)", "truth": "fix"}
+{"id": "127c0eeb", "state": "add `data` extra (pandas+scikit-learn) for data_analysis (v0.13.1)", "truth": "other"}
+{"id": "f3a9beb0", "state": "data_visualization skill + render_chart Vega-Lite tool (v0.13.0)", "truth": "feature"}
+{"id": "f6dec6e5", "state": "data_analysis skill + download_media (yt-dlp) + local image backend (v0.12.0)", "truth": "feature"}
+{"id": "1e869d86", "state": "CSS-deterministic extract, resumable crawl, speech-to-text tool (v0.11.0)", "truth": "feature"}
+{"id": "5bce7c14", "state": "Phase 2 — map + crawl (whole-site, robots-aware) completes the verb set (v0.10.0)", "truth": "feature"}
+{"id": "7dbab881", "state": "agent-native web scraping + injection-safe structured extraction (v0.9.0)", "truth": "feature"}
+{"id": "a1f5ba46", "state": "v0.8.1 — Docker image bakes the browser (Chromium + system libs)", "truth": "other"}
+{"id": "e51b273b", "state": "bake the browser into the image so it launches in the container", "truth": "fix"}
+{"id": "bde5aa3b", "state": "ship the full browser in the base + auto-download Chromium (v0.8.0)", "truth": "feature"}
+{"id": "59146aa0", "state": "skip absent-extra assertions when playwright is installed", "truth": "test"}
+{"id": "d7a7d998", "state": "v0.7.0 — front-end reading + honest-benchmark release", "truth": "other"}
+{"id": "f3544114", "state": "read the front-end — read_text + find on the browser tool", "truth": "feature"}
+{"id": "f94b44f2", "state": "re-sync all 6 translated READMEs to the current English canonical (M-TB)", "truth": "docs"}
+{"id": "aa05cc30", "state": "add official Terminal-Bench null result to the honest-benchmarks pillar (M-TB)", "truth": "docs"}
+{"id": "659a8b39", "state": "finalize series — baseline serial repeat + honest self-correction (M-TB)", "truth": "other"}
+{"id": "013e5916", "state": "follow-ups published — anomaly resolved + max-attempts-3 A/B (M-TB)", "truth": "other"}
+{"id": "7b3d1541", "state": "anomaly resolved — hello-world flaky at serial (2/5), intrinsic variance not concurrency (M-TB)", "truth": "other"}
+{"id": "97243515", "state": "pre-register follow-ups (anomaly repeat + max-attempts-3 A/B) before running (M-TB)", "truth": "other"}
+{"id": "99ed0abb", "state": "Phase 2 A/B published — honest negative result (M-TB)", "truth": "other"}
+{"id": "a2535a46", "state": "pre-register Phase 2 A/B prediction before running (M-TB)", "truth": "other"}
+{"id": "8088db26", "state": "Phase 1 DONE — two integration bugs fixed, config locked (M-TB)", "truth": "other"}
+{"id": "c6da72fe", "state": "Phase 0 DONE — harness grades the Chimera agent (no more agent_timeout)", "truth": "other"}
+{"id": "287540dc", "state": "Phase 0 root-cause + execution plan", "truth": "docs"}
+{"id": "330f7de3", "state": "transfer-holdout promotion gate (from EvoAgentBench 2607.05202)", "truth": "feature"}
+{"id": "1ec2b10b", "state": "M18 — continuous MEASURED dollar (captures cache tokens through the arms)", "truth": "feature"}
+{"id": "89330cd7", "state": "M17 — actually USE prompt caching + thread cache tokens into receipts", "truth": "feature"}
+{"id": "c69e4611", "state": "capture prompt-cache tokens + measured-dollar bridge (validate caching model)", "truth": "feature"}
+{"id": "397df90a", "state": "curve-driven gate + doc-heterogeneity + caching-dollar model", "truth": "feature"}
+{"id": "c2a653ad", "state": "full real runs on all 3 axes — (D-1)/D law confirmed", "truth": "other"}
+{"id": "159ae6c5", "state": "generalize companion sweep to 3 axes — D, S (doc size), Q (turns)", "truth": "feature"}
+{"id": "3e0fd339", "state": "per-subtask inline gate + D-sweep confirms the (D-1)/D token law", "truth": "feature"}
+{"id": "a6ea40f7", "state": "v0.6.0 — M16 Hierarchy & Second Brain", "truth": "other"}
+{"id": "9519f940", "state": "address M16 code review — verification bypass + budget honesty + 4 more", "truth": "fix"}
+{"id": "4b437df6", "state": "multi-step companion finds the token crossover — -66.5% (M16)", "truth": "other"}
+{"id": "8ed7e70d", "state": "first real 4-arm run — fusion is 11x waste, cascade near-mid at 1/12 cost (M16-A6)", "truth": "other"}
+{"id": "6c0748eb", "state": "first real run — honest result (M16-A8)", "truth": "other"}
+{"id": "43cb449f", "state": "M16 Hierarchy & Second Brain under [Unreleased]", "truth": "docs"}
+{"id": "28924e82", "state": "hierarchy paired A/B — the M16 headline benchmark (M16-A8)", "truth": "feature"}
+{"id": "28cff8f3", "state": "morning brief — parallel research recipe on the hierarchy (M16-B3)", "truth": "feature"}
+{"id": "033996fc", "state": "HierarchicalOrchestrator — the M16 centerpiece (M16-A7)", "truth": "feature"}
+{"id": "2cd1c0b1", "state": "chimera assist — the daily-driver on the cascade (M16-B2)", "truth": "feature"}
+{"id": "528e9916", "state": "persistent user profile as a byte-stable cacheable preamble (M16-B1)", "truth": "feature"}
+{"id": "d66fab35", "state": "FrugalGPT cascade weak->gate->mid->gate->fusion + route log (M16-A6)", "truth": "feature"}
+{"id": "30fd3e76", "state": "three-gate envelope verifier (M16-A5)", "truth": "feature"}
+{"id": "00d5b1b4", "state": "harness-enforced per-delegation token budgets (M16-A4)", "truth": "feature"}
+{"id": "5203f81b", "state": "delegation receipts + profitability gate + counterfactual (M16-A3)", "truth": "feature"}
+{"id": "ad4e9655", "state": "artifact store + envelope compaction (M16-A2)", "truth": "feature"}
+{"id": "bc1e4520", "state": "model tiers + cost modes + delegation contract (M16-A1)", "truth": "feature"}
+{"id": "15cfd2ec", "state": "v0.5.0 positioning — \"governed, self-evolving agent, proved and governed\" (7 languages)", "truth": "docs"}
+{"id": "fe9af648", "state": "v0.5.0 — M15 \"Proved and Governed\"", "truth": "other"}
+{"id": "c3e1345d", "state": "doctor --fix — safe, secret-free setup repairs (M15-D1)", "truth": "feature"}
+{"id": "9da48af5", "state": "dreaming promotion gate — promote a recall only when it earns it (M15-C3)", "truth": "feature"}
+{"id": "08edc111", "state": "error->recovery taxonomy + credential-pool cooldowns (M15-C2)", "truth": "feature"}
+{"id": "7909f2d4", "state": "note M15-B2 (HITL envelope), B4 (distill), B5 (maturity scorecard)", "truth": "docs"}
+{"id": "48730a4b", "state": "maturity scorecard — surfaces x coverage-IDs proven by real tests (M15-B5)", "truth": "feature"}
+{"id": "8e013ca6", "state": "distill a verified failed->passed correction into a skill card (M15-B4)", "truth": "feature"}
+{"id": "5bde5eb6", "state": "HITL {accept, edit, respond, ignore} envelope over the taint-pause (M15-B2)", "truth": "feature"}
+{"id": "6f683a0a", "state": "goldilocks C1 run — loop tripled pass-rate, 3-0 discordant, one pair short", "truth": "docs"}
+{"id": "3d4cf6a1", "state": "record the 6-task paired C1 run — method proven, number honest (M15-C1)", "truth": "docs"}
+{"id": "32c76e20", "state": "persist per-task rows + model in the paired result (M15-C1)", "truth": "feature"}
+{"id": "eb7b9a6f", "state": "paired weak-model-lift runner over fork+identical-state (M15-C1 runner)", "truth": "feature"}
+{"id": "a597c16b", "state": "note M15-A2 (SKILL.md) + A5 (idempotency/memory sanitize) — Phase A done", "truth": "docs"}
+{"id": "2e412887", "state": "idempotency guard on side-effect retries + memory sanitization (M15-A5)", "truth": "feature"}
+{"id": "491d8506", "state": "SKILL.md interop + progressive disclosure (M15-A2)", "truth": "feature"}
+{"id": "2779c0a3", "state": "note M15-B1 checkpoint fork + paired A/B", "truth": "docs"}
+{"id": "6632cd19", "state": "checkpoint fork + paired A/B for replayable evolution experiments (M15-B1)", "truth": "feature"}
+{"id": "381b4135", "state": "note the M15-B3 fusion receipts under Unreleased", "truth": "docs"}
+{"id": "9bcb5aed", "state": "per-advisor cost receipts + cost×quality summary (M15-B3)", "truth": "feature"}
+{"id": "7e467e08", "state": "note M15-A3 (control-token stripping) + A4 (tool-loop breaker)", "truth": "docs"}
+{"id": "a9d628af", "state": "tool-loop circuit breaker — stop a spinning run (M15-A4)", "truth": "feature"}
+{"id": "58819773", "state": "strip chat-template/control tokens from untrusted content (M15-A3)", "truth": "feature"}
+{"id": "3389c23e", "state": "note the M15-A1 diff-gate under Unreleased", "truth": "docs"}
+{"id": "6107458e", "state": "diff-gate — certify a step by its real diff, not self-report (M15-A1)", "truth": "feature"}
+{"id": "ebe0499a", "state": "lead with `pip install chimera-agent` + PyPI badge (7 languages)", "truth": "docs"}
+{"id": "4586062a", "state": "PyPI Trusted Publishing workflow (OIDC, no stored token)", "truth": "other"}
+{"id": "ab98eb6e", "state": "note the version-reporting fix under 0.4.1", "truth": "docs"}
+{"id": "60f5e4c3", "state": "read __version__ from package metadata, not a stale literal", "truth": "fix"}
+{"id": "58d8e16f", "state": "v0.4.1 — solve reliability + speed, weak-model A/B harness", "truth": "other"}
+{"id": "c2358a71", "state": "record the honest weak-model A/B (raw-8B vs full loop, +16.7pp, n=6)", "truth": "docs"}
+{"id": "15323570", "state": "add a baseline arm to the CI gauge (raw model vs chimera A/B)", "truth": "test"}
+{"id": "2e4f625d", "state": "skip the LLM coverage grade when an executable verifier already passed", "truth": "other"}
+{"id": "94553a15", "state": "surface the solve error tail in the CI gauge (diagnose 429s etc.)", "truth": "test"}
+{"id": "4df371aa", "state": "default quality-bench to a valid free model (qwen3-coder:free)", "truth": "other"}
+{"id": "82a7ae46", "state": "quality-bench workflow (manual trigger, free model, reports pass-rate)", "truth": "other"}
+{"id": "5f089927", "state": "CI quality gauge — chimera solve pass-rate over the local task set", "truth": "test"}
+{"id": "99a4e85f", "state": "feed the concrete test output to the retry, not just the manager's note", "truth": "feature"}
+{"id": "a460fde0", "state": "inject the requirement checklist into the worker's first attempt", "truth": "feature"}
+{"id": "fa817f1f", "state": "run the TB Chimera agent via container.exec_run, bypassing tmux completion detection", "truth": "fix"}
+{"id": "e7d3b141", "state": "make the agent execute the fix, not narrate it (+ TB completion polish)", "truth": "feature"}
+{"id": "62ef6090", "state": "run agent commands non-interactively with stdin closed (kills the hang)", "truth": "fix"}
+{"id": "6633a05e", "state": "use context manager for the TB agent temp script (ruff SIM115)", "truth": "other"}
+{"id": "b72607ba", "state": "working Terminal-Bench installed-agent for Chimera (proven on the official harness)", "truth": "test"}
+{"id": "16aa7b68", "state": "self-contained official Terminal-Bench A/B runner (disposable-box, disk-guarded)", "truth": "test"}
+{"id": "6339c415", "state": "v0.4.0 — M14 cycle (proof infra + amplification + closed loop + rubric)", "truth": "other"}
+{"id": "5a2cc0cd", "state": "reproducible local weak-model-lift A/B harness (Docker-free)", "truth": "test"}
+{"id": "6add7bf9", "state": "SWE-bench Verified-Mini adapter — second scoreboard for the weak-model-lift thesis", "truth": "feature"}
+{"id": "358bfa13", "state": "authorable rubric grading — weighted criteria + required-criterion veto", "truth": "feature"}
+{"id": "79a66eeb", "state": "RFT loop — rejection-sampling fine-tuning, gated by an honest A/B bench", "truth": "feature"}
+{"id": "0d3811e8", "state": "ACE delta-playbook — incremental strategy memory (anti context-collapse)", "truth": "feature"}
+{"id": "cfbfdce4", "state": "GEPA — reflective, Pareto-guided prompt evolution for skills", "truth": "feature"}
+{"id": "76228323", "state": "independent strong verification, gated to hard turns", "truth": "feature"}
+{"id": "9a3769be", "state": "verifier-based sample selection (Weaver-lite) — pick, don't just vote", "truth": "feature"}
+{"id": "950a2e09", "state": "agreement-based escalation — a free confidence signal for routing", "truth": "feature"}
+{"id": "462599d3", "state": "requirement checklist — catch the constraints a weak model drops", "truth": "feature"}
+{"id": "84d92778", "state": "Terminal-Bench adapter + honest A/B engine — the \"with proof\" measuring stick", "truth": "feature"}
+{"id": "8585a78a", "state": "v0.3.0 — M13 cycle (coding, intelligence, resilience, interop)", "truth": "other"}
+{"id": "f696bf2d", "state": "browser navigation — accessibility-tree driving (answer -> act)", "truth": "feature"}
+{"id": "fb1dbc62", "state": "repo-map — structural workspace digest for the agent's context", "truth": "feature"}
+{"id": "6186ee26", "state": "self-consistency (best-of-N) — cheap single-model fusion", "truth": "feature"}
+{"id": "94215259", "state": "human-in-the-loop interrupt — pause a tainted run for approve/deny", "truth": "feature"}
+{"id": "a37839cf", "state": "durable execution — checkpoint/resume the solve loop by thread", "truth": "feature"}
+{"id": "35cdf97c", "state": "dual-ledger re-plan — rebuild the plan from accumulated failure cause on stall", "truth": "feature"}
+{"id": "dd0b185b", "state": "A2A message/stream — SSE streaming task lifecycle (orchestratable)", "truth": "feature"}
+{"id": "a1500251", "state": "streaming foundation — token primitive + structured run events", "truth": "feature"}
+{"id": "dbbaaed2", "state": "completion contracts — machine-checkable success clauses (anti-overclaim)", "truth": "feature"}
+{"id": "6d43b834", "state": "progress ledger — structured per-attempt self-check (weak-LLM lift)", "truth": "feature"}
+{"id": "df8b3b39", "state": "read_document — ingest PDF/DOCX/XLSX via MarkItDown (opt-in extra)", "truth": "feature"}
+{"id": "23fd2525", "state": "surgical file editing — edit_file + apply_patch (stop rewriting files)", "truth": "feature"}
+{"id": "363178b8", "state": "complete the 0.2.0 entry with M11 (memory) + M12 (interop)", "truth": "docs"}
+{"id": "bba5d486", "state": "A2A adapter — agent card + task lifecycle over JSON-RPC", "truth": "feature"}
+{"id": "8841d550", "state": "Chimera as an MCP server — serve --mcp exposes solve/fuse/memory", "truth": "feature"}
+{"id": "5ce4bc16", "state": "skill retirement — proposed-with-review, reversible, never a delete", "truth": "feature"}
+{"id": "b9d0c6a5", "state": "opt-in semantic recall — embeddings bridge paraphrases, FTS fallback", "truth": "feature"}
+{"id": "d3b1b1ac", "state": "memory-bench — recall@k vs scale, lexical vs paraphrase", "truth": "feature"}
+{"id": "3167f1b5", "state": "+2 consumer recipes (research brief, repo watchdog) + index", "truth": "docs"}
+{"id": "3935aee8", "state": "chimera init — one-command out-of-the-box setup", "truth": "feature"}
+{"id": "c9a5e6b1", "state": "prompt-injection red-team suite — the honest number for #5", "truth": "feature"}
+{"id": "621173e4", "state": "taint-adaptive allowlist — narrow dangerous tools after taint", "truth": "feature"}
+{"id": "d1285051", "state": "quarantined reader (dual-LLM / CaMeL injection defense)", "truth": "feature"}
+{"id": "b0502881", "state": "per-skill usage metrics + measured retirement signal", "truth": "feature"}
+{"id": "c466bcf8", "state": "real-server guide + runnable GitHub MCP example", "truth": "docs"}
+{"id": "da1957ae", "state": "dedup memory candidates resolving to the same file", "truth": "fix"}
+{"id": "f017a95a", "state": "email triage — first real end-to-end consumer example", "truth": "feature"}
+{"id": "aad75f31", "state": "data-fencing (spotlighting) on untrusted fetched content", "truth": "feature"}
+{"id": "6a32edf1", "state": "taint provenance on memories and learned skills (anti-poisoning)", "truth": "feature"}
+{"id": "8f15e427", "state": "multi-round evolution bench — vector-mode stagnation + cost drift", "truth": "feature"}
+{"id": "71a1da75", "state": "anti-stagnation signal for the solve/evolution loop", "truth": "feature"}
+{"id": "16be8ee6", "state": "capability ledger + heuristic taint tracking (issues #2, #5)", "truth": "feature"}
+{"id": "df641223", "state": "per-session tool allowlist (issue #4)", "truth": "feature"}
+{"id": "cb7d8020", "state": "opt-in gVisor runtime for the docker sandbox", "truth": "feature"}
+{"id": "b4503a96", "state": "escalate a failed attempt's retry to the fusion worker", "truth": "feature"}
+{"id": "717d6752", "state": "sync 6 translations with the sandbox/rules/fusion honesty fixes", "truth": "docs"}
+{"id": "041110c8", "state": "re-escalate a single-model turn to fusion when a check fails", "truth": "feature"}
+{"id": "8b0dbfc5", "state": "be honest about sandbox isolation, rule limits, and fusion", "truth": "docs"}
+{"id": "42052666", "state": "cross-link the r/ChimeraAgent Reddit community", "truth": "docs"}
+{"id": "49434fad", "state": "structural-vs-parametric AST edit classifier (EvoPolicyGym)", "truth": "feature"}
+{"id": "ff528d59", "state": "refresh all 7 READMEs — test count, measured selective fusion, bench commands", "truth": "docs"}
+{"id": "8cf65665", "state": "process-quality trajectory filter (SkillCoach, phase 1)", "truth": "feature"}
+{"id": "151309d3", "state": "state-based, side-effect-aware grading (WorkBench)", "truth": "feature"}
+{"id": "d343ff90", "state": "statistically-honest degradation flag + Wilson skill-accept gate (SEA)", "truth": "feature"}
+{"id": "86ed9e03", "state": "wire schema compaction + schema-bench (opt-in)", "truth": "feature"}
+{"id": "47f72782", "state": "advertise-time tool-schema compaction", "truth": "feature"}
+{"id": "e2b1dc94", "state": "record skillcard-bench evidence for keeping cards off by default", "truth": "docs"}
+{"id": "f7335a09", "state": "skill-card A/B bench (with cards vs without)", "truth": "feature"}
+{"id": "2c911336", "state": "BM25 skill-card retrieval + injection into the worker context", "truth": "feature"}
+{"id": "da29edb7", "state": "correctness-aware card distillation (pattern + anti-pattern)", "truth": "feature"}
+{"id": "023ff7f9", "state": "TRS reasoning-card schema on LearnedSkill", "truth": "feature"}
+{"id": "14c9b5ff", "state": "make selective fusion the default", "truth": "feature"}
+{"id": "8b8e0af9", "state": "fusion A/B bench (full vs selective)", "truth": "feature"}
+{"id": "56bab8b1", "state": "opt-in selective/escalating fusion", "truth": "feature"}
+{"id": "634c6241", "state": "per-stage token telemetry on FusionTrace", "truth": "feature"}
+{"id": "79b53b02", "state": "warn against :free panel models (429) + a cheap reliable fusion recipe", "truth": "docs"}
+{"id": "0863d4ff", "state": "skip the live httpbin test when the third party is down", "truth": "test"}
+{"id": "2cb7b22a", "state": "run_shell — per-call cwd + configurable timeout cap", "truth": "feature"}
+{"id": "b7034dfc", "state": "production-harden the cron daemon (live reload + confirmed delivery)", "truth": "feature"}
+{"id": "b0b64fa4", "state": "link Discussions from the new-issue chooser", "truth": "other"}
+{"id": "c46bd468", "state": "add donation link (Stripe) — Sponsor button, header badge, Support section", "truth": "docs"}
+{"id": "350c9125", "state": "retranslate all 6 READMEs to match the newcomer-friendly rewrite", "truth": "docs"}
+{"id": "c75f4a0e", "state": "rewrite for newcomers — plain language, visual map, clearer vision", "truth": "docs"}
+{"id": "fdbad6fe", "state": "Dockerfile + docker-compose + deploy guide + install.sh", "truth": "feature"}

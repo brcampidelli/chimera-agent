@@ -1007,6 +1007,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/decide": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide Route
+         * @description Typed questions over a state — the open System One interface (study 22, phase 4).
+         *
+         *     The same function as `chimera decide` and the agent's `decide` tool. A question the linter
+         *     rejects is a 422 naming it; a backend that fails on a question is that question's `error`,
+         *     and the others are still answered. The decider is built once and kept: it holds one client
+         *     and the cache of readings.
+         */
+        post: operations["decide_route_api_decide_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/decisions/{decision_id}/label": {
         parameters: {
             query?: never;
@@ -4342,6 +4367,57 @@ export interface components {
             grace_seconds: number;
             /** Overdue */
             overdue: components["schemas"]["CronLateOut"][];
+        };
+        /**
+         * DecideIn
+         * @description The open System One request (study 22, phase 4) — the Decisions API's own shape.
+         */
+        DecideIn: {
+            /**
+             * Decision
+             * @default
+             */
+            decision: string;
+            /** Questions */
+            questions: {
+                [key: string]: components["schemas"]["DecideQuestionIn"];
+            };
+            /** State */
+            state: string;
+        };
+        /** DecideOut */
+        DecideOut: {
+            /** Answers */
+            answers: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+            /** Model */
+            model: string;
+            /** Receipts */
+            receipts: {
+                [key: string]: {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        /** DecideQuestionIn */
+        DecideQuestionIn: {
+            /**
+             * Criteria
+             * @default {}
+             */
+            criteria: {
+                [key: string]: string;
+            };
+            /** Instructions */
+            instructions: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "noul" | "choice" | "score";
         };
         /** DecisionLabelIn */
         DecisionLabelIn: {
@@ -8787,6 +8863,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CronJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_route_api_decide_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecideOut"];
                 };
             };
             /** @description Validation Error */

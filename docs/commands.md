@@ -27,6 +27,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
+| [`decide`](#decide) | Ask typed questions — yes/no, a choice, a score — and get probabilities back. |
 | [`decisions`](#decisions) | The decision log: what the typed decisions answered, labels, a report and a refit. |
 | [`delegations`](#delegations) | Measured vs counterfactual across delegations — what the hierarchy actually saved. |
 | [`deliver`](#deliver) | Deliverable Mode: produce a polished, self-contained artifact. Requires a key. |
@@ -426,6 +427,28 @@ Manage scheduled jobs (crons and event SOPs).
 ```bash
 chimera cron
 ```
+
+## decide
+
+Ask typed questions — yes/no, a choice, a score — and get probabilities back.
+
+Every question is read on its own, decision-first; a question the linter rejects is refused before
+any call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a
+probability of being right. A number is calibrated only where a map exists for exactly this question.
+
+```bash
+chimera decide
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--questions`, `-q` | JSON file: the questions (request shape, no state). |  |
+| `--state`, `-s` | The state to ask about. | `''` |
+| `--jsonl` | Ask about every line of this JSONL file instead. |  |
+| `--field` | With --jsonl: the field that holds the state. | `'state'` |
+| `--out`, `-o` | With --jsonl: write results here (default: stdout). |  |
+| `--decision` | Name the decision (the key a calibration map is found by). | `''` |
+| `--no-log` | Do not write the answers to the decision log. |  |
 
 ## decisions
 
