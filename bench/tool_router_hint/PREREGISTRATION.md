@@ -81,3 +81,15 @@ edits (§2aa). Arm names `sys1h-{off,on}-{exec}-r{k}`, so no B4 result or home i
 **Pilot, unscored:** one `on` solve on `044-ci-config-repair` for the strong and the weak executor, read only for
 the positive control — the router's receipt must show `hinted > 0` and no fallback storm — and deleted before the
 scored run. If the pilot shows the hint never reaches the executor, the run does not start.
+
+## Amendment 2 — the wrapper runs from $HOME; the pilot passed (2026-09-23, before any scored solve)
+
+Setup found that the frozen venv listed the ruler (`chimera-b4b`) while `import chimera` resolved to the main
+working tree: `wsl` starts in the Windows working directory, and `python -m` puts the current directory first on
+`sys.path`. The wrapper now `cd`s to `$HOME` before the solve and writes `=== chimera=<path> ===` into every log,
+so each solve carries a receipt of the code that ran. (B4's venv pointed at the main tree outright; that is a note
+about B4's apparatus, recorded here and not re-litigated.)
+
+Pilot (`044`, `on`, strong + weak, US$ 0.02): both logs name the frozen ruler; the router gave **13 and 4 hints,
+narrowed 0, answered 0, fallbacks 0**; the executors followed 5/13 and 1/4. Positive control passed; the two
+solves and their homes, logs and sandboxes were deleted, and the scored run starts clean.

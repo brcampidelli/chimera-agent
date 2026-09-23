@@ -26,6 +26,14 @@ export CHIMERA_HOST_EXEC=allow
   echo "=== start=$(date +%s) task=$task_id hid=$hid model=$executor flags=[${flags[*]}] ==="
 } >> "$log"
 
+# `python -m` puts the CURRENT DIRECTORY first on sys.path, and a `wsl` launched from Windows starts in
+# the Windows working directory — which, on this machine, is the main Chimera tree someone else edits.
+# The import then silently runs THAT code instead of the frozen ruler. Found in setup (study 22 phase 6):
+# the venv listed the frozen worktree while `import chimera` resolved to the main tree. So the solve runs
+# from $HOME, and the log records which tree answered.
+cd "$HOME" || exit 2
+echo "=== chimera=$("$HOME/hb-venv-b4b/bin/python" -c 'import chimera, os; print(os.path.dirname(chimera.__file__))') ===" >> "$log"
+
 "$HOME/hb-venv-b4b/bin/python" -m chimera.cli.main solve "$(cat "$prompt_file")" \
   -w "$ws" -m "$executor" \
   --max-attempts 1 --max-steps 120 \
