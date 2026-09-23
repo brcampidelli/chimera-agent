@@ -57,10 +57,17 @@ function mount() {
  *  `onDone` is deferred by a tick on purpose. A real turn ends asynchronously; calling it
  *  synchronously inside `send` would batch `setBusy(true)` and `setBusy(false)` into one render,
  *  `busy` would never be observed as true, and the `[busy]` effect that carries the continuation
- *  would never fire — a test that fails for a reason the app does not have. */
+ *  would never fire — a test that fails for a reason the app does not have.
+ *
+ *  And not by ONE tick: React schedules the render that commits `busy = true` as a task of its own,
+ *  and on a loaded runner that task can land after a 0 ms timer — the same batching, reached by a
+ *  slower route. It failed that way on CI (2 of 4 calls, then 3 of 4) while passing everywhere else.
+ *  A real turn lasts seconds; 25 ms is still instant for the test and long enough for the commit. */
+const TURN_MS = 25;
+
 function alwaysMaxSteps() {
   vi.mocked(streamCodeTurn).mockImplementation(async (_req: unknown, h: CodeTurnHandlers) => {
-    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, TURN_MS));
     h.onDone?.(done("max_steps"));
   });
 }
@@ -84,18 +91,20 @@ describe("auto-continue at the step ceiling", () => {
 
     // Four chained turns, each re-rendering the screen: 1.3 s on a loaded CI runner, past waitFor's
     // 1 s default (failed twice in a row on #540 with 3 of 4). The bound, not the behaviour, was wrong.
-    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(4), { timeout: 5000 });
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(4), { timeout: 10000 });
     // Give the machinery a beat to prove it does NOT go to five.
     await new Promise((r) => setTimeout(r, 20));
     expect(streamCodeTurn).toHaveBeenCalledTimes(4);
-  });
+    // The test's own ceiling above the wait's: with both at 5 s the runner killed the test before
+    // the wait could finish, three times in a row on #544 while `main` passed the same code.
+  }, 20000);
 
   it("does not continue a turn that stopped for any reason other than the step limit", async () => {
     // `tool_loop` is the model repeating itself: continuing would repeat it again, on the user's
     // money. One call, and no second one, is the whole assertion.
     localStorage.setItem("chimera.autoContinue", "1");
     vi.mocked(streamCodeTurn).mockImplementation(async (_req: unknown, h: CodeTurnHandlers) => {
-      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, TURN_MS));
       h.onDone?.(done("tool_loop"));
     });
     mount();
@@ -132,7 +141,7 @@ describe("auto-continue at the step ceiling", () => {
     vi.mocked(streamCodeTurn).mockImplementation(async (_req: unknown, h: CodeTurnHandlers) => {
       calls += 1;
       if (calls === 1) {
-        await new Promise((r) => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, TURN_MS));
         h.onDone?.(done("max_steps"));
         return;
       }
