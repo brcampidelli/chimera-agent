@@ -14,6 +14,7 @@ with the two thresholds read off the ROC at the false-refusal rate the owner tol
 from __future__ import annotations
 
 from chimera.decisions.contract import Choice
+from chimera.decisions.spec import DecisionSpec, Escalation, Mode, register
 
 DECISION = "governance.danger"
 
@@ -34,3 +35,17 @@ DANGER = Choice(
     event=("BLOCK", "REVIEW"),
     event_name="dangerous",
 )
+
+SPEC = register(DecisionSpec(
+    name=DECISION,
+    questions=(DANGER,),
+    escalation=Escalation.REVIEW,
+    bench="bench/jev_decisions/RESULTS.md",
+    # The band reads p through its own two thresholds and hysteresis (settings), not one cut.
+    threshold=None,
+    mode=Mode.ENFORCE,
+    # A halt leaves the kernel's rules and ledger as they decided: the band only ever adds a card.
+    on_no_signal=None,
+    description="Is this shell action dangerous? p = P(BLOCK or REVIEW); the band raises REVIEW.",
+    surfaces=("chimera/governance/band.py",),
+))

@@ -100,6 +100,10 @@ call.
    on hosted backends isolation means N calls, and the spec says so. **A decision cache** keyed on
    (normalized state, instrument hash, build) — repeated shell commands are the common case (edge-orchestration
    paper: caching erased the latency gap entirely).
+   *Correction, 2026-09-23 (phase 1):* the shipped instrument puts the state **after** each question's
+   instructions, so N questions share no prefix and cost N full reads (measured 3.92× for four).
+   State-first would share it, but it is a different instrument — a new hash that the shipped
+   governance map does not cover — so it waits for a bench of its own.
 3. **Answer v2.** Adds `confidence` = (K·p_max−1)/(K−1) for Choice/Score (documented as a shape statistic, never
    thresholded — I5), `expectation` for Score, neutral-label rendering (I3: options sent as `0/1/2…` or `A/B/C` with
    the meaning in `criteria`), and a Meta-style trace: matched rule, instrument hash, map key, build, cache hit.
@@ -177,7 +181,7 @@ second training round transferred to 0 of 13 other families.
 | Phase | Content | Gate | Cost |
 |---|---|---|---|
 | **0 — Hygiene** (done, 2026-09-23) | An abstention is never recorded as a verdict (spot check, strong verifier, checklist); zero label mass is no signal, not p = 0; stale "no surface wires a Decider" docstrings; `EXIT_AT` as a setting; A4 first-token collision check; correct the MCA statements in study 20 / jev_decisions (clause removed 2026-09-19) | Tests + sabotage | US$ 0 |
-| **1 — Contract v2** | `DecisionSpec` + escalate-only `direction` type + AST guard on specs; fan-out asker with shared prefix; decision cache; Answer v2 (confidence, expectation, neutral labels, trace); question linter | Contract tests; latency of N questions vs 1 on qwen3:4b measured | US$ 0 |
+| **1 — Contract v2** (done, 2026-09-23) | `DecisionSpec` + escalate-only `Escalation` type + AST guard that every spec names a bench file on disk; `decide_many` (isolated reads — **no** shared prefix: state-first is a new instrument and would orphan the shipped map); `DecisionCache` keyed on the exact state; Answer v2 (`confidence` as a shape statistic, `cached` on the receipt, `Choice.neutral()` + `restore`); question linter (`chimera/decisions/lint.py`). Governance registered as the first spec | Contract tests + sabotage; `bench/decisions_v2/RESULTS.md`: 1 question 0.32 s, 4 questions 1.26 s (3.92×), cache hit 0.1 ms, 0 halts / 385 | US$ 0 |
 | **2 — Label loop** | `decisions.jsonl`; outcome filling from verifier/oracle; danger label on the approval card (separate from Approve); `chimera decisions refit/report` with per-family pooling (<20 positives) and review-budget metric | A refit on the bench rows reproduces the shipped map; report on the owner's data | US$ 0 |
 | **3 — First surfaces, shadow → enforce** | Band rollout with the overseer battery as a shadow arm; spot check as Nouls on blind_audit; voice gray zone once 100 rows are reviewed; Manager *p* record-only | One pre-registered bench per surface; enforce only on a passed gate | ≤ US$ 1 (local) |
 | **4 — Open interface** | `chimera decide`, `/api/decide`, Decisions screen, `decide` agent tool + MCP, `system-one-design` skill | Round-trip tests in the SDK shape; a map-reduce demo on 1,000 items, local, timed | US$ 0 |
