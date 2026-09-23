@@ -44,7 +44,7 @@ call.
 | **I5** | **Only a calibrated *p* crosses a threshold; the map is per question, pooled when data is thin.** Read the Noul, never a raw Choice mass or a vendor "confidence". | Study 21: Choice mass +0.11 above the Noul, ECE 0.221 vs 0.120. Jev over-confident mid-scale (stated 0.60 right 27%). | Crash narratives (2609.24052): slopes 0.51–1.24 per variable, recalibration cuts ECE 3.3×; pool families with <20 positives. TypeSafe: calibration is group-level, thresholds are domain-specific; confidence is a shape statistic, (K·p_max−1)/(K−1) fits every published example. |
 | **I6** | **Decompose, then combine in code.** Many atomic questions with named weights beat one holistic judgment. | claim-vs-diff as one Noul: AUROC 0.537 (= shuffled control). aacr review findings: ECE 0.405. | TypeSafe's spam (6 atomic Nouls), overseer (4), SDE cascade (7), composite scoring; beri write-up: phishing 62.6%→95% by decomposition. Link (Zenodo): *absence* is detected at 0.31 vs 0.99 for explicit statements — never ask "is anything missing?". |
 | **I7** | **Fuse, don't replace.** A decision reorders or filters what a deterministic stage produced; it does not become the ranking. | rag_rerank: Noul-per-chunk replaced RRF and lost −7.8 pp recall@10. | Jev-Mem fuses Jev relevance with embedding rank; TypeSafe's rerank cookbook reranks BM25 top-30 and says the shortlist bounds recall. |
-| **I8** | **Every surface is shadowed before it acts, earns an AST `ALLOWED` entry with a bench, and fails toward scrutiny.** An unreadable or halted decision means "uncertain → escalate", never "pass". | Three quality decisions fail *open* today (spot check, strong verifier, checklist grade). The AST guard in `tests/test_a_decision_has_a_contract.py` already enforces the bench-first rule. | Meta: rules first, model on the gray zone, shadow mode, promote by compare-and-swap, versioned context. "Doomed from the start" (2607.06503): recall-controlled abort gates keep 90–95% of success. |
+| **I8** | **Every surface is shadowed before it acts, earns an AST `ALLOWED` entry with a bench, and fails toward scrutiny.** An unreadable or halted decision means "uncertain → escalate", never "pass". | Three quality judges fail *open* by design (spot check, strong verifier, checklist grade) — an outage must not block a run — but they recorded the outage as a verdict (see §6, phase 0 as done). The AST guard in `tests/test_a_decision_has_a_contract.py` already enforces the bench-first rule. | Meta: rules first, model on the gray zone, shadow mode, promote by compare-and-swap, versioned context. "Doomed from the start" (2607.06503): recall-controlled abort gates keep 90–95% of success. |
 
 ---
 
@@ -60,7 +60,8 @@ call.
 - **Label reality on the owner's machine** — 197 approval rows, **all raised by taint narrowing, none carrying *p***,
   99.4% approved: they measure approval fatigue, not danger. `observe` mode produces no human labels at all.
 - **Bounded judgments made by generative calls with no number**: Manager APPROVED/REVISE, strong verifier (0–10),
-  checklist grade, progress ledger, envelope spot check, fusion selector, rubric, tool router. Three fail open.
+  checklist grade, progress ledger, envelope spot check, fusion selector, rubric, tool router. Three fail open by
+  design, and until phase 0 wrote the abstention down as a pass.
 - **Evidence** (all pre-registered): works — governance danger on short action states. Fails — claim-vs-diff,
   review findings, relevance reranking, facts-in-state, the stop decision.
 
@@ -106,9 +107,11 @@ call.
    no compound condition ("and/or" in a Noul), affirmative phrasing, instructions and criteria aligned, no numeric-only
    levels, no polar option names, a first-token collision check across options (study 21 A4, still missing), no
    reused threshold across primitives.
-5. **Fail toward scrutiny.** `halt`, parse failure and "uncalibrated" all map to the spec's escalating default. The
-   three fail-open generative judges (spot check, strong verifier, checklist) are converted in Phase 0 — that is a
-   bug fix independent of any model.
+5. **Fail toward scrutiny — for new decisions.** `halt`, parse failure and "uncalibrated" all map to the spec's
+   escalating default. The three existing judges (spot check, strong verifier, checklist) keep failing open: their
+   docstrings choose availability on purpose, and turning a provider outage into a blocked run is a trade the owner
+   makes, not a hygiene fix. What phase 0 removed is the lie: an abstention no longer reaches the record as a pass
+   (`"spot"` in `checks_run`, a 10/10 grade, "all requirements met").
 6. **DecisionLog** (`<home>/decisions/decisions.jsonl`) — every answer with its receipt and an empty `outcome` slot
    that the label loop fills.
 
@@ -173,7 +176,7 @@ second training round transferred to 0 of 13 other families.
 
 | Phase | Content | Gate | Cost |
 |---|---|---|---|
-| **0 — Hygiene** | Fail-open → escalate in spot check / strong verifier / checklist; stale "no surface wires a Decider" docstrings; `EXIT_AT` as a setting; A4 first-token collision check; correct the MCA statements in study 20 / jev_decisions (clause removed 2026-09-19) | Tests + sabotage | US$ 0 |
+| **0 — Hygiene** (done, 2026-09-23) | An abstention is never recorded as a verdict (spot check, strong verifier, checklist); zero label mass is no signal, not p = 0; stale "no surface wires a Decider" docstrings; `EXIT_AT` as a setting; A4 first-token collision check; correct the MCA statements in study 20 / jev_decisions (clause removed 2026-09-19) | Tests + sabotage | US$ 0 |
 | **1 — Contract v2** | `DecisionSpec` + escalate-only `direction` type + AST guard on specs; fan-out asker with shared prefix; decision cache; Answer v2 (confidence, expectation, neutral labels, trace); question linter | Contract tests; latency of N questions vs 1 on qwen3:4b measured | US$ 0 |
 | **2 — Label loop** | `decisions.jsonl`; outcome filling from verifier/oracle; danger label on the approval card (separate from Approve); `chimera decisions refit/report` with per-family pooling (<20 positives) and review-budget metric | A refit on the bench rows reproduces the shipped map; report on the owner's data | US$ 0 |
 | **3 — First surfaces, shadow → enforce** | Band rollout with the overseer battery as a shadow arm; spot check as Nouls on blind_audit; voice gray zone once 100 rows are reviewed; Manager *p* record-only | One pre-registered bench per surface; enforce only on a passed gate | ≤ US$ 1 (local) |

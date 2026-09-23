@@ -1175,7 +1175,9 @@ class AutonomousAgent:
             # self-enhancement bias of a model checking itself.
             if ok and self.strong_verifier is not None and index > 1:
                 passed, score = self.strong_verifier.verify(task, answer)
-                if not passed:
+                # `score is None` is an abstention (no grade came back); it never blocks, and
+                # `passed` is True with it — the `not passed` branch always carries a real grade.
+                if not passed and score is not None:
                     ok = False
                     detail = (
                         f"Independent verification scored this {score:.0%} (below the bar) — the "

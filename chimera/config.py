@@ -907,6 +907,11 @@ class Settings(BaseSettings):
     governance_band: str = Field(default="off", validation_alias="CHIMERA_GOVERNANCE_BAND")
     governance_band_review_at: float = Field(default=0.50, validation_alias="CHIMERA_GOVERNANCE_BAND_REVIEW_AT")
     governance_band_allow_below: float = Field(default=0.30, validation_alias="CHIMERA_GOVERNANCE_BAND_ALLOW_BELOW")
+    # Hysteresis exit: an action already in REVIEW leaves it only below this. It sits between the two
+    # thresholds (the band refuses any other order) — the local arm moves up to 0.05 raw between two
+    # runs of the same item, and without the gap a retry would flip verdicts on noise. It was a
+    # constant until study 22 (phase 0); a deployment that moves the thresholds must be able to move it.
+    governance_band_exit_at: float = Field(default=0.40, validation_alias="CHIMERA_GOVERNANCE_BAND_EXIT_AT")
 
     # Deployment-level tool allowlist/denylist (names). Empty allowlist = no restriction (all
     # tools); a non-empty allowlist grants only those. Denylist removes even if allowed.

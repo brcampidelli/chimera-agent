@@ -175,5 +175,9 @@ def build_band(settings: Any) -> DecisionBand:
 
     return DecisionBand(
         build_decider(settings),
-        Band(review_at=float(settings.governance_band_review_at), allow_below=float(settings.governance_band_allow_below)),
+        Band(
+            review_at=float(settings.governance_band_review_at),
+            allow_below=float(settings.governance_band_allow_below),
+            exit_at=float(getattr(settings, "governance_band_exit_at", EXIT_AT)),
+        ),
     )

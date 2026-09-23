@@ -57,6 +57,15 @@ NUM_PREDICT = 24
 TOP_LOGPROBS = 10
 
 
+def _ambiguous_prefix(token: str, options: tuple[str, ...] | list[str]) -> bool:
+    """Whether the label token is a non-empty prefix of MORE THAN ONE option (after the same
+    normalisation `label_probabilities` applies) — the first-token collision study 21 A4 named."""
+    t = token.strip().strip("\"'`*_").casefold()
+    if not t:
+        return False
+    return sum(1 for option in options if option.casefold().startswith(t)) > 1
+
+
 class LocalLogprobBackend:
     name = "local_logprob"
 
@@ -161,9 +170,18 @@ class LocalLogprobBackend:
         shares: dict[str, float] | None = None
         mass: float | None = None
         p: float | None = None
+        if idx is not None and _ambiguous_prefix(str(logprobs[idx]["token"]), question.options):  # type: ignore[index]
+            # Study 21 A4. The label token located is a prefix of more than one option (`RE` for
+            # both `REVIEW` and `REFUSE`): `label_probabilities` refuses to assign it, so the
+            # reading would be built from whatever residual mass the OTHER candidates carried —
+            # a number about the wrong token. No read is the honest outcome.
+            idx = None
         if idx is not None:
             read = label_probabilities(SimpleNamespace(logprobs=logprobs), list(question.options), position=idx)
-            if read is not None:
+            # Zero mass on the labels is NO signal, not a signal of zero. `label_probabilities`
+            # returns all-zero shares then, and summing them gave p = 0.0 — which the REVIEW band
+            # reads as a confident "not dangerous" (study 22, phase 0).
+            if read is not None and read.mass > 0.0:
                 shares, mass = read.shares, read.mass
                 if question.event:
                     p = sum(shares.get(o, 0.0) for o in question.event)
