@@ -114,7 +114,14 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--home", type=Path, default=Path(os.path.expanduser("~/harness-bench")))
     ap.add_argument("--json", type=Path)
+    ap.add_argument(
+        "--exclude",
+        default="",
+        help="comma-separated task:hid cells to treat as MISSING (the sensitivity check of RESULTS §5: "
+        "cells that failed twice before the freeze rule existed and completed on a third attempt)",
+    )
     args = ap.parse_args()
+    excluded = {tuple(x.split(":", 1)) for x in args.exclude.split(",") if ":" in x}
 
     cells: dict = {}
     for ex in EXECUTORS:
@@ -122,6 +129,9 @@ def main() -> None:
             for k in REPLICAS:
                 h = hid(arm, ex, k)
                 for task in TASKS:
+                    if (task, h) in excluded:
+                        cells[(task, arm, ex, k)] = {"outcome": None, "steps": None, "router": {}}
+                        continue
                     cells[(task, arm, ex, k)] = {
                         "outcome": outcome_of(args.home, h, task),
                         **receipt_of(h, task),
