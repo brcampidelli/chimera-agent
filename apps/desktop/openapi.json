@@ -8507,6 +8507,14 @@
             },
             "title": "Tools",
             "type": "array"
+          },
+          "unavailable": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/UnavailableToolOut"
+            },
+            "title": "Unavailable",
+            "type": "array"
           }
         },
         "required": [
@@ -8570,6 +8578,58 @@
           "assistant"
         ],
         "title": "TurnOut",
+        "type": "object"
+      },
+      "UnavailableToolOut": {
+        "description": "A tool the registry holds only under a condition that is not met right now.",
+        "properties": {
+          "default_on": {
+            "default": false,
+            "title": "Default On",
+            "type": "boolean"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "setting",
+              "key",
+              "package"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "requires": {
+            "default": "",
+            "title": "Requires",
+            "type": "string"
+          },
+          "switchable": {
+            "title": "Switchable",
+            "type": "boolean"
+          },
+          "variables": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Variables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "kind",
+          "variables",
+          "switchable"
+        ],
+        "title": "UnavailableToolOut",
         "type": "object"
       },
       "UpdatedOut": {
