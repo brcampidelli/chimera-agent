@@ -440,6 +440,10 @@ ALLOWED: dict[str, str] = {
     # in `bench/decide_interface/RESULTS.md`.
     "chimera/cli/decide_cmd.py": "the open interface's CLI (study 22 phase 4) — asked on purpose, gates nothing",
     "chimera/api/app.py": "POST /api/decide (study 22 phase 4) — asked on purpose, gates nothing",
+    "chimera/tools/decide.py": (
+        "the agent's `decide` tool and the MCP `chimera_decide` (study 22 phase 4) — the agent reads the "
+        "answer; nothing is gated on it; off by default as a tool (CHIMERA_DECIDE_TOOL)"
+    ),
 }
 
 

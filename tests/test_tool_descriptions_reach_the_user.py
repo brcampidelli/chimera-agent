@@ -123,6 +123,7 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
     the tool, not about whether this machine happens to have its API key.
     """
     from chimera.tools.calendar import CalendarEventsTool
+    from chimera.tools.decide import DecideTool
     from chimera.tools.email import ReadEmailTool, SendEmailTool
     from chimera.tools.media import ImageGenTool, TextToSpeechTool, TranscribeAudioTool
     from chimera.tools.web import WebSearchTool
@@ -135,6 +136,7 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
         SendEmailTool,
         ReadEmailTool,
         CalendarEventsTool,
+        DecideTool,
     ]
     keys = _english_dict()
 

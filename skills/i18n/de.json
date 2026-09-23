@@ -92,6 +92,10 @@
     "warn-before-the-thing-you-are-warning-about": {
       "source_sha256": "e1f0c23a799b631b2081b73d1f2941094c34150f6663ea486c6315b63f141fea",
       "text": "Ein Warnhinweis nach der Handlung, die er betrifft, kommt an, wenn die lesende Person längst entschieden hat. Setze ihn darüber und mache ihn unabweisbar, wenn es darauf ankommt."
+    },
+    "system-one-design": {
+      "source_sha256": "e7fdb28e1f92ebb814bd3f914486e40f79f7d8b57984a48128f74477105894bf",
+      "text": "Mache aus einem Frage-und-Auslese-Schritt typisierte Fragen — je eine Bedingung, Optionsnamen ohne Urteil, eine Zahl zurück — und lass diese Zahl die Arbeit nie allein stoppen."
     }
   },
   "sections": {
@@ -278,6 +282,14 @@
       "Risk": "Warnhinweise nach vorn zu ziehen lässt eine Seite schwerer wirken und kann einen Nutzer abschrecken, für den das Risiko nie real war. Diese Kosten sind echt und nur dort lohnenswert, wo die Überraschung echt ist.\n\nDer Fehlermodus einer übertriebenen Anwendung ist ein Produkt, das wirkt, als wäre es nervös vor sich selbst. Wenn jeder Bildschirm mit einem Disclaimer beginnt, werden die Disclaimer zu bloßem Beiwerk, und der Leser überspringt sie — womit Sie wieder da stehen, wo Sie angefangen haben, nur mit schlechteren Texten.",
       "Trigger": "Etwas, das ein Nutzer gleich tun wird, hat eine Konsequenz, die er nicht erwartet: ein unsigniertes Installationsprogramm, das sein Betriebssystem blockiert, ein Befehl, der die Historie umschreibt, eine Einstellung, die einen Menschen aus einer Schleife entfernt, ein Export, der die Sandbox verlässt.\n\nDas gilt nicht für Konsequenzen, die aus der Beschriftung offensichtlich sind. „Löschen\" braucht keinen Absatz, der erklärt, dass es löscht.",
       "source_sha256": "4f250b6116c616ce24fb306c223edd701c96323c735ec69a3a9d33d305c65d7c"
+    },
+    "system-one-design": {
+      "source_sha256": "1032031526f9ef881e5793b291ff16d78eb3be6f6dd0821ec74ff9a66a25e5d3",
+      "Trigger": "Ein Schritt stellt einem Modell eine Frage, deren Antwort einer von wenigen bekannten Werten ist — ja oder nein, eines von fünf\nLabels, eine Stufe von niedrig bis hoch — und liest diesen Wert dann aus der geschriebenen Prosa. Oder dieselbe\nFrage wird Hunderten von Einträgen gestellt. Das ist eine typisierte Entscheidung im Chat-Kostüm.",
+      "Do": "1. Stelle sie als typisierte Frage (`chimera decide`, `POST /api/decide` oder das Werkzeug `decide`): `noul`\n   für ja/nein, `choice` für eines aus einer Menge, `score` für geordnete Stufen. Zurück kommt eine Wahrscheinlichkeit.\n2. Eine Bedingung pro Frage. „Ist es ein Fehler und kommt er aus der Datenbank?“ sind zwei Fragen; stelle beide und\n   kombiniere die Antworten im Code, wo die Regel sichtbar ist.\n3. Gib Optionen Namen, die das Urteil nicht tragen (nicht \"yes\", \"safe\", \"pass\"), und schreibe die Bedeutung\n   in die Kriterien. Eine Sammeloption (\"other\") ist, wohin eine unsichere Lesung geht — gib ihr ein enges\n   Kriterium oder lass sie weg.\n4. Zeige dem Modell nur das, was beurteilt wird: nicht die Werkzeugausgabe drumherum, nicht einen Satz, der\n   für eine Antwort wirbt.\n5. Wähle jede Schwelle anhand gelabelter Beispiele, nie aus dem Bauch, und halte die Zahl neben\n   der Entscheidung fest, die sie gespeist hat.",
+      "Avoid": "Die Zahl Arbeit beenden, überspringen oder freigeben lassen. Eine Entscheidung darf Prüfung hinzufügen — ein Review, eine Warnung, eine\nzweite Kontrolle — und sonst nichts: die einzige Entscheidung in diesem Projekt, die „hier aufhören“ sagen konnte, machte\njedes gesteuerte Modell schlechter, und umso schlechter, je besser das Modell war.\n\nVermeide auch, die Antwort nach einem Denkweg zu lesen (die Zahl kollabiert auf 0 oder 1), ein\nUrteil in Atome zu zerlegen, die etwas beschreiben, das beide Klassen teilen (ein Atom „zerstört Daten?“ markierte\nlegitime Aufräumaktionen so bereitwillig wie Angriffe), und eine rohe Wahrscheinlichkeit für kalibriert zu halten.",
+      "Check": "- Der Linter akzeptiert jede Frage (eine abgelehnte Frage erreicht nie ein Modell).\n- Jede Frage antwortet über deine Einträge hinweg in beide Richtungen; eine, die immer dasselbe sagt, liest\n  das Format, nicht den Text.\n- Bei langem Zustand und lokalem Modell passt der Prompt ins Kontextfenster — eine stille Kürzung wirkt wie\n  ein Modellergebnis.\n- Irgendwo zeigt eine gelabelte Stichprobe, dass die Zahl die Fälle trennt, auf die es ankommt.",
+      "Risk": "Eine typisierte Antwort wirkt sicherer als Prosa, ist es aber nicht: ein kleines Modell kann gut ordnen und trotzdem\nin der Mitte seiner Skala selbstsicher falschliegen. Behandle eine unkalibrierte Zahl als Hinweis, halte sie fest und\nkalibriere mit eigenen Labels, bevor irgendeine Schwelle etwas bedeutet."
     }
   },
   "triggers": {
@@ -494,6 +506,15 @@
         "eine destruktive Aktion einbauen",
         "eine Stolperfalle dokumentieren",
         "wohin gehört diese Warnung"
+      ]
+    },
+    "system-one-design": {
+      "source_sha256": "a962eeee248b3ef180708dfd8d5e30331d3b0e5489acd204a01628ea6dd52bbc",
+      "text": [
+        "ein Ja oder Nein aus der Prosa eines Modells lesen",
+        "viele Einträge mit einem Modell klassifizieren",
+        "ein Modell etwas bewerten lassen",
+        "die Antwort eines Modells entscheidet, was als Nächstes passiert"
       ]
     }
   }

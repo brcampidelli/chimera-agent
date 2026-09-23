@@ -373,6 +373,10 @@ class Settings(BaseSettings):
     # watch is adoption: a tool the model never calls is 657 characters of nothing, and that is the
     # number that would turn this default off.
     todo_list: bool = Field(default=True, validation_alias="CHIMERA_TODO_LIST")
+    # --- The `decide` tool (study 22, phase 4): typed questions the agent asks over text it has,
+    # answered by the configured decision backend. OFF by default for the reason `edit_batch` is: a
+    # schema in every prompt of every step. Nothing is gated on its answers — they go to the agent.
+    decide_tool: bool = Field(default=False, validation_alias="CHIMERA_DECIDE_TOOL")
     # --- Where an approval question goes when there is nobody at a console.
     #
     # This is what makes the three-state gate reachable on the surfaces that need it most. A cron

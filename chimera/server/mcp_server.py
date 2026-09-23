@@ -58,6 +58,25 @@ CHIMERA_MCP_TOOLS: list[dict[str, Any]] = [
 ]
 
 
+DECIDE_SPEC: dict[str, Any] = {
+    "name": "chimera_decide",
+    "description": (
+        "Ask typed questions about a text and get probabilities back: 'noul' (P(yes)), 'choice' "
+        "(probabilities over options) or 'score' (expected level). Uncalibrated unless a map exists "
+        "for the exact question; decides nothing by itself."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "questions": {"type": "object", "description": "key -> {type, instructions, criteria}"},
+            "state": {"type": "string"},
+            "states": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["questions"],
+    },
+}
+
+
 @dataclass
 class ChimeraMCP:
     """Bridges MCP tool calls to injected Chimera capabilities.
@@ -69,9 +88,11 @@ class ChimeraMCP:
     solve: Callable[[str], str]
     fuse: Callable[[str], str]
     memory_search: Callable[[str, int], list[str]]
+    decide: Callable[[dict[str, Any]], str] | None = None
+    """Typed questions over a state (study 22, phase 4) — listed only when injected."""
 
     def tool_specs(self) -> list[dict[str, Any]]:
-        return CHIMERA_MCP_TOOLS
+        return CHIMERA_MCP_TOOLS + ([DECIDE_SPEC] if self.decide is not None else [])
 
     def dispatch(self, name: str, arguments: dict[str, Any]) -> str:
         """Route one MCP tool call to the matching capability; raise KeyError on unknown name."""
@@ -87,6 +108,8 @@ class ChimeraMCP:
                 k = 5
             hits = self.memory_search(str(arguments["query"]), k)
             return "\n".join(f"- {hit}" for hit in hits) if hits else "(no matching memories)"
+        if name == "chimera_decide" and self.decide is not None:
+            return self.decide(dict(arguments))
         raise KeyError(name)
 
     def build(self) -> Any:

@@ -3227,9 +3227,13 @@ def _serve_mcp(
     def _search(query: str, k: int) -> list[str]:
         return [item.content for item in _memory_manager().search(query, k=k)]
 
-    bridge = ChimeraMCP(solve=_solve, fuse=_fuse, memory_search=_search)
+    from chimera.tools.decide import make_decide
+
+    # `chimera_decide` is listed to MCP clients always: the schema cost is the client's, paid only by
+    # a client that lists tools, and the decider is built on the first call, not here.
+    bridge = ChimeraMCP(solve=_solve, fuse=_fuse, memory_search=_search, decide=make_decide())
     print(
-        "chimera MCP server on stdio — tools: chimera_solve, chimera_fuse, chimera_memory_search",
+        "chimera MCP server on stdio — tools: chimera_solve, chimera_fuse, chimera_memory_search, chimera_decide",
         file=sys.stderr,
     )
     try:
