@@ -1285,7 +1285,7 @@
     },
     {
       "deprecated": false,
-      "help": "Ask typed questions \u2014 yes/no, a choice, a score \u2014 and get probabilities back.\n\nEvery question is read on its own, decision-first; a question the linter rejects is refused before\nany call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a\nprobability of being right. A number is calibrated only where a map exists for exactly this question.",
+      "help": "Ask typed questions \u2014 yes/no, a choice, a score \u2014 and get probabilities back.\n\nEvery question is read on its own, decision-first; a question the linter rejects is refused before\nany call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a\nprobability of being right. A number is calibrated only where a map exists for exactly this question.\n\nMeasured on a ruler we did not build (`bench/jevbench_local`, the 231 public JevBench items): the\ndefault local backend answers 0.619 of them right (Jev 1.13: 0.866), 0.324 on the hard tier, with a\nraw top-label ECE of 0.218. Options that share a first token cannot be read locally: name them so\ntheir first words differ.",
       "hidden": false,
       "name": "decide",
       "params": [
