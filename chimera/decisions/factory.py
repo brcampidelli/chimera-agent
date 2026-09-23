@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from chimera.decisions.calibration import CalibrationMaps
-from chimera.decisions.contract import Decider, DecisionBackend
+from chimera.decisions.contract import Decider, DecisionBackend, DecisionCache
+from chimera.decisions.log import DecisionLog
 
 BACKENDS = ("local_logprob", "hosted_verbalized", "openrouter_decisions")
 
@@ -53,6 +54,13 @@ def build_backend(settings: Any, *, gateway: Any | None = None) -> DecisionBacke
     raise ValueError(f"unknown decision backend {name!r}; one of {', '.join(BACKENDS)}")
 
 
-def build_decider(settings: Any, *, gateway: Any | None = None) -> Decider:
+def build_decider(settings: Any, *, gateway: Any | None = None, log: bool = True) -> Decider:
+    """The Decider a surface uses: the settings' backend, the shipped maps under the deployment's
+    refits, a per-process cache of readings, and the decision log under ``<home>/decisions/`` —
+    every answer written with its raw number, so the deployment's own labels can refit the map
+    (study 22, phase 2). ``log=False`` for a caller that only reads (a report, a test)."""
     maps = CalibrationMaps.shipped().merged(CalibrationMaps.load(maps_path(settings)))
-    return Decider(build_backend(settings, gateway=gateway), maps)
+    return Decider(
+        build_backend(settings, gateway=gateway), maps, cache=DecisionCache(),
+        log=DecisionLog.for_home(Path(settings.home)) if log else None,
+    )

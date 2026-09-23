@@ -1007,6 +1007,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/decisions/{decision_id}/label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Label Decision
+         * @description The card's second question — *was this dangerous?* — written to the decision log as the
+         *     label of the answer that raised the card (study 22, phase 2). Separate from the approval on
+         *     purpose: approving says "may it run", and a person approves a dangerous action they meant to
+         *     run. `ok: False` when the log has no answer with that id.
+         */
+        post: operations["label_decision_api_decisions__decision_id__label_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dictation": {
         parameters: {
             query?: never;
@@ -3177,6 +3200,11 @@ export interface components {
              * @default review
              */
             decision: string;
+            /**
+             * Decision Id
+             * @default
+             */
+            decision_id: string;
             /** Id */
             id: string;
             /** P */
@@ -4314,6 +4342,16 @@ export interface components {
             grace_seconds: number;
             /** Overdue */
             overdue: components["schemas"]["CronLateOut"][];
+        };
+        /** DecisionLabelIn */
+        DecisionLabelIn: {
+            /** Event */
+            event: boolean;
+        };
+        /** DecisionLabelOut */
+        DecisionLabelOut: {
+            /** Ok */
+            ok: boolean;
         };
         /** DecomposedOut */
         DecomposedOut: {
@@ -8749,6 +8787,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CronJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    label_decision_api_decisions__decision_id__label_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                decision_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionLabelIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionLabelOut"];
                 };
             };
             /** @description Validation Error */

@@ -5896,6 +5896,11 @@ def migrate(
         console.print("[dim]Re-run with --apply to write the imported artifacts.[/dim]")
 
 
+from chimera.cli.decisions_cmd import decisions_app  # noqa: E402
+
+app.add_typer(decisions_app, name="decisions")
+
+
 # --- cron subcommands ---------------------------------------------------------
 
 @app.command()

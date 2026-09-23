@@ -1284,6 +1284,126 @@
       "path": "cron"
     },
     {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "Say what was true for one answer. A later label for the same id replaces an earlier one.",
+          "hidden": false,
+          "name": "label",
+          "params": [
+            {
+              "help": "The id from `chimera decisions log` or the approval card.",
+              "kind": "argument",
+              "name": "entry_id",
+              "opts": [
+                "entry_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "The question's event happened (governance: it WAS dangerous).",
+              "kind": "option",
+              "name": "yes",
+              "opts": [
+                "--yes",
+                "-y"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "It did not (governance: it was NOT dangerous).",
+              "kind": "option",
+              "name": "no",
+              "opts": [
+                "--no",
+                "-n"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "default": "''",
+              "help": "Why, for whoever reads the label later.",
+              "kind": "option",
+              "name": "note",
+              "opts": [
+                "--note"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "decisions label"
+        },
+        {
+          "deprecated": false,
+          "help": "The latest answers, newest last, with their label when one was given.",
+          "hidden": false,
+          "name": "log",
+          "params": [
+            {
+              "default": "20",
+              "help": "How many of the latest answers.",
+              "kind": "option",
+              "name": "limit",
+              "opts": [
+                "--limit",
+                "-n"
+              ],
+              "required": false,
+              "type": "int"
+            },
+            {
+              "help": "Only answers without a label.",
+              "kind": "option",
+              "name": "unlabelled",
+              "opts": [
+                "--unlabelled"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "decisions log"
+        },
+        {
+          "deprecated": false,
+          "help": "Fit this deployment's own map on its labelled answers \u2014 pooled with the shipped rows while it\nhas fewer than 20 labels of a class. Prints before writing; writes only with --write.",
+          "hidden": false,
+          "name": "refit",
+          "params": [
+            {
+              "help": "Save the refitted maps to <home>/decisions/maps.json.",
+              "kind": "option",
+              "name": "write",
+              "opts": [
+                "--write"
+              ],
+              "required": false,
+              "type": "boolean"
+            }
+          ],
+          "path": "decisions refit"
+        },
+        {
+          "deprecated": false,
+          "help": "What the log holds: availability, the review budget, label coverage, and \u2014 where labels exist \u2014\ncatch and false refusal at the REVIEW threshold.",
+          "hidden": false,
+          "name": "report",
+          "params": [],
+          "path": "decisions report"
+        }
+      ],
+      "deprecated": false,
+      "help": "The decision log: what the typed decisions answered, labels, a report and a refit.",
+      "hidden": false,
+      "name": "decisions",
+      "params": [],
+      "path": "decisions"
+    },
+    {
       "deprecated": false,
       "help": "Measured vs counterfactual across delegations \u2014 what the hierarchy actually saved.",
       "hidden": false,

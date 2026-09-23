@@ -248,6 +248,14 @@ export const answerApproval = (id: string, approved: boolean) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ approved }),
   });
+/** The card's second question — was the action dangerous? — as the label of the decision that raised
+ *  it. Separate from `answerApproval`: approving says "may it run", not "was it dangerous". */
+export const labelDecision = (decisionId: string, event: boolean) =>
+  json<{ ok: boolean }>(`/api/decisions/${encodeURIComponent(decisionId)}/label`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event }),
+  });
 export const getTools = () => json<Tools>("/api/tools");
 
 // --- Filesystem (read-only tree + file viewer for the Code screen) ---

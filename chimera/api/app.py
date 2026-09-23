@@ -60,6 +60,8 @@ from chimera.api.schemas import (
     CompletionOut,
     ConfigOut,
     ConfigTestOut,
+    DecisionLabelIn,
+    DecisionLabelOut,
     DeletedOut,
     DiagnosticsOut,
     DoctorOut,
@@ -1348,6 +1350,7 @@ def build_api_app(
                 "p": q.p,
                 "band": q.band,
                 "decider_model": q.decider_model,
+                "decision_id": q.decision_id,
             }
             for q in pending(live_settings().home)
         ]
@@ -1363,6 +1366,19 @@ def build_api_app(
         from chimera.governance.pending import answer
 
         return {"ok": answer(live_settings().home, request_id, bool(req.approved))}
+
+    @app.post("/api/decisions/{decision_id}/label", dependencies=[guard], response_model=DecisionLabelOut)
+    def label_decision(decision_id: str, req: DecisionLabelIn) -> dict[str, Any]:
+        """The card's second question — *was this dangerous?* — written to the decision log as the
+        label of the answer that raised the card (study 22, phase 2). Separate from the approval on
+        purpose: approving says "may it run", and a person approves a dangerous action they meant to
+        run. `ok: False` when the log has no answer with that id."""
+        from chimera.decisions.log import DecisionLog, find, log_path
+
+        path = log_path(Path(live_settings().home))
+        if find(path, decision_id) is None:
+            return {"ok": False}
+        return {"ok": DecisionLog(path).outcome(decision_id, bool(req.event), source="card")}
 
     @app.get("/api/runs/paused", dependencies=[guard], response_model=list[PausedRunOut])
     def paused_runs() -> list[dict[str, Any]]:
@@ -2004,6 +2020,7 @@ def build_api_app(
                     "p": question.p,
                     "band": question.band,
                     "decider_model": question.decider_model,
+                    "decision_id": question.decision_id,
                     "wait_seconds": float(live_settings().approval_wait),
                 },
             )

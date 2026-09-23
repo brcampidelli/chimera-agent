@@ -60,6 +60,12 @@ class Verdict:
     map is keyed on the build (study 21 §2ad), so the same 0.80 means different things under
     different builds. The card shows it; the record keeps it."""
 
+    decision_id: str = ""
+    """The decision log's id for the answer behind this verdict (``<home>/decisions/decisions.jsonl``),
+    when the band asked a decider that keeps a log. The card sends it back with the person's answer
+    to *was this dangerous?* — the only way that answer becomes a label on the number that asked
+    (study 22, phase 2). Empty for a rule."""
+
     @property
     def allowed(self) -> bool:
         """True if the action may proceed without human review (allow/warn)."""

@@ -1558,6 +1558,11 @@ class ApprovalOut(BaseModel):
     things under different builds, so a probability whose model is not named is a probability about
     nothing in particular."""
 
+    decision_id: str = ""
+    """The decision log's id for the answer that raised the question. The card posts the person's
+    *was this dangerous?* to ``/api/decisions/{decision_id}/label``; empty for a rule-raised question,
+    and the card then does not ask."""
+
 
 class ApprovalAnswerIn(BaseModel):
     approved: bool
@@ -1565,6 +1570,16 @@ class ApprovalAnswerIn(BaseModel):
 
 class ApprovalAnswerOut(BaseModel):
     ok: bool  # False when no question with that id is waiting — a stale click, 200, not a 404
+
+
+class DecisionLabelIn(BaseModel):
+    event: bool
+    """Whether the question's event was true — for ``governance.danger``, whether the action WAS
+    dangerous. Not whether it was approved: a person approves a dangerous action they meant to run."""
+
+
+class DecisionLabelOut(BaseModel):
+    ok: bool  # False when the log has no answer with that id — a stale card, 200, not a 404
 
 
 class BatchCancelOut(BaseModel):

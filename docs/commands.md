@@ -27,6 +27,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
+| [`decisions`](#decisions) | The decision log: what the typed decisions answered, labels, a report and a refit. |
 | [`delegations`](#delegations) | Measured vs counterfactual across delegations — what the hierarchy actually saved. |
 | [`deliver`](#deliver) | Deliverable Mode: produce a polished, self-contained artifact. Requires a key. |
 | [`doctor`](#doctor) | Check the environment and configuration. With --fix, repair safe setup issues. |
@@ -424,6 +425,14 @@ Manage scheduled jobs (crons and event SOPs).
 
 ```bash
 chimera cron
+```
+
+## decisions
+
+The decision log: what the typed decisions answered, labels, a report and a refit.
+
+```bash
+chimera decisions
 ```
 
 ## delegations

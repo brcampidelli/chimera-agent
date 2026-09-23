@@ -1601,6 +1601,7 @@ def register_code_api(
                 "p": question.p,
                 "band": question.band,
                 "decider_model": question.decider_model,
+                "decision_id": question.decision_id,
                 "wait_seconds": float(settings.approval_wait),
             },
         )
