@@ -84,11 +84,13 @@ describe("auto-continue at the step ceiling", () => {
 
     // Four chained turns, each re-rendering the screen: 1.3 s on a loaded CI runner, past waitFor's
     // 1 s default (failed twice in a row on #540 with 3 of 4). The bound, not the behaviour, was wrong.
-    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(4), { timeout: 5000 });
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(4), { timeout: 10000 });
     // Give the machinery a beat to prove it does NOT go to five.
     await new Promise((r) => setTimeout(r, 20));
     expect(streamCodeTurn).toHaveBeenCalledTimes(4);
-  });
+    // The test's own ceiling above the wait's: with both at 5 s the runner killed the test before
+    // the wait could finish, three times in a row on #544 while `main` passed the same code.
+  }, 20000);
 
   it("does not continue a turn that stopped for any reason other than the step limit", async () => {
     // `tool_loop` is the model repeating itself: continuing would repeat it again, on the user's
