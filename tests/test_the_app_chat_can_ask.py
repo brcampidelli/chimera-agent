@@ -443,9 +443,13 @@ def test_the_posture_line_still_admits_an_unguarded_chat(
 #: nothing else, so the answer it collected could not be joined to the probability that asked. They
 #: are on the frame because the card is where a person reads the number, and the record line joins
 #: that same `p` to the yes/no — which is the only pairing that turns an answer into a label.
+#:
+#: `decision_id` joined on 2026-09-23 (study 22, phase 2): the yes/no to "may it run?" turned out not
+#: to be the label — a person approves a dangerous action they meant to run — so the card asks
+#: "was it dangerous?" separately and posts it against this id.
 APPROVAL_KEYS = {
     "id", "action", "reason", "asked_at", "wait_seconds", "decision",
-    "p", "band", "decider_model",
+    "p", "band", "decider_model", "decision_id",
 }
 
 

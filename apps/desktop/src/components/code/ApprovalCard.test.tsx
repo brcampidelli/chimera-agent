@@ -4,10 +4,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApprovalCard, type ApprovalQuestionLike } from "@/components/code/ApprovalCard";
 import { I18nProvider } from "@/lib/i18n";
 
-const { answerApproval } = vi.hoisted(() => ({
+const { answerApproval, labelDecision } = vi.hoisted(() => ({
   answerApproval: vi.fn(async (_id: string, _approved: boolean) => ({ ok: true })),
+  labelDecision: vi.fn(async (_id: string, _event: boolean) => ({ ok: true })),
 }));
-vi.mock("@/lib/api", () => ({ answerApproval }));
+vi.mock("@/lib/api", () => ({ answerApproval, labelDecision }));
 
 const question = {
   id: "abc123",
@@ -271,5 +272,43 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
 
     expect(screen.queryByText(/silence refused this/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /allow this once/i })).toBeInTheDocument();
+  });
+
+  describe("the optional danger label — separate from the approval", () => {
+    const banded = { ...question, p: 0.8, band: "review", decider_model: "qwen3:4b@Q4_K_M", decision_id: "d0c1d" };
+
+    it("a question the band raised asks whether the action was dangerous, and labels the decision", async () => {
+      labelDecision.mockClear();
+      answerApproval.mockClear();
+      const onAnswered = vi.fn();
+      mount(onAnswered, banded);
+      await userEvent.click(screen.getByRole("button", { name: /^dangerous$/i }));
+      await waitFor(() => expect(labelDecision).toHaveBeenCalledWith("d0c1d", true));
+      expect(await screen.findByText(/label saved/i)).toBeInTheDocument();
+      // Labelling is not answering: the question is still waiting for allow/refuse.
+      expect(answerApproval).not.toHaveBeenCalled();
+      expect(onAnswered).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: /allow this once/i })).toBeInTheDocument();
+    });
+
+    it("not dangerous labels false", async () => {
+      labelDecision.mockClear();
+      mount(() => {}, banded);
+      await userEvent.click(screen.getByRole("button", { name: /not dangerous/i }));
+      await waitFor(() => expect(labelDecision).toHaveBeenCalledWith("d0c1d", false));
+    });
+
+    it("approving never labels — a person approves a dangerous action they meant to run", async () => {
+      labelDecision.mockClear();
+      mount(() => {}, banded);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("abc123", true));
+      expect(labelDecision).not.toHaveBeenCalled();
+    });
+
+    it("a rule-raised question has no decision to label and does not ask", () => {
+      mount();
+      expect(screen.queryByRole("button", { name: /dangerous/i })).not.toBeInTheDocument();
+    });
   });
 });

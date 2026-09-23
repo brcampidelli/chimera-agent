@@ -108,6 +108,10 @@ class PendingApproval:
     decider_model: str = ""
     """The build that answered, when a model did — ``qwen3:4b@Q4_K_M``. Empty for a rule."""
 
+    decision_id: str = ""
+    """The decision log's id for the answer that raised it — what the card's *was this dangerous?*
+    labels. Empty for a question a rule or the taint ledger raised."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -151,6 +155,7 @@ def pending(home: Path) -> list[PendingApproval]:
                 p=(float(data["p"]) if isinstance(data.get("p"), (int, float)) else None),
                 band=str(data.get("band") or ""),
                 decider_model=str(data.get("decider_model") or ""),
+                decision_id=str(data.get("decision_id") or ""),
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -184,6 +189,7 @@ def ask_durably(
     p: float | None = None,
     band: str = "",
     decider_model: str = "",
+    decision_id: str = "",
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
 
@@ -222,6 +228,11 @@ def ask_durably(
         band = str(named.get("band") or "")
     if not decider_model:
         decider_model = str(named.get("decider_model") or "")
+    if not decision_id:
+        decision_id = str(named.get("decision_id") or "")
+    if decision_id:
+        # Onto the record line through the same named facts, so both ways of passing it land it.
+        facts = {**named, "decision_id": decision_id}
     # One clock reading for the file, the announcement and the record. There used to be one per
     # site, and a time-to-answer measured between two of them carried their difference.
     asked_at = time.time()
@@ -240,6 +251,7 @@ def ask_durably(
                     **({"p": round(float(p), 4)} if p is not None else {}),
                     **({"band": band} if band else {}),
                     **({"decider_model": decider_model} if decider_model else {}),
+                    **({"decision_id": decision_id} if decision_id else {}),
                 },
                 ensure_ascii=False,
             ),
@@ -260,6 +272,7 @@ def ask_durably(
                 PendingApproval(
                     id=request_id, action=action, reason=reason, asked_at=asked_at,
                     decision=decision, p=p, band=band, decider_model=decider_model,
+                    decision_id=decision_id,
                 )
             )
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
@@ -335,7 +348,7 @@ FACTS: tuple[str, ...] = ("run_id", "surface", "tool", "rule", "lineage", "sourc
 #: that turns an answer into a LABEL. Every card answered is one real row for a map refitted on the
 #: deployment's own data, where today the map comes from 55 bench items.
 NUMERIC_FACTS = ("p",)
-FACTS = FACTS + NUMERIC_FACTS + ("band", "decider_model")
+FACTS = FACTS + NUMERIC_FACTS + ("band", "decider_model", "decision_id")
 
 
 def _record(

@@ -135,6 +135,9 @@ def _facts_of(*args: Any) -> dict[str, Any]:
     model = getattr(head, "decider_model", "")
     if isinstance(model, str) and model:
         facts["decider_model"] = model
+    decision_id = getattr(head, "decision_id", "")
+    if isinstance(decision_id, str) and decision_id:
+        facts["decision_id"] = decision_id
     return facts
 
 

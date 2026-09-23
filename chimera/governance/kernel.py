@@ -214,6 +214,7 @@ class TrustKernel:
                 # about nothing in particular, since the map is keyed on the build.
                 verdict.band = reading.band
                 verdict.decider_model = reading.answer.resolved_model
+                verdict.decision_id = reading.answer.log_id
         if verdict is None and self.judge is not None:
             if self._judge_takes_context:
                 verdict = cast("ContextJudgeFn", self.judge)(action, context)
@@ -236,6 +237,7 @@ class TrustKernel:
                     # which band it fell in, or "0.45" reads as a verdict it never was.
                     band=reading.band,
                     decider_model=reading.answer.resolved_model,
+                    decision_id=reading.answer.log_id,
                 )
             else:
                 verdict = Verdict(self.default, "no rule matched; default policy", "default")

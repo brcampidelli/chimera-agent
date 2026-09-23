@@ -38,6 +38,7 @@ function question(id = "q1") {
     p: null,
     band: "",
     decider_model: "",
+    decision_id: "",
   };
 }
 

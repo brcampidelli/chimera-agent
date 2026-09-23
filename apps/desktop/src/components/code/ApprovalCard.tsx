@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ShieldQuestion, ShieldX } from "lucide-react";
-import { answerApproval } from "@/lib/api";
+import { answerApproval, labelDecision } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useP, useT } from "@/lib/i18n";
@@ -58,6 +58,9 @@ export interface ApprovalQuestionLike {
   band?: string;
   /** The build that answered, when a model did — `qwen3:4b@Q4_K_M`. Empty for a rule. */
   decider_model?: string;
+  /** The decision log's id for the answer that raised the question. Present only when the band
+   *  asked; the card then offers the optional *was this dangerous?* that labels the number. */
+  decision_id?: string;
   wait_seconds?: number;
   /** When the call parked, in the SERVER's epoch seconds. Both wire shapes carry it — the stream
    *  frame (`chimera/api/code_api.py`) and `ApprovalOut` — and it is what lets a card that mounts
@@ -151,6 +154,7 @@ export function ApprovalCard({
   const t = useT();
   const pct = useP();
   const [busy, setBusy] = useState(false);
+  const [labelled, setLabelled] = useState(false);
   const left = useSecondsLeft(question);
   const expired = left === 0;
   // Normalised here and nowhere else. A level the UI has no word for is dropped rather than shown
@@ -171,6 +175,14 @@ export function ApprovalCard({
   // where the decimal separator is a comma — and this line sits inside a translated sentence.
   const p = typeof question.p === "number" ? pct(question.p) : null;
   const bandKey = BAND_LABEL[(question.band ?? "").trim().toLowerCase()];
+  // The second question, separate from the answer. Approving says "may it run"; a person approves a
+  // dangerous action they meant to run, so the approval is never read as a label (study 22,
+  // phase 2). Optional: the card works exactly as before for whoever ignores it.
+  const label = async (event: boolean) => {
+    if (!question.decision_id) return;
+    const r = await labelDecision(question.decision_id, event).catch(() => ({ ok: false }));
+    if (r.ok) setLabelled(true);
+  };
   const answer = async (approved: boolean) => {
     setBusy(true);
     try {
@@ -255,6 +267,23 @@ export function ApprovalCard({
           Order, not `autoFocus`. This card also mounts inline in the composer, where stealing focus
           would yank the caret out of a half-typed message; DOM order gives the dialog its safe
           default and costs the inline mount nothing. */}
+      {/* Only for a question the band raised, and only while it is live. Order is the same
+          fail-safe as below: the answer that asks for more scrutiny comes first. */}
+      {question.decision_id && !expired ? (
+        labelled ? (
+          <p className="mt-2 text-xs text-muted-foreground">{t("code.approval.label.saved")}</p>
+        ) : (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>{t("code.approval.label.ask")}</span>
+            <Button size="sm" variant="ghost" onClick={() => void label(true)}>
+              {t("code.approval.label.yes")}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => void label(false)}>
+              {t("code.approval.label.no")}
+            </Button>
+          </div>
+        )
+      ) : null}
       {expired ? null : (
         <div className="mt-2 flex gap-2">
           <Button size="sm" disabled={busy} onClick={() => void answer(false)}>

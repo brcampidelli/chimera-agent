@@ -100,7 +100,8 @@
     "commands": [
       "guard",
       "redteam",
-      "approve"
+      "approve",
+      "decisions"
     ]
   },
   {

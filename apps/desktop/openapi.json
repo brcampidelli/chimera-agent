@@ -622,6 +622,11 @@
             "title": "Decision",
             "type": "string"
           },
+          "decision_id": {
+            "default": "",
+            "title": "Decision Id",
+            "type": "string"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -2986,6 +2991,32 @@
           "grace_seconds"
         ],
         "title": "CronSilenceOut",
+        "type": "object"
+      },
+      "DecisionLabelIn": {
+        "properties": {
+          "event": {
+            "title": "Event",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "event"
+        ],
+        "title": "DecisionLabelIn",
+        "type": "object"
+      },
+      "DecisionLabelOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "DecisionLabelOut",
         "type": "object"
       },
       "DecomposedOut": {
@@ -11184,6 +11215,56 @@
           }
         },
         "summary": "Enable Cron"
+      }
+    },
+    "/api/decisions/{decision_id}/label": {
+      "post": {
+        "description": "The card's second question \u2014 *was this dangerous?* \u2014 written to the decision log as the\nlabel of the answer that raised the card (study 22, phase 2). Separate from the approval on\npurpose: approving says \"may it run\", and a person approves a dangerous action they meant to\nrun. `ok: False` when the log has no answer with that id.",
+        "operationId": "label_decision_api_decisions__decision_id__label_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "decision_id",
+            "required": true,
+            "schema": {
+              "title": "Decision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DecisionLabelIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DecisionLabelOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Label Decision"
       }
     },
     "/api/dictation": {

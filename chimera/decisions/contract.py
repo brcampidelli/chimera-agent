@@ -25,6 +25,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Protocol, runtime_checkable
 
 from chimera.decisions.calibration import CalibrationMaps, prompt_hash
+from chimera.decisions.log import DecisionLog
 
 MAX_OPTIONS = 255
 
@@ -220,6 +221,9 @@ class Answer:
     """Why a map that exists was not applied — the build differs from the one it was fitted on."""
     cached: bool = False
     """The reading came from the :class:`DecisionCache`, not from a call made for this answer."""
+    log_id: str = ""
+    """The id of this answer's line in the decision log, when the Decider keeps one — what an
+    outcome later names to label it. Empty without a log, or when the line could not be written."""
 
     @property
     def answered(self) -> bool:
@@ -275,6 +279,8 @@ class Answer:
             out["note"] = self.note
         if self.cached:
             out["cached"] = True
+        if self.log_id:
+            out["log_id"] = self.log_id
         if self.halt:
             out["halt"] = self.halt
         return out
@@ -335,11 +341,17 @@ class Decider:
     """A backend plus the maps: asks, calibrates when a map for exactly this instrument exists."""
 
     def __init__(
-        self, backend: DecisionBackend, maps: CalibrationMaps | None = None, *, cache: DecisionCache | None = None,
+        self,
+        backend: DecisionBackend,
+        maps: CalibrationMaps | None = None,
+        *,
+        cache: DecisionCache | None = None,
+        log: DecisionLog | None = None,
     ) -> None:
         self.backend = backend
         self.maps = maps if maps is not None else CalibrationMaps()
         self.cache = cache
+        self.log = log
 
     def decide(self, decision: str, state: str, question: Question) -> Answer:
         choice = as_choice(question)
@@ -375,7 +387,7 @@ class Decider:
             note = f"map fitted on {found.resolved_model}, this answer came from {reading.resolved_model}"
             usable = None
         p = usable.apply(raw_p) if (usable is not None and raw_p is not None) else raw_p
-        return Answer(
+        answer = Answer(
             decision=decision, key=choice.key, backend=self.backend.name, model=self.backend.model,
             prompt_hash=digest, choice=reading.choice, shares=reading.shares, raw_p=raw_p, p=p,
             calibrated=usable is not None and raw_p is not None, map=found.id if found is not None else None,
@@ -383,6 +395,12 @@ class Decider:
             logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
             cached=cached is not None,
         )
+        if self.log is not None:
+            # Every answer, halts included: a halt is a fact about availability the report counts.
+            entry_id = self.log.answer(answer.receipt(), state, raw_p=raw_p)
+            if entry_id:
+                answer = replace(answer, log_id=entry_id)
+        return answer
 
     def decide_many(self, decision: str, state: str, questions: Iterable[Question]) -> dict[str, Answer]:
         """One state, several atomic questions (study 22, I6), each read **in isolation** — its own
