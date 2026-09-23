@@ -93,3 +93,15 @@ about B4's apparatus, recorded here and not re-litigated.)
 Pilot (`044`, `on`, strong + weak, US$ 0.02): both logs name the frozen ruler; the router gave **13 and 4 hints,
 narrowed 0, answered 0, fallbacks 0**; the executors followed 5/13 and 1/4. Positive control passed; the two
 solves and their homes, logs and sandboxes were deleted, and the scored run starts clean.
+
+## Amendment 3 — cap raised to US$ 45 (2026-09-23, at 24/414 solves, US$ 2.37, before any score was read)
+
+At 24 solves the projected total was ≈ US$ 41, above the US$ 40 cap, driven by the Sol arm. The owner raised the
+cap to **US$ 45** so the run can close complete. Only the spend ceiling changed; no outcome had been read.
+
+## Amendment 4 — the run goes in foreground chunks (2026-09-23, before any score was read)
+
+A detached driver (`nohup`, then `setsid`) died with the launching `wsl` session — the WSL VM shuts down when no
+session is open. The driver runs in the foreground in 50-minute chunks (`timeout 3000`) and resumes: done cells are
+skipped; a solve cut by a chunk's end has no result and is re-run in the next chunk. A first 40-second probe
+started 6 solves that died with it; they left no result and are re-run like any other.
