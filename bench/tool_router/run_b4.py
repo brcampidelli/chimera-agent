@@ -82,13 +82,26 @@ def result_exists(hid: str, task: str) -> bool:
 
 
 def solve_usd(hid: str, task: str) -> float | None:
+    """The solve's cost, or None when ANY round could not be priced.
+
+    `or 0.0` on a missing `usd` turns "we do not know what this cost" into "it cost nothing", and
+    a receipt that says nothing then counts as a finished, free solve. Measured: the first six Sol
+    solves died in ten seconds because `--max-usd` refuses fail-closed on an unpriced model, wrote
+    a receipt with `usd: null`, and were recorded as done at US$ 0.00 — a zero that was never a
+    measurement (Bee §2z)."""
     p = HOMES / f"{task}-{hid}" / "runs.jsonl"
     if not p.is_file():
         return None
     lines = [x for x in p.read_text(encoding="utf-8").splitlines() if x.strip()]
     if not lines:
         return None
-    return sum(float(json.loads(x).get("usd") or 0.0) for x in lines)
+    total = 0.0
+    for line in lines:
+        value = json.loads(line).get("usd")
+        if value is None:
+            return None
+        total += float(value)
+    return total
 
 
 def run_one(hid: str, task: str) -> dict:

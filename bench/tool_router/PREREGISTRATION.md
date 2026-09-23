@@ -197,3 +197,19 @@ Everything else is the registered design: the same 23 tasks, the same two arms, 
 
 1. **The model is one day old.** OpenRouter shows "not enough performance data" for it, and this bench has already been halted six times by provider stalls. The freeze rule (amendment 4/5) is what keeps that from becoming a silent hole; the frozen count goes in the results.
 2. **A third executor is a third comparison, not a factor.** It is read as its own paired off/on contrast, never pooled with the other two — three executors averaged into one number is the §2y shape this project has already been bitten by.
+
+### Amendment 6a — the Sol arm needed a catalogue price, and a zero that was never a measurement (2026-09-22)
+
+The first six Sol solves finished in **ten to twenty seconds** each and scored 0.0–0.3. Checked before letting the arm run, and the arm was never running: `--max-usd 2.0` **refuses fail-closed on a model with no price** —
+
+```
+run stopped on budget: the price of openrouter/openai/gpt-6-sol is unknown,
+so the spend so far cannot be known either
+ending: spend · 1 attempt · 0 accepted changes
+```
+
+`gpt-6-sol` was released today and was not in `chimera/providers/catalog.py`. The refusal is correct behaviour and is why the fix is a **catalogue row** (2.00 / 10.00, cache read 0.20, read off the index the same day) rather than dropping the cap — an arm run without a ceiling is not the arm the other two ran.
+
+**The defect this exposed is the one worth keeping.** Those six cells were recorded as **done, at US$ 0.00**: the driver summed the receipt with `float(row.get("usd") or 0.0)`, so a receipt that says *"the cost is unknown"* became a solve that cost nothing, and `result_exists` counted it as finished. A cell that failed before it did any work would have entered the Sol arm's cost mean as a free success (Bee §2z: a zero that was never a measurement). `solve_usd` now returns `None` when **any** round is unpriced, so such a cell is missing rather than free.
+
+The ten dead Sol cells are discarded and re-run. The other two executors are untouched: their models are priced, so no cell of theirs could take this path.
