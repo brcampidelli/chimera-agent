@@ -18,6 +18,13 @@ Two things make it measurable rather than plausible:
 Off unless asked (`--tool-router MODEL`). It is a *cost* experiment: nothing about it is free, and
 the router's own spend is charged to the run like any other call, or the comparison would price one
 arm and not the other.
+
+**Two modes.** ``narrow`` is the B4 router, measured and not recommended (`bench/tool_router`: −0.087 /
+−0.194 / −0.307 oracle score). It broke both halves of study 22's direction rule at once — it removed
+tools and it could end the loop with ``ANSWER`` — and B4 could not tell which half did the damage.
+``hint`` (B4b, `bench/tool_router_hint`) keeps only what the rule allows: the router may *suggest* a
+tool, the executor keeps every tool and the decision whether to act, there is no ``ANSWER``, and the
+router reads the tools already used this run, so "one step from done" is not read off one output.
 """
 
 from __future__ import annotations
@@ -31,6 +38,9 @@ _log = get_logger("core.tool_router")
 
 ANSWER = "ANSWER"
 """The router's word for "no tool — answer the user". It narrows the step to no tools at all."""
+
+MODES = ("narrow", "hint")
+_HISTORY_TOOLS = 12
 
 _OBSERVATION_CHARS = 1200
 _TASK_CHARS = 1200
@@ -48,6 +58,10 @@ class RouterStats:
     """Steps where the router said ANSWER and the executor was given none."""
     fallbacks: int = 0
     """Steps where the router's word matched no tool, or the call failed."""
+    hinted: int = 0
+    """``hint`` mode: steps where a suggestion was put in front of the executor."""
+    followed: int = 0
+    """``hint`` mode: hinted steps whose first tool call was the suggested tool."""
     usd: float = 0.0
     picks: dict[str, int] = field(default_factory=dict)
 
@@ -56,6 +70,8 @@ class RouterStats:
             "calls": self.calls,
             "narrowed": self.narrowed,
             "answered": self.answered,
+            "hinted": self.hinted,
+            "followed": self.followed,
             "fallbacks": self.fallbacks,
             "usd": round(self.usd, 6),
             "picks": dict(sorted(self.picks.items(), key=lambda kv: -kv[1])),
@@ -65,10 +81,13 @@ class RouterStats:
 class ToolRouter:
     """Asks a cheap model which tool the next step should use."""
 
-    def __init__(self, backend: Any, model: str, *, temperature: float = 0.0) -> None:
+    def __init__(self, backend: Any, model: str, *, temperature: float = 0.0, mode: str = "narrow") -> None:
+        if mode not in MODES:
+            raise ValueError(f"router mode must be one of {MODES}, got {mode!r}")
         self.backend = backend
         self.model = model
         self.temperature = temperature
+        self.mode = mode
         self.stats = RouterStats()
 
     # --- the prompt -------------------------------------------------------------------------
@@ -91,9 +110,46 @@ class ToolRouter:
                 return text[-_OBSERVATION_CHARS:]
         return ""
 
+    def _history(self, messages: list[dict[str, Any]]) -> list[str]:
+        """The tool names called so far this run, oldest first — the progress a shallow reader lacked."""
+        names: list[str] = []
+        for message in messages:
+            for call in message.get("tool_calls") or []:
+                # The loop stores OpenAI-shaped dicts ({"function": {"name": ...}}); a gateway
+                # `ToolCall` carries `.name` itself. Both are read, nothing else is guessed.
+                if isinstance(call, dict):
+                    fn = call.get("function")
+                    name = fn.get("name") if isinstance(fn, dict) else call.get("name")
+                else:
+                    name = getattr(call, "name", None)
+                if name:
+                    names.append(str(name))
+        return names[-_HISTORY_TOOLS:]
+
     def _prompt(self, task: str, messages: list[dict[str, Any]], menu: list[tuple[str, str]]) -> list[dict[str, str]]:
         tools = "\n".join(f"- {name}: {line}" for name, line in menu)
         last = self._last_observation(messages)
+        if self.mode == "hint":
+            history = ", ".join(self._history(messages)) or "(none yet)"
+            return [
+                {
+                    "role": "system",
+                    "content": (
+                        "You advise one step of a coding agent. Given the task, the tools it has used so "
+                        "far and what just happened, name the ONE tool the next step would most likely "
+                        "need. The agent decides for itself whether to use it. Reply with exactly one "
+                        "word: a tool name from the list."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Task:\n{task[:_TASK_CHARS]}\n\nTools used so far: {history}\n\n"
+                        f"Last output:\n{last or '(nothing yet — this is the first step)'}\n\n"
+                        f"Tools:\n{tools}\n\nOne word:"
+                    ),
+                },
+            ]
         return [
             {
                 "role": "system",
@@ -160,11 +216,22 @@ class ToolRouter:
             self.stats.fallbacks += 1
             return None
         self.stats.picks[word] = self.stats.picks.get(word, 0) + 1
+        if self.mode == "hint":
+            if word == ANSWER:  # not offered in this mode; a model that says it anyway is ignored
+                self.stats.fallbacks += 1
+                return None
+            self.stats.hinted += 1
+            return word
         if word == ANSWER:
             self.stats.answered += 1
         else:
             self.stats.narrowed += 1
         return word
+
+    def record_follow(self, suggested: str, first_call: str | None) -> None:
+        """``hint`` mode: whether the executor's first call this step was the suggested tool."""
+        if first_call is not None and first_call == suggested:
+            self.stats.followed += 1
 
     def _word(self, content: str, names: set[str]) -> str | None:
         """The tool name in the reply, or None.
@@ -189,6 +256,17 @@ class ToolRouter:
         if not candidates:
             return None
         return max(candidates, key=len)
+
+
+def hint_message(name: str) -> dict[str, str]:
+    """The suggestion, as a message put in front of ONE step and not kept in the history."""
+    return {
+        "role": "system",
+        "content": (
+            f"Hint from a fast router: the next step may need `{name}`. It is only a suggestion — use "
+            "any tool, or none, as the task requires."
+        ),
+    }
 
 
 def narrow(schemas: list[dict[str, Any]], name: str) -> list[dict[str, Any]] | None:

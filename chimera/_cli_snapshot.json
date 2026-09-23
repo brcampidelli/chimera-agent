@@ -5270,6 +5270,17 @@
           "type": "str"
         },
         {
+          "default": "'narrow'",
+          "help": "EXPERIMENT (study 22 B4b): 'narrow' gives the executor only the routed tool (B4, measured worse); 'hint' keeps every tool and only suggests one for the step, with no ANSWER.",
+          "kind": "option",
+          "name": "tool_router_mode",
+          "opts": [
+            "--tool-router-mode"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
           "help": "After a failed attempt, run a structured self-check that steers the retry (helps weak models).",
           "kind": "option",
           "name": "progress_ledger",
