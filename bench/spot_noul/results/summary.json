@@ -1,0 +1,18 @@
+{
+  "envelopes": 92,
+  "no_p": 0,
+  "auroc": [
+    0.6545368620037807,
+    0.5382797731568998,
+    0.7590476190476191
+  ],
+  "at_0.5": {
+    "head": "0/23",
+    "middle": "0/23",
+    "none": "0/23",
+    "middle_clause": "0/23"
+  },
+  "seconds_per_call": 1.31,
+  "prompt_tokens_max": 9820,
+  "resolved_model": "qwen3:4b@Q4_K_M"
+}
