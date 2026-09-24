@@ -1,0 +1,90 @@
+=== pilot start 2026-09-24T00:18:18-04:00
+seed=20260924 queue=1 already-done=0 pending=1 concurrency=1 max_usd=1.0
+[1/1] 011-code-debug                     m6-esc-weak-r0 rc=0 usd=0.000515 out=0.17 39.1s | Σ$0.00 bad=0
+
+finished: done=1 spent=US$0.00 rc_err=0 receiptless=0 halted=False
+=== pilot end rc=0 2026-09-24T00:18:57-04:00
+=== chunk start 2026-09-24T00:19:07-04:00
+seed=20260924 queue=72 already-done=0 pending=72 concurrency=6 max_usd=8.0
+[1/72] 082-compose-config-repair          m6-esc-weak-r1 rc=0 usd=0.00034 out=0.3 25.3s | Σ$0.00 bad=0
+[2/72] 041-frontend-state-bug             m6-stop-weak-r0 rc=0 usd=0.000381 out=0.2039 52.6s | Σ$0.00 bad=0
+[3/72] 042-api-schema-migration           m6-esc-weak-r1 rc=0 usd=0.000512 out=0.15 65.6s | Σ$0.00 bad=0
+[4/72] 082-compose-config-repair          m6-esc-weak-r0 rc=0 usd=0.000343 out=0.3 19.8s | Σ$0.00 bad=0
+[5/72] 043-db-migration-safety            m6-stop-weak-r2 rc=0 usd=0.001689 out=0.158 80.0s | Σ$0.00 bad=0
+[6/72] 082-compose-config-repair          m6-esc-strong-r2 rc=0 usd=0.22106 out=0.99 134.2s | Σ$0.22 bad=0
+[7/72] 042-api-schema-migration           m6-stop-weak-r2 rc=0 usd=0.000517 out=0.15 72.5s | Σ$0.22 bad=0
+[8/72] 087-cli-parser-bug-tests           m6-esc-weak-r0 rc=0 usd=0.000284 out=0.2867 41.2s | Σ$0.23 bad=0
+[9/72] 087-cli-parser-bug-tests           m6-esc-weak-r2 rc=0 usd=0.00028 out=0.2867 27.1s | Σ$0.23 bad=0
+[10/72] 082-compose-config-repair          m6-esc-strong-r0 rc=0 usd=0.027333 out=0.99 209.3s | Σ$0.25 bad=0
+[11/72] 041-frontend-state-bug             m6-stop-strong-r2 rc=0 usd=0.044563 out=0.2925 298.6s | Σ$0.30 bad=0
+[12/72] 087-cli-parser-bug-tests           m6-esc-weak-r1 rc=0 usd=0.000462 out=0.2867 29.4s | Σ$0.30 bad=0
+[13/72] 082-compose-config-repair          m6-stop-strong-r1 rc=0 usd=0.019529 out=0.3 112.6s | Σ$0.32 bad=0
+[14/72] 087-cli-parser-bug-tests           m6-stop-strong-r1 rc=0 usd=0.108091 out=0.6607 601.0s | Σ$0.43 bad=0
+[15/72] 041-frontend-state-bug             m6-stop-strong-r1 rc=0 usd=0.068101 out=0.5962 416.9s | Σ$0.49 bad=0
+[16/72] 042-api-schema-migration           m6-esc-strong-r0 rc=0 usd=0.134083 out=0.4 631.2s | Σ$0.63 bad=0
+[17/72] 043-db-migration-safety            m6-esc-weak-r2 rc=0 usd=0.000877 out=0.098 46.4s | Σ$0.63 bad=0
+[18/72] 086-sql-migration-preflight-rollback m6-esc-weak-r0 rc=0 usd=0.001355 out=0.1928 269.6s | Σ$0.63 bad=0
+[19/72] 041-frontend-state-bug             m6-esc-weak-r2 rc=0 usd=0.000774 out=0.2039 705.4s | Σ$0.63 bad=0
+[20/72] 042-api-schema-migration           m6-esc-weak-r2 rc=0 usd=0.000484 out=0.15 128.9s | Σ$0.63 bad=0
+[21/72] 042-api-schema-migration           m6-stop-weak-r1 rc=0 usd=0.000612 out=0.15 134.4s | Σ$0.63 bad=0
+[22/72] 082-compose-config-repair          m6-stop-weak-r0 rc=0 usd=0.002971 out=0.7 216.1s | Σ$0.63 bad=0
+[23/72] 041-frontend-state-bug             m6-stop-weak-r2 rc=0 usd=0.004768 out=0.9962 424.8s | Σ$0.64 bad=0
+[24/72] 082-compose-config-repair          m6-stop-weak-r2 rc=0 usd=0.000352 out=0.3 86.3s | Σ$0.64 bad=0
+[25/72] 041-frontend-state-bug             m6-stop-strong-r0 rc=0 usd=0.1015 out=0.9962 590.6s | Σ$0.74 bad=0
+[26/72] 086-sql-migration-preflight-rollback m6-stop-weak-r0 rc=0 usd=0.001451 out=0.5769 77.9s | Σ$0.74 bad=0
+[27/72] 086-sql-migration-preflight-rollback m6-esc-weak-r1 rc=0 usd=0.000887 out=0.1928 55.8s | Σ$0.74 bad=0
+[28/72] 082-compose-config-repair          m6-stop-weak-r1 rc=0 usd=0.002101 out=0.99 113.5s | Σ$0.75 bad=0
+[29/72] 041-frontend-state-bug             m6-esc-strong-r1 rc=0 usd=0.105127 out=0.9962 533.2s | Σ$0.85 bad=0
+[30/72] 086-sql-migration-preflight-rollback m6-esc-weak-r2 rc=0 usd=0.00506 out=0.1928 592.0s | Σ$0.86 bad=0
+[31/72] 086-sql-migration-preflight-rollback m6-stop-weak-r2 rc=0 usd=0.001384 out=0.11 82.4s | Σ$0.86 bad=0
+[32/72] 087-cli-parser-bug-tests           m6-stop-weak-r2 rc=0 usd=0.000438 out=0.2867 33.6s | Σ$0.86 bad=0
+[33/72] 087-cli-parser-bug-tests           m6-stop-weak-r0 rc=0 usd=0.001269 out=0.2867 54.0s | Σ$0.86 bad=0
+[34/72] 086-sql-migration-preflight-rollback m6-stop-strong-r1 rc=0 usd=0.035742 out=0.594 301.6s | Σ$0.89 bad=0
+[35/72] 043-db-migration-safety            m6-esc-weak-r1 rc=0 usd=0.001943 out=0.72 115.6s | Σ$0.90 bad=0
+[36/72] 043-db-migration-safety            m6-esc-strong-r1 rc=0 usd=0.032389 out=0.275 389.8s | Σ$0.93 bad=0
+[37/72] 082-compose-config-repair          m6-esc-strong-r1 rc=0 usd=0.029013 out=1.0 160.5s | Σ$0.96 bad=0
+[38/72] 043-db-migration-safety            m6-stop-weak-r0 rc=0 usd=0.000319 out=0.098 33.8s | Σ$0.96 bad=0
+[39/72] 043-db-migration-safety            m6-stop-weak-r1 rc=0 usd=0.005125 out=0.19 219.2s | Σ$0.96 bad=0
+[40/72] 042-api-schema-migration           m6-esc-strong-r2 rc=0 usd=0.1247 out=0.74 684.6s | Σ$1.09 bad=0
+[41/72] 042-api-schema-migration           m6-esc-weak-r0 rc=0 usd=0.00032 out=0.15 69.7s | Σ$1.09 bad=0
+[42/72] 043-db-migration-safety            m6-esc-strong-r2 rc=0 usd=0.07189 out=0.275 1158.5s | Σ$1.16 bad=0
+[43/72] 087-cli-parser-bug-tests           m6-esc-strong-r1 rc=0 usd=0.156654 out=0.675 1027.4s | Σ$1.32 bad=0
+[44/72] 043-db-migration-safety            m6-stop-strong-r1 rc=0 usd=0.094841 out=0.275 1667.1s | Σ$1.41 bad=0
+[45/72] 042-api-schema-migration           m6-esc-strong-r1 rc=0 usd=0.176897 out=0.74 1650.6s | Σ$1.59 bad=0
+[46/72] 043-db-migration-safety            m6-stop-strong-r2 rc=0 usd=0.088333 out=0.995 1270.8s | Σ$1.68 bad=0
+[47/72] 042-api-schema-migration           m6-stop-weak-r0 rc=0 usd=0.000323 out=0.15 44.0s | Σ$1.68 bad=0
+=== chunk end rc=124 2026-09-24T01:09:07-04:00
+=== chunk start 2026-09-24T01:09:19-04:00
+seed=20260924 queue=72 already-done=47 pending=25 concurrency=6 max_usd=8.0
+[1/25] 041-frontend-state-bug             m6-esc-strong-r2 rc=0 usd=0.260559 out=0.5962 233.4s | Σ$1.94 bad=0
+[2/25] 043-db-migration-safety            m6-esc-strong-r0 rc=0 usd=0.030097 out=0.275 324.0s | Σ$1.97 bad=0
+[3/25] 087-cli-parser-bug-tests           m6-stop-strong-r0 rc=0 usd=0.148829 out=0.6607 602.0s | Σ$2.12 bad=0
+[4/25] 087-cli-parser-bug-tests           m6-stop-strong-r2 rc=0 usd=0.093708 out=0.6607 463.0s | Σ$2.21 bad=0
+[5/25] 087-cli-parser-bug-tests           m6-esc-strong-r0 rc=0 usd=0.156845 out=0.675 806.2s | Σ$2.37 bad=0
+[6/25] 086-sql-migration-preflight-rollback m6-stop-weak-r1 rc=0 usd=0.00031 out=0.1928 22.9s | Σ$2.37 bad=0
+[7/25] 043-db-migration-safety            m6-stop-strong-r0 rc=0 usd=0.040514 out=0.275 887.5s | Σ$2.41 bad=0
+[8/25] 082-compose-config-repair          m6-stop-strong-r0 rc=0 usd=0.03602 out=0.99 237.6s | Σ$2.44 bad=0
+[9/25] 082-compose-config-repair          m6-stop-strong-r2 rc=0 usd=0.030119 out=0.5964 158.7s | Σ$2.47 bad=0
+[10/25] 086-sql-migration-preflight-rollback m6-stop-strong-r2 rc=0 usd=0.077885 out=0.674 1240.9s | Σ$2.55 bad=0
+[11/25] 042-api-schema-migration           m6-stop-strong-r2 rc=0 usd=0.134826 out=0.4 1662.5s | Σ$2.69 bad=0
+[12/25] 086-sql-migration-preflight-rollback m6-esc-strong-r2 rc=0 usd=0.069655 out=0.7 1116.1s | Σ$2.76 bad=0
+[13/25] 043-db-migration-safety            m6-esc-weak-r0 rc=0 usd=0.004805 out=0.236 153.7s | Σ$2.76 bad=0
+[14/25] 087-cli-parser-bug-tests           m6-stop-weak-r1 rc=0 usd=0.00027 out=0.2867 32.1s | Σ$2.76 bad=0
+[15/25] 041-frontend-state-bug             m6-stop-weak-r1 rc=0 usd=0.000387 out=0.2039 214.6s | Σ$2.76 bad=0
+[16/25] 041-frontend-state-bug             m6-esc-weak-r1 rc=0 usd=0.003344 out=0.2039 409.9s | Σ$2.77 bad=0
+[17/25] 041-frontend-state-bug             m6-esc-weak-r0 rc=0 usd=0.000969 out=0.5962 82.1s | Σ$2.77 bad=0
+[18/25] 086-sql-migration-preflight-rollback m6-esc-strong-r1 rc=0 usd=0.053266 out=0.144 1418.5s | Σ$2.82 bad=0
+[19/25] 086-sql-migration-preflight-rollback m6-esc-strong-r0 rc=0 usd=0.071861 out=0.7 1384.2s | Σ$2.89 bad=0
+[20/25] 082-compose-config-repair          m6-esc-weak-r2 rc=0 usd=0.000358 out=0.3 42.5s | Σ$2.89 bad=0
+    resubmitting once: 086-sql-migration-preflight-rollback m6-stop-strong-r0
+[21/25] 041-frontend-state-bug             m6-esc-strong-r0 rc=0 usd=0.293547 out=0.5925 236.5s | Σ$3.19 bad=0
+[22/25] 042-api-schema-migration           m6-stop-strong-r1 rc=0 usd=0.022834 out=0.15 393.3s | Σ$3.21 bad=0
+=== chunk end rc=124 2026-09-24T01:59:19-04:00
+=== chunk start 2026-09-24T02:00:09-04:00
+seed=20260924 queue=72 already-done=69 pending=3 concurrency=6 max_usd=8.0
+[1/3] 087-cli-parser-bug-tests           m6-esc-strong-r2 rc=0 usd=0.107028 out=0.675 407.1s | Σ$3.32 bad=0
+[2/3] 042-api-schema-migration           m6-stop-strong-r0 rc=0 usd=0.103736 out=0.74 576.3s | Σ$3.42 bad=0
+[3/3] 086-sql-migration-preflight-rollback m6-stop-strong-r0 rc=0 usd=0.139326 out=0.7 625.3s | Σ$3.56 bad=0
+
+finished: done=3 spent=US$3.56 rc_err=0 receiptless=0 halted=False
+=== chunk end rc=0 2026-09-24T02:10:35-04:00

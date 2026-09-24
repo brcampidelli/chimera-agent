@@ -206,6 +206,10 @@ class AgentConfig:
     # of solves at a mean score of 0.416 against 0.681, a gap that mixes task difficulty with the cost
     # of stopping, and `bench/tool_loop_escalation` is what separates the two. A second trip, on the
     # stronger model, still stops the run exactly as before.
+    # Measured (72 solves): a tie at that bench's power on both executors, so it stays off and is not
+    # recommended. On the strong executor the three runs it escalated scored 0.726 against 0.396 for
+    # the three the breaker stopped, at +US$ 0.23 each; the arm-level design dilutes that by the trip
+    # rate. A fork at the trip point is the design that could decide it.
     escalate_on_tool_loop: str | None = None
     # Surface the few most task-relevant built-in skills (name + description) into the system prompt,
     # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
