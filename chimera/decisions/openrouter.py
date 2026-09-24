@@ -78,28 +78,65 @@ class OpenRouterDecisionsBackend:
         return self.read(response.json(), question)
 
     def read(self, data: dict[str, Any], question: Question) -> Reading:
+        """The reading, or ``ValueError`` — which the Decider records as a halt.
+
+        Strict since study 24 (item 3). The first version repaired what it could not read: an option
+        missing from ``probabilities`` became 0.0, a Noul outside [0, 1] was clamped, and a written
+        choice that named no option fell back to the argmax. Each repair turned a malformed body into
+        a confident number — keys spelled another way read as ``p = 0``, which the REVIEW band takes
+        as "not dangerous", failing OPEN. A halt keeps the run's other layers in charge instead.
+        """
         choice_q = as_choice(question)
-        answers = data.get("answers") or {}
-        answer = answers.get(question.key) or {}
+        answers = data.get("answers")
+        answer = answers.get(question.key) if isinstance(answers, dict) else None
+        if not isinstance(answer, dict):
+            raise ValueError(f"the response carries no answer for {question.key!r}")
         usage = data.get("usage") or {}
         usd = usage.get("cost")
         # The build that answered — `typesafe/jev-1.13-20260917` behind the alias on 09-19. The bench
         # stored it from the first run; the product did not until study 21 found every gateway hiding
         # it. Empty when the route sends none.
         resolved = str(data.get("model") or "").strip()
-        if "noul" in answer:
-            yes = min(max(float(answer["noul"]), 0.0), 1.0)
+        raw = json.dumps(answer)[:200]
+        if isinstance(question, Noul):
+            yes = _probability(answer.get("noul"), f"{question.key}.noul")
             return Reading(
                 choice="yes" if yes >= 0.5 else "no", shares={"yes": yes, "no": 1.0 - yes}, p=yes, usd=usd,
-                raw=json.dumps(answer)[:200], resolved_model=resolved,
+                raw=raw, resolved_model=resolved,
             )
-        probs = answer.get("probabilities") or {}
-        shares: dict[str, float] | None = {o: float(probs.get(o, 0.0)) for o in choice_q.options} if probs else None
-        written = str(answer.get("choice") or "")
-        choice = next((o for o in choice_q.options if o.casefold() == written.strip().casefold()), None)
-        if choice is None and shares:
-            choice = max(shares, key=lambda k: shares[k])
+        probs = answer.get("probabilities")
+        if not isinstance(probs, dict) or set(probs) != set(choice_q.options):
+            got = sorted(probs) if isinstance(probs, dict) else probs
+            raise ValueError(f"{question.key}: probabilities {got!r} do not name exactly the options {list(choice_q.options)}")
+        shares = {o: _probability(probs[o], f"{question.key}.{o}") for o in choice_q.options}
+        total = sum(shares.values())
+        if abs(total - 1.0) > SUM_TOLERANCE:
+            raise ValueError(f"{question.key}: probabilities sum to {total:.4f}, not 1")
+        shares = {o: v / total for o, v in shares.items()}
+        written = answer.get("choice")
+        choice = max(shares, key=lambda k: shares[k])
+        if written is not None:
+            named = next((o for o in choice_q.options if o.casefold() == str(written).strip().casefold()), None)
+            if named is None:
+                raise ValueError(f"{question.key}: choice {written!r} is not one of the options")
+            choice = named
         p: float | None = None
-        if shares is not None and choice_q.event:
-            p = min(max(sum(shares.get(o, 0.0) for o in choice_q.event), 0.0), 1.0)
-        return Reading(choice=choice, shares=shares, p=p, usd=usd, raw=json.dumps(answer)[:200], resolved_model=resolved)
+        if choice_q.event:
+            p = sum(shares[o] for o in choice_q.event)
+        return Reading(choice=choice, shares=shares, p=p, usd=usd, raw=raw, resolved_model=resolved)
+
+
+#: How far a Choice's probabilities may sum from 1 and still be read (then renormalized) — rounding to
+#: two or three decimals across up to a dozen options, the band JevBench itself adopted (RENORM_TOL
+#: 2e-2) after its v1 run showed models rounding. Outside it the body is malformed, and a halt.
+SUM_TOLERANCE = 0.02
+
+
+def _probability(value: Any, where: str) -> float:
+    """A finite number in [0, 1], or ``ValueError`` — never clamped into one."""
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ValueError(f"{where}: {value!r} is not a probability")
+    number = float(value)
+    if not 0.0 <= number <= 1.0:  # NaN fails both comparisons and lands here too
+        raise ValueError(f"{where}: {number!r} is outside [0, 1]")
+    return number

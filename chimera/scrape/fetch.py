@@ -62,9 +62,17 @@ def _http_fetch(url: str, timeout: float = 20.0) -> tuple[int, str]:
 
 
 def _browser_fetch(url: str) -> str:
-    """Render ``url`` in the built-in browser and return its post-JS HTML (auto-installs Chromium)."""
+    """Render ``url`` in the built-in browser and return its post-JS HTML (auto-installs Chromium).
+
+    SSRF-checked here as well as in the driver (study 24, item 1): ``render="browser"`` reached
+    this function without any check — only ``_http_fetch`` had one — so ``scrape`` could render
+    ``http://169.254.169.254/…`` or the sidecar. The explicit check gives a clean refusal before a
+    browser is launched; the driver's route re-checks every redirect and navigation after it.
+    """
+    from chimera.scrape.ssrf import check_url
     from chimera.tools import browser as b
 
+    check_url(url)
     try:
         driver = b._new_playwright_driver(headless=True)
     except Exception as exc:  # noqa: BLE001 — most likely the Chromium binary isn't downloaded yet
