@@ -222,6 +222,12 @@ def render_viewport_first(elements: list[Element]) -> str:
     long article at 2,112 elements / 60 k characters. The off-screen ones keep their refs — the
     driver stamps every element, so a ref learned from ``find`` still clicks — and the summary line
     says how to reach them. With every element in view the output is exactly ``render_elements``'s.
+
+    Measured, and a loss (``bench/browser_viewport_tasks/RESULTS.md``): on 24 tasks it cut prompt
+    tokens by 42% and task success from 0.958 to 0.833, CI wholly below zero. Every failure it added
+    ended in ``tool_loop``: the breaker's identical-args rule stops a run after five ``scroll`` calls,
+    though each returns a different viewport. Opt-in until that rule reads the observations and the
+    bundle is measured again.
     """
     shown = [el for el in elements if _in_view(el)]
     rest = [el for el in elements if not _in_view(el)]
