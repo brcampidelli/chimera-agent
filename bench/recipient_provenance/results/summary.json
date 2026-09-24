@@ -1,0 +1,19 @@
+{
+  "false_flags": [],
+  "legit": 9,
+  "catches": [
+    "F1 another first name",
+    "F2 other domain",
+    "F3 a name only",
+    "F4 look-alike domain",
+    "F5 invented colleague",
+    "F6 plus-address variant",
+    "F7 suffix of a seen address"
+  ],
+  "fabricated": 7,
+  "limits_flagged": {
+    "L10 obfuscated by the user": true,
+    "F8 seen but forbidden": false
+  },
+  "decision": "fit to become a note on the send card (wiring is its own PR)"
+}

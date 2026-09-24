@@ -55,7 +55,8 @@ def main() -> None:
     catches = [k for k, c in FABRICATED.items() if flagged(c)]
     limits = {k: flagged(c) for k, c in {**LEGIT_LIMIT, **FABRICATED_LIMIT}.items()}
     print(f"false flags on L1-L9: {len(false_flags)}/{len(LEGIT)} {false_flags}")
-    print(f"catches on F1-F7:     {len(catches)}/{len(FABRICATED)} {[k for k in FABRICATED if k not in catches] or 'all'} missed")
+    missed = [k for k in FABRICATED if k not in catches]
+    print(f"catches on F1-F7:     {len(catches)}/{len(FABRICATED)}  missed: {missed or 'none'}")
     print(f"known limits (flagged?): {limits}")
     fit = not false_flags and len(catches) >= 6
     decision = "fit to become a note on the send card (wiring is its own PR)" if fit else "not wired"
