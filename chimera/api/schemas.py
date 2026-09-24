@@ -1580,15 +1580,17 @@ class DecisionLabelIn(BaseModel):
 
 class DecideQuestionIn(BaseModel):
     type: Literal["noul", "choice", "score"]
-    instructions: str
-    criteria: dict[str, str] = {}
-    """noul: ``true``/``false``; choice: option -> meaning, in order; score: level -> meaning, lowest first."""
+    instructions: str | dict[str, Any] | list[Any] | None = None
+    """Text, or an object/list rendered as JSON; optional on a noul whose criteria say it."""
+    criteria: dict[str, str | dict[str, Any] | list[Any] | None] | list[str | dict[str, Any] | list[Any]] = {}
+    """noul: ``true``/``false``; choice: option -> meaning (``null`` = the name alone), in order; score:
+    the SDK's list of level meanings, lowest first, or level -> meaning."""
 
 
 class DecideIn(BaseModel):
-    """The open System One request (study 22, phase 4) — the Decisions API's own shape."""
+    """The open System One request (study 22, phase 4) — the vendor SDK's own shape (study 24, A1)."""
 
-    state: str
+    state: str | dict[str, Any] | list[Any]
     questions: dict[str, DecideQuestionIn]
     decision: str = ""
     """Optional name the calibration map is found by; empty = ad hoc, never calibrated."""
@@ -1597,8 +1599,8 @@ class DecideIn(BaseModel):
 class DecideOut(BaseModel):
     model: str
     answers: dict[str, dict[str, Any]]
-    """Per key: ``{"noul": p}`` | ``{"choice", "probabilities", "confidence"}`` |
-    ``{"score", "probabilities", "legend", "confidence"}`` | ``{"error"}``."""
+    """Per key, each with ``type``: ``{"noul": p}`` | ``{"choice", "probabilities", "confidence"}`` |
+    ``{"score", "probabilities", "legend": {level: meaning}, "confidence"}`` | ``{"error"}``."""
     receipts: dict[str, dict[str, Any]]
 
 

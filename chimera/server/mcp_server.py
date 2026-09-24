@@ -68,9 +68,12 @@ DECIDE_SPEC: dict[str, Any] = {
     "inputSchema": {
         "type": "object",
         "properties": {
-            "questions": {"type": "object", "description": "key -> {type, instructions, criteria}"},
-            "state": {"type": "string"},
-            "states": {"type": "array", "items": {"type": "string"}},
+            "questions": {
+                "type": "object",
+                "description": "key -> {type, instructions, criteria} — the TypeSafe SDK's question shape",
+            },
+            "state": {"anyOf": [{"type": "string"}, {"type": "object"}, {"type": "array"}]},
+            "states": {"type": "array", "items": {"anyOf": [{"type": "string"}, {"type": "object"}, {"type": "array"}]}},
         },
         "required": ["questions"],
     },

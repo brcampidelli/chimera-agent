@@ -49,8 +49,8 @@ class DecideTool(Tool):
             "questions": {
                 "type": "object",
                 "description": (
-                    "key -> {type: noul|choice|score, instructions: str, criteria: {...}}. noul criteria: "
-                    "{true, false}; choice: option -> meaning; score: level -> meaning, lowest first."
+                    "key -> {type: noul|choice|score, instructions: str, criteria: ...}. noul criteria: "
+                    "{true, false}; choice: option -> meaning; score: a list of level meanings, lowest first."
                 ),
             },
             "state": {"type": "string", "description": "The text to ask about."},
@@ -75,10 +75,12 @@ class DecideTool(Tool):
         questions = kwargs.get("questions")
         state = kwargs.get("state")
         states = kwargs.get("states")
-        texts: list[str]
+        # A state may also be an object or a list (the SDK's shape); the interface renders it as JSON.
+        # `str()` on it would have handed the model Python's repr instead.
+        texts: list[Any]
         if isinstance(states, list) and states:
-            texts = [str(s) for s in states]
-        elif isinstance(state, str) and state.strip():
+            texts = [s if isinstance(s, str | dict | list) else str(s) for s in states]
+        elif (isinstance(state, str) and state.strip()) or (isinstance(state, dict | list) and state):
             texts = [state]
         else:
             return "error: give 'state' (one text) or 'states' (a list of texts)"

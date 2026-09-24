@@ -14,7 +14,8 @@ tokenizer- or context-dependent and need a reader.
   read as the word, not the rubric: arXiv 2609.26758 swapped rubrics under yes/no labels and changed
   76.9% of answers, 6.5% under neutral ones (I3). A Noul is yes/no by contract and is exempt; its
   remedy is :meth:`Choice.neutral` on the Choice it reduces to, benched first.
-* **numeric_levels** (error, Score) — levels ``1``…``5`` carry no meaning the model can read;
+* **numeric_levels** (error, Score) — levels ``1``…``5`` **without a meaning each** carry nothing the
+  model can read (with one each — the SDK's list shape — they are neutral identifiers, study 22 I3);
   name what each level is.
 * **prefix** (error) — an option that is a prefix of another (``RE`` and ``REVIEW``): the label
   token cannot say which one was meant (study 21 A4; phase 0 now refuses that read at run time).
@@ -70,7 +71,13 @@ def lint(question: Question) -> list[Finding]:
         polar = [o for o in choice.options if o.strip().casefold() in POLAR_LABELS]
         if polar:
             found.append(Finding("error", "polar_label", f"{choice.key}: options {polar} are read as words, not rubric"))
-    if isinstance(question, Score) and all(level.strip().replace(".", "", 1).isdigit() for level in question.levels):
+    if (
+        isinstance(question, Score)
+        and all(level.strip().replace(".", "", 1).isdigit() for level in question.levels)
+        and not all(question.criteria.get(level) for level in question.levels)
+    ):
+        # Numbers with a meaning each are neutral identifiers (I3) — the SDK's own Score shape, levels
+        # "0", "1", ... with the meanings in criteria. Numbers with nothing behind them name nothing.
         found.append(Finding("error", "numeric_levels", f"{choice.key}: levels {list(question.levels)} name nothing"))
     folded = [(o, o.strip().casefold()) for o in choice.options]
     for a, fa in folded:
