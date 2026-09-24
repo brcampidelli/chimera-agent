@@ -67,3 +67,52 @@ bootstrap 95% CI over tasks, beside the `off` arm's own replica SD.
 
 Hint content other than one tool name; a deep router (whole transcript); retries (`--max-attempts 1`); tasks
 outside the 23.
+
+## Amendment 1 — approval, executors, cap and pilot (2026-09-23, before any solve)
+
+**Approved by the owner: options (a) and (b) — all three executors** (strong `deepseek-v3.2`, weak `gpt-oss-20b`,
+Sol `gpt-6-sol`), estimated ≈ US$ 37. The driver's own cap is **US$ 40**; reaching it halts new submissions and
+the result is reported with the missing cells named.
+
+**The ruler is frozen:** the arms run from a dedicated worktree at `e5bbc845` (the merge that shipped the hint
+mode), installed into its own venv `hb-venv-b4b` — not the B4 venv, which points at a working tree someone else
+edits (§2aa). Arm names `sys1h-{off,on}-{exec}-r{k}`, so no B4 result or home is reused.
+
+**Pilot, unscored:** one `on` solve on `044-ci-config-repair` for the strong and the weak executor, read only for
+the positive control — the router's receipt must show `hinted > 0` and no fallback storm — and deleted before the
+scored run. If the pilot shows the hint never reaches the executor, the run does not start.
+
+## Amendment 2 — the wrapper runs from $HOME; the pilot passed (2026-09-23, before any scored solve)
+
+Setup found that the frozen venv listed the ruler (`chimera-b4b`) while `import chimera` resolved to the main
+working tree: `wsl` starts in the Windows working directory, and `python -m` puts the current directory first on
+`sys.path`. The wrapper now `cd`s to `$HOME` before the solve and writes `=== chimera=<path> ===` into every log,
+so each solve carries a receipt of the code that ran. (B4's venv pointed at the main tree outright; that is a note
+about B4's apparatus, recorded here and not re-litigated.)
+
+Pilot (`044`, `on`, strong + weak, US$ 0.02): both logs name the frozen ruler; the router gave **13 and 4 hints,
+narrowed 0, answered 0, fallbacks 0**; the executors followed 5/13 and 1/4. Positive control passed; the two
+solves and their homes, logs and sandboxes were deleted, and the scored run starts clean.
+
+## Amendment 3 — cap raised to US$ 45 (2026-09-23, at 24/414 solves, US$ 2.37, before any score was read)
+
+At 24 solves the projected total was ≈ US$ 41, above the US$ 40 cap, driven by the Sol arm. The owner raised the
+cap to **US$ 45** so the run can close complete. Only the spend ceiling changed; no outcome had been read.
+
+## Amendment 4 — the run goes in foreground chunks (2026-09-23, before any score was read)
+
+A detached driver (`nohup`, then `setsid`) died with the launching `wsl` session — the WSL VM shuts down when no
+session is open. The driver runs in the foreground in 50-minute chunks (`timeout 3000`) and resumes: done cells are
+skipped; a solve cut by a chunk's end has no result and is re-run in the next chunk. A first 40-second probe
+started 6 solves that died with it; they left no result and are re-run like any other.
+
+## Amendment 6 — chunk 3 ran without the graders' tools (2026-09-23)
+
+Chunk 3 was launched from a non-login shell, which lacks `~/.local/bin`; the graders shell out to `pytest` and
+`node`, and two tasks (016, 084) failed with `FileNotFoundError` twice each, were frozen, and tripped the 5% stop
+rule after 25 solves. Any other solve of that chunk may have been graded without its tools and come back low
+without an error (§2c #4), so **every cell the chunk touched** — 21 graded plus the 4 frozen — was moved, not
+deleted, to `~/b4b-quarantine-chunk3/` with its home (its `runs.jsonl` sums every round, so a rerun must start
+from an empty receipt), and the freeze list moved with it. They are re-run from chunk 4 on. The chunk script now
+prepends `~/.local/bin` and refuses to start without `pytest` and `node`. The US$ 2.60 the chunk spent is real
+money outside the run's own accounting; the cap is unchanged.
