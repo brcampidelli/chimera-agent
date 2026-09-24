@@ -22,7 +22,7 @@ Local only (`qwen3:4b` through the shipped `LocalLogprobBackend`), US$ 0.*
 
 The **30 longest states of JevBench's public hard tier**:
 - **Source:** MIT, at the commit `bench/jevbench_local` pinned (`2fa63fa`, same file hashes).
-- **Length:** by the prompt token count `bench/jevbench_local` recorded, 1,100–3,900 tokens.
+- **Length:** by the prompt token count `bench/jevbench_local` recorded, which puts them between 2,302 and 3,905 tokens (read off the file when this was committed).
 - **Questions:** each item's own question, mapped exactly as `bench/jevbench_local` maps it.
 
 ## Procedure
