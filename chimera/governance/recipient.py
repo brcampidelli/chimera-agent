@@ -29,7 +29,8 @@ def normalise(address: str) -> str:
     if angle:
         text = angle.group(1)
     text = text.strip().strip("`'\"").removeprefix("mailto:").removeprefix("MAILTO:")
-    return text.strip().rstrip(".,;:!?)").lower()
+    # Quotes and punctuation in any order at the end (`a@b.c`. and a@b.c.` both end in both).
+    return text.strip().rstrip(".,;:!?)`'\"").lower()
 
 
 def addresses_in(text: str) -> set[str]:
