@@ -4251,6 +4251,10 @@ def solve(
         None, "--escalate-on-tool-loop",
         help="EXPERIMENT (study 24 M6): when the tool-loop breaker trips, hand the rest of the run to this stronger MODEL instead of stopping. A second trip stops as before. Off by default.",
     ),
+    snapshot_at_tool_loop: str = typer.Option(
+        None, "--snapshot-at-tool-loop",
+        help="EXPERIMENT (study 24 M6 fork): with --escalate-on-tool-loop, copy the workspace to this DIR at the trip, before escalating — what stopping would have left. Off by default.",
+    ),
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
@@ -4591,6 +4595,7 @@ def solve(
                 _ToolRouter(backend, tool_router, mode=tool_router_mode) if tool_router else None
             ),
             escalate_on_tool_loop=escalate_on_tool_loop or None,
+            snapshot_on_tool_loop=Path(snapshot_at_tool_loop) if snapshot_at_tool_loop else None,
         )
         worker = Agent(backend, registry, _worker_cfg)
         escalate_worker = (
