@@ -91,6 +91,23 @@ DANGEROUS_WHEN_TAINTED = frozenset(
 )
 
 
+def browser_reads_loaded_page(name: str, kwargs: dict[str, Any]) -> bool:
+    """A browser call that reads the page already loaded and sends nothing (study 24, M8).
+
+    ``read`` never navigates (the tool ignores any ``url`` it is handed); ``read_text`` and ``find``
+    navigate only when they carry a ``url``. The action is normalised exactly as ``BrowserTool`` does
+    (``str(...).strip()``), so a spelling the tool would run as another action cannot open this.
+    Everything that can make a request — navigate, click, type, back, screenshot, or a read with a
+    ``url`` — stays outside it.
+    """
+    if name != "browser":
+        return False
+    action = str(kwargs.get("action", "")).strip()
+    if action == "read":
+        return True
+    return action in ("read_text", "find") and not str(kwargs.get("url", "") or "").strip()
+
+
 class LedgeredTool(Tool):
     """A tool whose calls are logged to the ledger and reviewed for tainted-input execution."""
 
@@ -102,9 +119,13 @@ class LedgeredTool(Tool):
         approve: ApproveFn | None = None,
         audit: AuditLog | None = None,
         narrow_on_taint: bool = False,
+        free_browser_reads: bool = False,
     ) -> None:
         self.inner = inner
         self.ledger = ledger
+        # Study 24, M8: under narrowing, reading the page the browser already holds asked for a card
+        # on every call. `bench/browser_taint_cards` measures what exempting those reads costs.
+        self.free_browser_reads = free_browser_reads
         self.approve = approve
         self.audit = audit
         # Taint-adaptive allowlist (M9b): once the run is tainted, a dangerous tool is
@@ -126,6 +147,7 @@ class LedgeredTool(Tool):
         if (
             self.narrow_on_taint
             and self.name in DANGEROUS_WHEN_TAINTED
+            and not (self.free_browser_reads and browser_reads_loaded_page(self.name, kwargs))
             and self.ledger.run_tainted(for_narrowing=True)
         ):
             # The question a person answers needs three things the old one lacked: what will run,
