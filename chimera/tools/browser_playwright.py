@@ -23,6 +23,7 @@ Three things study 24 found missing (``bench/PLAN-study24-jev-practice.md``, ite
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Callable
 from typing import Any
 from urllib.parse import urlparse
@@ -98,20 +99,33 @@ class RequestGuard:
         return self._hosts[key]
 
     def on_paused(self, session: Any, params: dict[str, Any]) -> None:
-        """One paused request: continue it or fail it. Any error while deciding fails it — a request
-        left paused hangs the page, and a guard that cannot decide must not wave it through."""
+        """One paused request: continue it or fail it. Any error while DECIDING fails it — a request
+        left paused hangs the page, and a guard that cannot decide must not wave it through.
+
+        The decision and the command are separate steps. The first version sent ``continueRequest``
+        inside the try, so when the page had already cancelled the request (it navigated away), the
+        protocol's "Invalid InterceptionId" landed in the except and the guard sent ``failRequest``
+        for the same dead id — which raised again, out of the event handler (study 24, M7, seen on a
+        live page with nothing refused). A request that is already gone cannot be sent either way,
+        so a failed command is dropped, never retried as the opposite verdict."""
         request_id = params.get("requestId")
+        url = ""
         try:
             url = str((params.get("request") or {}).get("url", ""))
-            if self.permits(url):
-                session.send("Fetch.continueRequest", {"requestId": request_id})
-                return
+            allow = self.permits(url)
+        except Exception:  # noqa: BLE001 — cannot decide: fail closed
+            allow = False
+        if not allow:
             self.blocked_requests += 1
             if params.get("resourceType") == "Document":
                 self.blocked_navigations.append(url)
-        except Exception:  # noqa: BLE001 — fail closed, below
-            pass
-        session.send("Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"})
+        command = (
+            ("Fetch.continueRequest", {"requestId": request_id})
+            if allow
+            else ("Fetch.failRequest", {"requestId": request_id, "errorReason": "BlockedByClient"})
+        )
+        with contextlib.suppress(Exception):  # the request is gone: nothing left to allow or refuse
+            session.send(*command)
 
     def take(self) -> list[str]:
         out, self.blocked_navigations = self.blocked_navigations, []

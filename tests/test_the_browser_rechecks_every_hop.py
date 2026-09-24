@@ -75,6 +75,21 @@ def test_a_guard_that_cannot_decide_fails_the_request_closed() -> None:
     assert session.sent == [("Fetch.failRequest", {"requestId": "r1", "errorReason": "BlockedByClient"})]
 
 
+def test_a_request_the_page_already_cancelled_is_dropped_not_refused_twice() -> None:
+    """Seen live (study 24, M7): the page navigated away, `continueRequest` answered "Invalid
+    InterceptionId", and the old guard then sent `failRequest` for the same dead id, which raised out
+    of the event handler. One command per paused request, and a failed one is dropped."""
+
+    class _GoneSession(_Session):
+        def send(self, method: str, params: dict[str, Any]) -> None:
+            super().send(method, params)
+            raise RuntimeError("Protocol error (Fetch.continueRequest): Invalid InterceptionId.")
+
+    session = _GoneSession()
+    RequestGuard(lambda url: True).on_paused(session, _paused("https://example.com/"))  # must not raise
+    assert [method for method, _ in session.sent] == ["Fetch.continueRequest"]
+
+
 def test_the_guard_resolves_each_host_once_and_ignores_non_http() -> None:
     asked: list[str] = []
 
