@@ -88,3 +88,11 @@ One Sol solve cost **US$ 2.28** against a `--max-usd 2.0` ceiling (`086`, on, r1
 - A **better router model**: one router (`deepseek-v4-flash-0731`), named in advance.
 - Comparison of absolute pass rates with #453: the grading environment differs (`pytest` and `node` installed here, §4 of the registration).
 - Anything about `gpt-6-sol` beyond the day it shipped, on OpenRouter's standard routing.
+- **Fabrication.** These tasks have no step where the agent must look something up or invent it, so B4 can show the router ending the loop early. It cannot show an executor making up a value it was no longer able to look up.
+
+**Two outside sources name that second mechanism** (added 2026-09-24, study 24, A4; cited qualitatively, and no number from either is published here as ours):
+
+- **`vinilana/jev-eval-agent`**, read from its own published outputs. With the tool router on, no executor searched the contacts it needed, and most of them wrote an invented recipient address instead. Its scoreboard checks only tool *names*, so it recorded none of this.
+- **`jev-gateway` issue #26**, in production. The gateway's `none` mode stripped sub-agents of their tools and still answered HTTP 200 — the "nothing gives an error" family of §6.
+
+Both point the same way as this table. They also add what B4 could not see: narrowing the tools does not only stop the work, it can make the agent fill the gap with a fabricated answer. `bench/recipient_provenance` (study 24, M2) is the check we built for that case in our own loop.
