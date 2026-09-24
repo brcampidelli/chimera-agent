@@ -1,0 +1,75 @@
+{
+ "task": "R1",
+ "arm": "viewport",
+ "replica": 0,
+ "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+ "stratum": "in_view",
+ "hurt_prone": false,
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "15ee770664e2e7fe",
+  "chimera": "C:\\Users\\brcam\\AppData\\Local\\Temp\\chimera-brk-fixed\\chimera",
+  "commit": "c45333477f737eefa40cfe2fc237c29c6e1657f5"
+ },
+ "error": "",
+ "agent_config": {
+  "temperature": 0.2,
+  "compact_schemas": false,
+  "detect_tool_loops": true,
+  "inject_skill_context": true,
+  "prefix_nonce_set": false,
+  "max_steps": 20,
+  "max_usd": 0.25
+ },
+ "cap_usd": 0.0005547000000000001,
+ "answer": "BQ9086C",
+ "success": true,
+ "stopped_reason": "final",
+ "steps": 4,
+ "tool_calls": 3,
+ "prompt_tokens": 7872,
+ "completion_tokens": 239,
+ "cache_read_tokens": 5120,
+ "cache_write_tokens": 0,
+ "usd": 0.000334,
+ "answered_by": "openrouter/deepseek/deepseek-v4-flash-0731",
+ "providers": [
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace"
+ ],
+ "context_peak_tokens": 2328,
+ "observation_chars": 2734,
+ "browser_actions": {
+  "navigate": 1,
+  "click": 1,
+  "read_text": 1
+ },
+ "browser_calls": [
+  {
+   "action": "navigate",
+   "chars": 2382,
+   "error": false
+  },
+  {
+   "action": "click",
+   "chars": 128,
+   "error": false
+  },
+  {
+   "action": "read_text",
+   "chars": 224,
+   "error": false
+  }
+ ],
+ "seconds": 11.2,
+ "requested_paths": [
+  "/repo/acme-widgets.html",
+  "/go/repo/tab-issues"
+ ],
+ "stripped_env": [
+  "CHIMERA_CHAT_MEMORY"
+ ]
+}
