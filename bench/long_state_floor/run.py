@@ -67,14 +67,17 @@ def read() -> None:
     by_item: dict[str, list[dict[str, Any]]] = {}
     for r in rows:
         by_item.setdefault(r["id"], []).append(r)
-    deltas, flips, partial = [], [], []
+    deltas, flips, partial, never = [], [], [], []
     for item_id, reps in by_item.items():
         reps.sort(key=lambda r: r["round"])
         read_ok = [r for r in reps if r["shares"]]
+        # The first reader put "unread in every round" into the "some rounds only" list: a label that
+        # made a deterministic no-read (a first-token collision) look like replay variance.
+        if not read_ok:
+            never.append(item_id)
+            continue
         if len(read_ok) != len(reps):
             partial.append(item_id)
-        if not read_ok:
-            continue
         label = max(read_ok[0]["shares"], key=read_ok[0]["shares"].get)
         ps = [r["shares"].get(label, 0.0) for r in read_ok]
         deltas.append(max(ps) - min(ps))
@@ -85,7 +88,7 @@ def read() -> None:
     summary = {
         "items": len(by_item), "rounds": len(rows) // max(len(by_item), 1), "build": rows[0]["build"] if rows else "",
         "max_abs_dp_median": deltas[len(deltas) // 2] if deltas else None, "max_abs_dp_max": max(deltas) if deltas else None,
-        "flips": flips, "unread_in_some_rounds_only": partial,
+        "items_read": len(deltas), "flips": flips, "unread_in_some_rounds_only": partial, "unread_in_every_round": never,
     }
     ok = len(flips) <= 1 and (summary["max_abs_dp_max"] or 0) <= 0.02
     summary["decision"] = "floor extends to long states" if ok else "publish the floor beside spot_noul and manager_p"
