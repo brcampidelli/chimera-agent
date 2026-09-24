@@ -1,0 +1,11 @@
+{
+  "pages": 20,
+  "measured": 19,
+  "failed": 1,
+  "elements_median": 152,
+  "elements_p90": 772,
+  "rendered_chars_median": 4156,
+  "hidden_or_disabled_share_median": 0.01231060606060606,
+  "offscreen_share_median": 0.7941176470588235,
+  "decision": "propose a cap/filter in its own PR"
+}
