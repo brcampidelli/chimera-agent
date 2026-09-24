@@ -50,3 +50,9 @@ success from a false one — it rejects both. It says nothing about the diff pat
 
 Nothing about other executors; nothing past 2 000 characters of task or answer (the run log's cut —
 141 of 385 tasks were cut); nothing about the diff path (above).
+
+## Note added 2026-09-24 — the replay floor on long states (study 24, M3)
+
+This null was read without a replay floor of its own on long states. `bench/long_state_floor` measured one on the same instrument: **no label flips** in 22 long JevBench states × 5 identical rounds. But `p` moves by up to **0.036** (median 0.003), mostly in the middle of the scale. The requests are byte-identical and only the call order changes, so the likeliest cause is what Ollama can reuse from the previous prompt; that cause was not isolated.
+
+A jitter that size can reorder items whose `p` differ by less than 0.036. It cannot create or erase an AUROC gap of the size reported above, so the null is expected to stand. A re-read against the floor is owed in a follow-up.
