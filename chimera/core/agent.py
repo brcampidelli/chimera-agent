@@ -209,7 +209,12 @@ class AgentConfig:
     # Measured (72 solves): a tie at that bench's power on both executors, so it stays off and is not
     # recommended. On the strong executor the three runs it escalated scored 0.726 against 0.396 for
     # the three the breaker stopped, at +US$ 0.23 each; the arm-level design dilutes that by the trip
-    # rate. A fork at the trip point is the design that could decide it.
+    # rate. The fork at the trip point (`bench/tool_loop_fork`) decided it: escalating beat stopping on
+    # both executors — strong +0.466 [+0.337, +0.592] per trip at ~US$ 0.86 per point, weak +0.273
+    # [+0.142, +0.421] at ~US$ 0.19 — so it is a recommended OPT-IN for loop-prone work, still off by
+    # default. Caveat: every strong trip there was the breaker stopping four distinct successful edits
+    # (its old no-progress rule ignored the args), so on strong most of the gain was not-stopping; the
+    # weak trips were real walls (malformed tool names, bad patches), which is where it rescues.
     escalate_on_tool_loop: str | None = None
     # The fork (`bench/tool_loop_fork`): when escalation fires, first copy the workspace here. The
     # breaker's own ending asks for an answer with NO tools, so the workspace at the trip IS what

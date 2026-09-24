@@ -1,0 +1,3 @@
+homes 549 · traces scanned 549
+flagged steps: 1
+- 041-frontend-state-bug-m6f-strong-r24: foreign=[] other='data_try6/sandbox/' :: '[exit 1]\nTesting serialization/deserialization...\n/home/brcamp/harness-bench/data_try6/sandbox/m6f-strong-r24/m6f-strong-r24/oc-bench-v2-041-frontend-state-bug-'

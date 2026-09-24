@@ -1,0 +1,699 @@
+=== pilot start 2026-09-24T10:12:22-04:00
+[harnessbench] run-task 011-code-debug (harness=m6f-weak-r0, mode=live) ...
+[harnessbench] run-task 011-code-debug finished adapter_ok=False elapsed=65.135s
+{
+  "task_id": "011-code-debug",
+  "elapsed_sec": 65.135,
+  "api_model_slug": "unknown-api",
+  "api_model_label": "",
+  "usage_summary": {
+    "available": false,
+    "reason": "adapter metadata has no usage root",
+    "session_id": "hb-m6f-weak-r0-011-code-debug-57771125"
+  },
+  "oracle_result": {
+    "task": "011-code-debug",
+    "workspace": "/home/brcamp/harness-bench/data_try6/sandbox/m6f-weak-r0/m6f-weak-r0/oc-bench-v2-011-code-debug-m6f-weak-r0-20260924-101222-8688e0f8/workspace",
+    "outcome_score": 0.17,
+    "level": "fail",
+    "checks": [
+      {
+        "id": "layers_fixed",
+        "label": "修复层数: 1/5",
+        "pass": false,
+        "weight": 0.6,
+        "detail": {
+          "layers_fixed": 1,
+          "total": 5,
+          "per_layer": [
+            {
+              "layer": 1,
+              "snapshot_exists": true,
+              "run_passed": true
+            },
+            {
+              "layer": 2,
+              "snapshot_exists": false,
+              "run_passed": false
+            },
+            {
+              "layer": 3,
+              "snapshot_exists": false,
+              "run_passed": false
+            },
+            {
+              "layer": 4,
+              "snapshot_exists": false,
+              "run_passed": false
+            },
+            {
+              "layer": 5,
+              "snapshot_exists": false,
+              "run_passed": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "rounds_efficiency",
+        "label": "效率: 1轮 (最优5)",
+        "pass": false,
+        "weight": 0.25,
+        "detail": {
+          "rounds_used": 1,
+          "efficiency": 0.2
+        }
+      },
+      {
+        "id": "fix_quality",
+        "label": "修复质量: 注释+日志+完成度",
+        "pass": false,
+        "weight": 0.15,
+        "detail": {
+          "quality_score": 0.0
+        }
+      }
+    ],
+    "summary": {
+      "layers_fixed": "1/5",
+      "rounds_used": 1,
+      "quality_score": 0.0,
+      "all_layers_fixed": false,
+      "used_runtime_summary": true
+    },
+    "outcome_llm_weight": 0.0
+  },
+  "scoring": {
+    "extract_mode": null,
+    "source_response_file": null,
+    "proxy_trace_error": "missing responses/",
+    "rubric_prompt_source": null,
+    "rubric_model": null,
+    "rubric": {
+      "skipped": true,
+      "reason": "no proxy trace: missing responses/"
+    },
+    "process_score": null,
+    "process_effective": 1.0,
+    "security_score": 1.0,
+    "outcome_score": 0.17,
+    "oracle_outcome_score": 0.17,
+    "oracle_quality": null,
+    "quality_rubric_meta": null,
+    "outcome_llm_weight": 0.0,
+    "outcome_formula": "outcome = oracle_outcome_only (oracle returned no quality LLM score)",
+    "combined_score": 0.17,
+    "notes": "no usage-proxy; process=default; security=1; outcome = oracle_outcome_only (oracle returned no quality LLM score)"
+  },
+  "sandbox": "/home/brcamp/harness-bench/data_try6/sandbox/m6f-weak-r0/m6f-weak-r0/oc-bench-v2-011-code-debug-m6f-weak-r0-20260924-101222-8688e0f8"
+}
+=== pilot end rc=0 2026-09-24T10:13:27-04:00
+=== chunk start 2026-09-24T10:13:56-04:00
+seed=20260925 pairs so far={'strong': 0, 'weak': 0} target=20 spent=US$0.00 pending={'strong': 160, 'weak': 480} frozen=0
+[1] 082-compose-config-repair  m6f-strong-r27   rc=0 usd=0.028076 out=0.99 trip=0 118.9s | pairs={'strong': 0, 'weak': 0} Σ$0.03 bad=0
+[2] 082-compose-config-repair  m6f-strong-r8    rc=0 usd=0.025155 out=1.0 trip=0 140.0s | pairs={'strong': 0, 'weak': 0} Σ$0.05 bad=0
+[3] 041-frontend-state-bug     m6f-weak-r39     rc=0 usd=0.000602 out=0.2039 trip=0 173.0s | pairs={'strong': 0, 'weak': 0} Σ$0.05 bad=0
+[4] 082-compose-config-repair  m6f-weak-r79     rc=0 usd=0.002747 out=0.99 trip=0 215.6s | pairs={'strong': 0, 'weak': 0} Σ$0.06 bad=0
+[5] 041-frontend-state-bug     m6f-strong-r28   rc=0 usd=0.170655 out=0.9962 trip=1 234.6s | pairs={'strong': 1, 'weak': 0} Σ$0.23 bad=0
+[6] 082-compose-config-repair  m6f-weak-r28     rc=0 usd=0.000427 out=0.3 trip=0 98.4s | pairs={'strong': 1, 'weak': 0} Σ$0.23 bad=0
+[7] 041-frontend-state-bug     m6f-weak-r76     rc=0 usd=0.001546 out=0.9925 trip=0 274.3s | pairs={'strong': 1, 'weak': 0} Σ$0.23 bad=0
+[8] 042-api-schema-migration   m6f-weak-r25     rc=0 usd=0.000636 out=0.15 trip=0 116.0s | pairs={'strong': 1, 'weak': 0} Σ$0.23 bad=0
+[9] 082-compose-config-repair  m6f-strong-r34   rc=0 usd=0.022838 out=1.0 trip=0 116.7s | pairs={'strong': 1, 'weak': 0} Σ$0.25 bad=0
+[10] 043-db-migration-safety    m6f-strong-r18   rc=0 usd=0.042385 out=0.275 trip=0 255.8s | pairs={'strong': 1, 'weak': 0} Σ$0.30 bad=0
+[11] 042-api-schema-migration   m6f-weak-r29     rc=0 usd=0.000424 out=0.15 trip=0 110.8s | pairs={'strong': 1, 'weak': 0} Σ$0.30 bad=0
+[12] 041-frontend-state-bug     m6f-weak-r114    rc=0 usd=0.000562 out=0.2039 trip=0 249.4s | pairs={'strong': 1, 'weak': 0} Σ$0.30 bad=0
+[13] 041-frontend-state-bug     m6f-weak-r108    rc=0 usd=0.000235 out=0.2039 trip=0 187.7s | pairs={'strong': 1, 'weak': 0} Σ$0.30 bad=0
+[14] 043-db-migration-safety    m6f-strong-r4    rc=0 usd=0.726685 out=0.995 trip=1 588.7s | pairs={'strong': 2, 'weak': 0} Σ$1.02 bad=0
+[15] 043-db-migration-safety    m6f-weak-r103    rc=0 usd=0.000614 out=0.098 trip=0 90.3s | pairs={'strong': 2, 'weak': 0} Σ$1.02 bad=0
+[16] 042-api-schema-migration   m6f-strong-r10   rc=0 usd=0.669436 out=0.74 trip=1 400.8s | pairs={'strong': 3, 'weak': 0} Σ$1.69 bad=0
+[17] 041-frontend-state-bug     m6f-strong-r4    rc=0 usd=0.569021 out=0.6 trip=1 691.1s | pairs={'strong': 4, 'weak': 0} Σ$2.26 bad=0
+[18] 042-api-schema-migration   m6f-weak-r103    rc=0 usd=0.000305 out=0.15 trip=0 119.7s | pairs={'strong': 4, 'weak': 0} Σ$2.26 bad=0
+[19] 041-frontend-state-bug     m6f-strong-r39   rc=0 usd=0.216698 out=0.9962 trip=1 221.2s | pairs={'strong': 5, 'weak': 0} Σ$2.48 bad=0
+[20] 042-api-schema-migration   m6f-weak-r80     rc=0 usd=0.000331 out=0.15 trip=0 60.6s | pairs={'strong': 5, 'weak': 0} Σ$2.48 bad=0
+[21] 042-api-schema-migration   m6f-weak-r43     rc=0 usd=0.000867 out=0.15 trip=0 602.4s | pairs={'strong': 5, 'weak': 0} Σ$2.48 bad=0
+[22] 042-api-schema-migration   m6f-weak-r87     rc=0 usd=0.000308 out=0.15 trip=0 64.0s | pairs={'strong': 5, 'weak': 0} Σ$2.48 bad=0
+[23] 043-db-migration-safety    m6f-strong-r19   rc=0 usd=0.080191 out=0.275 trip=0 470.5s | pairs={'strong': 5, 'weak': 0} Σ$2.56 bad=0
+[24] 082-compose-config-repair  m6f-weak-r16     rc=0 usd=0.000207 out=0.3 trip=0 73.0s | pairs={'strong': 5, 'weak': 0} Σ$2.56 bad=0
+[25] 043-db-migration-safety    m6f-strong-r24   rc=0 usd=0.141122 out=0.987 trip=0 788.8s | pairs={'strong': 5, 'weak': 0} Σ$2.70 bad=0
+[26] 043-db-migration-safety    m6f-weak-r80     rc=0 usd=0.000197 out=0.098 trip=0 33.6s | pairs={'strong': 5, 'weak': 0} Σ$2.70 bad=0
+[27] 082-compose-config-repair  m6f-weak-r99     rc=0 usd=0.000347 out=0.3 trip=0 72.1s | pairs={'strong': 5, 'weak': 0} Σ$2.70 bad=0
+[28] 082-compose-config-repair  m6f-strong-r30   rc=0 usd=0.069781 out=0.99 trip=0 251.9s | pairs={'strong': 5, 'weak': 0} Σ$2.77 bad=0
+[29] 043-db-migration-safety    m6f-weak-r78     rc=0 usd=0.00019 out=0.098 trip=0 34.7s | pairs={'strong': 5, 'weak': 0} Σ$2.77 bad=0
+[30] 041-frontend-state-bug     m6f-strong-r34   rc=0 usd=0.090049 out=0.5962 trip=0 414.4s | pairs={'strong': 5, 'weak': 0} Σ$2.86 bad=0
+[31] 082-compose-config-repair  m6f-strong-r7    rc=0 usd=0.041197 out=0.99 trip=0 184.3s | pairs={'strong': 5, 'weak': 0} Σ$2.90 bad=0
+[32] 043-db-migration-safety    m6f-weak-r91     rc=0 usd=0.000207 out=0.098 trip=0 29.6s | pairs={'strong': 5, 'weak': 0} Σ$2.90 bad=0
+[33] 082-compose-config-repair  m6f-strong-r36   rc=0 usd=0.029117 out=1.0 trip=0 110.0s | pairs={'strong': 5, 'weak': 0} Σ$2.93 bad=0
+[34] 041-frontend-state-bug     m6f-strong-r35   rc=0 usd=0.085733 out=0.5925 trip=0 354.3s | pairs={'strong': 5, 'weak': 0} Σ$3.02 bad=0
+[35] 043-db-migration-safety    m6f-strong-r33   rc=0 usd=0.073023 out=1.0 trip=0 284.1s | pairs={'strong': 5, 'weak': 0} Σ$3.09 bad=0
+[36] 042-api-schema-migration   m6f-strong-r25   rc=0 usd=0.116329 out=0.74 trip=0 331.2s | pairs={'strong': 5, 'weak': 0} Σ$3.21 bad=0
+[37] 043-db-migration-safety    m6f-weak-r36     rc=0 usd=0.001553 out=0.158 trip=0 286.0s | pairs={'strong': 5, 'weak': 0} Σ$3.21 bad=0
+[38] 041-frontend-state-bug     m6f-weak-r49     rc=0 usd=0.001695 out=0.5962 trip=0 197.4s | pairs={'strong': 5, 'weak': 0} Σ$3.21 bad=0
+[39] 043-db-migration-safety    m6f-weak-r18     rc=0 usd=0.000192 out=0.098 trip=0 26.6s | pairs={'strong': 5, 'weak': 0} Σ$3.21 bad=0
+[40] 082-compose-config-repair  m6f-strong-r22   rc=0 usd=0.028116 out=1.0 trip=0 102.2s | pairs={'strong': 5, 'weak': 0} Σ$3.24 bad=0
+[41] 043-db-migration-safety    m6f-strong-r8    rc=0 usd=0.265103 out=0.992 trip=0 735.9s | pairs={'strong': 5, 'weak': 0} Σ$3.50 bad=0
+[42] 042-api-schema-migration   m6f-weak-r35     rc=0 usd=0.000953 out=0.15 trip=0 50.9s | pairs={'strong': 5, 'weak': 0} Σ$3.51 bad=0
+[43] 043-db-migration-safety    m6f-weak-r56     rc=0 usd=0.000201 out=0.098 trip=0 33.2s | pairs={'strong': 5, 'weak': 0} Σ$3.51 bad=0
+[44] 043-db-migration-safety    m6f-strong-r38   rc=0 usd=0.205645 out=0.985 trip=0 544.3s | pairs={'strong': 5, 'weak': 0} Σ$3.71 bad=0
+[45] 082-compose-config-repair  m6f-weak-r50     rc=0 usd=0.000208 out=0.3 trip=0 25.7s | pairs={'strong': 5, 'weak': 0} Σ$3.71 bad=0
+[46] 043-db-migration-safety    m6f-strong-r10   rc=0 usd=0.036079 out=0.87 trip=0 231.8s | pairs={'strong': 5, 'weak': 0} Σ$3.75 bad=0
+[47] 042-api-schema-migration   m6f-weak-r93     rc=0 usd=0.000666 out=0.15 trip=0 118.4s | pairs={'strong': 5, 'weak': 0} Σ$3.75 bad=0
+[48] 043-db-migration-safety    m6f-strong-r12   rc=0 usd=0.039307 out=0.275 trip=0 177.3s | pairs={'strong': 5, 'weak': 0} Σ$3.79 bad=0
+[49] 043-db-migration-safety    m6f-weak-r119    rc=0 usd=0.0002 out=0.098 trip=0 32.2s | pairs={'strong': 5, 'weak': 0} Σ$3.79 bad=0
+[50] 041-frontend-state-bug     m6f-weak-r3      rc=0 usd=0.00323 out=0.2039 trip=0 514.2s | pairs={'strong': 5, 'weak': 0} Σ$3.79 bad=0
+[51] 042-api-schema-migration   m6f-strong-r33   rc=0 usd=0.132511 out=0.4 trip=0 334.2s | pairs={'strong': 5, 'weak': 0} Σ$3.92 bad=0
+[52] 042-api-schema-migration   m6f-weak-r45     rc=0 usd=0.001098 out=0.15 trip=0 87.4s | pairs={'strong': 5, 'weak': 0} Σ$3.92 bad=0
+[53] 041-frontend-state-bug     m6f-strong-r0    rc=0 usd=0.373825 out=0.5962 trip=1 509.7s | pairs={'strong': 6, 'weak': 0} Σ$4.30 bad=0
+[54] 043-db-migration-safety    m6f-weak-r58     rc=0 usd=0.000201 out=0.098 trip=0 17.1s | pairs={'strong': 6, 'weak': 0} Σ$4.30 bad=0
+[55] 043-db-migration-safety    m6f-strong-r9    rc=0 usd=0.240047 out=0.925 trip=0 666.0s | pairs={'strong': 6, 'weak': 0} Σ$4.54 bad=0
+[56] 041-frontend-state-bug     m6f-strong-r24   rc=0 usd=0.108691 out=0.9962 trip=0 287.4s | pairs={'strong': 6, 'weak': 0} Σ$4.65 bad=0
+[57] 082-compose-config-repair  m6f-weak-r70     rc=0 usd=0.000703 out=0.3 trip=0 106.2s | pairs={'strong': 6, 'weak': 0} Σ$4.65 bad=0
+[58] 042-api-schema-migration   m6f-strong-r13   rc=0 usd=0.092749 out=0.74 trip=0 357.2s | pairs={'strong': 6, 'weak': 0} Σ$4.74 bad=0
+[59] 041-frontend-state-bug     m6f-strong-r5    rc=0 usd=0.269024 out=0.9962 trip=1 280.4s | pairs={'strong': 7, 'weak': 0} Σ$5.01 bad=0
+[60] 041-frontend-state-bug     m6f-strong-r13   rc=0 usd=0.466237 out=0.9962 trip=1 409.5s | pairs={'strong': 8, 'weak': 0} Σ$5.48 bad=0
+[61] 043-db-migration-safety    m6f-strong-r20   rc=0 usd=0.036047 out=0.275 trip=0 202.8s | pairs={'strong': 8, 'weak': 0} Σ$5.51 bad=0
+[62] 042-api-schema-migration   m6f-weak-r100    rc=0 usd=0.000963 out=0.15 trip=0 64.1s | pairs={'strong': 8, 'weak': 0} Σ$5.51 bad=0
+[63] 042-api-schema-migration   m6f-strong-r24   rc=0 usd=0.097894 out=0.74 trip=0 271.6s | pairs={'strong': 8, 'weak': 0} Σ$5.61 bad=0
+[64] 041-frontend-state-bug     m6f-weak-r7      rc=0 usd=0.001626 out=0.5962 trip=0 249.9s | pairs={'strong': 8, 'weak': 0} Σ$5.61 bad=0
+[65] 043-db-migration-safety    m6f-weak-r61     rc=0 usd=0.000212 out=0.098 trip=0 39.7s | pairs={'strong': 8, 'weak': 0} Σ$5.61 bad=0
+[66] 043-db-migration-safety    m6f-weak-r27     rc=0 usd=0.000197 out=0.098 trip=0 21.2s | pairs={'strong': 8, 'weak': 0} Σ$5.61 bad=0
+[67] 082-compose-config-repair  m6f-strong-r15   rc=0 usd=0.048464 out=1.0 trip=0 158.3s | pairs={'strong': 8, 'weak': 0} Σ$5.66 bad=0
+[68] 082-compose-config-repair  m6f-strong-r39   rc=0 usd=0.086921 out=1.0 trip=0 211.0s | pairs={'strong': 8, 'weak': 0} Σ$5.75 bad=0
+[69] 082-compose-config-repair  m6f-weak-r49     rc=0 usd=0.000202 out=0.3 trip=0 29.2s | pairs={'strong': 8, 'weak': 0} Σ$5.75 bad=0
+[70] 041-frontend-state-bug     m6f-strong-r20   rc=0 usd=0.357419 out=0.9962 trip=1 259.5s | pairs={'strong': 9, 'weak': 0} Σ$6.11 bad=0
+[71] 082-compose-config-repair  m6f-weak-r11     rc=0 usd=0.000538 out=0.3 trip=0 52.3s | pairs={'strong': 9, 'weak': 0} Σ$6.11 bad=0
+[72] 082-compose-config-repair  m6f-strong-r28   rc=0 usd=0.238619 out=0.98 trip=1 160.8s | pairs={'strong': 10, 'weak': 0} Σ$6.35 bad=0
+[73] 042-api-schema-migration   m6f-strong-r39   rc=0 usd=0.132741 out=0.4 trip=0 319.1s | pairs={'strong': 10, 'weak': 0} Σ$6.48 bad=0
+[74] 042-api-schema-migration   m6f-strong-r18   rc=0 usd=0.102716 out=0.4 trip=0 252.1s | pairs={'strong': 10, 'weak': 0} Σ$6.58 bad=0
+=== chunk end rc=124 2026-09-24T11:04:29-04:00
+=== chunk start 2026-09-24T11:05:00-04:00
+seed=20260925 pairs so far={'strong': 10, 'weak': 0} target=20 spent=US$6.58 pending={'strong': 122, 'weak': 444} frozen=0
+[1] 041-frontend-state-bug     m6f-weak-r8      rc=0 usd=0.000244 out=0.2039 trip=0 79.5s | pairs={'strong': 10, 'weak': 0} Σ$6.58 bad=0
+[2] 082-compose-config-repair  m6f-strong-r10   rc=0 usd=0.039259 out=1.0 trip=0 128.9s | pairs={'strong': 10, 'weak': 0} Σ$6.62 bad=0
+[3] 041-frontend-state-bug     m6f-weak-r73     rc=0 usd=0.00123 out=0.2039 trip=0 147.9s | pairs={'strong': 10, 'weak': 0} Σ$6.62 bad=0
+[4] 043-db-migration-safety    m6f-weak-r99     rc=0 usd=0.000198 out=0.098 trip=0 23.1s | pairs={'strong': 10, 'weak': 0} Σ$6.62 bad=0
+[5] 041-frontend-state-bug     m6f-strong-r23   rc=0 usd=0.315259 out=1.0 trip=1 206.0s | pairs={'strong': 11, 'weak': 0} Σ$6.94 bad=0
+[6] 042-api-schema-migration   m6f-strong-r32   rc=0 usd=0.086318 out=0.74 trip=0 222.6s | pairs={'strong': 11, 'weak': 0} Σ$7.02 bad=0
+[7] 042-api-schema-migration   m6f-weak-r68     rc=0 usd=0.000968 out=0.15 trip=0 99.9s | pairs={'strong': 11, 'weak': 0} Σ$7.02 bad=0
+[8] 042-api-schema-migration   m6f-weak-r97     rc=0 usd=0.001047 out=0.15 trip=0 102.4s | pairs={'strong': 11, 'weak': 0} Σ$7.03 bad=0
+[9] 041-frontend-state-bug     m6f-strong-r3    rc=0 usd=0.076565 out=0.5962 trip=0 246.9s | pairs={'strong': 11, 'weak': 0} Σ$7.10 bad=0
+[10] 082-compose-config-repair  m6f-strong-r26   rc=0 usd=0.065337 out=1.0 trip=0 174.3s | pairs={'strong': 11, 'weak': 0} Σ$7.17 bad=0
+[11] 042-api-schema-migration   m6f-weak-r30     rc=0 usd=0.001036 out=0.15 trip=0 63.4s | pairs={'strong': 11, 'weak': 0} Σ$7.17 bad=0
+[12] 041-frontend-state-bug     m6f-weak-r109    rc=0 usd=0.003015 out=0.2039 trip=0 469.7s | pairs={'strong': 11, 'weak': 0} Σ$7.17 bad=0
+[13] 042-api-schema-migration   m6f-strong-r35   rc=0 usd=0.130364 out=0.74 trip=0 331.6s | pairs={'strong': 11, 'weak': 0} Σ$7.30 bad=0
+[14] 042-api-schema-migration   m6f-weak-r14     rc=0 usd=0.000715 out=0.15 trip=0 59.4s | pairs={'strong': 11, 'weak': 0} Σ$7.30 bad=0
+[15] 082-compose-config-repair  m6f-weak-r43     rc=0 usd=0.000212 out=0.3 trip=0 19.7s | pairs={'strong': 11, 'weak': 0} Σ$7.30 bad=0
+[16] 041-frontend-state-bug     m6f-weak-r96     rc=0 usd=0.001484 out=0.2039 trip=0 236.4s | pairs={'strong': 11, 'weak': 0} Σ$7.30 bad=0
+[17] 042-api-schema-migration   m6f-strong-r12   rc=0 usd=0.106789 out=0.74 trip=0 323.1s | pairs={'strong': 11, 'weak': 0} Σ$7.41 bad=0
+[18] 041-frontend-state-bug     m6f-strong-r38   rc=0 usd=0.072004 out=0.5962 trip=0 260.9s | pairs={'strong': 11, 'weak': 0} Σ$7.48 bad=0
+[19] 041-frontend-state-bug     m6f-weak-r24     rc=0 usd=0.00081 out=0.2039 trip=0 154.3s | pairs={'strong': 11, 'weak': 0} Σ$7.48 bad=0
+[20] 082-compose-config-repair  m6f-weak-r72     rc=0 usd=0.001351 out=0.95 trip=0 68.2s | pairs={'strong': 11, 'weak': 0} Σ$7.49 bad=0
+[21] 043-db-migration-safety    m6f-strong-r39   rc=0 usd=0.043662 out=0.275 trip=0 200.3s | pairs={'strong': 11, 'weak': 0} Σ$7.53 bad=0
+[22] 041-frontend-state-bug     m6f-strong-r2    rc=0 usd=0.443118 out=0.9812 trip=1 229.4s | pairs={'strong': 12, 'weak': 0} Σ$7.97 bad=0
+[23] 041-frontend-state-bug     m6f-strong-r8    rc=0 usd=0.724402 out=0.9925 trip=1 454.6s | pairs={'strong': 13, 'weak': 0} Σ$8.70 bad=0
+[24] 043-db-migration-safety    m6f-strong-r6    rc=0 usd=0.457396 out=0.995 trip=1 315.4s | pairs={'strong': 14, 'weak': 0} Σ$9.15 bad=0
+[25] 082-compose-config-repair  m6f-weak-r87     rc=0 usd=0.000317 out=0.3 trip=0 59.8s | pairs={'strong': 14, 'weak': 0} Σ$9.15 bad=0
+[26] 042-api-schema-migration   m6f-weak-r84     rc=0 usd=0.00119 out=0.15 trip=0 107.4s | pairs={'strong': 14, 'weak': 0} Σ$9.16 bad=0
+[27] 041-frontend-state-bug     m6f-weak-r116    rc=0 usd=0.000363 out=0.2039 trip=0 111.3s | pairs={'strong': 14, 'weak': 0} Σ$9.16 bad=0
+[28] 042-api-schema-migration   m6f-strong-r3    rc=0 usd=0.076536 out=0.4 trip=0 260.0s | pairs={'strong': 14, 'weak': 0} Σ$9.23 bad=0
+[29] 041-frontend-state-bug     m6f-weak-r113    rc=0 usd=0.000241 out=0.2039 trip=0 124.3s | pairs={'strong': 14, 'weak': 0} Σ$9.23 bad=0
+[30] 043-db-migration-safety    m6f-strong-r22   rc=0 usd=0.046226 out=0.27 trip=0 233.9s | pairs={'strong': 14, 'weak': 0} Σ$9.28 bad=0
+[31] 042-api-schema-migration   m6f-weak-r19     rc=0 usd=0.001119 out=0.15 trip=0 81.9s | pairs={'strong': 14, 'weak': 0} Σ$9.28 bad=0
+[32] 041-frontend-state-bug     m6f-strong-r11   rc=0 usd=0.078861 out=1.0 trip=0 278.4s | pairs={'strong': 14, 'weak': 0} Σ$9.36 bad=0
+[33] 043-db-migration-safety    m6f-weak-r70     rc=0 usd=0.00124 out=0.182 trip=0 132.2s | pairs={'strong': 14, 'weak': 0} Σ$9.36 bad=0
+[34] 042-api-schema-migration   m6f-weak-r47     rc=0 usd=0.001106 out=0.15 trip=0 96.4s | pairs={'strong': 14, 'weak': 0} Σ$9.36 bad=0
+[35] 082-compose-config-repair  m6f-strong-r1    rc=0 usd=0.030291 out=1.0 trip=0 109.7s | pairs={'strong': 14, 'weak': 0} Σ$9.39 bad=0
+[36] 042-api-schema-migration   m6f-strong-r19   rc=0 usd=0.132439 out=0.74 trip=0 370.2s | pairs={'strong': 14, 'weak': 0} Σ$9.52 bad=0
+[37] 082-compose-config-repair  m6f-weak-r37     rc=0 usd=0.000201 out=0.3 trip=0 69.8s | pairs={'strong': 14, 'weak': 0} Σ$9.52 bad=0
+[38] 082-compose-config-repair  m6f-weak-r21     rc=0 usd=0.000203 out=0.3 trip=0 31.2s | pairs={'strong': 14, 'weak': 0} Σ$9.52 bad=0
+[39] 082-compose-config-repair  m6f-strong-r11   rc=0 usd=0.026305 out=1.0 trip=0 114.8s | pairs={'strong': 14, 'weak': 0} Σ$9.55 bad=0
+[40] 042-api-schema-migration   m6f-strong-r6    rc=0 usd=0.141354 out=0.4 trip=0 389.7s | pairs={'strong': 14, 'weak': 0} Σ$9.69 bad=0
+[41] 043-db-migration-safety    m6f-strong-r31   rc=0 usd=0.06101 out=0.267 trip=0 259.4s | pairs={'strong': 14, 'weak': 0} Σ$9.75 bad=0
+[42] 042-api-schema-migration   m6f-strong-r15   rc=0 usd=0.05836 out=0.74 trip=0 214.5s | pairs={'strong': 14, 'weak': 0} Σ$9.81 bad=0
+[43] 043-db-migration-safety    m6f-strong-r21   rc=0 usd=0.5303 out=0.935 trip=1 268.4s | pairs={'strong': 15, 'weak': 0} Σ$10.34 bad=0
+[44] 043-db-migration-safety    m6f-strong-r3    rc=0 usd=1.079061 out=0.995 trip=1 510.6s | pairs={'strong': 16, 'weak': 0} Σ$11.42 bad=0
+[45] 041-frontend-state-bug     m6f-weak-r67     rc=0 usd=0.001243 out=0.2039 trip=0 245.0s | pairs={'strong': 16, 'weak': 0} Σ$11.42 bad=0
+[46] 043-db-migration-safety    m6f-strong-r30   rc=0 usd=0.026527 out=0.262 trip=0 140.3s | pairs={'strong': 16, 'weak': 0} Σ$11.45 bad=0
+[47] 042-api-schema-migration   m6f-weak-r113    rc=0 usd=0.000725 out=0.15 trip=0 69.9s | pairs={'strong': 16, 'weak': 0} Σ$11.45 bad=0
+[48] 082-compose-config-repair  m6f-strong-r35   rc=0 usd=0.026962 out=1.0 trip=0 107.2s | pairs={'strong': 16, 'weak': 0} Σ$11.48 bad=0
+[49] 082-compose-config-repair  m6f-strong-r29   rc=0 usd=0.292363 out=0.98 trip=1 124.3s | pairs={'strong': 17, 'weak': 0} Σ$11.77 bad=0
+[50] 041-frontend-state-bug     m6f-weak-r103    rc=0 usd=0.003039 out=0.9962 trip=0 503.3s | pairs={'strong': 17, 'weak': 0} Σ$11.77 bad=0
+[51] 082-compose-config-repair  m6f-weak-r36     rc=0 usd=0.001466 out=1.0 trip=0 145.3s | pairs={'strong': 17, 'weak': 0} Σ$11.77 bad=0
+[52] 041-frontend-state-bug     m6f-strong-r27   rc=0 usd=0.566927 out=0.5962 trip=1 241.1s | pairs={'strong': 18, 'weak': 0} Σ$12.34 bad=0
+[53] 041-frontend-state-bug     m6f-weak-r44     rc=0 usd=0.000482 out=0.2039 trip=0 230.5s | pairs={'strong': 18, 'weak': 0} Σ$12.34 bad=0
+[54] 041-frontend-state-bug     m6f-weak-r118    rc=0 usd=0.003114 out=0.2039 trip=0 425.6s | pairs={'strong': 18, 'weak': 0} Σ$12.34 bad=0
+[55] 082-compose-config-repair  m6f-weak-r66     rc=0 usd=0.002089 out=1.0 trip=0 149.3s | pairs={'strong': 18, 'weak': 0} Σ$12.35 bad=0
+[56] 043-db-migration-safety    m6f-strong-r25   rc=0 usd=0.383354 out=0.935 trip=1 226.4s | pairs={'strong': 19, 'weak': 0} Σ$12.73 bad=0
+[57] 042-api-schema-migration   m6f-weak-r31     rc=0 usd=0.001175 out=0.15 trip=0 253.6s | pairs={'strong': 19, 'weak': 0} Σ$12.73 bad=0
+[58] 041-frontend-state-bug     m6f-strong-r22   rc=0 usd=0.681293 out=0.9962 trip=1 307.6s | pairs={'strong': 20, 'weak': 0} Σ$13.41 bad=0
+[59] 042-api-schema-migration   m6f-strong-r20   rc=0 usd=0.081269 out=0.74 trip=0 298.6s | pairs={'strong': 20, 'weak': 0} Σ$13.49 bad=0
+[60] 042-api-schema-migration   m6f-weak-r79     rc=0 usd=0.001249 out=0.15 trip=0 223.6s | pairs={'strong': 20, 'weak': 0} Σ$13.49 bad=0
+[61] 043-db-migration-safety    m6f-weak-r88     rc=0 usd=0.000196 out=0.098 trip=0 36.7s | pairs={'strong': 20, 'weak': 0} Σ$13.49 bad=0
+[62] 041-frontend-state-bug     m6f-strong-r6    rc=0 usd=0.068283 out=0.5962 trip=0 234.4s | pairs={'strong': 20, 'weak': 0} Σ$13.56 bad=0
+[63] 041-frontend-state-bug     m6f-weak-r47     rc=0 usd=0.000873 out=0.2963 trip=0 236.9s | pairs={'strong': 20, 'weak': 0} Σ$13.56 bad=0
+[64] 082-compose-config-repair  m6f-strong-r23   rc=0 usd=0.06937 out=1.0 trip=0 180.9s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[65] 042-api-schema-migration   m6f-weak-r101    rc=0 usd=0.0003 out=0.15 trip=0 156.0s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[66] 042-api-schema-migration   m6f-weak-r55     rc=0 usd=0.000294 out=0.15 trip=0 69.4s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[67] 042-api-schema-migration   m6f-weak-r104    rc=0 usd=0.000195 out=0.15 trip=0 98.4s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[68] 043-db-migration-safety    m6f-weak-r68     rc=0 usd=0.000196 out=0.098 trip=0 24.1s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[69] 041-frontend-state-bug     m6f-weak-r57     rc=0 usd=0.000498 out=0.2887 trip=0 112.8s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[70] 042-api-schema-migration   m6f-weak-r110    rc=0 usd=0.000195 out=0.15 trip=0 104.9s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[71] 042-api-schema-migration   m6f-weak-r40     rc=0 usd=0.000204 out=0.15 trip=0 69.9s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[72] 041-frontend-state-bug     m6f-weak-r58     rc=0 usd=0.000555 out=0.2039 trip=0 172.3s | pairs={'strong': 20, 'weak': 0} Σ$13.63 bad=0
+[73] 041-frontend-state-bug     m6f-weak-r62     rc=0 usd=0.001222 out=0.9962 trip=0 243.9s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[74] 042-api-schema-migration   m6f-weak-r95     rc=0 usd=0.000403 out=0.15 trip=0 88.9s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[75] 042-api-schema-migration   m6f-weak-r81     rc=0 usd=0.000202 out=0.15 trip=0 53.3s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[76] 082-compose-config-repair  m6f-weak-r110    rc=0 usd=0.001487 out=1.0 trip=0 75.2s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[77] 082-compose-config-repair  m6f-weak-r51     rc=0 usd=0.002612 out=1.0 trip=0 86.8s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[78] 082-compose-config-repair  m6f-weak-r92     rc=0 usd=0.002296 out=0.95 trip=0 82.3s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[79] 042-api-schema-migration   m6f-weak-r4      rc=0 usd=0.000204 out=0.15 trip=0 56.4s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[80] 042-api-schema-migration   m6f-weak-r108    rc=0 usd=0.000891 out=0.15 trip=0 160.5s | pairs={'strong': 20, 'weak': 0} Σ$13.64 bad=0
+[81] 082-compose-config-repair  m6f-weak-r10     rc=0 usd=0.001299 out=0.95 trip=0 83.7s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[82] 041-frontend-state-bug     m6f-weak-r20     rc=0 usd=0.000955 out=0.5925 trip=0 184.8s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[83] 041-frontend-state-bug     m6f-weak-r110    rc=0 usd=0.000256 out=0.2039 trip=0 131.8s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[84] 042-api-schema-migration   m6f-weak-r106    rc=0 usd=0.000199 out=0.15 trip=0 110.4s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[85] 082-compose-config-repair  m6f-weak-r111    rc=0 usd=0.001913 out=1.0 trip=0 107.3s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[86] 041-frontend-state-bug     m6f-weak-r83     rc=0 usd=0.000481 out=0.2039 trip=0 128.8s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[87] 082-compose-config-repair  m6f-weak-r60     rc=0 usd=0.002456 out=1.0 trip=0 78.2s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[88] 043-db-migration-safety    m6f-weak-r39     rc=0 usd=0.000205 out=0.098 trip=0 26.1s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[89] 041-frontend-state-bug     m6f-weak-r37     rc=0 usd=0.001047 out=0.2039 trip=0 216.3s | pairs={'strong': 20, 'weak': 0} Σ$13.65 bad=0
+[90] 041-frontend-state-bug     m6f-weak-r26     rc=0 usd=0.002043 out=0.5962 trip=0 296.9s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[91] 041-frontend-state-bug     m6f-weak-r23     rc=0 usd=0.000436 out=0.2039 trip=0 120.3s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[92] 042-api-schema-migration   m6f-weak-r48     rc=0 usd=0.000297 out=0.15 trip=0 75.4s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[93] 043-db-migration-safety    m6f-weak-r22     rc=0 usd=0.000215 out=0.098 trip=0 28.6s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[94] 082-compose-config-repair  m6f-weak-r96     rc=0 usd=0.000213 out=0.3 trip=0 212.9s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[95] 043-db-migration-safety    m6f-weak-r7      rc=0 usd=0.000196 out=0.098 trip=0 24.1s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[96] 082-compose-config-repair  m6f-weak-r112    rc=0 usd=0.003441 out=1.0 trip=0 116.8s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[97] 082-compose-config-repair  m6f-weak-r107    rc=0 usd=0.002079 out=1.0 trip=0 70.7s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[98] 041-frontend-state-bug     m6f-weak-r17     rc=0 usd=0.000228 out=0.2039 trip=0 95.8s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[99] 041-frontend-state-bug     m6f-weak-r43     rc=0 usd=0.000488 out=0.2039 trip=0 188.8s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[100] 042-api-schema-migration   m6f-weak-r76     rc=0 usd=0.000297 out=0.15 trip=0 61.9s | pairs={'strong': 20, 'weak': 0} Σ$13.66 bad=0
+[101] 082-compose-config-repair  m6f-weak-r35     rc=0 usd=0.003316 out=1.0 trip=0 115.3s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[102] 082-compose-config-repair  m6f-weak-r119    rc=0 usd=0.001341 out=0.3 trip=0 61.3s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[103] 042-api-schema-migration   m6f-weak-r49     rc=0 usd=0.000296 out=0.15 trip=0 126.9s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[104] 042-api-schema-migration   m6f-weak-r21     rc=0 usd=0.000308 out=0.15 trip=0 70.4s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[105] 082-compose-config-repair  m6f-weak-r94     rc=0 usd=0.000885 out=0.99 trip=0 34.7s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[106] 041-frontend-state-bug     m6f-weak-r28     rc=0 usd=0.000395 out=0.2039 trip=0 116.3s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[107] 043-db-migration-safety    m6f-weak-r96     rc=0 usd=0.000208 out=0.098 trip=0 26.6s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[108] 042-api-schema-migration   m6f-weak-r26     rc=0 usd=0.000199 out=0.15 trip=0 56.9s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+=== chunk end rc=124 2026-09-24T11:56:05-04:00
+=== chunk start 2026-09-24T11:56:30-04:00
+seed=20260925 pairs so far={'strong': 20, 'weak': 0} target=20 spent=US$13.67 pending={'strong': 90, 'weak': 368} frozen=0
+[1] 042-api-schema-migration   m6f-weak-r28     rc=0 usd=0.000197 out=0.15 trip=0 62.4s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[2] 082-compose-config-repair  m6f-weak-r46     rc=0 usd=0.001386 out=0.99 trip=0 79.8s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[3] 043-db-migration-safety    m6f-weak-r117    rc=0 usd=0.000195 out=0.098 trip=0 24.1s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[4] 042-api-schema-migration   m6f-weak-r65     rc=0 usd=0.000314 out=0.15 trip=0 148.5s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[5] 082-compose-config-repair  m6f-weak-r118    rc=0 usd=0.002005 out=0.99 trip=0 70.7s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[6] 041-frontend-state-bug     m6f-weak-r85     rc=0 usd=0.000679 out=0.2039 trip=0 151.9s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[7] 043-db-migration-safety    m6f-weak-r47     rc=0 usd=0.000206 out=0.098 trip=0 20.6s | pairs={'strong': 20, 'weak': 0} Σ$13.67 bad=0
+[8] 082-compose-config-repair  m6f-weak-r116    rc=0 usd=0.003059 out=1.0 trip=0 116.8s | pairs={'strong': 20, 'weak': 0} Σ$13.68 bad=0
+[9] 082-compose-config-repair  m6f-weak-r95     rc=0 usd=0.002103 out=1.0 trip=0 63.2s | pairs={'strong': 20, 'weak': 0} Σ$13.68 bad=0
+[10] 041-frontend-state-bug     m6f-weak-r2      rc=0 usd=0.002344 out=0.9962 trip=0 253.9s | pairs={'strong': 20, 'weak': 0} Σ$13.68 bad=0
+[11] 082-compose-config-repair  m6f-weak-r6      rc=0 usd=0.002929 out=1.0 trip=0 111.7s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[12] 041-frontend-state-bug     m6f-weak-r16     rc=0 usd=0.000185 out=0.2039 trip=0 66.2s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[13] 042-api-schema-migration   m6f-weak-r111    rc=0 usd=0.000978 out=0.15 trip=0 153.5s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[14] 042-api-schema-migration   m6f-weak-r83     rc=0 usd=0.000197 out=0.15 trip=0 72.9s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[15] 042-api-schema-migration   m6f-weak-r59     rc=0 usd=0.000277 out=0.15 trip=0 56.4s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[16] 043-db-migration-safety    m6f-weak-r98     rc=0 usd=0.000193 out=0.098 trip=0 29.6s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[17] 041-frontend-state-bug     m6f-weak-r79     rc=0 usd=0.00042 out=0.2039 trip=0 99.2s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[18] 043-db-migration-safety    m6f-weak-r114    rc=0 usd=0.000191 out=0.098 trip=0 19.1s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[19] 043-db-migration-safety    m6f-weak-r38     rc=0 usd=0.000192 out=0.098 trip=0 21.1s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[20] 082-compose-config-repair  m6f-weak-r2      rc=0 usd=0.001853 out=1.0 trip=0 88.2s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[21] 043-db-migration-safety    m6f-weak-r109    rc=0 usd=0.000192 out=0.098 trip=0 19.1s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[22] 042-api-schema-migration   m6f-weak-r56     rc=0 usd=0.000199 out=0.15 trip=0 116.4s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[23] 042-api-schema-migration   m6f-weak-r34     rc=0 usd=0.000918 out=0.15 trip=0 78.9s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[24] 043-db-migration-safety    m6f-weak-r23     rc=0 usd=0.000573 out=0.098 trip=0 62.7s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[25] 041-frontend-state-bug     m6f-weak-r93     rc=0 usd=0.000507 out=0.2039 trip=0 167.8s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[26] 042-api-schema-migration   m6f-weak-r39     rc=0 usd=0.000204 out=0.15 trip=0 62.4s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[27] 082-compose-config-repair  m6f-weak-r56     rc=0 usd=0.00235 out=1.0 trip=0 90.2s | pairs={'strong': 20, 'weak': 0} Σ$13.69 bad=0
+[28] 043-db-migration-safety    m6f-weak-r86     rc=0 usd=0.000196 out=0.098 trip=0 21.6s | pairs={'strong': 20, 'weak': 0} Σ$13.70 bad=0
+[29] 082-compose-config-repair  m6f-weak-r15     rc=0 usd=0.002822 out=0.99 trip=0 129.3s | pairs={'strong': 20, 'weak': 0} Σ$13.70 bad=0
+[30] 041-frontend-state-bug     m6f-weak-r70     rc=0 usd=0.000994 out=0.5962 trip=0 186.3s | pairs={'strong': 20, 'weak': 0} Σ$13.70 bad=0
+[31] 041-frontend-state-bug     m6f-weak-r31     rc=0 usd=0.000185 out=0.2039 trip=0 68.2s | pairs={'strong': 20, 'weak': 0} Σ$13.70 bad=0
+[32] 041-frontend-state-bug     m6f-weak-r86     rc=0 usd=0.004608 out=0.9962 trip=0 666.8s | pairs={'strong': 20, 'weak': 0} Σ$13.70 bad=0
+[33] 042-api-schema-migration   m6f-weak-r57     rc=0 usd=0.000299 out=0.15 trip=0 79.9s | pairs={'strong': 20, 'weak': 0} Σ$13.70 bad=0
+[34] 082-compose-config-repair  m6f-weak-r61     rc=0 usd=0.001972 out=1.0 trip=0 147.8s | pairs={'strong': 20, 'weak': 0} Σ$13.71 bad=0
+[35] 041-frontend-state-bug     m6f-weak-r59     rc=0 usd=0.002018 out=0.5962 trip=0 516.6s | pairs={'strong': 20, 'weak': 0} Σ$13.71 bad=0
+[36] 043-db-migration-safety    m6f-weak-r2      rc=0 usd=0.003006 out=0.254 trip=0 142.7s | pairs={'strong': 20, 'weak': 0} Σ$13.71 bad=0
+[37] 041-frontend-state-bug     m6f-weak-r66     rc=0 usd=0.013478 out=0.5962 trip=1 257.9s | pairs={'strong': 20, 'weak': 1} Σ$13.72 bad=0
+[38] 042-api-schema-migration   m6f-weak-r53     rc=0 usd=0.000296 out=0.15 trip=0 101.9s | pairs={'strong': 20, 'weak': 1} Σ$13.72 bad=0
+[39] 041-frontend-state-bug     m6f-weak-r22     rc=0 usd=0.001287 out=0.2421 trip=0 224.3s | pairs={'strong': 20, 'weak': 1} Σ$13.73 bad=0
+[40] 043-db-migration-safety    m6f-weak-r93     rc=0 usd=0.005231 out=0.249 trip=0 321.4s | pairs={'strong': 20, 'weak': 1} Σ$13.73 bad=0
+[41] 041-frontend-state-bug     m6f-weak-r107    rc=0 usd=0.003058 out=0.9962 trip=0 280.4s | pairs={'strong': 20, 'weak': 1} Σ$13.73 bad=0
+[42] 043-db-migration-safety    m6f-weak-r30     rc=0 usd=0.000202 out=0.098 trip=0 30.6s | pairs={'strong': 20, 'weak': 1} Σ$13.73 bad=0
+[43] 043-db-migration-safety    m6f-weak-r0      rc=0 usd=0.000205 out=0.098 trip=0 23.1s | pairs={'strong': 20, 'weak': 1} Σ$13.73 bad=0
+[44] 082-compose-config-repair  m6f-weak-r80     rc=0 usd=0.002433 out=0.99 trip=0 87.2s | pairs={'strong': 20, 'weak': 1} Σ$13.74 bad=0
+[45] 043-db-migration-safety    m6f-weak-r111    rc=0 usd=0.000981 out=0.098 trip=0 47.2s | pairs={'strong': 20, 'weak': 1} Σ$13.74 bad=0
+[46] 082-compose-config-repair  m6f-weak-r0      rc=0 usd=0.001654 out=0.99 trip=0 65.7s | pairs={'strong': 20, 'weak': 1} Σ$13.74 bad=0
+[47] 043-db-migration-safety    m6f-weak-r67     rc=0 usd=0.002812 out=0.257 trip=0 115.3s | pairs={'strong': 20, 'weak': 1} Σ$13.74 bad=0
+[48] 082-compose-config-repair  m6f-weak-r18     rc=0 usd=0.002634 out=1.0 trip=0 103.3s | pairs={'strong': 20, 'weak': 1} Σ$13.75 bad=0
+[49] 043-db-migration-safety    m6f-weak-r84     rc=0 usd=0.004759 out=0.257 trip=0 347.9s | pairs={'strong': 20, 'weak': 1} Σ$13.75 bad=0
+[50] 043-db-migration-safety    m6f-weak-r34     rc=0 usd=0.001726 out=0.182 trip=0 99.3s | pairs={'strong': 20, 'weak': 1} Σ$13.75 bad=0
+[51] 082-compose-config-repair  m6f-weak-r25     rc=0 usd=0.001576 out=1.0 trip=0 85.8s | pairs={'strong': 20, 'weak': 1} Σ$13.75 bad=0
+[52] 043-db-migration-safety    m6f-weak-r73     rc=0 usd=0.002583 out=0.182 trip=0 218.4s | pairs={'strong': 20, 'weak': 1} Σ$13.76 bad=0
+[53] 042-api-schema-migration   m6f-weak-r85     rc=0 usd=0.000953 out=0.15 trip=0 80.0s | pairs={'strong': 20, 'weak': 1} Σ$13.76 bad=0
+[54] 043-db-migration-safety    m6f-weak-r52     rc=0 usd=0.004985 out=0.182 trip=0 496.7s | pairs={'strong': 20, 'weak': 1} Σ$13.76 bad=0
+[55] 041-frontend-state-bug     m6f-weak-r90     rc=0 usd=0.006179 out=0.5962 trip=0 303.0s | pairs={'strong': 20, 'weak': 1} Σ$13.77 bad=0
+[56] 043-db-migration-safety    m6f-weak-r15     rc=0 usd=0.082766 out=0.992 trip=1 533.7s | pairs={'strong': 20, 'weak': 2} Σ$13.85 bad=0
+[57] 041-frontend-state-bug     m6f-weak-r42     rc=0 usd=0.002054 out=0.5962 trip=0 400.3s | pairs={'strong': 20, 'weak': 2} Σ$13.85 bad=0
+[58] 082-compose-config-repair  m6f-weak-r8      rc=0 usd=0.001942 out=1.0 trip=0 123.8s | pairs={'strong': 20, 'weak': 2} Σ$13.85 bad=0
+[59] 042-api-schema-migration   m6f-weak-r27     rc=0 usd=0.000304 out=0.15 trip=0 168.2s | pairs={'strong': 20, 'weak': 2} Σ$13.86 bad=0
+[60] 082-compose-config-repair  m6f-weak-r63     rc=0 usd=0.001664 out=1.0 trip=0 96.3s | pairs={'strong': 20, 'weak': 2} Σ$13.86 bad=0
+[61] 041-frontend-state-bug     m6f-weak-r46     rc=0 usd=0.001608 out=0.9962 trip=0 326.7s | pairs={'strong': 20, 'weak': 2} Σ$13.86 bad=0
+[62] 082-compose-config-repair  m6f-weak-r65     rc=0 usd=0.001636 out=0.99 trip=0 117.2s | pairs={'strong': 20, 'weak': 2} Σ$13.86 bad=0
+[63] 043-db-migration-safety    m6f-weak-r26     rc=0 usd=0.004888 out=0.243 trip=0 351.0s | pairs={'strong': 20, 'weak': 2} Σ$13.86 bad=0
+[64] 042-api-schema-migration   m6f-weak-r3      rc=0 usd=0.000315 out=0.15 trip=0 261.6s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[65] 082-compose-config-repair  m6f-weak-r23     rc=0 usd=0.001067 out=0.3 trip=0 131.4s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[66] 042-api-schema-migration   m6f-weak-r50     rc=0 usd=0.000417 out=0.15 trip=0 60.9s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[67] 082-compose-config-repair  m6f-weak-r104    rc=0 usd=0.000834 out=0.3 trip=0 105.8s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[68] 082-compose-config-repair  m6f-weak-r55     rc=0 usd=0.001797 out=0.99 trip=0 136.3s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[69] 082-compose-config-repair  m6f-weak-r100    rc=0 usd=0.000771 out=0.3 trip=0 67.8s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[70] 042-api-schema-migration   m6f-weak-r38     rc=0 usd=0.000281 out=0.15 trip=0 112.4s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[71] 082-compose-config-repair  m6f-weak-r64     rc=0 usd=0.000208 out=0.3 trip=0 24.7s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[72] 082-compose-config-repair  m6f-weak-r114    rc=0 usd=0.000209 out=0.3 trip=0 59.7s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[73] 082-compose-config-repair  m6f-weak-r17     rc=0 usd=0.00021 out=0.3 trip=0 26.2s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[74] 041-frontend-state-bug     m6f-weak-r82     rc=0 usd=0.0017 out=0.5962 trip=0 184.4s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[75] 042-api-schema-migration   m6f-weak-r114    rc=0 usd=0.000308 out=0.15 trip=0 153.9s | pairs={'strong': 20, 'weak': 2} Σ$13.87 bad=0
+[76] 043-db-migration-safety    m6f-weak-r19     rc=0 usd=0.036639 out=0.252 trip=1 282.9s | pairs={'strong': 20, 'weak': 3} Σ$13.91 bad=0
+[77] 041-frontend-state-bug     m6f-weak-r38     rc=0 usd=0.002378 out=0.5962 trip=0 553.2s | pairs={'strong': 20, 'weak': 3} Σ$13.91 bad=0
+[78] 043-db-migration-safety    m6f-weak-r28     rc=0 usd=0.003576 out=0.26 trip=0 294.4s | pairs={'strong': 20, 'weak': 3} Σ$13.92 bad=0
+[79] 041-frontend-state-bug     m6f-weak-r106    rc=0 usd=0.001711 out=0.9962 trip=0 299.5s | pairs={'strong': 20, 'weak': 3} Σ$13.92 bad=0
+[80] 082-compose-config-repair  m6f-weak-r105    rc=0 usd=0.028224 out=1.0 trip=1 232.9s | pairs={'strong': 20, 'weak': 4} Σ$13.95 bad=0
+[81] 043-db-migration-safety    m6f-weak-r113    rc=0 usd=0.127092 out=0.925 trip=1 547.2s | pairs={'strong': 20, 'weak': 5} Σ$14.07 bad=0
+[82] 042-api-schema-migration   m6f-weak-r73     rc=0 usd=0.000203 out=0.15 trip=0 22.9s | pairs={'strong': 20, 'weak': 5} Σ$14.07 bad=0
+[83] 041-frontend-state-bug     m6f-weak-r97     rc=0 usd=0.001565 out=0.9962 trip=0 385.0s | pairs={'strong': 20, 'weak': 5} Σ$14.07 bad=0
+[84] 082-compose-config-repair  m6f-weak-r115    rc=0 usd=0.000209 out=0.3 trip=0 96.8s | pairs={'strong': 20, 'weak': 5} Σ$14.07 bad=0
+[85] 082-compose-config-repair  m6f-weak-r75     rc=0 usd=0.000216 out=0.3 trip=0 33.3s | pairs={'strong': 20, 'weak': 5} Σ$14.07 bad=0
+[86] 082-compose-config-repair  m6f-weak-r101    rc=0 usd=0.000204 out=0.3 trip=0 77.3s | pairs={'strong': 20, 'weak': 5} Σ$14.07 bad=0
+[87] 043-db-migration-safety    m6f-weak-r82     rc=0 usd=0.001978 out=0.182 trip=0 220.0s | pairs={'strong': 20, 'weak': 5} Σ$14.08 bad=0
+[88] 041-frontend-state-bug     m6f-weak-r48     rc=0 usd=0.000921 out=0.2963 trip=0 126.4s | pairs={'strong': 20, 'weak': 5} Σ$14.08 bad=0
+[89] 041-frontend-state-bug     m6f-weak-r32     rc=0 usd=0.001316 out=0.5813 trip=0 206.4s | pairs={'strong': 20, 'weak': 5} Σ$14.08 bad=0
+[90] 042-api-schema-migration   m6f-weak-r67     rc=0 usd=0.000195 out=0.15 trip=0 23.0s | pairs={'strong': 20, 'weak': 5} Σ$14.08 bad=0
+[91] 043-db-migration-safety    m6f-weak-r62     rc=0 usd=0.002155 out=0.174 trip=0 146.8s | pairs={'strong': 20, 'weak': 5} Σ$14.08 bad=0
+[92] 043-db-migration-safety    m6f-weak-r60     rc=0 usd=0.003995 out=0.267 trip=0 245.9s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[93] 042-api-schema-migration   m6f-weak-r9      rc=0 usd=0.000198 out=0.15 trip=0 48.4s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[94] 082-compose-config-repair  m6f-weak-r113    rc=0 usd=0.000546 out=0.3 trip=0 71.3s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[95] 082-compose-config-repair  m6f-weak-r47     rc=0 usd=0.001032 out=0.3 trip=0 118.9s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[96] 043-db-migration-safety    m6f-weak-r1      rc=0 usd=0.00063 out=0.098 trip=0 53.7s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[97] 043-db-migration-safety    m6f-weak-r104    rc=0 usd=0.001161 out=0.174 trip=0 118.8s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[98] 043-db-migration-safety    m6f-weak-r29     rc=0 usd=0.003099 out=0.106 trip=0 344.5s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[99] 042-api-schema-migration   m6f-weak-r22     rc=0 usd=0.000204 out=0.15 trip=0 73.5s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[100] 042-api-schema-migration   m6f-weak-r13     rc=0 usd=0.000317 out=0.15 trip=0 153.0s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[101] 041-frontend-state-bug     m6f-weak-r92     rc=0 usd=0.000885 out=0.2039 trip=0 240.5s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[102] 042-api-schema-migration   m6f-weak-r105    rc=0 usd=0.000298 out=0.15 trip=0 216.1s | pairs={'strong': 20, 'weak': 5} Σ$14.09 bad=0
+[103] 041-frontend-state-bug     m6f-weak-r45     rc=0 usd=0.001725 out=0.2039 trip=0 380.1s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[104] 041-frontend-state-bug     m6f-weak-r30     rc=0 usd=0.003103 out=0.2963 trip=0 472.2s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[105] 042-api-schema-migration   m6f-weak-r107    rc=0 usd=0.000792 out=0.15 trip=0 146.6s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[106] 042-api-schema-migration   m6f-weak-r33     rc=0 usd=0.000316 out=0.15 trip=0 164.6s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[107] 082-compose-config-repair  m6f-weak-r1      rc=0 usd=0.000205 out=0.3 trip=0 77.9s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+=== chunk end rc=124 2026-09-24T12:47:43-04:00
+=== chunk start 2026-09-24T12:47:58-04:00
+seed=20260925 pairs so far={'strong': 20, 'weak': 5} target=20 spent=US$14.10 pending={'strong': 90, 'weak': 261} frozen=0
+[1] 042-api-schema-migration   m6f-weak-r0      rc=0 usd=0.000403 out=0.15 trip=0 83.1s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[2] 082-compose-config-repair  m6f-weak-r29     rc=0 usd=0.000204 out=0.3 trip=0 51.3s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[3] 043-db-migration-safety    m6f-weak-r42     rc=0 usd=0.002355 out=0.227 trip=0 169.3s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[4] 042-api-schema-migration   m6f-weak-r17     rc=0 usd=0.000297 out=0.15 trip=0 73.6s | pairs={'strong': 20, 'weak': 5} Σ$14.10 bad=0
+[5] 041-frontend-state-bug     m6f-weak-r112    rc=0 usd=0.002144 out=0.5813 trip=0 264.4s | pairs={'strong': 20, 'weak': 5} Σ$14.11 bad=0
+[6] 041-frontend-state-bug     m6f-weak-r72     rc=0 usd=0.000401 out=0.2039 trip=0 119.4s | pairs={'strong': 20, 'weak': 5} Σ$14.11 bad=0
+[7] 042-api-schema-migration   m6f-weak-r82     rc=0 usd=0.000303 out=0.15 trip=0 81.1s | pairs={'strong': 20, 'weak': 5} Σ$14.11 bad=0
+[8] 041-frontend-state-bug     m6f-weak-r55     rc=0 usd=0.002526 out=0.9962 trip=0 333.0s | pairs={'strong': 20, 'weak': 5} Σ$14.11 bad=0
+[9] 082-compose-config-repair  m6f-weak-r54     rc=0 usd=0.000646 out=0.3 trip=0 57.4s | pairs={'strong': 20, 'weak': 5} Σ$14.11 bad=0
+[10] 043-db-migration-safety    m6f-weak-r90     rc=0 usd=0.003941 out=0.114 trip=0 397.6s | pairs={'strong': 20, 'weak': 5} Σ$14.11 bad=0
+[11] 043-db-migration-safety    m6f-weak-r66     rc=0 usd=0.003521 out=0.174 trip=0 201.5s | pairs={'strong': 20, 'weak': 5} Σ$14.12 bad=0
+[12] 042-api-schema-migration   m6f-weak-r10     rc=0 usd=0.000203 out=0.15 trip=0 103.4s | pairs={'strong': 20, 'weak': 5} Σ$14.12 bad=0
+[13] 041-frontend-state-bug     m6f-weak-r54     rc=0 usd=0.004602 out=0.9962 trip=0 550.8s | pairs={'strong': 20, 'weak': 5} Σ$14.12 bad=0
+[14] 041-frontend-state-bug     m6f-weak-r68     rc=0 usd=0.001424 out=0.9812 trip=0 167.6s | pairs={'strong': 20, 'weak': 5} Σ$14.12 bad=0
+[15] 043-db-migration-safety    m6f-weak-r81     rc=0 usd=0.003961 out=0.239 trip=0 147.9s | pairs={'strong': 20, 'weak': 5} Σ$14.13 bad=0
+[16] 043-db-migration-safety    m6f-weak-r85     rc=0 usd=0.049636 out=0.262 trip=1 435.2s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[17] 082-compose-config-repair  m6f-weak-r24     rc=0 usd=0.000659 out=0.95 trip=0 61.2s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[18] 041-frontend-state-bug     m6f-weak-r100    rc=0 usd=0.001341 out=0.5813 trip=0 223.5s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[19] 043-db-migration-safety    m6f-weak-r65     rc=0 usd=0.00274 out=0.262 trip=0 162.0s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[20] 041-frontend-state-bug     m6f-weak-r15     rc=0 usd=0.001535 out=0.9962 trip=0 196.1s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[21] 042-api-schema-migration   m6f-weak-r71     rc=0 usd=0.000198 out=0.15 trip=0 66.6s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[22] 082-compose-config-repair  m6f-weak-r45     rc=0 usd=0.000766 out=0.95 trip=0 67.8s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[23] 082-compose-config-repair  m6f-weak-r82     rc=0 usd=0.000208 out=0.3 trip=0 28.3s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[24] 042-api-schema-migration   m6f-weak-r32     rc=0 usd=0.000294 out=0.15 trip=0 107.6s | pairs={'strong': 20, 'weak': 6} Σ$14.18 bad=0
+[25] 042-api-schema-migration   m6f-weak-r116    rc=0 usd=0.007325 out=0.6174 trip=0 579.7s | pairs={'strong': 20, 'weak': 6} Σ$14.19 bad=0
+[26] 043-db-migration-safety    m6f-weak-r72     rc=0 usd=0.001254 out=0.158 trip=0 124.8s | pairs={'strong': 20, 'weak': 6} Σ$14.19 bad=0
+[27] 041-frontend-state-bug     m6f-weak-r98     rc=0 usd=0.001631 out=0.5925 trip=0 179.4s | pairs={'strong': 20, 'weak': 6} Σ$14.19 bad=0
+[28] 082-compose-config-repair  m6f-weak-r86     rc=0 usd=0.000212 out=0.3 trip=0 18.4s | pairs={'strong': 20, 'weak': 6} Σ$14.19 bad=0
+[29] 043-db-migration-safety    m6f-weak-r87     rc=0 usd=0.001894 out=0.19 trip=0 124.8s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[30] 041-frontend-state-bug     m6f-weak-r64     rc=0 usd=0.000825 out=0.2039 trip=0 245.0s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[31] 082-compose-config-repair  m6f-weak-r69     rc=0 usd=0.000207 out=0.3 trip=0 30.9s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[32] 042-api-schema-migration   m6f-weak-r18     rc=0 usd=0.000295 out=0.15 trip=0 74.6s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[33] 042-api-schema-migration   m6f-weak-r118    rc=0 usd=0.0002 out=0.15 trip=0 45.6s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[34] 042-api-schema-migration   m6f-weak-r99     rc=0 usd=0.001397 out=0.15 trip=0 127.6s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[35] 041-frontend-state-bug     m6f-weak-r84     rc=0 usd=0.002272 out=0.5813 trip=0 271.6s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[36] 043-db-migration-safety    m6f-weak-r64     rc=0 usd=0.001025 out=0.182 trip=0 78.8s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[37] 043-db-migration-safety    m6f-weak-r49     rc=0 usd=0.00142 out=0.174 trip=0 119.8s | pairs={'strong': 20, 'weak': 6} Σ$14.20 bad=0
+[38] 042-api-schema-migration   m6f-weak-r8      rc=0 usd=0.000712 out=0.15 trip=0 160.6s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[39] 082-compose-config-repair  m6f-weak-r67     rc=0 usd=0.000217 out=0.3 trip=0 58.0s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[40] 042-api-schema-migration   m6f-weak-r1      rc=0 usd=0.000202 out=0.15 trip=0 74.6s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[41] 082-compose-config-repair  m6f-weak-r81     rc=0 usd=0.000542 out=0.3 trip=0 59.4s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[42] 082-compose-config-repair  m6f-weak-r19     rc=0 usd=0.002133 out=1.0 trip=0 157.9s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[43] 043-db-migration-safety    m6f-weak-r55     rc=0 usd=0.003138 out=0.098 trip=0 311.6s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[44] 041-frontend-state-bug     m6f-weak-r35     rc=0 usd=0.00281 out=0.5962 trip=0 229.1s | pairs={'strong': 20, 'weak': 6} Σ$14.21 bad=0
+[45] 041-frontend-state-bug     m6f-weak-r5      rc=0 usd=0.002974 out=0.9962 trip=0 347.7s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[46] 082-compose-config-repair  m6f-weak-r34     rc=0 usd=0.001222 out=0.95 trip=0 79.3s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[47] 041-frontend-state-bug     m6f-weak-r33     rc=0 usd=0.001533 out=0.5962 trip=0 214.5s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[48] 042-api-schema-migration   m6f-weak-r12     rc=0 usd=0.000198 out=0.15 trip=0 62.1s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[49] 082-compose-config-repair  m6f-weak-r109    rc=0 usd=0.001316 out=1.0 trip=0 154.4s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[50] 042-api-schema-migration   m6f-weak-r96     rc=0 usd=0.000317 out=0.15 trip=0 149.6s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[51] 042-api-schema-migration   m6f-weak-r94     rc=0 usd=0.000301 out=0.15 trip=0 105.1s | pairs={'strong': 20, 'weak': 6} Σ$14.22 bad=0
+[52] 043-db-migration-safety    m6f-weak-r46     rc=0 usd=0.003926 out=0.257 trip=0 155.9s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[53] 041-frontend-state-bug     m6f-weak-r21     rc=0 usd=0.003735 out=0.5813 trip=0 373.7s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[54] 043-db-migration-safety    m6f-weak-r83     rc=0 usd=0.00137 out=0.19 trip=0 94.4s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[55] 043-db-migration-safety    m6f-weak-r118    rc=0 usd=0.002037 out=0.19 trip=0 127.9s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[56] 042-api-schema-migration   m6f-weak-r15     rc=0 usd=0.000197 out=0.15 trip=0 99.2s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[57] 082-compose-config-repair  m6f-weak-r76     rc=0 usd=0.000209 out=0.3 trip=0 63.5s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[58] 082-compose-config-repair  m6f-weak-r77     rc=0 usd=0.000543 out=0.3 trip=0 81.9s | pairs={'strong': 20, 'weak': 6} Σ$14.23 bad=0
+[59] 043-db-migration-safety    m6f-weak-r106    rc=0 usd=0.004064 out=0.257 trip=0 243.1s | pairs={'strong': 20, 'weak': 6} Σ$14.24 bad=0
+[60] 043-db-migration-safety    m6f-weak-r53     rc=0 usd=0.004042 out=0.228 trip=0 301.6s | pairs={'strong': 20, 'weak': 6} Σ$14.24 bad=0
+[61] 082-compose-config-repair  m6f-weak-r12     rc=0 usd=0.000209 out=0.3 trip=0 52.3s | pairs={'strong': 20, 'weak': 6} Σ$14.24 bad=0
+[62] 082-compose-config-repair  m6f-weak-r31     rc=0 usd=0.00131 out=1.0 trip=0 148.0s | pairs={'strong': 20, 'weak': 6} Σ$14.24 bad=0
+[63] 041-frontend-state-bug     m6f-weak-r61     rc=0 usd=0.003922 out=0.5962 trip=0 478.4s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[64] 082-compose-config-repair  m6f-weak-r88     rc=0 usd=0.000418 out=0.3 trip=0 69.8s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[65] 042-api-schema-migration   m6f-weak-r90     rc=0 usd=0.000278 out=0.15 trip=0 48.5s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[66] 082-compose-config-repair  m6f-weak-r68     rc=0 usd=0.000218 out=0.3 trip=0 34.3s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[67] 043-db-migration-safety    m6f-weak-r116    rc=0 usd=0.00216 out=0.19 trip=0 129.9s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[68] 043-db-migration-safety    m6f-weak-r57     rc=0 usd=0.001287 out=0.158 trip=0 108.8s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[69] 041-frontend-state-bug     m6f-weak-r29     rc=0 usd=0.001948 out=0.5962 trip=0 274.3s | pairs={'strong': 20, 'weak': 6} Σ$14.25 bad=0
+[70] 041-frontend-state-bug     m6f-weak-r105    rc=0 usd=0.004948 out=1.0 trip=0 370.7s | pairs={'strong': 20, 'weak': 6} Σ$14.26 bad=0
+[71] 082-compose-config-repair  m6f-weak-r78     rc=0 usd=0.000205 out=0.3 trip=0 72.3s | pairs={'strong': 20, 'weak': 6} Σ$14.26 bad=0
+[72] 041-frontend-state-bug     m6f-weak-r75     rc=0 usd=0.003004 out=0.9962 trip=0 391.6s | pairs={'strong': 20, 'weak': 6} Σ$14.26 bad=0
+[73] 041-frontend-state-bug     m6f-weak-r18     rc=0 usd=0.001801 out=0.9962 trip=0 272.0s | pairs={'strong': 20, 'weak': 6} Σ$14.26 bad=0
+[74] 042-api-schema-migration   m6f-weak-r98     rc=0 usd=0.005922 out=0.546 trip=0 379.8s | pairs={'strong': 20, 'weak': 6} Σ$14.27 bad=0
+[75] 043-db-migration-safety    m6f-weak-r95     rc=0 usd=0.000204 out=0.098 trip=0 27.7s | pairs={'strong': 20, 'weak': 6} Σ$14.27 bad=0
+[76] 043-db-migration-safety    m6f-weak-r8      rc=0 usd=0.003971 out=0.098 trip=0 380.5s | pairs={'strong': 20, 'weak': 6} Σ$14.27 bad=0
+[77] 041-frontend-state-bug     m6f-weak-r89     rc=0 usd=0.00631 out=0.2963 trip=0 577.5s | pairs={'strong': 20, 'weak': 6} Σ$14.28 bad=0
+[78] 042-api-schema-migration   m6f-weak-r6      rc=0 usd=0.00599 out=0.15 trip=0 346.2s | pairs={'strong': 20, 'weak': 6} Σ$14.29 bad=0
+[79] 043-db-migration-safety    m6f-weak-r112    rc=0 usd=0.000195 out=0.098 trip=0 26.2s | pairs={'strong': 20, 'weak': 6} Σ$14.29 bad=0
+[80] 082-compose-config-repair  m6f-weak-r32     rc=0 usd=0.001098 out=1.0 trip=0 98.7s | pairs={'strong': 20, 'weak': 6} Σ$14.29 bad=0
+[81] 042-api-schema-migration   m6f-weak-r7      rc=0 usd=0.007796 out=0.4 trip=0 433.2s | pairs={'strong': 20, 'weak': 6} Σ$14.30 bad=0
+[82] 042-api-schema-migration   m6f-weak-r5      rc=0 usd=0.004833 out=0.15 trip=0 299.9s | pairs={'strong': 20, 'weak': 6} Σ$14.30 bad=0
+[83] 043-db-migration-safety    m6f-weak-r94     rc=0 usd=0.000204 out=0.098 trip=0 24.3s | pairs={'strong': 20, 'weak': 6} Σ$14.30 bad=0
+[84] 041-frontend-state-bug     m6f-weak-r78     rc=0 usd=0.001729 out=0.5962 trip=0 230.4s | pairs={'strong': 20, 'weak': 6} Σ$14.30 bad=0
+[85] 043-db-migration-safety    m6f-weak-r59     rc=0 usd=0.000208 out=0.098 trip=0 30.7s | pairs={'strong': 20, 'weak': 6} Σ$14.30 bad=0
+[86] 041-frontend-state-bug     m6f-weak-r71     rc=0 usd=0.00379 out=0.9925 trip=0 556.2s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[87] 041-frontend-state-bug     m6f-weak-r56     rc=0 usd=0.003859 out=0.5962 trip=0 269.6s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[88] 082-compose-config-repair  m6f-weak-r22     rc=0 usd=0.000314 out=0.3 trip=0 59.9s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[89] 043-db-migration-safety    m6f-weak-r101    rc=0 usd=0.000192 out=0.098 trip=0 23.2s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[90] 082-compose-config-repair  m6f-weak-r90     rc=0 usd=0.000205 out=0.3 trip=0 58.3s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[91] 043-db-migration-safety    m6f-weak-r110    rc=0 usd=0.000219 out=0.098 trip=0 24.1s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[92] 042-api-schema-migration   m6f-weak-r112    rc=0 usd=0.000312 out=0.15 trip=0 163.2s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[93] 042-api-schema-migration   m6f-weak-r119    rc=0 usd=0.000202 out=0.15 trip=0 120.4s | pairs={'strong': 20, 'weak': 6} Σ$14.31 bad=0
+[94] 041-frontend-state-bug     m6f-weak-r50     rc=0 usd=0.003938 out=0.5962 trip=0 490.7s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[95] 043-db-migration-safety    m6f-weak-r44     rc=0 usd=0.000208 out=0.098 trip=0 20.1s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[96] 041-frontend-state-bug     m6f-weak-r80     rc=0 usd=0.001653 out=0.9962 trip=0 240.0s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+=== chunk end rc=124 2026-09-24T13:39:15-04:00
+=== chunk start 2026-09-24T13:39:27-04:00
+seed=20260925 pairs so far={'strong': 20, 'weak': 6} target=20 spent=US$14.32 pending={'strong': 90, 'weak': 165} frozen=0
+[1] 043-db-migration-safety    m6f-weak-r16     rc=0 usd=0.000214 out=0.098 trip=0 29.1s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[2] 043-db-migration-safety    m6f-weak-r5      rc=0 usd=0.000203 out=0.098 trip=0 33.1s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[3] 043-db-migration-safety    m6f-weak-r43     rc=0 usd=0.000208 out=0.098 trip=0 30.7s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[4] 082-compose-config-repair  m6f-weak-r14     rc=0 usd=0.001764 out=0.95 trip=0 87.2s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[5] 042-api-schema-migration   m6f-weak-r2      rc=0 usd=0.00089 out=0.15 trip=0 141.4s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[6] 042-api-schema-migration   m6f-weak-r74     rc=0 usd=0.000421 out=0.15 trip=0 110.9s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[7] 043-db-migration-safety    m6f-weak-r92     rc=0 usd=0.000623 out=0.174 trip=0 62.7s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[8] 043-db-migration-safety    m6f-weak-r97     rc=0 usd=0.000198 out=0.098 trip=0 22.6s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[9] 082-compose-config-repair  m6f-weak-r117    rc=0 usd=0.000326 out=0.3 trip=0 32.2s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[10] 041-frontend-state-bug     m6f-weak-r102    rc=0 usd=0.001933 out=0.5962 trip=0 151.8s | pairs={'strong': 20, 'weak': 6} Σ$14.32 bad=0
+[11] 041-frontend-state-bug     m6f-weak-r4      rc=0 usd=0.001885 out=0.5962 trip=0 214.8s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[12] 082-compose-config-repair  m6f-weak-r38     rc=0 usd=0.000312 out=0.3 trip=0 48.2s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[13] 041-frontend-state-bug     m6f-weak-r94     rc=0 usd=0.001375 out=0.9962 trip=0 226.9s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[14] 043-db-migration-safety    m6f-weak-r24     rc=0 usd=0.000203 out=0.098 trip=0 21.6s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[15] 042-api-schema-migration   m6f-weak-r115    rc=0 usd=0.000303 out=0.15 trip=0 68.9s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[16] 082-compose-config-repair  m6f-weak-r27     rc=0 usd=0.000212 out=0.3 trip=0 39.7s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[17] 082-compose-config-repair  m6f-weak-r84     rc=0 usd=0.000531 out=0.3 trip=0 57.3s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[18] 082-compose-config-repair  m6f-weak-r74     rc=0 usd=0.000303 out=0.3 trip=0 30.2s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[19] 042-api-schema-migration   m6f-weak-r86     rc=0 usd=0.0002 out=0.15 trip=0 54.4s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[20] 082-compose-config-repair  m6f-weak-r58     rc=0 usd=0.000204 out=0.3 trip=0 50.8s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[21] 043-db-migration-safety    m6f-weak-r100    rc=0 usd=0.000205 out=0.098 trip=0 32.2s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[22] 041-frontend-state-bug     m6f-weak-r12     rc=0 usd=0.00152 out=0.9962 trip=0 200.3s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[23] 041-frontend-state-bug     m6f-weak-r95     rc=0 usd=0.000326 out=0.2039 trip=0 106.7s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[24] 082-compose-config-repair  m6f-weak-r106    rc=0 usd=0.000206 out=0.3 trip=0 22.7s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[25] 043-db-migration-safety    m6f-weak-r11     rc=0 usd=0.000516 out=0.098 trip=0 54.7s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[26] 043-db-migration-safety    m6f-weak-r48     rc=0 usd=0.000196 out=0.098 trip=0 20.7s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[27] 043-db-migration-safety    m6f-weak-r32     rc=0 usd=0.000198 out=0.098 trip=0 32.2s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[28] 042-api-schema-migration   m6f-weak-r24     rc=0 usd=0.000201 out=0.15 trip=0 89.9s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[29] 082-compose-config-repair  m6f-weak-r42     rc=0 usd=0.000553 out=0.3 trip=0 72.3s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[30] 042-api-schema-migration   m6f-weak-r72     rc=0 usd=0.000193 out=0.15 trip=0 74.9s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[31] 082-compose-config-repair  m6f-weak-r3      rc=0 usd=0.000525 out=0.3 trip=0 26.7s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[32] 082-compose-config-repair  m6f-weak-r108    rc=0 usd=0.000213 out=0.3 trip=0 32.2s | pairs={'strong': 20, 'weak': 6} Σ$14.33 bad=0
+[33] 041-frontend-state-bug     m6f-weak-r14     rc=0 usd=0.00253 out=0.5962 trip=0 234.9s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[34] 042-api-schema-migration   m6f-weak-r102    rc=0 usd=0.000335 out=0.15 trip=0 107.9s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[35] 082-compose-config-repair  m6f-weak-r30     rc=0 usd=0.000216 out=0.3 trip=0 48.2s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[36] 082-compose-config-repair  m6f-weak-r5      rc=0 usd=0.00158 out=0.3 trip=0 74.8s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[37] 041-frontend-state-bug     m6f-weak-r0      rc=0 usd=0.002374 out=0.5962 trip=0 215.4s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[38] 042-api-schema-migration   m6f-weak-r36     rc=0 usd=0.000317 out=0.15 trip=0 105.9s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[39] 043-db-migration-safety    m6f-weak-r115    rc=0 usd=0.001462 out=0.098 trip=0 154.2s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[40] 082-compose-config-repair  m6f-weak-r20     rc=0 usd=0.000202 out=0.3 trip=0 46.2s | pairs={'strong': 20, 'weak': 6} Σ$14.34 bad=0
+[41] 041-frontend-state-bug     m6f-weak-r11     rc=0 usd=0.002267 out=0.5962 trip=0 208.9s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[42] 042-api-schema-migration   m6f-weak-r54     rc=0 usd=0.000306 out=0.15 trip=0 125.4s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[43] 041-frontend-state-bug     m6f-weak-r36     rc=0 usd=0.003314 out=0.5962 trip=0 270.9s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[44] 082-compose-config-repair  m6f-weak-r98     rc=0 usd=0.000209 out=0.3 trip=0 43.2s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[45] 042-api-schema-migration   m6f-weak-r46     rc=0 usd=0.000389 out=0.15 trip=0 102.4s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[46] 082-compose-config-repair  m6f-weak-r39     rc=0 usd=0.000211 out=0.3 trip=0 12.7s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[47] 042-api-schema-migration   m6f-weak-r89     rc=0 usd=0.000199 out=0.15 trip=0 68.9s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[48] 082-compose-config-repair  m6f-weak-r59     rc=0 usd=0.000339 out=0.3 trip=0 38.2s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[49] 082-compose-config-repair  m6f-weak-r13     rc=0 usd=0.000207 out=0.3 trip=0 42.7s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[50] 042-api-schema-migration   m6f-weak-r44     rc=0 usd=0.000462 out=0.15 trip=0 89.3s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[51] 082-compose-config-repair  m6f-weak-r57     rc=0 usd=0.000203 out=0.3 trip=0 39.8s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[52] 043-db-migration-safety    m6f-weak-r21     rc=0 usd=0.000412 out=0.098 trip=0 42.7s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[53] 082-compose-config-repair  m6f-weak-r7      rc=0 usd=0.000541 out=0.3 trip=0 48.3s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[54] 041-frontend-state-bug     m6f-weak-r77     rc=0 usd=0.001163 out=0.9962 trip=0 121.8s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[55] 082-compose-config-repair  m6f-weak-r97     rc=0 usd=0.000207 out=0.3 trip=0 32.6s | pairs={'strong': 20, 'weak': 6} Σ$14.35 bad=0
+[56] 041-frontend-state-bug     m6f-weak-r74     rc=0 usd=0.003969 out=0.9962 trip=0 272.0s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[57] 042-api-schema-migration   m6f-weak-r92     rc=0 usd=0.000293 out=0.15 trip=0 71.5s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[58] 041-frontend-state-bug     m6f-weak-r119    rc=0 usd=0.001979 out=0.2963 trip=0 212.9s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[59] 043-db-migration-safety    m6f-weak-r25     rc=0 usd=0.000201 out=0.098 trip=0 37.5s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[60] 043-db-migration-safety    m6f-weak-r71     rc=0 usd=0.002167 out=0.122 trip=0 132.3s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[61] 043-db-migration-safety    m6f-weak-r79     rc=0 usd=0.000194 out=0.098 trip=0 24.1s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[62] 042-api-schema-migration   m6f-weak-r64     rc=0 usd=0.000415 out=0.15 trip=0 94.4s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[63] 082-compose-config-repair  m6f-weak-r52     rc=0 usd=0.000215 out=0.3 trip=0 56.8s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[64] 043-db-migration-safety    m6f-weak-r76     rc=0 usd=0.000203 out=0.098 trip=0 41.7s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[65] 042-api-schema-migration   m6f-weak-r78     rc=0 usd=0.000321 out=0.15 trip=0 133.5s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[66] 043-db-migration-safety    m6f-weak-r9      rc=0 usd=0.000213 out=0.098 trip=0 48.6s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[67] 043-db-migration-safety    m6f-weak-r41     rc=0 usd=0.000201 out=0.098 trip=0 31.6s | pairs={'strong': 20, 'weak': 6} Σ$14.36 bad=0
+[68] 041-frontend-state-bug     m6f-weak-r81     rc=0 usd=0.001654 out=0.5962 trip=0 193.2s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[69] 042-api-schema-migration   m6f-weak-r61     rc=0 usd=0.000312 out=0.15 trip=0 62.4s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[70] 042-api-schema-migration   m6f-weak-r70     rc=0 usd=0.000487 out=0.15 trip=0 83.9s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[71] 042-api-schema-migration   m6f-weak-r42     rc=0 usd=0.000293 out=0.15 trip=0 62.9s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[72] 082-compose-config-repair  m6f-weak-r62     rc=0 usd=0.000207 out=0.3 trip=0 52.2s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[73] 041-frontend-state-bug     m6f-weak-r91     rc=0 usd=0.001995 out=0.9962 trip=0 189.8s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[74] 082-compose-config-repair  m6f-weak-r71     rc=0 usd=0.000608 out=0.3 trip=0 86.8s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[75] 043-db-migration-safety    m6f-weak-r40     rc=0 usd=0.00021 out=0.098 trip=0 31.6s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[76] 041-frontend-state-bug     m6f-weak-r27     rc=0 usd=0.003648 out=0.9962 trip=0 484.1s | pairs={'strong': 20, 'weak': 6} Σ$14.37 bad=0
+[77] 041-frontend-state-bug     m6f-weak-r19     rc=0 usd=0.001982 out=1.0 trip=0 230.4s | pairs={'strong': 20, 'weak': 6} Σ$14.38 bad=0
+[78] 043-db-migration-safety    m6f-weak-r35     rc=0 usd=0.063546 out=0.267 trip=1 685.4s | pairs={'strong': 20, 'weak': 7} Σ$14.44 bad=0
+[79] 082-compose-config-repair  m6f-weak-r4      rc=0 usd=0.002088 out=1.0 trip=0 175.8s | pairs={'strong': 20, 'weak': 7} Σ$14.44 bad=0
+[80] 041-frontend-state-bug     m6f-weak-r87     rc=0 usd=0.000364 out=0.2039 trip=0 139.3s | pairs={'strong': 20, 'weak': 7} Σ$14.44 bad=0
+[81] 041-frontend-state-bug     m6f-weak-r13     rc=0 usd=0.001993 out=0.9962 trip=0 512.1s | pairs={'strong': 20, 'weak': 7} Σ$14.44 bad=0
+[82] 042-api-schema-migration   m6f-weak-r20     rc=0 usd=0.00988 out=0.6174 trip=0 355.6s | pairs={'strong': 20, 'weak': 7} Σ$14.45 bad=0
+[83] 043-db-migration-safety    m6f-weak-r31     rc=0 usd=0.000196 out=0.098 trip=0 27.6s | pairs={'strong': 20, 'weak': 7} Σ$14.45 bad=0
+[84] 043-db-migration-safety    m6f-weak-r37     rc=0 usd=0.000204 out=0.098 trip=0 31.7s | pairs={'strong': 20, 'weak': 7} Σ$14.45 bad=0
+[85] 082-compose-config-repair  m6f-weak-r33     rc=0 usd=0.00259 out=0.99 trip=0 116.3s | pairs={'strong': 20, 'weak': 7} Σ$14.46 bad=0
+[86] 041-frontend-state-bug     m6f-weak-r41     rc=0 usd=0.002666 out=0.5962 trip=0 260.5s | pairs={'strong': 20, 'weak': 7} Σ$14.46 bad=0
+[87] 041-frontend-state-bug     m6f-weak-r101    rc=0 usd=0.001599 out=0.9962 trip=0 236.4s | pairs={'strong': 20, 'weak': 7} Σ$14.46 bad=0
+[88] 041-frontend-state-bug     m6f-weak-r99     rc=0 usd=0.001492 out=0.9962 trip=0 248.4s | pairs={'strong': 20, 'weak': 7} Σ$14.46 bad=0
+[89] 041-frontend-state-bug     m6f-weak-r63     rc=0 usd=0.002109 out=0.5962 trip=0 260.9s | pairs={'strong': 20, 'weak': 7} Σ$14.46 bad=0
+[90] 041-frontend-state-bug     m6f-weak-r53     rc=0 usd=0.002659 out=0.9812 trip=0 233.0s | pairs={'strong': 20, 'weak': 7} Σ$14.47 bad=0
+[91] 043-db-migration-safety    m6f-weak-r12     rc=0 usd=0.000197 out=0.098 trip=0 25.2s | pairs={'strong': 20, 'weak': 7} Σ$14.47 bad=0
+[92] 042-api-schema-migration   m6f-weak-r66     rc=0 usd=0.004243 out=0.4 trip=0 427.1s | pairs={'strong': 20, 'weak': 7} Σ$14.47 bad=0
+[93] 041-frontend-state-bug     m6f-weak-r60     rc=0 usd=0.003639 out=0.2963 trip=0 301.1s | pairs={'strong': 20, 'weak': 7} Σ$14.47 bad=0
+[94] 042-api-schema-migration   m6f-weak-r88     rc=0 usd=0.006398 out=0.74 trip=0 282.3s | pairs={'strong': 20, 'weak': 7} Σ$14.48 bad=0
+[95] 043-db-migration-safety    m6f-weak-r4      rc=0 usd=0.093211 out=0.27 trip=1 572.8s | pairs={'strong': 20, 'weak': 8} Σ$14.57 bad=0
+[96] 041-frontend-state-bug     m6f-weak-r40     rc=0 usd=0.002606 out=0.9775 trip=0 367.2s | pairs={'strong': 20, 'weak': 8} Σ$14.58 bad=0
+[97] 043-db-migration-safety    m6f-weak-r89     rc=0 usd=0.00114 out=0.182 trip=0 129.8s | pairs={'strong': 20, 'weak': 8} Σ$14.58 bad=0
+[98] 082-compose-config-repair  m6f-weak-r41     rc=0 usd=0.002114 out=0.99 trip=0 111.8s | pairs={'strong': 20, 'weak': 8} Σ$14.58 bad=0
+[99] 042-api-schema-migration   m6f-weak-r16     rc=0 usd=0.002048 out=0.546 trip=0 176.2s | pairs={'strong': 20, 'weak': 8} Σ$14.58 bad=0
+[100] 043-db-migration-safety    m6f-weak-r63     rc=0 usd=0.000192 out=0.098 trip=0 35.4s | pairs={'strong': 20, 'weak': 8} Σ$14.58 bad=0
+[101] 082-compose-config-repair  m6f-weak-r9      rc=0 usd=0.001396 out=0.6643 trip=0 153.5s | pairs={'strong': 20, 'weak': 8} Σ$14.58 bad=0
+[102] 042-api-schema-migration   m6f-weak-r51     rc=0 usd=0.015304 out=0.15 trip=0 830.9s | pairs={'strong': 20, 'weak': 8} Σ$14.60 bad=0
+[103] 082-compose-config-repair  m6f-weak-r73     rc=0 usd=0.002248 out=0.7 trip=0 154.5s | pairs={'strong': 20, 'weak': 8} Σ$14.60 bad=0
+[104] 041-frontend-state-bug     m6f-weak-r10     rc=0 usd=0.00575 out=0.9962 trip=0 510.4s | pairs={'strong': 20, 'weak': 8} Σ$14.61 bad=0
+[105] 041-frontend-state-bug     m6f-weak-r51     rc=0 usd=0.005059 out=0.9812 trip=0 771.5s | pairs={'strong': 20, 'weak': 8} Σ$14.61 bad=0
+[106] 082-compose-config-repair  m6f-weak-r83     rc=0 usd=0.001784 out=1.0 trip=0 143.4s | pairs={'strong': 20, 'weak': 8} Σ$14.61 bad=0
+=== chunk end rc=124 2026-09-24T14:30:40-04:00
+=== chunk start 2026-09-24T14:30:57-04:00
+seed=20260925 pairs so far={'strong': 20, 'weak': 8} target=20 spent=US$14.61 pending={'strong': 90, 'weak': 59} frozen=0
+[1] 042-api-schema-migration   m6f-weak-r52     rc=0 usd=0.00147 out=0.15 trip=0 130.0s | pairs={'strong': 20, 'weak': 8} Σ$14.62 bad=0
+[2] 041-frontend-state-bug     m6f-weak-r88     rc=0 usd=0.001129 out=0.2039 trip=0 155.9s | pairs={'strong': 20, 'weak': 8} Σ$14.62 bad=0
+[3] 043-db-migration-safety    m6f-weak-r105    rc=0 usd=0.000525 out=0.098 trip=0 31.2s | pairs={'strong': 20, 'weak': 8} Σ$14.62 bad=0
+[4] 042-api-schema-migration   m6f-weak-r91     rc=0 usd=0.026601 out=0.4848 trip=1 310.7s | pairs={'strong': 20, 'weak': 9} Σ$14.64 bad=0
+[5] 041-frontend-state-bug     m6f-weak-r9      rc=0 usd=0.001696 out=0.5962 trip=0 243.5s | pairs={'strong': 20, 'weak': 9} Σ$14.65 bad=0
+[6] 043-db-migration-safety    m6f-weak-r108    rc=0 usd=0.021509 out=0.259 trip=1 421.1s | pairs={'strong': 20, 'weak': 10} Σ$14.67 bad=0
+[7] 042-api-schema-migration   m6f-weak-r62     rc=0 usd=0.095741 out=0.4 trip=1 434.4s | pairs={'strong': 20, 'weak': 11} Σ$14.76 bad=0
+[8] 082-compose-config-repair  m6f-weak-r102    rc=0 usd=0.001445 out=0.99 trip=0 75.2s | pairs={'strong': 20, 'weak': 11} Σ$14.76 bad=0
+[9] 043-db-migration-safety    m6f-weak-r50     rc=0 usd=0.005439 out=0.257 trip=0 285.5s | pairs={'strong': 20, 'weak': 11} Σ$14.77 bad=0
+[10] 043-db-migration-safety    m6f-weak-r77     rc=0 usd=0.00258 out=0.257 trip=0 187.8s | pairs={'strong': 20, 'weak': 11} Σ$14.77 bad=0
+[11] 041-frontend-state-bug     m6f-weak-r25     rc=0 usd=0.004224 out=0.2963 trip=0 498.7s | pairs={'strong': 20, 'weak': 11} Σ$14.78 bad=0
+[12] 082-compose-config-repair  m6f-weak-r89     rc=0 usd=0.001862 out=0.99 trip=0 112.3s | pairs={'strong': 20, 'weak': 11} Σ$14.78 bad=0
+[13] 043-db-migration-safety    m6f-weak-r14     rc=0 usd=0.002188 out=0.262 trip=0 130.8s | pairs={'strong': 20, 'weak': 11} Σ$14.78 bad=0
+    resubmitting once: 041-frontend-state-bug m6f-weak-r6
+    resubmitting once: 082-compose-config-repair m6f-weak-r26
+    frozen after 2 failures: 041-frontend-state-bug m6f-weak-r6
+[14] 041-frontend-state-bug     m6f-weak-r6      rc=0 usd=None out=0.2039 trip=0 31.7s | pairs={'strong': 20, 'weak': 11} Σ$14.78 bad=1
+    frozen after 2 failures: 082-compose-config-repair m6f-weak-r26
+[15] 082-compose-config-repair  m6f-weak-r26     rc=0 usd=None out=0.3 trip=0 26.7s | pairs={'strong': 20, 'weak': 11} Σ$14.78 bad=2
+    resubmitting once: 043-db-migration-safety m6f-weak-r17
+    resubmitting once: 042-api-schema-migration m6f-weak-r63
+[16] 042-api-schema-migration   m6f-weak-r41     rc=0 usd=0.002196 out=0.15 trip=0 157.6s | pairs={'strong': 20, 'weak': 11} Σ$14.78 bad=2
+[17] 042-api-schema-migration   m6f-weak-r58     rc=0 usd=0.015566 out=0.15 trip=1 180.1s | pairs={'strong': 20, 'weak': 12} Σ$14.80 bad=2
+[18] 042-api-schema-migration   m6f-weak-r63     rc=0 usd=0.003267 out=0.74 trip=0 283.7s | pairs={'strong': 20, 'weak': 12} Σ$14.80 bad=2
+[19] 082-compose-config-repair  m6f-weak-r91     rc=0 usd=0.0019 out=0.6643 trip=0 107.8s | pairs={'strong': 20, 'weak': 12} Σ$14.80 bad=2
+[20] 041-frontend-state-bug     m6f-weak-r52     rc=0 usd=0.002068 out=0.5962 trip=0 247.4s | pairs={'strong': 20, 'weak': 12} Σ$14.81 bad=2
+HALT: 2/20 rc!=0-or-receiptless > 5% — investigate apparatus
+[21] 043-db-migration-safety    m6f-weak-r17     rc=0 usd=0.005933 out=0.27 trip=0 454.2s | pairs={'strong': 20, 'weak': 12} Σ$14.81 bad=2
+HALT: 2/21 rc!=0-or-receiptless > 5% — investigate apparatus
+    resubmitting once: 041-frontend-state-bug m6f-weak-r69
+    resubmitting once: 042-api-schema-migration m6f-weak-r69
+[22] 041-frontend-state-bug     m6f-weak-r117    rc=0 usd=0.004111 out=0.5962 trip=0 255.0s | pairs={'strong': 20, 'weak': 12} Σ$14.82 bad=2
+HALT: 2/22 rc!=0-or-receiptless > 5% — investigate apparatus
+[23] 041-frontend-state-bug     m6f-weak-r104    rc=0 usd=0.004605 out=0.9962 trip=0 504.2s | pairs={'strong': 20, 'weak': 12} Σ$14.82 bad=2
+HALT: 2/23 rc!=0-or-receiptless > 5% — investigate apparatus
+[24] 041-frontend-state-bug     m6f-weak-r69     rc=0 usd=0.001205 out=0.3 trip=0 203.9s | pairs={'strong': 20, 'weak': 12} Σ$14.82 bad=2
+HALT: 2/24 rc!=0-or-receiptless > 5% — investigate apparatus
+[25] 042-api-schema-migration   m6f-weak-r69     rc=0 usd=0.005411 out=0.15 trip=0 557.8s | pairs={'strong': 20, 'weak': 12} Σ$14.83 bad=2
+HALT: 2/25 rc!=0-or-receiptless > 5% — investigate apparatus
+
+finished: done=25 pairs={'strong': 20, 'weak': 12} spent=US$14.83 rc_err=0 receiptless=2 halted=True
+=== chunk end rc=0 2026-09-24T15:01:16-04:00
+=== chunk start 2026-09-24T15:01:34-04:00
+seed=20260925 pairs so far={'strong': 20, 'weak': 12} target=20 spent=US$14.83 pending={'strong': 90, 'weak': 34} frozen=2
+[1] 042-api-schema-migration   m6f-weak-r23     rc=0 usd=0.001833 out=0.4 trip=0 152.0s | pairs={'strong': 20, 'weak': 12} Σ$14.83 bad=0
+[2] 042-api-schema-migration   m6f-weak-r109    rc=0 usd=0.000284 out=0.15 trip=0 167.5s | pairs={'strong': 20, 'weak': 12} Σ$14.83 bad=0
+[3] 041-frontend-state-bug     m6f-weak-r65     rc=0 usd=0.001616 out=0.5962 trip=0 215.5s | pairs={'strong': 20, 'weak': 12} Σ$14.83 bad=0
+[4] 042-api-schema-migration   m6f-weak-r75     rc=0 usd=0.013546 out=0.15 trip=1 157.1s | pairs={'strong': 20, 'weak': 13} Σ$14.84 bad=0
+[5] 043-db-migration-safety    m6f-weak-r6      rc=0 usd=0.004454 out=0.265 trip=0 349.0s | pairs={'strong': 20, 'weak': 13} Σ$14.85 bad=0
+[6] 043-db-migration-safety    m6f-weak-r20     rc=0 usd=0.001461 out=0.182 trip=0 87.2s | pairs={'strong': 20, 'weak': 13} Σ$14.85 bad=0
+[7] 043-db-migration-safety    m6f-weak-r45     rc=0 usd=0.004377 out=0.098 trip=0 433.1s | pairs={'strong': 20, 'weak': 13} Σ$14.85 bad=0
+[8] 042-api-schema-migration   m6f-weak-r77     rc=0 usd=0.065312 out=0.4 trip=1 507.8s | pairs={'strong': 20, 'weak': 14} Σ$14.92 bad=0
+[9] 041-frontend-state-bug     m6f-weak-r34     rc=0 usd=0.002258 out=0.5962 trip=0 401.1s | pairs={'strong': 20, 'weak': 14} Σ$14.92 bad=0
+[10] 042-api-schema-migration   m6f-weak-r37     rc=0 usd=0.002273 out=0.15 trip=0 214.5s | pairs={'strong': 20, 'weak': 14} Σ$14.92 bad=0
+[11] 043-db-migration-safety    m6f-weak-r33     rc=0 usd=0.00231 out=0.182 trip=0 179.8s | pairs={'strong': 20, 'weak': 14} Σ$14.93 bad=0
+[12] 043-db-migration-safety    m6f-weak-r54     rc=0 usd=0.001369 out=0.19 trip=0 134.7s | pairs={'strong': 20, 'weak': 14} Σ$14.93 bad=0
+[13] 043-db-migration-safety    m6f-weak-r3      rc=0 usd=0.005456 out=0.182 trip=0 591.8s | pairs={'strong': 20, 'weak': 14} Σ$14.93 bad=0
+[14] 043-db-migration-safety    m6f-weak-r74     rc=0 usd=0.004185 out=0.252 trip=0 266.3s | pairs={'strong': 20, 'weak': 14} Σ$14.94 bad=0
+[15] 042-api-schema-migration   m6f-weak-r60     rc=0 usd=0.011324 out=0.15 trip=0 348.7s | pairs={'strong': 20, 'weak': 14} Σ$14.95 bad=0
+[16] 041-frontend-state-bug     m6f-weak-r111    rc=0 usd=0.004047 out=0.9812 trip=0 381.1s | pairs={'strong': 20, 'weak': 14} Σ$14.95 bad=0
+[17] 041-frontend-state-bug     m6f-weak-r1      rc=0 usd=0.005566 out=0.9962 trip=0 576.8s | pairs={'strong': 20, 'weak': 14} Σ$14.96 bad=0
+[18] 082-compose-config-repair  m6f-weak-r85     rc=0 usd=0.001888 out=1.0 trip=0 70.7s | pairs={'strong': 20, 'weak': 14} Σ$14.96 bad=0
+[19] 082-compose-config-repair  m6f-weak-r44     rc=0 usd=0.053352 out=1.0 trip=1 193.8s | pairs={'strong': 20, 'weak': 15} Σ$15.01 bad=0
+[20] 043-db-migration-safety    m6f-weak-r69     rc=0 usd=0.001957 out=0.182 trip=0 221.3s | pairs={'strong': 20, 'weak': 15} Σ$15.02 bad=0
+[21] 042-api-schema-migration   m6f-weak-r11     rc=0 usd=0.004057 out=0.4 trip=0 437.8s | pairs={'strong': 20, 'weak': 15} Σ$15.02 bad=0
+[22] 082-compose-config-repair  m6f-weak-r48     rc=0 usd=0.002079 out=1.0 trip=0 125.3s | pairs={'strong': 20, 'weak': 15} Σ$15.02 bad=0
+[23] 082-compose-config-repair  m6f-weak-r53     rc=0 usd=0.002019 out=0.95 trip=0 104.8s | pairs={'strong': 20, 'weak': 15} Σ$15.02 bad=0
+[24] 082-compose-config-repair  m6f-weak-r93     rc=0 usd=0.002108 out=0.95 trip=0 107.7s | pairs={'strong': 20, 'weak': 15} Σ$15.03 bad=0
+[25] 043-db-migration-safety    m6f-weak-r107    rc=0 usd=0.008513 out=0.25 trip=0 355.5s | pairs={'strong': 20, 'weak': 15} Σ$15.03 bad=0
+[26] 043-db-migration-safety    m6f-weak-r13     rc=0 usd=0.001917 out=0.19 trip=0 126.2s | pairs={'strong': 20, 'weak': 15} Σ$15.04 bad=0
+[27] 043-db-migration-safety    m6f-weak-r51     rc=0 usd=0.000757 out=0.098 trip=0 28.1s | pairs={'strong': 20, 'weak': 15} Σ$15.04 bad=0
+[28] 082-compose-config-repair  m6f-weak-r40     rc=0 usd=0.001616 out=1.0 trip=0 68.7s | pairs={'strong': 20, 'weak': 15} Σ$15.04 bad=0
+[29] 082-compose-config-repair  m6f-weak-r103    rc=0 usd=0.002101 out=0.99 trip=0 86.7s | pairs={'strong': 20, 'weak': 15} Σ$15.04 bad=0
+[30] 043-db-migration-safety    m6f-weak-r10     rc=0 usd=0.002702 out=0.25 trip=0 222.8s | pairs={'strong': 20, 'weak': 15} Σ$15.04 bad=0
+[31] 043-db-migration-safety    m6f-weak-r102    rc=0 usd=0.004667 out=0.255 trip=0 320.9s | pairs={'strong': 20, 'weak': 15} Σ$15.05 bad=0
+[32] 043-db-migration-safety    m6f-weak-r75     rc=0 usd=0.005712 out=0.262 trip=0 391.0s | pairs={'strong': 20, 'weak': 15} Σ$15.05 bad=0
+[33] 042-api-schema-migration   m6f-weak-r117    rc=0 usd=0.077878 out=0.74 trip=1 377.7s | pairs={'strong': 20, 'weak': 16} Σ$15.13 bad=0
+[34] 041-frontend-state-bug     m6f-weak-r115    rc=0 usd=0.001467 out=0.5962 trip=0 348.0s | pairs={'strong': 20, 'weak': 16} Σ$15.13 bad=0
+
+finished: done=34 pairs={'strong': 20, 'weak': 16} spent=US$15.13 rc_err=0 receiptless=0 halted=False
+=== chunk end rc=0 2026-09-24T15:28:35-04:00
