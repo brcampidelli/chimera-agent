@@ -43,7 +43,7 @@ Q = {"failure": {"type": "noul", "instructions": "Does the line report a failure
 
 def test_one_state_answers_with_the_number_and_says_it_is_uncalibrated() -> None:
     out = json.loads(DecideTool(Decider(_Backend())).run(questions=Q, state="ERROR boom"))
-    assert out["answers"]["failure"] == {"noul": pytest.approx(0.9)} and out["calibrated"] == {"failure": False}
+    assert out["answers"]["failure"] == {"type": "noul", "noul": pytest.approx(0.9)} and out["calibrated"] == {"failure": False}
 
 
 def test_many_states_come_back_in_order_and_the_cap_is_enforced() -> None:

@@ -4393,7 +4393,7 @@ export interface components {
         };
         /**
          * DecideIn
-         * @description The open System One request (study 22, phase 4) — the Decisions API's own shape.
+         * @description The open System One request (study 22, phase 4) — the vendor SDK's own shape (study 24, A1).
          */
         DecideIn: {
             /**
@@ -4406,7 +4406,9 @@ export interface components {
                 [key: string]: components["schemas"]["DecideQuestionIn"];
             };
             /** State */
-            state: string;
+            state: string | {
+                [key: string]: unknown;
+            } | unknown[];
         };
         /** DecideOut */
         DecideOut: {
@@ -4432,10 +4434,16 @@ export interface components {
              * @default {}
              */
             criteria: {
-                [key: string]: string;
-            };
+                [key: string]: string | {
+                    [key: string]: unknown;
+                } | unknown[] | null;
+            } | (string | {
+                [key: string]: unknown;
+            } | unknown[])[];
             /** Instructions */
-            instructions: string;
+            instructions?: string | {
+                [key: string]: unknown;
+            } | unknown[] | null;
             /**
              * Type
              * @enum {string}

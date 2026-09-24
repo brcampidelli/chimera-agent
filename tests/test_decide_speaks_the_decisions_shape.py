@@ -58,12 +58,12 @@ REQUEST = {"state": "ERROR db: connection pool exhausted", "questions": {"failur
 def test_each_kind_comes_back_in_its_own_shape() -> None:
     out = decide(Decider(_Backend()), REQUEST)
     assert out["model"] == "fake-4b@Q4"
-    assert out["answers"]["failure"] == {"noul": pytest.approx(0.8)}
+    assert out["answers"]["failure"] == {"type": "noul", "noul": pytest.approx(0.8)}
     sub = out["answers"]["subsystem"]
     assert sub["choice"] == "database" and set(sub["probabilities"]) == {"database", "network", "other"}
     assert sub["confidence"] == pytest.approx((3 * 0.8 - 1) / 2)
     urg = out["answers"]["urgency"]
-    assert urg["legend"] == ["low", "medium", "high"]
+    assert urg["legend"] == {"low": "informational", "medium": "degraded", "high": "outage"} and urg["type"] == "score"
     assert urg["score"] == pytest.approx(0 * 0.8 + 1 * 0.1 + 2 * 0.1)
     assert set(out["receipts"]) == {"failure", "subsystem", "urgency"}
     assert out["receipts"]["failure"]["calibrated"] is False  # ad hoc: no map, and the receipt says so
@@ -120,7 +120,7 @@ def test_a_question_the_linter_rejects_is_refused_before_any_call() -> None:
 
 def test_a_backend_that_fails_on_one_question_fails_that_one_only() -> None:
     out = decide(Decider(_Backend()), {"state": "s", "questions": {"broken": NOUL, "failure": NOUL}})
-    assert "error" in out["answers"]["broken"] and out["answers"]["failure"] == {"noul": pytest.approx(0.8)}
+    assert "error" in out["answers"]["broken"] and out["answers"]["failure"] == {"type": "noul", "noul": pytest.approx(0.8)}
 
 
 # --- the route and the command -------------------------------------------------------------------
@@ -165,5 +165,5 @@ def test_the_command_maps_a_question_over_every_line(tmp_path: Path, fake_decide
     assert result.exit_code == 0, result.output
     rows = [json.loads(x) for x in result_path.read_text(encoding="utf-8").splitlines()]
     assert [r["id"] for r in rows] == ["a", "c"]  # the line without a state is skipped, not guessed
-    assert rows[0]["answers"]["failure"] == {"noul": pytest.approx(0.8)}
+    assert rows[0]["answers"]["failure"] == {"type": "noul", "noul": pytest.approx(0.8)}
     assert CliRunner().invoke(app, ["decide", "-q", str(questions)]).exit_code == 2  # a state or a file

@@ -2994,7 +2994,7 @@
         "type": "object"
       },
       "DecideIn": {
-        "description": "The open System One request (study 22, phase 4) \u2014 the Decisions API's own shape.",
+        "description": "The open System One request (study 22, phase 4) \u2014 the vendor SDK's own shape (study 24, A1).",
         "properties": {
           "decision": {
             "default": "",
@@ -3009,8 +3009,20 @@
             "type": "object"
           },
           "state": {
-            "title": "State",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              }
+            ],
+            "title": "State"
           }
         },
         "required": [
@@ -3054,16 +3066,68 @@
       "DecideQuestionIn": {
         "properties": {
           "criteria": {
-            "additionalProperties": {
-              "type": "string"
-            },
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    {
+                      "items": {},
+                      "type": "array"
+                    }
+                  ]
+                },
+                "type": "array"
+              }
+            ],
             "default": {},
-            "title": "Criteria",
-            "type": "object"
+            "title": "Criteria"
           },
           "instructions": {
-            "title": "Instructions",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instructions"
           },
           "type": {
             "enum": [
@@ -3076,8 +3140,7 @@
           }
         },
         "required": [
-          "type",
-          "instructions"
+          "type"
         ],
         "title": "DecideQuestionIn",
         "type": "object"

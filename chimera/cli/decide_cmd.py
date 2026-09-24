@@ -83,7 +83,8 @@ def decide(
                 text = row.get(field) if isinstance(row, dict) else None
             except ValueError:
                 text = None
-            if not isinstance(text, str) or not text.strip():
+            # A state may be an object or a list too (the SDK's shape; the interface renders it).
+            if not text or (isinstance(text, str) and not text.strip()) or not isinstance(text, str | dict | list):
                 skipped += 1
                 continue
             result = ask(decider, {**template, "state": text})
