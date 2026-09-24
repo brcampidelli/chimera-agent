@@ -11,6 +11,7 @@ Two layers:
 
 from __future__ import annotations
 
+import re
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -21,6 +22,13 @@ from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 
 _log = get_logger("integrations.mcp")
+
+_TOOL_NAME = re.compile(r"[A-Za-z0-9_.:-]{1,64}")
+
+
+def valid_tool_name(name: str) -> bool:
+    """Whether ``name`` may be registered: 1-64 characters of letters, digits and ``_ . : -``."""
+    return _TOOL_NAME.fullmatch(name) is not None
 
 
 @dataclass
@@ -106,10 +114,28 @@ class MCPConnector(Connector):
         self._name_prefix = name_prefix
 
     def tools(self) -> list[Tool]:
-        return [
-            MCPTool(spec, self._session.call_tool, name_prefix=self._name_prefix)
-            for spec in self._session.list_tools()
-        ]
+        """The server's tools, minus any whose advertised name is not a plain identifier.
+
+        The name is the one string a server we did not write puts OUTSIDE the data fence: it goes
+        into the tool list the model reads, leads the action on every card a person approves
+        (``render_action``) and the audit line. Nothing checked it, so a server could name a tool
+        with a newline and a sentence. Study 24, S5 (the charset is the one the plan registered).
+
+        Only the ADVERTISED name is checked, not the prefix: the prefix is the server's name in our
+        own config, typed by the person who added it, and it may hold a space. Checking the joined
+        name would have dropped every tool of a server called "GitHub Tools".
+
+        A tool that fails is dropped and logged rather than renamed: a renamed tool is a name the
+        server never advertised, and calling it would need a mapping nobody can audit.
+        """
+        tools: list[Tool] = []
+        for spec in self._session.list_tools():
+            if not valid_tool_name(spec.name):
+                _log.warning("MCP server %r advertised a tool with an invalid name (%r); not registered",
+                             self.name, spec.name[:80])
+                continue
+            tools.append(MCPTool(spec, self._session.call_tool, name_prefix=self._name_prefix))
+        return tools
 
 
 def _content_to_text(result: Any) -> str:
