@@ -54,6 +54,9 @@ _TAG_SCRIPT = r"""
      el.getAttribute('placeholder') || el.getAttribute('name') || '').trim().slice(0, 120);
   const sel = 'a,button,input,textarea,select,[role=button],[role=link],[role=textbox]';
   const els = Array.from(document.querySelectorAll(sel));
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const whereFor = (r) =>
+    r.bottom <= 0 ? 'above' : r.top >= vh ? 'below' : (r.right <= 0 || r.left >= vw) ? 'beside' : 'in';
   const out = [];
   let i = 0;
   for (const el of els) {
@@ -61,10 +64,15 @@ _TAG_SCRIPT = r"""
     if (rect.width === 0 && rect.height === 0) continue;  // skip hidden
     const ref = 'e' + (++i);
     el.setAttribute('data-chimera-ref', ref);
-    out.push({ ref, role: roleFor(el), name: nameFor(el) });
+    out.push({ ref, role: roleFor(el), name: nameFor(el), where: whereFor(rect) });
   }
   return out;
 }
+"""
+
+# One viewport's worth, less a strip of overlap so a line cut at the edge is seen whole on one side.
+_SCROLL_SCRIPT = r"""
+(sign) => window.scrollBy({ top: sign * Math.round(window.innerHeight * 0.85), behavior: 'instant' })
 """
 
 
@@ -167,7 +175,7 @@ class PlaywrightDriver:
 
     def _snapshot(self) -> list[Element]:
         raw: list[dict[str, Any]] = self._page.evaluate(_TAG_SCRIPT)
-        return [Element(ref=r["ref"], role=r["role"], name=r["name"]) for r in raw]
+        return [Element(ref=r["ref"], role=r["role"], name=r["name"], where=r.get("where")) for r in raw]
 
     def _guarded(self, step: Callable[[], object]) -> list[Element]:
         """Run a step that may navigate; a navigation the guard refused is an error, not a page."""
@@ -209,6 +217,13 @@ class PlaywrightDriver:
         return self._guarded(lambda: self._page.goto(url, wait_until="domcontentloaded"))
 
     def read(self) -> list[Element]:
+        return self._snapshot()
+
+    def scroll(self, direction: str = "down") -> list[Element]:
+        """Move the viewport one screen (``down`` or ``up``) and snapshot again. Used only by the
+        opt-in viewport-first listing. It navigates nowhere, but a page may load content on scroll,
+        and those requests pass the same guard as any other."""
+        self._page.evaluate(_SCROLL_SCRIPT, -1 if direction == "up" else 1)
         return self._snapshot()
 
     def click(self, ref: str) -> list[Element]:

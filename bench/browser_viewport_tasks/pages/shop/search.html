@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Search — Lumen &amp; Co.</title><style>
+body{margin:0;font:16px/1.5 Arial,Helvetica,sans-serif;color:#202122;background:#fff}
+a{color:#0645ad;text-decoration:none}
+header.top{display:flex;gap:14px;align-items:center;padding:10px 16px;border-bottom:1px solid #ccc;flex-wrap:wrap;background:#f8f9fa}
+header.sticky{position:sticky;top:0;z-index:5}
+.wrap{display:flex;align-items:flex-start}
+nav.side{width:220px;flex:none;padding:12px 16px;font-size:14px}
+nav.side a{display:block;padding:1px 0}
+nav.side h3{font-size:13px;margin:14px 0 4px;color:#54595d}
+main{flex:1;padding:12px 24px;min-width:0}
+aside.right{width:270px;flex:none;padding:12px 16px;font-size:14px}
+aside.right a{display:block}
+.infobox{float:right;width:280px;margin:0 0 12px 16px;border:1px solid #a2a9b1;background:#f8f9fa;font-size:14px;padding:8px}
+.infobox a{display:block}
+footer{border-top:1px solid #ccc;padding:16px;font-size:14px;clear:both}
+footer a{display:inline-block;margin:2px 10px 2px 0}
+ol.refs{font-size:13px;columns:2}
+.navbox{border:1px solid #a2a9b1;margin:12px 0;padding:6px;font-size:13px}
+.navbox a{margin-right:8px}
+.card{border:1px solid #ddd;padding:12px;height:300px;box-sizing:border-box}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.row{display:flex;gap:16px;border-bottom:1px solid #eee;padding:8px 4px;height:24px;overflow:hidden}
+.row .name{width:260px;flex:none}
+.comment{border-top:1px solid #eee;padding:10px 0}
+.meta{color:#54595d;font-size:13px}
+pre{background:#f6f8fa;padding:10px;overflow:auto}
+</style></head>
+<body>
+<header class="top sticky"><a href="/shop/lamps.html">Lumen &amp; Co.</a><form action="/shop/search.html" method="get"><input name="q" placeholder="Search the shop"><button type="submit">Search</button></form><a href="/go/shop/account">Account</a><a id="cart-link" href="/go/shop/cart">Cart (0)</a><span id="cart-status" role="status"></span><a href="/go/shop/category-lamps">Lamps</a><a href="/go/shop/category-pendants">Pendants</a><a href="/go/shop/category-wall-lights">Wall lights</a><a href="/go/shop/category-outdoor">Outdoor</a><a href="/go/shop/category-bulbs">Bulbs</a><a href="/go/shop/category-shades">Shades</a><a href="/go/shop/category-smart-lighting">Smart lighting</a><a href="/go/shop/category-kids">Kids</a><a href="/go/shop/category-sale">Sale</a><a href="/go/shop/category-new-in">New in</a></header><main><h1 id="h">Search</h1><div id="results"></div></main>
+<script>
+function m7code(key) {
+  const L = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const s = "m7|" + key;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  const c1 = L[h % 24]; h = Math.floor(h / 24);
+  const c2 = L[h % 24]; h = Math.floor(h / 24);
+  const d = String(h % 10000).padStart(4, "0"); h = Math.floor(h / 10000);
+  return c1 + c2 + d + L[h % 24];
+}
+
+const CATALOG = [{"id": "p1", "name": "Steel Lantern Wall Light", "price": 97.1}, {"id": "p2", "name": "Linen Tulip Desk Lamp", "price": 106.4}, {"id": "p3", "name": "Oak Orb Floor Lamp", "price": 307.3}, {"id": "p4", "name": "Brass Cone Desk Lamp", "price": 316.2}, {"id": "p5", "name": "Steel Dome Reading Light", "price": 93.7}, {"id": "p6", "name": "Linen Cone Pendant", "price": 102.0}, {"id": "p7", "name": "Marble Arc Floor Lamp", "price": 111.9}, {"id": "p8", "name": "Glass Tulip Desk Lamp", "price": 120.4}, {"id": "p9", "name": "Paper Orb Reading Light", "price": 121.5}, {"id": "p10", "name": "Concrete Column Pendant", "price": 130.8}, {"id": "p11", "name": "Glass Column Table Lamp", "price": 244.8}, {"id": "p12", "name": "Marble Drum Wall Light", "price": 235.3}, {"id": "p13", "name": "Copper Bell Table Lamp", "price": 208.2}, {"id": "p14", "name": "Ceramic Orb Wall Light", "price": 407.3}, {"id": "p15", "name": "Linen Globe Pendant", "price": 398.8}, {"id": "p16", "name": "Rattan Orb Wall Light", "price": 421.3}, {"id": "p17", "name": "Glass Globe Table Lamp", "price": 412.8}, {"id": "p18", "name": "Ceramic Lantern Reading Light", "price": 403.9}, {"id": "p19", "name": "Ceramic Arc Wall Light", "price": 31.9}, {"id": "p20", "name": "Brass Tulip Pendant", "price": 40.4}, {"id": "p21", "name": "Paper Dome Floor Lamp", "price": 413.7}, {"id": "p22", "name": "Concrete Cone Table Lamp", "price": 422.0}, {"id": "p23", "name": "Ceramic Dome Reading Light", "price": 259.5}, {"id": "p24", "name": "Copper Cone Pendant", "price": 236.2}, {"id": "p25", "name": "Rattan Drum Floor Lamp", "price": 49.3}, {"id": "p26", "name": "Walnut Globe Table Lamp", "price": 58.6}, {"id": "p27", "name": "Ceramic Lantern Wall Light", "price": 263.9}, {"id": "p28", "name": "Copper Column Table Lamp", "price": 64.8}, {"id": "p29", "name": "Linen Bell Desk Lamp", "price": 394.4}, {"id": "p30", "name": "Paper Arc Reading Light", "price": 385.7}, {"id": "p31", "name": "Copper Column Pendant", "price": 204.8}, {"id": "p32", "name": "Oak Drum Floor Lamp", "price": 195.3}, {"id": "p33", "name": "Linen Column Pendant", "price": 390.0}, {"id": "p34", "name": "Paper Orb Floor Lamp", "price": 381.3}, {"id": "p35", "name": "Copper Cone Table Lamp", "price": 376.2}, {"id": "p36", "name": "Ceramic Dome Wall Light", "price": 399.5}, {"id": "p37", "name": "Harbor Brass Floor Lamp", "price": 189.0}, {"id": "p38", "name": "Steel Arc Reading Light", "price": 365.7}, {"id": "p39", "name": "Walnut Bell Desk Lamp", "price": 374.4}, {"id": "p40", "name": "Marble Lantern Floor Lamp", "price": 383.9}, {"id": "p41", "name": "Steel Drum Wall Light", "price": 369.1}, {"id": "p42", "name": "Brass Bell Desk Lamp", "price": 188.2}, {"id": "p43", "name": "Rattan Lantern Wall Light", "price": 197.1}, {"id": "p44", "name": "Walnut Tulip Desk Lamp", "price": 206.4}, {"id": "p45", "name": "Copper Globe Table Lamp", "price": 72.6}, {"id": "p46", "name": "Oak Lantern Reading Light", "price": 63.1}, {"id": "p47", "name": "Rattan Arc Wall Light", "price": 45.9}, {"id": "p48", "name": "Glass Bell Table Lamp", "price": 268.4}, {"id": "p49", "name": "Linen Column Desk Lamp", "price": 90.8}, {"id": "p50", "name": "Steel Orb Wall Light", "price": 81.5}, {"id": "p51", "name": "Glass Cone Desk Lamp", "price": 96.0}, {"id": "p52", "name": "Oak Drum Reading Light", "price": 295.1}, {"id": "p53", "name": "Ceramic Arc Reading Light", "price": 371.9}, {"id": "p54", "name": "Copper Tulip Pendant", "price": 380.8}, {"id": "p55", "name": "Walnut Bell Table Lamp", "price": 74.0}, {"id": "p56", "name": "Brass Cone Pendant", "price": 56.8}, {"id": "p57", "name": "Paper Lantern Floor Lamp", "price": 157.3}, {"id": "p58", "name": "Concrete Bell Table Lamp", "price": 134.4}, {"id": "p59", "name": "Walnut Cone Desk Lamp", "price": 382.2}, {"id": "p60", "name": "Paper Drum Reading Light", "price": 169.3}, {"id": "p61", "name": "Ceramic Orb Reading Light", "price": 187.5}, {"id": "p62", "name": "Steel Orb Reading Light", "price": 141.5}, {"id": "p63", "name": "Walnut Cone Table Lamp", "price": 362.2}, {"id": "p64", "name": "Brass Globe Desk Lamp", "price": 172.6}, {"id": "p65", "name": "Steel Drum Reading Light", "price": 349.1}, {"id": "p66", "name": "Walnut Globe Desk Lamp", "price": 358.8}, {"id": "p67", "name": "Marble Orb Floor Lamp", "price": 367.3}, {"id": "p68", "name": "Paper Lantern Reading Light", "price": 377.9}, {"id": "p69", "name": "Steel Arc Wall Light", "price": 65.9}, {"id": "p70", "name": "Oak Orb Reading Light", "price": 47.5}, {"id": "p71", "name": "Rattan Drum Wall Light", "price": 29.3}, {"id": "p72", "name": "Rattan Dome Floor Lamp", "price": 73.7}, {"id": "p73", "name": "Oak Arc Floor Lamp", "price": 91.9}, {"id": "p74", "name": "Linen Tulip Pendant", "price": 286.6}, {"id": "p75", "name": "Brass Column Pendant", "price": 64.8}, {"id": "p76", "name": "Ceramic Drum Wall Light", "price": 295.1}, {"id": "p77", "name": "Linen Bell Pendant", "price": 174.2}, {"id": "p78", "name": "Marble Arc Wall Light", "price": 411.7}, {"id": "p79", "name": "Steel Dome Wall Light", "price": 393.5}, {"id": "p80", "name": "Oak Lantern Floor Lamp", "price": 163.9}, {"id": "p81", "name": "Concrete Bell Pendant", "price": 394.2}, {"id": "p82", "name": "Brass Column Desk Lamp", "price": 404.8}, {"id": "p83", "name": "Ceramic Drum Reading Light", "price": 395.3}, {"id": "p84", "name": "Paper Dome Reading Light", "price": 273.5}, {"id": "p85", "name": "Linen Cone Desk Lamp", "price": 282.2}, {"id": "p86", "name": "Copper Globe Pendant", "price": 92.6}, {"id": "p87", "name": "Paper Drum Floor Lamp", "price": 269.1}, {"id": "p88", "name": "Rattan Lantern Floor Lamp", "price": 297.9}, {"id": "p89", "name": "Concrete Tulip Pendant", "price": 306.6}, {"id": "p90", "name": "Concrete Column Table Lamp", "price": 310.8}, {"id": "p91", "name": "Petite Brass Candle Lamp", "price": 24.9}, {"id": "p92", "name": "Walnut Tulip Table Lamp", "price": 346.4}, {"id": "p93", "name": "Marble Lantern Wall Light", "price": 123.1}, {"id": "p94", "name": "Glass Tulip Table Lamp", "price": 300.6}, {"id": "p95", "name": "Brass Globe Pendant", "price": 112.8}, {"id": "p96", "name": "Marble Drum Floor Lamp", "price": 215.9}, {"id": "p97", "name": "Concrete Tulip Table Lamp", "price": 206.4}, {"id": "p98", "name": "Steel Lantern Reading Light", "price": 197.7}, {"id": "p99", "name": "Brass Tulip Desk Lamp", "price": 420.2}, {"id": "p100", "name": "Glass Globe Desk Lamp", "price": 392.4}, {"id": "p101", "name": "Oak Dome Reading Light", "price": 79.9}, {"id": "p102", "name": "Walnut Column Desk Lamp", "price": 270.0}, {"id": "p103", "name": "Marble Dome Floor Lamp", "price": 279.5}, {"id": "p104", "name": "Glass Bell Desk Lamp", "price": 48.2}, {"id": "p105", "name": "Oak Arc Reading Light", "price": 351.9}, {"id": "p106", "name": "Copper Tulip Table Lamp", "price": 360.4}, {"id": "p107", "name": "Rattan Dome Wall Light", "price": 333.7}, {"id": "p108", "name": "Glass Cone Table Lamp", "price": 156.2}, {"id": "p109", "name": "Linen Globe Desk Lamp", "price": 378.6}, {"id": "p110", "name": "Glass Column Desk Lamp", "price": 384.8}, {"id": "p111", "name": "Paper Arc Floor Lamp", "price": 125.9}, {"id": "p112", "name": "Rattan Arc Floor Lamp", "price": 385.7}, {"id": "p113", "name": "Walnut Column Table Lamp", "price": 410.0}, {"id": "p114", "name": "Marble Dome Wall Light", "price": 179.7}, {"id": "p115", "name": "Marble Orb Wall Light", "price": 187.5}, {"id": "p116", "name": "Concrete Cone Pendant", "price": 162.0}, {"id": "p117", "name": "Rattan Orb Floor Lamp", "price": 321.3}, {"id": "p118", "name": "Concrete Globe Table Lamp", "price": 118.8}, {"id": "p119", "name": "Copper Bell Pendant", "price": 388.4}, {"id": "p120", "name": "Oak Dome Floor Lamp", "price": 179.5}];
+function addToCart(id) {
+  const p = CATALOG.find(x => x.id === id);
+  document.getElementById('cart-link').textContent = 'Cart (1)';
+  document.getElementById('cart-status').textContent =
+    'Added ' + p.name + ' to your cart. Cart code: ' + m7code('cart|' + id);
+}
+
+const q = (new URLSearchParams(location.search).get('q') || '').trim().toLowerCase();
+const hits = q ? CATALOG.filter(p => p.name.toLowerCase().includes(q)) : [];
+document.getElementById('h').textContent = hits.length + ' results for "' + q + '"';
+document.getElementById('results').innerHTML = hits.map(p =>
+  '<div class="row"><a class="name" href="/shop/product.html?id=' + p.id + '">' + p.name + '</a>' +
+  '<span>$' + p.price.toFixed(2) + '</span>' +
+  '<button onclick="addToCart(\'' + p.id + '\')">Add to cart</button></div>').join('');
+</script>
+</body></html>
