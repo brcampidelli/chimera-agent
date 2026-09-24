@@ -1,0 +1,21 @@
+{
+  "items": 30,
+  "rounds": 5,
+  "build": "qwen3:4b@Q4_K_M",
+  "max_abs_dp_median": 0.0033766889322487392,
+  "max_abs_dp_max": 0.03641161822343841,
+  "items_read": 22,
+  "flips": [],
+  "unread_in_some_rounds_only": [],
+  "unread_in_every_round": [
+    "hard-sol-c-multi_hop-11",
+    "hard-opus-c-long_policy-03",
+    "hard-opus-b-multi_hop-03",
+    "hard-opus-b-multi_hop-07",
+    "hard-sol-b-long_policy-05",
+    "hard-opus-a-long_policy-01",
+    "hard-sol-b-long_policy-01",
+    "hard-sol-b-long_policy-02"
+  ],
+  "decision": "publish the floor beside spot_noul and manager_p"
+}

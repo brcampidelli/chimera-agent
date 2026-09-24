@@ -43,3 +43,9 @@ which is right for the governance question (a shell action is short) and wrong f
 Nothing about a larger local model, about reading the label after a short reasoning trace (study
 20's L2 arm: that collapses `p` to 0/1), or about a hosted model read by logprobs. Nothing about
 summaries a model wrote.
+
+## Note added 2026-09-24 — the replay floor on long states (study 24, M3)
+
+This null was read without a replay floor of its own on long states. `bench/long_state_floor` measured one on the same instrument: **no label flips** in 22 long JevBench states × 5 identical rounds. But `p` moves by up to **0.036** (median 0.003), mostly in the middle of the scale. The requests are byte-identical and only the call order changes, so the likeliest cause is what Ollama can reuse from the previous prompt; that cause was not isolated.
+
+A jitter that size can reorder items whose `p` differ by less than 0.036. It cannot create or erase an AUROC gap of the size reported above, so the null is expected to stand. A re-read against the floor is owed in a follow-up.
