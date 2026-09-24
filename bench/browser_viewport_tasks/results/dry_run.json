@@ -1,0 +1,1151 @@
+{
+ "suite": {
+  "tasks": 24,
+  "in_view": 8,
+  "below": 16,
+  "hurt_prone": [
+   "W3",
+   "N2",
+   "F2",
+   "S3",
+   "G2"
+  ],
+  "checkers": {
+   "code": 21,
+   "number": 1,
+   "phrase": 1,
+   "substring": 1
+  }
+ },
+ "site": {
+  "pages": 10,
+  "manifest_matches": true
+ },
+ "placement": {
+  "W1": {
+   "target": "Rance Tidal Power Station",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "W2": {
+   "target": "Dynamic tidal power",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "W3": {
+   "target": "Barrages and Their Discontents",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "D1": {
+   "target": "Changelog",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "D2": {
+   "target": "Permalink to Widget.fetch",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "D3": {
+   "target": "acme.widgets.sensors.thermal",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "N1": {
+   "target": "Harbor council approves tidal lagoon after decade-long fight",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "N2": {
+   "target": "Science",
+   "where": "below",
+   "all_places": [
+    "below",
+    "in"
+   ]
+  },
+  "N3": {
+   "target": "Corrections",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "P1": {
+   "target": "Issues",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "P2": {
+   "target": "3.8.2",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "P3": {
+   "target": "acme_widgets-4.2.0-py3-none-any.whl",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "F1": {
+   "target": "halvard_n",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "F2": {
+   "target": "marlow_k",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "F3": {
+   "target": "More comments",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "S1": {
+   "target": "Search the shop",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "S2": {
+   "target": "Page 3",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "S3": {
+   "target": "Harbor Brass Floor Lamp",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "R1": {
+   "target": "Issues 12",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "R2": {
+   "target": "CONTRIBUTING.md",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "R3": {
+   "target": "discussion forum",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "G1": {
+   "target": "Renew your passport",
+   "where": "in",
+   "all_places": [
+    "in"
+   ]
+  },
+  "G2": {
+   "target": "Your email address",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  },
+  "G3": {
+   "target": "Ombudsman",
+   "where": "below",
+   "all_places": [
+    "below"
+   ]
+  }
+ },
+ "pages": {
+  "pages": {
+   "wiki": {
+    "elements": 2038,
+    "offscreen": 1943,
+    "chars_today": 64768,
+    "chars_viewport": 2730
+   },
+   "docs": {
+    "elements": 695,
+    "offscreen": 620,
+    "chars_today": 23456,
+    "chars_viewport": 2599
+   },
+   "news": {
+    "elements": 283,
+    "offscreen": 235,
+    "chars_today": 15334,
+    "chars_viewport": 2386
+   },
+   "pkg": {
+    "elements": 153,
+    "offscreen": 102,
+    "chars_today": 4314,
+    "chars_viewport": 1793
+   },
+   "forum": {
+    "elements": 247,
+    "offscreen": 196,
+    "chars_today": 5614,
+    "chars_viewport": 1853
+   },
+   "shop": {
+    "elements": 177,
+    "offscreen": 121,
+    "chars_today": 4866,
+    "chars_viewport": 1660
+   },
+   "repo": {
+    "elements": 217,
+    "offscreen": 136,
+    "chars_today": 5812,
+    "chars_viewport": 2382
+   },
+   "gov": {
+    "elements": 161,
+    "offscreen": 126,
+    "chars_today": 5928,
+    "chars_viewport": 1458
+   }
+  },
+  "elements_median": 232.0,
+  "offscreen_share_median": 0.7880654814293259
+ },
+ "scripts": {
+  "today": {
+   "W1": {
+    "answer": "SM1308A",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     64768,
+     130,
+     255
+    ],
+    "seconds": 1.7
+   },
+   "W2": {
+    "answer": "XV2733P",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     64768,
+     130,
+     243
+    ],
+    "seconds": 0.55
+   },
+   "W3": {
+    "answer": "YK9275M",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     64768,
+     1069,
+     130,
+     275
+    ],
+    "seconds": 0.25
+   },
+   "D1": {
+    "answer": "JS9865B",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     23456,
+     147,
+     241
+    ],
+    "seconds": 0.17
+   },
+   "D2": {
+    "answer": "37.5 seconds",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find"
+    ],
+    "chars": [
+     23456,
+     248
+    ],
+    "seconds": 0.06
+   },
+   "D3": {
+    "answer": "LW0635P",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     23456,
+     147,
+     267
+    ],
+    "seconds": 0.2
+   },
+   "N1": {
+    "answer": "KH1850B",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     15334,
+     138,
+     225
+    ],
+    "seconds": 0.16
+   },
+   "N2": {
+    "answer": "SM5020N",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     15334,
+     138,
+     227
+    ],
+    "seconds": 0.2
+   },
+   "N3": {
+    "answer": "VJ5886G",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     15334,
+     138,
+     229
+    ],
+    "seconds": 0.17
+   },
+   "P1": {
+    "answer": "PR1723E",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     4314,
+     133,
+     236
+    ],
+    "seconds": 0.16
+   },
+   "P2": {
+    "answer": "SF7476P",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     4314,
+     133,
+     234
+    ],
+    "seconds": 0.14
+   },
+   "P3": {
+    "answer": "42baff7dbc66",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find"
+    ],
+    "chars": [
+     4314,
+     281
+    ],
+    "seconds": 0.06
+   },
+   "F1": {
+    "answer": "KA4964H",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5614,
+     131,
+     237
+    ],
+    "seconds": 0.16
+   },
+   "F2": {
+    "answer": "BU5690Q",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5614,
+     131,
+     227
+    ],
+    "seconds": 0.19
+   },
+   "F3": {
+    "answer": "HA5188D",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5614,
+     131,
+     243
+    ],
+    "seconds": 0.2
+   },
+   "S1": {
+    "answer": "Petite Brass Candle Lamp",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "type",
+     "click"
+    ],
+    "chars": [
+     4866,
+     4856,
+     1073
+    ],
+    "seconds": 0.17
+   },
+   "S2": {
+    "answer": "UT8920V",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     4866,
+     132,
+     225
+    ],
+    "seconds": 0.17
+   },
+   "S3": {
+    "answer": "DY6778Y",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "find"
+    ],
+    "chars": [
+     4866,
+     4866,
+     201
+    ],
+    "seconds": 0.11
+   },
+   "R1": {
+    "answer": "BQ9086C",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5812,
+     128,
+     224
+    ],
+    "seconds": 0.2
+   },
+   "R2": {
+    "answer": "CD6942V",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5812,
+     128,
+     244
+    ],
+    "seconds": 0.14
+   },
+   "R3": {
+    "answer": "HF2423B",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5812,
+     128,
+     236
+    ],
+    "seconds": 0.16
+   },
+   "G1": {
+    "answer": "BL4691D",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5928,
+     132,
+     241
+    ],
+    "seconds": 0.16
+   },
+   "G2": {
+    "answer": "PV9339R",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "type",
+     "type",
+     "type",
+     "click",
+     "find"
+    ],
+    "chars": [
+     5928,
+     5930,
+     5935,
+     5942,
+     5942,
+     187
+    ],
+    "seconds": 0.17
+   },
+   "G3": {
+    "answer": "KP7470V",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     5928,
+     132,
+     221
+    ],
+    "seconds": 0.17
+   }
+  },
+  "viewport": {
+   "W1": {
+    "answer": "SM1308A",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2730,
+     130,
+     255
+    ],
+    "seconds": 0.38
+   },
+   "W2": {
+    "answer": "XV2733P",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2730,
+     366,
+     130,
+     243
+    ],
+    "seconds": 0.38
+   },
+   "W3": {
+    "answer": "YK9275M",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2730,
+     1222,
+     480,
+     130,
+     275
+    ],
+    "seconds": 0.42
+   },
+   "D1": {
+    "answer": "JS9865B",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2599,
+     147,
+     241
+    ],
+    "seconds": 0.17
+   },
+   "D2": {
+    "answer": "37.5 seconds",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find"
+    ],
+    "chars": [
+     2599,
+     417
+    ],
+    "seconds": 0.16
+   },
+   "D3": {
+    "answer": "LW0635P",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2599,
+     402,
+     147,
+     267
+    ],
+    "seconds": 0.19
+   },
+   "N1": {
+    "answer": "KH1850B",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2386,
+     138,
+     225
+    ],
+    "seconds": 0.14
+   },
+   "N2": {
+    "answer": "SM5020N",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "scroll",
+     "scroll",
+     "scroll",
+     "scroll",
+     "scroll",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2386,
+     356,
+     2157,
+     2043,
+     2053,
+     2165,
+     2159,
+     138,
+     227
+    ],
+    "seconds": 0.3
+   },
+   "N3": {
+    "answer": "VJ5886G",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2386,
+     653,
+     138,
+     229
+    ],
+    "seconds": 0.17
+   },
+   "P1": {
+    "answer": "PR1723E",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1793,
+     133,
+     236
+    ],
+    "seconds": 0.16
+   },
+   "P2": {
+    "answer": "SF7476P",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1793,
+     329,
+     133,
+     234
+    ],
+    "seconds": 0.17
+   },
+   "P3": {
+    "answer": "42baff7dbc66",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find"
+    ],
+    "chars": [
+     1793,
+     436
+    ],
+    "seconds": 0.06
+   },
+   "F1": {
+    "answer": "KA4964H",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1853,
+     131,
+     237
+    ],
+    "seconds": 0.19
+   },
+   "F2": {
+    "answer": "BU5690Q",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "scroll",
+     "scroll",
+     "scroll",
+     "scroll",
+     "scroll",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1853,
+     337,
+     927,
+     914,
+     933,
+     958,
+     957,
+     131,
+     227
+    ],
+    "seconds": 0.27
+   },
+   "F3": {
+    "answer": "HA5188D",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1853,
+     342,
+     131,
+     243
+    ],
+    "seconds": 0.17
+   },
+   "S1": {
+    "answer": "Petite Brass Candle Lamp",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "type",
+     "click"
+    ],
+    "chars": [
+     1660,
+     1650,
+     1073
+    ],
+    "seconds": 0.14
+   },
+   "S2": {
+    "answer": "UT8920V",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1660,
+     320,
+     132,
+     225
+    ],
+    "seconds": 0.19
+   },
+   "S3": {
+    "answer": "DY6778Y",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "scroll",
+     "scroll",
+     "scroll",
+     "scroll",
+     "scroll",
+     "click",
+     "find"
+    ],
+    "chars": [
+     1660,
+     382,
+     1445,
+     1279,
+     1149,
+     1145,
+     1158,
+     1158,
+     359
+    ],
+    "seconds": 0.22
+   },
+   "R1": {
+    "answer": "BQ9086C",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2382,
+     128,
+     224
+    ],
+    "seconds": 0.14
+   },
+   "R2": {
+    "answer": "CD6942V",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2382,
+     349,
+     128,
+     244
+    ],
+    "seconds": 0.17
+   },
+   "R3": {
+    "answer": "HF2423B",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     2382,
+     460,
+     128,
+     236
+    ],
+    "seconds": 0.17
+   },
+   "G1": {
+    "answer": "BL4691D",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1458,
+     132,
+     241
+    ],
+    "seconds": 0.16
+   },
+   "G2": {
+    "answer": "PV9339R",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "type",
+     "find",
+     "type",
+     "find",
+     "type",
+     "find",
+     "click",
+     "find"
+    ],
+    "chars": [
+     1458,
+     332,
+     1396,
+     359,
+     1383,
+     326,
+     1340,
+     340,
+     1743,
+     351
+    ],
+    "seconds": 0.22
+   },
+   "G3": {
+    "answer": "KP7470V",
+    "accepted": true,
+    "error": "",
+    "calls": [
+     "navigate",
+     "find",
+     "click",
+     "read_text"
+    ],
+    "chars": [
+     1458,
+     729,
+     132,
+     221
+    ],
+    "seconds": 0.16
+   }
+  }
+ },
+ "solve_path": {
+  "today": {
+   "success": true,
+   "answer": "SM1308A",
+   "steps": 4,
+   "usd": 0.0,
+   "cap_usd": 3.32e-05,
+   "observation_chars": 65153,
+   "browser_actions": {
+    "navigate": 1,
+    "click": 1,
+    "read_text": 1
+   },
+   "error": "",
+   "offers_scroll": false
+  },
+  "viewport": {
+   "success": true,
+   "answer": "SM1308A",
+   "steps": 4,
+   "usd": 0.0,
+   "cap_usd": 3.32e-05,
+   "observation_chars": 3115,
+   "browser_actions": {
+    "navigate": 1,
+    "click": 1,
+    "read_text": 1
+   },
+   "error": "",
+   "offers_scroll": true
+  }
+ },
+ "projection": {
+  "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "price_in_per_m": 0.065,
+  "price_out_per_m": 0.18,
+  "inflate": 3.0,
+  "k": 5,
+  "solves": 240,
+  "per_arm": {
+   "today": {
+    "scripted_prompt_tokens_mean": 17148,
+    "scripted_prompt_tokens_max": 69626,
+    "scripted_usd_per_solve_mean": 0.0011587389583333333,
+    "projected_usd_per_solve": 0.0034762168750000003
+   },
+   "viewport": {
+    "scripted_prompt_tokens_mean": 9122,
+    "scripted_prompt_tokens_max": 28888,
+    "scripted_usd_per_solve_mean": 0.0006514259375,
+    "projected_usd_per_solve": 0.0019542778125
+   }
+  },
+  "projected_total_usd": 0.6516593625
+ },
+ "failures": []
+}

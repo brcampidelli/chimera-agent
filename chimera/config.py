@@ -296,6 +296,10 @@ class Settings(BaseSettings):
 
     # --- Browser tool: run Chromium headless (default) or headful for debugging. ---
     browser_headless: bool = Field(default=True, validation_alias="CHIMERA_BROWSER_HEADLESS")
+    # --- Browser tool: list the viewport's elements and a count of the rest (study 24, M7). Off:
+    # step 1 measured four in five listed elements off-screen, but what a shorter list does to task
+    # success is `bench/browser_viewport_tasks`'s question, and it is unanswered. ---
+    browser_viewport_first: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_VIEWPORT_FIRST")
 
     # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
     # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---
