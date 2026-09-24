@@ -4247,6 +4247,10 @@ def solve(
         "narrow", "--tool-router-mode",
         help="EXPERIMENT (study 22 B4b): 'narrow' gives the executor only the routed tool (B4, measured worse); 'hint' keeps every tool and only suggests one for the step, with no ANSWER.",
     ),
+    escalate_on_tool_loop: str = typer.Option(
+        None, "--escalate-on-tool-loop",
+        help="EXPERIMENT (study 24 M6): when the tool-loop breaker trips, hand the rest of the run to this stronger MODEL instead of stopping. A second trip stops as before. Off by default.",
+    ),
     progress_ledger: bool = typer.Option(
         False, "--progress-ledger", help="After a failed attempt, run a structured self-check that steers the retry (helps weak models)."
     ),
@@ -4577,6 +4581,7 @@ def solve(
             tool_router=(
                 _ToolRouter(backend, tool_router, mode=tool_router_mode) if tool_router else None
             ),
+            escalate_on_tool_loop=escalate_on_tool_loop or None,
         )
         worker = Agent(backend, registry, _worker_cfg)
         escalate_worker = (
