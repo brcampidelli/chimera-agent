@@ -308,7 +308,10 @@ def build_right_hand(
     # remaining terms are the owner's: the explicit switch and the reach/approval floor.
     narrow = bool(settings.taint_narrow or deployment_posture(settings).narrow_on_taint)
     governed = ledger_registry(
-        step.registry, ledger, narrow_on_taint=narrow, audit=audit, approve=approve
+        step.registry, ledger, narrow_on_taint=narrow, audit=audit, approve=approve,
+        # A send to an address nobody mentioned becomes a question only when a person is here to
+        # answer it (study 24, M2); under a pipe it goes ahead and the audit records it.
+        ask_unseen_recipients=attended,
     )
     return RightHand(
         registry=governed,

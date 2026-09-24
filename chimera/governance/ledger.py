@@ -43,6 +43,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from chimera.governance.policy import Decision
+from chimera.governance.recipient import addresses_in
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.ledger")
@@ -294,6 +295,9 @@ class TaintLedger:
         )
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
+        # Every whole email address the conversation has shown: the instruction, each tool result,
+        # earlier turns when a surface hands them over. Only ever grows (study 24, M2).
+        self._seen_addresses: set[str] = set()
         # Optional cross-agent taint view: siblings in a fan-out share one, so a fetch here arms the
         # tainted-tool narrowing in every worker (not just this one). None = a standalone run.
         self._shared = shared
@@ -409,6 +413,36 @@ class TaintLedger:
         """
         self._instruction = _normalise(text or "")
         self._workspace = _normalise(str(workspace)) if workspace is not None else ""
+        # The instruction is replaced; the addresses it named are not forgotten. A chat sets the
+        # instruction once per turn, and an address given two turns ago is still one the user gave.
+        self.note_seen(text or "")
+
+    # --- recipients: did the conversation ever show this address? (study 24, M2) -------------
+
+    def note_seen(self, *texts: str) -> None:
+        """Remember every whole email address in ``texts`` as shown to this run.
+
+        Fed by the instruction, by every tool result (`LedgeredTool`), and by a surface's earlier
+        turns. Seen is not intended and not trusted: an address on a fetched page counts as seen,
+        because this check asks only whether the address was made up — the taint layer is what asks
+        whether it was planted.
+        """
+        for text in texts:
+            if text:
+                self._seen_addresses |= addresses_in(text)
+
+    def unseen_addresses(self, values: Iterable[str]) -> list[str]:
+        """The email addresses in ``values`` that this run has never been shown, in order, once.
+
+        A value with no address in it (a channel id, a phone number, a URL) contributes nothing:
+        there is nothing to compare, so there is nothing to flag.
+        """
+        out: list[str] = []
+        for value in values:
+            for address in sorted(addresses_in(value)):
+                if address not in self._seen_addresses and address not in out:
+                    out.append(address)
+        return out
 
     @property
     def instruction(self) -> str | None:

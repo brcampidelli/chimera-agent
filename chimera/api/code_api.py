@@ -748,7 +748,24 @@ def assemble_registry(
         # And never `step.approve`, for the reason above: in `observe` that one says yes to
         # everything, so measurement would silently subtract protection.
         approve=owner,
+        # A send to an address nobody mentioned asks only where a screen can show the card (study
+        # 24, M2). Without a sink this is `POST /api/runs` and friends: nobody to ask, so the send
+        # goes ahead and the audit records it — the owner's decision, never a block.
+        ask_unseen_recipients=approval_sink is not None,
     ), ledger
+
+
+def _message_texts(messages: Sequence[Any]) -> list[str]:
+    """The text of every stored message, whatever its shape: a plain string, or a list of parts
+    of which only the ``text`` ones count. A part this cannot read is skipped, not guessed at."""
+    texts: list[str] = []
+    for message in messages:
+        content = message.get("content") if isinstance(message, dict) else getattr(message, "content", None)
+        if isinstance(content, str):
+            texts.append(content)
+        elif isinstance(content, list):
+            texts.extend(str(part.get("text", "")) for part in content if isinstance(part, dict))
+    return texts
 
 
 def _owner_allows(
@@ -1518,6 +1535,11 @@ def register_code_api(
         else:
             session = store.load(req.session_id, agent) if req.session_id else CodeSession(agent)
         session.agent = agent  # a loaded session carries messages, not the agent that made them
+        # The ledger is built per turn and knows only this turn's message; an address the person
+        # gave three turns ago is still one they gave. The earlier turns go in as "seen" so a send
+        # to it is not flagged as made up (study 24, M2).
+        if ledger is not None:
+            ledger.note_seen(*_message_texts(session.messages))
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be
