@@ -119,12 +119,14 @@ class LedgeredTool(Tool):
         approve: ApproveFn | None = None,
         audit: AuditLog | None = None,
         narrow_on_taint: bool = False,
-        free_browser_reads: bool = False,
+        free_browser_reads: bool = True,
     ) -> None:
         self.inner = inner
         self.ledger = ledger
         # Study 24, M8: under narrowing, reading the page the browser already holds asked for a card
-        # on every call. `bench/browser_taint_cards` measures what exempting those reads costs.
+        # on every call. `bench/browser_taint_cards`: exempting those reads took the benign sessions from
+        # 24 cards to 6 with attack success unchanged at 0/14, and a sabotaged exemption that also freed
+        # url-carrying reads let 4/14 through - so the edge is measured, not assumed. On by default.
         self.free_browser_reads = free_browser_reads
         self.approve = approve
         self.audit = audit
