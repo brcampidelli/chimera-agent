@@ -91,6 +91,28 @@ DANGEROUS_WHEN_TAINTED = frozenset(
 )
 
 
+_RECIPIENT_KEYS = ("to", "recipient", "recipients", "cc", "bcc", "email")
+
+
+def sends_to_someone(name: str) -> bool:
+    """A send tool: one of :data:`SIDE_EFFECT_TOOLS`, or a connector's tool ending in one of their
+    names (an MCP server's ``gmail_send_email`` arrives prefixed, and is the same act)."""
+    return name in SIDE_EFFECT_TOOLS or any(name.endswith(f"_{tool}") for tool in SIDE_EFFECT_TOOLS)
+
+
+def recipient_values(kwargs: Mapping[str, Any]) -> list[str]:
+    """The raw values of a call's recipient arguments, lists flattened. Addresses are found in them
+    later; a value that holds none (a chat id, a channel) is simply not checkable."""
+    values: list[str] = []
+    for key in _RECIPIENT_KEYS:
+        value = kwargs.get(key)
+        if isinstance(value, list | tuple):
+            values.extend(str(v) for v in value)
+        elif value is not None:
+            values.append(str(value))
+    return values
+
+
 def browser_reads_loaded_page(name: str, kwargs: dict[str, Any]) -> bool:
     """A browser call that reads the page already loaded and sends nothing (study 24, M8).
 
@@ -120,9 +142,16 @@ class LedgeredTool(Tool):
         audit: AuditLog | None = None,
         narrow_on_taint: bool = False,
         free_browser_reads: bool = True,
+        ask_unseen_recipient: bool = False,
     ) -> None:
         self.inner = inner
         self.ledger = ledger
+        # Study 24, M2 (`bench/recipient_provenance`: 7/7 fabrications caught, 0/9 false flags): a
+        # send to an email address the run was never shown is a card — but only where somebody can
+        # answer one. The surface says so; `approve` alone cannot, because on an unattended surface
+        # it exists and refuses everything, and this note must never become a block. Everywhere
+        # else the send goes ahead and the audit keeps a `recipient_unseen` line.
+        self.ask_unseen_recipient = ask_unseen_recipient
         # Study 24, M8: under narrowing, reading the page the browser already holds asked for a card
         # on every call. `bench/browser_taint_cards`: exempting those reads took the benign sessions from
         # 24 cards to 6 with attack success unchanged at 0/14, and a sabotaged exemption that also freed
@@ -142,6 +171,16 @@ class LedgeredTool(Tool):
         self.parameters = inner.parameters
 
     def run(self, **kwargs: Any) -> str:
+        # Recipients this run was never shown (M2). Worked out first so a card asked for another
+        # reason below can carry the note: one question with two reasons, never two questions.
+        unseen = (
+            self.ledger.unseen_addresses(recipient_values(kwargs)) if sends_to_someone(self.name) else []
+        )
+        note = (
+            f"; the recipient {', '.join(unseen)} never appeared in the conversation or in "
+            "anything this run read" if unseen else ""
+        )
+        asked = False
         # 0. Taint-adaptive narrowing: a dangerous tool is off-limits once the run is
         #    tainted (needs approval), even without a direct tainted reference.
         #    `for_narrowing` is the one place the ledger's `authority` mode can answer differently
@@ -159,6 +198,7 @@ class LedgeredTool(Tool):
             reason = (
                 f"{self.name} is restricted after this run consumed untrusted content"
                 + (f" from {'; '.join(sources[:3])}" if sources else "")
+                + note
             )
             target = (
                 _first(kwargs, _COMMAND_KEYS) or _first(kwargs, _PATH_KEYS)
@@ -177,10 +217,12 @@ class LedgeredTool(Tool):
             if not approved:
                 return refusal(f"[taint: needs review — {reason}] "
                                f"The tool did NOT run. Do not report this as done.")
+            asked = True
 
         # 1. Sequence-aware pre-check: does this action consume tainted input?
         assessment = assess_action(self.name, kwargs, self.ledger)
         if assessment.escalate:
+            assessment.reason += note
             self.ledger.record_escalation(self.name, assessment)
             if self.audit is not None:
                 self.audit.record(
@@ -196,6 +238,13 @@ class LedgeredTool(Tool):
             if not approved:
                 return refusal(f"[taint: needs review — {assessment.reason}] "
                                f"The tool did NOT run. Do not report this as done.")
+            asked = True
+
+        # 1a. A recipient nobody mentioned (M2), when no card above already carried the note.
+        if unseen:
+            refused = self._ask_about_recipients(unseen, asked=asked)
+            if refused is not None:
+                return refused
 
         # 1b. Idempotency guard (M15-A5): a non-idempotent external side effect (send/post) is run
         #     at most once per identical (name, args). A retry re-issuing the same call gets the
@@ -213,11 +262,40 @@ class LedgeredTool(Tool):
         if idem_key is not None:
             self._idempotency_cache[idem_key] = result
         self._record_effect(kwargs, result)  # ledger sees the RAW content (taint snippets)
+        # Every result, whatever the tool: a contact looked up by `run_shell` or an MCP server is
+        # an address the run was shown, and so is the one in a sent message's own confirmation.
+        self.ledger.note_seen(result)
         if self._is_fetch() and result.strip():
             # M15-A3: defang chat-template/control tokens BEFORE fencing, so untrusted content
             # can't spoof a system/user turn or a tool call to break out of the data fence.
             return fence(sanitize_untrusted(result))
         return result
+
+    def _ask_about_recipients(self, unseen: list[str], *, asked: bool) -> str | None:
+        """Record a send to an address the run was never shown, and ask when this surface can.
+
+        Returns the refusal when a person said no, else None. ``asked`` means a card for this same
+        call already carried the note (the taint gates above), so no second card is shown.
+        """
+        ask = not asked and self.ask_unseen_recipient and self.approve is not None
+        if self.audit is not None:
+            self.audit.record(
+                "recipient_unseen",
+                {"tool": self.name, "recipients": unseen, "card": asked or ask},
+            )
+        if not ask or self.approve is None:
+            return None
+        reason = (
+            f"{self.name} to {', '.join(unseen)}: this address never appeared in the conversation "
+            "or in anything this run read"
+        )
+        assessment = SequenceAssessment(
+            True, Decision.REVIEW, reason, action=f"{self.name}: {', '.join(unseen)}"
+        )
+        if self.approve(assessment):
+            return None
+        return refusal(f"[recipient: needs review — {reason}] "
+                       f"The tool did NOT run. Do not report this as done.")
 
     def _is_fetch(self) -> bool:
         """A tool whose output is untrusted external content — by builtin name OR by an
@@ -264,17 +342,22 @@ def ledger_registry(
     approve: ApproveFn | None = None,
     audit: AuditLog | None = None,
     narrow_on_taint: bool = False,
+    ask_unseen_recipients: bool = False,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
 
     ``narrow_on_taint`` enables the taint-adaptive allowlist: once the run is tainted,
     dangerous tools (:data:`DANGEROUS_WHEN_TAINTED`) require approval for the rest of it.
+
+    ``ask_unseen_recipients`` is the surface saying a person can answer a card here (study 24,
+    M2). False by default, so every surface that does not say so keeps sending and only records.
     """
     wrapped = ToolRegistry()
     for tool in registry.tools():
         wrapped.register(
             LedgeredTool(
-                tool, ledger, approve=approve, audit=audit, narrow_on_taint=narrow_on_taint
+                tool, ledger, approve=approve, audit=audit, narrow_on_taint=narrow_on_taint,
+                ask_unseen_recipient=ask_unseen_recipients,
             )
         )
     return wrapped

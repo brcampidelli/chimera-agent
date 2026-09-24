@@ -4542,8 +4542,17 @@ def solve(
             ledger.set_instruction(task, workspace=ws)
             # narrow_on_taint: once the run consumes untrusted content, dangerous tools
             # (shell/write/exec/email) require approval for the rest of the run (M9b).
+            from chimera.governance.approval import nobody_is_at_a_terminal
+
             registry = ledger_registry(
-                registry, ledger, audit=allow_audit, narrow_on_taint=True, approve=approve
+                registry, ledger, audit=allow_audit, narrow_on_taint=True, approve=approve,
+                # A send to an address nobody mentioned asks only a person at this terminal (study
+                # 24, M2); a solve under cron or a pipe sends and records, rather than waiting on a
+                # durable question the owner never asked for.
+                ask_unseen_recipients=(
+                    (settings.approval_mode or "ask").strip().lower() == "ask"
+                    and not nobody_is_at_a_terminal()
+                ),
             )
         # insist_on_action: solve is autonomous task completion, so a described-but-unexecuted plan
         # is pushed back to actually run — the fix for the worker narrating instead of acting.
