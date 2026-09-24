@@ -99,7 +99,11 @@ def test_a_mixed_run_is_a_loop_not_a_wall() -> None:
         verdict = detector.record("read_file", {"path": "x.py"}, "error: permission denied", ok=False)
 
     assert verdict is not None and verdict.tripped
-    assert "identical args" in verdict.reason
+    # Since 2026-09-24 the trip comes from the stalled-output rule, not the identical-args one: the
+    # success returned something else, so it is not part of the repeat. The point of this test holds —
+    # the same call got through once, so the words must say loop, never wall.
+    assert "nothing ran" not in verdict.reason
+    assert "polled" in verdict.reason or "identical args" in verdict.reason
 
 
 def test_a_stalled_poll_that_never_ran_says_so() -> None:
