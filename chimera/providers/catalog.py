@@ -106,8 +106,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/openai/gpt-oss-20b", "weak", "OpenAI",
-        0.03, 0.13, tools=True, context_k=131,
-        notes="the paid variant; the :free one was withdrawn on 2026-08-21",
+        0.018, 0.09, tools=True, context_k=131, also_seen=((0.03, 0.13),),
+        notes="the paid variant; the :free one was withdrawn on 2026-08-21. Read 0.03/0.13 here until\n        the live check on main turned red on 2026-09-24: the index now quotes 0.018/0.09. The old\n        figure stays in also_seen in case the route flips back",
     ),
     # --- mid: the daily workhorses. Reliable tools, cents per task. ---
     CatalogEntry(
@@ -186,8 +186,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/openai/gpt-6-sol", "top", "OpenAI",
-        2.00, 10.00, tools=True, context_k=1100,
-        notes="the cost-efficient high end of the GPT-6 line (below Astra, above Luna), released 2026-09-22 and priced off the index the same day: 2.00/10.00 with cache read at 0.20. Added because `bench/tool_router` needs it as its third executor and a model with no price cannot run under a dollar cap at all — `--max-usd` refuses fail-closed, which is correct and is why the row exists rather than the cap being removed. Unmeasured in this repo",
+        2.00, 10.00, tools=True, context_k=1050,
+        notes="the cost-efficient high end of the GPT-6 line (below Astra, above Luna), released 2026-09-22 and priced off the index the same day: 2.00/10.00 with cache read at 0.20. The window read 1100k here until 2026-09-24; the provider serves 1,050,000, and a row that promises more than is served would let a prompt be sized past the real limit. Added because `bench/tool_router` needs it as its third executor and a model with no price cannot run under a dollar cap at all — `--max-usd` refuses fail-closed, which is correct and is why the row exists rather than the cap being removed. Unmeasured in this repo",
     ),
     CatalogEntry(
         "openrouter/google/gemini-3.8-flash", "top", "Google",
