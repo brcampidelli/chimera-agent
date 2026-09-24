@@ -25,6 +25,13 @@ tools and it could end the loop with ``ANSWER`` — and B4 could not tell which 
 ``hint`` (B4b, `bench/tool_router_hint`) keeps only what the rule allows: the router may *suggest* a
 tool, the executor keeps every tool and the decision whether to act, there is no ``ANSWER``, and the
 router reads the tools already used this run, so "one step from done" is not read off one output.
+Measured and not recommended either: a tie on every executor (+0.063 / +0.003 / +0.008, all inside
+the floor), and the executor followed the hint on only 31–36% of hinted steps. Both modes stay for
+reproducibility; neither is a default.
+
+A known defect of ``hint``, left unfixed because the mode is not recommended (study 24, item A3): the
+hint is a trailing ``system`` message, and LiteLLM hoists every system message to the top on an
+Anthropic route, so the prompt cache's prefix changes every step. No B4b executor was Anthropic.
 """
 
 from __future__ import annotations

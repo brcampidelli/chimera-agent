@@ -1,0 +1,37 @@
+cells with an outcome: 414 / 414
+
+============ executor: strong ============
+  replica SD of the control arm (the floor, measured here): 0.1730 over 23 tasks
+  tasks compared: 23
+  outcome  off 0.6905  on 0.6942   Δ +0.0037  95% CI over tasks [-0.0861, +0.0932]   (floor 0.1730)
+  pass@0.8 off 0.391  on 0.391
+  usd     off 0.0569  on 0.0472   Δ -0.0097  95% CI [-0.0175, -0.0024]   relative -8.6%  (n=23)
+  steps   off 27.9638  on 24.1739   Δ -3.7899  95% CI [-6.8841, -0.8623]   relative -8.8%  (n=23)
+  router: 1652 calls · narrowed 0 · answered 0 · fallbacks 8 · US$ 0.1313 = 4.1% of the arm's US$ 3.2295
+  picks: {'read_file': 450, 'write_file': 347, 'run_shell': 312, 'edit_file': 194, 'execute_code': 93, 'list_dir': 83, 'code_interpreter': 64, 'todo_write': 33}
+  chained 011-code-debug: off 0.113 on 0.170 Δ +0.057
+  control arms carrying a router receipt (must be 0): 0
+
+============ executor: weak ============
+  replica SD of the control arm (the floor, measured here): 0.1288 over 23 tasks
+  tasks compared: 23
+  outcome  off 0.2476  on 0.3101   Δ +0.0625  95% CI over tasks [-0.0053, +0.1364]   (floor 0.1288)
+  pass@0.8 off 0.000  on 0.000
+  usd     off 0.0021  on 0.0027   Δ +0.0006  95% CI [-0.0005, +0.0018]   relative +90.7%  (n=23)
+  steps   off 6.6957  on 6.5217   Δ -0.1739  95% CI [-2.4783, +1.9130]   relative +24.3%  (n=23)
+  router: 450 calls · narrowed 0 · answered 0 · fallbacks 3 · US$ 0.0335 = 18.0% of the arm's US$ 0.1860
+  picks: {'read_file': 181, 'run_shell': 85, 'apply_patch': 49, 'list_dir': 39, 'execute_code': 28, 'write_file': 22, 'edit_file': 21, 'glob': 6}
+  chained 011-code-debug: off 0.170 on 0.113 Δ -0.057
+  control arms carrying a router receipt (must be 0): 0
+
+============ executor: sol ============
+  replica SD of the control arm (the floor, measured here): 0.0256 over 23 tasks
+  tasks compared: 23
+  outcome  off 0.8613  on 0.8691   Δ +0.0078  95% CI over tasks [-0.0065, +0.0274]   (floor 0.0256)
+  pass@0.8 off 0.739  on 0.783
+  usd     off 0.2196  on 0.2246   Δ +0.0050  95% CI [-0.0050, +0.0156]   relative +4.1%  (n=23)
+  steps   off 12.2464  on 12.6087   Δ +0.3623  95% CI [-0.1014, +0.8696]   relative +4.3%  (n=23)
+  router: 870 calls · narrowed 0 · answered 0 · fallbacks 4 · US$ 0.0752 = 0.5% of the arm's US$ 15.4967
+  picks: {'read_file': 264, 'run_shell': 245, 'write_file': 131, 'edit_file': 68, 'execute_code': 60, 'todo_write': 41, 'list_dir': 15, 'echo': 14}
+  chained 011-code-debug: off 0.170 on 0.170 Δ +0.000
+  control arms carrying a router receipt (must be 0): 0

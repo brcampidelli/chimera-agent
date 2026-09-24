@@ -1,0 +1,9 @@
+homes 412 · traces scanned 412 · traces with no own workspace id 0
+flagged steps: 7
+- 064-service-dependency-triage-sys1h-on-weak-r2: foreign=[] other='data_try6/sandbox/' :: '**Files created**\n\n- `/home/brcamp/harness-bench/data_try6/sandbox/sys1h-on-weak-r2/sys1h-on-weak-r2/oc-bench-v2-064-service-dependency-triage-sys1h-on-weak-r2-'
+- 083-monorepo-interface-repair-sys1h-off-sol-r0: foreign=[] other='data_try6/sandbox/' :: '{"new": "    return {\\"total_cents\\": total, \\"currency\\": order_currency if order_currency is not None else \\"USD\\"}\\n", "old": "    return {\\"total_cents\\": t'
+- 083-monorepo-interface-repair-sys1h-on-sol-r2: foreign=[] other='data_try6/sandbox/' :: '{"new": "        price = product_money(catalog[line[\\"sku\\"]])\\n        line_currency = price.currency\\n", "old": "        product = catalog[line[\\"sku\\"]]\\n   '
+- 086-sql-migration-preflight-rollback-sys1h-off-weak-r1: foreign=[] other='data_try6/sandbox/' :: '{"patch": "<<<<<<< SEARCH\\nBEGIN TRANSACTION;\\n<<<<<<< =======\\n-- Begin transaction and disable foreign key enforcement for schema changes\\nPRAGMA foreign_keys'
+- 086-sql-migration-preflight-rollback-sys1h-off-weak-r1: foreign=[] other='data_try6/sandbox/' :: '{"patch": "<<<<<<< SEARCH\\nBEGIN TRANSACTION;\\n<<<<<<< =======\\n-- Begin transaction and disable foreign key enforcement for schema changes\\nPRAGMA foreign_keys'
+- 086-sql-migration-preflight-rollback-sys1h-on-strong-r1: foreign=[] other='data_try6/sandbox/' :: '{"code": "import sqlite3\\nimport os\\n\\n# Create an in-memory SQLite database and load the schema\\nconn = sqlite3.connect(\':memory:\')\\nconn.row_factory = sqlite3'
+- 086-sql-migration-preflight-rollback-sys1h-on-strong-r1: foreign=[] other='data_try6/sandbox/' :: '{"code": "import sqlite3\\nimport os\\n\\n# Create an in-memory SQLite database and load the schema\\nconn = sqlite3.connect(\':memory:\')\\nconn.row_factory = sqlite3'

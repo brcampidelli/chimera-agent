@@ -168,7 +168,7 @@ second training round transferred to 0 of 13 other families.
 | Skill/card relevance | `evolution/card_retrieval.py` | **Shadow; per-card Noul, may only remove** | TypeSafe's own skill cookbook: wrong loads 16.8%→7.3%, and it broke 7 cases |
 | Strong verifier trigger | `core/autonomous.py` D9 | **Change the gate, not the signal** | verifier_by_uncertainty: fired 0/385 |
 | RAG relevance | `rag/hybrid.py` | **Only fused with RRF; benchmark vs Qwen3-Reranker first** | I7 |
-| **Tool router / `ANSWER`** | `core/tool_router.py` | **Never as shipped.** A REFLEX-style variant (confident *which-tool* only, executor keeps *whether-to-act*, state carries progress, neutral ids) is the only form worth a new pre-registration | B4; I1, I2, I3 |
+| **Tool router / `ANSWER`** | `core/tool_router.py` | **Closed.** Never as a gate (B4: −0.087 / −0.194 / −0.307); as a hint, no effect (B4b: +0.063 / +0.003 / +0.008, all inside the floor, hint followed on 31–36% of steps). Both modes stay opt-in for reproducibility | B4, B4b; I1, I2, I3 |
 | **Any "is it done?" / auto-accept / skip-verification** | ledger `complete`, auto-continue, cascade skip-climb | **Never** | I1 |
 | **Auto-approving taint reviews** | `governance/ledger_tool.py` | **Never** | This is exactly where framing attacks live |
 | Claim-vs-diff, review findings, memory gate by model | — | **Never** (measured) | AUROC 0.54, ECE 0.405, memory_poison |

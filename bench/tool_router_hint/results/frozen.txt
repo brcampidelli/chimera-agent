@@ -1,0 +1,2 @@
+082-compose-config-repair sys1h-on-strong-r1
+040-test-coverage-fill sys1h-off-strong-r0
