@@ -1424,6 +1424,7 @@ chimera solve [TASK]
 | `--repo-map` | Prepend a structural map of the workspace (files + top-level symbols) to the agent's context. |  |
 | `--tool-router` | EXPERIMENT (study 20 B4): a cheap MODEL names the tool before each step and the executor is given only that tool. Reads a shallow context on purpose. Narrows only — an undecided router leaves the full list, and the run's receipt counts how often that happened. |  |
 | `--tool-router-mode` | EXPERIMENT (study 22 B4b): 'narrow' gives the executor only the routed tool (B4, measured worse); 'hint' keeps every tool and only suggests one for the step, with no ANSWER. | `'narrow'` |
+| `--escalate-on-tool-loop` | EXPERIMENT (study 24 M6): when the tool-loop breaker trips, hand the rest of the run to this stronger MODEL instead of stopping. A second trip stops as before. Off by default. |  |
 | `--progress-ledger` | After a failed attempt, run a structured self-check that steers the retry (helps weak models). |  |
 | `--checklist` | Extract the task's atomic requirements and grade each attempt's coverage (catches dropped constraints). |  |
 | `--gen-tests` | With no --verify: generate executable pytest grounded in the task's requirements and use it as the gate (catches wrong code the coverage grade rubber-stamps). Measured on 78 labelled patches (bench/test_gate_two_sided): fails every wrong patch, and reverts 4 of 64 correct ones (6%) on a test of its own that is wrong — opt-in for that reason. |  |

@@ -1,0 +1,14 @@
+
+===== executor: strong =====
+  scored cells: stop 18/18  esc 18/18  · floor (stop replica SD) 0.2444
+  outcome  stop 0.5865  esc 0.6355  Δ +0.0490  95% CI over tasks [-0.1084, +0.2082]
+  pass@0.8 stop 0.167  esc 0.222
+  breaker ended the run: stop 3/18  esc 0/18 · escalated in esc: 3/18 (their mean score 0.726)
+  usd/solve  stop 0.0771  esc 0.1179  (n 18/18)
+
+===== executor: weak =====
+  scored cells: stop 18/18  esc 18/18  · floor (stop replica SD) 0.1833
+  outcome  stop 0.3350  esc 0.2692  Δ -0.0657  95% CI over tasks [-0.2039, +0.0676]
+  pass@0.8 stop 0.111  esc 0.000
+  breaker ended the run: stop 2/18  esc 0/18 · escalated in esc: 0/18 (their mean score nan)
+  usd/solve  stop 0.0014  esc 0.0013  (n 18/18)

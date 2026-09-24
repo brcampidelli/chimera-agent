@@ -5281,6 +5281,16 @@
           "type": "str"
         },
         {
+          "help": "EXPERIMENT (study 24 M6): when the tool-loop breaker trips, hand the rest of the run to this stronger MODEL instead of stopping. A second trip stops as before. Off by default.",
+          "kind": "option",
+          "name": "escalate_on_tool_loop",
+          "opts": [
+            "--escalate-on-tool-loop"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
           "help": "After a failed attempt, run a structured self-check that steers the retry (helps weak models).",
           "kind": "option",
           "name": "progress_ledger",

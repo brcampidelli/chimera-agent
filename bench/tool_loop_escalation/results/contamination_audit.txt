@@ -1,0 +1,3 @@
+homes 73 · traces scanned 73
+flagged steps: 1
+- 011-code-debug-m6-esc-weak-r0: foreign=[] other='data_try6/sandbox/' :: '{"command": "python /home/brcamp/harness-bench/data_try6/sandbox/m3-esc-weak????"}'

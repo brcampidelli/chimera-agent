@@ -201,6 +201,16 @@ class AgentConfig:
     # repeats / ping-pong / no-progress polling) instead of grinding to max_steps. Conservative
     # thresholds, so a genuine multi-step run is untouched.
     detect_tool_loops: bool = True
+    # Study 24, M6: when the breaker trips, hand the rest of the run to this (stronger) model instead
+    # of asking for a final answer. Off by default (None): the stored runs show the breaker ending 6.4%
+    # of solves at a mean score of 0.416 against 0.681, a gap that mixes task difficulty with the cost
+    # of stopping, and `bench/tool_loop_escalation` is what separates the two. A second trip, on the
+    # stronger model, still stops the run exactly as before.
+    # Measured (72 solves): a tie at that bench's power on both executors, so it stays off and is not
+    # recommended. On the strong executor the three runs it escalated scored 0.726 against 0.396 for
+    # the three the breaker stopped, at +US$ 0.23 each; the arm-level design dilutes that by the trip
+    # rate. A fork at the trip point is the design that could decide it.
+    escalate_on_tool_loop: str | None = None
     # Surface the few most task-relevant built-in skills (name + description) into the system prompt,
     # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
     # nothing matches. This is what connects the built-in skill library to the running loop.
@@ -610,6 +620,9 @@ class Agent:
         steplog = StepLog()
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
+        # The model this run's steps go to. Set once, when the breaker trips and an escalation model
+        # is configured; per RUN, so the Agent's own config is never mutated for the runs after it.
+        run_model: str | None = None
         # Drift is reported once, at the step it first shows. Post-hoc the trace carries it anyway;
         # what this adds is knowing at step 60 of 200 rather than after the bill. It does not act:
         # stopping, re-planning and force-compacting are all plausible answers and we have no
@@ -658,7 +671,8 @@ class Agent:
                         hinted = picked
                     elif picked is not None:
                         step_tools = narrow(tool_schema, picked)
-                result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend)
+                result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend,
+                                    model=run_model)
                 router = self.config.tool_router
                 if hinted is not None and router is not None:
                     calls = getattr(result, "tool_calls", None) or []
@@ -862,6 +876,15 @@ class Agent:
                     drift_reported = True
                     _log.warning("context drift at step %d: %s", step, drift.summary)
 
+            if tripped is not None and self.config.escalate_on_tool_loop and run_model is None:
+                # Study 24, M6: the first trip hands the run to the stronger model, with a fresh
+                # detector and every tool, and says nothing else — the transcript already shows the
+                # repetition. `run_model is None` makes it once: a trip on the stronger model falls
+                # through to the stop below, as a run without escalation always does.
+                run_model = self.config.escalate_on_tool_loop
+                _log.info("tool-loop breaker tripped (%s): escalating to %s", tripped, run_model)
+                loop_detector = ToolLoopDetector()
+                continue
             if tripped is not None:
                 # Physically spinning: stop burning budget. Ask once, no tools, for a final answer
                 # with what it has — better than grinding to max_steps on a stuck loop.
@@ -871,7 +894,7 @@ class Agent:
                     "Give your best final answer now with what you already have."
                 )
                 final = self._step([*messages, {"role": "user", "content": nudge}], spend=spend,
-                                   tools=None, on_token=on_token, usage=usage)
+                                   tools=None, on_token=on_token, usage=usage, model=run_model)
                 messages.append({"role": "assistant", "content": final.content})
                 return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
                                     tool_names, usage, final.model, steplog=steplog, task=task)
@@ -887,6 +910,7 @@ class Agent:
 
         # Budget exhausted: ask once more, without tools, for a final answer.
         final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}], spend=spend,
+                           model=run_model,
                            tools=None, on_token=on_token, usage=usage)
         messages.append({"role": "assistant", "content": final.content})
         return self._result(final.content, self.config.max_steps, "max_steps", messages,
@@ -901,6 +925,7 @@ class Agent:
         on_token: Callable[[str], None] | None,
         usage: _UsageTally,
         spend: SpendBudget | None = None,
+        model: str | None = None,
     ) -> CompletionResult:
         """One model call. Streams (with live token deltas) when a token callback is given AND the
         backend supports ``stream_complete``; otherwise a plain blocking ``complete``. Either way the
@@ -924,12 +949,12 @@ class Agent:
         asked = {} if self.config.thinking is None else {"thinking": self.config.thinking}
         if on_token is not None and hasattr(self.backend, "stream_complete"):
             result = self.backend.stream_complete(  # type: ignore[attr-defined]
-                messages, model=self.config.model, temperature=self.config.temperature,
+                messages, model=model or self.config.model, temperature=self.config.temperature,
                 tools=tools, on_delta=on_token, **asked,
             )
         else:
             result = self.backend.complete(
-                messages, model=self.config.model, temperature=self.config.temperature, tools=tools,
+                messages, model=model or self.config.model, temperature=self.config.temperature, tools=tools,
                 **asked,
             )
         usage.add(result)
