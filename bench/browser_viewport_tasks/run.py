@@ -48,7 +48,9 @@ from bench.browser_viewport_tasks.solve_one import MODEL, PER_SOLVE_USD, worst_p
 from bench.browser_viewport_tasks.tasks import TASKS  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
-RESULTS = HERE / "results"
+#: Step 2 wrote to `results/`; a later registered step points M7_RESULTS at its own folder (step 3:
+#: `results-step3`), so the resume logic never mistakes step 2's records for its own.
+RESULTS = HERE / os.environ.get("M7_RESULTS", "results")
 SOLVES = RESULTS / "solves"
 FROZEN = RESULTS / "frozen.txt"
 DRIVER_LOG = RESULTS / "driver.jsonl"
