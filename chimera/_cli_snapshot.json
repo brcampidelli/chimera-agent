@@ -5291,6 +5291,16 @@
           "type": "str"
         },
         {
+          "help": "EXPERIMENT (study 24 M6 fork): with --escalate-on-tool-loop, copy the workspace to this DIR at the trip, before escalating \u2014 what stopping would have left. Off by default.",
+          "kind": "option",
+          "name": "snapshot_at_tool_loop",
+          "opts": [
+            "--snapshot-at-tool-loop"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
           "help": "After a failed attempt, run a structured self-check that steers the retry (helps weak models).",
           "kind": "option",
           "name": "progress_ledger",
