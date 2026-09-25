@@ -6,6 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.61.1] - 2026-09-25
+### Added
+
+- **A reopened turn shows what it was actually charged, beside the estimate.** The receipt's `usd` is priced from the catalogue row of the model id, but one id is served by several routes at different prices. The router's generation record carries `total_cost`, the real charge. The replay that already learns a turn's route now also sums that charge over **every** call of the turn.
+  - The answers found so far are kept between reopens.
+  - `billed_usd` is written only once every call has answered, so a partial sum never shows a cheaper turn than the one that happened. A record without a number is unknown, never free.
+  - The route and the bill share the existing 2.5 s budget, so reopening a conversation is no slower.
+  - The Code screen draws `billed $X` beside the estimate, in ten languages. It never draws it on an external turn. (#590)
+
+- **Study 24's judge read is finished: `bench/review_judge` reports arm C out of sample.** The read was pre-registered on 2026-08-20. Arm C's lead over arm A in Youden's J is **+9.7 pp [+1.7, +17.8]** on the 814 out-of-sample items, above the in-sample +6.8, so the clause that would have reinterpreted arms A–E does not fire.
+  - Arm C still does not ship: its false-rejection rate is 43.5%, against a 20% ceiling.
+  - Unregistered finding: re-judging the same 105 items changed arm C's verdict on 23 of them. (#588)
+
+### Fixed
+
+- **`execute_code` runs a Python the machine has, instead of the literal name `python`.** Any machine without a `python` alias answered exit 127 on every call. That includes Debian and Ubuntu without `python-is-python3`, and current macOS. Measured on the harness-bench traces: 743 of 748 failing calls were `python: not found`, so the tool never ran in the #453 factorial or the study-24 benches. The effect was the same in every arm, so those comparisons stand. The interpreter is now chosen by where the code runs:
+  - on this machine, the interpreter that runs Chimera, by absolute path;
+  - in a frozen build, the first of `python3`/`python` on PATH (`python`/`py` on Windows), with an error that names what it looked for when none is found;
+  - in a running container, whichever of the two the container has. (#587)
+
+- **The loop breaker stops the same failure repeated under different args, even when the tool reports it only in its answer.** Until now it recognised a failure only by the loop's `error:` flag. So a `run_shell` given its command as a list (`[exit 127] /bin/sh: 1: [bash,: not found`, whatever the list held) and a `ZeroDivisionError` repeated over four pieces of code ran until `max_steps`.
+  - Now `[exit N]` followed by text, and a last line shaped like an exception, count as failures. A silent non-zero exit, such as a `grep` that found nothing, does not.
+  - Replayed on about 2,500 recorded traces (`bench/tool_loop_silent_failure`, pre-registered, US$ 0): the rule stops exactly those three runs, brings back none of the 86 distinct-edit false alarms, and would stop none of the 76 runs that continued under the fixed breaker. (#586)
+
+- **When the taint ledger refuses a call, the refusal now says why and names the way out**, as the policy kernel's refusal has since 0.58.0.
+  - **With no approver:** the refusal says nobody could be asked, that retrying will be refused identically, and names the ways through: the Code screen's card, `chimera solve` at a terminal, a run started with pause-on-taint, and `CHIMERA_TAINT_NARROW=0` on a deployment that must act on its own. These are written for the person, and the model is told to relay them, not to route around the gate.
+  - **With an approver who said no:** the refusal stays "Nobody approved it." (#589)
+
 ## [0.61.0] - 2026-09-24
 ### Added
 
