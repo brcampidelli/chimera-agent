@@ -23,6 +23,14 @@ of that pair, and each half had its own measured false alarm:
 Now a repeat must match the last call's args and its answer (numbers and spacing flattened, so a
 timing in a test report does not hide a real loop). A run of unchanged output with *different* args
 still breaks when those calls failed — the same error four times is a wall, whatever was tried.
+
+**A call that changes only its shape asks the same question.** ``list_dir`` of the root at depth 2,
+3, 2 and 1 returned the same listing each time. It was the fix's one known miss. ``_no_progress``
+therefore also compares ``_target_sig``, the call without its numbers, booleans and path spellings,
+against the exact answer. It was replayed on about 2,500 recorded traces
+(``bench/tool_loop_near_args``). Of the 138 legacy stops, the wider rule reproduces 5, all
+re-listings of the root. It reproduces none of the 86 distinct-write stops above, and it would
+have stopped none of the 76 runs that continued under the fixed rule.
 """
 
 from __future__ import annotations

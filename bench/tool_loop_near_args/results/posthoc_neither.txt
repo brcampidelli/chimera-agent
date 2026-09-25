@@ -1,0 +1,61 @@
+## F-disagreement 016-code-repair-pytest-sys1-off-weak-r0 recorded=13 legacy@9 fixed@9 new@9 stopped=tool_loop
+    s4 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> 'error: hunk 1 SEARCH not found (must match exactly, incl. wh'
+    s5 read_file {"line_end": 200, "line_start": 1, "path": "in/app/config_manager.py"} ok=True -> 'def deep_update(base_dict, update_dict):\n    """\n    更新基础配置字'
+    s6 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> 'error: hunk 1 SEARCH not found (must match exactly, incl. wh'
+    s7 read_file {"line_end": 20, "line_start": 1, "path": "in/app/config_manager.py"} ok=True -> 'def deep_update(base_dict, update_dict):\n    """\n    更新基础配置字'
+    s8 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> 'error: hunk 1 SEARCH not found (must match exactly, incl. wh'
+    s9 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> 'error: hunk 1 SEARCH not found (must match exactly, incl. wh'
+    s10 read_file {"line_end": 20, "line_start": 1, "path": "in/app/config_manager.py"} ok=True -> 'def deep_update(base_dict, update_dict):\n    """\n    更新基础配置字'
+## F-disagreement 016-code-repair-pytest-sys1h-off-weak-r2 recorded=None legacy@7 fixed@7 new@7 stopped=final
+    s2 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> "error: unterminated hunk: expected '=======' then '>>>>>>> R"
+    s3 read_file {"line_end": 200, "line_start": 1, "path": "in/app/config_manager.py"} ok=True -> 'def deep_update(base_dict, update_dict):\n    """\n    更新基础配置字'
+    s4 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> "error: unterminated hunk: expected '=======' then '>>>>>>> R"
+    s5 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> "error: unterminated hunk: expected '=======' then '>>>>>>> R"
+    s6 read_file {"line_end": 200, "line_start": 1, "path": "in/app/config_manager.py"} ok=True -> 'def deep_update(base_dict, update_dict):\n    """\n    更新基础配置字'
+    s7 apply_patch {"_raw": "{\"patch\": \"<<<<<<< SEARCH\\n-def deep_update(base_dict, u ok=False -> "error: unterminated hunk: expected '=======' then '>>>>>>> R"
+    s8 write_file {"_raw": "{\"allow_invalid\": true, \"content\": \"def deep_update(bas ok=True -> 'wrote 906 chars to in/app/config_manager.py'
+## other 039-repo-architecture-map-sys1-on-sol-r1 [reads, distinct args]
+    s9 glob {"max_results": 100, "pattern": "in/repo/**"} ok=True -> 'no files match'
+    s9 glob {"max_results": 100, "pattern": "in/repo/**/*test*"} ok=True -> 'no files match'
+    s9 glob {"max_results": 100, "pattern": "out/**"} ok=True -> 'no files match'
+    s9 glob {"max_results": 100, "pattern": "in/repo/*design*"} ok=True -> 'no files match'
+## brk-legacy-weak 041-frontend-state-bug-brk-legacy-weak-r8 [reads, distinct args]
+    s4 run_shell {"command": ["bash", "-lc", "node /home/brcamp/harness-bench/data_try6/sandbox/b ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+    s5 run_shell {"command": ["bash", "-lc", "node \"$(pwd)/in/cart-ui/src/cartState.test.js\""], ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+    s6 run_shell {"command": ["bash", "-lc", "node -v"], "timeout": 100000} ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+    s7 run_shell {"command": ["bash", "-lc", "which node"], "timeout": 100000} ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+## m6f-weak 041-frontend-state-bug-m6f-weak-r66 [reads, distinct args]
+    s3 run_shell {"command": ["bash", "-lc", "node in/cart-ui/src/cartState.test.js"], "timeout": ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+    s4 run_shell {"command": ["bash", "-lc", "node in/cart-ui/src/cartState.test.js"], "timeout": ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+    s5 run_shell {"command": ["bash", "-lc", "echo test"], "timeout": 10000} ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+    s6 run_shell {"command": ["bash", "-lc", "node in/cart-ui/src/cartState.test.js"], "timeout": ok=True -> '[exit 127]\n/bin/sh: 1: [bash,: not found'
+## other 080-schema-roundtrip-conversion-arm-111-r1 [reads, distinct args]
+    s13 code_interpreter {"code": "import json\nimport yaml\nimport csv\nimport re\nfrom collections impo ok=True -> '(no output)'
+    s14 code_interpreter {"_raw": "{\"code\": \"def parse_markdown_table(content: str) -> List[Dict[str,  ok=True -> '(no output)'
+    s15 code_interpreter {"_raw": "{\"code\": \"def parse_csv_file(content: str) -> List[Dict[str, Any]]: ok=True -> '(no output)'
+    s16 code_interpreter {"code": "def parse_json_file(content: str) -> List[Dict[str, Any]]:\n    \"\"\" ok=True -> '(no output)'
+## other 084-js-state-type-bug-arm-111-r1 [mixed, distinct args]
+    s14 edit_file {"_raw": "{\"new\": \"function setPreference(session, key, value) {\\n  if (!key ok=True -> 'edited /home/brcamp/harness-bench/data_try6/sandbox/arm-111-r1/arm-111'
+    s15 run_shell {"command": "cd /home/brcamp/harness-bench/data_try6/sandbox/arm-111-r1/arm-111- ok=True -> '[exit 1]\nnode:assert:150\n  throw new AssertionError(obj);\n  ^\n\nAsserti'
+    s16 edit_file {"_raw": "{\"new\": \"function login(session, user) {\\n  if (!user || user.id = ok=True -> 'edited /home/brcamp/harness-bench/data_try6/sandbox/arm-111-r1/arm-111'
+    s17 run_shell {"command": "cd /home/brcamp/harness-bench/data_try6/sandbox/arm-111-r1/arm-111- ok=True -> '[exit 0]\nsession store tests passed'
+## other 085-flaky-test-root-cause-arm-001-r0 [mixed, distinct args]
+    s33 run_shell {"command": "cd /home/brcamp/harness-bench/data_try6/sandbox/arm-001-r0/arm-001- ok=True -> '[exit 0]\nRun 1:\n>       assert [task.id for task in scheduler.ready()]'
+    s34 edit_file {"_raw": "{\"new\": \"from __future__ import annotations\\n\\nimport random\\nim ok=True -> 'edited /home/brcamp/harness-bench/data_try6/sandbox/arm-001-r0/arm-001'
+    s35 edit_file {"_raw": "{\"new\": \"from __future__ import annotations\\n\\nimport random\\nim ok=True -> 'edited /home/brcamp/harness-bench/data_try6/sandbox/arm-001-r0/arm-001'
+    s36 run_shell {"command": "cd /home/brcamp/harness-bench/data_try6/sandbox/arm-001-r0/arm-001- ok=True -> '[exit 1]\n============================= test session starts ==========='
+## other 085-flaky-test-root-cause-arm-100-r0 [mixed, distinct args]
+    s38 edit_file {"_raw": "{\"new\": \"from __future__ import annotations\\n\\nimport random\\nim ok=True -> 'edited /home/brcamp/harness-bench/data_try6/sandbox/arm-100-r0/arm-100'
+    s39 run_shell {"command": "cd /home/brcamp/harness-bench/data_try6/sandbox/arm-100-r0/arm-100- ok=True -> '[exit 1]\n============================= test session starts ==========='
+    s40 edit_file {"_raw": "{\"new\": \"from __future__ import annotations\\n\\nimport random\\nim ok=True -> 'edited /home/brcamp/harness-bench/data_try6/sandbox/arm-100-r0/arm-100'
+    s41 run_shell {"command": "cd /home/brcamp/harness-bench/data_try6/sandbox/arm-100-r0/arm-100- ok=True -> '[exit 0]\n============================= test session starts ==========='
+## other 087-cli-parser-bug-tests-sys1-on-strong-r2 [mixed, distinct args]
+    s21 write_file {"_raw": "{\"content\": \"from __future__ import annotations\\n\\nimport argpars ok=True -> 'wrote 2544 chars to in/csvtool/csvtool/cli.py'
+    s22 run_shell {"command": "cd in/csvtool && python -m csvtool.cli samples/orders.csv --where s ok=True -> '[exit 2]\nusage: cli.py [-h] [--where WHERE] [--select SELECT] [--sort '
+    s23 write_file {"_raw": "{\"content\": \"from __future__ import annotations\\n\\nimport argpars ok=True -> 'wrote 2767 chars to in/csvtool/csvtool/cli.py'
+    s24 run_shell {"command": "cd in/csvtool && python -m csvtool.cli samples/orders.csv --where s ok=True -> "[exit 2]\nDEBUG: Original argv = ['samples/orders.csv', '--where', 'sta"
+## other 089-ab-test-caveat-analysis-sys1-on-weak-r2 [reads, distinct args]
+    s3 code_interpreter {"_raw": "{\"code\": \"import math\\n\\n# Function to perform a two-proportion z ok=True -> 'ZeroDivisionError: float division by zero'
+    s4 code_interpreter {"_raw": "{\"code\": \"import math\\n\\n# Function to perform a two-proportion z ok=True -> 'ZeroDivisionError: float division by zero'
+    s5 code_interpreter {"_raw": "{\"code\": \"import math\\n\\n# Function to perform a two-proportion z ok=True -> 'ZeroDivisionError: float division by zero'
+    s6 code_interpreter {"_raw": "{\"code\": \"import math\\n\\n# Function to perform a two-proportion z ok=True -> 'ZeroDivisionError: float division by zero'

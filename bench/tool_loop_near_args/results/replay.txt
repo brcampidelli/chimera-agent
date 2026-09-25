@@ -1,0 +1,57 @@
+== F: fidelity (the rule each run ran, replayed, against its recorded trip)
+  brk-fixed-strong               37/37   = 100.0%
+  brk-fixed-weak                 39/39   = 100.0%
+  brk-legacy-strong              39/39   = 100.0%
+  brk-legacy-weak                38/38   = 100.0%
+  m6-esc-strong                  18/18   = 100.0%
+  m6-esc-weak                    19/19   = 100.0%
+  m6-stop-strong                 18/18   = 100.0%
+  m6-stop-weak                   18/18   = 100.0%
+  m6f-strong                     70/70   = 100.0%
+  m6f-weak                      479/479  = 100.0%
+  other (before the fix)       1247/1249 = 99.8%
+  gate F: PASS   disagreements: 2
+    other (before the fix)       016-code-repair-pytest-sys1-off-weak-r0  recorded step=13  replayed legacy step=9
+    other (before the fix)       016-code-repair-pytest-sys1h-off-weak-r2  recorded step=None  replayed legacy step=7
+
+== legacy stops, classified (which rule would also stop there)
+  brk-legacy-strong              11  neither · writes, distinct args
+  brk-legacy-weak                 1  fixed reproduces · mixed, distinct args
+  brk-legacy-weak                 1  fixed reproduces · writes, distinct args
+  brk-legacy-weak                 2  fixed reproduces · writes, identical args
+  brk-legacy-weak                 1  neither · reads, distinct args
+  brk-legacy-weak                 1  neither · writes, distinct args
+  m6-esc-strong                   3  neither · writes, distinct args
+  m6-stop-strong                  3  neither · writes, distinct args
+  m6-stop-weak                    1  fixed reproduces · reads, distinct args
+  m6-stop-weak                    1  fixed reproduces · reads, identical args
+  m6f-strong                     20  neither · writes, distinct args
+  m6f-weak                        1  fixed reproduces · mixed, distinct args
+  m6f-weak                        3  fixed reproduces · reads, distinct args
+  m6f-weak                        4  fixed reproduces · reads, identical args
+  m6f-weak                        4  fixed reproduces · writes, distinct args
+  m6f-weak                        1  neither · reads, distinct args
+  m6f-weak                        3  new only · reads, distinct args
+  other (before the fix)          3  fixed reproduces · mixed, distinct args
+  other (before the fix)          7  fixed reproduces · reads, distinct args
+  other (before the fix)          5  fixed reproduces · reads, identical args
+  other (before the fix)          2  fixed reproduces · writes, distinct args
+  other (before the fix)          3  fixed reproduces · writes, identical args
+  other (before the fix)          4  neither · mixed, distinct args
+  other (before the fix)          3  neither · reads, distinct args
+  other (before the fix)         48  neither · writes, distinct args
+  other (before the fix)          2  new only · reads, distinct args
+
+  legacy stops the new rule reproduces and fixed does not: 5
+    other (before the fix)       039-repo-architecture-map-sys1h-on-weak-r2  list_dir {"path": ""} | list_dir {"path": ""} | list_dir {"path": ""} | list_dir {"path": "."}
+    m6f-weak                     042-api-schema-migration-m6f-weak-r58  list_dir {"depth": 2, "path": ""} | list_dir {"depth": 3, "path": ""} | list_dir {"depth": 2, "path": ""} | list_dir {"depth": 1, "path": ""}
+    m6f-weak                     043-db-migration-safety-m6f-weak-r35  list_dir {"max_results": 200, "path": ""} | list_dir {"path": ""} | list_dir {"path": ""} | list_dir {"max_results": 200, "path": ""}
+    other (before the fix)       043-db-migration-safety-sys1h-on-weak-r0  list_dir {"depth": 3, "path": ""} | list_dir {"depth": 3, "path": ""} | list_dir {"depth": 4, "path": ""} | list_dir {"depth": 4, "path": ""}
+    m6f-weak                     082-compose-config-repair-m6f-weak-r44  list_dir {"depth": 3, "path": ""} | list_dir {"depth": 4, "path": ""} | list_dir {"depth": 2, "path": ""} | list_dir {"depth": 2, "path": ""}
+  criterion 2 (write-tail, distinct args, reproduced by new): 0 -> PASS
+
+== cost: new-only fires in runs that continued under the fixed rule
+  criterion 3 (strong): 0 -> PASS
+  criterion 4 (weak): 0 fires, 0 above their cell median -> PASS
+
+  skipped: {'unknown rule (from the fix day on, outside the families)': 193, 'no trace': 18, 'bad line': 1}
