@@ -693,8 +693,38 @@ This protocol applies to every behavioural change in §9. It is the protocol alr
 | H8 | Masking old observations matches the summary at lower cost | S13, S1 | Cost per success; success | Only after the trigger is fixed |
 | H9 | STATUS/COMPLETE plus the spoken standard cuts unspeakable output | S4 | Spoken-format checker; time to first audio | Deterministic checker |
 | H10 | The brief contract cuts invented requirements in worker output | S6 | Manager or diff audit of worker output | |
-| H11 | The review rubric raises precision without collapsing recall | S15 | `review_judge` precision and recall | Recall 15.1% today |
+| H11 | The review rubric raises precision without collapsing recall | S15 | `review_judge` precision and recall | Recall of *correct* comments 92.4% today, out of sample (the 15.1% first written here was the pilot's rejection recall on incorrect ones) |
 | H12 | The steward contract cuts no-information Discord messages | S10 | Messages with no new information per day | Run in ops, owner's call |
+
+**Wave 3, as run (2026-09-25).** Every arm was pre-registered before its first paid call, and every outcome was published, including those that were not adopted. Total spend: about US$ 3.
+
+*Decided arms.* No sentence was adopted, because none met its registered bar:
+
+| Arm | Outcome | PR |
+|---|---|---|
+| H1 | Unrequested writes fell from 18/40 to 10/40 (p = 0.008), but the registered bar was "at most half", so it missed by one pair. The effect was on diagnoses (8 → 3), not on reports of a problem (8 → 7). | #610 |
+| H6 | Framing flips fell from 27/94 to 18/94 (p = 0.049), which is not half, and it made 3 benign actions stricter against a limit of 2. The effect was on the easy corpus only. | #611 |
+| H9 | The rewrite that names no forbidden form brought the Markdown back (format −23.6 pp, p = 0.0002). `SPOKEN_NOTE` stays. | #614 |
+| H11 | Not run, US$ 0. Arm C, out of sample, already gave +4.5 pp precision for −35.9 pp recall of correct comments. | #609 |
+
+*Uninformative arms.* The control never showed the failure this model was meant to fix, so there was nothing to test against:
+
+| Arm | Why it stopped at its pilot gate | PR |
+|---|---|---|
+| H2 + H3 | False success 0/34, premature stop 1/34 | #617 |
+| H7 | FULL 93.8% against SHARDED 90.6% | #616 |
+| H10 | The manager invented a requirement 1/20 times | #613 |
+
+*Arms not run:*
+- **H4 and H5** need a bench that discriminates. The corpora built here sat at ceiling, and LoopsBench costs about US$ 25 a run, which is the owner's call.
+- **H8** still measures a path production does not take (see below).
+- **H12** is operations on the VPS, and the owner's call.
+
+*What the arms found in the harness,* each fixed in its own PR:
+- The blocking gateway paths dropped `thinking=` (#615, found by H9).
+- An empty closing reply at the step limit is now asked again (#619, found by H1, H2 + H3 and H10).
+- The compaction budget is now capped at the context the default model was measured to read well (#620): 128k, from `bench/useful_context` (#618), which moves the trigger from 503k to 102k.
+- The ollama stream test flake, which LiteLLM 1.102.1 exposed (#612).
 
 **Wave 4 — new modules**
 1. S11 browser.
