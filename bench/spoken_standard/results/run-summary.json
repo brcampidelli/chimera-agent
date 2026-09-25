@@ -1,0 +1,330 @@
+{
+ "meta": {
+  "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "temperature": 0.2,
+  "max_tokens": 1500,
+  "replicas": 2,
+  "reasoning": "off",
+  "budget_usd": 0.3,
+  "git_head": "HEAD",
+  "note_sha256": {
+   "A": "6a8930c909c08421ae53743da301e8aed6a73625b1046741cf546cf49ef25bfe",
+   "B": "00034da6bc8d7f8b2fd89489c980cc0d3bdc496e33f9b8df958ce786e50581e8",
+   "N": null
+  },
+  "system_prompt_sha256": {
+   "A": "93db370583d3a7c4ed02af0427d6ff68de069b5aee7d11b18fbb44d46abd6359",
+   "B": "d905a2d460412090a6e75b15e7df06a63397d3c94ceb70e546b3e6987082667d",
+   "N": "66299259ecf8e09b5072f5fb7abea3b93927b35d13b620ae68b1413ea19a1810"
+  },
+  "checker_sha256": "4da541c440d67e58ae5b152ed403a9899f9b913933d43e80df103e62e5b36209",
+  "corpus_sha256": "16f351802ce3434e8933446ff020ab7b01b3c384d4fa00a5dd9b292e730cbe0c",
+  "started": "2026-09-25T19:01:48",
+  "stopped_by_budget": false
+ },
+ "calls": 180,
+ "halts": 0,
+ "arms": {
+  "A": {
+   "n": 72,
+   "speakable": 28,
+   "speakable_rate": 0.3888888888888889,
+   "speakable_ci95": [
+    0.2846571431119397,
+    0.5043764509669592
+   ],
+   "format_speakable": 42,
+   "format_speakable_rate": 0.5833333333333334,
+   "answers_with": {
+    "heading": 0,
+    "list": 2,
+    "table": 0,
+    "code_fence": 11,
+    "inline_code": 23,
+    "emphasis": 1,
+    "quote": 0,
+    "link": 0,
+    "emoji": 0,
+    "sentences": 4,
+    "url": 10,
+    "digits": 2,
+    "path": 4,
+    "empty": 0
+   },
+   "counts": {
+    "heading": 0,
+    "list": 7,
+    "table": 0,
+    "code_fence": 13,
+    "inline_code": 79,
+    "emphasis": 2,
+    "quote": 0,
+    "link": 0,
+    "emoji": 0,
+    "sentences": 4,
+    "url": 10,
+    "digits": 12,
+    "path": 4,
+    "empty": 0
+   },
+   "answers_with_markdown": 29,
+   "answers_with_content_violation": 16,
+   "rule_rate": 0.5,
+   "spoken_words_mean": 36.43055555555556,
+   "spoken_words_median": 29.5,
+   "spoken_chars_mean": 237.76388888888889,
+   "sentences_mean": 2.3472222222222223,
+   "completion_tokens_mean": 122.93055555555556,
+   "truncated": 0,
+   "latency_median_s": 2.8280000000000003,
+   "usd_priced": 0.00197,
+   "unpriced_calls": 0,
+   "providers": {
+    "Cohere": 2,
+    "Relace": 21,
+    "DeepInfra": 5,
+    "Nebius": 1,
+    "Sail Research": 26,
+    "StreamLake": 3,
+    "BaseTen": 1,
+    "Makora": 2,
+    "Baidu": 1,
+    "OpenInference": 8,
+    "Parasail": 1,
+    "Reka": 1
+   }
+  },
+  "B": {
+   "n": 72,
+   "speakable": 21,
+   "speakable_rate": 0.2916666666666667,
+   "speakable_ci95": [
+    0.19938056126820808,
+    0.40505742762972713
+   ],
+   "format_speakable": 25,
+   "format_speakable_rate": 0.3472222222222222,
+   "answers_with": {
+    "heading": 1,
+    "list": 14,
+    "table": 0,
+    "code_fence": 15,
+    "inline_code": 32,
+    "emphasis": 24,
+    "quote": 0,
+    "link": 0,
+    "emoji": 0,
+    "sentences": 18,
+    "url": 9,
+    "digits": 2,
+    "path": 5,
+    "empty": 0
+   },
+   "counts": {
+    "heading": 3,
+    "list": 59,
+    "table": 0,
+    "code_fence": 27,
+    "inline_code": 131,
+    "emphasis": 65,
+    "quote": 0,
+    "link": 0,
+    "emoji": 0,
+    "sentences": 18,
+    "url": 9,
+    "digits": 12,
+    "path": 5,
+    "empty": 0
+   },
+   "answers_with_markdown": 46,
+   "answers_with_content_violation": 16,
+   "rule_rate": 0.7222222222222222,
+   "spoken_words_mean": 56.916666666666664,
+   "spoken_words_median": 34.5,
+   "spoken_chars_mean": 373.1666666666667,
+   "sentences_mean": 4.0,
+   "completion_tokens_mean": 184.25,
+   "truncated": 0,
+   "latency_median_s": 2.7430000000000003,
+   "usd_priced": 0.002309,
+   "unpriced_calls": 0,
+   "providers": {
+    "Inceptron": 2,
+    "StreamLake": 4,
+    "Sail Research": 25,
+    "Relace": 22,
+    "CoreWeave": 2,
+    "Makora": 4,
+    "Morph": 1,
+    "BaseTen": 1,
+    "Together": 1,
+    "OpenInference": 8,
+    "DeepInfra": 2
+   }
+  },
+  "N": {
+   "n": 36,
+   "speakable": 5,
+   "speakable_rate": 0.1388888888888889,
+   "speakable_ci95": [
+    0.06081814970651184,
+    0.2865953052710121
+   ],
+   "format_speakable": 5,
+   "format_speakable_rate": 0.1388888888888889,
+   "answers_with": {
+    "heading": 6,
+    "list": 19,
+    "table": 2,
+    "code_fence": 17,
+    "inline_code": 21,
+    "emphasis": 29,
+    "quote": 0,
+    "link": 0,
+    "emoji": 1,
+    "sentences": 22,
+    "url": 5,
+    "digits": 1,
+    "path": 8,
+    "empty": 0
+   },
+   "counts": {
+    "heading": 36,
+    "list": 146,
+    "table": 19,
+    "code_fence": 50,
+    "inline_code": 173,
+    "emphasis": 127,
+    "quote": 0,
+    "link": 0,
+    "emoji": 1,
+    "sentences": 22,
+    "url": 8,
+    "digits": 13,
+    "path": 18,
+    "empty": 0
+   },
+   "answers_with_markdown": 30,
+   "answers_with_content_violation": 13,
+   "rule_rate": 0.05555555555555555,
+   "spoken_words_mean": 118.80555555555556,
+   "spoken_words_median": 98.5,
+   "spoken_chars_mean": 832.25,
+   "sentences_mean": 11.666666666666666,
+   "completion_tokens_mean": 277.22222222222223,
+   "truncated": 0,
+   "latency_median_s": 4.445,
+   "usd_priced": 0.001259,
+   "unpriced_calls": 0,
+   "providers": {
+    "Baidu": 1,
+    "DigitalOcean": 1,
+    "Sail Research": 16,
+    "OpenInference": 5,
+    "Relace": 11,
+    "DeepInfra": 2
+   }
+  }
+ },
+ "paired_speakable": {
+  "pairs": 72,
+  "both": 17,
+  "A_only": 11,
+  "B_only": 4,
+  "neither": 40,
+  "mcnemar_p": 0.11846923828125,
+  "diff_B_minus_A": -0.09722222222222221,
+  "newcombe95": [
+   -0.19748199604166788,
+   0.0058989693266516124
+  ],
+  "requests_B_better": 3,
+  "requests_A_better": 8,
+  "request_sign_p": 0.2265625
+ },
+ "paired_format_speakable": {
+  "pairs": 72,
+  "both": 23,
+  "A_only": 19,
+  "B_only": 2,
+  "neither": 28,
+  "mcnemar_p": 0.00022125244140625,
+  "diff_B_minus_A": -0.23611111111111116,
+  "newcombe95": [
+   -0.33974772432416034,
+   -0.12067549750842167
+  ],
+  "requests_B_better": 2,
+  "requests_A_better": 14,
+  "request_sign_p": 0.004180908203125
+ },
+ "replay_floor": {
+  "A": {
+   "requests": 36,
+   "flips": 4,
+   "rate": 0.1111111111111111
+  },
+  "B": {
+   "requests": 36,
+   "flips": 3,
+   "rate": 0.08333333333333333
+  }
+ },
+ "per_kind": {
+  "files": {
+   "A": "4/12",
+   "B": "1/12",
+   "N": "0/6"
+  },
+  "command": {
+   "A": "1/12",
+   "B": "0/12",
+   "N": "0/6"
+  },
+  "code": {
+   "A": "0/10",
+   "B": "0/10",
+   "N": "0/5"
+  },
+  "url": {
+   "A": "0/10",
+   "B": "1/10",
+   "N": "0/5"
+  },
+  "numbers": {
+   "A": "8/10",
+   "B": "6/10",
+   "N": "1/5"
+  },
+  "compare": {
+   "A": "7/10",
+   "B": "5/10",
+   "N": "1/5"
+  },
+  "chat": {
+   "A": "8/8",
+   "B": "8/8",
+   "N": "3/4"
+  }
+ },
+ "per_lang": {
+  "pt": {
+   "A": "15/36",
+   "B": "8/36",
+   "N": "1/18"
+  },
+  "en": {
+   "A": "13/36",
+   "B": "13/36",
+   "N": "4/18"
+  }
+ },
+ "length_ratio_B_over_A": 1.5623332062523827,
+ "positive_control": {
+  "A_minus_N": 0.25,
+  "passes": true
+ },
+ "usd_priced_total": 0.005538,
+ "usd_bound_total": 0.010595,
+ "decision": "NULL: no difference in speakable at p < 0.05"
+}
