@@ -1,3 +1,4 @@
+# Frozen copy for bench/tool_loop_near_args. Source: chimera/core/tool_loop.py at 2599c7db (main, after #577). Do not edit.
 """Tool-loop circuit breaker (M15-A4) — an anti-stagnation signal at the *execution* layer.
 
 OpenClaw hashes the last N tool calls and trips a breaker when the agent keeps making the same
@@ -23,21 +24,12 @@ of that pair, and each half had its own measured false alarm:
 Now a repeat must match the last call's args and its answer (numbers and spacing flattened, so a
 timing in a test report does not hide a real loop). A run of unchanged output with *different* args
 still breaks when those calls failed — the same error four times is a wall, whatever was tried.
-
-**A call that changes only its shape asks the same question.** ``list_dir`` of the root at depth 2,
-3, 2 and 1 returned the same listing each time. It was the fix's one known miss. ``_no_progress``
-therefore also compares ``_target_sig``, the call without its numbers, booleans and path spellings,
-against the exact answer. It was replayed on about 2,500 recorded traces
-(``bench/tool_loop_near_args``). Of the 138 legacy stops, the wider rule reproduces 5, all
-re-listings of the root. It reproduces none of the 86 distinct-write stops above, and it would
-have stopped none of the 76 runs that continued under the fixed rule.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import posixpath
 import re
 from collections import deque
 from dataclasses import dataclass
@@ -66,38 +58,6 @@ def _sig(name: str, arguments: dict[str, Any]) -> str:
     except (TypeError, ValueError):
         payload = repr(sorted(arguments.items()))
     return hashlib.sha256(f"{name}\x00{payload}".encode()).hexdigest()[:16]
-
-
-_NUMBER = re.compile(r"\s*-?\d+(?:\.\d+)?\s*")
-_PATH_KEY = re.compile(r"(?:^|_)(?:path|file|filename|dir|directory|folder|cwd)s?$", re.IGNORECASE)
-
-
-def _norm_path(value: str) -> str:
-    """``""``, ``"."``, ``"./"`` and ``"in/"`` versus ``"in"``: the same place, spelled differently."""
-    v = value.strip().replace("\\", "/")
-    return posixpath.normpath(v) if v else "."
-
-
-def _target_sig(name: str, arguments: dict[str, Any]) -> str:
-    """The call without its shape: what it points at, not how much of it it asks for.
-
-    ``list_dir`` of one folder at depth 2, 3 and 1, or with and without ``max_results``, asks one
-    question four times. So this drops numbers and booleans (depth, limit, offset, timeout), and any
-    string that is only a number, since a model will send depth ``"0"``. It also normalises
-    path-like keys. Every other value is kept whole, including strings, lists and objects, so four
-    edits with different text stay four calls.
-    """
-    kept: dict[str, Any] = {}
-    for key, value in arguments.items():
-        if value is None or isinstance(value, bool | int | float):
-            continue
-        if isinstance(value, str):
-            if _PATH_KEY.search(str(key)):
-                value = _norm_path(value)
-            elif _NUMBER.fullmatch(value):
-                continue
-        kept[key] = value
-    return _sig(name, kept)
 
 
 def _obs_hash(observation: str | None) -> str:
@@ -137,7 +97,6 @@ class ToolLoopDetector:
         self.stall_break = stall_break
         self._names: deque[str] = deque(maxlen=window)
         self._sigs: deque[str] = deque(maxlen=window)
-        self._targets: deque[str] = deque(maxlen=window)
         self._obs: deque[str] = deque(maxlen=window)
         self._gist: deque[str] = deque(maxlen=window)
         self._ok: deque[bool | None] = deque(maxlen=window)
@@ -163,7 +122,6 @@ class ToolLoopDetector:
         """
         self._names.append(name)
         self._sigs.append(_sig(name, arguments))
-        self._targets.append(_target_sig(name, arguments))
         self._obs.append(_obs_hash(observation))
         self._gist.append(_gist_hash(observation))
         self._ok.append(ok)
@@ -214,21 +172,18 @@ class ToolLoopDetector:
     def _no_progress(self) -> ToolLoopVerdict:
         """Same tool + same observation, back to back — a poll that never changes.
 
-        With the same args, with args that differ only in shape (``_target_sig``: depth, a limit, a
-        spelling of the same path), or with calls that all failed. Four DIFFERENT calls that succeeded
-        with the same confirmation (four edits, each ``replaced 1 occurrence``) are four pieces of
-        work. The observation is compared exactly, not as a gist: pages of a log that differ only in
-        their timestamps are new pages.
+        With the same args, or with calls that all failed. Four DIFFERENT calls that succeeded with the
+        same confirmation (four edits, each ``replaced 1 occurrence``) are four pieces of work.
         """
         if len(self._obs) < self.stall_break or not self._obs[-1]:
             return ToolLoopVerdict("ok")
-        name, obs, sig, target = self._names[-1], self._obs[-1], self._sigs[-1], self._targets[-1]
+        name, obs, sig = self._names[-1], self._obs[-1], self._sigs[-1]
         run = 0
-        for n, o, s, t, ok in zip(
-            reversed(self._names), reversed(self._obs), reversed(self._sigs), reversed(self._targets),
-            reversed(self._ok), strict=True,
+        for n, o, s, ok in zip(
+            reversed(self._names), reversed(self._obs), reversed(self._sigs), reversed(self._ok),
+            strict=True,
         ):
-            if n == name and o == obs and (s == sig or t == target or ok is False):
+            if n == name and o == obs and (s == sig or ok is False):
                 run += 1
             else:
                 break

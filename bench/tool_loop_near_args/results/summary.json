@@ -1,0 +1,108 @@
+{
+  "fidelity": {
+    "other (before the fix)": {
+      "agree": 1247,
+      "disagree": 2
+    },
+    "brk-fixed-weak": {
+      "agree": 39
+    },
+    "brk-legacy-weak": {
+      "agree": 38
+    },
+    "m6-esc-weak": {
+      "agree": 19
+    },
+    "m6f-weak": {
+      "agree": 479
+    },
+    "brk-fixed-strong": {
+      "agree": 37
+    },
+    "brk-legacy-strong": {
+      "agree": 39
+    },
+    "m6-esc-strong": {
+      "agree": 18
+    },
+    "m6-stop-strong": {
+      "agree": 18
+    },
+    "m6-stop-weak": {
+      "agree": 18
+    },
+    "m6f-strong": {
+      "agree": 70
+    }
+  },
+  "gate_F": true,
+  "stops": {
+    "other (before the fix)": {
+      "fixed reproduces · mixed, distinct args": 3,
+      "fixed reproduces · reads, distinct args": 7,
+      "neither · reads, distinct args": 3,
+      "neither · writes, distinct args": 48,
+      "new only · reads, distinct args": 2,
+      "fixed reproduces · reads, identical args": 5,
+      "fixed reproduces · writes, identical args": 3,
+      "fixed reproduces · writes, distinct args": 2,
+      "neither · mixed, distinct args": 4
+    },
+    "brk-legacy-strong": {
+      "neither · writes, distinct args": 11
+    },
+    "brk-legacy-weak": {
+      "neither · writes, distinct args": 1,
+      "neither · reads, distinct args": 1,
+      "fixed reproduces · writes, identical args": 2,
+      "fixed reproduces · writes, distinct args": 1,
+      "fixed reproduces · mixed, distinct args": 1
+    },
+    "m6-esc-strong": {
+      "neither · writes, distinct args": 3
+    },
+    "m6-stop-strong": {
+      "neither · writes, distinct args": 3
+    },
+    "m6f-strong": {
+      "neither · writes, distinct args": 20
+    },
+    "m6f-weak": {
+      "neither · reads, distinct args": 1,
+      "fixed reproduces · writes, distinct args": 4,
+      "new only · reads, distinct args": 3,
+      "fixed reproduces · reads, distinct args": 3,
+      "fixed reproduces · reads, identical args": 4,
+      "fixed reproduces · mixed, distinct args": 1
+    },
+    "m6-stop-weak": {
+      "fixed reproduces · reads, distinct args": 1,
+      "fixed reproduces · reads, identical args": 1
+    }
+  },
+  "new_only_legacy": [
+    "other (before the fix)       039-repo-architecture-map-sys1h-on-weak-r2  list_dir {\"path\": \"\"} | list_dir {\"path\": \"\"} | list_dir {\"path\": \"\"} | list_dir {\"path\": \".\"}",
+    "m6f-weak                     042-api-schema-migration-m6f-weak-r58  list_dir {\"depth\": 2, \"path\": \"\"} | list_dir {\"depth\": 3, \"path\": \"\"} | list_dir {\"depth\": 2, \"path\": \"\"} | list_dir {\"depth\": 1, \"path\": \"\"}",
+    "m6f-weak                     043-db-migration-safety-m6f-weak-r35  list_dir {\"max_results\": 200, \"path\": \"\"} | list_dir {\"path\": \"\"} | list_dir {\"path\": \"\"} | list_dir {\"max_results\": 200, \"path\": \"\"}",
+    "other (before the fix)       043-db-migration-safety-sys1h-on-weak-r0  list_dir {\"depth\": 3, \"path\": \"\"} | list_dir {\"depth\": 3, \"path\": \"\"} | list_dir {\"depth\": 4, \"path\": \"\"} | list_dir {\"depth\": 4, \"path\": \"\"}",
+    "m6f-weak                     082-compose-config-repair-m6f-weak-r44  list_dir {\"depth\": 3, \"path\": \"\"} | list_dir {\"depth\": 4, \"path\": \"\"} | list_dir {\"depth\": 2, \"path\": \"\"} | list_dir {\"depth\": 2, \"path\": \"\"}"
+  ],
+  "criterion_2_write_tail_reproduced": [],
+  "cost_rows": [],
+  "cell_medians": {
+    "brk-fixed-weak|011-code-debug": 0.0,
+    "brk-fixed-strong|041-frontend-state-bug": 0.5962,
+    "brk-fixed-weak|041-frontend-state-bug": 0.98685,
+    "brk-fixed-strong|042-api-schema-migration": 0.74,
+    "brk-fixed-weak|042-api-schema-migration": 0.15,
+    "brk-fixed-strong|043-db-migration-safety": 0.275,
+    "brk-fixed-weak|043-db-migration-safety": 0.16599999999999998,
+    "brk-fixed-strong|082-compose-config-repair": 1.0,
+    "brk-fixed-weak|082-compose-config-repair": 1.0
+  },
+  "skipped": {
+    "unknown rule (from the fix day on, outside the families)": 193,
+    "no trace": 18,
+    "bad line": 1
+  }
+}
