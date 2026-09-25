@@ -675,7 +675,7 @@ def _check_fixtures() -> list[str]:
 
 def check() -> None:
     problems = detect.selftest()
-    print("detector self-test:", "OK" if not problems else problems)
+    print("detector self-test:", problems if problems else "OK")
     for arm, clause in (("B", H2_CLAUSE), ("C", H3_CLAUSE), ("P", PLACEBO)):
         text = ARMS[arm]
         i = text.index(clause)

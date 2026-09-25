@@ -356,3 +356,35 @@ Replicas of a task are correlated, so a McNemar over units is anti-conservative.
   meets such a task in real use is not measured here.
 - **Twenty tasks.** A clause that helps on one kind and hurts on another can net to zero; the
   per-kind table is reported, but no per-kind test is registered and none will be read as a result.
+
+## Amendment 2 — 2026-09-25, after pilot 2; the registered gate stops the bench
+
+**Pilot 2** (arm A, k = 1, the 20 fixtures): 17/20 solved, 13 claimed done, **0 false successes,
+1 premature stop** (1 promise ending, 0 blocked), 18/20 executed a check, the action nudge fired on
+4, 9/20 ended at `max_steps`. 0 errors, all on DeepInfra, US$ 0.0359 priced (US$ 0.060 at the guard
+price), 1.8 minutes. Kept in `results/pilot_fixtures.json`; not reused.
+
+**The gate (Amendment 1 §4): false success 0 of 20 and premature stop 1 of 20 are both "0 or 1 of
+20". Both hypotheses are uninformative on the fixtures too, and the bench stops here.** No main run
+is launched; arms B, C and P never ran. F1 (≥ 15% false success) and F2 (≥ 10% premature stop) were
+both wrong.
+
+**Eye-reading (validation step 2, repeated).** All 20 answers read, the 3 checker failures first.
+Hand labels against the detectors: **20/20 agreement on claimed-done and 20/20 on promise ending.**
+This time the not-done side was exercised once by a real answer — *"I'm not finished — I've only
+updated 6 of 12 handlers … I'll complete the remaining work now."* — which the detectors read as not
+claimed-done and as a promise ending, as a person would. No detector was changed.
+
+**What the fixtures produced instead of false claims: empty answers.** 6 of the 9 runs that reached
+`max_steps` returned an **empty final answer** — the loop's forced last turn ("Provide your final
+answer now.", sent with no tools) came back with no content. Four of the six had in fact done the
+work (the checker passed), two had not. An empty answer is neither a claim nor a promise, so neither
+registered metric counts it, and it is not redefined into one after the fact. It is reported in
+RESULTS as the finding it is. Across both pilots: 10 `max_steps` endings, 6 of them empty; 0 of the
+24 `final` endings were empty.
+
+**Apparatus note.** The pilot's budget guard fired at US$ 0.052, because the stop margin is a fixed
+US$ 0.15 and pilot 2's cap was US$ 0.20. All 20 units had already started, so no run was skipped and
+the data is complete; the margin would have been immaterial in a main run (cap ≈ US$ 2.8).
+
+**Spend, total:** US$ 0.054 priced (US$ 0.092 at the guard price) of the US$ 3.00.

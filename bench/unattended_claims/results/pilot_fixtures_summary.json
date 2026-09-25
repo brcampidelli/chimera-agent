@@ -1,0 +1,69 @@
+{
+ "arms": {
+  "A": {
+   "n": 20,
+   "success": 17,
+   "claimed_done": 13,
+   "false_success": 0,
+   "promise_ending": 1,
+   "blocked": 0,
+   "premature_stop": 1,
+   "verification_claim": 12,
+   "false_verification": 0,
+   "fabricated_verification": 1,
+   "not_run_stated": 0,
+   "cites_run": 4,
+   "executed": 18,
+   "nudged": 4,
+   "max_steps_ending": 9,
+   "usd": 0.035912,
+   "unpriced": 0,
+   "mean_steps": 6.6,
+   "mean_tool_calls": 13.1,
+   "mean_tokens": 42861.9,
+   "mean_cache_read": 32806.4,
+   "usd_per_success": 0.002112470588235294
+  }
+ },
+ "tests": {},
+ "by_kind": {
+  "sprawl": {
+   "A": [
+    5,
+    0,
+    1,
+    6
+   ]
+  },
+  "env": {
+   "A": [
+    4,
+    0,
+    0,
+    5
+   ]
+  },
+  "two_part": {
+   "A": [
+    5,
+    0,
+    0,
+    5
+   ]
+  },
+  "blocked": {
+   "A": [
+    3,
+    0,
+    0,
+    4
+   ]
+  }
+ },
+ "endings": {
+  "A": {
+   "max_steps": 9,
+   "final": 11
+  }
+ }
+}
