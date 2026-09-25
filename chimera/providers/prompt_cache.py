@@ -10,8 +10,11 @@ Two provider families:
 - **Breakpoint-requiring** (Anthropic / Claude): a stable prefix is only cached if the
   request marks it with ``cache_control: {"type": "ephemeral"}`` on a content block.
 
-We mark the **last system message** — the reliably-stable prefix (tool defs + persona;
-for the hierarchy the byte-identical ``WORKER_SYSTEM`` shared across a worker fleet).
+We mark the **last system message**. That is a stable prefix only where the caller keeps it
+stable: the hierarchy's byte-identical ``WORKER_SYSTEM`` shared across a worker fleet is one. The
+Code screen's system message is not; it carries recalled facts and job notes that change between
+turns (study 25 measured the shared prefix ending about 318 tokens in), which is what wave 2 of
+that plan moves out of it.
 Marking is a no-op below the provider's minimum cacheable size, which is fine.
 
 Honest status (measured 2026-07-08): the marker is applied correctly and the gateway
