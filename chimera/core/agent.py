@@ -660,6 +660,12 @@ class Agent:
         if spend is None and self.config.max_usd:
             spend = SpendBudget(self.config.max_usd)
         steplog = StepLog()
+        # Which instructions this run was given, as twelve hex characters in its trace. The
+        # prompt registry snapshots every piece; this is what ties a run back to a version of them
+        # (study 25, wave 0).
+        from chimera.prompts import fingerprint
+
+        steplog.system_sha = fingerprint(system_prompt)
         nudged = False
         loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
         # The model this run's steps go to. Set once, when the breaker trips and an escalation model
