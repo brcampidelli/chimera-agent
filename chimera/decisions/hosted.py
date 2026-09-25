@@ -4,15 +4,19 @@ The instrument `bench/jev_decisions/run.py` measured as arm V (RESULTS.md §4–
 framing, then the over-confidence advisory (Lindfors' recipe — "actively look for a reason you might
 be wrong"), then an instruction to answer with one JSON object carrying ``p_<event>`` and the option.
 On the ambiguous governance slice it ranked with the vendor (AUROC 0.886 against 0.903) and was the
-best-calibrated arm raw (Brier 0.097, ECE 0.051, honest bins) — a verbalized number from a model that
-is not reasoning is a different signal from a decision token after reasoning, and it is the one worth
-having from a hosted model that returns no logprobs.
+best-calibrated arm raw (Brier 0.097, ECE 0.051, honest bins). It is the number worth having from a
+hosted model that returns no logprobs.
 
-Three things this does that cost two runs to learn (§2ad): **reasoning off** for the call
-(``thinking=False`` — not every route honours it), a **wide budget** (2000 tokens: at 400 the
-reasoning routes returned 155/394 empty answers, at 600 still 79/394), and **one re-ask on an empty
-answer**. The count of answers that still came back without a number is on the receipt of each call
-(``p`` None, ``raw`` empty), never folded into a verdict.
+**The model was reasoning when those numbers were taken.**
+- The bench asked for ``thinking=False`` through ``LLMGateway.complete``. Until 2026-09-25 that method accepted the flag and dropped it (only ``stream_complete`` forwarded it), so every arm-V call ran with the model's default reasoning.
+- Hence the empty answers: 155/394 at a budget of 400 and still 79/394 at 600 were reasoning spending the budget, on every route. They were not routes ignoring the switch.
+
+So this backend asks for exactly what was measured:
+- the model's own reasoning default (no ``thinking`` argument);
+- a **wide budget** of 2000 tokens;
+- **one re-ask on an empty answer**.
+
+A reasoning-off call is a different instrument, and it is unmeasured: switching to it needs a run of its own before any number above applies to it. The count of answers that still came back without a number is on the receipt of each call (``p`` None, ``raw`` empty), never folded into a verdict.
 
 Temperature 0.3 because that is what was measured (the judge's own setting); a caller that wants a
 deterministic decision passes 0 and measures again. Shares are not available on this backend: the
@@ -74,7 +78,10 @@ class HostedVerbalizedBackend:
         for _attempt in range(2):
             result = self.gateway.complete(
                 [{"role": "system", "content": self.system_text(question)}, {"role": "user", "content": state}],
-                model=self.model, temperature=self.temperature, max_tokens=self.max_tokens, thinking=False,
+                # No `thinking`: the measured instrument ran with the model's default (see the module
+                # docstring), and asking for reasoning off now that the gateway forwards it would
+                # quietly swap in an instrument nobody has measured.
+                model=self.model, temperature=self.temperature, max_tokens=self.max_tokens,
             )
             cost = price_completion(result)
             if not cost.unpriced:

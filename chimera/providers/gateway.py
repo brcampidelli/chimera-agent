@@ -187,6 +187,21 @@ class CompletionResult(BaseModel):
 MessageLike = Message | dict[str, Any]
 
 
+def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, Any]:
+    """The gateway's per-call kwargs with the caller's on top, ``extra_body`` merged key by key.
+
+    A plain ``dict(provider, **caller)`` let a caller's ``extra_body`` replace the gateway's whole,
+    so a bench pinning a provider through ``extra_body`` lost ``reasoning`` and a configured
+    ``provider_order`` lost its pin the moment the caller added anything of its own. The caller still
+    wins on a key both set; only the keys it did not name survive now.
+    """
+    merged = dict(provider, **caller)
+    ours, theirs = provider.get("extra_body"), caller.get("extra_body")
+    if isinstance(ours, dict) and isinstance(theirs, dict):
+        merged["extra_body"] = {**ours, **theirs}
+    return merged
+
+
 def _to_message_dicts(messages: list[MessageLike]) -> list[dict[str, Any]]:
     """Every message in the shape a provider accepts — including the ones that arrive as plain dicts.
 
@@ -562,7 +577,10 @@ class LLMGateway:
         self._warn_generate_prefix_with_tools(resolved, tools)
         max_tokens = self._bounded(max_tokens)
 
-        extra = self._provider_kwargs()
+        # `thinking` reaches the provider here too. Until 2026-09-25 only `stream_complete` passed it,
+        # so every blocking call that asked for reasoning off — `decisions.hosted`, the agent loop
+        # without a token callback, `bench/jev_decisions` — ran with the model's own default.
+        extra = self._provider_kwargs(resolved, thinking=thinking)
         message_dicts = _to_message_dicts(messages)
 
         # HORIZON-style prompt caching: serve an identical tool-free request from cache.
@@ -577,7 +595,7 @@ class LLMGateway:
         if cache is not None and tools is None and temperature == 0:
             # Fold the other response-affecting request fields into the key so e.g. two calls that
             # differ only in top_p / seed / stop / response_format / api_base don't collide.
-            key_params = {k: v for k, v in {**extra, **kwargs}.items() if k != "api_key"}
+            key_params = {k: v for k, v in _call_kwargs(extra, kwargs).items() if k != "api_key"}
             cache_key = CompletionCache.key(
                 model=resolved,
                 messages=message_dicts,
@@ -605,8 +623,13 @@ class LLMGateway:
             provider = candidate.split("/", 1)[0]
             api_keys: tuple[str | None, ...] = tuple(self._key_order(provider)) or (None,)
             next_model = False
+            # Per candidate: the reasoning switch is an OpenRouter parameter, and a fallback on another
+            # route must not be sent one it would refuse.
+            candidate_extra = (
+                extra if candidate == resolved else self._provider_kwargs(candidate, thinking=thinking)
+            )
             for api_key in api_keys:
-                call_kwargs: dict[str, Any] = dict(extra, **kwargs)
+                call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, kwargs)
                 if api_key:
                     call_kwargs["api_key"] = api_key
                 call_messages = message_dicts
@@ -695,6 +718,7 @@ class LLMGateway:
         temperature: float = 0.7,
         max_tokens: int | None = None,
         tools: list[dict[str, Any]] | None = None,
+        thinking: bool | None = None,
         **kwargs: Any,
     ) -> CompletionResult:
         """Async single-shot completion. Minimal by design: no fallback chain or cache (the fusion
@@ -709,7 +733,7 @@ class LLMGateway:
         self._warn_generate_prefix_with_tools(resolved, tools)
         max_tokens = self._bounded(max_tokens)
 
-        call_kwargs: dict[str, Any] = dict(self._provider_kwargs(), **kwargs)
+        call_kwargs: dict[str, Any] = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys and keys[0]:
             call_kwargs["api_key"] = keys[0]
@@ -774,7 +798,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         max_tokens = self._bounded(max_tokens)
-        call_kwargs = dict(self._provider_kwargs(), **kwargs)
+        call_kwargs = _call_kwargs(self._provider_kwargs(), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
@@ -823,7 +847,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        call_kwargs = dict(self._provider_kwargs(resolved, thinking=thinking), **kwargs)
+        call_kwargs = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]

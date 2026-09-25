@@ -5,6 +5,29 @@ judge-as-a-library decision was measured on; **US$ 0.08** for the registered des
 three follow-ups, 0 halts. Raw rows in `results/`; the numbers below come from `report.py`,
 `recalibrate.py` and `report_followup.py` over those files.
 
+## Correction, 2026-09-25: no arm here ran with reasoning off
+
+Every place below that says "thinking off" or `thinking=False` describes what the runner **asked
+for**, not what the provider received.
+
+**Why.** `run.py` and `run_review.py` call `LLMGateway.complete(..., thinking=False)`. Until the fix
+that lands with this note, `complete` accepted the flag and dropped it; only `stream_complete`
+forwarded it. So:
+- arm V, on both the governance and the review corpora, ran with `deepseek-v4-flash-0731`'s default
+  reasoning;
+- the empty answers in §10 (79/394 at 600 tokens) and in the review section (148/919 at 2,000) were
+  reasoning spending the budget on every route. They were not "routes that do not honour
+  `reasoning.enabled=false`": no route was ever sent it.
+
+**What still holds.** The numbers are unchanged, because they describe the instrument that actually
+ran.
+
+**What changes.**
+- `chimera.decisions.hosted` now asks for exactly that instrument: no `thinking` argument, the 2,000
+  budget, and one re-ask.
+- A re-run of these scripts after the fix would turn reasoning off for real. That is a different,
+  unmeasured instrument, so to reproduce these numbers, drop the `thinking=False` argument.
+
 **Terms, read before publishing (2026-09-19).** The vendor's Master Customer Agreement (§2.3(f)) forbids
 its direct customers from publishing performance information about its service. This run did not go
 through the vendor: it went through **OpenRouter's Decisions API** (`POST /api/alpha/decisions`), under
