@@ -122,6 +122,10 @@ class ChimeraTUI(App[None]):
         self.model_label = model_label
         self.stream_enabled = stream and not fuse  # never promise a stream fusion can't deliver
         self.fuse = fuse
+        #: Whether this session has already been told that --fuse did not fuse. Once, not every turn:
+        #: the fact does not change between turns, and a line repeated under every answer is a line
+        #: nobody reads.
+        self._said_fusion_skipped = False
         self._live = ""
         #: Where to append this run's usage rows, or None for a TUI nobody is billing (the tests).
         #: The panel showed a price per turn and recorded it nowhere, so the Cost screen reported
@@ -341,6 +345,15 @@ class ChimeraTUI(App[None]):
             )
             if governance:
                 log.write(governance)
+        if self.fuse and not self._said_fusion_skipped and report.model != "fusion":
+            # Said after the fact, from what answered, not predicted: a turn that ran with no tool
+            # in play can reach fusion, and then this stays quiet.
+            self._said_fusion_skipped = True
+            log.write(
+                "[dim]--fuse: this turn went to one model. Fusion never answers a step that can "
+                "call a tool, and every step here can; it answers only a step run without tools. "
+                "(said once per session)[/dim]"
+            )
         panel = self._activity()
         panel.set_tokens(report)
         panel.set_memory(report.memory_facts_used, report.memory_layer)
@@ -380,7 +393,10 @@ class ChimeraTUI(App[None]):
 
     def _toggle_stream(self) -> None:
         if self.fuse:
-            self._append("[dim]streaming stays off under --fuse (fusion has no token stream)[/dim]")
+            self._append(
+                "[dim]streaming stays off under --fuse: a step that reaches fusion has no token "
+                "stream[/dim]"
+            )
             return
         self.stream_enabled = not self.stream_enabled
         self._append(f"[dim]streaming {'on' if self.stream_enabled else 'off'}[/dim]")
@@ -388,7 +404,10 @@ class ChimeraTUI(App[None]):
     # -- helpers -----------------------------------------------------------
     def _busy_label(self) -> str:
         if self.fuse:
-            return "fusion — synthesizing (no token stream)"
+            # Not "fusion — synthesizing", which this said for every turn: fusion never answers a
+            # step that can call a tool (`RoutedBackend.complete`), and every step of this agent
+            # can. The label promised work that, on almost every turn, did not happen.
+            return "thinking… (--fuse: fusion answers only steps without tools)"
         return "streaming…" if self.stream_enabled else "thinking…"
 
     def _show_budget(self) -> None:

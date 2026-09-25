@@ -215,6 +215,9 @@ coding turn read an absolute path, so writer and reader had never met.
 so it recalls from every project despite taking a `--workspace`. One line plus a test, left
 out of #405 because that branch's measurements were already taken.
 
+**Delivered later — #415 (2026-09-10):** the TUI keeps its sessions and scopes recall with
+`project_key(workspace)`, like `chat` and `assist`.
+
 ### Step 5 — a ruler that measures the right-hand (M; cents per run)
 Rebuild `chimera scenarios` as turn scripts routed through `ChatSession` exactly as `chat` builds
 it, with functional checks (a tool reads a file of N lines the harness generates — N is not in the
@@ -252,6 +255,10 @@ still registered behind `settings.todo_list` (`chimera/tools/builtin.py:118-121`
 surface drawing it — and the `--fuse` honesty label. `chat --fuse` already routes through
 `RoutedBackend`, which predates this plan, and `assist` has no `--fuse` at all; neither was
 re-measured, so neither is claimed here.
+
+**The `--fuse` label, 2026-09-25:** the TUI's busy label no longer says "fusion — synthesizing";
+it says fusion answers only steps without tools, which is what `RoutedBackend.complete` does. After
+a turn that fusion did not answer, the TUI says so once per session. `todo_write` is still open.
 
 ## 4 · What this study cannot show
 

@@ -187,3 +187,74 @@ async def test_stream_forced_off_under_fuse() -> None:
         await pilot.pause()
         assert session.sent == ["hi"]
         assert session.tokens_streamed == 0  # no live tokens under fusion
+
+
+# --- --fuse says what ran --------------------------------------------------------------------
+#
+# The busy label read "fusion — synthesizing" on every turn under --fuse. Fusion never answers a step
+# that can call a tool (`RoutedBackend.complete`), and every step of this agent can, so on almost
+# every turn the label promised work that did not happen (bench/PLAN-right-hand.md, step 6).
+
+
+class _FusedSession(DrivenSession):
+    """A turn that DID reach fusion: the answer's model is "fusion"."""
+
+    def send_verbose(
+        self,
+        message: str,
+        *,
+        on_token: Callable[[str], None] | None = None,
+        on_tool: Callable[[ToolActivity], None] | None = None,
+    ) -> TurnReport:
+        report = super().send_verbose(message, on_token=on_token, on_tool=on_tool)
+        report.model = "fusion"
+        return report
+
+
+def _log_text(app: ChimeraTUI) -> str:
+    from textual.widgets import RichLog
+
+    return "\n".join(str(line.text) for line in app.query_one("#log", RichLog).lines)
+
+
+def test_the_busy_label_no_longer_claims_fusion_is_synthesizing() -> None:
+    label = ChimeraTUI(DrivenSession(), model_label="stub", fuse=True)._busy_label()
+    assert "synthesizing" not in label
+    assert "without tools" in label
+
+
+async def test_a_turn_that_went_to_one_model_says_so_once() -> None:
+    from textual.widgets import Input
+
+    app = ChimeraTUI(DrivenSession(), model_label="stub", fuse=True)
+    async with app.run_test() as pilot:
+        for text in ("one", "two"):
+            app.query_one("#prompt", Input).value = text
+            await pilot.press("enter")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+        assert _log_text(app).count("this turn went to one model") == 1
+
+
+async def test_a_turn_that_reached_fusion_is_not_told_otherwise() -> None:
+    from textual.widgets import Input
+
+    app = ChimeraTUI(_FusedSession(), model_label="stub", fuse=True)
+    async with app.run_test() as pilot:
+        app.query_one("#prompt", Input).value = "hi"
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert "went to one model" not in _log_text(app)
+
+
+async def test_without_fuse_nothing_is_said_about_fusion() -> None:
+    from textual.widgets import Input
+
+    app = ChimeraTUI(DrivenSession(), model_label="stub")
+    async with app.run_test() as pilot:
+        app.query_one("#prompt", Input).value = "hi"
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        assert "--fuse" not in _log_text(app)
