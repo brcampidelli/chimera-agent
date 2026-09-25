@@ -1,0 +1,9 @@
+042-api-schema-migration brk-fixed-strong-r6
+082-compose-config-repair brk-fixed-weak-r3
+041-frontend-state-bug brk-legacy-weak-r7
+041-frontend-state-bug brk-fixed-strong-r6
+041-frontend-state-bug brk-legacy-weak-r2
+043-db-migration-safety brk-legacy-strong-r5
+041-frontend-state-bug brk-legacy-weak-r9
+042-api-schema-migration brk-fixed-strong-r5
+042-api-schema-migration brk-fixed-weak-r3

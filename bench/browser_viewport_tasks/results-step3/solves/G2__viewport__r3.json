@@ -1,0 +1,134 @@
+{
+ "task": "G2",
+ "arm": "viewport",
+ "replica": 3,
+ "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+ "stratum": "below",
+ "hurt_prone": true,
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "15ee770664e2e7fe",
+  "chimera": "C:\\Users\\brcam\\AppData\\Local\\Temp\\chimera-brk-fixed\\chimera",
+  "commit": "c45333477f737eefa40cfe2fc237c29c6e1657f5"
+ },
+ "error": "",
+ "agent_config": {
+  "temperature": 0.2,
+  "compact_schemas": false,
+  "detect_tool_loops": true,
+  "inject_skill_context": true,
+  "prefix_nonce_set": false,
+  "max_steps": 20,
+  "max_usd": 0.25
+ },
+ "cap_usd": 0.002808195,
+ "answer": "PV9339R",
+ "success": true,
+ "stopped_reason": "final",
+ "steps": 11,
+ "tool_calls": 13,
+ "prompt_tokens": 40431,
+ "completion_tokens": 1001,
+ "cache_read_tokens": 30720,
+ "cache_write_tokens": 0,
+ "usd": 0.001699,
+ "answered_by": "openrouter/deepseek/deepseek-v4-flash-0731",
+ "providers": [
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace",
+  "Relace"
+ ],
+ "context_peak_tokens": 8711,
+ "observation_chars": 23925,
+ "browser_actions": {
+  "navigate": 1,
+  "find": 1,
+  "scroll": 5,
+  "type": 4,
+  "click": 1,
+  "read_text": 1
+ },
+ "browser_calls": [
+  {
+   "action": "navigate",
+   "chars": 1458,
+   "error": false
+  },
+  {
+   "action": "find",
+   "chars": 303,
+   "error": false
+  },
+  {
+   "action": "scroll",
+   "chars": 1278,
+   "error": false
+  },
+  {
+   "action": "scroll",
+   "chars": 1305,
+   "error": false
+  },
+  {
+   "action": "scroll",
+   "chars": 1346,
+   "error": false
+  },
+  {
+   "action": "scroll",
+   "chars": 1333,
+   "error": false
+  },
+  {
+   "action": "scroll",
+   "chars": 1261,
+   "error": false
+  },
+  {
+   "action": "type",
+   "chars": 1263,
+   "error": false
+  },
+  {
+   "action": "type",
+   "chars": 1268,
+   "error": false
+  },
+  {
+   "action": "type",
+   "chars": 1275,
+   "error": false
+  },
+  {
+   "action": "type",
+   "chars": 1305,
+   "error": false
+  },
+  {
+   "action": "click",
+   "chars": 1305,
+   "error": false
+  },
+  {
+   "action": "read_text",
+   "chars": 9225,
+   "error": false
+  }
+ ],
+ "seconds": 19.9,
+ "requested_paths": [
+  "/gov/services.html"
+ ],
+ "stripped_env": [
+  "CHIMERA_CHAT_MEMORY"
+ ]
+}

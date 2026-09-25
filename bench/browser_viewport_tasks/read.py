@@ -10,6 +10,7 @@ paired read (both reported). The CI is a percentile bootstrap over tasks, 10,000
 from __future__ import annotations
 
 import json
+import os
 import random
 import statistics
 import sys
@@ -24,7 +25,7 @@ if str(ROOT) not in sys.path:
 
 from bench.browser_viewport_tasks.tasks import TASKS  # noqa: E402
 
-SOLVES = Path(__file__).resolve().parent / "results" / "solves"
+SOLVES = Path(__file__).resolve().parent / os.environ.get("M7_RESULTS", "results") / "solves"
 MARGIN = 0.10  # success may not fall by more than this at the CI's lower bound
 POINT_FLOOR = -0.05  # nor by more than this at the point estimate
 STRATUM_FLOOR = -0.20  # nor, at the point estimate, in any registered stratum

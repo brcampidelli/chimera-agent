@@ -1,0 +1,23 @@
+
+===== executor: strong =====
+  solves legacy 39 · fixed 37 · floor (legacy replica SD) 0.2528
+  score legacy 0.5685  fixed 0.7149  Δ +0.1465  95% CI [+0.0538, +0.2404]
+    041-frontend-state-bug     legacy 0.576 fixed 0.640
+    042-api-schema-migration   legacy 0.604 fixed 0.740
+    043-db-migration-safety    legacy 0.342 fixed 0.483
+    082-compose-config-repair  legacy 0.752 fixed 0.996
+  legacy breaker ended the run 11/39 (0.282) · US$/solve 0.0651 · steps 28.3
+         reasons: ['apply_patch · args distinct · output same', 'edit_file · args distinct · output same']
+  fixed  breaker ended the run 0/37 (0.000) · US$/solve 0.0816 · steps 32.6
+
+===== executor: weak =====
+  solves legacy 37 · fixed 38 · floor (legacy replica SD) 0.2355
+  score legacy 0.4666  fixed 0.5291  Δ +0.0625  95% CI [-0.0421, +0.1678]
+    041-frontend-state-bug     legacy 0.609 fixed 0.774
+    042-api-schema-migration   legacy 0.335 fixed 0.271
+    043-db-migration-safety    legacy 0.170 fixed 0.150
+    082-compose-config-repair  legacy 0.752 fixed 0.921
+  legacy breaker ended the run 6/37 (0.162) · US$/solve 0.0031 · steps 10.1
+         reasons: ['apply_patch · args distinct · output same', 'apply_patch · args same · output same', 'apply_patch/read_file · args distinct · output distinct', 'run_shell · args distinct · output same']
+  fixed  breaker ended the run 2/38 (0.053) · US$/solve 0.0023 · steps 9.1
+         reasons: ['read_file/write_file · args distinct · output distinct', 'run_shell · args distinct · output same']

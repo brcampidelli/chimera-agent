@@ -223,11 +223,11 @@ def render_viewport_first(elements: list[Element]) -> str:
     driver stamps every element, so a ref learned from ``find`` still clicks — and the summary line
     says how to reach them. With every element in view the output is exactly ``render_elements``'s.
 
-    Measured, and a loss (``bench/browser_viewport_tasks/RESULTS.md``): on 24 tasks it cut prompt
-    tokens by 42% and task success from 0.958 to 0.833, CI wholly below zero. Every failure it added
-    ended in ``tool_loop``: the breaker's identical-args rule stops a run after five ``scroll`` calls,
-    though each returns a different viewport. Opt-in until that rule reads the observations and the
-    bundle is measured again.
+    Measured, and a loss both times (``bench/browser_viewport_tasks``). Step 2: success 0.958 → 0.833,
+    every added failure the old breaker stopping five productive ``scroll`` calls. Step 3, with the
+    breaker fixed to need the same call and the same answer: 0.958 → 0.917, CI [−0.083, −0.008], the
+    loss now the listing's own (targets defined by position; wrong picks), and a prompt-token ratio of
+    0.76 whose CI reaches 1.0. Opt-in.
     """
     shown = [el for el in elements if _in_view(el)]
     rest = [el for el in elements if not _in_view(el)]

@@ -1,0 +1,4 @@
+homes 153 · traces scanned 153
+flagged steps: 2
+- 041-frontend-state-bug-brk-legacy-strong-r1: foreign=[] other='data_try6/sandbox/' :: '{"new": "let cart8 = addItem(createCart(), { sku: \'x\', name: \'X\', unitCents: 100, quantity: 1 });", "old": "let cart8 = addItem(createCart(), { sku: \'x\', name: '
+- 042-api-schema-migration-brk-fixed-weak-r1: foreign=[] other='data_try6/sandbox/' :: 'Maybe write_file expects allow_invalid? But content is valid. The error says "invalid syntax (line 1, col 6)". That indicates the file content is not valid Pyth'

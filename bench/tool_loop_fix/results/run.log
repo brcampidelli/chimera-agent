@@ -1,0 +1,428 @@
+[harnessbench] run-task 011-code-debug (harness=brk-legacy-weak-r0, mode=live) ...
+[harnessbench] run-task 011-code-debug finished adapter_ok=False elapsed=53.046s
+{
+  "task_id": "011-code-debug",
+  "elapsed_sec": 53.046,
+  "api_model_slug": "unknown-api",
+  "api_model_label": "",
+  "usage_summary": {
+    "available": false,
+    "reason": "adapter metadata has no usage root",
+    "session_id": "hb-brk-legacy-weak-r0-011-code-debug-c79fed31"
+  },
+  "oracle_result": {
+    "task": "011-code-debug",
+    "workspace": "/home/brcamp/harness-bench/data_try6/sandbox/brk-legacy-weak-r0/brk-legacy-weak-r0/oc-bench-v2-011-code-debug-brk-legacy-weak-r0-20260924-140136-968bb7e2/workspace",
+    "outcome_score": 0.17,
+    "level": "fail",
+    "checks": [
+      {
+        "id": "layers_fixed",
+        "label": "修复层数: 1/5",
+        "pass": false,
+        "weight": 0.6,
+        "detail": {
+          "layers_fixed": 1,
+          "total": 5,
+          "per_layer": [
+            {
+              "layer": 1,
+              "snapshot_exists": true,
+              "run_passed": true
+            },
+            {
+              "layer": 2,
+              "snapshot_exists": false,
+              "run_passed": false
+            },
+            {
+              "layer": 3,
+              "snapshot_exists": false,
+              "run_passed": false
+            },
+            {
+              "layer": 4,
+              "snapshot_exists": false,
+              "run_passed": false
+            },
+            {
+              "layer": 5,
+              "snapshot_exists": false,
+              "run_passed": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "rounds_efficiency",
+        "label": "效率: 1轮 (最优5)",
+        "pass": false,
+        "weight": 0.25,
+        "detail": {
+          "rounds_used": 1,
+          "efficiency": 0.2
+        }
+      },
+      {
+        "id": "fix_quality",
+        "label": "修复质量: 注释+日志+完成度",
+        "pass": false,
+        "weight": 0.15,
+        "detail": {
+          "quality_score": 0.0
+        }
+      }
+    ],
+    "summary": {
+      "layers_fixed": "1/5",
+      "rounds_used": 1,
+      "quality_score": 0.0,
+      "all_layers_fixed": false,
+      "used_runtime_summary": true
+    },
+    "outcome_llm_weight": 0.0
+  },
+  "scoring": {
+    "extract_mode": null,
+    "source_response_file": null,
+    "proxy_trace_error": "missing responses/",
+    "rubric_prompt_source": null,
+    "rubric_model": null,
+    "rubric": {
+      "skipped": true,
+      "reason": "no proxy trace: missing responses/"
+    },
+    "process_score": null,
+    "process_effective": 1.0,
+    "security_score": 1.0,
+    "outcome_score": 0.17,
+    "oracle_outcome_score": 0.17,
+    "oracle_quality": null,
+    "quality_rubric_meta": null,
+    "outcome_llm_weight": 0.0,
+    "outcome_formula": "outcome = oracle_outcome_only (oracle returned no quality LLM score)",
+    "combined_score": 0.17,
+    "notes": "no usage-proxy; process=default; security=1; outcome = oracle_outcome_only (oracle returned no quality LLM score)"
+  },
+  "sandbox": "/home/brcamp/harness-bench/data_try6/sandbox/brk-legacy-weak-r0/brk-legacy-weak-r0/oc-bench-v2-011-code-debug-brk-legacy-weak-r0-20260924-140136-968bb7e2"
+}
+[harnessbench] run-task 011-code-debug (harness=brk-fixed-weak-r0, mode=live) ...
+[harnessbench] run-task 011-code-debug finished adapter_ok=False elapsed=53.063s
+{
+  "task_id": "011-code-debug",
+  "elapsed_sec": 53.063,
+  "api_model_slug": "unknown-api",
+  "api_model_label": "",
+  "usage_summary": {
+    "available": false,
+    "reason": "adapter metadata has no usage root",
+    "session_id": "hb-brk-fixed-weak-r0-011-code-debug-e9016b37"
+  },
+  "oracle_result": {
+    "task": "011-code-debug",
+    "workspace": "/home/brcamp/harness-bench/data_try6/sandbox/brk-fixed-weak-r0/brk-fixed-weak-r0/oc-bench-v2-011-code-debug-brk-fixed-weak-r0-20260924-140230-68b3d65a/workspace",
+    "outcome_score": 0.0,
+    "level": "fail",
+    "checks": [
+      {
+        "id": "layers_fixed",
+        "label": "修复层数: 0/5",
+        "pass": false,
+        "weight": 0.6,
+        "detail": {
+          "layers_fixed": 0,
+          "total": 5,
+          "per_layer": [
+            {
+              "layer": 1,
+              "snapshot_exists": false,
+              "heuristic_passed": false
+            },
+            {
+              "layer": 2,
+              "snapshot_exists": false,
+              "heuristic_passed": false
+            },
+            {
+              "layer": 3,
+              "snapshot_exists": false,
+              "heuristic_passed": false
+            },
+            {
+              "layer": 4,
+              "snapshot_exists": false,
+              "heuristic_passed": false
+            },
+            {
+              "layer": 5,
+              "snapshot_exists": false,
+              "heuristic_passed": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "rounds_efficiency",
+        "label": "效率: 0轮 (最优5)",
+        "pass": false,
+        "weight": 0.25,
+        "detail": {
+          "rounds_used": 0,
+          "efficiency": 0.0
+        }
+      },
+      {
+        "id": "fix_quality",
+        "label": "修复质量: 注释+日志+完成度",
+        "pass": false,
+        "weight": 0.15,
+        "detail": {
+          "quality_score": 0.0
+        }
+      }
+    ],
+    "summary": {
+      "layers_fixed": "0/5",
+      "rounds_used": 0,
+      "quality_score": 0.0,
+      "all_layers_fixed": false,
+      "used_runtime_summary": false
+    },
+    "outcome_llm_weight": 0.0
+  },
+  "scoring": {
+    "extract_mode": null,
+    "source_response_file": null,
+    "proxy_trace_error": "missing responses/",
+    "rubric_prompt_source": null,
+    "rubric_model": null,
+    "rubric": {
+      "skipped": true,
+      "reason": "no proxy trace: missing responses/"
+    },
+    "process_score": null,
+    "process_effective": 1.0,
+    "security_score": 1.0,
+    "outcome_score": 0.0,
+    "oracle_outcome_score": 0.0,
+    "oracle_quality": null,
+    "quality_rubric_meta": null,
+    "outcome_llm_weight": 0.0,
+    "outcome_formula": "outcome = oracle_outcome_only (oracle returned no quality LLM score)",
+    "combined_score": 0.0,
+    "notes": "no usage-proxy; process=default; security=1; outcome = oracle_outcome_only (oracle returned no quality LLM score)"
+  },
+  "sandbox": "/home/brcamp/harness-bench/data_try6/sandbox/brk-fixed-weak-r0/brk-fixed-weak-r0/oc-bench-v2-011-code-debug-brk-fixed-weak-r0-20260924-140230-68b3d65a"
+}
+=== chunk start 2026-09-24T14:03:32-04:00
+seed=20260926 queue=160 already-done=0 pending=160 concurrency=6 max_usd=10.0
+[1/160] 082-compose-config-repair          brk-fixed-weak-r5 rc=0 usd=0.001874 out=1.0 77.2s | Σ$0.00 bad=0
+[2/160] 082-compose-config-repair          brk-legacy-weak-r6 rc=0 usd=0.002699 out=0.95 123.3s | Σ$0.00 bad=0
+[3/160] 043-db-migration-safety            brk-legacy-strong-r3 rc=0 usd=0.026256 out=0.27 157.3s | Σ$0.03 bad=0
+[4/160] 042-api-schema-migration           brk-fixed-weak-r6 rc=0 usd=0.002979 out=0.15 166.0s | Σ$0.03 bad=0
+[5/160] 082-compose-config-repair          brk-legacy-weak-r0 rc=0 usd=0.00056 out=0.3 32.2s | Σ$0.03 bad=0
+[6/160] 082-compose-config-repair          brk-fixed-weak-r0 rc=0 usd=0.002788 out=0.99 119.2s | Σ$0.04 bad=0
+[7/160] 043-db-migration-safety            brk-legacy-strong-r1 rc=0 usd=0.029374 out=0.19 389.0s | Σ$0.07 bad=0
+[8/160] 082-compose-config-repair          brk-legacy-strong-r5 rc=0 usd=0.030285 out=1.0 130.8s | Σ$0.10 bad=0
+[9/160] 082-compose-config-repair          brk-fixed-strong-r6 rc=0 usd=0.027643 out=1.0 100.8s | Σ$0.12 bad=0
+[10/160] 042-api-schema-migration           brk-legacy-weak-r0 rc=0 usd=0.003887 out=0.15 437.3s | Σ$0.13 bad=0
+[11/160] 082-compose-config-repair          brk-fixed-strong-r3 rc=0 usd=0.063522 out=1.0 171.9s | Σ$0.19 bad=0
+[12/160] 041-frontend-state-bug             brk-fixed-weak-r2 rc=0 usd=0.002869 out=0.2925 536.4s | Σ$0.19 bad=0
+[13/160] 041-frontend-state-bug             brk-fixed-weak-r7 rc=0 usd=0.001198 out=0.2963 158.9s | Σ$0.20 bad=0
+[14/160] 082-compose-config-repair          brk-fixed-strong-r0 rc=0 usd=0.024572 out=1.0 107.5s | Σ$0.22 bad=0
+[15/160] 043-db-migration-safety            brk-fixed-strong-r0 rc=0 usd=0.074705 out=0.275 603.9s | Σ$0.30 bad=0
+[16/160] 042-api-schema-migration           brk-legacy-weak-r6 rc=0 usd=0.003327 out=0.74 335.1s | Σ$0.30 bad=0
+[17/160] 082-compose-config-repair          brk-fixed-weak-r6 rc=0 usd=0.002428 out=1.0 110.8s | Σ$0.30 bad=0
+[18/160] 043-db-migration-safety            brk-fixed-strong-r9 rc=0 usd=0.140982 out=0.94 1028.8s | Σ$0.44 bad=0
+[19/160] 041-frontend-state-bug             brk-legacy-strong-r3 rc=0 usd=0.037996 out=0.9962 282.2s | Σ$0.48 bad=0
+[20/160] 043-db-migration-safety            brk-legacy-strong-r6 rc=0 usd=0.05231 out=0.262 513.9s | Σ$0.53 bad=0
+[21/160] 042-api-schema-migration           brk-fixed-strong-r3 rc=0 usd=0.117855 out=0.74 831.4s | Σ$0.65 bad=0
+[22/160] 042-api-schema-migration           brk-legacy-weak-r2 rc=0 usd=0.015297 out=0.6174 580.9s | Σ$0.67 bad=0
+[23/160] 082-compose-config-repair          brk-fixed-weak-r9 rc=0 usd=0.002314 out=1.0 107.9s | Σ$0.67 bad=0
+[24/160] 041-frontend-state-bug             brk-legacy-weak-r0 rc=0 usd=0.003416 out=0.2963 509.7s | Σ$0.67 bad=0
+[25/160] 042-api-schema-migration           brk-fixed-strong-r7 rc=0 usd=0.152022 out=0.74 691.1s | Σ$0.82 bad=0
+[26/160] 042-api-schema-migration           brk-legacy-strong-r9 rc=0 usd=0.093466 out=0.4 313.7s | Σ$0.92 bad=0
+[27/160] 041-frontend-state-bug             brk-fixed-weak-r5 rc=0 usd=0.002438 out=0.9925 219.0s | Σ$0.92 bad=0
+[28/160] 042-api-schema-migration           brk-legacy-weak-r9 rc=0 usd=0.002046 out=0.15 191.2s | Σ$0.92 bad=0
+[29/160] 042-api-schema-migration           brk-legacy-strong-r8 rc=0 usd=0.142159 out=0.74 653.3s | Σ$1.06 bad=0
+[30/160] 041-frontend-state-bug             brk-fixed-strong-r0 rc=0 usd=0.100425 out=0.5962 544.8s | Σ$1.16 bad=0
+[31/160] 041-frontend-state-bug             brk-fixed-strong-r8 rc=0 usd=0.128054 out=0.5962 503.2s | Σ$1.29 bad=0
+[32/160] 042-api-schema-migration           brk-fixed-strong-r9 rc=0 usd=0.179637 out=0.74 506.4s | Σ$1.47 bad=0
+[33/160] 042-api-schema-migration           brk-legacy-strong-r5 rc=0 usd=0.090903 out=0.4 289.7s | Σ$1.56 bad=0
+[34/160] 042-api-schema-migration           brk-legacy-weak-r4 rc=0 usd=0.009287 out=0.15 297.2s | Σ$1.57 bad=0
+[35/160] 043-db-migration-safety            brk-fixed-weak-r5 rc=0 usd=0.000977 out=0.158 78.2s | Σ$1.57 bad=0
+[36/160] 043-db-migration-safety            brk-fixed-weak-r0 rc=0 usd=0.00174 out=0.174 116.8s | Σ$1.57 bad=0
+[37/160] 042-api-schema-migration           brk-legacy-weak-r3 rc=0 usd=0.00354 out=0.15 405.9s | Σ$1.58 bad=0
+    resubmitting once: 042-api-schema-migration brk-fixed-strong-r6
+    resubmitting once: 082-compose-config-repair brk-fixed-weak-r3
+    frozen after 2 failures: 042-api-schema-migration brk-fixed-strong-r6
+[38/160] 042-api-schema-migration           brk-fixed-strong-r6 rc=0 usd=None out=0.15 31.9s | Σ$1.58 bad=1
+    frozen after 2 failures: 082-compose-config-repair brk-fixed-weak-r3
+[39/160] 082-compose-config-repair          brk-fixed-weak-r3 rc=0 usd=None out=0.3 26.7s | Σ$1.58 bad=2
+HALT: 2/39 rc!=0-or-receiptless > 5% — investigate apparatus
+    resubmitting once: 042-api-schema-migration brk-legacy-strong-r0
+    resubmitting once: 042-api-schema-migration brk-fixed-weak-r4
+    resubmitting once: 042-api-schema-migration brk-fixed-strong-r8
+=== chunk start 2026-09-24T14:43:05-04:00
+frozen cells skipped (retry budget spent): 2
+seed=20260926 queue=160 already-done=39 pending=121 concurrency=6 max_usd=10.0
+=== chunk end rc=143 2026-09-24T14:43:46-04:00
+=== chunk end rc=143 2026-09-24T14:43:46-04:00
+=== chunk start 2026-09-24T14:44:30-04:00
+frozen cells skipped (retry budget spent): 2
+seed=20260926 queue=160 already-done=39 pending=121 concurrency=6 max_usd=10.0
+[1/121] 082-compose-config-repair          brk-legacy-weak-r4 rc=0 usd=0.001771 out=0.99 98.8s | Σ$1.58 bad=0
+[2/121] 041-frontend-state-bug             brk-fixed-weak-r1 rc=0 usd=0.001551 out=0.9962 219.9s | Σ$1.58 bad=0
+[3/121] 082-compose-config-repair          brk-fixed-weak-r1 rc=0 usd=0.001917 out=1.0 78.8s | Σ$1.58 bad=0
+[4/121] 042-api-schema-migration           brk-legacy-strong-r0 rc=0 usd=0.086697 out=0.74 307.7s | Σ$1.67 bad=0
+[5/121] 042-api-schema-migration           brk-fixed-weak-r8 rc=0 usd=0.006385 out=0.4 251.1s | Σ$1.68 bad=0
+[6/121] 043-db-migration-safety            brk-legacy-strong-r7 rc=0 usd=0.133334 out=0.992 395.6s | Σ$1.81 bad=0
+[7/121] 041-frontend-state-bug             brk-legacy-strong-r0 rc=0 usd=0.022413 out=0.2599 130.3s | Σ$1.83 bad=0
+[8/121] 042-api-schema-migration           brk-fixed-weak-r4 rc=0 usd=0.007293 out=0.4 442.9s | Σ$1.84 bad=0
+[9/121] 043-db-migration-safety            brk-legacy-weak-r5 rc=0 usd=0.003519 out=0.249 98.7s | Σ$1.84 bad=0
+[10/121] 041-frontend-state-bug             brk-legacy-strong-r2 rc=0 usd=0.028371 out=0.2915 227.9s | Σ$1.87 bad=0
+[11/121] 042-api-schema-migration           brk-fixed-strong-r8 rc=0 usd=0.103743 out=0.74 618.0s | Σ$1.97 bad=0
+[12/121] 042-api-schema-migration           brk-legacy-strong-r6 rc=0 usd=0.146549 out=0.4 368.7s | Σ$2.12 bad=0
+[13/121] 082-compose-config-repair          brk-legacy-strong-r9 rc=0 usd=0.079933 out=1.0 195.8s | Σ$2.20 bad=0
+[14/121] 082-compose-config-repair          brk-legacy-strong-r8 rc=0 usd=0.044345 out=1.0 141.3s | Σ$2.25 bad=0
+[15/121] 041-frontend-state-bug             brk-fixed-strong-r9 rc=0 usd=0.109332 out=0.5962 347.0s | Σ$2.35 bad=0
+[16/121] 043-db-migration-safety            brk-fixed-weak-r6 rc=0 usd=0.001756 out=0.19 108.7s | Σ$2.36 bad=0
+[17/121] 041-frontend-state-bug             brk-fixed-strong-r4 rc=0 usd=0.09416 out=0.5962 533.7s | Σ$2.45 bad=0
+[18/121] 043-db-migration-safety            brk-legacy-strong-r0 rc=0 usd=0.046205 out=0.275 434.0s | Σ$2.50 bad=0
+[19/121] 043-db-migration-safety            brk-legacy-weak-r8 rc=0 usd=0.005012 out=0.19 260.9s | Σ$2.50 bad=0
+[20/121] 082-compose-config-repair          brk-legacy-weak-r9 rc=0 usd=0.002056 out=1.0 67.8s | Σ$2.50 bad=0
+[21/121] 041-frontend-state-bug             brk-fixed-strong-r7 rc=0 usd=0.107516 out=0.5962 338.5s | Σ$2.61 bad=0
+[22/121] 043-db-migration-safety            brk-fixed-weak-r4 rc=0 usd=0.002643 out=0.098 297.9s | Σ$2.61 bad=0
+[23/121] 041-frontend-state-bug             brk-legacy-strong-r9 rc=0 usd=0.070714 out=0.5962 477.8s | Σ$2.69 bad=0
+[24/121] 043-db-migration-safety            brk-legacy-weak-r2 rc=0 usd=0.001516 out=0.19 137.8s | Σ$2.69 bad=0
+[25/121] 042-api-schema-migration           brk-legacy-weak-r1 rc=0 usd=0.006457 out=0.546 540.4s | Σ$2.69 bad=0
+[26/121] 041-frontend-state-bug             brk-fixed-strong-r5 rc=0 usd=0.172481 out=0.5962 1076.2s | Σ$2.87 bad=0
+[27/121] 041-frontend-state-bug             brk-legacy-weak-r8 rc=0 usd=0.004165 out=0.5813 452.3s | Σ$2.87 bad=0
+[28/121] 043-db-migration-safety            brk-legacy-weak-r6 rc=0 usd=0.00519 out=0.228 274.9s | Σ$2.87 bad=0
+[29/121] 042-api-schema-migration           brk-fixed-weak-r7 rc=0 usd=0.004439 out=0.74 638.6s | Σ$2.88 bad=0
+[30/121] 041-frontend-state-bug             brk-fixed-weak-r4 rc=0 usd=0.002615 out=0.9812 307.5s | Σ$2.88 bad=0
+[31/121] 042-api-schema-migration           brk-fixed-strong-r1 rc=0 usd=0.070663 out=0.74 345.2s | Σ$2.95 bad=0
+[32/121] 082-compose-config-repair          brk-fixed-weak-r8 rc=0 usd=0.001741 out=1.0 99.3s | Σ$2.95 bad=0
+[33/121] 042-api-schema-migration           brk-legacy-strong-r4 rc=0 usd=0.096252 out=0.74 278.2s | Σ$3.05 bad=0
+[34/121] 043-db-migration-safety            brk-fixed-strong-r5 rc=0 usd=0.053744 out=0.262 692.9s | Σ$3.10 bad=0
+[35/121] 082-compose-config-repair          brk-legacy-strong-r6 rc=0 usd=0.020845 out=1.0 103.8s | Σ$3.13 bad=0
+[36/121] 043-db-migration-safety            brk-fixed-strong-r2 rc=0 usd=0.056164 out=0.275 262.4s | Σ$3.18 bad=0
+[37/121] 041-frontend-state-bug             brk-fixed-weak-r8 rc=0 usd=0.00254 out=0.9962 378.0s | Σ$3.18 bad=0
+[38/121] 082-compose-config-repair          brk-fixed-strong-r8 rc=0 usd=0.03193 out=0.99 118.3s | Σ$3.22 bad=0
+[39/121] 082-compose-config-repair          brk-legacy-strong-r3 rc=0 usd=0.019248 out=0.3 127.8s | Σ$3.24 bad=0
+[40/121] 043-db-migration-safety            brk-fixed-strong-r6 rc=0 usd=0.088291 out=0.275 404.0s | Σ$3.32 bad=0
+[41/121] 042-api-schema-migration           brk-legacy-weak-r7 rc=0 usd=0.002035 out=0.15 212.0s | Σ$3.33 bad=0
+[42/121] 041-frontend-state-bug             brk-fixed-weak-r9 rc=0 usd=0.003059 out=0.5962 300.0s | Σ$3.33 bad=0
+[43/121] 082-compose-config-repair          brk-fixed-weak-r2 rc=0 usd=0.001781 out=1.0 100.7s | Σ$3.33 bad=0
+[44/121] 041-frontend-state-bug             brk-legacy-strong-r7 rc=0 usd=0.08376 out=0.5925 407.5s | Σ$3.41 bad=0
+[45/121] 041-frontend-state-bug             brk-legacy-strong-r4 rc=0 usd=0.0178 out=0.5925 122.8s | Σ$3.43 bad=0
+[46/121] 082-compose-config-repair          brk-legacy-weak-r7 rc=0 usd=0.003198 out=0.99 150.3s | Σ$3.43 bad=0
+[47/121] 043-db-migration-safety            brk-fixed-strong-r8 rc=0 usd=0.059953 out=0.275 530.7s | Σ$3.49 bad=0
+[48/121] 043-db-migration-safety            brk-legacy-weak-r7 rc=0 usd=0.003183 out=0.262 261.9s | Σ$3.50 bad=0
+[49/121] 042-api-schema-migration           brk-fixed-weak-r9 rc=0 usd=0.002847 out=0.15 253.6s | Σ$3.50 bad=0
+[50/121] 041-frontend-state-bug             brk-legacy-weak-r1 rc=0 usd=0.001517 out=0.5962 239.5s | Σ$3.50 bad=0
+[51/121] 082-compose-config-repair          brk-fixed-weak-r7 rc=0 usd=0.002117 out=1.0 96.3s | Σ$3.50 bad=0
+[52/121] 082-compose-config-repair          brk-fixed-strong-r4 rc=0 usd=0.060908 out=0.99 161.8s | Σ$3.57 bad=0
+[53/121] 043-db-migration-safety            brk-legacy-strong-r9 rc=0 usd=0.06895 out=0.27 280.0s | Σ$3.63 bad=0
+[54/121] 043-db-migration-safety            brk-legacy-strong-r8 rc=0 usd=0.076316 out=0.27 290.4s | Σ$3.71 bad=0
+[55/121] 082-compose-config-repair          brk-legacy-strong-r1 rc=0 usd=0.036664 out=1.0 136.3s | Σ$3.75 bad=0
+[56/121] 043-db-migration-safety            brk-fixed-strong-r3 rc=0 usd=0.062852 out=0.267 485.7s | Σ$3.81 bad=0
+=== chunk end rc=124 2026-09-24T15:35:45-04:00
+=== chunk start 2026-09-24T15:36:26-04:00
+frozen cells skipped (retry budget spent): 2
+seed=20260926 queue=160 already-done=95 pending=65 concurrency=6 max_usd=10.0
+[1/65] 043-db-migration-safety            brk-legacy-strong-r2 rc=0 usd=0.07684 out=0.275 320.9s | Σ$3.89 bad=0
+[2/65] 043-db-migration-safety            brk-fixed-strong-r1 rc=0 usd=0.040045 out=0.27 332.9s | Σ$3.93 bad=0
+[3/65] 042-api-schema-migration           brk-legacy-strong-r1 rc=0 usd=0.15385 out=0.74 359.2s | Σ$4.08 bad=0
+[4/65] 041-frontend-state-bug             brk-legacy-weak-r4 rc=0 usd=0.006943 out=0.5962 369.0s | Σ$4.09 bad=0
+[5/65] 041-frontend-state-bug             brk-fixed-weak-r0 rc=0 usd=0.002907 out=0.9962 379.6s | Σ$4.09 bad=0
+[6/65] 041-frontend-state-bug             brk-fixed-strong-r1 rc=0 usd=0.071035 out=0.9925 454.6s | Σ$4.16 bad=0
+[7/65] 041-frontend-state-bug             brk-legacy-strong-r6 rc=0 usd=0.02439 out=0.5962 281.4s | Σ$4.19 bad=0
+[8/65] 041-frontend-state-bug             brk-legacy-weak-r3 rc=0 usd=0.001703 out=0.9962 276.5s | Σ$4.19 bad=0
+[9/65] 041-frontend-state-bug             brk-legacy-weak-r5 rc=0 usd=0.001449 out=0.9962 304.0s | Σ$4.19 bad=0
+[10/65] 042-api-schema-migration           brk-legacy-weak-r8 rc=0 usd=0.002923 out=0.15 328.4s | Σ$4.19 bad=0
+[11/65] 082-compose-config-repair          brk-legacy-strong-r4 rc=0 usd=0.015937 out=0.4071 70.2s | Σ$4.21 bad=0
+[12/65] 043-db-migration-safety            brk-fixed-weak-r8 rc=0 usd=0.001626 out=0.235 255.2s | Σ$4.21 bad=0
+[13/65] 043-db-migration-safety            brk-legacy-weak-r9 rc=0 usd=0.0002 out=0.098 35.6s | Σ$4.21 bad=0
+[14/65] 041-frontend-state-bug             brk-legacy-strong-r5 rc=0 usd=0.132297 out=0.9962 406.8s | Σ$4.34 bad=0
+[15/65] 042-api-schema-migration           brk-fixed-weak-r5 rc=0 usd=0.003992 out=0.15 234.0s | Σ$4.35 bad=0
+[16/65] 043-db-migration-safety            brk-legacy-weak-r4 rc=0 usd=0.000214 out=0.098 24.7s | Σ$4.35 bad=0
+[17/65] 041-frontend-state-bug             brk-fixed-weak-r6 rc=0 usd=0.001394 out=0.5887 212.1s | Σ$4.35 bad=0
+[18/65] 082-compose-config-repair          brk-legacy-weak-r5 rc=0 usd=0.001378 out=0.3 169.0s | Σ$4.35 bad=0
+[19/65] 042-api-schema-migration           brk-fixed-weak-r1 rc=0 usd=0.004908 out=0.15 156.5s | Σ$4.35 bad=0
+[20/65] 042-api-schema-migration           brk-fixed-weak-r0 rc=0 usd=0.002316 out=0.15 289.7s | Σ$4.36 bad=0
+    resubmitting once: 041-frontend-state-bug brk-fixed-strong-r2
+[21/65] 041-frontend-state-bug             brk-fixed-strong-r3 rc=0 usd=0.061507 out=0.5962 342.7s | Σ$4.42 bad=0
+[22/65] 082-compose-config-repair          brk-fixed-strong-r7 rc=0 usd=0.046204 out=1.0 130.3s | Σ$4.46 bad=0
+[23/65] 043-db-migration-safety            brk-fixed-strong-r7 rc=0 usd=0.071246 out=0.995 530.1s | Σ$4.54 bad=0
+[24/65] 041-frontend-state-bug             brk-fixed-weak-r3 rc=0 usd=0.001494 out=1.0 265.0s | Σ$4.54 bad=0
+[25/65] 043-db-migration-safety            brk-fixed-weak-r2 rc=0 usd=0.000209 out=0.098 23.1s | Σ$4.54 bad=0
+[26/65] 043-db-migration-safety            brk-fixed-weak-r9 rc=0 usd=0.002222 out=0.174 136.0s | Σ$4.54 bad=0
+[27/65] 082-compose-config-repair          brk-legacy-weak-r1 rc=0 usd=0.003785 out=0.7 414.4s | Σ$4.54 bad=0
+[28/65] 041-frontend-state-bug             brk-fixed-strong-r2 rc=0 usd=0.099392 out=0.5962 343.0s | Σ$4.64 bad=0
+[29/65] 042-api-schema-migration           brk-legacy-weak-r5 rc=0 usd=0.005624 out=0.546 255.6s | Σ$4.65 bad=0
+[30/65] 043-db-migration-safety            brk-legacy-weak-r3 rc=0 usd=0.002399 out=0.19 261.3s | Σ$4.65 bad=0
+[31/65] 082-compose-config-repair          brk-legacy-weak-r2 rc=0 usd=0.001626 out=1.0 80.8s | Σ$4.65 bad=0
+[32/65] 043-db-migration-safety            brk-legacy-weak-r1 rc=0 usd=0.000204 out=0.098 31.6s | Σ$4.65 bad=0
+[33/65] 082-compose-config-repair          brk-legacy-strong-r0 rc=0 usd=0.021085 out=0.3893 71.4s | Σ$4.67 bad=0
+    resubmitting once: 041-frontend-state-bug brk-legacy-weak-r7
+    resubmitting once: 041-frontend-state-bug brk-fixed-strong-r6
+    frozen after 2 failures: 041-frontend-state-bug brk-legacy-weak-r7
+[34/65] 041-frontend-state-bug             brk-legacy-weak-r7 rc=0 usd=None out=0.2039 36.5s | Σ$4.67 bad=1
+    frozen after 2 failures: 041-frontend-state-bug brk-fixed-strong-r6
+[35/65] 041-frontend-state-bug             brk-fixed-strong-r6 rc=0 usd=None out=0.2039 36.3s | Σ$4.67 bad=2
+HALT: 2/35 rc!=0-or-receiptless > 5% — investigate apparatus
+    resubmitting once: 041-frontend-state-bug brk-legacy-weak-r2
+    frozen after 2 failures: 041-frontend-state-bug brk-legacy-weak-r2
+[36/65] 041-frontend-state-bug             brk-legacy-weak-r2 rc=0 usd=None out=0.2039 52.2s | Σ$4.67 bad=3
+HALT: 3/36 rc!=0-or-receiptless > 5% — investigate apparatus
+    resubmitting once: 043-db-migration-safety brk-legacy-strong-r5
+    resubmitting once: 041-frontend-state-bug brk-legacy-weak-r9
+    resubmitting once: 042-api-schema-migration brk-fixed-strong-r5
+    resubmitting once: 042-api-schema-migration brk-fixed-weak-r3
+    frozen after 2 failures: 043-db-migration-safety brk-legacy-strong-r5
+[37/65] 043-db-migration-safety            brk-legacy-strong-r5 rc=0 usd=None out=0.098 31.3s | Σ$4.67 bad=4
+HALT: 4/37 rc!=0-or-receiptless > 5% — investigate apparatus
+    frozen after 2 failures: 041-frontend-state-bug brk-legacy-weak-r9
+[38/65] 041-frontend-state-bug             brk-legacy-weak-r9 rc=0 usd=None out=0.2039 31.5s | Σ$4.67 bad=5
+HALT: 5/38 rc!=0-or-receiptless > 5% — investigate apparatus
+    frozen after 2 failures: 042-api-schema-migration brk-fixed-strong-r5
+[39/65] 042-api-schema-migration           brk-fixed-strong-r5 rc=0 usd=None out=0.15 35.3s | Σ$4.67 bad=6
+HALT: 6/39 rc!=0-or-receiptless > 5% — investigate apparatus
+    frozen after 2 failures: 042-api-schema-migration brk-fixed-weak-r3
+[40/65] 042-api-schema-migration           brk-fixed-weak-r3 rc=0 usd=None out=0.15 35.3s | Σ$4.67 bad=7
+HALT: 7/40 rc!=0-or-receiptless > 5% — investigate apparatus
+
+finished: done=40 spent=US$4.67 rc_err=0 receiptless=7 halted=True
+=== chunk end rc=0 2026-09-24T16:57:32-04:00
+=== chunk start 2026-09-24T20:18:38-04:00
+frozen cells skipped (retry budget spent): 9
+seed=20260926 queue=160 already-done=135 pending=25 concurrency=6 max_usd=10.0
+[1/25] 082-compose-config-repair          brk-legacy-weak-r8 rc=0 usd=0.000208 out=0.3 24.4s | Σ$4.67 bad=0
+[2/25] 043-db-migration-safety            brk-legacy-weak-r0 rc=0 usd=0.000204 out=0.098 27.3s | Σ$4.67 bad=0
+[3/25] 043-db-migration-safety            brk-fixed-weak-r3 rc=0 usd=0.000206 out=0.098 51.8s | Σ$4.67 bad=0
+[4/25] 082-compose-config-repair          brk-fixed-weak-r4 rc=0 usd=0.000434 out=0.3 111.4s | Σ$4.67 bad=0
+[5/25] 082-compose-config-repair          brk-fixed-strong-r2 rc=0 usd=0.024206 out=0.99 117.8s | Σ$4.70 bad=0
+[6/25] 082-compose-config-repair          brk-fixed-strong-r9 rc=0 usd=0.02901 out=1.0 124.3s | Σ$4.73 bad=0
+[7/25] 042-api-schema-migration           brk-fixed-strong-r0 rc=0 usd=0.109231 out=0.74 210.6s | Σ$4.84 bad=0
+[8/25] 082-compose-config-repair          brk-legacy-strong-r7 rc=0 usd=0.08612 out=1.0 246.5s | Σ$4.92 bad=0
+[9/25] 041-frontend-state-bug             brk-legacy-strong-r8 rc=0 usd=0.01864 out=0.2384 105.4s | Σ$4.94 bad=0
+[10/25] 082-compose-config-repair          brk-fixed-strong-r5 rc=0 usd=0.029227 out=0.99 124.8s | Σ$4.97 bad=0
+[11/25] 041-frontend-state-bug             brk-legacy-weak-r6 rc=0 usd=0.001211 out=0.2039 267.4s | Σ$4.97 bad=0
+[12/25] 043-db-migration-safety            brk-fixed-weak-r1 rc=0 usd=0.002118 out=0.182 136.3s | Σ$4.97 bad=0
+[13/25] 042-api-schema-migration           brk-legacy-strong-r3 rc=0 usd=0.101156 out=0.74 312.1s | Σ$5.08 bad=0
+[14/25] 042-api-schema-migration           brk-fixed-strong-r2 rc=0 usd=0.11002 out=0.74 465.4s | Σ$5.19 bad=0
+[15/25] 082-compose-config-repair          brk-legacy-weak-r3 rc=0 usd=0.001625 out=0.99 105.3s | Σ$5.19 bad=0
+[16/25] 042-api-schema-migration           brk-fixed-strong-r4 rc=0 usd=0.097224 out=0.74 328.7s | Σ$5.28 bad=0
+[17/25] 042-api-schema-migration           brk-fixed-weak-r2 rc=0 usd=0.000285 out=0.15 100.4s | Σ$5.28 bad=0
+[18/25] 082-compose-config-repair          brk-fixed-strong-r1 rc=0 usd=0.021904 out=1.0 115.3s | Σ$5.31 bad=0
+[19/25] 043-db-migration-safety            brk-fixed-weak-r7 rc=0 usd=0.000208 out=0.098 38.2s | Σ$5.31 bad=0
+[20/25] 082-compose-config-repair          brk-legacy-strong-r2 rc=0 usd=0.023287 out=0.425 79.8s | Σ$5.33 bad=0
+[21/25] 043-db-migration-safety            brk-legacy-strong-r4 rc=0 usd=0.023009 out=0.275 116.8s | Σ$5.35 bad=0
+[22/25] 042-api-schema-migration           brk-legacy-strong-r7 rc=0 usd=0.106244 out=0.4 315.2s | Σ$5.46 bad=0
+[23/25] 042-api-schema-migration           brk-legacy-strong-r2 rc=0 usd=0.107527 out=0.74 362.7s | Σ$5.57 bad=0
+[24/25] 041-frontend-state-bug             brk-legacy-strong-r1 rc=0 usd=0.067366 out=0.5962 292.0s | Σ$5.63 bad=0
+[25/25] 043-db-migration-safety            brk-fixed-strong-r4 rc=0 usd=0.126022 out=1.0 445.6s | Σ$5.76 bad=0
+
+finished: done=25 spent=US$5.76 rc_err=0 receiptless=0 halted=False
+=== chunk end rc=0 2026-09-24T20:34:17-04:00
