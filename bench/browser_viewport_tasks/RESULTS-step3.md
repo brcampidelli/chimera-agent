@@ -49,3 +49,7 @@
 ## What this cannot show
 
 Step 2's list stands: real sites, which of the three changes did it, other models, other viewports.
+
+## After this result (2026-09-24)
+
+The owner removed the setting. `CHIMERA_BROWSER_VIEWPORT_FIRST` no longer exists, so the assembled browser always lists the whole page. The mode is still `BrowserTool(viewport_first=True)`, which is what `harness.py` constructs, so both steps reproduce from main. The only difference is `browser.py`'s hash in the `ruler` field: the edit that removed the setting also rewrote a comment in that file.

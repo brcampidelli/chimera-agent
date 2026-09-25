@@ -234,7 +234,6 @@ def default_registry(
                 headless=settings.browser_headless,
                 workspace=workspace,
                 write_region=write_region,
-                viewport_first=settings.browser_viewport_first,
             )
         )
     return registry
