@@ -24,8 +24,9 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("fusion.verifier_select")
 
-# Scores how well an answer solves a task, in [0, 1] (higher = better).
-Scorer = Callable[[str, str], float]
+# Scores how well an answer solves a task, in [0, 1] (higher = better), or None when it could not
+# tell. None is an abstention, and it must not be confused with a grade of zero: see _parse_score.
+Scorer = Callable[[str, str], float | None]
 
 _SCORE_SYSTEM = (
     "You are a strict grader. Given a task and a candidate answer, rate how well the answer solves "
@@ -37,11 +38,14 @@ _NUM = re.compile(r"-?\d+(?:\.\d+)?")
 
 @dataclass
 class Selection:
-    """The chosen candidate: its index, the candidate text, and its mean score."""
+    """The chosen candidate: its index, the candidate text, and its mean score.
+
+    ``score`` is None when no scorer could grade any candidate, and the choice fell back to order.
+    """
 
     index: int
     answer: str
-    score: float
+    score: float | None
 
 
 class VerifierSelector:
@@ -52,39 +56,53 @@ class VerifierSelector:
             raise ValueError("VerifierSelector needs at least one scorer")
         self.scorers = scorers
 
-    def _mean_score(self, task: str, answer: str) -> float:
+    def _mean_score(self, task: str, answer: str) -> float | None:
         values: list[float] = []
         for scorer in self.scorers:
             try:
-                values.append(float(scorer(task, answer)))
+                value = scorer(task, answer)
             except Exception as exc:  # noqa: BLE001 — a broken scorer is skipped, not fatal
                 _log.debug("scorer failed on a candidate, skipping it: %s", exc)
-        return sum(values) / len(values) if values else 0.0
+                continue
+            # An abstention is skipped like a broken scorer, not averaged in as a zero.
+            if value is not None:
+                values.append(float(value))
+        return sum(values) / len(values) if values else None
 
     def select(self, task: str, candidates: list[str]) -> Selection:
-        """Return the highest-scoring candidate (ties broken by original order, stable)."""
+        """Return the highest-scoring candidate (ties broken by original order, stable).
+
+        A candidate nobody could grade ranks below every candidate somebody graded, including one
+        graded zero: "could not tell" is not evidence that it is wrong. When no candidate could be
+        graded, the first one is returned with a score of None.
+        """
         if not candidates:
             raise ValueError("no candidates to select from")
-        best = Selection(0, candidates[0], -1.0)
+        best = Selection(0, candidates[0], None)
         for i, candidate in enumerate(candidates):
             score = self._mean_score(task, candidate)
-            if score > best.score:
+            if score is not None and (best.score is None or score > best.score):
                 best = Selection(i, candidate, score)
         return best
 
 
-def _parse_score(text: str) -> float:
-    """Parse a 0-10 grade into a [0, 1] score; 0.0 if unparseable."""
+def _parse_score(text: str) -> float | None:
+    """Parse a 0-10 grade into a [0, 1] score; None when the reply holds no number.
+
+    It used to return 0.0, which read a grader that did not answer as a grader that failed the
+    candidate. The rubric judge and the strong verifier had already stopped doing that; this was
+    the third grader with the third meaning of "no answer" (study 25, defect 6).
+    """
     match = _NUM.search(text)
     if not match:
-        return 0.0
+        return None
     return max(0.0, min(1.0, float(match.group()) / 10.0))
 
 
 def llm_scorer(backend: SupportsComplete, model: str | None = None) -> Scorer:
-    """A verifier that asks a model to grade an answer 0-10 (normalized to [0, 1])."""
+    """A verifier that asks a model to grade an answer 0-10 (normalized to [0, 1]), or None."""
 
-    def score(task: str, answer: str) -> float:
+    def score(task: str, answer: str) -> float | None:
         result = backend.complete(
             [
                 Message(role="system", content=_SCORE_SYSTEM),
