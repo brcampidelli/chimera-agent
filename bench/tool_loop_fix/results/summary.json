@@ -1,0 +1,122 @@
+{
+  "frozen": [
+    "041-frontend-state-bug brk-fixed-strong-r6",
+    "041-frontend-state-bug brk-legacy-weak-r2",
+    "041-frontend-state-bug brk-legacy-weak-r7",
+    "041-frontend-state-bug brk-legacy-weak-r9",
+    "042-api-schema-migration brk-fixed-strong-r5",
+    "042-api-schema-migration brk-fixed-strong-r6",
+    "042-api-schema-migration brk-fixed-weak-r3",
+    "043-db-migration-safety brk-legacy-strong-r5",
+    "082-compose-config-repair brk-fixed-weak-r3"
+  ],
+  "executors": {
+    "strong": {
+      "delta": 0.14645055555555553,
+      "ci95": [
+        0.053823611111111114,
+        0.24036888888888885
+      ],
+      "floor": 0.2527648767308077,
+      "by_task": {
+        "041-frontend-state-bug": {
+          "legacy": 0.57558,
+          "fixed": 0.6402333333333333
+        },
+        "042-api-schema-migration": {
+          "legacy": 0.604,
+          "fixed": 0.74
+        },
+        "043-db-migration-safety": {
+          "legacy": 0.34211111111111114,
+          "fixed": 0.4834
+        },
+        "082-compose-config-repair": {
+          "legacy": 0.75214,
+          "fixed": 0.996
+        }
+      },
+      "breaker_ended": {
+        "legacy": [
+          11,
+          39
+        ],
+        "fixed": [
+          0,
+          37
+        ]
+      },
+      "usd_per_solve": {
+        "legacy": 0.06509982051282051,
+        "fixed": 0.08155208108108108
+      },
+      "steps": {
+        "legacy": 28.333333333333332,
+        "fixed": 32.567567567567565
+      },
+      "reasons": {
+        "legacy": [
+          "apply_patch \u00b7 args distinct \u00b7 output same",
+          "edit_file \u00b7 args distinct \u00b7 output same"
+        ],
+        "fixed": []
+      }
+    },
+    "weak": {
+      "delta": 0.062452698412698404,
+      "ci95": [
+        -0.04207404761904761,
+        0.16779511904761907
+      ],
+      "floor": 0.23549726111907576,
+      "by_task": {
+        "041-frontend-state-bug": {
+          "legacy": 0.6094714285714286,
+          "fixed": 0.7736
+        },
+        "042-api-schema-migration": {
+          "legacy": 0.33494,
+          "fixed": 0.27111111111111114
+        },
+        "043-db-migration-safety": {
+          "legacy": 0.1701,
+          "fixed": 0.1505
+        },
+        "082-compose-config-repair": {
+          "legacy": 0.752,
+          "fixed": 0.9211111111111111
+        }
+      },
+      "breaker_ended": {
+        "legacy": [
+          6,
+          37
+        ],
+        "fixed": [
+          2,
+          38
+        ]
+      },
+      "usd_per_solve": {
+        "legacy": 0.0031182162162162164,
+        "fixed": 0.0023317894736842107
+      },
+      "steps": {
+        "legacy": 10.108108108108109,
+        "fixed": 9.078947368421053
+      },
+      "reasons": {
+        "legacy": [
+          "apply_patch \u00b7 args distinct \u00b7 output same",
+          "apply_patch \u00b7 args same \u00b7 output same",
+          "apply_patch/read_file \u00b7 args distinct \u00b7 output distinct",
+          "run_shell \u00b7 args distinct \u00b7 output same"
+        ],
+        "fixed": [
+          "read_file/write_file \u00b7 args distinct \u00b7 output distinct",
+          "run_shell \u00b7 args distinct \u00b7 output same"
+        ]
+      }
+    }
+  }
+}
