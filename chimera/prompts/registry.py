@@ -273,7 +273,7 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("fusion.consistency", "chimera.fusion.consistency:_SYNTH_SYSTEM", "call", ("S7",),
        "unmeasured"),
     _c("fusion.verifier_score", "chimera.fusion.verifier_select:_SCORE_SYSTEM", "call",
-       ("S7", "S8"), "unmeasured"),
+       ("S7", "S8"), "unmeasured", note="no number in the reply is an abstention (None), never 0.0"),
     # ---- verifiers of an orchestration envelope ------------------------------------------------
     _c("envelope.dropped_only", "chimera.orchestration.envelope_verify:_SPOT_SYSTEM_DROPPED_ONLY",
        "call", ("S6", "S8"), "measured", "bench/blind_audit: caught 23/23, 20/23 as a clause"),

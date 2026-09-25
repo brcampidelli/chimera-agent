@@ -48,7 +48,7 @@ def test_empty_scorers_rejected() -> None:
 def test_parse_score_normalizes() -> None:
     assert _parse_score("8") == 0.8
     assert _parse_score("The score is 10/10") == 1.0
-    assert _parse_score("garbage") == 0.0
+    assert _parse_score("garbage") is None  # no number is an abstention, not a zero
     assert _parse_score("12") == 1.0  # clamped
 
 
@@ -78,3 +78,30 @@ def test_llm_scorer_reads_a_grade() -> None:
     graded = _Backend(["7"])
     scorer = llm_scorer(graded)
     assert scorer("task", "an answer") == 0.7
+
+
+# --- "could not tell" is not zero (study 25, defect 6) ------------------------------------------
+
+
+def test_an_abstaining_scorer_does_not_drag_a_candidate_to_zero() -> None:
+    """One grader abstains on the first candidate, the other grades both. Averaging the abstention
+    in as 0.0 used to hand the pick to the second candidate on a grade nobody gave."""
+    abstains_on_a = lambda t, a: None if a == "A" else 0.6  # noqa: E731
+    grades = lambda t, a: 0.8 if a == "A" else 0.6  # noqa: E731
+    sel = VerifierSelector([abstains_on_a, grades]).select("t", ["A", "B"])
+    assert sel.answer == "A" and sel.score == 0.8
+
+
+def test_a_graded_zero_still_beats_a_candidate_nobody_could_grade() -> None:
+    graded_zero_or_abstain = lambda t, a: 0.0 if a == "graded" else None  # noqa: E731
+    sel = VerifierSelector([graded_zero_or_abstain]).select("t", ["ungraded", "graded"])
+    assert sel.answer == "graded" and sel.score == 0.0
+
+
+def test_when_nobody_can_grade_the_first_candidate_is_kept_and_says_so() -> None:
+    sel = VerifierSelector([lambda t, a: None]).select("t", ["first", "second"])
+    assert sel.index == 0 and sel.score is None
+
+
+def test_an_llm_grader_that_answers_without_a_number_abstains() -> None:
+    assert llm_scorer(_Backend(["I cannot grade this."]))("task", "an answer") is None
