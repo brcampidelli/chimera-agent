@@ -1123,6 +1123,12 @@ export interface CodeTurnDone {
    *  usage — a silent route, not a miss; zero is a real answer (a route that switched and cached
    *  nothing), and the two must not be drawn alike. */
   cache_read_tokens?: number | null;
+  /** What the account was actually charged for this turn, in US$: the router's `total_cost`
+   *  summed over every call. `usd` above is an estimate from the catalogue row of the model id, and
+   *  one id is served by several routes at different prices. Learned on reopen, like `provider`, and
+   *  only once EVERY call has answered — absent until then, never a partial sum, which would show a
+   *  cheaper turn than the one that happened. */
+  billed_usd?: number | null;
   // Typed as the real shape rather than an opaque bag: the fusion panel renders it, and an opaque
   // record forced every consumer to cast — which is how a field silently stops being rendered.
   route_meta: RouteMeta | null;
