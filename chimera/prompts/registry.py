@@ -160,6 +160,11 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("loop.stop_nudge", "chimera.core.agent:Agent.run", "turn", _LOOP, "measured",
        "bench/tool_loop_fix measured the breaker; the sentence itself is unmeasured"),
     _i("loop.final_nudge", "chimera.core.agent:Agent.run", "turn", _LOOP),
+    _c("loop.empty_close_nudge", "chimera.core.agent:_EMPTY_CLOSE_NUDGE", "turn", _LOOP, "unmeasured",
+       note="asked once when the closing reply is empty; the failure is measured (6/10 at max_steps in "
+            "bench/unattended_claims), the sentence's effect is not"),
+    _i("loop.empty_close_note", "chimera.core.agent:_empty_close_note", "turn", _LOOP,
+       note="the harness's own words when the closing reply is empty twice; never a claim of success"),
     _i("loop.unanswered_call_stub", "chimera.core.agent:Agent.run", "turn", _LOOP),
     _i("loop.prefix_nonce", "chimera.core.agent:Agent.run", "core", ("eval",),
        note="bench instrument only; empty unless CHIMERA_PREFIX_NONCE is set"),

@@ -136,6 +136,34 @@ _ASSUME_NUDGE = (
 )
 
 
+#: Asked once when a closing call — the step limit, the loop breaker — came back with no text.
+#: Measured before it existed (study 25): 6 of the 10 unattended solves in `bench/unattended_claims`
+#: that reached `max_steps` ended with an empty answer, against 0 of the 24 that finished on their
+#: own, and four of the six had done the work. `bench/directive_boundary` and `bench/brief_contract`
+#: saw the same ending. A live probe of the closing call (2026-09-25) found no dropped tool call
+#: behind it: `finish_reason` "stop", ~330 completion tokens, empty content — the model reasoned
+#: through its answer and wrote none of it.
+_EMPTY_CLOSE_NUDGE = (
+    "Your reply was empty. Write your final answer now, as plain text: what you changed, what you "
+    "checked and what it showed, and what is left undone."
+)
+
+
+def _empty_close_note(tool_names: list[str]) -> str:
+    """What the run says when the model gave no closing text even when asked twice.
+
+    Empty reads as "it produced nothing", which is a different claim: the tools below did run. This
+    says only what the harness knows — never that anything worked."""
+    counts: dict[str, int] = {}
+    for name in tool_names:
+        counts[name] = counts.get(name, 0) + 1
+    ran = ", ".join(f"{name} ×{n}" if n > 1 else name for name, n in counts.items()) or "none"
+    return (
+        "(No final answer: the model returned an empty reply twice when asked to close the run. "
+        f"Tools called: {ran}. Whatever they changed is in the workspace, not in this message.)"
+    )
+
+
 def _looks_like_questions(text: str) -> bool:
     """A final answer that asks rather than narrates: a few lines end in a question mark, none is code."""
     if "```" in text:
@@ -1034,10 +1062,10 @@ class Agent:
                     f"Stop — you are repeating the same action ({tripped}). Do not call more tools. "
                     "Give your best final answer now with what you already have."
                 )
-                final = self._step([*messages, {"role": "user", "content": nudge}], spend=spend,
-                                   tools=None, on_token=on_token, usage=usage, model=run_model)
-                messages.append({"role": "assistant", "content": final.content})
-                return self._result(final.content, step, "tool_loop", messages, tool_calls_made,
+                final, answer = self._close(messages, nudge, tool_names=tool_names, spend=spend,
+                                            on_token=on_token, usage=usage, model=run_model)
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "tool_loop", messages, tool_calls_made,
                                     tool_names, usage, final.model, steplog=steplog, task=task)
 
         if contexto_travado is not None:
@@ -1050,13 +1078,39 @@ class Agent:
                                 task=task)
 
         # Budget exhausted: ask once more, without tools, for a final answer.
-        final = self._step([*messages, {"role": "user", "content": "Provide your final answer now."}], spend=spend,
-                           model=run_model,
-                           tools=None, on_token=on_token, usage=usage)
-        messages.append({"role": "assistant", "content": final.content})
-        return self._result(final.content, self.config.max_steps, "max_steps", messages,
+        final, answer = self._close(messages, "Provide your final answer now.", tool_names=tool_names,
+                                    spend=spend, on_token=on_token, usage=usage, model=run_model)
+        messages.append({"role": "assistant", "content": answer})
+        return self._result(answer, self.config.max_steps, "max_steps", messages,
                             tool_calls_made, tool_names, usage, final.model, steplog=steplog,
                             task=task)
+
+    def _close(
+        self,
+        messages: list[MessageLike],
+        nudge: str,
+        *,
+        tool_names: list[str],
+        on_token: Callable[[str], None] | None,
+        usage: _UsageTally,
+        spend: SpendBudget | None,
+        model: str | None,
+    ) -> tuple[CompletionResult, str]:
+        """The closing call, without tools: the result and the answer the run reports.
+
+        An empty reply is asked once more (`_EMPTY_CLOSE_NUDGE`), as `decisions.hosted` and the
+        fusion judge already do for the same failure; a second empty one is reported as what it is
+        (`_empty_close_note`) rather than as a blank answer. A reply with text costs no extra call."""
+        final = self._step([*messages, {"role": "user", "content": nudge}], spend=spend, tools=None,
+                           on_token=on_token, usage=usage, model=model)
+        if (final.content or "").strip():
+            return final, final.content
+        _log.info("the closing reply was empty; asking once more")
+        final = self._step([*messages, {"role": "user", "content": f"{nudge}\n\n{_EMPTY_CLOSE_NUDGE}"}],
+                           spend=spend, tools=None, on_token=on_token, usage=usage, model=model)
+        if (final.content or "").strip():
+            return final, final.content
+        return final, _empty_close_note(tool_names)
 
     def _step(
         self,
