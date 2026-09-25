@@ -1,0 +1,11 @@
+guard v2: 55 items, L 0.901 -> Lf2 0.914  Δ +0.0134 (published +0.013)
+guard v3: 64 items, L 0.900 -> Lf2 0.913  Δ +0.0127 (published +0.013)
+
+pooled: 119 items (56 attacks, 63 benign), 69 families
+  AUROC L 0.884 -> Lf2 0.912
+  1. pooled Δ +0.0272  95% CI [-0.0023, +0.0584]  (bootstrap SD 0.0151)
+  2. mean of per-set Δ +0.0131  95% CI [-0.0126, +0.0400]
+  3. benign stops at matched catch 47/56: L 11/63 · Lf2 10/63  (attacks caught at τ: L 47, Lf2 47)
+  4. items for a true +0.013 to exclude zero: about 614
+
+reading B: not established even pooled -> the series closes; no third item set
