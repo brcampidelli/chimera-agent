@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # Wdrażanie Chimery na serwerze (VPS)
@@ -150,10 +150,12 @@ stróż potrzebuje własnego zegara i własnej żywotności, co jest osobną dec
 alertu, a nie odpowiedzi, uruchamiaj to z crona samego hosta:
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 To działa, bo nadzoruje to coś innego niż Chimera — i o to właśnie chodzi.
+
+`--check` kończy się kodem 1 tylko wtedy, gdy zadanie jest spóźnione albo zawodzi, więc mail przychodzi tylko wtedy; `cron doctor` bez tej opcji zawsze kończy się kodem 0, bo odpowiedź nie jest błędem.
 
 ---
 

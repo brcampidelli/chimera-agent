@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # 在服务器（VPS）上部署 Chimera
@@ -144,10 +144,12 @@ chimera cron doctor
 警而不是回答，就从宿主机自己的 cron 里运行它：
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 这之所以有效，正是因为看着它的是 Chimera 之外的东西——这就是全部要点。
+
+`--check` 只在有任务延迟或失败时以 1 退出，所以邮件只在那时才到；不带该选项的 `cron doctor` 总是以 0 退出，因为回答不是失败。
 
 ---
 

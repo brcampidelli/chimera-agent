@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # Развёртывание Chimera на сервере (VPS)
@@ -152,10 +152,12 @@ chimera cron doctor
 нужно оповещение, а не ответ, запускайте это из собственного cron хоста:
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 Это работает, потому что за ним присматривает не сама Chimera, — в чём и весь смысл.
+
+`--check` завершается с кодом 1 только когда задание опоздало или падает, поэтому письмо приходит только тогда; `cron doctor` без этого флага всегда завершается с 0 — ответить на вопрос не значит упасть.
 
 ---
 

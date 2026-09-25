@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # Déployer Chimera sur un serveur (VPS)
@@ -155,10 +155,12 @@ propre vivacité, ce qui est une décision à part et est
 une alerte plutôt qu'une réponse, lancez-le depuis le cron de l'hôte lui-même :
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 Cela fonctionne parce que c'est supervisé par autre chose que Chimera — et c'est tout l'intérêt.
+
+`--check` ne sort avec 1 que lorsqu'une tâche est en retard ou échoue, donc le mail n'arrive qu'à ce moment-là ; `cron doctor` sans l'option sort toujours avec 0, car répondre n'est pas un échec.
 
 ---
 

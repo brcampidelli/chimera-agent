@@ -293,3 +293,43 @@ def test_cron_doctor_says_what_it_cannot_see(tmp_path: Path, monkeypatch: pytest
     out = CliRunner().invoke(app, ["cron", "doctor"]).output
     assert "on schedule" in out
     assert "nothing here watches while this process is not running" in out
+
+
+def test_cron_doctor_check_fails_only_when_something_is_wrong(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The exit code is what a watcher outside Chimera reads (#26).
+
+    Without it the host-cron line in docs/deploy.md mailed the same report every thirty minutes,
+    healthy or not. Plain `cron doctor` keeps exiting 0: it is a question, and answering it is not a
+    failure.
+    """
+    from typer.testing import CliRunner
+
+    from chimera.cli.main import app
+
+    sched = _cli_scheduler(tmp_path, monkeypatch)
+    runner = CliRunner()
+    assert runner.invoke(app, ["cron", "doctor", "--check"]).exit_code == 0, "healthy: nothing to alert"
+
+    sched.schedule_cron("esquecido", "0 * * * *", "do it", now=0.0)
+    late = runner.invoke(app, ["cron", "doctor", "--check"])
+    assert late.exit_code == 1 and "never dispatched" in late.output
+    assert runner.invoke(app, ["cron", "doctor"]).exit_code == 0, "without --check it still only answers"
+
+
+def test_cron_doctor_check_fails_on_a_job_that_runs_and_loses(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from chimera.cli.main import app
+
+    sched = _cli_scheduler(tmp_path, monkeypatch)
+    perdedor = _hourly(sched, "perdedor", 0.0)
+    sched.run_due(perdedor.next_run or 0.0, lambda _job: (_ for _ in ()).throw(RuntimeError("x")))
+    # Keep it from also being late: only the failure is left to report.
+    monkeypatch.setattr("time.time", lambda: (sched.store.get(perdedor.id).next_run or 0.0) - 60)
+
+    out = CliRunner().invoke(app, ["cron", "doctor", "--check"])
+    assert out.exit_code == 1 and "failing" in out.output and "never dispatched" not in out.output

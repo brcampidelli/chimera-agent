@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # Implantando o Chimera em um servidor (VPS)
@@ -151,10 +151,12 @@ partida. Um vigia de verdade precisa do próprio relógio e da própria vivacida
 um alerta em vez de uma resposta, rode isso a partir do cron do próprio host:
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 Isso funciona porque é supervisionado por algo que não é o Chimera — que é justamente o ponto.
+
+`--check` sai com 1 só quando há job atrasado ou falhando, então o e-mail só chega nessa hora; o `cron doctor` sem ele sai sempre com 0, porque responder não é falhar.
 
 ---
 
