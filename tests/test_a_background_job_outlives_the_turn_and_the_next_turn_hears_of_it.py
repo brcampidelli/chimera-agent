@@ -225,12 +225,16 @@ def test_the_api_lists_and_cancels_and_the_next_turn_is_told(
     import chimera.core
 
     seen_prompts: list[str] = []
+    seen_systems: list[str] = []
 
     class _Spy:
         def __init__(self, *a: Any, **kw: Any) -> None:
             # `build_agent` passes the config third and positional: Agent(gateway, registry, config)
             config = a[2] if len(a) > 2 else kw.get("config")
-            seen_prompts.append(str(getattr(config, "system_prompt", "") or ""))
+            # The job note travels in the turn notes since study 25 wave 2: true for this turn,
+            # absent from the stored transcript, and out of the system message a provider caches.
+            seen_prompts.append(str(getattr(config, "turn_notes", "") or ""))
+            seen_systems.append(str(getattr(config, "system_prompt", "") or ""))
 
         def run(self, task: str, **_: Any) -> Any:
             from chimera.core.agent import AgentResult
@@ -273,6 +277,7 @@ def test_the_api_lists_and_cancels_and_the_next_turn_is_told(
     assert "Background jobs that finished since your last turn" in prompt
     assert f"job {short_id} finished (exit 0)" in prompt and f"job {long_id} cancelled" in prompt
     assert "read the log with read_file" in prompt
+    assert "Background jobs" not in seen_systems[-1], "the note is back in the cached system message"
 
     client.post("/api/code/turn", json={"message": "de novo"})
     assert "Background jobs that finished" not in seen_prompts[-1], "told twice"

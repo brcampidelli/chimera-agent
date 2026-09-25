@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -257,6 +258,20 @@ class AgentConfig:
     # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
     # nothing matches. This is what connects the built-in skill library to the running loop.
     inject_skill_context: bool = True
+    #: Study 25, wave 2. On, everything that changes from turn to turn leaves the system message and
+    #: rides in a turn-context block at the head of this turn's user message, which the transcript
+    #: gets back bare when the run ends (:mod:`chimera.prompts.context`):
+    #: - the retrieved skills and cards;
+    #: - :attr:`turn_notes`;
+    #: - the date, system, working directory and git state.
+    #:
+    #: The system message is then the same bytes on every turn, so a provider can cache it. Off by
+    #: default, so a library caller and every bench keep the old placement. The surfaces that
+    #: answer a person turn it on (`tests/test_the_owner_is_heard_on_every_surface.py` lists them).
+    turn_context: bool = False
+    #: Text that is true for this turn only, put in the turn context: recalled facts, a job that
+    #: finished, the approved plan. Only read when :attr:`turn_context` is on.
+    turn_notes: str = ""
     # A cheap model picks the tool NAME before each step and the executor is given only that tool
     # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
     # (study 20 B4), it spends money of its own, and nothing outside `bench/tool_router` asks for it.
@@ -483,6 +498,8 @@ class Agent:
         # that mints cards promised "a learned skill is read back when it matches the task", and on
         # the surface most people use, nothing learned ever came back.
         self.cards = cards
+        # Per-thread state of the run in progress (see `run`, where the turn context is swapped).
+        self._local = threading.local()
 
     def compose_system_prompt(self, task: str) -> str:
         """The system message this agent sends for ``task``, in the order it is assembled.
@@ -500,13 +517,15 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{UNTRUSTED_DATA_RULE}"
         if self.config.prefix_nonce:
             system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
-        skill_block = self._skill_context(task)
+        # Under `turn_context` the retrieved skills and cards change with the task, so they go to
+        # the turn context instead (see `compose_turn_context`) and the system stays one string.
+        skill_block = "" if self.config.turn_context else self._skill_context(task)
         if skill_block:
             system_prompt = f"{system_prompt}\n\n{skill_block}"
         # What it LEARNED, after what it shipped with: a card comes from a run that
         # actually worked here, so it is the more specific advice of the two. Advisory
         # either way — the cards suggest, the verifier decides.
-        card_block = self._card_context(task)
+        card_block = "" if self.config.turn_context else self._card_context(task)
         if card_block:
             system_prompt = f"{system_prompt}\n\n{card_block}"
         # After the skills, so the project's own conventions outrank a generic skill card that
@@ -536,6 +555,25 @@ class Agent:
         if _find_tool(self.tools, "todo_write") is not None:
             system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         return system_prompt
+
+    def compose_turn_context(self, task: str) -> str:
+        """The block that heads this turn's user message, or "" when :attr:`AgentConfig.turn_context`
+        is off.
+
+        Everything in it changes between turns, which is why none of it is in the system message.
+        The environment comes first because it frames the rest; the notes come last, closest to the
+        user's words, because they are the most specific.
+        """
+        if not self.config.turn_context:
+            return ""
+        from chimera.prompts.context import environment_facts, turn_context
+
+        return turn_context(
+            environment_facts(self.config.project_root),
+            self._skill_context(task),
+            self._card_context(task),
+            self.config.turn_notes,
+        )
 
     def _skill_context(self, task: str) -> str:
         """Task-relevant built-in skills as a prompt block ("" when none match or on any error)."""
@@ -671,6 +709,22 @@ class Agent:
         # The system message is rebuilt every turn rather than carried in ``history``: skills are
         # retrieved for THIS task and the project instructions follow the file now in focus, so a
         # stale system message would pin both to whatever the first turn happened to be about.
+        # What this turn's user message is, and what the transcript keeps of it. Different only
+        # when a turn context heads the message: the model reads the context, the stored
+        # conversation keeps the user's words (study 25, wave 2).
+        bare_turn: dict[str, Any] = (
+            {"role": "user", "content": task, "images": list(images)}
+            if images
+            else {"role": "user", "content": task}
+        )
+        context_block = self.compose_turn_context(task)
+        turn_message: dict[str, Any] = (
+            {**bare_turn, "content": f"{context_block}\n\n{task}"} if context_block else bare_turn
+        )
+        # Handed to `_result` through a thread-local rather than threaded through its six call sites:
+        # one Agent can serve concurrent runs (a shared crew registry, a bot answering two chats),
+        # and each run must swap back the turn it sent, not another thread's.
+        self._local.turn_swap = (turn_message, bare_turn) if context_block else None
         messages: list[MessageLike] = [
             {"role": "system", "content": system_prompt},
             *(history or []),
@@ -678,11 +732,7 @@ class Agent:
             # encodes each one into the request, so carrying them forward would re-send the same
             # picture on every subsequent turn of the conversation — paid for again each time, and
             # for a model with a small context window, eventually instead of the conversation.
-            (
-                {"role": "user", "content": task, "images": list(images)}
-                if images
-                else {"role": "user", "content": task}
-            ),
+            turn_message,
         ]
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0
@@ -1068,8 +1118,21 @@ class Agent:
         route_meta: dict[str, Any] | None = None,
         steplog: StepLog | None = None,
         task: str = "",
+        turn_swap: tuple[MessageLike, MessageLike] | None = None,
     ) -> AgentResult:
-        """Assemble the final result from the per-call costs the tally already accumulated."""
+        """Assemble the final result from the per-call costs the tally already accumulated.
+
+        ``turn_swap`` is ``(sent, kept)``: the user message this turn sent, with its turn context,
+        and the bare one the transcript keeps in its place. Matched by identity, so a compaction
+        that already folded the sent message into a summary leaves nothing to swap.
+        """
+        local = getattr(self, "_local", None)
+        if turn_swap is None and local is not None:
+            turn_swap = getattr(local, "turn_swap", None)
+            local.turn_swap = None
+        if turn_swap is not None:
+            sent, kept = turn_swap
+            transcript = [kept if m is sent else m for m in transcript]
         from chimera.obs import record_llm_metrics
 
         log = steplog if steplog is not None else StepLog()

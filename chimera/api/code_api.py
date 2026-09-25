@@ -1195,21 +1195,22 @@ def register_code_api(
             extra_tools=extra_tools,
             run_id=run_id,
         )
-        # Recalled facts ride in the SYSTEM prompt, and that placement is load-bearing: `absorb`
-        # drops system messages when it stores the transcript, so the recall is refreshed each turn
-        # instead of accumulating stale copies of itself in the conversation forever.
+        # Recalled facts and the turn's notes go in the TURN CONTEXT, not the system prompt (study
+        # 25, wave 2). They used to be appended to the system prompt so that `absorb`, which drops
+        # system messages when it stores the transcript, would not keep stale copies. The turn
+        # context keeps that property, because the loop puts the bare user message back into the
+        # transcript. And the system message is now the same bytes every turn, where before it
+        # changed about 318 tokens in whenever a fact, a job or a work did, so a provider could
+        # cache almost none of it.
         from chimera.core.agent import DEFAULT_SYSTEM_PROMPT
+        from chimera.prompts.context import facts_block
 
         system_prompt = DEFAULT_SYSTEM_PROMPT
-        if facts:
-            system_prompt += "\n\nRelevant facts from memory:\n" + "\n".join(
-                f"- {f}" for f in facts
-            )
-        # Same placement, same reason: true for this turn, absent from the stored transcript.
-        if note:
-            system_prompt += f"\n\n{note}"
+        # The spoken note stays: it is the contract of the surface (voice or text), the same on every
+        # turn of a spoken conversation, not something that is true of one turn.
         if req.spoken:
             system_prompt += f"\n\n{SPOKEN_NOTE}"
+        turn_notes = "\n\n".join(part for part in (facts_block(facts), note) if part)
         model, thinking = _model_for(req, live())
         agent = Agent(
             gateway,
@@ -1217,6 +1218,8 @@ def register_code_api(
             AgentConfig(
                 model=model,
                 system_prompt=system_prompt,
+                turn_context=True,
+                turn_notes=turn_notes,
                 thinking=thinking,
                 max_steps=steps,
                 context_budget=req.context_budget,
@@ -1458,10 +1461,10 @@ def register_code_api(
         message = req.message
         if doc_blocks:
             message = message + "\n\n" + "\n\n".join(doc_blocks)
-        # What the model is told about the image it did not get. In the SYSTEM prompt, not
-        # appended to the user's message, and that placement is the difference between a note and
-        # a defacement: `absorb` drops system messages when it stores the transcript, so this
-        # reaches the model for this turn and never becomes part of what the user said. Appended
+        # What the model is told about the image it did not get. In the turn context, not appended
+        # to the user's message, and that placement is the difference between a note and a
+        # defacement: the loop stores the user's message bare, so this reaches the model for this
+        # turn and never becomes part of what the user said. Appended
         # to the message it also became the conversation's TITLE in the sidebar — a row reading
         # "what do you see in this image? [The user attached `6d2b57e5…" — because a title is the
         # first thing the user asked, and this was pretending to be part of it.
@@ -1848,11 +1851,13 @@ def register_code_api(
                         })
                         return
                     if verdict.plan is not None:
-                        # The approved steps, into the SYSTEM prompt — same placement and same
-                        # reason as the recalled facts above: `absorb` drops system messages, so
-                        # this steers the turn without being recorded as something the user said.
-                        agent.config.system_prompt += "\n\n" + _plan_gate.as_system_note(
-                            verdict.plan
+                        # The approved steps, into the turn context: same placement and same reason
+                        # as the recalled facts above. It steers this turn without being recorded as
+                        # something the user said, and without changing the cached system message.
+                        approved = _plan_gate.as_system_note(verdict.plan)
+                        agent.config.turn_notes = (
+                            f"{agent.config.turn_notes}\n\n{approved}" if agent.config.turn_notes
+                            else approved
                         )
 
                 external = (req.provider or "").strip().lower()

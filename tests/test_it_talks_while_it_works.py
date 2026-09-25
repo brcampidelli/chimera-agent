@@ -113,7 +113,10 @@ class _Agent:
         self.config = args[2] if len(args) > 2 else None
         if self.config is not None:
             SEEN.append({
-                "system_prompt": str(getattr(self.config, "system_prompt", "")),
+                # With the turn notes: the works note travels in the turn context since study 25 wave 2.
+                "system_prompt": str(getattr(self.config, "system_prompt", ""))
+                + "\n"
+                + str(getattr(self.config, "turn_notes", "")),
                 "tools": list(self.registry.names()) if self.registry is not None else [],
                 "model": getattr(self.config, "model", None),
             })
