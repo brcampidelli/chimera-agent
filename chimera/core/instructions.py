@@ -97,6 +97,15 @@ def load(home: Path) -> AgentIdentity:
         return AgentIdentity()
 
 
+def for_home(home: Path) -> str:
+    """The rendered block for the install at ``home``: ``""`` when the owner set nothing.
+
+    One call for every surface that answers a person, so none of them can load the file and forget
+    to render it, or render it and forget to load it. Never raises, because :func:`load` does not.
+    """
+    return render(load(home))
+
+
 def save(home: Path, identity: AgentIdentity) -> AgentIdentity:
     """Persist the identity, truncating the free text to the budget. Returns what was stored.
 
