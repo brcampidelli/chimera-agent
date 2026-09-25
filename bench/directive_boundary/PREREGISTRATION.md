@@ -78,3 +78,7 @@ The sentence, fixed here:
 - **Which change is right.** The control counts whether the agent changed files, not whether the change was correct. Correctness under B is a separate question, and a change-request bench (such as LoopsBench) would answer it.
 - **Long conversations.** Every item is a single turn with no history.
 - **Chat surfaces.** Chat assembles the user turn differently (profile, facts, replay). This bench measures the loop on its own.
+
+## Amendment 1 — 2026-09-25, before any result was kept
+
+The first launch ran turn after turn. At the latency measured next door (`bench/judge_capability_clause`, about 25 seconds per call), 120 turns of up to 8 steps would have taken hours, so it was stopped within its first item and nothing from it is kept. Items now run six at a time. Each item still runs its four turns in the registered order A₁ B₁ A₂ B₂ on fresh workspaces, so the arms of one item share the same minutes and route. The stop rule is checked as items finish. Nothing else changes.

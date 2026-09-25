@@ -95,31 +95,49 @@ def _turn(backend: _Pinned, arm: str, item: Item) -> dict[str, Any]:
         shutil.rmtree(ws, ignore_errors=True)
 
 
-def run(out: Path, replicas: int) -> None:
+def _item(backend: _Pinned, item: Item, replicas: int) -> dict[str, Any]:
+    """One item's turns, in the registered order A1 B1 A2 B2."""
+    row: dict[str, Any] = {"id": item.id, "kind": item.kind, "runs": {"A": [], "B": []}}
+    for _replica in range(replicas):
+        for arm in ("A", "B"):
+            row["runs"][arm].append(_turn(backend, arm, item))
+    return row
+
+
+def run(out: Path, replicas: int, workers: int) -> None:
+    """Amendment 1: items run in parallel (each keeps its A1 B1 A2 B2 order), because one turn after
+    another the run would have taken hours. The stop rule is checked as items finish."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
     backend = _Pinned()
     rows: list[dict[str, Any]] = []
     errors = {"A": 0, "B": 0}
     turns = {"A": 0, "B": 0}
     usd = 0.0
-    for index, item in enumerate(ITEMS, 1):
-        row: dict[str, Any] = {"id": item.id, "kind": item.kind, "runs": {"A": [], "B": []}}
-        for _replica in range(replicas):
+    stopped = False
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(_item, backend, item, replicas): item for item in ITEMS}
+        for done, future in enumerate(as_completed(futures), 1):
+            item, row = futures[future], future.result()
+            rows.append(row)
             for arm in ("A", "B"):
-                got = _turn(backend, arm, item)
-                row["runs"][arm].append(got)
-                turns[arm] += 1
-                errors[arm] += int(got["error"] is not None)
-                usd += got.get("usd") or 0.0
-        rows.append(row)
-        marks = {arm: "".join("E" if r["error"] else ("W" if r["changed"] else ".") for r in row["runs"][arm])
-                 for arm in ("A", "B")}
-        print(f"  [{index:>2}/{len(ITEMS)}] {item.kind:9} {item.id:<16} A={marks['A']:<3} B={marks['B']:<3} "
-              f"US${usd:.3f}", flush=True)
-        for arm in ("A", "B"):
-            if turns[arm] >= 10 and errors[arm] / turns[arm] > 0.10:
-                print(f"STOP RULE: arm {arm} errored on {errors[arm]}/{turns[arm]} turns")
-                _write(out, rows, usd, errors)
-                return
+                for got in row["runs"][arm]:
+                    turns[arm] += 1
+                    errors[arm] += int(got["error"] is not None)
+                    usd += got.get("usd") or 0.0
+            marks = {arm: "".join("E" if r["error"] else ("W" if r["changed"] else ".") for r in row["runs"][arm])
+                     for arm in ("A", "B")}
+            print(f"  [{done:>2}/{len(ITEMS)}] {item.kind:9} {item.id:<16} A={marks['A']:<3} B={marks['B']:<3} "
+                  f"US${usd:.3f}", flush=True)
+            for arm in ("A", "B"):
+                if not stopped and turns[arm] >= 10 and errors[arm] / turns[arm] > 0.10:
+                    print(f"STOP RULE: arm {arm} errored on {errors[arm]}/{turns[arm]} turns")
+                    stopped = True
+            if stopped:
+                for pending in futures:
+                    pending.cancel()
+                break
+    rows.sort(key=lambda r: [i.id for i in ITEMS].index(r["id"]))
     _write(out, rows, usd, errors)
 
 
@@ -198,6 +216,7 @@ def main() -> None:
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--report", type=Path)
     ap.add_argument("--replicas", type=int, default=2)
+    ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--out", type=Path, default=HERE / "results" / "run.json")
     args = ap.parse_args()
     if args.report:
@@ -206,7 +225,7 @@ def main() -> None:
         i = SYSTEM_B.index(SENTENCE)
         print(SYSTEM_B[max(0, i - 160): i + len(SENTENCE) + 80])
     elif args.run:
-        run(args.out, args.replicas)
+        run(args.out, args.replicas, args.workers)
     else:
         ap.error("pass --run, --check or --report")
 
