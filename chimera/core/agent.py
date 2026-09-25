@@ -121,6 +121,28 @@ _ACTION_NUDGE = (
 )
 
 
+#: The nudge for a run that answered with questions instead of acting.
+#:
+#: ``insist_on_action`` is set only where nobody answers mid-run (``solve``, ``/api/runs``). The
+#: default prompt allows up to three blocking questions, and the one nudge that existed answered
+#: them with "you described a solution but did not carry it out", which is false of a question
+#: and leaves the question standing. This one says what is true of this run and what to do
+#: instead (study 25, defect 5).
+_ASSUME_NUDGE = (
+    "Nobody can answer questions during this run. For each question you asked, choose the most "
+    "reasonable reading, state it in one line at the top of your answer, and then do the task with "
+    "your tools."
+)
+
+
+def _looks_like_questions(text: str) -> bool:
+    """A final answer that asks rather than narrates: a few lines end in a question mark, none is code."""
+    if "```" in text:
+        return False
+    asked = [line for line in text.splitlines() if line.strip().endswith("?")]
+    return 0 < len(asked) <= 5
+
+
 def _looks_like_unexecuted_plan(text: str) -> bool:
     """Heuristic: a final 'answer' that hands the user a command/plan instead of reporting a change.
 
@@ -861,7 +883,9 @@ class Agent:
                 ):
                     nudged = True
                     messages.append({"role": "assistant", "content": result.content})
-                    messages.append({"role": "user", "content": _ACTION_NUDGE})
+                    asked = tool_calls_made == 0 and _looks_like_questions(result.content)
+                    nudge = _ASSUME_NUDGE if asked else _ACTION_NUDGE
+                    messages.append({"role": "user", "content": nudge})
                     continue
                 messages.append({"role": "assistant", "content": result.content})
                 return self._result(result.content, step, "final", messages, tool_calls_made,
