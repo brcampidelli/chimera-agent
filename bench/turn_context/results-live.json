@@ -1,0 +1,324 @@
+{
+  "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+  "arms": {
+    "before": {
+      "nonce": "e048bd39",
+      "prompt_tokens": 22954,
+      "cached_tokens": 10240,
+      "cached_share": 0.446,
+      "providers": [
+        "DeepInfra",
+        "Makora",
+        "Reka",
+        "Relace"
+      ],
+      "rows": [
+        {
+          "request": 0,
+          "prompt_tokens": 426,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 1,
+          "prompt_tokens": 485,
+          "cached_tokens": 0,
+          "provider": "Relace"
+        },
+        {
+          "request": 2,
+          "prompt_tokens": 544,
+          "cached_tokens": 0,
+          "provider": "Reka"
+        },
+        {
+          "request": 3,
+          "prompt_tokens": 524,
+          "cached_tokens": 0,
+          "provider": "Makora"
+        },
+        {
+          "request": 4,
+          "prompt_tokens": 626,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 5,
+          "prompt_tokens": 685,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 6,
+          "prompt_tokens": 744,
+          "cached_tokens": 0,
+          "provider": "Relace"
+        },
+        {
+          "request": 7,
+          "prompt_tokens": 803,
+          "cached_tokens": 512,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 8,
+          "prompt_tokens": 842,
+          "cached_tokens": 256,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 9,
+          "prompt_tokens": 901,
+          "cached_tokens": 256,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 10,
+          "prompt_tokens": 960,
+          "cached_tokens": 768,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 11,
+          "prompt_tokens": 940,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 12,
+          "prompt_tokens": 942,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 13,
+          "prompt_tokens": 1001,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 14,
+          "prompt_tokens": 1060,
+          "cached_tokens": 768,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 15,
+          "prompt_tokens": 1119,
+          "cached_tokens": 768,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 16,
+          "prompt_tokens": 1112,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 17,
+          "prompt_tokens": 1171,
+          "cached_tokens": 1024,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 18,
+          "prompt_tokens": 1230,
+          "cached_tokens": 1024,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 19,
+          "prompt_tokens": 1289,
+          "cached_tokens": 1024,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 20,
+          "prompt_tokens": 1299,
+          "cached_tokens": 256,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 21,
+          "prompt_tokens": 1358,
+          "cached_tokens": 1024,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 22,
+          "prompt_tokens": 1417,
+          "cached_tokens": 1280,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 23,
+          "prompt_tokens": 1476,
+          "cached_tokens": 1280,
+          "provider": "DeepInfra"
+        }
+      ]
+    },
+    "after": {
+      "nonce": "243df521",
+      "prompt_tokens": 26453,
+      "cached_tokens": 15226,
+      "cached_share": 0.576,
+      "providers": [
+        "DeepInfra",
+        "Inceptron",
+        "Mancer 2",
+        "OpenInference",
+        "Relace",
+        "Sail Research",
+        "StreamLake"
+      ],
+      "rows": [
+        {
+          "request": 0,
+          "prompt_tokens": 529,
+          "cached_tokens": 0,
+          "provider": "DeepInfra"
+        },
+        {
+          "request": 1,
+          "prompt_tokens": 588,
+          "cached_tokens": 0,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 2,
+          "prompt_tokens": 647,
+          "cached_tokens": 512,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 3,
+          "prompt_tokens": 706,
+          "cached_tokens": 512,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 4,
+          "prompt_tokens": 729,
+          "cached_tokens": 256,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 5,
+          "prompt_tokens": 788,
+          "cached_tokens": 512,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 6,
+          "prompt_tokens": 847,
+          "cached_tokens": 768,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 7,
+          "prompt_tokens": 906,
+          "cached_tokens": 768,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 8,
+          "prompt_tokens": 945,
+          "cached_tokens": 512,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 9,
+          "prompt_tokens": 1004,
+          "cached_tokens": 768,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 10,
+          "prompt_tokens": 1063,
+          "cached_tokens": 768,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 11,
+          "prompt_tokens": 1122,
+          "cached_tokens": 1024,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 12,
+          "prompt_tokens": 1124,
+          "cached_tokens": 768,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 13,
+          "prompt_tokens": 1183,
+          "cached_tokens": 1024,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 14,
+          "prompt_tokens": 1242,
+          "cached_tokens": 1024,
+          "provider": "Sail Research"
+        },
+        {
+          "request": 15,
+          "prompt_tokens": 1301,
+          "cached_tokens": 0,
+          "provider": "StreamLake"
+        },
+        {
+          "request": 16,
+          "prompt_tokens": 1294,
+          "cached_tokens": 0,
+          "provider": "Relace"
+        },
+        {
+          "request": 17,
+          "prompt_tokens": 1274,
+          "cached_tokens": 0,
+          "provider": "Inceptron"
+        },
+        {
+          "request": 18,
+          "prompt_tokens": 1412,
+          "cached_tokens": 0,
+          "provider": "Relace"
+        },
+        {
+          "request": 19,
+          "prompt_tokens": 1471,
+          "cached_tokens": 0,
+          "provider": "Mancer 2"
+        },
+        {
+          "request": 20,
+          "prompt_tokens": 1481,
+          "cached_tokens": 1481,
+          "provider": "OpenInference"
+        },
+        {
+          "request": 21,
+          "prompt_tokens": 1540,
+          "cached_tokens": 1371,
+          "provider": "OpenInference"
+        },
+        {
+          "request": 22,
+          "prompt_tokens": 1599,
+          "cached_tokens": 1599,
+          "provider": "OpenInference"
+        },
+        {
+          "request": 23,
+          "prompt_tokens": 1658,
+          "cached_tokens": 1559,
+          "provider": "OpenInference"
+        }
+      ]
+    }
+  }
+}

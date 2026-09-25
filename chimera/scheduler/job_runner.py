@@ -95,6 +95,7 @@ def make_run_job(
                 # owner who had configured Portuguese, because the same rendered block carries the
                 # "always answer in {language}" line.
                 instructions=render_identity(load_identity(settings.home)),
+                turn_context=True,
                 # The path that runs the most was the one with no step-level record at all. Without
                 # it there is no success-versus-context curve, no replay of a job that went wrong,
                 # and no reliability bench for the 24/7 loop — every one of those reads this file.

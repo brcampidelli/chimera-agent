@@ -97,6 +97,18 @@ def test_every_surface_that_answers_a_person_passes_the_owner() -> None:
     assert not missing, f"these agents answer a person without the owner's identity: {missing}"
 
 
+def test_every_surface_that_answers_a_person_keeps_its_system_message_stable() -> None:
+    """Study 25, wave 2: the same surfaces put what changes per turn in the turn context, so the
+    system message a provider caches is the same bytes on every turn."""
+    missing = [
+        f"{rel}:{node.lineno} ({name})"
+        for rel, name, node in _agent_configs()
+        if (rel, name) in ANSWERS_A_PERSON
+        and not any(k.arg == "turn_context" and getattr(k.value, "value", None) is True for k in node.keywords)
+    ]
+    assert not missing, f"these agents answer a person without turn_context=True: {missing}"
+
+
 def test_the_lists_do_not_go_stale() -> None:
     built = {(rel, name) for rel, name, _ in _agent_configs()}
     assert built >= ANSWERS_A_PERSON, sorted(ANSWERS_A_PERSON - built)

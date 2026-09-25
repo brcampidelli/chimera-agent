@@ -160,6 +160,7 @@ class MessagingManager:
                     project_root=self._workspace,
                     # The owner's identity, as on every surface that answers a person.
                     instructions=owner_identity(self._settings.home),
+                    turn_context=True,
                 ),
             )
             return ChatSession(

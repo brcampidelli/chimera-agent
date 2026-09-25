@@ -1157,6 +1157,7 @@ def agent(
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=Path(workspace),
                 instructions=owner_identity(get_settings().home),
+                turn_context=True,
             ),
         )
         result = runner.run(task)
@@ -1870,6 +1871,7 @@ def chat(
             # surface did, so one configuration produced two agents that answered differently
             # depending on which window you opened.
             instructions=render_identity(load_identity(settings.home)),
+            turn_context=True,
         ),
     )
     mem = None if no_memory else _memory_manager()
@@ -2086,6 +2088,7 @@ def assist(
             max_steps=max_steps,
             project_root=Path(workspace),
             instructions=render_identity(load_identity(settings.home)),
+            turn_context=True,
         ),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
@@ -2390,6 +2393,7 @@ def tui(
             # opened. Nothing failed and nothing said so — the only symptom is a reply that reads
             # like a stranger's.
             instructions=render_identity(load_identity(settings.home)),
+            turn_context=True,
         ),
     )
     mem = None if no_memory else _memory_manager()
@@ -2553,6 +2557,7 @@ def serve(
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 instructions=owner_identity(settings.home),
+                turn_context=True,
             ),
         )
         return ChatSession(
@@ -2918,6 +2923,7 @@ def desktop_app(
                 # The same identity the coding turn applies. Without it a Discord bot and the app
                 # would answer as two different agents from one configuration.
                 instructions=render_identity(load_identity(live.home)),
+                turn_context=True,
                 # …and the same workspace that roots the tools below, so the project's own
                 # conventions reach the app's chat the way they reach `solve`.
                 project_root=workspace_path,
@@ -3070,6 +3076,7 @@ def _start_cron_daemon(
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace,
                 instructions=owner_identity(get_settings().home),
+                turn_context=True,
             ),
         )
         return agent.run(task).answer
@@ -3185,6 +3192,7 @@ def acp_server(
             project_root=workspace_path,
             trace_path=settings.home / "traces.jsonl",
             instructions=owner_identity(settings.home),
+            turn_context=True,
         ),
     )
 
@@ -3239,6 +3247,7 @@ def _serve_mcp(
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 instructions=owner_identity(get_settings().home),
+                turn_context=True,
             ),
         )
         auto = AutonomousAgent(
@@ -3299,6 +3308,7 @@ def _build_a2a(
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 instructions=owner_identity(get_settings().home),
+                turn_context=True,
             ),
         )
         auto = AutonomousAgent(
@@ -3372,6 +3382,7 @@ def _serve_platform(
                 # bot `serve --discord` starts answered as a different agent from the one the
                 # owner configured, in whatever language the message happened to be in.
                 instructions=owner_identity(get_settings().home),
+                turn_context=True,
             ),
         )
         return ChatSession(
@@ -4616,6 +4627,7 @@ def solve(
             # repository it is solving in — the same instructions every other agent tool reads.
             project_root=ws,
             instructions=owner_identity(get_settings().home),
+            turn_context=True,
             # One JSONL line per worker run: per-step tokens, cache hit rate, the tools called, and
             # the drift assessment. This is the only place the step log is persisted, so without it
             # every measurement the loop takes dies with the process.
@@ -5042,6 +5054,7 @@ def solve_batch(
                     context_budget=context_budget,
                     project_root=ws,
                     instructions=owner_identity(get_settings().home),
+                    turn_context=True,
                 ),
             )
             auto = AutonomousAgent(

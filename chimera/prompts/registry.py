@@ -174,6 +174,13 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("loop.project_instructions", "chimera.core.agents_md:load_agent_instructions", "project", _ALL),
     _i("loop.owner_identity", "chimera.core.instructions:render", "owner",
        ("S1", "S2", "S3", "S5", "S10")),
+    # ---- the turn context (wave 2): what changes per turn, out of the system message -----------
+    _c("context.open", "chimera.prompts.context:TURN_CONTEXT_OPEN", "volatile", _ALL, "unmeasured",
+       note="heads the turn's user message; the transcript keeps the message bare"),
+    _c("context.close", "chimera.prompts.context:TURN_CONTEXT_CLOSE", "volatile", _ALL, "unmeasured"),
+    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile", ("S2", "S4"),
+       "unmeasured", note="recalled facts, labelled as recall that the present overrides"),
+    _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
     # ---- compaction and memory -----------------------------------------------------------------
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
        "measured", "bench/compaction: fired 0 times in 137 real runs"),

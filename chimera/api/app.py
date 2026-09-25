@@ -2526,6 +2526,7 @@ def _build_solve_agent(
         # And the owner's own instructions, which outrank it — a repository is a convention, this is
         # the person who runs the agent. Read per run, not held from boot.
         instructions=render_identity(load_identity(settings.home)),
+        turn_context=True,
         # Same trace the CLI writes, in the same place — a run started from the app and one started
         # from a terminal should leave the same evidence.
         trace_path=settings.home / "traces.jsonl",
