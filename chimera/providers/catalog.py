@@ -117,13 +117,15 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
-        0.15, 0.50, tools=True, context_k=1048, also_seen=((0.075, 0.25),),
+        0.045, 0.60, tools=True, context_k=1048, also_seen=((0.075, 0.25), (0.15, 0.50)),
         notes="a third-party agentic index of 58.2, within a point of claude-opus-5 at 33x the\n"
         "        input price. Read 0.075/0.25 here until the live check on 2026-09-10 found it\n"
         "        DOUBLED to 0.15/0.50 — still the best price-to-index in this tier, by half the\n"
-        "        margin the earlier note claimed. NOT the default, and the reason is measured: on\n"
-        "        the same one-file probe it took 257s against 72s for the slug above. Reach for it\n"
-        "        when the window or the index matters more than latency",
+        "        margin the earlier note claimed. On 2026-09-24 the live check on main turned red\n"
+        "        again: the index now quotes 0.045 in / 0.60 out (input cheaper, output dearer);\n"
+        "        both earlier figures stay in also_seen. NOT the default, and the reason is\n"
+        "        measured: on the same one-file probe it took 257s against 72s for the slug above.\n"
+        "        Reach for it when the window or the index matters more than latency",
     ),
     CatalogEntry(
         "openrouter/deepseek/deepseek-chat-v3.1", "mid", "DeepSeek",
