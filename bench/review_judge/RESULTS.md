@@ -405,3 +405,176 @@ Not a fifth wording. The candidates the data actually points at:
 - **A larger sample before any of it.** At n=105 with 53 incorrect comments, a 10-point difference
   in recall is roughly the width of the confidence interval. The full slice is 1017 rows and US$ 3.66;
   after five arms at US$ 0.5, the cheap thing has stopped being cheap relative to what it buys.
+
+---
+
+# The full slice — arm C out of sample (the pre-registered read)
+
+Runs 2026-08-20 · same judge (`openrouter/deepseek/deepseek-r1`), same prompts, temperature 0 · arm A
+8.3 h, arm C 11.7 h · read 2026-09-24 from the files on disk, no model calls, US$ 0 ·
+`read_full.py` → `results/full_read.txt`
+
+`PREREGISTRATION-full.md` fixed three things before either arm ran: every result reported three
+times — over all rows, over the **105 items arm C's rubric was written against**, and over the rest;
+the out-of-sample figure as the headline; and a clause — *if C's advantage over A shrinks materially
+between the two, the rubric was fitted to the pilot's misses and the reading of the last five arms
+changes, retroactively.*
+
+Both arms finished on 2026-08-20. Their numbers went into two commit messages (5787f481 for A;
+26af6e42 for C, inside an unrelated PR) and never into this file, and the in/out split — the thing
+the run existed to measure — was never computed. The second message was headed "arm C out of
+sample", but the C − A it quoted (+9.4) was over all 919 rows, and subtracted from rounded rates; the
+exact all-rows figure is +9.3. This section is the read that was registered.
+
+## Before any number
+
+- **The guard.** `read_full.py` rebuilds both `summary.json` files from `details.jsonl` — thirteen
+  fields each, all identical — and reproduces the paired interval this file published for the pilot's
+  arm C ([+30.5, +48.4]). Nothing below is read unless both hold. Both hold.
+- **`row_id` is 0 on every row.** The dataset has no `__index__` field, so the runner's id is a
+  constant. Items are keyed by content (repo, PR, path, lines, comment, label) instead, and every key
+  is unique.
+- **The in-sample mark is the pilot's 105, exactly.** The runner's `in_pilot` flag matches the items
+  graded in the three pilot arms still on disk, and in the pilot's own arm A and arm C files, which
+  the full run overwrote in place and which survive in git (3ba341bf, 029e89f6).
+
+## Survival
+
+| | planned | graded | dropped (no diff) | incorrect | correct |
+|---|---:|---:|---:|---:|---:|
+| all | 1017 | 919 | 98 | 235 | 684 |
+| in sample | 105 | 105 | 0 | 53 | 52 |
+| out of sample | 912 | **814** | 98 | 182 | 632 |
+
+All 105 in-sample items survive; the out-of-sample half is **814 of 912**, not 912. Fifteen of the 98
+dropped rows are pilot draws that had no diff in the pilot either — never graded, never read by
+anyone designing a prompt, so out of sample by the pre-registration's own definition (checked against
+the local dataset cache, which is not committed). The 700-row condition does not fire: 919 survived,
+and 814 out of sample alone.
+
+## Both arms, three ways
+
+Wilson 95%. J = rejection recall − false rejection, in points.
+
+| | arm | rejection recall | false rejection | reject rate | J |
+|---|---|---:|---:|---:|---:|
+| all | A | 17.9% (42/235) [13.5%, 23.3%] | 7.5% (51/684) [5.7%, 9.7%] | 10.1% | +10.4 |
+| all | C | 62.6% (147/235) [56.2%, 68.5%] | 42.8% (293/684) [39.2%, 46.6%] | 47.9% | +19.7 |
+| in sample | A | 20.8% (11/53) [12.0%, 33.5%] | 5.8% (3/52) [2.0%, 15.6%] | 13.3% | +15.0 |
+| in sample | C | 62.3% (33/53) [48.8%, 74.1%] | 34.6% (18/52) [23.2%, 48.2%] | 48.6% | +27.6 |
+| **out of sample** | **A** | **17.0% (31/182) [12.3%, 23.2%]** | 7.6% (48/632) [5.8%, 9.9%] | 9.7% | +9.4 |
+| **out of sample** | **C** | 62.6% (114/182) [55.4%, 69.3%] | **43.5% (275/632) [39.7%, 47.4%]** | 47.8% | +19.1 |
+
+No uninformative condition fires in any subset: 0 unparsed answers and 0 failed calls in both arms,
+reject rates between 9.7% and 48.6%, and at least 17 discordant pairs on every paired comparison.
+
+## C − A, paired over the same items
+
+ΔTPR and ΔFPR use `chimera/eval/paired.py` (McNemar, Wilson on the discordant pairs), the method
+`PREREGISTRATION-arms.md` and `-rubric.md` fixed. **No pre-registration here specified a paired
+method for J**, so ΔJ uses a paired bootstrap over items, resampled within label, seed 20260819,
+10,000 draws, percentile interval — chosen for this read, not in advance. A normal-approximation
+interval on the same pairs agrees with it within 0.5 points in every row.
+
+| | ΔTPR | ΔFPR | **ΔJ** |
+|---|---:|---:|---:|
+| all | +44.7 [+40.9, +45.4] · 106 vs 1 | +35.4 [+33.4, +36.3] · 248 vs 6 | +9.3 [+1.9, +16.9] |
+| in sample | +41.5 [+27.0, +44.6] · 23 vs 1 | +28.8 [+15.1, +32.0] · 16 vs 1 | +12.7 [−6.4, +31.8] |
+| **out of sample** | +45.6 [+41.6, +45.6] · 83 vs 0 | +35.9 [+33.9, +36.8] · 232 vs 5 | **+9.7 [+1.7, +17.8]** |
+
+Points; "106 vs 1" is the discordant pairs, caught (or rejected) by C only against A only. ΔJ is
+computed before rounding, so it can differ by 0.1 from the J column above. Out of sample, C keeps
+every one of A's 31 catches and adds 83.
+
+## The three primary comparisons, out of sample
+
+1. **A's rejection recall: 17.0% (31/182), Wilson [12.3%, 23.2%].** The number for "how well does
+   Chimera's judge catch a plausible-but-wrong finding". By the first pre-registration's rule it does
+   not discriminate: the upper bound does not reach the 30% weak band.
+2. **C − A in Youden's J: +9.7 points, paired bootstrap [+1.7, +17.8].** The interval excludes zero:
+   the rubric change separates the classes better on 814 items nobody read while writing it.
+3. **C's false rejection: 43.5% (275/632), Wilson [39.7%, 47.4%]** — the whole interval above the
+   20% ceiling. Not lower than in sample (38.5% in the pilot, 34.6% in this run's re-grade of the same
+   items), so the opposite-direction sign of fitting the pre-registration named is absent.
+
+## Predictions
+
+| | predicted, out of sample | measured, out of sample | |
+|---|---|---:|---|
+| A recall | 12–20% | 17.0% | inside |
+| C recall | 45–60% | 62.6% | **above** |
+| C false rejection | 32–45% | 43.5% | inside |
+| C − A in J | +2 to +7 points | +9.7 points | **above** |
+
+Two inside, two above, and both misses are high — the direction of every missed prediction in this
+directory (arm C's recall in the pilot, arm E's recall and false rejection). The arm C commit message
+already noted the pattern from the all-rows numbers; the out-of-sample figures do not change it.
+
+## The clause, applied as written
+
+The pre-registration named the in-sample value it meant — the pilot's **+6.8**, the "in sample
+(known)" column of its table — and gave the reading: *"If it holds at +6.8 or better, the improvement
+is real and general; if it collapses to near zero, arm C was a description of 41 specific comments."*
+
+- **Against that value, the edge did not shrink.** +9.7 out of sample against +6.8 in sample. The
+  clause does not fire, and the reading of the five earlier arms stands.
+- **That is a statement about point estimates.** The interval [+1.7, +17.8] excludes zero — the
+  improvement is real — but it does not exclude values below +6.8, so "at least as large as in the
+  pilot" is not established.
+- **Against this run's own re-grade of the 105 (+12.7), out of sample is 3.0 points lower**, and the
+  interval on that difference is [−17.6, +24.0]. With 105 items on one side, this comparison cannot
+  see a shrinkage much smaller than 20 points. It is recorded as what the instrument cannot show, not
+  as evidence that nothing shrank.
+
+"Materially" was never given a number; the document's own anchor (+6.8) is what is applied, and the
+within-run comparison is printed beside it. Where that 3.0 comes from: not from catching fewer bad
+comments out of sample — C's recall is 62.3% in sample and 62.6% out — but from rejecting more good
+ones, 34.6% in sample against 43.5% out.
+
+## Not pre-registered: the same 105 items, graded twice
+
+The in-sample items were graded in the pilot and again in this run — same judge, same prompt
+(identical `prompt_sha`), same diff cache, same verdict parser, temperature 0. What changed was the
+run: chimera 0.48.0rc7 → rc9, and the runner's retry and concurrency code, which touches neither the
+prompt nor the verdict parser.
+
+| | pilot | this run | same verdict |
+|---|---:|---:|---:|
+| A recall | 8/53 (15.1%) | 11/53 (20.8%) | 97 of 105 |
+| A false rejection | 0/52 (0.0%) | 3/52 (5.8%) | |
+| C recall | 32/53 (60.4%) | 33/53 (62.3%) | **82 of 105** |
+| C false rejection | 20/52 (38.5%) | 18/52 (34.6%) | |
+| C − A in J | +6.8 | +12.7 | moved **+5.8** |
+
+Arm C changed its verdict on 23 of 105 items with nothing changed but the run. One re-run is one
+difference, not a variance, so this sets no noise floor. What it does show:
+
+- **The pilot's +6.8 was one draw** of a quantity that read +12.7 the second time. "The edge held, and
+  grew" — +9.7 against +6.8 — compares a replication with a single noisy reference.
+- **The intervals in this directory model which items were drawn, not which answer the judge gave.**
+  McNemar and Wilson treat each verdict as fixed. Arm C's own J moved +5.7 points on re-run — the size
+  of the differences the arms D and E section ranked by (D +16.3, C +21.9, E +8.9, one run each at
+  n=105).
+- The pilot's "never rejected a correct comment in 52 tries" for arm A is 3 of 52 on the same items
+  the second time.
+
+## What the trade costs at the natural prevalence
+
+The pilot was balanced, and there arm C's trade read as nearly one for one: +24 bad comments caught,
+20 good ones destroyed. The slice is 74% correct comments. Out of sample, C catches **83** more
+incorrect comments than A and rejects **227** more correct ones — **2.73 correct findings destroyed
+per extra catch** (in sample, balanced: 22 against 15, 0.68). The rates carry the same trade; the
+prevalence is what makes it this expensive in use.
+
+## Verdict
+
+- **The judge as shipped (A): 17.0% rejection recall out of sample, [12.3%, 23.2%], at 7.6% false
+  rejection. It does not discriminate.** Inside the predicted band. This is the confirmatory number,
+  and the answer to "how good is the judge" stops being provisional.
+- **Arm C separates better out of sample** — +9.7 J, interval excluding zero, on items nobody read
+  while writing the rubric. The rubric change generalises; it was not a description of 41 comments.
+- **Arm C does not ship.** 43.5% false rejection out of sample, the whole interval above the 20%
+  ceiling, and 2.73 correct findings destroyed per extra catch at the slice's own prevalence.
+- **The retroactive clause does not fire**, and the reading of arms A–E stands. The re-grade adds a
+  caveat the clause did not anticipate: J differences of about six points at n=105 are the size of
+  what re-running arm C alone produced.
