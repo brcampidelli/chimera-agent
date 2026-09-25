@@ -1,0 +1,108 @@
+== 1. guard — each summary.json reproduced from its details.jsonl (all graded rows)
+  A cautious  n_graded                     details 919              summary 919              ok
+  A cautious  n_unparsed                   details 0                summary 0                ok
+  A cautious  n_call_failed                details 0                summary 0                ok
+  A cautious  bad_comments                 details 235              summary 235              ok
+  A cautious  caught                       details 42               summary 42               ok
+  A cautious  rejection_recall             details 0.179            summary 0.179            ok
+  A cautious  rejection_recall_ci          details [0.135, 0.233]   summary [0.135, 0.233]   ok
+  A cautious  good_comments                details 684              summary 684              ok
+  A cautious  wrongly_rejected             details 51               summary 51               ok
+  A cautious  false_rejection_rate         details 0.075            summary 0.075            ok
+  A cautious  false_rejection_ci           details [0.057, 0.097]   summary [0.057, 0.097]   ok
+  A cautious  reject_rate_overall          details 0.101            summary 0.101            ok
+  A cautious  approve_everything_accuracy  details 0.744            summary 0.744            ok
+  C split     n_graded                     details 919              summary 919              ok
+  C split     n_unparsed                   details 0                summary 0                ok
+  C split     n_call_failed                details 0                summary 0                ok
+  C split     bad_comments                 details 235              summary 235              ok
+  C split     caught                       details 147              summary 147              ok
+  C split     rejection_recall             details 0.626            summary 0.626            ok
+  C split     rejection_recall_ci          details [0.562, 0.685]   summary [0.562, 0.685]   ok
+  C split     good_comments                details 684              summary 684              ok
+  C split     wrongly_rejected             details 293              summary 293              ok
+  C split     false_rejection_rate         details 0.428            summary 0.428            ok
+  C split     false_rejection_ci           details [0.392, 0.466]   summary [0.392, 0.466]   ok
+  C split     reject_rate_overall          details 0.479            summary 0.479            ok
+  C split     approve_everything_accuracy  details 0.744            summary 0.744            ok
+  paired interval on the pilot's arm C recall: [30.5, 48.4] (published [30.5, 48.4]) ok
+  GUARD PASSED
+
+== 2. the in-sample mark
+  row_id distinct values in arm A: 1 (every row is 0; items are keyed by content instead)
+  A and C: same items in the same order True · same in_pilot mark True · every key unique True
+  rows marked in_pilot: 105
+  == the 105 items the pilot graded in results/neutral: True
+  == the 105 items the pilot graded in results/nodefect: True
+  == the 105 items the pilot graded in results/preexisting: True
+  == the pilot's own arm A details @ 3ba341bf: True
+  == the pilot's own arm C details @ 029e89f6: True
+
+== 3. survival (rows whose diff could not be fetched are dropped, never re-drawn)
+                  planned  graded  dropped   bad  good
+  all                1017     919       98   235   684
+  in-sample           105     105        0    53    52
+  out-of-sample       912     814       98   182   632
+  fewer than 700 of 1017 surviving? 919 survived — does not fire (out of sample alone: 814)
+
+== 4. each arm, three ways (Wilson 95%)
+                 arm   recall     (k/n)               CI   false rej     (k/n)               CI   reject      J
+  all            A      17.9%   42/235    [13.5%, 23.3%]        7.5%   51/684      [5.7%, 9.7%]    10.1%  +10.4
+  all            C      62.6%  147/235    [56.2%, 68.5%]       42.8%  293/684    [39.2%, 46.6%]    47.9%  +19.7
+  in-sample      A      20.8%   11/53     [12.0%, 33.5%]        5.8%    3/52      [2.0%, 15.6%]    13.3%  +15.0
+  in-sample      C      62.3%   33/53     [48.8%, 74.1%]       34.6%   18/52     [23.2%, 48.2%]    48.6%  +27.6
+  out-of-sample  A      17.0%   31/182    [12.3%, 23.2%]        7.6%   48/632      [5.8%, 9.9%]     9.7%   +9.4
+  out-of-sample  C      62.6%  114/182    [55.4%, 69.3%]       43.5%  275/632    [39.7%, 47.4%]    47.8%  +19.1
+
+== 5. C − A, paired over the same items
+  ΔTPR and ΔFPR: chimera/eval/paired.py (McNemar, Wilson on the discordant pairs) — the
+  method the earlier pre-registrations fixed. ΔJ: no paired method was specified for J;
+  paired bootstrap over items within label, seed 20260819, 10,000 draws, percentile 95%.
+  all
+    ΔTPR +44.7 pp  CI [+40.9, +45.4]  discordant 107 (C only 106, A only 1)  n=235
+    ΔFPR +35.4 pp  CI [+33.4, +36.3]  discordant 254 (C only 248, A only 6)  n=684
+    ΔJ   +9.3 pp  bootstrap CI [+1.9, +16.9]  (Wald cross-check [+1.8, +16.8])
+    net: C catches +105 more incorrect comments and rejects +242 more correct ones — 2.30 correct findings per extra catch
+  in-sample
+    ΔTPR +41.5 pp  CI [+27.0, +44.6]  discordant 24 (C only 23, A only 1)  n=53
+    ΔFPR +28.8 pp  CI [+15.1, +32.0]  discordant 17 (C only 16, A only 1)  n=52
+    ΔJ   +12.7 pp  bootstrap CI [-6.4, +31.8]  (Wald cross-check [-6.9, +32.2])
+    net: C catches +22 more incorrect comments and rejects +15 more correct ones — 0.68 correct findings per extra catch
+  out-of-sample
+    ΔTPR +45.6 pp  CI [+41.6, +45.6]  discordant 83 (C only 83, A only 0)  n=182
+    ΔFPR +35.9 pp  CI [+33.9, +36.8]  discordant 237 (C only 232, A only 5)  n=632
+    ΔJ   +9.7 pp  bootstrap CI [+1.7, +17.8]  (Wald cross-check [+1.5, +17.9])
+    net: C catches +83 more incorrect comments and rejects +227 more correct ones — 2.73 correct findings per extra catch
+
+== 6. did C's edge shrink between in-sample and out-of-sample? (independent groups)
+  ΔJ(in) − ΔJ(out) = +3.0 pp  bootstrap CI [-17.6, +24.0]
+
+== 7. the 105 in-sample items were graded twice — the pilot, then this run
+  (not pre-registered; one re-run is one difference, not a variance)
+  arm A: pilot recall 8/53 (15.1%), false rej 0/52 (0.0%), J +15.1 · this run recall 11/53 (20.8%), false rej 3/52 (5.8%), J +15.0 · J moved -0.1 pp
+    same verdict on 97/105 items at temperature 0 (git @ 3ba341bf reproduces the published counts)
+  arm C: pilot recall 32/53 (60.4%), false rej 20/52 (38.5%), J +21.9 · this run recall 33/53 (62.3%), false rej 18/52 (34.6%), J +27.6 · J moved +5.7 pp
+    same verdict on 82/105 items at temperature 0 (git @ 029e89f6 reproduces the published counts)
+  C − A in J on the same 105: pilot +6.8 pp · this run +12.7 pp · moved +5.8 pp with nothing changed but the run
+
+== 8. the three primary comparisons, out of sample (PREREGISTRATION-full.md)
+  1. A rejection recall   17.0% (31/182)  Wilson [12.3%, 23.2%]  first rule: DOES NOT DISCRIMINATE
+  2. C − A in J           +9.7 pp  paired bootstrap [+1.7, +17.8]  excludes 0
+  3. C false rejection    43.5% (275/632)  Wilson [39.7%, 47.4%]  ABOVE the 20% ceiling; lower bound above it
+
+== 9. predictions (out-of-sample bands, fixed before the run)
+  A recall           predicted 12%–20%          measured 17.0%     inside the band
+  C recall           predicted 45%–60%          measured 62.6%     ABOVE the band
+  C false rejection  predicted 32%–45%          measured 43.5%     inside the band
+  C - A in J         predicted +2.0 to +7.0 pp  measured +9.7 pp   ABOVE the band
+
+== 10. uninformative conditions
+  all            A: unparsed 0/919 · call failed 0/919 · reject rate 10.1%
+  all            C: unparsed 0/919 · call failed 0/919 · reject rate 47.9%
+  all            discordant pairs: recall 107, false rejection 254 (both ≥ 10)
+  in-sample      A: unparsed 0/105 · call failed 0/105 · reject rate 13.3%
+  in-sample      C: unparsed 0/105 · call failed 0/105 · reject rate 48.6%
+  in-sample      discordant pairs: recall 24, false rejection 17 (both ≥ 10)
+  out-of-sample  A: unparsed 0/814 · call failed 0/814 · reject rate 9.7%
+  out-of-sample  C: unparsed 0/814 · call failed 0/814 · reject rate 47.8%
+  out-of-sample  discordant pairs: recall 83, false rejection 237 (both ≥ 10)
