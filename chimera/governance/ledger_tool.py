@@ -216,7 +216,8 @@ class LedgeredTool(Tool):
             approved = self.approve(assessment) if self.approve else False
             if not approved:
                 return refusal(f"[taint: needs review — {reason}] "
-                               f"The tool did NOT run. Do not report this as done.")
+                               f"The tool did NOT run. {self._why_not_approved()} "
+                               f"Do not report this as done.")
             asked = True
 
         # 1. Sequence-aware pre-check: does this action consume tainted input?
@@ -237,7 +238,8 @@ class LedgeredTool(Tool):
             approved = self.approve(assessment) if self.approve else False
             if not approved:
                 return refusal(f"[taint: needs review — {assessment.reason}] "
-                               f"The tool did NOT run. Do not report this as done.")
+                               f"The tool did NOT run. {self._why_not_approved()} "
+                               f"Do not report this as done.")
             asked = True
 
         # 1a. A recipient nobody mentioned (M2), when no card above already carried the note.
@@ -270,6 +272,33 @@ class LedgeredTool(Tool):
             # can't spoof a system/user turn or a tool call to break out of the data fence.
             return fence(sanitize_untrusted(result))
         return result
+
+    def _why_not_approved(self) -> str:
+        """The sentence after "the tool did NOT run", naming the way out of a TAINT refusal.
+
+        ``test_the_refusal_never_named_the_taint_or_the_way_out`` measured the cost of saying
+        nothing: an agent refused a tainted write over the API retried its whole budget on an answer
+        that could not change, four times, for US$ 5.11 and nothing written. The kernel's sentence
+        was fixed in 0.58.0 to name the way out of a POLICY refusal, and it said the taint remedies
+        belong here, beside the taint refusal, which until now carried none.
+
+        With no approver at all, nobody could be asked and retrying is futile, so the ways through
+        are named. They are written for the PERSON, and the model is told to relay them rather than
+        take them: re-reading untrusted content by another route would launder the taint this gate
+        exists for. With an approver that said no, a person may say yes next time; the sentence
+        stays plain, as the kernel's does for a real decline.
+        """
+        if self.approve is not None:
+            return "Nobody approved it."
+        return (
+            "Nobody could be asked: this run read content from outside it (a web page, a download, "
+            "an MCP tool), and after that a call that could carry it somewhere needs a person's "
+            "approval, which nobody on this surface can give. Retrying will be refused identically. "
+            "Tell the person what was refused and why; the ways through are theirs to choose — run it "
+            "where a question can be answered (the app's Code screen asks with a card, `chimera solve` "
+            "asks at the terminal, and a run started with pause-on-taint waits for a verdict instead "
+            "of refusing), or, on a deployment that must act on its own, CHIMERA_TAINT_NARROW=0."
+        )
 
     def _ask_about_recipients(self, unseen: list[str], *, asked: bool) -> str | None:
         """Record a send to an address the run was never shown, and ask when this surface can.
