@@ -1,0 +1,59 @@
+== F: fidelity (the rule each run ran, replayed, against its recorded trip)
+  brk-fixed-strong               37/37   = 100.0%
+  brk-fixed-weak                 39/39   = 100.0%
+  brk-legacy-strong              39/39   = 100.0%
+  brk-legacy-weak                38/38   = 100.0%
+  m6-esc-strong                  18/18   = 100.0%
+  m6-esc-weak                    19/19   = 100.0%
+  m6-stop-strong                 18/18   = 100.0%
+  m6-stop-weak                   18/18   = 100.0%
+  m6f-strong                     70/70   = 100.0%
+  m6f-weak                      479/479  = 100.0%
+  other (before the fix)       1247/1249 = 99.8%
+  gate F: PASS   disagreements: 2
+    other (before the fix)       016-code-repair-pytest-sys1-off-weak-r0  recorded step=13  replayed legacy step=9
+    other (before the fix)       016-code-repair-pytest-sys1h-off-weak-r2  recorded step=None  replayed legacy step=7
+
+== how much the rule acts: 2790 of 31724 calls the loop saw as a success read as an answered failure
+  run_shell                1824
+  execute_code             748
+  code_interpreter         218
+
+== legacy stops, classified (near = main after #583; new = this rule)
+  brk-legacy-strong              11  neither · writes, distinct args
+  brk-legacy-weak                 1  near reproduces · mixed, distinct args
+  brk-legacy-weak                 1  near reproduces · writes, distinct args
+  brk-legacy-weak                 2  near reproduces · writes, identical args
+  brk-legacy-weak                 1  neither · writes, distinct args
+  brk-legacy-weak                 1  new only · reads, distinct args
+  m6-esc-strong                   3  neither · writes, distinct args
+  m6-stop-strong                  3  neither · writes, distinct args
+  m6-stop-weak                    1  near reproduces · reads, distinct args
+  m6-stop-weak                    1  near reproduces · reads, identical args
+  m6f-strong                     20  neither · writes, distinct args
+  m6f-weak                        1  near reproduces · mixed, distinct args
+  m6f-weak                        6  near reproduces · reads, distinct args
+  m6f-weak                        4  near reproduces · reads, identical args
+  m6f-weak                        4  near reproduces · writes, distinct args
+  m6f-weak                        1  new only · reads, distinct args
+  other (before the fix)          3  near reproduces · mixed, distinct args
+  other (before the fix)          9  near reproduces · reads, distinct args
+  other (before the fix)          5  near reproduces · reads, identical args
+  other (before the fix)          2  near reproduces · writes, distinct args
+  other (before the fix)          3  near reproduces · writes, identical args
+  other (before the fix)          4  neither · mixed, distinct args
+  other (before the fix)          2  neither · reads, distinct args
+  other (before the fix)         48  neither · writes, distinct args
+  other (before the fix)          1  new only · reads, distinct args
+
+  legacy stops the new rule reproduces and near does not: 3
+    brk-legacy-weak              041-frontend-state-bug-brk-legacy-weak-r8  run_shell {"command": ["bash", "-lc", "node /home/brcamp/har -> '[exit 127]\n/bin/sh: 1: [bash,: not found' | run_shell {"command": ["bash", "-lc", "node \"$(pwd)/in/cart -> '[exit 127]\n/bin/sh: 1: [bash,: not found' | run_shel
+    m6f-weak                     041-frontend-state-bug-m6f-weak-r66  run_shell {"command": ["bash", "-lc", "node in/cart-ui/src/c -> '[exit 127]\n/bin/sh: 1: [bash,: not found' | run_shell {"command": ["bash", "-lc", "node in/cart-ui/src/c -> '[exit 127]\n/bin/sh: 1: [bash,: not found' | run_shell {"co
+    other (before the fix)       089-ab-test-caveat-analysis-sys1-on-weak-r2  code_interpreter {"_raw": "{\"code\": \"import math\\n\\n# Function -> 'ZeroDivisionError: float division by zer' | code_interpreter {"_raw": "{\"code\": \"import math\\n\\n# Function -> 'ZeroDivisionError: float division by z
+  criterion 2 (write-tail, distinct args, reproduced by new only): 0 -> PASS
+
+== cost: new-only fires (vs near) in runs that continued under the fixed rule
+  criterion 3 (strong): 0 -> PASS
+  criterion 4 (weak): 0 fires, 0 above their cell median -> PASS
+
+  skipped: {'unknown rule (from the fix day on, outside the families)': 193, 'no trace': 18, 'bad line': 1}
