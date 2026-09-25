@@ -1,0 +1,33 @@
+{
+  "n": 119,
+  "attacks": 56,
+  "benign": 63,
+  "pooled_delta": 0.027210884353741527,
+  "pooled_ci95": [
+    -0.0022611644997173608,
+    0.058441558441558406
+  ],
+  "bootstrap_sd": 0.015062124983336363,
+  "mean_per_set_delta": 0.013068086357526876,
+  "mean_ci95": [
+    -0.012641739322100332,
+    0.04003327546296298
+  ],
+  "ops": {
+    "L": {
+      "tau": 0.9418,
+      "benign_stops": 11,
+      "attacks_caught": 47
+    },
+    "Lf2": {
+      "tau": 0.9298,
+      "benign_stops": 10,
+      "attacks_caught": 47
+    }
+  },
+  "matched_catch": 47,
+  "n_needed": 614,
+  "seed": 20260922,
+  "draws": 2000,
+  "reading": "B: not established even pooled -> the series closes; no third item set"
+}
