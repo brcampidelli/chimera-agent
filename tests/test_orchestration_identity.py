@@ -96,9 +96,9 @@ def test_the_stage_that_answers_a_person_carries_the_owners_instructions(tmp_pat
     synth = _system_of(backend, "Synthesize ONE final answer")
     assert "português" in synth, "the language line is the visible half of this"
     assert "Prefira respostas curtas." in synth
-    # In front of the stage prompt: the stage instruction is the more specific one, and the
-    # convention everywhere else in the stack is that closer-to-the-task text comes last.
-    assert synth.index("Quimera") < synth.index("Synthesize ONE final answer")
+    # After the stage prompt, as in the agent loop: the owner is read last and wins. It used to go
+    # in front, where the stage's "answer in the task's language" read closer (study 25, defect 4).
+    assert synth.index("Synthesize ONE final answer") < synth.index("Quimera")
 
 
 def test_the_decomposer_is_deliberately_left_alone(tmp_path: Path) -> None:
@@ -164,7 +164,7 @@ def test_a_crew_role_carries_the_owners_instructions() -> None:
 
     system = backend.calls[0]["system"]
     assert "português" in system
-    assert system.index("Quimera") < system.index("You write the final answer.")
+    assert system.index("You write the final answer.") < system.index("Quimera")
 
 
 def test_a_crew_role_without_an_identity_sends_only_its_role() -> None:
@@ -215,3 +215,17 @@ def test_a_tool_using_crew_role_reads_the_projects_conventions(tmp_path: Path) -
     ).act("faça")
 
     assert any("aspas simples" in c["system"] for c in backend.calls)
+
+
+def test_the_owners_language_wins_where_the_stage_names_another(tmp_path: Path) -> None:
+    """Study 25, defect 4. The synthesis prompt says "answer in the language of the task", and the
+    owner's block says "always answer in português, whatever language the question is in". They met
+    in one system message, and a model settles such a conflict by what reads closer. Now the stage
+    line defers to the owner in words, and the owner's block is the last thing read."""
+    backend = _Backend()
+
+    _orchestrator(backend, tmp_path, identity=IDENTITY).run(_READ_TASK)  # the task is in English
+
+    synth = _system_of(backend, "Synthesize ONE final answer")
+    assert "unless the owner's instructions name a language" in synth
+    assert synth.index("SAME LANGUAGE") < synth.index("Always answer in português")
