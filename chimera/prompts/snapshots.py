@@ -60,9 +60,18 @@ def assembled_examples() -> dict[str, str]:
                 inject_skill_context=False, prefix_nonce="", project_root=root, instructions=owner
             ),
         )
+        from chimera.orchestration.hierarchy import WORKER_SYSTEM
+
+        # A role that replaces the default prompt, as the hierarchy's workers do.
+        worker = Agent(
+            backend,
+            ToolRegistry(),
+            AgentConfig(inject_skill_context=False, prefix_nonce="", system_prompt=WORKER_SYSTEM),
+        )
         texts = {
             "assembled.loop_bare": bare.compose_system_prompt(EXAMPLE_TASK),
             "assembled.loop_project_owner_todo": full.compose_system_prompt(EXAMPLE_TASK),
+            "assembled.hierarchy_worker": worker.compose_system_prompt(EXAMPLE_TASK),
         }
         # The temporary directory's name is not part of the prompt anyone reviews.
         return {name: text.replace(str(root), "<project>") for name, text in texts.items()}

@@ -146,6 +146,9 @@ def _i(
 
 SECTIONS: tuple[PromptSection, ...] = (
     # ---- the agent loop ------------------------------------------------------------------------
+    _c("loop.untrusted_data_rule", "chimera.core.agent:UNTRUSTED_DATA_RULE", "core",
+       _ALL + ("S6", "S12"), "measured", "bench/right_hand_governance (0/12 → 12/12)",
+       note="appended to any loop prompt that lacks it (Agent.compose_system_prompt)"),
     _c("loop.default", "chimera.core.agent:DEFAULT_SYSTEM_PROMPT", "core", _ALL, "measured",
        "ask exception: tests/test_the_agent_may_ask.py (paired run); fence: bench/right_hand_governance"),
     _c("loop.todo", "chimera.core.agent:TODO_PROMPT", "tool", _LOOP, "unmeasured",
@@ -203,7 +206,7 @@ SECTIONS: tuple[PromptSection, ...] = (
        "unmeasured", render=_restored_labels),
     _i("chat.profile", "chimera.interface.profile:render_profile", "volatile", ("S3", "S10")),
     _i("webhook.payload", "chimera.cli.main:_webhook_handler", "volatile", ("S10",),
-       note="payload appended to the job prompt; docs/audits/sleeper-channels.md channel 4"),
+       note="payload appended to the job prompt inside the fence; sleeper-channels audit, channel 4"),
     # ---- autonomous solve ----------------------------------------------------------------------
     _i("solve.compose", "chimera.core.autonomous:AutonomousAgent._compose", "volatile", ("S1", "S5")),
     _i("solve.context_blocks", "chimera.core.autonomous:AutonomousAgent.run", "volatile", ("S1",),

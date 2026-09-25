@@ -3392,6 +3392,7 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
     import json as _json
     import time
 
+    from chimera.governance.ledger_tool import fence
     from chimera.scheduler import Scheduler
     from chimera.server import InboundMessage
 
@@ -3403,7 +3404,10 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
         def dispatch(job: Any) -> None:
             prompt = job.action
             if payload:
-                prompt = f"{prompt}\n\nWebhook payload:\n{_json.dumps(payload)}"
+                # Fenced: the payload is whatever the sender POSTed, and the job's action is the
+                # only part the owner wrote. Unfenced, a pull-request title reading "ignore the
+                # task above" arrived as more instructions (sleeper-channels audit, channel 4).
+                prompt = f"{prompt}\n\nWebhook payload:\n{fence(_json.dumps(payload))}"
             results.append(
                 gateway.on_message(
                     InboundMessage(text=prompt, chat_id=f"webhook:{hook}", platform="webhook")

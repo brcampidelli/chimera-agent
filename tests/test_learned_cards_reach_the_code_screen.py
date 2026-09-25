@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from chimera.core.agent import Agent, AgentConfig
+from chimera.core.agent import UNTRUSTED_DATA_RULE, Agent, AgentConfig
 from chimera.providers.gateway import CompletionResult
 from chimera.tools.registry import ToolRegistry
 
@@ -83,7 +83,9 @@ def test_no_retriever_changes_nothing() -> None:
 
     Agent(backend, ToolRegistry(), AgentConfig(system_prompt="BASE", inject_skill_context=False)).run("go")
 
-    assert backend.systems[0] == "BASE"
+    # A custom system prompt gets the untrusted-data sentence after it, as every replaced prompt does
+    # (study 25, defect 2); what this test pins is that no card section is added.
+    assert backend.systems[0] == f"BASE\n\n{UNTRUSTED_DATA_RULE}"
 
 
 def test_an_empty_result_adds_no_empty_section() -> None:
