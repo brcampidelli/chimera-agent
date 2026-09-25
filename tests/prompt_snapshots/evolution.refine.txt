@@ -1,0 +1,1 @@
+Improve a skill's prompt_template given examples of how it failed. Reply with ONLY a JSON object: {"prompt_template": "the improved template"}.

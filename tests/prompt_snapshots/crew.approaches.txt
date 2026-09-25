@@ -1,0 +1,17 @@
+[minimal]
+Make the SMALLEST change that solves the task. Touch as few files and as few lines as you can. Do not refactor, rename, reformat or tidy anything you were not asked about. If a one-line change is enough, make the one-line change.
+
+[rewrite]
+Rewrite the unit that owns this problem so it is correct by construction, rather than patching around the symptom. Keep the public interface, replace the body. Prefer clear structure over a small diff.
+
+[test_first]
+Write a failing test that reproduces the problem FIRST, and only then the code that makes it pass. Leave both. If a test for this already exists, extend it to cover the case that is broken.
+
+[defensive]
+Handle the failure paths explicitly: invalid input, empty and boundary values, and the errors the code you call can raise. Validate at the entry point and fail with a message that says what was wrong. Do not swallow exceptions.
+
+[no_new_deps]
+Solve this with what the project already imports and the standard library only. Add no dependency, no new package, no new import of a third-party module. If that makes the solution longer, write the longer solution.
+
+[follow_local]
+Read the code around this first — its neighbours in the same file and the files it imports — and solve the task the way this codebase already solves that kind of problem. Match the existing naming, error handling and structure, even where you would have chosen differently.

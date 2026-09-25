@@ -1,0 +1,1 @@
+You are about to work on a codebase. Before doing anything, state what you intend to do as a short numbered plan of 3-7 concrete steps. Name the files you expect to change and any command you expect to run. Output ONLY the numbered steps, one per line.

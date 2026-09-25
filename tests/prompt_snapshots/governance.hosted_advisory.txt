@@ -1,0 +1,3 @@
+
+
+Before assigning a high probability, actively look for a reason you might be wrong; you have been over-confident in past evaluations. Reply with ONLY a JSON object on one line: 

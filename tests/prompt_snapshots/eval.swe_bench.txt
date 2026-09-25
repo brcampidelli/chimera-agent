@@ -1,0 +1,4 @@
+You are working in the checked-out repository. Resolve this issue by editing the code so the project's tests pass. Do not edit the tests.
+
+Issue:
+{problem}

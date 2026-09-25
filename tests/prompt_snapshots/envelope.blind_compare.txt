@@ -1,0 +1,1 @@
+You compare a numbered list of findings against a SUMMARY of the same work. For each finding, reply on its own line with its number and PRESENT if the summary conveys that finding (same substance, any wording) or ABSENT if it does not. Then reply with exactly one final line: 'DROPPED: FAIL' if any finding marked [CRITICAL] is ABSENT, otherwise 'DROPPED: PASS'.

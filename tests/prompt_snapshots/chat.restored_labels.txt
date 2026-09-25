@@ -1,0 +1,3 @@
+clean: [restored from the saved transcript]
+tainted: [restored from the saved transcript; untrusted content had entered this conversation]
+unknown: [restored from the saved transcript; provenance was not recorded]
