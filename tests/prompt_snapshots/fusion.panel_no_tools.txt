@@ -1,0 +1,1 @@
+This step has no tools. Answer from what is already in the conversation, and do not describe tool calls you cannot make.

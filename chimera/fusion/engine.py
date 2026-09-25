@@ -289,6 +289,29 @@ def _content_text(content: object) -> str:
     return str(content) if content else ""
 
 
+#: Appended to the caller's system message for the panel only.
+#:
+#: The caller is usually the agent loop, and its default prompt says to use the provided tools.
+#: The panel is given none, and fusion answers only the steps that offer none. A model told to
+#: use tools it was not given tends to describe the calls it would make instead of answering
+#: (study 25, defect 5).
+_NO_TOOLS_NOTE = (
+    "This step has no tools. Answer from what is already in the conversation, and do not describe "
+    "tool calls you cannot make."
+)
+
+
+def _without_tools(messages: list[MessageLike]) -> list[MessageLike]:
+    """``messages`` with :data:`_NO_TOOLS_NOTE` on the system message (one is added if there is none)."""
+    if messages:
+        first = messages[0]
+        data = first.as_dict() if isinstance(first, Message) else dict(first)
+        if data.get("role") == "system":
+            data["content"] = f"{_content_text(data.get('content', ''))}\n\n{_NO_TOOLS_NOTE}"
+            return [data, *messages[1:]]
+    return [{"role": "system", "content": _NO_TOOLS_NOTE}, *messages]
+
+
 def _conversation_text(messages: list[MessageLike]) -> str:
     lines: list[str] = []
     for message in messages:
@@ -546,6 +569,7 @@ class FusionEngine:
         self, messages: list[MessageLike], models: list[str] | None = None
     ) -> list[PanelResponse]:
         panel_models = models if models is not None else self.config.panel
+        messages = _without_tools(messages)
 
         def call(model: str) -> PanelResponse:
             try:
