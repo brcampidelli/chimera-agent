@@ -54,6 +54,16 @@ PLACEBO = (
 #: Appended to the last user turn in every condition, so every conversation ends on a request for
 #: the whole code and the grader reads a complete answer rather than a patch.
 CLOSING = "That is everything. Please give me the complete, final version of the code."
+#: Amendment 1: the surface line (plan §5.1, L3), last in every condition's system prompt. The
+#: shipped prompt tells the model to use tools these calls do not carry; on the first launch it
+#: narrated file edits it could not make and then returned empty replies on 3 of 9 sharded runs.
+SURFACE = (
+    "No tools are available in this conversation, so no file can be created, read or run: write any "
+    "code in your reply, in a fenced code block."
+)
+#: Amendment 1: spent on the discarded first launch (US$ 0.011 measured, rounded up), counted
+#: against the cap.
+DISCARDED_SPEND = 0.02
 
 #: DeepInfra's list price for this model, read from OpenRouter's public endpoint list on 2026-09-25
 #: ($ per token). Cache reads are priced at the full input rate, which overstates cost slightly.
@@ -80,11 +90,13 @@ def chat_system_prompt() -> str:
 
 SYSTEM_A = chat_system_prompt()
 assert SYSTEM_A == DEFAULT_SYSTEM_PROMPT, "the chat build changed; re-register before running"
+#: L0, then the situation-layer sentence under test (B) or its placebo (P), then the surface line
+#: (Amendment 1), in the plan's layer order.
 SYSTEMS = {
-    "F": SYSTEM_A,
-    "A": SYSTEM_A,
-    "B": SYSTEM_A + "\n\n" + RECAP,
-    "P": SYSTEM_A + "\n\n" + PLACEBO,
+    "F": SYSTEM_A + "\n\n" + SURFACE,
+    "A": SYSTEM_A + "\n\n" + SURFACE,
+    "B": SYSTEM_A + "\n\n" + RECAP + "\n\n" + SURFACE,
+    "P": SYSTEM_A + "\n\n" + PLACEBO + "\n\n" + SURFACE,
 }
 assert abs(len(PLACEBO) - len(RECAP)) <= 0.15 * len(RECAP), "placebo must be as long as the recap"
 
@@ -111,6 +123,7 @@ class Pinned:
         """One reply. Up to three attempts on an exception or an empty reply; then a halt."""
         err = ""
         spent = 0.0
+        log: list[str] = []  # Amendment 1: why each attempt ended, so an empty reply has a cause on record
         for attempt in range(3):
             t0 = time.time()
             try:
@@ -120,15 +133,18 @@ class Pinned:
                 )
             except Exception as exc:  # noqa: BLE001 — a provider failure is a halt, not a fail
                 err = f"{type(exc).__name__}: {exc}"[:300]
+                log.append(err)
                 time.sleep(5 * (attempt + 1))
                 continue
             usd = (r.prompt_tokens or 0) * PRICE_IN + (r.completion_tokens or 0) * PRICE_OUT
             spent += usd
+            log.append(f"finish={r.finish_reason or '?'} tool_calls={len(r.tool_calls or [])} "
+                       f"chars={len(r.content or '')} out={r.completion_tokens}")
             rec = {
                 "content": r.content, "prompt_tokens": r.prompt_tokens or 0,
                 "completion_tokens": r.completion_tokens or 0, "cache_read_tokens": r.cache_read_tokens,
                 "provider": r.provider, "model": r.model, "finish": r.finish_reason,
-                "seconds": round(time.time() - t0, 1), "usd": spent, "attempts": attempt + 1,
+                "seconds": round(time.time() - t0, 1), "usd": spent, "attempts": attempt + 1, "log": log,
             }
             if r.truncated:
                 return {**rec, "halt": "truncated"}
@@ -138,7 +154,7 @@ class Pinned:
                 err = "empty reply"
                 continue
             return {**rec, "halt": None}
-        return {"halt": err or "failed", "usd": spent, "content": ""}
+        return {"halt": err or "failed", "usd": spent, "content": "", "log": log}
 
 
 def _turn_summary(got: dict[str, Any]) -> dict[str, Any]:
@@ -149,7 +165,8 @@ def _turn_summary(got: dict[str, Any]) -> dict[str, Any]:
         "halt": got.get("halt"), "usd": round(got.get("usd", 0.0), 7),
         "prompt_tokens": got.get("prompt_tokens"), "completion_tokens": got.get("completion_tokens"),
         "cache_read_tokens": got.get("cache_read_tokens"), "provider": got.get("provider"),
-        "seconds": got.get("seconds"), "attempts": got.get("attempts"), "chars": len(content),
+        "seconds": got.get("seconds"), "attempts": got.get("attempts"), "finish": got.get("finish"),
+        "log": got.get("log"), "chars": len(content),
         "n_blocks": len(code_blocks(content)), "recap_items": recap_items(content), "head": content[:500],
     }
 
@@ -230,7 +247,8 @@ def execute(units: list[tuple[Task, int]], conds: tuple[str, ...], out: Path, sp
     payload = {"label": label, "model": MODEL, "provider": PROVIDER, "temperature": TEMPERATURE,
                "conds": list(conds), "units_planned": len(units), "usd": usd, "spent_before": spent_before,
                "stop_reason": stop_reason, "halts": halts, "seconds": round(time.time() - t0),
-               "systems": SYSTEMS, "recap": RECAP, "placebo": PLACEBO, "closing": CLOSING, "rows": rows}
+               "systems": SYSTEMS, "recap": RECAP, "placebo": PLACEBO, "closing": CLOSING,
+               "surface": SURFACE, "rows": rows}
     out.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(f"\nwrote {out}  US${usd:.4f} this run, US${spent_before + usd:.4f} in total; halts {halts}")
     return payload
@@ -443,7 +461,7 @@ def check() -> None:
 
 def pilot(out: Path, workers: int) -> None:
     units = [(task, 0) for task in TASKS]
-    payload = execute(units, ("F", "A"), out, 0.0, workers, "pilot")
+    payload = execute(units, ("F", "A"), out, DISCARDED_SPEND, workers, "pilot")
     print(json.dumps(pilot_decision(payload), indent=1, default=str))
 
 

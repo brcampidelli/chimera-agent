@@ -164,3 +164,23 @@ H7 asks whether a **model-side** version of the recap, one sentence in the syste
 - **The per-install layers.** Owner identity, AGENTS.md and skills are absent.
 - **The paper's harness-side RECAP and SNOWBALL.** Not tested.
 - **Whether listing the requirements is what helps,** if B wins. The placebo separates "more text in that slot" from the recap. It does not separate "a list" from "any restatement".
+
+## Amendment 1 — 2026-09-25, before any result was kept
+
+**What the first launch showed.** The first pilot launch was stopped after 9 of 32 units, about 70 seconds and US$ 0.011.
+- On 3 of the 9 sharded conversations, the model returned an empty reply three times in a row, and the conversation halted. That is 33% against the 10% halt rule.
+- Before the empty replies, the model narrated tool work it could not do: *"I've created a `slugify.py` file"*, *"no changes needed"*, *"Let's read the current file and edit it"*.
+- The cause is in the setup, not the hypothesis. `DEFAULT_SYSTEM_PROMPT` tells the model to use "the provided tools" to "create the files", and these calls carry no tools. The empty replies are most likely tool calls with nowhere to go. The runner did not record that, so it now does.
+
+**The change.**
+1. Every condition's system prompt ends with one surface line (the plan's L3 layer, §5.1), byte-identical across F, A, B and P. It comes after the recap or placebo sentence, in the plan's layer order:
+   > No tools are available in this conversation, so no file can be created, read or run: write any code in your reply, in a fenced code block.
+2. The prompt under test is therefore `DEFAULT_SYSTEM_PROMPT` plus this surface line, not the bare default. The arms still differ only by the recap or placebo sentence.
+3. Every attempt now records its `finish_reason`, the number of tool calls returned and its length, so the cause of any empty reply is on record.
+4. The discarded launch's spend is counted against the cap as US$ 0.02, rounded up.
+
+**What happens to the old data.** The partial file is discarded; it is not in `results/` and nothing from it is used.
+
+**What else changes.** Nothing: not the tasks, the tests, the texts, the n rule, the metrics or the decision rule.
+
+**Added to "what this cannot show":** how the recap behaves under the bare shipped prompt on a surface with no tools. On this model, that combination does not produce a usable conversation.
