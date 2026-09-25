@@ -16,6 +16,7 @@ import argparse
 import json
 import math
 import random
+import statistics
 import sys
 import threading
 import time
@@ -259,24 +260,29 @@ def report(path: Path, show: int = 6) -> dict[str, Any]:
         rule = sum(r["grade"]["rule_ok"] for r in single)
         brk = sum(r["grade"]["kind"] in it.BREAKAGE for r in cell)
         fgt = sum(r["grade"]["kind"] in it.FORGETTING for r in cell)
-        toks = sorted(r["prompt_tokens"] for r in cell)
-        med = toks[len(toks) // 2] if toks else 0
+        med = int(statistics.median(r["prompt_tokens"] for r in cell)) if cell else 0
         cache = sum(r["cached_tokens"] for r in cell) / max(1, sum(r["prompt_tokens"] for r in cell))
-        reas = sorted(r["reasoning_tokens"] for r in cell)
-        secs = sorted(r["seconds"] for r in cell)
+        reas = statistics.median(r["reasoning_tokens"] for r in cell) if cell else 0
+        secs = statistics.median(r["seconds"] for r in cell) if cell else 0
         usd = sum(r["cost"] for r in cell)
         print(f"{arm:>7} {n:>4} {ok:>4} {ok / max(1, n):>6.3f} [{lo:.3f}, {hi:.3f}] {fact / max(1, n):>6.3f} "
               f"{rule}/{len(single):<5} {brk:>6} {fgt:>6} {med:>8} {cache:>6.2f} "
-              f"{(reas[len(reas) // 2] if reas else 0):>6} {(secs[len(secs) // 2] if secs else 0):>6.1f} {usd:>7.4f}")
+              f"{reas:>6.0f} {secs:>6.1f} {usd:>7.4f}")
         kinds: dict[str, int] = {}
         for r in cell:
             kinds[r["grade"]["kind"]] = kinds.get(r["grade"]["kind"], 0) + 1
+        # Descriptive, not registered: did the answers that skipped reasoning fail more often?
+        skipped = [r for r in cell if r["reasoning_tokens"] == 0]
+        skipped_fail = sum(not r["grade"]["ok"] for r in skipped)
+        reasoned_fail = sum(not r["grade"]["ok"] for r in cell if r["reasoning_tokens"] > 0)
         summary["cells"][arm] = {"n": n, "ok": ok, "acc": ok / max(1, n), "wilson": [lo, hi],
                                  "fact_ok": fact, "rule_ok": [rule, len(single)], "kinds": kinds,
                                  "median_prompt_tokens": med, "cache_share": cache, "usd": usd,
-                                 "median_reasoning_tokens": reas[len(reas) // 2] if reas else 0,
-                                 "median_seconds": secs[len(secs) // 2] if secs else 0}
-        print(f"        kinds: {kinds}")
+                                 "median_reasoning_tokens": reas, "median_seconds": secs,
+                                 "no_reasoning": [skipped_fail, len(skipped)],
+                                 "with_reasoning_failures": reasoned_fail}
+        print(f"        kinds: {kinds}   no reasoning: {len(skipped)} rows, {skipped_fail} failed; "
+              f"with reasoning: {n - len(skipped)} rows, {reasoned_fail} failed")
 
     def pair(arm: str, base: str = str(it.CONTROL)) -> tuple[int, int, int, int]:
         a = b = c = d = 0
@@ -292,9 +298,15 @@ def report(path: Path, show: int = 6) -> dict[str, Any]:
 
     if "replay" in arms:
         a, b, c, d = pair("replay")
-        summary["floor"] = {"table": [a, b, c, d], "discordant": b + c, "n": a + b + c + d}
+        _, flo, fhi = newcombe_paired(a, b, c, d)
+        same = sum(1 for (item, x), r in by.items() if x == "replay" and (item, str(it.CONTROL)) in by
+                   and r["content"] == by[(item, str(it.CONTROL))]["content"])
+        summary["floor"] = {"table": [a, b, c, d], "discordant": b + c, "n": a + b + c + d,
+                            "ci": [flo, fhi], "gate_pass": flo >= MARGIN, "identical_content": same}
         print(f"\nFLOOR 4k replay vs 4k: both {a}, replay-only {b}, 4k-only {c}, neither {d} -> "
-              f"{b + c}/{a + b + c + d} discordant; exact McNemar p = {mcnemar_exact(b, c):.3g}")
+              f"{b + c}/{a + b + c + d} discordant; exact McNemar p = {mcnemar_exact(b, c):.3g}; "
+              f"Newcombe [{flo:+.3f}, {fhi:+.3f}] -> FLOOR GATE {'PASS' if flo >= MARGIN else 'FAIL'}; "
+              f"byte-identical answers {same}/{a + b + c + d}")
 
     control = summary["cells"].get(str(it.CONTROL))
     if control:
@@ -321,13 +333,15 @@ def report(path: Path, show: int = 6) -> dict[str, Any]:
             useful = int(arm)
         else:
             still = False
-    summary["useful_length"] = useful
     top = max(int(a) for a in arms if a.isdigit())
-    trigger = int(TRIGGER_SHARE * useful) // 1000 * 1000
+    # Registered: the useful length is reported as that cell's median provider-counted prompt tokens.
+    realised = summary["cells"][str(useful)]["median_prompt_tokens"]
+    summary["useful_length"] = {"cell": useful, "median_prompt_tokens": realised, "lower_bound": useful == top}
+    trigger = int(TRIGGER_SHARE * realised) // 1000 * 1000
     summary["trigger_tokens"] = trigger
-    print(f"\nUSEFUL LENGTH (largest L with every tested L' <= L within margin): {useful:,}"
-          + ("  -- the top of the ladder: a lower bound" if useful == top else ""))
-    print(f"PROPOSED TRIGGER = floor({TRIGGER_SHARE} x useful, to 1,000) = {trigger:,} provider tokens")
+    print(f"\nUSEFUL LENGTH (largest L with every tested L' <= L within margin): the {useful:,} cell, "
+          f"median {realised:,} provider tokens" + ("  -- the top of the ladder: a lower bound" if useful == top else ""))
+    print(f"PROPOSED TRIGGER = floor({TRIGGER_SHARE} x {realised:,}, to 1,000) = {trigger:,} provider tokens")
 
     print("\nBY TARGET DEPTH (ok/n)")
     for arm in arms:
@@ -401,7 +415,10 @@ def main() -> int:
     if args.check:
         return check()
     if args.report:
-        report(Path(args.report))
+        source = Path(args.report)
+        summary = report(source)
+        target = source.with_name(source.stem + "-summary.json")
+        target.write_text(json.dumps(summary, indent=1) + "\n", encoding="utf-8", newline="\n")
         return 0
     if args.pilot:
         pilot = it.items("P", 20)

@@ -1,0 +1,255 @@
+{
+ "cells": {
+  "4000": {
+   "n": 90,
+   "ok": 90,
+   "acc": 1.0,
+   "wilson": [
+    0.9590629315783191,
+    0.9999999999999999
+   ],
+   "fact_ok": 90,
+   "rule_ok": [
+    90,
+    90
+   ],
+   "kinds": {
+    "ok": 90
+   },
+   "median_prompt_tokens": 4325,
+   "cache_share": 0.5219224652753615,
+   "usd": 0.015126480000000001,
+   "median_reasoning_tokens": 42.0,
+   "median_seconds": 2.3499999999999996,
+   "no_reasoning": [
+    0,
+    8
+   ],
+   "with_reasoning_failures": 0
+  },
+  "16000": {
+   "n": 90,
+   "ok": 90,
+   "acc": 1.0,
+   "wilson": [
+    0.9590629315783191,
+    0.9999999999999999
+   ],
+   "fact_ok": 90,
+   "rule_ok": [
+    90,
+    90
+   ],
+   "kinds": {
+    "ok": 90
+   },
+   "median_prompt_tokens": 16232,
+   "cache_share": 0.07137462132676739,
+   "usd": 0.08454366,
+   "median_reasoning_tokens": 58.5,
+   "median_seconds": 3.45,
+   "no_reasoning": [
+    0,
+    4
+   ],
+   "with_reasoning_failures": 0
+  },
+  "32000": {
+   "n": 90,
+   "ok": 90,
+   "acc": 1.0,
+   "wilson": [
+    0.9590629315783191,
+    0.9999999999999999
+   ],
+   "fact_ok": 90,
+   "rule_ok": [
+    90,
+    90
+   ],
+   "kinds": {
+    "ok": 90
+   },
+   "median_prompt_tokens": 32281,
+   "cache_share": 0.04180448589308754,
+   "usd": 0.1699239,
+   "median_reasoning_tokens": 64.0,
+   "median_seconds": 3.95,
+   "no_reasoning": [
+    0,
+    3
+   ],
+   "with_reasoning_failures": 0
+  },
+  "64000": {
+   "n": 90,
+   "ok": 89,
+   "acc": 0.9888888888888889,
+   "wilson": [
+    0.9397144555232022,
+    0.9980359664644876
+   ],
+   "fact_ok": 89,
+   "rule_ok": [
+    90,
+    90
+   ],
+   "kinds": {
+    "ok": 89,
+    "wrong_service": 1
+   },
+   "median_prompt_tokens": 64214,
+   "cache_share": 0.021265608278081057,
+   "usd": 0.34245588000000005,
+   "median_reasoning_tokens": 63.0,
+   "median_seconds": 5.3,
+   "no_reasoning": [
+    1,
+    6
+   ],
+   "with_reasoning_failures": 0
+  },
+  "128000": {
+   "n": 90,
+   "ok": 87,
+   "acc": 0.9666666666666667,
+   "wilson": [
+    0.9065255864388708,
+    0.9885998163675604
+   ],
+   "fact_ok": 87,
+   "rule_ok": [
+    88,
+    88
+   ],
+   "kinds": {
+    "ok": 87,
+    "wrong_service": 1,
+    "no_service": 1,
+    "tool_call": 1
+   },
+   "median_prompt_tokens": 128109,
+   "cache_share": 0.011279458987022222,
+   "usd": 0.6873133200000004,
+   "median_reasoning_tokens": 71.5,
+   "median_seconds": 8.1,
+   "no_reasoning": [
+    2,
+    7
+   ],
+   "with_reasoning_failures": 1
+  },
+  "replay": {
+   "n": 90,
+   "ok": 90,
+   "acc": 1.0,
+   "wilson": [
+    0.9590629315783191,
+    0.9999999999999999
+   ],
+   "fact_ok": 90,
+   "rule_ok": [
+    90,
+    90
+   ],
+   "kinds": {
+    "ok": 90
+   },
+   "median_prompt_tokens": 4319,
+   "cache_share": 0.4949691031005174,
+   "usd": 0.01568376,
+   "median_reasoning_tokens": 46.0,
+   "median_seconds": 2.2,
+   "no_reasoning": [
+    0,
+    4
+   ],
+   "with_reasoning_failures": 0
+  }
+ },
+ "paired": {
+  "16000": {
+   "table": [
+    90,
+    0,
+    0,
+    0
+   ],
+   "delta": 0.0,
+   "ci": [
+    -0.04093706842168088,
+    0.04093706842168088
+   ],
+   "mcnemar_p": 1.0,
+   "within_margin": true
+  },
+  "32000": {
+   "table": [
+    90,
+    0,
+    0,
+    0
+   ],
+   "delta": 0.0,
+   "ci": [
+    -0.04093706842168088,
+    0.04093706842168088
+   ],
+   "mcnemar_p": 1.0,
+   "within_margin": true
+  },
+  "64000": {
+   "table": [
+    89,
+    0,
+    1,
+    0
+   ],
+   "delta": -0.011111111111111072,
+   "ci": [
+    -0.06028554447679779,
+    0.03083543343233614
+   ],
+   "mcnemar_p": 1.0,
+   "within_margin": true
+  },
+  "128000": {
+   "table": [
+    87,
+    0,
+    3,
+    0
+   ],
+   "delta": -0.033333333333333326,
+   "ci": [
+    -0.09347441356112918,
+    0.013109175500311723
+   ],
+   "mcnemar_p": 0.25,
+   "within_margin": true
+  }
+ },
+ "floor": {
+  "table": [
+   90,
+   0,
+   0,
+   0
+  ],
+  "discordant": 0,
+  "n": 90,
+  "ci": [
+   -0.04093706842168088,
+   0.04093706842168088
+  ],
+  "gate_pass": true,
+  "identical_content": 90
+ },
+ "control_pass": true,
+ "useful_length": {
+  "cell": 128000,
+  "median_prompt_tokens": 128109,
+  "lower_bound": true
+ },
+ "trigger_tokens": 102000
+}
