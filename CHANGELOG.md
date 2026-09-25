@@ -6,6 +6,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.61.2] - 2026-09-25
+### Added
+
+- **`chat`, `assist` and the TUI draw the task list the agent keeps.** `todo_write` is registered on the terminal by default, and the tool itself says it exists so the person watching can see where the agent is. The desktop drew that list; the terminal did not, so the model kept a checklist nobody at a terminal saw.
+  - The turn report now carries the list from the last `todo_write` the tool accepted.
+  - It is printed under the reply with a progress count and one mark per status.
+  - Task text is escaped, so a task cannot inject console markup. (#596)
+
+- **`chimera cron doctor --check` exits 1 when a job is late or failing.** It is for a watcher that lives outside Chimera (#26).
+  - Plain `cron doctor` still exits 0: answering a question is not a failure.
+  - The host-cron example in `docs/deploy.md` used to mail the same report every thirty minutes, healthy or not. It now mails only on exit 1, in all ten languages. (#593)
+
+### Fixed
+
+- **Under `--fuse`, the TUI no longer claims "fusion — synthesizing" on every turn.** Fusion never answers a step that can call a tool, and every step of this agent can call one.
+  - The busy label now says so.
+  - After a turn fusion did not answer, the TUI says so once per session. (#594)
+
+### Changed
+
+- **CI and the release workflows build and test on Node 24.** They were on Node 20, which reached end of life in April 2026. (#592)
+
+- **Dependency updates:**
+  - `accelerate` (#512);
+  - `react-markdown` 9 → 10 (#477);
+  - `jsdom` 25 → 30.1.1 (#595). jsdom 30 implements object URLs, but only for its own Blob, so the desktop test setup now always installs its object-URL fake.
+
 ## [0.61.1] - 2026-09-25
 ### Added
 
