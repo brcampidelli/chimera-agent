@@ -17,6 +17,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from chimera.core.instructions import for_home as owner_identity
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:
@@ -157,6 +158,8 @@ class MessagingManager:
                     model=self._model,
                     max_steps=self._max_steps,
                     project_root=self._workspace,
+                    # The owner's identity, as on every surface that answers a person.
+                    instructions=owner_identity(self._settings.home),
                 ),
             )
             return ChatSession(

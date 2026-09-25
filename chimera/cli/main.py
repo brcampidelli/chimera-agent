@@ -69,6 +69,18 @@ def _force_utf8_streams() -> None:
 
 _force_utf8_streams()
 
+
+def owner_identity(home: Path) -> str:
+    """The owner's rendered identity block for the install at ``home`` ("" when none is set).
+
+    Every command that builds an agent a person talks to passes this, so the language, the name and
+    the standing instructions set in Settings follow the owner onto every surface, the bots included.
+    Imported lazily, like the rest of this module's dependencies, to keep `chimera --help` fast.
+    """
+    from chimera.core.instructions import for_home
+
+    return for_home(home)
+
 app = typer.Typer(
     name="chimera",
     help="Self-evolving AI agent with an LLM-Fusion reasoning core.",
@@ -1142,7 +1154,10 @@ def agent(
             registry = govern_registry(registry, kernel)
         runner = Agent(
             backend, registry,
-            AgentConfig(model=model, max_steps=max_steps, project_root=Path(workspace)),
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=Path(workspace),
+                instructions=owner_identity(get_settings().home),
+            ),
         )
         result = runner.run(task)
     except MissingCredentialsError as exc:
@@ -2535,7 +2550,10 @@ def serve(
             # capability here and not good enough to convey the project's conventions, which is
             # incoherent: `serve --workspace X` is the headless deployment from the README, and
             # its AGENTS.md was never read.
-            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=workspace_path,
+                instructions=owner_identity(settings.home),
+            ),
         )
         return ChatSession(
             runner,
@@ -3049,7 +3067,10 @@ def _start_cron_daemon(
         )
         agent = Agent(
             backend, registry,
-            AgentConfig(model=model, max_steps=max_steps, project_root=workspace),
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=workspace,
+                instructions=owner_identity(get_settings().home),
+            ),
         )
         return agent.run(task).answer
 
@@ -3163,6 +3184,7 @@ def acp_server(
             max_steps=max_steps,
             project_root=workspace_path,
             trace_path=settings.home / "traces.jsonl",
+            instructions=owner_identity(settings.home),
         ),
     )
 
@@ -3214,7 +3236,10 @@ def _serve_mcp(
         )
         worker = Agent(
             backend, registry,
-            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=workspace_path,
+                instructions=owner_identity(get_settings().home),
+            ),
         )
         auto = AutonomousAgent(
             worker,
@@ -3271,7 +3296,10 @@ def _build_a2a(
         )
         worker = Agent(
             backend, registry,
-            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=workspace_path,
+                instructions=owner_identity(get_settings().home),
+            ),
         )
         auto = AutonomousAgent(
             worker, config=AutonomousConfig(max_attempts=2, use_planner=False, use_manager=False)
@@ -3338,7 +3366,13 @@ def _serve_platform(
         registry.register(send_tool)
         runner = Agent(
             backend, registry,
-            AgentConfig(model=model, max_steps=max_steps, project_root=workspace_path),
+            AgentConfig(
+                model=model, max_steps=max_steps, project_root=workspace_path,
+                # The same identity the app's own bot and the coding turn apply. Without it the
+                # bot `serve --discord` starts answered as a different agent from the one the
+                # owner configured, in whatever language the message happened to be in.
+                instructions=owner_identity(get_settings().home),
+            ),
         )
         return ChatSession(
             runner,
@@ -4577,6 +4611,7 @@ def solve(
             # The workspace's own AGENTS.md, so `chimera solve` follows the conventions of the
             # repository it is solving in — the same instructions every other agent tool reads.
             project_root=ws,
+            instructions=owner_identity(get_settings().home),
             # One JSONL line per worker run: per-step tokens, cache hit rate, the tools called, and
             # the drift assessment. This is the only place the step log is persisted, so without it
             # every measurement the loop takes dies with the process.
@@ -5002,6 +5037,7 @@ def solve_batch(
                     max_steps=max_steps,
                     context_budget=context_budget,
                     project_root=ws,
+                    instructions=owner_identity(get_settings().home),
                 ),
             )
             auto = AutonomousAgent(

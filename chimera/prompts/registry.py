@@ -165,7 +165,8 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("loop.cards_block", "chimera.evolution.card_retrieval:cards_context_block", "volatile",
        ("S1", "S2")),
     _i("loop.project_instructions", "chimera.core.agents_md:load_agent_instructions", "project", _ALL),
-    _i("loop.owner_identity", "chimera.core.instructions:render", "owner", ("S2", "S3", "S5")),
+    _i("loop.owner_identity", "chimera.core.instructions:render", "owner",
+       ("S1", "S2", "S3", "S5", "S10")),
     # ---- compaction and memory -----------------------------------------------------------------
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
        "measured", "bench/compaction: fired 0 times in 137 real runs"),
