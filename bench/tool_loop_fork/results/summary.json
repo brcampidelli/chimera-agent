@@ -1,0 +1,78 @@
+{
+  "executors": {
+    "strong": {
+      "solves": 70,
+      "pairs": 20,
+      "trip_rate": 0.2857142857142857,
+      "delta": 0.466275,
+      "ci95": [
+        0.337195,
+        0.591695
+      ],
+      "helped_hurt_tied": [
+        15,
+        1,
+        4
+      ],
+      "by_task": {
+        "041-frontend-state-bug": {
+          "n": 12,
+          "delta": 0.31573333333333337
+        },
+        "042-api-schema-migration": {
+          "n": 1,
+          "delta": 0.59
+        },
+        "043-db-migration-safety": {
+          "n": 5,
+          "delta": 0.7352000000000001
+        },
+        "082-compose-config-repair": {
+          "n": 2,
+          "delta": 0.63535
+        }
+      },
+      "usd_per_solve": {
+        "tripped": 0.4765546,
+        "clean": 0.08084236
+      }
+    },
+    "weak": {
+      "solves": 480,
+      "pairs": 16,
+      "trip_rate": 0.03333333333333333,
+      "delta": 0.272875,
+      "ci95": [
+        0.1416875,
+        0.42125
+      ],
+      "helped_hurt_tied": [
+        12,
+        0,
+        4
+      ],
+      "by_task": {
+        "041-frontend-state-bug": {
+          "n": 1,
+          "delta": 0.0
+        },
+        "042-api-schema-migration": {
+          "n": 6,
+          "delta": 0.11566666666666665
+        },
+        "043-db-migration-safety": {
+          "n": 7,
+          "delta": 0.32457142857142857
+        },
+        "082-compose-config-repair": {
+          "n": 2,
+          "delta": 0.7
+        }
+      },
+      "usd_per_solve": {
+        "tripped": 0.0540060625,
+        "clean": 0.001506508658008658
+      }
+    }
+  }
+}

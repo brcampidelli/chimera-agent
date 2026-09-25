@@ -1,0 +1,42 @@
+strong 041-frontend-state-bug     m6f-strong-r0    Δ=+0.000  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r13   Δ=+0.000  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r2    Δ=+0.685  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r20   Δ=+0.400  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r22   Δ=+0.400  edição produtiva (args distintos, mesma confirmação)  [apply_patch] 'applied 1 hunk(s) to in/cart-ui/src/cartState.js'
+strong 041-frontend-state-bug     m6f-strong-r23   Δ=+0.762  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r27   Δ=+0.000  edição produtiva (args distintos, mesma confirmação)  [apply_patch] 'applied 1 hunk(s) to /home/brcamp/harness-bench/data_try6/sa'
+strong 041-frontend-state-bug     m6f-strong-r28   Δ=+0.400  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r39   Δ=+0.746  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r4    Δ=+0.000  edição produtiva (args distintos, mesma confirmação)  [apply_patch] 'applied 1 hunk(s) to in/cart-ui/src/cartState.js'
+strong 041-frontend-state-bug     m6f-strong-r5    Δ=+0.400  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 041-frontend-state-bug     m6f-strong-r8    Δ=-0.004  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/cart-ui/src/cartState.js: replaced 1 occurrence'
+strong 042-api-schema-migration   m6f-strong-r10   Δ=+0.590  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/schema_migration/client.py: replaced 1 occurrence'
+strong 043-db-migration-safety    m6f-strong-r21   Δ=+0.753  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/db/migration.sql: replaced 1 occurrence'
+strong 043-db-migration-safety    m6f-strong-r25   Δ=+0.745  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/db/migration.sql: replaced 1 occurrence'
+strong 043-db-migration-safety    m6f-strong-r3    Δ=+0.733  edição produtiva (args distintos, mesma confirmação)  [apply_patch] 'applied 1 hunk(s) to in/db/migration.sql'
+strong 043-db-migration-safety    m6f-strong-r4    Δ=+0.720  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/db/migration.sql: replaced 1 occurrence'
+strong 043-db-migration-safety    m6f-strong-r6    Δ=+0.725  edição produtiva (args distintos, mesma confirmação)  [edit_file] 'edited in/db/migration.sql: replaced 1 occurrence'
+strong 082-compose-config-repair  m6f-strong-r28   Δ=+0.680  edição produtiva (args distintos, mesma confirmação)  [apply_patch] 'applied 1 hunk(s) to in/composeapp/compose.yaml'
+strong 082-compose-config-repair  m6f-strong-r29   Δ=+0.591  edição produtiva (args distintos, mesma confirmação)  [apply_patch] 'applied 1 hunk(s) to in/composeapp/compose.yaml'
+weak   041-frontend-state-bug     m6f-weak-r66     Δ=+0.000  parede (mesmo erro)  [run_shell] '[exit 127]\n/bin/sh: 1: [bash,: not found'
+weak   042-api-schema-migration   m6f-weak-r117    Δ=+0.194  parede (mesmo erro)  [apply_patch] "error: unterminated hunk: expected '=======' then '>>>>>>> R"
+weak   042-api-schema-migration   m6f-weak-r58     Δ=+0.000  edição produtiva (args distintos, mesma confirmação)  [list_dir] 'in/\nout/'
+weak   042-api-schema-migration   m6f-weak-r62     Δ=+0.250  parede (mesmo erro)  [apply_patch] "error: expected '<<<<<<< SEARCH', got '*** Begin Patch'"
+weak   042-api-schema-migration   m6f-weak-r75     Δ=+0.000  parede (mesmo erro)  [run_shell] "error: tool 'run_shell' failed: 'command'"
+weak   042-api-schema-migration   m6f-weak-r77     Δ=+0.250  parede (mesmo erro)  [write_file<|channel|>commentary] "error: unknown tool 'write_file<|channel|>commentary'"
+weak   042-api-schema-migration   m6f-weak-r91     Δ=+0.000  parede (mesmo erro)  [apply_patch] "error: expected '<<<<<<< SEARCH', got '*** Begin Patch'"
+weak   043-db-migration-safety    m6f-weak-r108    Δ=+0.161  outro  [read_file] 'DROP TABLE users;\n\nCREATE TABLE users (\n    id TEXT PRIMARY '
+weak   043-db-migration-safety    m6f-weak-r113    Δ=+0.750  parede (mesmo erro)  [write_file<|channel|>commentary] "error: unknown tool 'write_file<|channel|>commentary'"
+weak   043-db-migration-safety    m6f-weak-r15     Δ=+0.810  parede (mesmo erro)  [write_file<|channel|>commentary] "error: unknown tool 'write_file<|channel|>commentary'"
+weak   043-db-migration-safety    m6f-weak-r19     Δ=+0.070  parede (mesmo erro)  [write_file<|channel|>commentary] "error: unknown tool 'write_file<|channel|>commentary'"
+weak   043-db-migration-safety    m6f-weak-r35     Δ=+0.169  edição produtiva (args distintos, mesma confirmação)  [list_dir] 'in/\nout/'
+weak   043-db-migration-safety    m6f-weak-r4      Δ=+0.172  giro (mesma chamada, mesma saída)  [list_dir] 'in/\nout/'
+weak   043-db-migration-safety    m6f-weak-r85     Δ=+0.140  parede (mesmo erro)  [write_file<|channel|>commentary] "error: unknown tool 'write_file<|channel|>commentary'"
+weak   082-compose-config-repair  m6f-weak-r105    Δ=+0.700  parede (mesmo erro)  [apply_patch] "error: unterminated hunk: expected '=======' then '>>>>>>> R"
+weak   082-compose-config-repair  m6f-weak-r44     Δ=+0.700  edição produtiva (args distintos, mesma confirmação)  [list_dir] 'in/\nout/'
+
+strong edição produtiva (args distintos, mesma confirmação)    20
+weak   edição produtiva (args distintos, mesma confirmação)    3
+weak   giro (mesma chamada, mesma saída)                       1
+weak   outro                                                   1
+weak   parede (mesmo erro)                                     11

@@ -209,8 +209,18 @@ class AgentConfig:
     # Measured (72 solves): a tie at that bench's power on both executors, so it stays off and is not
     # recommended. On the strong executor the three runs it escalated scored 0.726 against 0.396 for
     # the three the breaker stopped, at +US$ 0.23 each; the arm-level design dilutes that by the trip
-    # rate. A fork at the trip point is the design that could decide it.
+    # rate. The fork at the trip point (`bench/tool_loop_fork`) decided it: escalating beat stopping on
+    # both executors — strong +0.466 [+0.337, +0.592] per trip at ~US$ 0.86 per point, weak +0.273
+    # [+0.142, +0.421] at ~US$ 0.19 — so it is a recommended OPT-IN for loop-prone work, still off by
+    # default. Caveat: every strong trip there was the breaker stopping four distinct successful edits
+    # (its old no-progress rule ignored the args), so on strong most of the gain was not-stopping; the
+    # weak trips were real walls (malformed tool names, bad patches), which is where it rescues.
     escalate_on_tool_loop: str | None = None
+    # The fork (`bench/tool_loop_fork`): when escalation fires, first copy the workspace here. The
+    # breaker's own ending asks for an answer with NO tools, so the workspace at the trip IS what
+    # stopping would have left — grading this copy and the escalated workspace with the same oracle
+    # pairs the two arms at the one point where they differ. Off (None) unless a bench asks.
+    snapshot_on_tool_loop: Path | None = None
     # Surface the few most task-relevant built-in skills (name + description) into the system prompt,
     # so the model knows which learned procedures apply. Keyword-scored, so nothing is injected when
     # nothing matches. This is what connects the built-in skill library to the running loop.
@@ -299,6 +309,29 @@ def partial_spend(exc: BaseException) -> PartialSpend | None:
     """What the run behind ``exc`` had already paid for, or None if it never reached a model."""
     value = getattr(exc, _SPEND_ATTR, None)
     return value if isinstance(value, PartialSpend) else None
+
+
+def _snapshot_workspace(workspace: Path | None, dest: Path) -> None:
+    """Copy the run's workspace to ``dest`` as it stands (study 24, M6 fork). Never fails the run.
+
+    A missing workspace, an existing ``dest`` or an OS error is logged and skipped. The bench reads
+    a missing snapshot as a MISSING pair, never as a score of zero, so a failed copy costs a pair
+    and cannot bias one.
+    """
+    import shutil
+
+    if workspace is None:
+        _log.warning("tool-loop snapshot skipped: the run has no workspace")
+        return
+    if dest.exists():
+        _log.warning("tool-loop snapshot skipped: %s already exists", dest)
+        return
+    try:
+        shutil.copytree(workspace, dest, symlinks=True)
+    except OSError as exc:
+        _log.warning("tool-loop snapshot failed (%s): %s", dest, exc)
+        return
+    _log.info("tool-loop snapshot of %s written to %s", workspace, dest)
 
 
 def _last_answering_model(steplog: StepLog) -> str:
@@ -883,6 +916,8 @@ class Agent:
                 # through to the stop below, as a run without escalation always does.
                 run_model = self.config.escalate_on_tool_loop
                 _log.info("tool-loop breaker tripped (%s): escalating to %s", tripped, run_model)
+                if self.config.snapshot_on_tool_loop is not None:
+                    _snapshot_workspace(self.config.project_root, self.config.snapshot_on_tool_loop)
                 loop_detector = ToolLoopDetector()
                 continue
             if tripped is not None:

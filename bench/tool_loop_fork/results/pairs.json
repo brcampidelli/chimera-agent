@@ -1,0 +1,5502 @@
+[
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r0",
+  "executor": "strong",
+  "esc": 0.5962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r1",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r10",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": true,
+  "stop": 0.15,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r10",
+  "executor": "strong",
+  "esc": 0.87,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.87,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r10",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r11",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r11",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r12",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r12",
+  "executor": "strong",
+  "esc": 0.275,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.275,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r13",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": true,
+  "stop": 0.9962,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r13",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r15",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r15",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r18",
+  "executor": "strong",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r18",
+  "executor": "strong",
+  "esc": 0.275,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.275,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r19",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r19",
+  "executor": "strong",
+  "esc": 0.275,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.275,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r2",
+  "executor": "strong",
+  "esc": 0.9812,
+  "tripped": true,
+  "stop": 0.2963,
+  "copy_score": 0.9812,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r20",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r20",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r20",
+  "executor": "strong",
+  "esc": 0.275,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.275,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r21",
+  "executor": "strong",
+  "esc": 0.935,
+  "tripped": true,
+  "stop": 0.182,
+  "copy_score": 0.935,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r22",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r22",
+  "executor": "strong",
+  "esc": 0.27,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.27,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r22",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r23",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": true,
+  "stop": 0.2384,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r23",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r24",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r24",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r24",
+  "executor": "strong",
+  "esc": 0.987,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.987,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r25",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r25",
+  "executor": "strong",
+  "esc": 0.935,
+  "tripped": true,
+  "stop": 0.19,
+  "copy_score": 0.935,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r26",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r27",
+  "executor": "strong",
+  "esc": 0.5962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r27",
+  "executor": "strong",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r28",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r28",
+  "executor": "strong",
+  "esc": 0.98,
+  "tripped": true,
+  "stop": 0.3,
+  "copy_score": 0.98,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r29",
+  "executor": "strong",
+  "esc": 0.98,
+  "tripped": true,
+  "stop": 0.3893,
+  "copy_score": 0.98,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r3",
+  "executor": "strong",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r3",
+  "executor": "strong",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r3",
+  "executor": "strong",
+  "esc": 0.995,
+  "tripped": true,
+  "stop": 0.262,
+  "copy_score": 0.995,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r30",
+  "executor": "strong",
+  "esc": 0.262,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.262,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r30",
+  "executor": "strong",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r31",
+  "executor": "strong",
+  "esc": 0.267,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.267,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r32",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r33",
+  "executor": "strong",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r33",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r34",
+  "executor": "strong",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r34",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r35",
+  "executor": "strong",
+  "esc": 0.5925,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5925,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r35",
+  "executor": "strong",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r35",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r36",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r38",
+  "executor": "strong",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r38",
+  "executor": "strong",
+  "esc": 0.985,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.985,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r39",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": true,
+  "stop": 0.2502,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r39",
+  "executor": "strong",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r39",
+  "executor": "strong",
+  "esc": 0.275,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.275,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r39",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r4",
+  "executor": "strong",
+  "esc": 0.6,
+  "tripped": true,
+  "stop": 0.6,
+  "copy_score": 0.6,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r4",
+  "executor": "strong",
+  "esc": 0.995,
+  "tripped": true,
+  "stop": 0.275,
+  "copy_score": 0.995,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r5",
+  "executor": "strong",
+  "esc": 0.9962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r6",
+  "executor": "strong",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-strong-r6",
+  "executor": "strong",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r6",
+  "executor": "strong",
+  "esc": 0.995,
+  "tripped": true,
+  "stop": 0.27,
+  "copy_score": 0.995,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r7",
+  "executor": "strong",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-strong-r8",
+  "executor": "strong",
+  "esc": 0.9925,
+  "tripped": true,
+  "stop": 0.9962,
+  "copy_score": 0.9925,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r8",
+  "executor": "strong",
+  "esc": 0.992,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.992,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-strong-r8",
+  "executor": "strong",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-strong-r9",
+  "executor": "strong",
+  "esc": 0.925,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.925,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r0",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r0",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r0",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r0",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r1",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r1",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r1",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r1",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r10",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r10",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r10",
+  "executor": "weak",
+  "esc": 0.25,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.25,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r10",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r100",
+  "executor": "weak",
+  "esc": 0.5813,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5813,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r100",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r100",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r100",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r101",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r101",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r101",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r101",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r102",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r102",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r102",
+  "executor": "weak",
+  "esc": 0.255,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.255,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r102",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r103",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r103",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r103",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r103",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r104",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r104",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r104",
+  "executor": "weak",
+  "esc": 0.174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.174,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r104",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r105",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r105",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r105",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r105",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": true,
+  "stop": 0.3,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r106",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r106",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r106",
+  "executor": "weak",
+  "esc": 0.257,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.257,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r106",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r107",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r107",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r107",
+  "executor": "weak",
+  "esc": 0.25,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.25,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r107",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r108",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r108",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r108",
+  "executor": "weak",
+  "esc": 0.259,
+  "tripped": true,
+  "stop": 0.098,
+  "copy_score": 0.259,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r108",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r109",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r109",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r109",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r109",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r11",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r11",
+  "executor": "weak",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r11",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r11",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r110",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r110",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r110",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r110",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r111",
+  "executor": "weak",
+  "esc": 0.9812,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9812,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r111",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r111",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r111",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r112",
+  "executor": "weak",
+  "esc": 0.5813,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5813,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r112",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r112",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r112",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r113",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r113",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r113",
+  "executor": "weak",
+  "esc": 0.925,
+  "tripped": true,
+  "stop": 0.175,
+  "copy_score": 0.925,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r113",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r114",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r114",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r114",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r114",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r115",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r115",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r115",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r115",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r116",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r116",
+  "executor": "weak",
+  "esc": 0.6174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.6174,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r116",
+  "executor": "weak",
+  "esc": 0.19,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.19,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r116",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r117",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r117",
+  "executor": "weak",
+  "esc": 0.74,
+  "tripped": true,
+  "stop": 0.546,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r117",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r117",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r118",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r118",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r118",
+  "executor": "weak",
+  "esc": 0.19,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.19,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r118",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r119",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r119",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r119",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r119",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r12",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r12",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r12",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r12",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r13",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r13",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r13",
+  "executor": "weak",
+  "esc": 0.19,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.19,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r13",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r14",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r14",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r14",
+  "executor": "weak",
+  "esc": 0.262,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.262,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r14",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r15",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r15",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r15",
+  "executor": "weak",
+  "esc": 0.992,
+  "tripped": true,
+  "stop": 0.182,
+  "copy_score": 0.992,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r15",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r16",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r16",
+  "executor": "weak",
+  "esc": 0.546,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.546,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r16",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r16",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r17",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r17",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r17",
+  "executor": "weak",
+  "esc": 0.27,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.27,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r17",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r18",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r18",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r18",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r18",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r19",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r19",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r19",
+  "executor": "weak",
+  "esc": 0.252,
+  "tripped": true,
+  "stop": 0.182,
+  "copy_score": 0.252,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r19",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r2",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r2",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r2",
+  "executor": "weak",
+  "esc": 0.254,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.254,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r2",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r20",
+  "executor": "weak",
+  "esc": 0.5925,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5925,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r20",
+  "executor": "weak",
+  "esc": 0.6174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.6174,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r20",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r20",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r21",
+  "executor": "weak",
+  "esc": 0.5813,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5813,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r21",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r21",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r21",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r22",
+  "executor": "weak",
+  "esc": 0.2421,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2421,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r22",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r22",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r22",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r23",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r23",
+  "executor": "weak",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r23",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r23",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r24",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r24",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r24",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r24",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r25",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r25",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r25",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r25",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r26",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r26",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r26",
+  "executor": "weak",
+  "esc": 0.243,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.243,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r26",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r27",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r27",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r27",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r27",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r28",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r28",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r28",
+  "executor": "weak",
+  "esc": 0.26,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.26,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r28",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r29",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r29",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r29",
+  "executor": "weak",
+  "esc": 0.106,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.106,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r29",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r3",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r3",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r3",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r3",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r30",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r30",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r30",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r30",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r31",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r31",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r31",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r31",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r32",
+  "executor": "weak",
+  "esc": 0.5813,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5813,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r32",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r32",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r32",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r33",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r33",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r33",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r33",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r34",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r34",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r34",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r34",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r35",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r35",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r35",
+  "executor": "weak",
+  "esc": 0.267,
+  "tripped": true,
+  "stop": 0.098,
+  "copy_score": 0.267,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r35",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r36",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r36",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r36",
+  "executor": "weak",
+  "esc": 0.158,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.158,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r36",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r37",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r37",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r37",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r37",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r38",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r38",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r38",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r38",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r39",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r39",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r39",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r39",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r4",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r4",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r4",
+  "executor": "weak",
+  "esc": 0.27,
+  "tripped": true,
+  "stop": 0.098,
+  "copy_score": 0.27,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r4",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r40",
+  "executor": "weak",
+  "esc": 0.9775,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9775,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r40",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r40",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r40",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r41",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r41",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r41",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r41",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r42",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r42",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r42",
+  "executor": "weak",
+  "esc": 0.227,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.227,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r42",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r43",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r43",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r43",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r43",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r44",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r44",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r44",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r44",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": true,
+  "stop": 0.3,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r45",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r45",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r45",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r45",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r46",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r46",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r46",
+  "executor": "weak",
+  "esc": 0.257,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.257,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r46",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r47",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r47",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r47",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r47",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r48",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r48",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r48",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r48",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r49",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r49",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r49",
+  "executor": "weak",
+  "esc": 0.174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.174,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r49",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r5",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r5",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r5",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r5",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r50",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r50",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r50",
+  "executor": "weak",
+  "esc": 0.257,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.257,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r50",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r51",
+  "executor": "weak",
+  "esc": 0.9812,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9812,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r51",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r51",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r51",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r52",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r52",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r52",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r52",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r53",
+  "executor": "weak",
+  "esc": 0.9812,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9812,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r53",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r53",
+  "executor": "weak",
+  "esc": 0.228,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.228,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r53",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r54",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r54",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r54",
+  "executor": "weak",
+  "esc": 0.19,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.19,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r54",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r55",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r55",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r55",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r55",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r56",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r56",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r56",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r56",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r57",
+  "executor": "weak",
+  "esc": 0.2887,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2887,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r57",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r57",
+  "executor": "weak",
+  "esc": 0.158,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.158,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r57",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r58",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r58",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": true,
+  "stop": 0.15,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r58",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r58",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r59",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r59",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r59",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r59",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r6",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r6",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r6",
+  "executor": "weak",
+  "esc": 0.265,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.265,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r6",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r60",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r60",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r60",
+  "executor": "weak",
+  "esc": 0.267,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.267,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r60",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r61",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r61",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r61",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r61",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r62",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r62",
+  "executor": "weak",
+  "esc": 0.4,
+  "tripped": true,
+  "stop": 0.15,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r62",
+  "executor": "weak",
+  "esc": 0.174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.174,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r62",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r63",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r63",
+  "executor": "weak",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r63",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r63",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r64",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r64",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r64",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r64",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r65",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r65",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r65",
+  "executor": "weak",
+  "esc": 0.262,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.262,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r65",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r66",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": true,
+  "stop": 0.5962,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r66",
+  "executor": "weak",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r66",
+  "executor": "weak",
+  "esc": 0.174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.174,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r66",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r67",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r67",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r67",
+  "executor": "weak",
+  "esc": 0.257,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.257,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r67",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r68",
+  "executor": "weak",
+  "esc": 0.9812,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9812,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r68",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r68",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r68",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r69",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r69",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r69",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r69",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r7",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r7",
+  "executor": "weak",
+  "esc": 0.4,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r7",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r7",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r70",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r70",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r70",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r70",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r71",
+  "executor": "weak",
+  "esc": 0.9925,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9925,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r71",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r71",
+  "executor": "weak",
+  "esc": 0.122,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.122,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r71",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r72",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r72",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r72",
+  "executor": "weak",
+  "esc": 0.158,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.158,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r72",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r73",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r73",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r73",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r73",
+  "executor": "weak",
+  "esc": 0.7,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.7,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r74",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r74",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r74",
+  "executor": "weak",
+  "esc": 0.252,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.252,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r74",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r75",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r75",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": true,
+  "stop": 0.15,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r75",
+  "executor": "weak",
+  "esc": 0.262,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.262,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r75",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r76",
+  "executor": "weak",
+  "esc": 0.9925,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9925,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r76",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r76",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r76",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r77",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r77",
+  "executor": "weak",
+  "esc": 0.4,
+  "tripped": true,
+  "stop": 0.15,
+  "copy_score": 0.4,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r77",
+  "executor": "weak",
+  "esc": 0.257,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.257,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r77",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r78",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r78",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r78",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r78",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r79",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r79",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r79",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r79",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r8",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r8",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r8",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r8",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r80",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r80",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r80",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r80",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r81",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r81",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r81",
+  "executor": "weak",
+  "esc": 0.239,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.239,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r81",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r82",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r82",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r82",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r82",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r83",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r83",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r83",
+  "executor": "weak",
+  "esc": 0.19,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.19,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r83",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r84",
+  "executor": "weak",
+  "esc": 0.5813,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5813,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r84",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r84",
+  "executor": "weak",
+  "esc": 0.257,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.257,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r84",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r85",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r85",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r85",
+  "executor": "weak",
+  "esc": 0.262,
+  "tripped": true,
+  "stop": 0.122,
+  "copy_score": 0.262,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r85",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r86",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r86",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r86",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r86",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r87",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r87",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r87",
+  "executor": "weak",
+  "esc": 0.19,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.19,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r87",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r88",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r88",
+  "executor": "weak",
+  "esc": 0.74,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.74,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r88",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r88",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r89",
+  "executor": "weak",
+  "esc": 0.2963,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2963,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r89",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r89",
+  "executor": "weak",
+  "esc": 0.182,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.182,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r89",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r9",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r9",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r9",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r9",
+  "executor": "weak",
+  "esc": 0.6643,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.6643,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r90",
+  "executor": "weak",
+  "esc": 0.5962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r90",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r90",
+  "executor": "weak",
+  "esc": 0.114,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.114,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r90",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r91",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r91",
+  "executor": "weak",
+  "esc": 0.4848,
+  "tripped": true,
+  "stop": 0.4848,
+  "copy_score": 0.4848,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r91",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r91",
+  "executor": "weak",
+  "esc": 0.6643,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.6643,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r92",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r92",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r92",
+  "executor": "weak",
+  "esc": 0.174,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.174,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r92",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r93",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r93",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r93",
+  "executor": "weak",
+  "esc": 0.249,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.249,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r93",
+  "executor": "weak",
+  "esc": 0.95,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.95,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r94",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r94",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r94",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r94",
+  "executor": "weak",
+  "esc": 0.99,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.99,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r95",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r95",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r95",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r95",
+  "executor": "weak",
+  "esc": 1.0,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 1.0,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r96",
+  "executor": "weak",
+  "esc": 0.2039,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.2039,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r96",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r96",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r96",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r97",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r97",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r97",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r97",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r98",
+  "executor": "weak",
+  "esc": 0.5925,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.5925,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r98",
+  "executor": "weak",
+  "esc": 0.546,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.546,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r98",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r98",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ },
+ {
+  "task": "041-frontend-state-bug",
+  "hid": "m6f-weak-r99",
+  "executor": "weak",
+  "esc": 0.9962,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.9962,
+  "copy_ok": true
+ },
+ {
+  "task": "042-api-schema-migration",
+  "hid": "m6f-weak-r99",
+  "executor": "weak",
+  "esc": 0.15,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.15,
+  "copy_ok": true
+ },
+ {
+  "task": "043-db-migration-safety",
+  "hid": "m6f-weak-r99",
+  "executor": "weak",
+  "esc": 0.098,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.098,
+  "copy_ok": true
+ },
+ {
+  "task": "082-compose-config-repair",
+  "hid": "m6f-weak-r99",
+  "executor": "weak",
+  "esc": 0.3,
+  "tripped": false,
+  "stop": null,
+  "copy_score": 0.3,
+  "copy_ok": true
+ }
+]

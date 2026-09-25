@@ -1,0 +1,22 @@
+
+===== executor: strong =====
+  solves 70 · pairs (tripped) 20 · trip rate 0.286
+  stop 0.4486  esc 0.9149  Δ +0.4663  95% CI over pairs [+0.3372, +0.5917]
+  pairs where escalation helped / hurt / tied: 15 / 1 / 4
+    041-frontend-state-bug     n=12  Δ +0.316
+    042-api-schema-migration   n= 1  Δ +0.590
+    043-db-migration-safety    n= 5  Δ +0.735
+    082-compose-config-repair  n= 2  Δ +0.635
+  implied arm-level effect (trip rate × Δ): +0.1332
+  US$/solve: tripped 0.4766 (n 20) · clean 0.0808 (n 50)
+
+===== executor: weak =====
+  solves 480 · pairs (tripped) 16 · trip rate 0.033
+  stop 0.2364  esc 0.5092  Δ +0.2729  95% CI over pairs [+0.1417, +0.4213]
+  pairs where escalation helped / hurt / tied: 12 / 0 / 4
+    041-frontend-state-bug     n= 1  Δ +0.000
+    042-api-schema-migration   n= 6  Δ +0.116
+    043-db-migration-safety    n= 7  Δ +0.325
+    082-compose-config-repair  n= 2  Δ +0.700
+  implied arm-level effect (trip rate × Δ): +0.0091
+  US$/solve: tripped 0.0540 (n 16) · clean 0.0015 (n 462)
