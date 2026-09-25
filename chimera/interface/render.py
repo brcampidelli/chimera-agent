@@ -82,6 +82,26 @@ def refusal_lines(report: TurnReport) -> list[str]:
     ]
 
 
+_TODO_MARKS = {"done": "[green]✓[/green]", "doing": "[yellow]▸[/yellow]", "pending": "[dim]○[/dim]"}
+
+
+def todo_lines(report: TurnReport) -> list[str]:
+    """The task list the agent kept this turn, for printing under the reply — or nothing.
+
+    ``todo_write`` is registered on the terminal by default and exists so "the person watching can
+    see where you are". The desktop draws it; until now no terminal surface did, so the model kept
+    a checklist that nobody at a terminal ever saw. Same order the agent wrote, one mark per status.
+    """
+    todos = getattr(report, "todos", None) or []
+    if not todos:
+        return []
+    done = sum(1 for _, status in todos if status == "done")
+    lines = [f"[dim]tasks {done}/{len(todos)} done[/dim]"]
+    for task, status in todos:
+        lines.append(f"  {_TODO_MARKS.get(status, '[dim]·[/dim]')} {escape(task)}")
+    return lines
+
+
 def governance_line(granted: int, refused: int, *, attended: bool) -> str:
     """What the governance layer decided this turn, or ``""`` when it decided nothing.
 

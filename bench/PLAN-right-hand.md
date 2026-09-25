@@ -258,7 +258,11 @@ re-measured, so neither is claimed here.
 
 **The `--fuse` label, 2026-09-25:** the TUI's busy label no longer says "fusion — synthesizing";
 it says fusion answers only steps without tools, which is what `RoutedBackend.complete` does. After
-a turn that fusion did not answer, the TUI says so once per session. `todo_write` is still open.
+a turn that fusion did not answer, the TUI says so once per session.
+
+**`todo_write`, 2026-09-25: drawn.** The turn report carries the list the last accepted `todo_write`
+recorded, and `chat`, `assist` and the TUI print it under the reply, the way the desktop draws it.
+Step 6 has nothing left open.
 
 ## 4 · What this study cannot show
 
