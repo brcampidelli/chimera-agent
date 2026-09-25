@@ -31,6 +31,12 @@ against the exact answer. It was replayed on about 2,500 recorded traces
 (``bench/tool_loop_near_args``). Of the 138 legacy stops, the wider rule reproduces 5, all
 re-listings of the root. It reproduces none of the 86 distinct-write stops above, and it would
 have stopped none of the 76 runs that continued under the fixed rule.
+
+**A failure the tool reports in its own answer is a failure.** `[exit 127]` from a command passed as a
+list, or the same `ZeroDivisionError` from four pieces of code, reached the loop as successes, so
+"the same failure under different args" never stopped them (``_answered_failure``). The same replay
+(``bench/tool_loop_silent_failure``) finds that rule stops exactly those three legacy runs, none of the
+86 distinct-write stops, and none of the 76 continuing runs.
 """
 
 from __future__ import annotations

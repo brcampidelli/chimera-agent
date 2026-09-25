@@ -1,0 +1,111 @@
+{
+  "fidelity": {
+    "other (before the fix)": {
+      "agree": 1247,
+      "disagree": 2
+    },
+    "brk-fixed-weak": {
+      "agree": 39
+    },
+    "brk-legacy-weak": {
+      "agree": 38
+    },
+    "m6-esc-weak": {
+      "agree": 19
+    },
+    "m6f-weak": {
+      "agree": 479
+    },
+    "brk-fixed-strong": {
+      "agree": 37
+    },
+    "brk-legacy-strong": {
+      "agree": 39
+    },
+    "m6-esc-strong": {
+      "agree": 18
+    },
+    "m6-stop-strong": {
+      "agree": 18
+    },
+    "m6-stop-weak": {
+      "agree": 18
+    },
+    "m6f-strong": {
+      "agree": 70
+    }
+  },
+  "gate_F": true,
+  "acted": {
+    "run_shell": 1824,
+    "execute_code": 748,
+    "code_interpreter": 218
+  },
+  "calls_seen": 31724,
+  "stops": {
+    "other (before the fix)": {
+      "near reproduces · mixed, distinct args": 3,
+      "near reproduces · reads, distinct args": 9,
+      "neither · reads, distinct args": 2,
+      "neither · writes, distinct args": 48,
+      "near reproduces · reads, identical args": 5,
+      "near reproduces · writes, identical args": 3,
+      "near reproduces · writes, distinct args": 2,
+      "neither · mixed, distinct args": 4,
+      "new only · reads, distinct args": 1
+    },
+    "brk-legacy-strong": {
+      "neither · writes, distinct args": 11
+    },
+    "brk-legacy-weak": {
+      "neither · writes, distinct args": 1,
+      "new only · reads, distinct args": 1,
+      "near reproduces · writes, identical args": 2,
+      "near reproduces · writes, distinct args": 1,
+      "near reproduces · mixed, distinct args": 1
+    },
+    "m6-esc-strong": {
+      "neither · writes, distinct args": 3
+    },
+    "m6-stop-strong": {
+      "neither · writes, distinct args": 3
+    },
+    "m6f-strong": {
+      "neither · writes, distinct args": 20
+    },
+    "m6f-weak": {
+      "new only · reads, distinct args": 1,
+      "near reproduces · writes, distinct args": 4,
+      "near reproduces · reads, distinct args": 6,
+      "near reproduces · reads, identical args": 4,
+      "near reproduces · mixed, distinct args": 1
+    },
+    "m6-stop-weak": {
+      "near reproduces · reads, distinct args": 1,
+      "near reproduces · reads, identical args": 1
+    }
+  },
+  "new_only_legacy": [
+    "brk-legacy-weak              041-frontend-state-bug-brk-legacy-weak-r8  run_shell {\"command\": [\"bash\", \"-lc\", \"node /home/brcamp/har -> '[exit 127]\\n/bin/sh: 1: [bash,: not found' | run_shell {\"command\": [\"bash\", \"-lc\", \"node \\\"$(pwd)/in/cart -> '[exit 127]\\n/bin/sh: 1: [bash,: not found' | run_shell {\"command\": [\"bash\", \"-lc\", \"node -v\"], \"timeout\": -> '[exit 127]\\n/bin/sh: 1: [bash,: not found' | run_shell {\"command\": [\"bash\", \"-lc\", \"which node\"], \"timeou -> '[exit 127]\\n/bin/sh: 1: [bash,: not found'",
+    "m6f-weak                     041-frontend-state-bug-m6f-weak-r66  run_shell {\"command\": [\"bash\", \"-lc\", \"node in/cart-ui/src/c -> '[exit 127]\\n/bin/sh: 1: [bash,: not found' | run_shell {\"command\": [\"bash\", \"-lc\", \"node in/cart-ui/src/c -> '[exit 127]\\n/bin/sh: 1: [bash,: not found' | run_shell {\"command\": [\"bash\", \"-lc\", \"echo test\"], \"timeout -> '[exit 127]\\n/bin/sh: 1: [bash,: not found' | run_shell {\"command\": [\"bash\", \"-lc\", \"node in/cart-ui/src/c -> '[exit 127]\\n/bin/sh: 1: [bash,: not found'",
+    "other (before the fix)       089-ab-test-caveat-analysis-sys1-on-weak-r2  code_interpreter {\"_raw\": \"{\\\"code\\\": \\\"import math\\\\n\\\\n# Function -> 'ZeroDivisionError: float division by zer' | code_interpreter {\"_raw\": \"{\\\"code\\\": \\\"import math\\\\n\\\\n# Function -> 'ZeroDivisionError: float division by zer' | code_interpreter {\"_raw\": \"{\\\"code\\\": \\\"import math\\\\n\\\\n# Function -> 'ZeroDivisionError: float division by zer' | code_interpreter {\"_raw\": \"{\\\"code\\\": \\\"import math\\\\n\\\\n# Function -> 'ZeroDivisionError: float division by zer'"
+  ],
+  "criterion_2_write_tail_reproduced": [],
+  "cost_rows": [],
+  "cell_medians": {
+    "brk-fixed-weak|011-code-debug": 0.0,
+    "brk-fixed-strong|041-frontend-state-bug": 0.5962,
+    "brk-fixed-weak|041-frontend-state-bug": 0.98685,
+    "brk-fixed-strong|042-api-schema-migration": 0.74,
+    "brk-fixed-weak|042-api-schema-migration": 0.15,
+    "brk-fixed-strong|043-db-migration-safety": 0.275,
+    "brk-fixed-weak|043-db-migration-safety": 0.16599999999999998,
+    "brk-fixed-strong|082-compose-config-repair": 1.0,
+    "brk-fixed-weak|082-compose-config-repair": 1.0
+  },
+  "skipped": {
+    "unknown rule (from the fix day on, outside the families)": 193,
+    "no trace": 18,
+    "bad line": 1
+  }
+}

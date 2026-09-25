@@ -1,0 +1,4 @@
+run_shell          ok calls   5612  read as failure  1824 (32.5%)  non-zero exit with no text, not counted    5
+execute_code       ok calls    984  read as failure   748 (76.0%)  non-zero exit with no text, not counted    0
+code_interpreter   ok calls   1423  read as failure   218 (15.3%)  non-zero exit with no text, not counted    0
+all three          ok calls   8019  read as failure  2790 (34.8%)
