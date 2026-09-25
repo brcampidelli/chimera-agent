@@ -61,6 +61,7 @@ from typing import Any, Literal
 import httpx
 import pytest
 from litellm.llms.custom_httpx import http_handler
+from litellm.llms.ollama.common_utils import OllamaModelInfo
 
 import chimera.providers
 from chimera.config import get_settings
@@ -201,6 +202,23 @@ class _Wire:
     requests: list[_Request] = field(default_factory=list)
 
 
+#: Paths LiteLLM posts to on its OWN account, not to fetch an answer a test scripted. Measured on
+#: LiteLLM 1.102.1 (1.99.0 makes no such call): at the end of every ``ollama_chat/`` stream the cost
+#: stamp (`stream_chunk_builder` → `_stamp_streaming_usage_cost`) looks the answer's model up with
+#: ``POST /api/show`` (`OllamaModelInfo.get_runtime_model_info`) through the very `HTTPHandler.post`
+#: this module replaces — on the calling thread, and again from the ``litellm-logging`` pool, which
+#: can run after the test has returned and so reach the NEXT test's fake. Served from the queue, that
+#: lookup took a scripted answer: the stream it was meant for failed before any output with "pop from
+#: empty list", the gateway fell back to a batch call, and the batch call found the queue empty too.
+#: Whether it landed in time was up to the scheduler, so the suite passed or failed on thread timing.
+#: On the calling thread the same lookup took turn two's answer in the ollama_chat stream row of
+#: `test_the_result_goes_back_linked_to_its_call` run alone — every time; in the full file an earlier
+#: test had warmed LiteLLM's model-info cache, so it passed on collection order. A lookup is
+#: therefore answered here, the way Ollama answers a model it does not have (the fake's answers all
+#: name model ``m``), and it is neither queued nor recorded as a request.
+_LOOKUP_PATHS = ("/api/show",)
+
+
 def _serve(monkeypatch: pytest.MonkeyPatch, answers: list[dict[str, Any] | bytes]) -> _Wire:
     """Replace LiteLLM's one HTTP seam so every provider answers from ``answers``, offline."""
     wire = _Wire(list(answers))
@@ -208,6 +226,9 @@ def _serve(monkeypatch: pytest.MonkeyPatch, answers: list[dict[str, Any] | bytes
     def post(
         _self: Any, url: str, data: Any = None, json: Any = None, **kwargs: Any
     ) -> httpx.Response:
+        if httpx.URL(url).path.endswith(_LOOKUP_PATHS):
+            not_found = {"error": "model 'm' not found"}
+            return httpx.Response(404, json=not_found, request=httpx.Request("POST", url))
         raw = json if json is not None else data
         body = _loads(raw) if isinstance(raw, str | bytes) else dict(raw or {})
         wire.requests.append(_Request(url, body, bool(kwargs.get("stream"))))
@@ -868,6 +889,22 @@ def test_the_call_comes_back_as_it_was_sent(
     else:
         assert ids == [c.id for c in calls]
     assert result.truncated is False
+
+
+def test_a_model_lookup_litellm_makes_on_its_own_does_not_take_a_scripted_answer(
+    armed: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fake's contract, pinned at the call that broke it (see `_LOOKUP_PATHS`). LiteLLM's own
+    Ollama model lookup may run on a logging thread after its call returned, i.e. inside whichever
+    test's fake is installed by then — so it must leave that test's queue and request log alone.
+    Called directly, so it does not depend on LiteLLM's model-info cache being cold."""
+    answer = _answer("ollama_chat", [_Call("c1", "echo", {"text": "x"})], "", streamed=True)
+    wire = _serve(monkeypatch, [answer])
+
+    OllamaModelInfo().get_runtime_model_info("ollama_chat/m", api_base="http://127.0.0.1:11434")
+
+    assert wire.answers == [answer]
+    assert wire.requests == []
 
 
 # --- result: the observation goes back linked to its call ----------------------------------------
