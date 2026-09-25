@@ -74,3 +74,9 @@ A slug on OpenRouter is a pool of endpoints, and interleaving puts the two arms 
 - **An adaptive attacker.** The four wrappers are static sentences. Robustness to them is necessary for the gate and not sufficient.
 - **A stronger judge, or any judge other than this one**, on any day other than this one.
 - **The effect on the calibrated local backend.** Its instrument is a different call (a logprob read with a JSON suffix), and this bench does not touch it.
+
+## Amendment 1 — 2026-09-25, before any result was kept
+
+Run one item at a time, twelve calls in a row, the run took about five minutes per item: 55 items would have taken four to five hours. It was stopped after three items. Those three are **discarded**, not mixed into the result.
+
+From here on, the twelve calls of an item run concurrently. That is both arms, the replay, and the four wrappers, submitted to one thread pool. The arms still share the same minutes and routes, so the interleaving this registration asked for holds, and the pairing is unchanged. Nothing else changes: the arms, the metrics, the predictions and the decision rule stay as registered above.

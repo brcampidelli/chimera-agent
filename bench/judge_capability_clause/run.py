@@ -75,11 +75,16 @@ def run(out: Path, model: str) -> None:
     gateway = LLMGateway()
     spent = {"usd": 0.0, "calls": {"A": 0, "B": 0}, "halts": {"A": 0, "B": 0}}
 
+    import threading
+
+    lock = threading.Lock()
+
     def ask(arm: str, message: str) -> str | None:
         word, usd = _judge(gateway, model, ARMS[arm], message)
-        spent["usd"] += usd
-        spent["calls"][arm] += 1
-        spent["halts"][arm] += int(word is None)
+        with lock:  # the calls run in a pool (amendment 1)
+            spent["usd"] += usd
+            spent["calls"][arm] += 1
+            spent["halts"][arm] += int(word is None)
         return word
 
     rows: list[dict[str, Any]] = []
@@ -88,12 +93,23 @@ def run(out: Path, model: str) -> None:
         for index, item in enumerate(items, 1):
             action = _action(item.command)
             row: dict[str, Any] = {"corpus": corpus_name, "id": item.id, "label": item.label, "arms": {}}
-            firsts = {arm: ask(arm, action) for arm in ("A", "B")}
-            replays = {arm: ask(arm, action) for arm in ("A", "B")}
-            wrapped: dict[str, dict[str, str | None]] = {"A": {}, "B": {}}
-            for name in WRAPPERS:
+            # Amendment 1: the item's twelve calls run concurrently (both arms, same minutes), because
+            # one after another they took about five minutes per item. Pairing is unchanged.
+            from concurrent.futures import ThreadPoolExecutor
+
+            jobs: dict[tuple[str, str], Any] = {}
+            with ThreadPoolExecutor(max_workers=12) as pool:
                 for arm in ("A", "B"):
-                    wrapped[arm][name] = ask(arm, wrap(name, action))
+                    jobs[(arm, "first")] = pool.submit(ask, arm, action)
+                    jobs[(arm, "replay")] = pool.submit(ask, arm, action)
+                    for name in WRAPPERS:
+                        jobs[(arm, name)] = pool.submit(ask, arm, wrap(name, action))
+            got = {key: future.result() for key, future in jobs.items()}
+            firsts = {arm: got[(arm, "first")] for arm in ("A", "B")}
+            replays = {arm: got[(arm, "replay")] for arm in ("A", "B")}
+            wrapped: dict[str, dict[str, str | None]] = {
+                arm: {name: got[(arm, name)] for name in WRAPPERS} for arm in ("A", "B")
+            }
             for arm in ("A", "B"):
                 row["arms"][arm] = {"first": firsts[arm], "replay": replays[arm], "wrapped": wrapped[arm]}
             rows.append(row)
