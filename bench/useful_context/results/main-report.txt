@@ -1,0 +1,93 @@
+openrouter/deepseek/deepseek-v4-flash-0731 via DeepInfra  T=0.0  US$1.3150  rows 540  halted 0
+
+PER LENGTH (all valid rows)
+    arm    n   ok    acc       Wilson 95%   fact  rule|1  break forget  med tok  cache   reas    sec     US$
+   4000   90   90  1.000 [0.959, 1.000]  1.000 90/90         0      0     4325   0.52     42    2.3  0.0151
+        kinds: {'ok': 90}   no reasoning: 8 rows, 0 failed; with reasoning: 82 rows, 0 failed
+  16000   90   90  1.000 [0.959, 1.000]  1.000 90/90         0      0    16232   0.07     58    3.5  0.0845
+        kinds: {'ok': 90}   no reasoning: 4 rows, 0 failed; with reasoning: 86 rows, 0 failed
+  32000   90   90  1.000 [0.959, 1.000]  1.000 90/90         0      0    32281   0.04     64    4.0  0.1699
+        kinds: {'ok': 90}   no reasoning: 3 rows, 0 failed; with reasoning: 87 rows, 0 failed
+  64000   90   89  0.989 [0.940, 0.998]  0.989 90/90         0      1    64214   0.02     63    5.3  0.3425
+        kinds: {'ok': 89, 'wrong_service': 1}   no reasoning: 6 rows, 1 failed; with reasoning: 84 rows, 0 failed
+ 128000   90   87  0.967 [0.907, 0.989]  0.967 88/88         2      1   128109   0.01     72    8.1  0.6873
+        kinds: {'ok': 87, 'wrong_service': 1, 'no_service': 1, 'tool_call': 1}   no reasoning: 7 rows, 2 failed; with reasoning: 83 rows, 1 failed
+ replay   90   90  1.000 [0.959, 1.000]  1.000 90/90         0      0     4319   0.49     46    2.2  0.0157
+        kinds: {'ok': 90}   no reasoning: 4 rows, 0 failed; with reasoning: 86 rows, 0 failed
+
+FLOOR 4k replay vs 4k: both 90, replay-only 0, 4k-only 0, neither 0 -> 0/90 discordant; exact McNemar p = 1; Newcombe [-0.041, +0.041] -> FLOOR GATE PASS; byte-identical answers 90/90
+
+POSITIVE CONTROL 4k: 90/90 = 1.000 -> PASS
+
+PAIRED vs 4k (Newcombe method 10, 95%; exact McNemar)
+    16000: n=90  both 90  long-only 0  4k-only 0  neither 0  delta +0.000 [-0.041, +0.041]  p=1  within -0.10
+    32000: n=90  both 90  long-only 0  4k-only 0  neither 0  delta +0.000 [-0.041, +0.041]  p=1  within -0.10
+    64000: n=90  both 89  long-only 0  4k-only 1  neither 0  delta -0.011 [-0.060, +0.031]  p=1  within -0.10
+   128000: n=90  both 87  long-only 0  4k-only 3  neither 0  delta -0.033 [-0.093, +0.013]  p=0.25  within -0.10
+
+USEFUL LENGTH (largest L with every tested L' <= L within margin): the 128,000 cell, median 128,109 provider tokens  -- the top of the ladder: a lower bound
+PROPOSED TRIGGER = floor(0.8 x 128,109, to 1,000) = 102,000 provider tokens
+
+BY TARGET DEPTH (ok/n)
+     4000  d=0.1: 30/30   d=0.5: 30/30   d=0.9: 30/30
+    16000  d=0.1: 30/30   d=0.5: 30/30   d=0.9: 30/30
+    32000  d=0.1: 30/30   d=0.5: 30/30   d=0.9: 30/30
+    64000  d=0.1: 29/30   d=0.5: 30/30   d=0.9: 30/30
+   128000  d=0.1: 29/30   d=0.5: 29/30   d=0.9: 29/30
+   replay  d=0.1: 30/30   d=0.5: 30/30   d=0.9: 30/30
+
+BY RULE (ok/n)
+     4000  snake: 15/15  prefix: 15/15  suffix: 15/15  camel: 15/15  bracket: 15/15  dots: 15/15
+    16000  snake: 15/15  prefix: 15/15  suffix: 15/15  camel: 15/15  bracket: 15/15  dots: 15/15
+    32000  snake: 15/15  prefix: 15/15  suffix: 15/15  camel: 15/15  bracket: 15/15  dots: 15/15
+    64000  snake: 14/15  prefix: 15/15  suffix: 15/15  camel: 15/15  bracket: 15/15  dots: 15/15
+   128000  snake: 14/15  prefix: 15/15  suffix: 15/15  camel: 15/15  bracket: 14/15  dots: 14/15
+   replay  snake: 15/15  prefix: 15/15  suffix: 15/15  camel: 15/15  bracket: 15/15  dots: 15/15
+
+RAW OUTPUTS: every failure, and 6 random passes per length
+--- 4000: 0 failures
+  M041             ok  want 'svc:garnet-pipe'              got 'svc:garnet-pipe'  finish=stop tools=0
+  M019             ok  want 'OSPREY_LEDGER'                got 'OSPREY_LEDGER'  finish=stop tools=0
+  M050             ok  want '[lichen-post]'                got '[lichen-post]'  finish=stop tools=0
+  M083             ok  want 'harborVane'                   got 'harborVane'  finish=stop tools=0
+  M006             ok  want 'sorrel-grid@ops'              got 'sorrel-grid@ops'  finish=stop tools=0
+  M009             ok  want 'tallowGate'                   got 'tallowGate'  finish=stop tools=0
+--- 16000: 0 failures
+  M068             ok  want '[cobalt-drift]'               got '[cobalt-drift]'  finish=stop tools=0
+  M012             ok  want '[quartz-shuttle]'             got '[quartz-shuttle]'  finish=stop tools=0
+  M046             ok  want 'zinniaTally'                  got 'zinniaTally'  finish=stop tools=0
+  M074             ok  want 'QUILL_SORTER'                 got 'QUILL_SORTER'  finish=stop tools=0
+  M007             ok  want 'lumen-forge@ops'              got 'lumen-forge@ops'  finish=stop tools=0
+  M064             ok  want 'garnetPipe'                   got 'garnetPipe'  finish=stop tools=0
+--- 32000: 0 failures
+  M027             ok  want 'velvetScout'                  got 'velvetScout'  finish=stop tools=0
+  M004             ok  want 'svc:heron-batch'              got 'svc:heron-batch'  finish=stop tools=0
+  M011             ok  want 'sorrelGrid'                   got 'sorrelGrid'  finish=stop tools=0
+  M055             ok  want 'QUILL_SORTER'                 got 'QUILL_SORTER'  finish=stop tools=0
+  M053             ok  want 'marrow.sync'                  got 'marrow.sync'  finish=stop tools=0
+  M008             ok  want 'garnet-pipe@ops'              got 'garnet-pipe@ops'  finish=stop tools=0
+--- 64000: 1 failures
+  M054  wrong_service  want 'TUNDRA_PRESS'                 got 'TALLOW_GATE'  finish=stop tools=0
+  M030             ok  want '[basalt-hook]'                got '[basalt-hook]'  finish=stop tools=0
+  M011             ok  want 'sorrelGrid'                   got 'sorrelGrid'  finish=stop tools=0
+  M071             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0
+  M055             ok  want 'QUILL_SORTER'                 got 'QUILL_SORTER'  finish=stop tools=0
+  M007             ok  want 'lumen-forge@ops'              got 'lumen-forge@ops'  finish=stop tools=0
+  M073             ok  want 'ORCHID_RAIL'                  got 'ORCHID_RAIL'  finish=stop tools=0
+--- 128000: 3 failures
+  M014  wrong_service  want '[yarrow-switch]'              got '[fennel-queue]'  finish=stop tools=0
+  M055     no_service  want 'QUILL_SORTER'                 got 'QUIVER_SORTER'  finish=stop tools=0
+  M087      tool_call  want 'tamarind.mesh'                got ''  finish=tool_calls tools=1
+  M016             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0
+  M029             ok  want 'basaltHook'                   got 'basaltHook'  finish=stop tools=0
+  M082             ok  want 'velvetScout'                  got 'velvetScout'  finish=stop tools=0
+  M076             ok  want 'svc:quill-sorter'             got 'svc:quill-sorter'  finish=stop tools=0
+  M007             ok  want 'lumen-forge@ops'              got 'lumen-forge@ops'  finish=stop tools=0
+  M075             ok  want 'svc:velvet-scout'             got 'svc:velvet-scout'  finish=stop tools=0
+--- replay: 0 failures
+  M074             ok  want 'QUILL_SORTER'                 got 'QUILL_SORTER'  finish=stop tools=0
+  M050             ok  want '[lichen-post]'                got '[lichen-post]'  finish=stop tools=0
+  M006             ok  want 'sorrel-grid@ops'              got 'sorrel-grid@ops'  finish=stop tools=0
+  M028             ok  want 'pewterDock'                   got 'pewterDock'  finish=stop tools=0
+  M005             ok  want 'svc:marrow-sync'              got 'svc:marrow-sync'  finish=stop tools=0
+  M071             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0
