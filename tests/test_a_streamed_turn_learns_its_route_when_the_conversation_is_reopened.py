@@ -31,6 +31,14 @@ from chimera.interface import ChatSession
 from chimera.providers import generation
 from chimera.providers.gateway import CompletionResult, LLMGateway
 
+
+@pytest.fixture(autouse=True)
+def _no_bill_lookups_leave_this_machine(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The reopen also asks for the turn's bill (`resolve_missing_bills`). These tests are about the
+    route; the bill's lookup answers "not yet" here so none of them reaches the router."""
+    monkeypatch.setattr(generation, "lookup_cost", lambda *_a, **_k: None)
+
+
 # ------------------------------------------------------------------ the gateway keeps the id
 
 
@@ -338,3 +346,26 @@ def test_without_a_router_key_the_reopen_asks_nobody(
         client.get(f"/api/code/sessions/{session_id}").json()["exchanges"][-1]["done"]["provider"]
         == ""
     )
+
+
+def test_the_reopen_learns_the_bill_beside_the_route_and_keeps_both(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _client(tmp_path, monkeypatch, OPENROUTER_API_KEY="sk-test")
+    frames = _frames(client.post("/api/code/turn", json={"message": "oi"}))
+    session_id = frames["session"]["session_id"]
+    assert frames["done"].get("billed_usd") is None, "the charge is not knowable when the turn ends"
+
+    monkeypatch.setattr(generation, "lookup_route", lambda *_a, **_k: "Relace")
+    monkeypatch.setattr(generation, "lookup_cost", lambda *_a, **_k: 0.00125)
+    done = client.get(f"/api/code/sessions/{session_id}").json()["exchanges"][-1]["done"]
+    assert done["provider"] == "Relace"
+    assert done["billed_usd"] == 0.00125
+
+    def refuse(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("asked again")
+
+    monkeypatch.setattr(generation, "lookup_route", refuse)
+    monkeypatch.setattr(generation, "lookup_cost", refuse)
+    again = client.get(f"/api/code/sessions/{session_id}").json()["exchanges"][-1]["done"]
+    assert again["billed_usd"] == done["billed_usd"]

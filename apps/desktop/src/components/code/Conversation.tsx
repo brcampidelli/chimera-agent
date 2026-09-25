@@ -463,6 +463,12 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
           ? t("code.chat.unknownCost")
           : `$${done.usd.toFixed(4)}`}
       </Badge>
+      {/* The charge, beside the estimate: `usd` is priced from the catalogue row, and the route that
+          answered may charge another price. Learned when the conversation is reopened, and only
+          once every call has answered, so it is absent — not zero — until then. */}
+      {done.billed_usd != null && !done.external ? (
+        <Badge>{t("code.chat.billed", { usd: `$${done.billed_usd.toFixed(4)}` })}</Badge>
+      ) : null}
       {/* Only when a layer actually contributed. "0 facts" and "we did not look" render the same and
           mean different things, so the absent case says nothing rather than saying zero. */}
       {done.memory_facts_used ? (

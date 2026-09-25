@@ -2305,17 +2305,31 @@ def register_code_api(
         }
 
     def _learn_routes(session_id: str, data: dict[str, Any], receipts: list[dict[str, Any]]) -> None:
-        from chimera.providers.generation import resolve_missing_routes, wants_route
+        import time
 
-        if not any(wants_route(r) for r in receipts):
+        from chimera.providers.generation import (
+            PASS_BUDGET,
+            resolve_missing_bills,
+            resolve_missing_routes,
+            wants_bill,
+            wants_route,
+        )
+
+        if not any(wants_route(r) or wants_bill(r) for r in receipts):
             return
         current = live()
         pool = current.credential_pool("openrouter")
         key = (pool[0] if pool else None) or current.openrouter_api_key or ""
         if not key:
             return
+        # One budget for both passes: the route first (one lookup a receipt, and the badge that
+        # reframes the rest), then the bill with whatever time is left.
+        started = time.monotonic()
         try:
             filled = resolve_missing_routes(receipts, api_key=key)
+            left = PASS_BUDGET - (time.monotonic() - started)
+            if left > 0:
+                filled += resolve_missing_bills(receipts, api_key=key, budget_seconds=left)
         except Exception as exc:  # noqa: BLE001 — a replay must render whatever the router does
             _log.debug("routes not learned for %s: %s", session_id, exc)
             return

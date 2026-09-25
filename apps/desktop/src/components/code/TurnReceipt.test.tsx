@@ -158,3 +158,33 @@ describe("the route and the cache", () => {
     expect(dict["code.chat.cache"]).toContain("{n}");
   });
 });
+
+/**
+ * What the account was actually charged, beside the estimate. `usd` is priced from the catalogue row
+ * of the model id; the route that answered may charge another price. The receipt learns the charge
+ * when the conversation is reopened, and only once every call has answered — so it has two states
+ * that must not collapse: known (drawn) and not yet known (absent, never "$0").
+ */
+describe("the bill", () => {
+  it("draws what the turn was charged", () => {
+    receipt({ billed_usd: 0.0021 });
+
+    expect(screen.getByText("code.chat.billed")).toBeInTheDocument();
+  });
+
+  it("stays quiet until every call has answered", () => {
+    receipt({ billed_usd: null });
+
+    expect(screen.queryByText("code.chat.billed")).not.toBeInTheDocument();
+  });
+
+  it("does not bill an external turn — its calls were never ours", () => {
+    receipt({ external: "claude-code", billed_usd: 0.5 });
+
+    expect(screen.queryByText("code.chat.billed")).not.toBeInTheDocument();
+  });
+
+  it.each(LANGS.map((l) => l.code))("%s has the string", (code) => {
+    expect(DICTS[code]["code.chat.billed"]).toContain("{usd}");
+  });
+});
