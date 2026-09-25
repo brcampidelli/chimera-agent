@@ -1,0 +1,1 @@
+ Carry every figure, name, version, path and identifier from the summaries into the answer exactly as written — a value the summaries give is never rounded, paraphrased or left out, and every part of the task gets its value.

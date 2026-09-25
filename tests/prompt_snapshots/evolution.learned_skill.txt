@@ -1,0 +1,1 @@
+Follow the instruction exactly and output only the requested result, with no preamble.

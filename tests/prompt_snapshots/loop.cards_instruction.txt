@@ -1,0 +1,1 @@
+Prefer the most directly applicable skill; ignore irrelevant or contradictory advice. Keep reasoning concise while maintaining correctness.

@@ -1,0 +1,1 @@
+You design a specialized agent for a task. Reply with ONLY a JSON object: {"name": "snake_case_name", "role_prompt": "the agent system prompt", "tools": ["tool names chosen ONLY from the allowed list"]}.

@@ -1,0 +1,1 @@
+When a task has several steps, record them with todo_write before you start and update the list as each one finishes. It is your own account of your progress, so keep it true: mark a step done when it is done, not when you intend to do it.

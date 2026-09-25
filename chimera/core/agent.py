@@ -452,6 +452,52 @@ class Agent:
         # the surface most people use, nothing learned ever came back.
         self.cards = cards
 
+    def compose_system_prompt(self, task: str) -> str:
+        """The system message this agent sends for ``task``, in the order it is assembled.
+
+        Extracted from :meth:`run` unchanged, so the order can be snapshotted without a model: the
+        registry in :mod:`chimera.prompts` guards each piece, and this is what guards how they are
+        put together. ``run`` calls it once per turn, where the inline code used to be."""
+        system_prompt = self.config.system_prompt
+        if self.config.prefix_nonce:
+            system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
+        skill_block = self._skill_context(task)
+        if skill_block:
+            system_prompt = f"{system_prompt}\n\n{skill_block}"
+        # What it LEARNED, after what it shipped with: a card comes from a run that
+        # actually worked here, so it is the more specific advice of the two. Advisory
+        # either way — the cards suggest, the verifier decides.
+        card_block = self._card_context(task)
+        if card_block:
+            system_prompt = f"{system_prompt}\n\n{card_block}"
+        # After the skills, so the project's own conventions outrank a generic skill card that
+        # happens to have been retrieved — a repository that says "never use bare except" should
+        # win over one. Not last any more: see the owner's instructions below.
+        project_block = self._project_context()
+        if project_block:
+            system_prompt = f"{system_prompt}\n\n{project_block}"
+        # Last, and the ordering is the point: `agents_md` says in its own injected text that a
+        # repository is a convention rather than an authority, and an AGENTS.md can come from a repo
+        # cloned an hour ago. This is the owner speaking, so it is read last and wins. Appended,
+        # never substituted — the default prompt carries the act-rather-than-describe rule and the
+        # untrusted-data fence, and a customisation that could delete those would delete them
+        # silently.
+        if self.config.instructions:
+            system_prompt = f"{system_prompt}\n\n{self.config.instructions}"
+        # Last of all, and only when the session actually granted the tool: a sentence telling a
+        # model to use something it was not given is a sentence that invites a call to nothing.
+        #
+        # It is here because the schema alone does not work, and that is measured rather than
+        # assumed. Same task, same models, one sentence of difference: bare, `todo_write` was called
+        # 0 times by either of two models; nudged, glm-5.3 called it 4 times with a correct
+        # progression. deepseek-v4-flash called it 0 times in 4 nudged runs, so on that model this
+        # buys nothing — which is a fact about the shipped default, recorded in `chimera/config.py`
+        # rather than left for a user to discover. Without this line the tool is 657 characters of
+        # schema and no behaviour at all.
+        if _find_tool(self.tools, "todo_write") is not None:
+            system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
+        return system_prompt
+
     def _skill_context(self, task: str) -> str:
         """Task-relevant built-in skills as a prompt block ("" when none match or on any error)."""
         if not self.config.inject_skill_context:
@@ -572,44 +618,7 @@ class Agent:
                 if on_todo is not None
                 else None,
             )
-        system_prompt = self.config.system_prompt
-        if self.config.prefix_nonce:
-            system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
-        skill_block = self._skill_context(task)
-        if skill_block:
-            system_prompt = f"{system_prompt}\n\n{skill_block}"
-        # What it LEARNED, after what it shipped with: a card comes from a run that
-        # actually worked here, so it is the more specific advice of the two. Advisory
-        # either way — the cards suggest, the verifier decides.
-        card_block = self._card_context(task)
-        if card_block:
-            system_prompt = f"{system_prompt}\n\n{card_block}"
-        # After the skills, so the project's own conventions outrank a generic skill card that
-        # happens to have been retrieved — a repository that says "never use bare except" should
-        # win over one. Not last any more: see the owner's instructions below.
-        project_block = self._project_context()
-        if project_block:
-            system_prompt = f"{system_prompt}\n\n{project_block}"
-        # Last, and the ordering is the point: `agents_md` says in its own injected text that a
-        # repository is a convention rather than an authority, and an AGENTS.md can come from a repo
-        # cloned an hour ago. This is the owner speaking, so it is read last and wins. Appended,
-        # never substituted — the default prompt carries the act-rather-than-describe rule and the
-        # untrusted-data fence, and a customisation that could delete those would delete them
-        # silently.
-        if self.config.instructions:
-            system_prompt = f"{system_prompt}\n\n{self.config.instructions}"
-        # Last of all, and only when the session actually granted the tool: a sentence telling a
-        # model to use something it was not given is a sentence that invites a call to nothing.
-        #
-        # It is here because the schema alone does not work, and that is measured rather than
-        # assumed. Same task, same models, one sentence of difference: bare, `todo_write` was called
-        # 0 times by either of two models; nudged, glm-5.3 called it 4 times with a correct
-        # progression. deepseek-v4-flash called it 0 times in 4 nudged runs, so on that model this
-        # buys nothing — which is a fact about the shipped default, recorded in `chimera/config.py`
-        # rather than left for a user to discover. Without this line the tool is 657 characters of
-        # schema and no behaviour at all.
-        if todo is not None:
-            system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
+        system_prompt = self.compose_system_prompt(task)
         # Remembered here so a compaction can put it back. The task arrives as the last user message
         # and, after enough turns, falls out of the tail that compaction keeps — leaving the agent
         # executing a plan whose purpose was deleted. Set at the loop rather than by each caller
