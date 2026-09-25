@@ -173,3 +173,17 @@ def test_closing_leaves_nothing_running(client) -> None:
     close_all()
 
     assert not _servers
+
+
+def test_the_jail_and_the_file_type_hold_where_ruff_is_absent(client, monkeypatch) -> None:
+    """Validation before capability. With ruff missing, a path escape must still be refused as out
+    of bounds and a .ts buffer still declined as not Python — not answered with a note about this
+    machine's tools. The two tests above only proved it where ruff happened to be installed."""
+    monkeypatch.setattr("chimera.api.lsp_api.ruff_available", lambda: False)
+    api, _ = client
+
+    escape = api.post("/api/lsp/diagnostics", json={"path": "../../secrets.py", "text": "x = 1\n"}).json()
+    other = api.post("/api/lsp/diagnostics", json={"path": "app.ts", "text": "const x = 1;"}).json()
+
+    assert escape["available"] is False and "outside" in escape["note"]
+    assert other["available"] is False and "Python" in other["note"]

@@ -339,3 +339,35 @@ def test_the_only_screenshot_path_left_keeps_the_SSRF_guard() -> None:
     from chimera.tools.browser import BrowserTool
 
     assert not hasattr(BrowserTool, "capture_local")
+
+
+def test_a_failed_auto_install_keeps_the_real_cause_and_the_remedy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The install error used to REPLACE the launch error — and the launch error is the diagnosis.
+
+    A frozen sidecar reported a non-zero exit from the install: the state of a repair attempt, which
+    says nothing about what is missing. Playwright's own line — the one naming the absent binary —
+    was discarded on the way. "Unavailable" is a shrug without a cause and a remedy, so the answer
+    carries both. Recovered from an uncommitted draft of 2026-09-22 (the #531 work), which #531 left out.
+    """
+    import subprocess
+
+    def fake_new(headless: bool) -> _FakeDriver:
+        raise RuntimeError(
+            "Executable doesn't exist at C:\missing\chrome.exe. "
+            "Please run: playwright install to download the browser binaries"
+        )
+
+    def fake_install() -> None:
+        raise subprocess.CalledProcessError(returncode=2, cmd=["node", "cli.js", "install", "chromium"])
+
+    monkeypatch.setattr(browser_mod, "_new_playwright_driver", fake_new)
+    monkeypatch.setattr(browser_mod, "_install_chromium", fake_install)
+    monkeypatch.setattr(browser_mod, "_auto_install_enabled", lambda: True)
+
+    out = BrowserTool().run(action="read")
+
+    assert out.startswith("error:")
+    assert "Executable doesn't exist" in out, "the original cause was thrown away"
+    assert "playwright install chromium" in out, "no remedy on the line"

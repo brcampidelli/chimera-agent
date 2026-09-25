@@ -56,6 +56,14 @@ def _missing_browser_binary(exc: Exception) -> bool:
     return "playwright install" in str(exc).lower()
 
 
+#: Said when the browser binary is missing and the automatic download could not run. The remedy is
+#: on the line because "unavailable" without one is a shrug.
+_CHROMIUM_HINT = (
+    "Chromium is not installed and could not be downloaded automatically — run: "
+    "playwright install chromium"
+)
+
+
 def _install_chromium() -> None:
     """Download the Chromium binary (~150MB), one-time, on first browser use.
 
@@ -373,7 +381,14 @@ class BrowserTool(Tool):
         except Exception as exc:  # noqa: BLE001 — most likely the Chromium binary isn't downloaded yet
             if not (_missing_browser_binary(exc) and _auto_install_enabled()):
                 raise  # a real launch failure, or auto-install opted out -> surfaced by run()
-            _install_chromium()  # fetch the browser once…
+            try:
+                _install_chromium()  # fetch the browser once…
+            except Exception as install_exc:  # noqa: BLE001 — the download could not run; say so usefully
+                # Both failures, not just the second one. The launch error is what is actually
+                # missing and the install error is what was tried about it; letting the second
+                # replace the first dropped Playwright's own message — the only line naming the
+                # cause — and left "exit status 2" with no remedy.
+                raise RuntimeError(f"{exc}; {install_exc}. {_CHROMIUM_HINT}") from exc
             self._driver = _new_playwright_driver(self._headless)  # …then retry
         return self._driver
 

@@ -104,12 +104,16 @@ def diagnostics_for_buffer(workspace: Path, path: str, text: str) -> dict[str, A
     ``available: false`` is not the same as an empty list of problems, and conflating them would
     show a clean editor on a machine where nothing ever looked.
     """
-    if not ruff_available():
-        return {
-            "diagnostics": [],
-            "available": False,
-            "note": "ruff is not installed here (pip install ruff, or the 'dev' extra)",
-        }
+    # Validated before capability, and the order is the point. The workspace jail is the security
+    # property on this route and it has to hold on every machine, not only on one where the language
+    # server happens to be installed: a request naming `../../secrets.py` is refused as out of
+    # bounds, and which optional tools this install carries is not what decides that. The file type
+    # goes with it — ruff has no opinion about a .ts buffer whether or not ruff is here.
+    #
+    # Capability comes last, and only it may say "not installed here". Checked first, it answered a
+    # path escape and a .ts buffer with a note about THIS machine, so the two tests below — neither
+    # of which skips when ruff is absent, deliberately — only passed where the dev extra happened to
+    # be installed and `ruff` happened to be on PATH.
     try:
         target = resolve_in_workspace(workspace, path)
     except PathEscapesWorkspaceError:
@@ -118,6 +122,12 @@ def diagnostics_for_buffer(workspace: Path, path: str, text: str) -> dict[str, A
         # Said rather than answered with an empty list: ruff has no opinion about a .ts file, and a
         # silent empty answer there reads as "this file is fine".
         return {"diagnostics": [], "available": False, "note": "ruff only reads Python"}
+    if not ruff_available():
+        return {
+            "diagnostics": [],
+            "available": False,
+            "note": "ruff is not installed here (pip install ruff, or the 'dev' extra)",
+        }
 
     try:
         client = _server_for(Path(workspace))
