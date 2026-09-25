@@ -81,14 +81,18 @@ if (!Range.prototype.getClientRects) {
   Range.prototype.getBoundingClientRect = () => new DOMRect();
 }
 
-// jsdom implements no object URLs at all (`URL.createObjectURL` is simply undefined in v25), and the
-// image preview turns a fetched Blob into one. Without this the component throws on its first
-// render, which reads as "the preview is broken" rather than "the environment has no blob store".
+// Object URLs are faked, always. jsdom 25 had none (`URL.createObjectURL` was undefined), and the
+// image preview and the conversation's takeout each turn a Blob into one. jsdom 30 does implement
+// them — but only for its OWN Blob: a Blob that arrives from fetch or from Node's global reaches its
+// implementation without the internal slot it reads, and the component dies with "Cannot read
+// properties of undefined (reading '_buffer')". This fake used to install only when the function was
+// missing, so the upgrade silently swapped it for the real one and three suites went red for a
+// reason that has nothing to do with what they test.
 //
 // The counter is deliberate: the identity of the returned string is the only observable an object
 // URL has, so a fake that returned a constant would make "the previous URL was revoked when the
 // file changed" unassertable — and leaking object URLs is exactly the bug worth pinning here.
-if (!URL.createObjectURL) {
+{
   let issued = 0;
   URL.createObjectURL = () => `blob:chimera-test/${++issued}`;
   URL.revokeObjectURL = () => {};
