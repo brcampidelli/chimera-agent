@@ -101,7 +101,11 @@ _SYNTH_SYSTEM = (
     # came out of whatever the summaries happened to be in — the same Portuguese question got a
     # Portuguese answer on one run and an English one on the next, in an app whose entire
     # interface is translated into ten languages.
-    "Answer in the SAME LANGUAGE the user's task is written in."
+    # Deferring to the owner, because the two rules used to meet in this one prompt: the owner's
+    # block says "always answer in {language}, whatever language the question is in", this line said
+    # the task's language wins, and whichever the model read as closer decided (study 25, defect 4).
+    "Answer in the SAME LANGUAGE the user's task is written in, unless the owner's instructions "
+    "name a language; then answer in that one."
 )
 #: The sentence `HierarchyConfig.synthesis_verbatim` adds — on by default. `bench/hierarchy_equal_calls`
 #: (2026-09-11) measured the synthesis call as the place a weak backbone loses the workers' findings:
@@ -1119,12 +1123,14 @@ class HierarchicalOrchestrator:
             self.evolution.record_external(task, answer, success=bool(answer and answer.strip()))
 
     def _owned(self, system: str) -> str:
-        """``system`` with the owner's instructions in front of it, or unchanged when there are none.
+        """``system`` with the owner's instructions after it, or unchanged when there are none.
 
-        In front rather than appended: the stage prompt is the more specific instruction, and the
-        convention everywhere else in the stack is that the closer-to-the-task text comes last.
+        After, the same place the agent loop puts them: the owner's block is read last and wins, so
+        where a stage prompt and the owner disagree (the language, most visibly) the owner decides.
+        It used to go in front, and a stage line saying "answer in the task's language" then read
+        closer than the owner's "always answer in Portuguese" (study 25, defect 4).
         """
-        return f"{self.identity}\n\n{system}" if self.identity else system
+        return f"{system}\n\n{self.identity}" if self.identity else system
 
     def _complete_top(self, system: str, user: str) -> CompletionResult:
         return self.gateway.complete(

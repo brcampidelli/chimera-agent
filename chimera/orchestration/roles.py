@@ -119,9 +119,9 @@ class RoleAgent:
         self.last_stop = "final"
         system = self.role.system_prompt
         if self.identity:
-            # In front of the role, matching the agent loop's own order: the role is the more
-            # specific instruction and reads closer to the task.
-            system = f"{self.identity}\n\n{system}"
+            # After the role, matching the agent loop's own order (and the path above, which
+            # passes it as `instructions`): the owner is read last and wins where the two disagree.
+            system = f"{system}\n\n{self.identity}"
         return self.backend.complete(
             [
                 Message(role="system", content=system),
