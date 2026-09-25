@@ -336,6 +336,8 @@ class ChimeraTUI(App[None]):
         # refused command is.
         for line in render.refusal_lines(report):
             log.write(line)
+        for line in render.todo_lines(report):
+            log.write(line)
         cut = render.cut_short_line(report)
         if cut:
             log.write(cut)

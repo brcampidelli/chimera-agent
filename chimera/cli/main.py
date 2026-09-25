@@ -1298,6 +1298,8 @@ def _render_turn(
     console.print(render.reply_line(report.answer))
     for line in render.refusal_lines(report):
         console.print(line)
+    for line in render.todo_lines(report):
+        console.print(line)
     cut = render.cut_short_line(report)
     if cut:
         console.print(cut)

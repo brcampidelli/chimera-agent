@@ -92,6 +92,7 @@ def install_session(monkeypatch: pytest.MonkeyPatch, **script: Any) -> list[Any]
                 completion_tokens=int(script.get("completion_tokens", 0)),
                 memory_saved=script.get("memory_saved"),
                 model=str(script.get("model", "fake/model")),
+                todos=list(script.get("todos", ())),
             )
 
         def send(self, message: str) -> str:
@@ -366,6 +367,18 @@ def test_a_refused_command_is_named_under_the_invented_answer(
     assert shows(result.stdout, "marker-42")  # the model still said what it said
     assert shows(result.stdout, "run_shell did not succeed")
     assert shows(result.stdout, "host execution declined")
+
+
+@pytest.mark.parametrize("command", ["chat", "assist"])
+def test_the_task_list_the_agent_kept_is_drawn_under_the_reply(
+    monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    """`todo_write` is on by default here and the desktop draws it; the terminal drew nothing."""
+    install_session(monkeypatch, todos=[("read the test", "done"), ("fix the parser", "doing")])
+    result = runner.invoke(app, [command, "--no-memory"], input="fix it\n/exit\n")
+    assert result.exit_code == 0, result.output
+    assert shows(result.stdout, "tasks 1/2 done")
+    assert shows(result.stdout, "fix the parser")
 
 
 # -- 9. money ------------------------------------------------------------------------------------

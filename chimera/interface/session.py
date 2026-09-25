@@ -236,7 +236,41 @@ class TurnReport:
     declined: list[DeclinedTool] = field(default_factory=list)
     #: What this turn's own provenance was recorded as — see :func:`turn_provenance`.
     provenance: str = UNKNOWN
+    #: The task list the agent last wrote this turn with ``todo_write``, as ``(task, status)`` pairs,
+    #: or empty when it wrote none. The desktop draws this list live; the terminal registered the
+    #: tool (on by default) and drew nothing, so the model kept a checklist nobody at a terminal saw.
+    todos: list[tuple[str, str]] = field(default_factory=list)
 
+
+
+def last_todo_list(observed: list[ToolActivity]) -> list[tuple[str, str]]:
+    """The list the last ACCEPTED ``todo_write`` of a turn recorded, as ``(task, status)`` pairs.
+
+    Read from the call's own arguments, which is what the tool stored: it replaces the whole list
+    each time, so the last accepted call is the list. A refused or failed call recorded nothing and
+    is skipped. ``items`` may arrive as its JSON text, which the tool itself accepts too.
+    """
+    import json
+
+    for activity in reversed(observed):
+        if activity.name != "todo_write" or not activity.ok:
+            continue
+        raw = activity.arguments.get("items")
+        if isinstance(raw, str):
+            try:
+                raw = json.loads(raw)
+            except ValueError:
+                return []
+        if not isinstance(raw, list):
+            return []
+        out: list[tuple[str, str]] = []
+        for entry in raw:
+            if isinstance(entry, dict):
+                task = str(entry.get("task") or "").strip()
+                if task:
+                    out.append((task, str(entry.get("status") or "").strip().lower()))
+        return out
+    return []
 
 @dataclass
 class ChatSession:
@@ -367,6 +401,7 @@ class ChatSession:
         return TurnReport(
             answer=result.answer,
             declined=declined,
+            todos=last_todo_list(observed),
             memory_saved=saved,
             provenance=provenance,
             prompt_tokens=result.prompt_tokens,

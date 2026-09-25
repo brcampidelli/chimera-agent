@@ -258,3 +258,31 @@ async def test_without_fuse_nothing_is_said_about_fusion() -> None:
         await app.workers.wait_for_complete()
         await pilot.pause()
         assert "--fuse" not in _log_text(app)
+
+
+class _PlanningSession(DrivenSession):
+    """A turn in which the agent kept a task list."""
+
+    def send_verbose(
+        self,
+        message: str,
+        *,
+        on_token: Callable[[str], None] | None = None,
+        on_tool: Callable[[ToolActivity], None] | None = None,
+    ) -> TurnReport:
+        report = super().send_verbose(message, on_token=on_token, on_tool=on_tool)
+        report.todos = [("read the test", "done"), ("fix it", "doing")]
+        return report
+
+
+async def test_the_task_list_the_agent_kept_is_drawn_under_the_answer() -> None:
+    from textual.widgets import Input
+
+    app = ChimeraTUI(_PlanningSession(), model_label="stub")
+    async with app.run_test() as pilot:
+        app.query_one("#prompt", Input).value = "fix it"
+        await pilot.press("enter")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+        text = _log_text(app)
+        assert "tasks 1/2 done" in text and "fix it" in text
