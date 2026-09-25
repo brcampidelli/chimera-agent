@@ -151,6 +151,11 @@ class StepLog:
     """The per-step record of one run, plus the context high-water mark."""
 
     steps: list[StepRecord] = field(default_factory=list)
+    #: The fingerprint of the system message this run started with (see
+    #: :func:`chimera.prompts.fingerprint`), or "" when nobody set it. Kept in the trace so a
+    #: change in behaviour can be traced to a change in the prompt: two runs with different
+    #: fingerprints were not given the same instructions, whatever else they share.
+    system_sha: str = ""
 
     def add(self, step: StepRecord) -> None:
         self.steps.append(step)
@@ -290,6 +295,7 @@ class StepLog:
     def as_dict(self) -> dict[str, Any]:
         return {
             "context_peak_tokens": self.context_peak_tokens,
+            "system_sha": self.system_sha,
             "context_growth_per_step": round(self.context_growth_per_step, 1),
             "cache_hit_rate": (
                 None if self.cache_hit_rate is None else round(self.cache_hit_rate, 3)
