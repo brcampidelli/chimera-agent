@@ -1131,6 +1131,16 @@
               ],
               "required": false,
               "type": "float"
+            },
+            {
+              "help": "Exit 1 when a job is late or failing, so a watcher outside Chimera alerts only then.",
+              "kind": "option",
+              "name": "check",
+              "opts": [
+                "--check"
+              ],
+              "required": false,
+              "type": "boolean"
             }
           ],
           "path": "cron doctor"

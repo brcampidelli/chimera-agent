@@ -144,10 +144,12 @@ its own liveness, which is a separate decision and is
 alert rather than an answer, run it from the host's own cron:
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 That works because it is supervised by something other than Chimera — which is the whole point.
+
+`--check` exits 1 only when a job is late or failing, so the mail arrives only then; plain `cron doctor` always exits 0, because answering is not a failure.
 
 ---
 

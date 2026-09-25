@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # サーバー(VPS)へのChimeraのデプロイ
@@ -126,10 +126,12 @@ chimera cron doctor
 **これが何ではないか。** これは問いであって、見張りではありません: プロセスが落ちているあいだ、ここでは何も気づきません — クラッシュしたプロセスが自分のクラッシュをログに残せないのと同じ理由です。何かが尋ねたその瞬間に正直に答えます — シェル、アプリ、次回の起動。本物の監視役には自分の時計と自分の生存性が要り、それは別個の決定であって、[issue #26として追跡されています](https://github.com/brcampidelli/chimera-agent/issues/26)。答えではなく警報がほしい場合は、ホスト自身のcronから実行してください:
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 これが機能するのは、Chimera以外の何かに監督されているからです — それこそが要点です。
+
+`--check` はジョブが遅れているか失敗しているときだけ 1 で終了するので、メールはそのときだけ届きます。オプションなしの `cron doctor` は常に 0 で終了します — 答えることは失敗ではないからです。
 
 ---
 

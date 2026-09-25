@@ -6106,6 +6106,10 @@ def cron_doctor(
     grace_minutes: float = typer.Option(
         10.0, "--grace", help="How late a job may be before it counts as missed."
     ),
+    check: bool = typer.Option(
+        False, "--check",
+        help="Exit 1 when a job is late or failing, so a watcher outside Chimera alerts only then.",
+    ),
 ) -> None:
     """Ask the schedule what it is not telling you: what never ran, and what ran and lost.
 
@@ -6151,6 +6155,11 @@ def cron_doctor(
             "[dim]Said about what this can see: a job that has never been due yet has nothing to "
             "report, and nothing here watches while this process is not running.[/dim]"
         )
+    elif check:
+        # The exit code is what a watcher outside Chimera reads (chimera-agent#26). Without it the
+        # host-cron line in docs/deploy.md mailed the same report every thirty minutes whether or
+        # not anything was wrong, which trains the reader to stop opening it.
+        raise typer.Exit(1)
 
 
 def _ago(seconds: float) -> str:

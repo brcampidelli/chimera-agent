@@ -1,5 +1,5 @@
 ---
-source_sha256: bec93da7acb7d3a5290f324d0095c1da6c043ab5acb014a8cbcf4a63ada31510
+source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
 ---
 
 # Distribuire Chimera su un server (VPS)
@@ -152,10 +152,12 @@ decisione a parte ed è
 avviso invece di una risposta, eseguilo dal cron dell'host stesso:
 
 ```cron
-*/30 * * * * cd /opt/chimera && .venv/bin/chimera cron doctor | mail -s "chimera" you@example.com
+*/30 * * * * cd /opt/chimera && out=$(.venv/bin/chimera cron doctor --check) || echo "$out" | mail -s "chimera" you@example.com
 ```
 
 Funziona perché è sorvegliato da qualcosa che non è Chimera — che è tutto il punto.
+
+`--check` esce con 1 solo quando un job è in ritardo o fallisce, quindi la mail arriva solo allora; `cron doctor` senza l'opzione esce sempre con 0, perché rispondere non è un fallimento.
 
 ---
 
