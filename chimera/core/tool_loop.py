@@ -10,12 +10,26 @@ instead of grinding to ``max_steps``.
 Pure and dependency-free: it observes ``(tool, args, observation)`` signatures over a sliding window
 and returns a verdict. Detection is deliberately conservative — it fires on genuine repetition, not
 on legitimately calling the same tool with *different* args — so a real multi-step run is untouched.
+
+**A spin repeats the call AND the answer** (study 24, 2026-09-24). Until then each rule looked at half
+of that pair, and each half had its own measured false alarm:
+
+- ``_identical_repeat`` looked at the args only. Five ``scroll`` calls each returned a new viewport and
+  still stopped the run: all 20 failures viewport-first added in ``bench/browser_viewport_tasks``.
+- ``_no_progress`` looked at the output only. Four different edits all answer ``edited x: replaced 1
+  occurrence``, and that stopped the run mid-work: **all 20** breaker trips of the strong executor in
+  ``bench/tool_loop_fork`` were four successful, distinct edits.
+
+Now a repeat must match the last call's args and its answer (numbers and spacing flattened, so a
+timing in a test report does not hide a real loop). A run of unchanged output with *different* args
+still breaks when those calls failed — the same error four times is a wall, whatever was tried.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections import deque
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -51,6 +65,19 @@ def _obs_hash(observation: str | None) -> str:
     return hashlib.sha256(observation.strip().encode("utf-8", "replace")).hexdigest()[:16]
 
 
+_DIGITS = re.compile(r"\d+")
+_SPACE = re.compile(r"\s+")
+
+
+def _gist_hash(observation: str | None) -> str:
+    """The observation with its numbers and spacing flattened: the same test failing twice in 0.52s and
+    0.53s is the same answer, and a new viewport or a new file listing is not."""
+    if observation is None:
+        return ""
+    gist = _SPACE.sub(" ", _DIGITS.sub("#", observation)).strip()
+    return hashlib.sha256(gist.encode("utf-8", "replace")).hexdigest()[:16]
+
+
 class ToolLoopDetector:
     """Sliding-window detector for identical-repeat, ping-pong, and no-progress tool loops."""
 
@@ -70,6 +97,7 @@ class ToolLoopDetector:
         self._names: deque[str] = deque(maxlen=window)
         self._sigs: deque[str] = deque(maxlen=window)
         self._obs: deque[str] = deque(maxlen=window)
+        self._gist: deque[str] = deque(maxlen=window)
         self._ok: deque[bool | None] = deque(maxlen=window)
 
     def record(
@@ -94,6 +122,7 @@ class ToolLoopDetector:
         self._names.append(name)
         self._sigs.append(_sig(name, arguments))
         self._obs.append(_obs_hash(observation))
+        self._gist.append(_gist_hash(observation))
         self._ok.append(ok)
         return self._assess()
 
@@ -107,6 +136,11 @@ class ToolLoopDetector:
         chosen = [flag for flag, keep in zip(self._ok, mask, strict=True) if keep]
         return bool(chosen) and all(flag is False for flag in chosen)
 
+    def _same_call(self) -> list[bool]:
+        """Which calls in the window had the last call's tool and args, whatever they returned."""
+        last = self._sigs[-1]
+        return [s == last for s in self._sigs]
+
     def _assess(self) -> ToolLoopVerdict:
         verdict = ToolLoopVerdict("ok")
         for candidate in (self._identical_repeat(), self._no_progress(), self._ping_pong()):
@@ -117,13 +151,15 @@ class ToolLoopDetector:
         return verdict
 
     def _identical_repeat(self) -> ToolLoopVerdict:
+        """The same call returning the same answer. A repeat whose answer changed is not a spin: the
+        tool did something new (a scroll, a queue read, a page of results)."""
         if not self._sigs:
             return ToolLoopVerdict("ok")
-        last = self._sigs[-1]
-        matches = [s == last for s in self._sigs]
+        last, gist = self._sigs[-1], self._gist[-1]
+        matches = [s == last and g == gist for s, g in zip(self._sigs, self._gist, strict=True)]
         count = sum(matches)
         if count >= self.repeat_break:
-            if self._never_ran(matches):
+            if self._never_ran(self._same_call()):
                 return ToolLoopVerdict(
                     "break", f"{self._names[-1]} was refused or failed {count}× — nothing ran"
                 )
@@ -133,19 +169,29 @@ class ToolLoopDetector:
         return ToolLoopVerdict("ok")
 
     def _no_progress(self) -> ToolLoopVerdict:
-        """Same tool + same observation, back to back — a poll that never changes."""
+        """Same tool + same observation, back to back — a poll that never changes.
+
+        With the same args, or with calls that all failed. Four DIFFERENT calls that succeeded with the
+        same confirmation (four edits, each ``replaced 1 occurrence``) are four pieces of work.
+        """
         if len(self._obs) < self.stall_break or not self._obs[-1]:
             return ToolLoopVerdict("ok")
-        name, obs = self._names[-1], self._obs[-1]
+        name, obs, sig = self._names[-1], self._obs[-1], self._sigs[-1]
         run = 0
-        for n, o in zip(reversed(self._names), reversed(self._obs), strict=True):
-            if n == name and o == obs:
+        for n, o, s, ok in zip(
+            reversed(self._names), reversed(self._obs), reversed(self._sigs), reversed(self._ok),
+            strict=True,
+        ):
+            if n == name and o == obs and (s == sig or ok is False):
                 run += 1
             else:
                 break
         if run >= self.stall_break:
             tail = [i >= len(self._names) - run for i in range(len(self._names))]
-            if self._never_ran(tail):
+            # Wall or loop is asked of the CALL, not of the answer: if these same args got through
+            # once in the window, something ran, whatever the recent repeats returned.
+            same = self._same_call()
+            if self._never_ran([t or s for t, s in zip(tail, same, strict=True)]):
                 return ToolLoopVerdict(
                     "break", f"{name} was refused or failed {run}× — nothing ran"
                 )
