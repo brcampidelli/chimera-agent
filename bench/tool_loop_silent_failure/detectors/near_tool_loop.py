@@ -1,3 +1,4 @@
+# Frozen copy for bench/tool_loop_silent_failure. Source: chimera/core/tool_loop.py at 94f94eae (main, after #583). Do not edit.
 """Tool-loop circuit breaker (M15-A4) — an anti-stagnation signal at the *execution* layer.
 
 OpenClaw hashes the last N tool calls and trips a breaker when the agent keeps making the same
@@ -106,31 +107,6 @@ def _obs_hash(observation: str | None) -> str:
     return hashlib.sha256(observation.strip().encode("utf-8", "replace")).hexdigest()[:16]
 
 
-_EXIT = re.compile(r"\A\[exit (-?\d+)\]\n?(.*)\Z", re.DOTALL)
-_EXCEPTION_LINE = re.compile(r"[A-Z]\w*(?:Error|Exception): .+")
-
-
-def _answered_failure(observation: str | None) -> bool:
-    """A failure the tool reported in its answer rather than with the ``error:`` prefix.
-
-    The loop's ``ok`` is false for an error or a refusal. A command that ran and failed is a success
-    to it. ``run_shell`` and ``execute_code`` answer ``[exit N]`` and the output;
-    ``code_interpreter`` answers the exception's last line. Measured in ``bench/tool_loop_near_args``:
-    ``run_shell`` given its command as a list answered ``[exit 127] /bin/sh: 1: [bash,: not found``
-    whatever the command, and a ``ZeroDivisionError`` came back four times. Both times the same
-    failure under different args, which the breaker is meant to stop. A non-zero exit with no text
-    is not counted: that is a ``grep`` or a ``test`` that found nothing, and four searches that find
-    nothing are exploring.
-    """
-    if not observation:
-        return False
-    exited = _EXIT.match(observation.strip())
-    if exited:
-        return exited.group(1) != "0" and bool(exited.group(2).strip())
-    last = observation.rstrip().rsplit("\n", 1)[-1]
-    return bool(_EXCEPTION_LINE.fullmatch(last))
-
-
 _DIGITS = re.compile(r"\d+")
 _SPACE = re.compile(r"\s+")
 
@@ -166,7 +142,6 @@ class ToolLoopDetector:
         self._obs: deque[str] = deque(maxlen=window)
         self._gist: deque[str] = deque(maxlen=window)
         self._ok: deque[bool | None] = deque(maxlen=window)
-        self._failed: deque[bool] = deque(maxlen=window)
 
     def record(
         self,
@@ -193,7 +168,6 @@ class ToolLoopDetector:
         self._obs.append(_obs_hash(observation))
         self._gist.append(_gist_hash(observation))
         self._ok.append(ok)
-        self._failed.append(ok is False or _answered_failure(observation))
         return self._assess()
 
     def _never_ran(self, mask: list[bool]) -> bool:
@@ -242,8 +216,7 @@ class ToolLoopDetector:
         """Same tool + same observation, back to back — a poll that never changes.
 
         With the same args, with args that differ only in shape (``_target_sig``: depth, a limit, a
-        spelling of the same path), or with calls that all failed — refused, errored, or answering a
-        failure in their output (``_answered_failure``). Four DIFFERENT calls that succeeded
+        spelling of the same path), or with calls that all failed. Four DIFFERENT calls that succeeded
         with the same confirmation (four edits, each ``replaced 1 occurrence``) are four pieces of
         work. The observation is compared exactly, not as a gist: pages of a log that differ only in
         their timestamps are new pages.
@@ -252,11 +225,11 @@ class ToolLoopDetector:
             return ToolLoopVerdict("ok")
         name, obs, sig, target = self._names[-1], self._obs[-1], self._sigs[-1], self._targets[-1]
         run = 0
-        for n, o, s, t, failed in zip(
+        for n, o, s, t, ok in zip(
             reversed(self._names), reversed(self._obs), reversed(self._sigs), reversed(self._targets),
-            reversed(self._failed), strict=True,
+            reversed(self._ok), strict=True,
         ):
-            if n == name and o == obs and (s == sig or t == target or failed):
+            if n == name and o == obs and (s == sig or t == target or ok is False):
                 run += 1
             else:
                 break
@@ -269,11 +242,6 @@ class ToolLoopDetector:
                 return ToolLoopVerdict(
                     "break", f"{name} was refused or failed {run}× — nothing ran"
                 )
-            answered = [f and ok is not False for f, ok in zip(self._failed, self._ok, strict=True)]
-            if all(a for a, t in zip(answered, tail, strict=True) if t):
-                # It ran, and it failed the same way each time, in the tool's own words — not a
-                # poll. A run the loop itself saw fail keeps the wall/loop wording above.
-                return ToolLoopVerdict("break", f"{name} failed the same way {run}×")
             return ToolLoopVerdict("break", f"{name} polled {run}× with unchanged output")
         return ToolLoopVerdict("ok")
 
