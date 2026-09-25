@@ -279,3 +279,38 @@ answers given as tool calls (over-calls), refusals.
 ## Result
 
 `bench/useful_context/RESULTS.md`, with `results/pilot.json` and `results/main.json`.
+
+---
+
+## Addendum — 2026-09-25, after the pilot and before the main run: n and calibration
+
+Written from `results/pilot.json`. Nothing below changes the rule, the ladder, the margin or the texts;
+it fills in the two numbers the registration said the pilot would fix.
+
+**What the pilot checked.** 26 calls, **0 errors, 0 mis-routed** (every row answered by `DeepInfra`),
+29.5 s wall. The tool-shaped transcript is accepted and the answer arrives in `content`; no answer came
+back as a tool call; the longest completion was 192 tokens (reasoning included), far from
+`max_tokens`. Pilot gate: **20/20 at 4k — PASS.** Cost measured: US$ 0.000229 per 4k call and
+US$ 0.00715 per 128k call (which arrived at 118,354–120,012 provider tokens), US$ 0.0475 in all;
+OpenRouter's reported cost agrees with the computed one. DeepInfra served 1,024 cached tokens on some
+rows (the system prefix), so the cache is live on this route and is reported per row as registered.
+
+**What the pilot did not show: a drop.** 6/6 at ~119k. The brief asked the pilot to confirm a drop
+worth measuring, and it did not. By the registration the ladder does not move on pilot outcomes, and
+there is a reason beyond the letter: 6/6 has a Wilson lower bound of 61%, so it cannot exclude a drop
+several times the margin; the main run at the n below can. If every length passes, the result is the
+lower bound the registration already names ("≥ the 128k cell"), not a knee.
+
+**Calibration.** Median `est_chars / prompt_tokens` over the six 128k rows = 4.079 → **`--cpt 4.08`**.
+(At 4k the ratio is 3.77 — the head is prose-heavy — so the 4k cell will arrive a little under 4,000;
+it is reported at its realised count as registered.)
+
+**n.** Linear in prompt tokens between the two measured points: US$ 6.008e-8 per token, so one item
+(4k twice, 16k, 32k, 64k, 128k = 248,000 tokens) projects to **US$ 0.01479**. Available for the main
+run by the rule: 1.50 − 0.0475 − 0.10 = US$ 1.3525. Multiples of 18: 90 → US$ 1.331 (fits),
+108 → US$ 1.597 (does not). **n = 90.** The registration expected 72; the rule decides, and at 90 the
+precomputed table says the rule tolerates three net losses against 4k with no noise, and a flat length
+still passes with six discordant pairs each way.
+
+**Invocation cap:** `--cap 1.44`, so pilot plus main cannot pass US$ 1.4875. A call that would cross
+it is not sent and is recorded as a halt.
