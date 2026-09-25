@@ -1,0 +1,53 @@
+{
+ "arms": {
+  "A": {
+   "n": 14,
+   "success": 14,
+   "claimed_done": 14,
+   "false_success": 0,
+   "promise_ending": 0,
+   "blocked": 0,
+   "premature_stop": 0,
+   "verification_claim": 13,
+   "false_verification": 0,
+   "fabricated_verification": 0,
+   "not_run_stated": 0,
+   "cites_run": 2,
+   "executed": 14,
+   "nudged": 0,
+   "max_steps_ending": 1,
+   "usd": 0.018458,
+   "unpriced": 0,
+   "mean_steps": 4.785714285714286,
+   "mean_tool_calls": 4.0,
+   "mean_tokens": 30517.071428571428,
+   "mean_cache_read": 22656.0,
+   "usd_per_success": 0.0013184285714285713
+  }
+ },
+ "tests": {},
+ "by_kind": {
+  "local_lift": {
+   "A": [
+    10,
+    0,
+    0,
+    10
+   ]
+  },
+  "learning_lift_hard_fix": {
+   "A": [
+    4,
+    0,
+    0,
+    4
+   ]
+  }
+ },
+ "endings": {
+  "A": {
+   "final": 13,
+   "max_steps": 1
+  }
+ }
+}
