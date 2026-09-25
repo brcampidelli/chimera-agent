@@ -330,12 +330,14 @@ class BrowserTool(Tool):
         self._driver = driver
         self._own_driver = driver is None
         self._headless = headless
-        # Study 24, M7: list the viewport and count the rest (`CHIMERA_BROWSER_VIEWPORT_FIRST`). Off
-        # by default and, off, nothing changes — not the listing, not `find`, not the schema the
-        # model is shown: the class attributes stay the ones every run has read. On, the schema is
-        # set per instance (the `Tool` contract allows it) to add `scroll` and say how `find` now
-        # answers, because an action the model is not told about is an action it cannot take.
-        # Pending `bench/browser_viewport_tasks`, a task-based measurement of success and tokens.
+        # Study 24, M7: list the viewport and count the rest. Only the bench turns this on — no
+        # setting reaches it, because it lost on 24 browsing tasks (`bench/browser_viewport_tasks`):
+        # −0.125 success with the old loop breaker, −0.042 [−0.083, −0.008] with the fixed one, the
+        # listing's own cost on targets defined by position, and a token saving indistinguishable
+        # from none (ratio 0.76, CI to 1.03). Kept so the result reproduces and the next person with
+        # the same idea starts from the number. Off, nothing changes — not the listing, not `find`,
+        # not the schema: the class attributes stay the ones every run has read. On, the schema is
+        # set per instance to add `scroll` and say how `find` answers.
         self.viewport_first = viewport_first
         self._render: Callable[[list[Element]], str] = render_elements
         if viewport_first:

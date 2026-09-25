@@ -267,27 +267,33 @@ def test_on_a_driver_that_cannot_scroll_says_so() -> None:
     assert tool.run(action="scroll") == "error: this browser cannot scroll"
 
 
-# --- the setting reaches the tool -----------------------------------------------------------------
+# --- no setting reaches the tool ------------------------------------------------------------------
 
 
-def test_the_setting_is_off_by_default_and_reaches_the_tool(
+def test_no_setting_can_switch_the_measured_loss_on(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """It lost on both measurements, so the only thing a setting could do is make the browser worse.
+
+    The mode stays a constructor argument for the bench; the variable that used to reach it is
+    ignored, and the assembled tool lists the whole page.
+    """
     from chimera.config import Settings, get_settings
     from chimera.tools.builtin import default_registry
 
-    assert Settings.model_fields["browser_viewport_first"].default is False
-    assert Settings.model_fields["browser_viewport_first"].validation_alias == "CHIMERA_BROWSER_VIEWPORT_FIRST"
+    assert not any("viewport" in name for name in Settings.model_fields)
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
-    for value, expected in (("", False), ("true", True)):
-        monkeypatch.setenv("CHIMERA_BROWSER_VIEWPORT_FIRST", value)
-        get_settings.cache_clear()
+    monkeypatch.setenv("CHIMERA_BROWSER_VIEWPORT_FIRST", "true")
+    get_settings.cache_clear()
+    try:
         browser = default_registry(tmp_path).get("browser")
         assert isinstance(browser, BrowserTool)
-        assert browser.viewport_first is expected, value
-    get_settings.cache_clear()
+        assert browser.viewport_first is False
+        assert browser.parameters is BrowserTool.parameters
+    finally:
+        get_settings.cache_clear()
 
 
 # --- the real driver places elements and scrolls -------------------------------------------------
