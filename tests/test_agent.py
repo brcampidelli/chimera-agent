@@ -6,6 +6,7 @@ from typing import Any
 
 from chimera.core import Agent, AgentConfig
 from chimera.providers import CompletionResult, ToolCall
+from chimera.skills.retrieval import SKILLS_HEADER
 from chimera.tools import ToolRegistry
 from chimera.tools.builtin import EchoTool
 
@@ -57,7 +58,7 @@ def test_run_injects_relevant_skill_context() -> None:
     agent.run("please echo this message back to me")
     system = backend.calls[0]["messages"][0]
     assert system["role"] == "system"
-    assert "Relevant skills you can use:" in system["content"] and "echo" in system["content"]
+    assert SKILLS_HEADER in system["content"] and "echo" in system["content"]
 
 
 def test_skill_context_absent_when_no_match_or_disabled() -> None:
@@ -65,11 +66,11 @@ def test_skill_context_absent_when_no_match_or_disabled() -> None:
     # No keyword overlap -> no block injected.
     b1 = ScriptedBackend([CompletionResult(content="done", model="fake")])
     Agent(b1, _echo_registry(), AgentConfig(), skills=reg).run("xyzzy plugh frobnicate quux")
-    assert "Relevant skills" not in b1.calls[0]["messages"][0]["content"]
+    assert SKILLS_HEADER not in b1.calls[0]["messages"][0]["content"]
     # Explicitly disabled -> no block even with a matching skill.
     b2 = ScriptedBackend([CompletionResult(content="done", model="fake")])
     Agent(b2, _echo_registry(), AgentConfig(inject_skill_context=False), skills=reg).run("echo this")
-    assert "Relevant skills" not in b2.calls[0]["messages"][0]["content"]
+    assert SKILLS_HEADER not in b2.calls[0]["messages"][0]["content"]
 
 
 def test_insist_on_action_pushes_back_a_described_plan() -> None:

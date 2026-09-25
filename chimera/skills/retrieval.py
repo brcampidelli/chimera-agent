@@ -51,10 +51,21 @@ def retrieve_relevant_skills(
     return [skill for _, _, skill in scored[:k]]
 
 
+#: The header of the skills block. It used to read "Relevant skills you can use:", above names such
+#: as `fix_code` that the agent loop has no way to call: built-in skills run only inside the evolver
+#: and the holdout. Told it could use them, a model either invented a call to a tool that does not
+#: exist or described the skill instead of acting. What the block really is, is reference: a
+#: description of a technique that fits the task (study 25, defect 8).
+SKILLS_HEADER = (
+    "Techniques that match this task (reference only: they describe an approach, they are not "
+    "tools you can call):"
+)
+
+
 def skills_context_block(skills: list[Skill]) -> str:
     """Format skills as a context block to inject into a prompt."""
     if not skills:
         return ""
-    lines = ["Relevant skills you can use:"]
+    lines = [SKILLS_HEADER]
     lines += [f"- {skill.name}: {skill.description}" for skill in skills]
     return "\n".join(lines)

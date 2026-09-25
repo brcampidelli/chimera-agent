@@ -530,9 +530,9 @@ class Agent:
         # assumed. Same task, same models, one sentence of difference: bare, `todo_write` was called
         # 0 times by either of two models; nudged, glm-5.3 called it 4 times with a correct
         # progression. deepseek-v4-flash called it 0 times in 4 nudged runs, so on that model this
-        # buys nothing — which is a fact about the shipped default, recorded in `chimera/config.py`
-        # rather than left for a user to discover. Without this line the tool is 657 characters of
-        # schema and no behaviour at all.
+        # buys nothing, and deepseek-v4-flash is the shipped default model. The flag's comment in
+        # `chimera/config.py` names adoption as the number to watch; the four runs are here. Without
+        # this line the tool is 657 characters of schema and no behaviour at all.
         if _find_tool(self.tools, "todo_write") is not None:
             system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         return system_prompt

@@ -179,7 +179,10 @@ class RunState:
         return {
             "role": "user",
             "content": (
-                "[context restored after compaction — the conversation above was summarised]\n\n"
+                # "compacted", not "summarised": without a summariser the span above is a structural
+                # note that says what was dropped, and calling it a summary told the model it had
+                # read something it had not (study 25, defect 8).
+                "[context restored after compaction — the conversation above was compacted]\n\n"
                 + "\n\n".join(parts)
             ),
         }

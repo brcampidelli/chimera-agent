@@ -236,8 +236,10 @@ def register_openai_compat(
         system, exchanges, final_user = split_messages(req.messages)
         session = manager.ephemeral()
         if system:
-            # The session's persona preamble is exactly "text applied to every turn" — the right home
-            # for a system message, rather than smuggling it into the user turn.
+            # The session's persona preamble is "text applied to every turn", which is what a system
+            # message is. It still reaches the model INSIDE the user turn: ChatSession assembles the
+            # profile, the recalled facts and the recent turns into one user message. So the
+            # caller's system message sits below the agent's own system prompt, never beside it.
             session.profile = system
         if exchanges:
             from chimera.interface.session import ChatTurn

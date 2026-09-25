@@ -163,6 +163,8 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("loop.unanswered_call_stub", "chimera.core.agent:Agent.run", "turn", _LOOP),
     _i("loop.prefix_nonce", "chimera.core.agent:Agent.run", "core", ("eval",),
        note="bench instrument only; empty unless CHIMERA_PREFIX_NONCE is set"),
+    _c("loop.skills_header", "chimera.skills.retrieval:SKILLS_HEADER", "volatile", _ALL, "unmeasured",
+       note="the skills are reference, not callable tools; study 25 defect 8"),
     _i("loop.skills_block", "chimera.skills.retrieval:skills_context_block", "volatile", _ALL),
     _i("loop.bundles_block", "chimera.core.agent:Agent._bundle_context", "volatile", _ALL),
     _c("loop.cards_instruction", "chimera.evolution.card_retrieval:_INSTRUCTION", "volatile",
