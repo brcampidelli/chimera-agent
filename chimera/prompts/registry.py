@@ -297,6 +297,16 @@ SECTIONS: tuple[PromptSection, ...] = (
        ("S8",), "measured", "bench/blind_audit: blind form caught 19/23, cries wolf on half"),
     _c("envelope.blind_compare", "chimera.orchestration.envelope_verify:COMPARE_SYSTEM", "call",
        ("S8",), "measured", "bench/blind_audit"),
+    # ---- code review (`chimera review`, experimental) -------------------------------------------
+    _c("review.finder", "chimera.review.finder:FINDER_SYSTEM", "call", ("S15",), "unmeasured",
+       note="coverage stage: every defect with a confidence, never told to narrow"),
+    _i("review.finder_request", "chimera.review.finder:finder_request", "turn", ("S15",),
+       note="the rendered diff, fenced"),
+    _c("review.verifier", "chimera.review.verifier:VERIFIER_SYSTEM", "call", ("S15",), "unmeasured",
+       note="bench/review_judge arm A's stance and grounds, reworded; that bench measured A's "
+            "bytes, not these"),
+    _i("review.verifier_request", "chimera.review.verifier:verifier_request", "turn", ("S15",),
+       note="one finding and its diff window, fenced"),
     # ---- governance and typed decisions --------------------------------------------------------
     _c("governance.judge", "chimera.decisions.governance:JUDGE_TEXT", "call", ("S9",), "measured",
        "bench/governance_judge (9/9, 0/10); bench/perturbation_floor (framing: 8–9 of 14 to ALLOW)"),

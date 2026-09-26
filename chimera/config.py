@@ -519,6 +519,13 @@ class Settings(BaseSettings):
     # wearing the manipulation's name. OpenRouter only: other providers may reject the field.
     provider_order: str = Field(default="", validation_alias="CHIMERA_PROVIDER_ORDER")
 
+    # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
+    # the command pick the first rung of the tier ladder whose model family differs from the
+    # author's, because a reviewer from the author's own family shares its blind spots and prefers
+    # its output (study 25 §2.9; `chimera/review/family.py`). A value here is honoured even when it
+    # is the author's family, and the report says so rather than overriding the choice.
+    review_model: str = Field(default="", validation_alias="CHIMERA_REVIEW_MODEL")
+
     # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
     discord_bot_token: str | None = Field(
         default=None, validation_alias="CHIMERA_DISCORD_BOT_TOKEN"
