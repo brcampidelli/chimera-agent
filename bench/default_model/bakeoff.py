@@ -20,6 +20,7 @@ import contextlib
 import hashlib
 import json
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -60,6 +61,8 @@ TIMEOUT_S = 1800
 #: leaves room for the solves in flight and for a gap between the published price and the bill.
 STOP_AT_USD = 13.0
 HEADROOM = 1.25
+#: Amendment 4: no item is admitted while the host drive (C:, where WSL's disk lives) has less free.
+DISK_FLOOR = int(1.5 * 1024**3)
 _LOCK = threading.Lock()
 
 
@@ -85,7 +88,7 @@ def spent() -> float:
     for path in (PILOT, MAIN, KILLED, *DISCARDED):
         for r in load_jsonl(path):
             total += solve_usd(r) + solve_usd(r, calls_key="retry_calls")
-    for name in ("probe.json", "probe_sandbox.json"):
+    for name in ("probe.json", "probe_sandbox.json", "probe_sandbox_a4.json"):
         probe = RESULTS / name
         if probe.exists():
             total += float(json.loads(probe.read_text(encoding="utf-8")).get("usd", 0.0))
@@ -323,6 +326,10 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
                     admitted[iid] = not state["stopped"] and state["usd"] < STOP_AT_USD
                     if not admitted[iid] and not state["stopped"]:
                         state["stopped"] = f"budget: computed spend reached US${STOP_AT_USD}"
+                    # Disk guard (Amendment 4): the host drive filled once and WSL went down with it.
+                    if admitted[iid] and Path("/mnt/c").is_dir() and shutil.disk_usage("/mnt/c").free < DISK_FLOOR:
+                        admitted[iid] = False
+                        state["stopped"] = "disk guard: C: has under 1.5 GB free"
                     if admitted[iid]:
                         try:
                             build_template(inst)
@@ -462,8 +469,26 @@ def probe_sandbox(arms: list[str]) -> None:
         "other_template": f"ls {work}/templates",
         "windows_drive": "ls /mnt/c/Users",
         "docker": "curl -sS -m 10 --unix-socket /var/run/docker.sock http://localhost/version",
+        # Amendment 4: the gaps the H4/H5 bench found in its own first sandbox (its Amendment 7).
+        "wsl_bind_mounts": "ls /mnt/wsl/docker-desktop-bind-mounts",
+        "umount_home": f"umount {real_home}",
+        "umount_mnt": "umount /mnt",
     }
     must_hold = {
+        # Amendment 4. /mnt holds nothing but the path down to the resolver file.
+        "mnt_listing": "ls -A /mnt; ls -A /mnt/wsl",
+        # Amendment 4. The solve is not root and holds no capability in any set.
+        "no_capabilities": "id -u; grep -E '^Cap(Inh|Prm|Eff|Amb)' /proc/self/status",
+        # Amendment 4. Even a fresh user+mount namespace of its own cannot lift a cover: the mounts
+        # it inherits are locked. Both umounts must fail, and nothing may appear under them.
+        "nested_uncover": (f"unshare -rm sh -c 'umount -l /mnt; a=$?; umount -l {real_home}; b=$?; "
+                           f"echo \"$a $b\"; ls -A /mnt/wsl {real_home}' 2>/dev/null || echo 'unshare refused'"),
+        # Amendment 4. Outputs are not recorded, so the probe looks the way a solve would: every git
+        # repo, venv and answer-shaped file findable from /, outside the workspace.
+        "answer_shaped_files": (f"find / \\( -path /proc -o -path /sys -o -path {ws} \\) -prune -o \\( "
+                                "-name .git -o -name pyvenv.cfg -o -name patch.diff -o -name eval.sh "
+                                "-o -name '*django__django*' -o -iname '*swe-bench*' -o -iname '*swe_bench*' "
+                                "-o -iname '*sweb.eval*' \\) -print 2>/dev/null"),
         "home_listing": f"ls -A {real_home}; ls -A {work}",
         "django_copies": ("find / \\( -path /proc -o -path /sys \\) -prune -o -type f "
                           "-path '*/django/db/models/base.py' -print 2>/dev/null"),
@@ -482,7 +507,24 @@ def probe_sandbox(arms: list[str]) -> None:
         r = subprocess.run(sandboxed(["bash", "-c", cmd], ws, scratch), env=env, capture_output=True,
                            text=True, timeout=900, check=False)
         text = r.stdout.strip()
-        if name == "home_listing":
+        resolv_tail = Path(os.path.realpath("/etc/resolv.conf")).name
+        if name == "mnt_listing":
+            ok = set(text.split()) <= {"wsl", resolv_tail}
+        elif name == "no_capabilities":
+            lines = text.splitlines()
+            ok = (len(lines) == 5 and lines[0].isdigit() and lines[0] != "0"
+                  and all(ln.split()[-1].strip("0") == "" for ln in lines[1:]))
+        elif name == "nested_uncover":
+            lines = text.splitlines()
+            refused = lines[:1] == ["unshare refused"]
+            codes = lines[0].split() if lines and not refused else []
+            listed = set(" ".join(lines[1:]).replace(":", " ").split()) - {"/mnt/wsl", real_home}
+            ok = refused or (len(codes) == 2 and "0" not in codes
+                             and listed <= {resolv_tail, Path(work).name, ".local"})
+        elif name == "answer_shaped_files":
+            # Only the read-only code copy (an empty `git init` and the harness venv) may match.
+            ok = all(line.startswith(str(REPO) + "/") for line in text.splitlines())
+        elif name == "home_listing":
             # The work dir, the path down to the interpreter, and this solve's two dirs: nothing else.
             ok = set(text.split()) <= {Path(work).name, ".local", *own}
         elif name == "django_copies":
@@ -523,7 +565,8 @@ def probe_sandbox(arms: list[str]) -> None:
                          and all(v["ok"] for v in out["must_hold"].values()))
     out["arms_ok"] = all(v["tool_call_parsed"] and v["on_pin"] for v in out["arms"].values())
     out["usd"] = usd
-    (RESULTS / "probe_sandbox.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
+    # Amendment 4 writes its own file; the Amendment 3 probe stays as it was read.
+    (RESULTS / "probe_sandbox_a4.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
     print("WALL HOLDS" if out["wall_holds"] else "WALL DOES NOT HOLD")
     print("ARMS OK" if out["arms_ok"] else "AN ARM FAILED ITS PREFLIGHT")
     _rm(ws, work)

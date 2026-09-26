@@ -262,3 +262,42 @@ The fix is in `sandbox.sh`, before the restart. The resolver file is bound back 
 Between the two readings the WSL VM crashed. `getpwuid` failed with EIO, then `CreateInstance/E_UNEXPECTED`, after hours at a load average near 40 from this bench and H4/H5 together. It came back empty (uptime 0 min), and on the idle machine the probe passed in 32 s.
 
 To keep the shared machine up, the restarted main run starts at most **12 solves at a time**, not 16. That changes nothing a solve sees. The pre-amendment grading report for D (`dflt_main_D`, of discarded solves) moved to `results/grades_discarded_before_amendment3/`.
+
+## Amendment 4 — 2026-09-26, after the host disk filled and WSL crashed (07:39): the sandbox checked against H4/H5's v1 gaps, and the run resumed
+
+**State at the pause.**
+- `main_solves.jsonl` holds 250 solves (A 62, D 62, G 63, Q 63), all run under `sandbox.sh` as committed in `bc798258`.
+- Block 5 died in the crash, so its in-flight solves wrote no row.
+- Spend so far is US$ 3.84: US$ 2.55 in the main run, and the rest in the pilot, the discarded pre-sandbox run and the probes.
+- No main-run resolve rate has been read.
+
+**The three gaps H4/H5 found in its first sandbox (its Amendment 7), checked against this one.** `sandbox.sh` is unchanged.
+1. **`/mnt/wsl` visible (other containers' bind-mounted repositories and venvs).** Not shared. `sandbox.sh` covers all of `/mnt` with an empty tmpfs from its first version and binds back only the resolver file. The Amendment 3 probe's `ls /mnt/c/Users` failed, and its whole-disk search found no django but the workspace's.
+2. **The solve running as the namespace's root.** Not shared. The last step is a nested user namespace mapping the invoking uid back, and the Amendment 3 probe read `id -un` as the user. Capabilities and unmount attempts were not probed then; they are now.
+3. **A command audit sees commands, not their output.** This is true of `disk_scan.py` too. The wall here is enforcement, not the audit, so the probe now looks from inside the way a solve would.
+
+**The extended probe** (`bakeoff.py probe --sandbox`, into `results/probe_sandbox_a4.json`) runs on the unchanged `sandbox.sh` before any new solve. It adds six checks.
+
+Must fail:
+- listing `/mnt/wsl/docker-desktop-bind-mounts`;
+- `umount` of the home cover;
+- `umount /mnt`.
+
+Must hold:
+- `/mnt` lists only the path down to the resolver;
+- `id -u` is not 0, and every capability set is empty;
+- inside a fresh `unshare -rm` of the solve's own, both covers still refuse to unmount (inherited mounts are locked) and nothing appears under them;
+- a whole-disk `find` for `.git`, `pyvenv.cfg`, `patch.diff`, `eval.sh`, `*django__django*`, `*swe-bench*`, `*swe_bench*` and `*sweb.eval*` outside the workspace finds nothing but the read-only code copy.
+
+**Decision, fixed before the probe runs.**
+- **If every check holds,** the 250 rows stand. They ran under the very file the probe tests, and none is re-run.
+- **If any check fails,** those 250 rows leave the primary comparison and are never pooled with rows run under a fixed sandbox. They are kept as a secondary replica, and the main run restarts from item 0 behind the fix, after this file records it.
+  - The budget for that case: US$ 3.84 spent, about 2.6 to re-run the 250 rows, and about 145 × 0.041 ≈ 5.9 for the items not yet run. That is about US$ 12.4, under the US$ 13.00 stop but with little margin. If it does not fit, the report says so before any money is spent.
+
+**Operational changes. None changes what a solve sees.**
+- **Pacing.** At most 8 solves at a time (coordinator).
+- **Disk guard.** The runner refuses to start a block, and the grader to grade, when C: has under 1.5 GB free. The driver also stops admitting items when C: drops below that mid-block.
+- **Grading** moves to `grade_items.py` (commit `479acc02`). It grades item by item with the harness's own `run_instance` and removes each item's image once its arms are graded.
+- **Clean-up at driver start.**
+  - The driver records the call logs a killed block left behind (spend only, into `killed_solves.jsonl`).
+  - It removes leftover workspaces and templates.
