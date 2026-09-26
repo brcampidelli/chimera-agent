@@ -192,6 +192,9 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("loop.empty_close_note", "chimera.core.agent:_empty_close_note", "turn", _LOOP,
        note="the harness's own words when the closing reply is empty twice; never a claim of success"),
     _i("loop.unanswered_call_stub", "chimera.core.agent:Agent.run", "turn", _LOOP),
+    _i("loop.tool_raised", "chimera.tools.base:tool_raised", "turn", _LOOP,
+       note="the observation for a tool that raised; a taint source's is fenced behind "
+            "fence.failure_note, by the ledger or by the MCP tool itself"),
     _i("loop.prefix_nonce", "chimera.core.agent:Agent.run", "core", ("eval",),
        note="bench instrument only; empty unless CHIMERA_PREFIX_NONCE is set"),
     _c("loop.skills_header", "chimera.skills.retrieval:SKILLS_HEADER", "volatile", _ALL, "unmeasured",
