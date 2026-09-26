@@ -714,6 +714,13 @@ class Settings(BaseSettings):
     # extraction, which would pollute the store.
     remember_from_chat: bool = Field(default=False, validation_alias="CHIMERA_CHAT_MEMORY")
 
+    # Send a chat's earlier turns as the model's own messages, tool calls included, with the
+    # profile and recalled facts in the turn context, instead of one flattened user message
+    # (`ChatSession.real_history`). It reaches `chat`, `assist`, the TUI, the app's chat and both
+    # Discord paths. Off keeps the flattened form byte for byte; whether to flip it is measured in
+    # `bench/chat_history`, because the Discord bot in production runs this path.
+    chat_real_history: bool = Field(default=False, validation_alias="CHIMERA_CHAT_REAL_HISTORY")
+
     # Run the cron daemon inside `chimera app` (the desktop backend), so scheduled jobs fire while
     # the app is open — the whole point of a proactive assistant. Defaults ON: a "briefing at 7am"
     # should just work once you've scheduled it, without a separate `chimera serve --cron` terminal

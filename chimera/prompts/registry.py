@@ -183,8 +183,10 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("context.open", "chimera.prompts.context:TURN_CONTEXT_OPEN", "volatile", _ALL, "unmeasured",
        note="heads the turn's user message; the transcript keeps the message bare"),
     _c("context.close", "chimera.prompts.context:TURN_CONTEXT_CLOSE", "volatile", _ALL, "unmeasured"),
-    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile", ("S2", "S4"),
-       "unmeasured", note="recalled facts, labelled as recall that the present overrides"),
+    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile",
+       ("S2", "S3", "S4", "S10"), "unmeasured",
+       note="recalled facts, labelled as recall that the present overrides; chat sends it under "
+            "CHIMERA_CHAT_REAL_HISTORY"),
     _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
     # ---- compaction and memory -----------------------------------------------------------------
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
@@ -219,6 +221,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/harness_bench arm C (+0.003, inside SD 0.073)"),
     # ---- terminal chat, Discord, webhooks ------------------------------------------------------
     _i("chat.layout", "chimera.interface.session:ChatSession._assemble", "volatile", ("S3", "S10")),
+    _i("chat.history_messages", "chimera.interface.session:_as_messages", "volatile",
+       ("S3", "S10"), note="CHIMERA_CHAT_REAL_HISTORY: a restored turn's label and data fence, "
+                           "carried into its assistant message; bench/chat_history"),
     _c("chat.restored_labels", "chimera.interface.session:_RESTORED", "volatile", ("S3", "S10"),
        "unmeasured", render=_restored_labels),
     _i("chat.profile", "chimera.interface.profile:render_profile", "volatile", ("S3", "S10")),

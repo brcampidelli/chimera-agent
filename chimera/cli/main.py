@@ -1904,6 +1904,7 @@ def chat(
             # The setting existed and no terminal surface passed it, so "remember that…" was
             # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # Recall narrowed to the folder this conversation is open on, exactly as the coding
             # turn does it. `--workspace` decided which files the tools could touch and said
             # nothing about which project's memory arrived, so a note from one codebase turned up
@@ -2105,6 +2106,7 @@ def assist(
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
+        real_history=settings.chat_real_history,
         # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
         project=project_key(workspace),
@@ -2414,6 +2416,7 @@ def tui(
             graph=_recall_graph(mem),
             profile=_session_profile(mem),
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # Recall narrowed to the folder this app was opened on, exactly as `chat` and `assist`
             # do it. This surface takes a `--workspace` too, and until now that argument decided
             # which files the tools could touch and said nothing about which project's memory
@@ -2568,6 +2571,7 @@ def serve(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # `None` when governance is off — the shipped default, under which `governed_profile`
             # returns before it builds a ledger and never calls `_hold`. A hook wired to nothing
             # would be a lie about what this surface has; no hook is the truth, and it also keeps
@@ -2937,6 +2941,7 @@ def desktop_app(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=live.remember_from_chat,
+            real_history=live.chat_real_history,
             # The ledger is built once per conversation and the instruction is known once per TURN,
             # which is the whole reason `CHIMERA_TAINT_AUTHORITY` did nothing here: a ledger nobody
             # tells answers `unknown` for every fetch, and the narrowing treats that exactly as it
@@ -3391,6 +3396,8 @@ def _serve_platform(
             runner,
             memory=memory,
             graph=graph,
+            # The path `serve --discord` runs, which is the production bot.
+            real_history=get_settings().chat_real_history,
             # `None` under the shipped `CHIMERA_GOVERNANCE=off`, where no ledger is built at all.
             on_turn_start=(
                 None
