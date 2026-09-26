@@ -15,10 +15,12 @@ import pytest
 from chimera.cli import review_cmd
 from chimera.config import get_settings
 from chimera.review import CautiousVerifier, choose_reviewer, collect, model_family, review
+from chimera.review.family import MEASURED_REVIEWERS
 from tests.review_fakes import FakeBackend, finder_json, finding, repo_with_change
 
 DEEPSEEK = "openrouter/deepseek/deepseek-v4-flash-0731"
 GLM = "openrouter/z-ai/glm-5.3"
+LUNA = "openrouter/openai/gpt-6-luna"
 MISTRAL = "openrouter/mistralai/mistral-small-3.2-24b-instruct"
 OPUS = "openrouter/anthropic/claude-opus-5"
 
@@ -41,10 +43,38 @@ def test_a_slug_is_read_to_its_family(slug: str, family: str) -> None:
     assert model_family(slug) == family
 
 
-def test_the_default_is_the_strongest_rung_of_another_family() -> None:
+def test_without_a_measured_reviewer_the_strongest_rung_of_another_family_reviews() -> None:
     choice = choose_reviewer(DEEPSEEK, ladder=[GLM, DEEPSEEK, MISTRAL])
 
     assert (choice.model, choice.source, choice.same_family) == (GLM, "tier ladder", False)
+
+
+def test_a_measured_reviewer_comes_before_the_ladder() -> None:
+    """`bench/review_reviewer`: the ladder's top rung came back empty on one review in five."""
+    choice = choose_reviewer(DEEPSEEK, measured=[LUNA, DEEPSEEK], ladder=[GLM])
+
+    assert (choice.model, choice.source, choice.same_family) == (LUNA, "measured", False)
+
+
+def test_an_author_from_the_first_measured_family_gets_the_next_entry() -> None:
+    choice = choose_reviewer(LUNA, measured=[LUNA, DEEPSEEK], ladder=[GLM])
+
+    assert (choice.model, choice.source) == (DEEPSEEK, "measured")
+
+
+def test_a_measured_reviewer_no_key_can_call_falls_through_to_the_ladder() -> None:
+    choice = choose_reviewer(DEEPSEEK, measured=[LUNA], ladder=[GLM], reachable={GLM})
+
+    assert (choice.model, choice.source) == (GLM, "tier ladder")
+
+
+def test_the_measured_list_leaves_no_author_without_another_family() -> None:
+    """Two families at least, so an author from either still gets a measured reviewer."""
+    families = [model_family(m) for m in MEASURED_REVIEWERS]
+
+    assert len(set(families)) >= 2
+    for author in MEASURED_REVIEWERS:
+        assert choose_reviewer(author, measured=MEASURED_REVIEWERS).source == "measured"
 
 
 def test_a_ladder_of_one_family_falls_through_to_the_panel() -> None:
@@ -110,6 +140,35 @@ def test_the_command_picks_another_family_under_every_cost_mode(
 
     assert model_family(author) == "deepseek"
     assert choice.family != "deepseek", choice
+
+
+@pytest.mark.parametrize("mode", ["auto", "balanced", "cheap", "premium"])
+def test_the_command_reviews_the_default_model_with_the_measured_winner(
+    _settings: pytest.MonkeyPatch, mode: str
+) -> None:
+    """The winner of `bench/review_reviewer`'s frozen rule, whatever the cost mode's ladder holds."""
+    _settings.setenv("CHIMERA_COST_MODE", mode)
+    get_settings.cache_clear()
+
+    choice = review_cmd._reviewer(get_settings().default_model, "")
+
+    assert (choice.model, choice.source) == (LUNA, "measured")
+
+
+def test_the_command_gives_an_author_of_a_third_family_the_bench_winner_first(
+    _settings: pytest.MonkeyPatch,
+) -> None:
+    choice = review_cmd._reviewer(GLM, "")
+
+    assert (choice.model, choice.source) == (LUNA, "measured")
+
+
+def test_the_command_reviews_the_winners_own_work_with_the_default_model(
+    _settings: pytest.MonkeyPatch,
+) -> None:
+    choice = review_cmd._reviewer(LUNA, "")
+
+    assert (choice.model, choice.source) == (DEEPSEEK, "measured")
 
 
 def test_the_setting_names_the_reviewer(_settings: pytest.MonkeyPatch) -> None:

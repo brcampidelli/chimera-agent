@@ -65,6 +65,24 @@ def test_a_regex_quoted_in_a_finding_does_not_void_the_review(tmp_path: Path) ->
     assert report.findings[0].evidence == "pattern needs \\Z, and \\d+ never matches"
 
 
+def test_an_escaped_backslash_beside_a_stray_one_is_read_as_written(tmp_path: Path) -> None:
+    """A quoted regex holds both kinds: ``\\\\[`` is a valid escape (a backslash, then ``[``) and
+    ``\\]`` is not. The repair read backslashes one at a time, so it took the second half of the
+    valid pair for a stray one and broke it. Measured in `bench/review_reviewer`'s pilot: a
+    mistral-small reply quoting `(?:\\[[^\\]]*\\])?` came back unreadable and the review
+    incomplete."""
+    reply = (
+        '{"findings": [{"file": "calc.py", "line": 11, "priority": "P1", "title": "divides by n - 1",'
+        ' "evidence": "(?:\\\\[[^\\\\]]*\\])?", "confidence": 0.9}],'
+        ' "residual_risks": [], "untested_paths": []}'
+    )
+
+    report = review(collect(repo_with_change(tmp_path)), FakeBackend(reply), REVIEWER, KeepAll())
+
+    assert report.status == "findings"
+    assert report.findings[0].evidence == "(?:\\[[^\\]]*\\])?"
+
+
 def test_a_failed_call_is_an_incomplete_review(tmp_path: Path) -> None:
     class Down(FakeBackend):
         def complete(self, messages: list[Any], **kw: Any) -> Any:

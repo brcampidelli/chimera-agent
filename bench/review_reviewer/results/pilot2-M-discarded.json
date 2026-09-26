@@ -1,0 +1,208 @@
+{
+ "arms": {
+  "D": {
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "provider": "DeepInfra",
+   "price_per_m": [
+    0.06,
+    0.18
+   ],
+   "guard": 0.15
+  },
+  "L": {
+   "model": "openrouter/openai/gpt-6-luna",
+   "provider": "OpenAI",
+   "price_per_m": [
+    0.1,
+    0.5
+   ],
+   "guard": 0.75
+  },
+  "Q": {
+   "model": "openrouter/qwen/qwen3.7-flash",
+   "provider": "Alibaba",
+   "price_per_m": [
+    0.03,
+    0.13
+   ],
+   "guard": 0.25
+  },
+  "M": {
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "provider": "Parasail",
+   "price_per_m": [
+    0.09,
+    0.3
+   ],
+   "guard": 0.1
+  }
+ },
+ "replicas": 1,
+ "tol": 3,
+ "order": [
+  "8ac471ce",
+  "12116dda",
+  "d36ce2f3"
+ ],
+ "stopped": {},
+ "usd": 0.001,
+ "usd_by_arm": {
+  "D": 0.0,
+  "L": 0.0,
+  "Q": 0.0,
+  "M": 0.001
+ },
+ "fixtures_sha": "b2f9e29a5fd3",
+ "finder_prompt_sha": "3a480dab0478",
+ "verifier_prompt_sha": "ee9d780a9f4b",
+ "rows": [
+  {
+   "commit": "8ac471ce",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/repomap.py",
+    "line": 58,
+    "defect": "the ignore set holds names, so a path never matches and worktrees are still walked",
+    "category": "wrong constant"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 53,
+        "priority": "P1",
+        "confidence": 0.8,
+        "title": "Potential silent data corruption in repomap",
+        "evidence": "It fails in the worst direction. The map does not shrink and does not error; it stays the same size and quietly fills with duplicates, so the agent receives something that \"looks like a map\" — this module's own opening words — while the entry point it needed is missing.",
+        "consequence": "The repomap may contain duplicates and miss critical entry points, leading to agents looking in the wrong place without any error indication.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 974,
+        "completion": 251,
+        "cache_read": 0,
+        "provider": "Parasail",
+        "finish": "stop",
+        "seconds": 159.8,
+        "content": "```json\n{\n  \"findings\": [\n    {\n      \"file\": \"chimera/core/repomap.py\",\n      \"line\": 53,\n      \"priority\": \"P1\",\n      \"title\": \"Potential silent data corruption in repomap\",\n      \"evidence\": \"It fails in the worst direction. The map does not shrink and does not error; it stays the same size and quietly fills with duplicates, so the agent receives something that \\\"looks like a map\\\" — this module's own opening words — while the entry point it needed is missing.\",\n      \"consequence\": \"The repomap may contain duplicates and miss critical entry points, leading to agents looking in the wrong place without any error indication.\",\n      \"confidence\": 0.8\n    }\n  ],\n  \"residual_risks\": [\n    \"The impact of the new ignore pattern `.claude/worktrees` on the repomap's behavior in various scenarios is not fully clear from the diff.\"\n  ],\n  \"untested_paths\": [\n    \"The behavior of the repomap when multiple agents are running concurrently and creating worktrees is not tested in the provided diff.\"\n  ]\n}\n```"
+       }
+      ],
+      "usd": 0.00016295999999999997,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "12116dda",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/autonomous.py",
+    "line": 1257,
+    "defect": "every reverted attempt of a run overwrites the same file",
+    "category": "collision"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/api/runs.py",
+        "line": 47,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Potential Data Loss in `discarded_at` Field",
+        "evidence": "discarded_at: str = \"\"",
+        "consequence": "If the `discarded_at` field is not properly handled or updated, it could lead to data loss or incorrect information about where reverted work was written.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 248,
+        "priority": "P2",
+        "confidence": 0.6,
+        "title": "Potential Data Loss in `_preserve_discarded` Method",
+        "evidence": "if not attempt.diffs or self.run_log is None: return \"\"",
+        "consequence": "If the `attempt.diffs` is empty or `self.run_log` is None, the method returns an empty string, which might lead to loss of important reverted work data.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1273,
+        "priority": "P2",
+        "confidence": 0.5,
+        "title": "Exception Handling in `_preserve_discarded` Method",
+        "evidence": "except Exception as exc:  # noqa: BLE001 — guardar nunca pode impedir reverter",
+        "consequence": "The broad exception handling might mask specific issues, making it harder to debug and potentially leading to undetected errors.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 3561,
+        "completion": 491,
+        "cache_read": 368,
+        "provider": "Parasail",
+        "finish": "stop",
+        "seconds": 164.0,
+        "content": "```json\n{\n  \"findings\": [\n    {\n      \"file\": \"chimera/api/runs.py\",\n      \"line\": 47,\n      \"priority\": \"P2\",\n      \"title\": \"Potential Data Loss in `discarded_at` Field\",\n      \"evidence\": \"discarded_at: str = \\\"\\\"\",\n      \"consequence\": \"If the `discarded_at` field is not properly handled or updated, it could lead to data loss or incorrect information about where reverted work was written.\",\n      \"confidence\": 0.7\n    },\n    {\n      \"file\": \"chimera/core/autonomous.py\",\n      \"line\": 248,\n      \"priority\": \"P2\",\n      \"title\": \"Potential Data Loss in `_preserve_discarded` Method\",\n      \"evidence\": \"if not attempt.diffs or self.run_log is None: return \\\"\\\"\",\n      \"consequence\": \"If the `attempt.diffs` is empty or `self.run_log` is None, the method returns an empty string, which might lead to loss of important reverted work data.\",\n      \"confidence\": 0.6\n    },\n    {\n      \"file\": \"chimera/core/autonomous.py\",\n      \"line\": 1273,\n      \"priority\": \"P2\",\n      \"title\": \"Exception Handling in `_preserve_discarded` Method\",\n      \"evidence\": \"except Exception as exc:  # noqa: BLE001 — guardar nunca pode impedir reverter\",\n      \"consequence\": \"The broad exception handling might mask specific issues, making it harder to debug and potentially leading to undetected errors.\",\n      \"confidence\": 0.5\n    }\n  ],\n  \"residual_risks\": [\n    \"The effectiveness of the `_preserve_discarded` method in actually preserving the reverted work.\",\n    \"The impact of the broad exception handling in the `_preserve_discarded` method on debugging and error tracking.\"\n  ],\n  \"untested_paths\": [\n    \"The scenario where `attempt.diffs` is empty or `self.run_log` is None in the `_preserve_discarded` method.\",\n    \"The handling of exceptions in the `_preserve_discarded` method.\"\n  ]\n}\n```"
+       }
+      ],
+      "usd": 0.00046778999999999994,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "d36ce2f3",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 1660,
+        "completion": 727,
+        "cache_read": 368,
+        "provider": "Parasail",
+        "finish": "stop",
+        "seconds": 164.1,
+        "content": "```json\n{\n  \"findings\": [\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 151,\n      \"priority\": \"P2\",\n      \"title\": \"Potential False Positives in Package Install Rule\",\n      \"evidence\": \"Rule(\\n            \\\"package_install\\\",\\n            _pattern(\\n                # pip / pipx / uv: `install` (or uv's `add`) followed by options, then a name — and\\n                # not a requirements file (`-r`/`--requirement`), not a path, not an editable.\\n                r\\\"\\\\b(?:pip3?|pipx|uv\\\\s+pip|uv\\\\s+tool)\\\\s+install\\\\b(?![^\\\\n]*\\\\s(?:-r|--requirement)\\\\b)\\\"\\n                r\\\"(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w.\\\\-]*(?:\\\\[[^\\\\]]*\\])?(?:[=<>!~]=?\\\\S*)?\\\"\\n                r\\\"|\\\\buv\\\\s+add(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w.\\\\-]*\\\"\\n                # npm / yarn / pnpm: a name after `install`/`i`/`add`. Bare `npm install` (the\\n                # lockfile) has no name and does not match; neither does `npm ci`.\\n                r\\\"|\\\\b(?:npm\\\\s+(?:install|i|add)|yarn\\\\s+add|pnpm\\\\s+(?:add|install))(?:\\\\s+-[-\\\\w=]+)*\\\"\\n                r\\\"\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[@A-Za-z][\\\\w./@\\\\-]*\\\"\\n                # cargo, apt, brew, gem, go: the same shape.\\n                r\\\"|\\\\b(?:cargo\\\\s+(?:add|install)|apt(?:-get)?\\\\s+install|brew\\\\s+install|gem\\\\s+install\\\"\\n                r\\\"|go\\\\s+(?:get|install))(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w./@\\\\-]*\\\"\\n            ),\\n            Decision.REVIEW,\\n            \\\"installing a package by name — its install scripts run code before anything is imported\\\",\\n        ),\",\n      \"consequence\": \"The regex pattern might not correctly identify all package installation commands, leading to false positives or missed detections.\",\n      \"confidence\": 0.7\n    }\n  ],\n  \"residual_risks\": [\n    \"The effectiveness of the new rule in detecting all potential package installation commands that could be security risks.\",\n    \"The potential for the regex pattern to evolve as new package managers or installation commands are introduced.\"\n  ],\n  \"untested_paths\": [\n    \"The behavior of the rule when encountering package installation commands with unusual or non-standard syntax.\",\n    \"The interaction of the rule with other rules in the system, especially those that might also trigger on similar commands.\"\n  ]\n}\n```"
+       }
+      ],
+      "usd": 0.0003675,
+      "error": null
+     }
+    ]
+   }
+  }
+ ]
+}

@@ -1,0 +1,1216 @@
+{
+ "arms": {
+  "D": {
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "provider": "DeepInfra",
+   "price_per_m": [
+    0.06,
+    0.18
+   ],
+   "guard": 0.15
+  },
+  "L": {
+   "model": "openrouter/openai/gpt-6-luna",
+   "provider": "OpenAI",
+   "price_per_m": [
+    0.1,
+    0.5
+   ],
+   "guard": 0.75
+  },
+  "Q": {
+   "model": "openrouter/qwen/qwen3.7-flash",
+   "provider": "Alibaba",
+   "price_per_m": [
+    0.03,
+    0.13
+   ],
+   "guard": 0.25
+  },
+  "M": {
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "provider": "Parasail",
+   "price_per_m": [
+    0.09,
+    0.3
+   ],
+   "guard": 0.1
+  }
+ },
+ "replicas": 2,
+ "tol": 3,
+ "order": [
+  "8ac471ce",
+  "12116dda",
+  "d36ce2f3",
+  "44d580a9",
+  "5b65b44b",
+  "0739496c",
+  "4f9ec26d",
+  "b0f5c7ac",
+  "924aaa76",
+  "ef8e0153",
+  "b7fd88c8",
+  "e224de74",
+  "86ee1267",
+  "397cb65e",
+  "cf0ff439",
+  "a0d564b0",
+  "4371af4a",
+  "d6e88890",
+  "110d9dbe",
+  "08f94a6b",
+  "b5f7e949",
+  "d8662bd6",
+  "876d7805",
+  "8f529bf0",
+  "2b4354d0",
+  "8844b221",
+  "2157b03c",
+  "5b3ae2bb",
+  "e99e0cdc",
+  "69718424"
+ ],
+ "stopped": {
+  "M": "stop rule: 8/10 transport errors"
+ },
+ "usd": 0.0006,
+ "usd_by_arm": {
+  "D": 0.0,
+  "L": 0.0,
+  "Q": 0.0,
+  "M": 0.0006
+ },
+ "fixtures_sha": "b2f9e29a5fd3",
+ "finder_prompt_sha": "3a480dab0478",
+ "verifier_prompt_sha": "ee9d780a9f4b",
+ "rows": [
+  {
+   "commit": "8ac471ce",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/repomap.py",
+    "line": 58,
+    "defect": "the ignore set holds names, so a path never matches and worktrees are still walked",
+    "category": "wrong constant"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 138.9
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     },
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.5
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "12116dda",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/autonomous.py",
+    "line": 1257,
+    "defect": "every reverted attempt of a run overwrites the same file",
+    "category": "collision"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.5
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     },
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.4
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "d36ce2f3",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.4
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     },
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.4
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "44d580a9",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/events.py",
+    "line": 88,
+    "defect": "keeps everything after index tail instead of the last tail characters",
+    "category": "slice sign"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.4
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     },
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/events.py",
+        "line": 111,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Potential truncation of observation text",
+        "evidence": "\"observation\": _clip_observation(observation or \"\", TOOL_OBSERVATION_CHARS)",
+        "consequence": "The observation text might be truncated in a way that loses important information, especially if the middle part of the observation contains critical details.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 1628,
+        "completion": 224,
+        "cache_read": 0,
+        "provider": "Parasail",
+        "finish": "stop",
+        "seconds": 3.7,
+        "content": "```json\n{\n  \"findings\": [\n    {\n      \"file\": \"chimera/core/events.py\",\n      \"line\": 111,\n      \"priority\": \"P2\",\n      \"title\": \"Potential truncation of observation text\",\n      \"evidence\": \"\\\"observation\\\": _clip_observation(observation or \\\"\\\", TOOL_OBSERVATION_CHARS)\",\n      \"consequence\": \"The observation text might be truncated in a way that loses important information, especially if the middle part of the observation contains critical details.\",\n      \"confidence\": 0.7\n    }\n  ],\n  \"residual_risks\": [\n    \"The effectiveness of the new `_clip_observation` function in preserving critical information in various types of observations (e.g., test runs, compiler outputs) is not fully verifiable from the diff alone.\"\n  ],\n  \"untested_paths\": [\n    \"The behavior of `_clip_observation` with very long observation texts where the critical information is in the middle part of the text.\"\n  ]\n}\n```"
+       }
+      ],
+      "usd": 0.00021371999999999998,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "5b65b44b",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/governance/policy.py",
+    "line": 93,
+    "defect": "the upload-egress rule allows what it exists to review",
+    "category": "wrong constant"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "CredentialRejectedError: Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=o",
+        "seconds": 0.4
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     },
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 93,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Incorrect Decision for Data Upload Rule",
+        "evidence": "Decision.ALLOW",
+        "consequence": "The rule for data upload egress is set to ALLOW, which means it will not trigger a review. This could allow sensitive data to be uploaded without review, which contradicts the intention of the comment that suggests these actions should be reviewed.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 93,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Incorrect Decision for Data Upload Rule",
+        "evidence": "Decision.ALLOW",
+        "consequence": "The rule for data upload egress is set to ALLOW, which means it will not trigger a review. This could allow sensitive data to be uploaded without review, which contradicts the intention of the comment that suggests these actions should be reviewed.",
+        "anchor": "kept"
+       }
+      ],
+      "verified": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 93,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Incorrect Decision for Data Upload Rule",
+        "evidence": "Decision.ALLOW",
+        "consequence": "The rule for data upload egress is set to ALLOW, which means it will not trigger a review. This could allow sensitive data to be uploaded without review, which contradicts the intention of the comment that suggests these actions should be reviewed.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "the code the finding describes is in this diff and no line contradicts the finding's central claim"
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 2136,
+        "completion": 264,
+        "cache_read": 368,
+        "provider": "Parasail",
+        "finish": "stop",
+        "seconds": 4.7,
+        "content": "```json\n{\n  \"findings\": [\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 93,\n      \"priority\": \"P2\",\n      \"title\": \"Incorrect Decision for Data Upload Rule\",\n      \"evidence\": \"Decision.ALLOW\",\n      \"consequence\": \"The rule for data upload egress is set to ALLOW, which means it will not trigger a review. This could allow sensitive data to be uploaded without review, which contradicts the intention of the comment that suggests these actions should be reviewed.\",\n      \"confidence\": 0.7\n    }\n  ],\n  \"residual_risks\": [\n    \"The effectiveness of the new rules in detecting and preventing data exfiltration or unauthorized uploads is not fully verifiable from the diff alone.\",\n    \"The impact of the new rules on performance or usability is not addressed in the diff.\"\n  ],\n  \"untested_paths\": [\n    \"The behavior of the new rules when handling edge cases, such as malformed commands or unusual file paths, is not tested in the diff.\",\n    \"The interaction between the new rules and existing rules, especially in cases where multiple rules might match the same command, is not tested.\"\n  ]\n}\n```"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1505,
+        "completion": 36,
+        "cache_read": 0,
+        "provider": "Parasail",
+        "finish": "stop",
+        "seconds": 1.1,
+        "content": "```json\n{\"reason\": \"the code the finding describes is in this diff and no line contradicts the finding's central claim\", \"verdict\": \"keep\"}\n```"
+       }
+      ],
+      "usd": 0.00041769,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "0739496c",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "4f9ec26d",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/integrations/mcp_client.py",
+    "line": 31,
+    "defect": "match anchors only the start, so a name with a sentence after a valid prefix passes",
+    "category": "anchoring"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "b0f5c7ac",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/fusion/verifier_select.py",
+    "line": 70,
+    "defect": "averages over every scorer, so an abstention counts as a zero again",
+    "category": "wrong divisor"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "924aaa76",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "ef8e0153",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/integrations/mcp_client.py",
+    "line": 92,
+    "defect": "remote output is fenced without defanging chat-template tokens",
+    "category": "missing call"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "b7fd88c8",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/api/code_api.py",
+    "line": 668,
+    "defect": "a server set to ask gets an approver that says yes to everything",
+    "category": "widened condition"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "e224de74",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "86ee1267",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/cli/main.py",
+    "line": 1781,
+    "defect": "calls .names() on None, and reports 0 when servers did connect",
+    "category": "inverted None check"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "397cb65e",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/tools/browser.py",
+    "line": 391,
+    "defect": "drops the launch error, the one message naming the cause",
+    "category": "information dropped"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "cf0ff439",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "a0d564b0",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/spec_test.py",
+    "line": 102,
+    "defect": "the closing fence is kept in the extracted module, which then fails to compile",
+    "category": "boundary"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "4371af4a",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/tools/browser.py",
+    "line": 93,
+    "defect": "driver and cli swapped, so the install runs the script as the executable",
+    "category": "swapped arguments"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "d6e88890",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "110d9dbe",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/kanban/lanes.py",
+    "line": 44,
+    "defect": "counts distinct tools as refused calls",
+    "category": "wrong variable"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "08f94a6b",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/orchestration/hierarchy.py",
+    "line": 1133,
+    "defect": "with no owner identity the stage prompt is replaced by an empty string",
+    "category": "wrong return"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "b5f7e949",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "d8662bd6",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/eval/anytime.py",
+    "line": 98,
+    "defect": "multiplies alpha, loosening each round instead of tightening it",
+    "category": "wrong operator"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "876d7805",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/providers/catalog.py",
+    "line": 65,
+    "defect": "compares an input price against the output prices seen",
+    "category": "wrong index"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "8f529bf0",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "2b4354d0",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/governance/profile.py",
+    "line": 159,
+    "defect": "an unattended API run is told the deployment denies by configuration",
+    "category": "wrong constant"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "8844b221",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/tui/app.py",
+    "line": 348,
+    "defect": "says fusion was skipped exactly when fusion answered",
+    "category": "inverted condition"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "2157b03c",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "5b3ae2bb",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/tools/files.py",
+    "line": 75,
+    "defect": "content with NUL bytes is accepted as a valid full file",
+    "category": "error swallowed"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "e99e0cdc",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/cli/main.py",
+    "line": 3293,
+    "defect": "solve accepts --context-budget and drops it",
+    "category": "value dropped"
+   },
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  },
+  {
+   "commit": "69718424",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [],
+    "L": [],
+    "Q": [],
+    "M": [
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     },
+     {
+      "status": "stopped",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [],
+      "usd": 0.0,
+      "error": "stop rule: 8/10 transport errors"
+     }
+    ]
+   }
+  }
+ ]
+}

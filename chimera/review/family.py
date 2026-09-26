@@ -9,6 +9,9 @@ model, same family, is still grading your own homework.
 A slug names a route, not a family: ``openrouter/deepseek/deepseek-v4-flash`` and
 ``deepseek/deepseek-chat`` are one family behind two providers. :func:`model_family` reads the
 vendor segment where there is one and the model name where there is not.
+
+Which model of another family is a separate question, and it was measured rather than inherited:
+see :data:`MEASURED_REVIEWERS`.
 """
 
 from __future__ import annotations
@@ -59,13 +62,36 @@ def model_family(slug: str) -> str:
     return parts[0] if len(parts) > 1 else name.split(":", 1)[0]
 
 
+#: Models measured as reviewers, in the order `chimera review` prefers them by default.
+#:
+#: The command used to read the tier ladder first, strongest rung first, on the reasoning that the
+#: role placed on the top rung should review. As a reviewer that rung ran away: glm-5.3 reasoned to
+#: the 32,000-token ceiling and came back empty on 4 of 18 reviews, at 44 times the default model's
+#: price, for no recall the set could show (`bench/review_seeded`). `bench/review_reviewer`
+#: (2026-09-26) then ran three cheaper models from other families on the same seeded diffs and
+#: chose by a rule frozen before the run: the cheapest whose recall is within 10 points of the
+#: default model's, with at most 5% of reviews incomplete and at most two more findings than the
+#: default model's on ten clean diffs. gpt-6-luna qualified (39 of 40 seeded reviews showed the
+#: defect, none incomplete, at the default model's own cost per review); qwen3.7-flash did not, and
+#: mistral-small-3.2 could not be measured through the one route that serves the product's request.
+#:
+#: Two families, so every author has an entry from outside its own: the default model, measured as
+#: the reference, reviews what gpt-6-luna wrote. A list rather than a rung, because only a list says
+#: that its entries were measured at this job. Keys that call neither fall through to the ladder.
+MEASURED_REVIEWERS: tuple[str, ...] = (
+    "openrouter/openai/gpt-6-luna",
+    "openrouter/deepseek/deepseek-v4-flash-0731",
+)
+
+
 @dataclass(frozen=True)
 class ReviewerChoice:
     """The reviewer, the author it was chosen against, and where the choice came from."""
 
     model: str
     author_model: str
-    source: str  # "flag" | "setting" | "tier ladder" | "fusion panel" | "catalogue" | "fallback"
+    # "flag" | "setting" | "measured" | "tier ladder" | "fusion panel" | "catalogue" | "fallback"
+    source: str
 
     @property
     def family(self) -> str:
@@ -85,6 +111,7 @@ def choose_reviewer(
     *,
     explicit: str = "",
     setting: str = "",
+    measured: Iterable[str] = (),
     ladder: Iterable[str] = (),
     panel: Iterable[str] = (),
     catalogue: Iterable[str] = (),
@@ -95,9 +122,10 @@ def choose_reviewer(
     An explicit choice (the flag, then the setting) is honoured as given, even from the author's
     family: silently replacing a model someone named is the kind of rerouting
     `chimera.providers.catalog.resolve_tiers` refuses to do, and :attr:`ReviewerChoice.same_family`
-    lets the report say what was lost. Otherwise the tier ladder is read strongest first, as
-    `chimera.api.roles` puts the review role on the top rung, then the fusion panel, then the
-    catalogue, keeping only models the configured keys can call when ``reachable`` is given.
+    lets the report say what was lost. Otherwise the models measured as reviewers come first
+    (:data:`MEASURED_REVIEWERS`, in their order), then the tier ladder strongest first, then the
+    fusion panel, then the catalogue, keeping only models the configured keys can call when
+    ``reachable`` is given.
 
     When nothing from another family can be called, the author's own model reviews, and the report
     says so; an absent review would be worse than a weaker one.
@@ -108,7 +136,10 @@ def choose_reviewer(
         return ReviewerChoice(setting, author_model, "setting")
     author = model_family(author_model)
     allowed = set(reachable) if reachable is not None else None
-    sources = (("tier ladder", ladder), ("fusion panel", panel), ("catalogue", catalogue))
+    sources = (
+        ("measured", measured), ("tier ladder", ladder), ("fusion panel", panel),
+        ("catalogue", catalogue),
+    )
     for source, models in sources:
         for model in models:
             if not model or model_family(model) == author:

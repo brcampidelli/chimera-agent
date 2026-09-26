@@ -13,7 +13,8 @@ each piece of it answers a measured failure of a single judge:
   could not be completed (:mod:`.report`).
 
 `bench/review_seeded` measures the finder's recall on defects seeded into real diffs from this
-repository and what the verifier keeps.
+repository and what the verifier keeps; `bench/review_reviewer` chose the default reviewer on the
+same set (:data:`.family.MEASURED_REVIEWERS`).
 """
 
 from __future__ import annotations
