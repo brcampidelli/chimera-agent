@@ -68,10 +68,20 @@ def finder_request(rendered_diff: str) -> str:
     return "Review this change.\n\n" + fence(rendered_diff)
 
 
-#: A backslash that does not start a JSON escape. A reviewer quoting a regex writes ``\Z`` or ``\d``
-#: inside a string, which JSON forbids; one of them made `bench/review_seeded` run 1 lose a reply
-#: holding two correct findings, and the review read as incomplete.
-_STRAY_BACKSLASH = re.compile(r'\\(?!["\\/bfnrtu])')
+#: A backslash and the character after it, read left to right. A reviewer quoting a regex writes
+#: ``\Z`` or ``\d`` inside a string, which JSON forbids; one of them made `bench/review_seeded` run 1
+#: lose a reply holding two correct findings, and the review read as incomplete. The pair is the
+#: unit because ``\\`` is itself an escape: a repair that looked at one backslash at a time took the
+#: second half of ``\\[`` for a stray one and broke a valid reply (`bench/review_reviewer`, pilot).
+_ESCAPE_PAIR = re.compile(r"\\(.)", re.DOTALL)
+_JSON_ESCAPES = frozenset('"\\/bfnrtu')
+
+
+def _double_stray_backslashes(text: str) -> str:
+    """``text`` with every backslash that does not start a JSON escape doubled, so it reads as one."""
+    return _ESCAPE_PAIR.sub(
+        lambda m: m.group(0) if m.group(1) in _JSON_ESCAPES else "\\\\" + m.group(1), text
+    )
 
 
 def extract_json(text: str) -> Any:
@@ -84,7 +94,7 @@ def extract_json(text: str) -> Any:
         if 0 <= start < end:
             candidates.append(body[start : end + 1])
     for candidate in candidates:
-        for attempt in (candidate, _STRAY_BACKSLASH.sub(r"\\\\", candidate)):
+        for attempt in (candidate, _double_stray_backslashes(candidate)):
             try:
                 return json.loads(attempt)
             except ValueError:
