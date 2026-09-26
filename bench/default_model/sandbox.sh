@@ -30,34 +30,44 @@ case "$WS" in "$REAL_HOME"/?*/?*) ;; *) echo "sandbox: bad workspace $WS" >&2; e
 case "$SCR" in "$REAL_HOME"/?*/?*) ;; *) echo "sandbox: bad scratch $SCR" >&2; exit 90;; esac
 case "$CODE" in /tmp/?*) ;; *) echo "sandbox: bad code dir $CODE" >&2; exit 90;; esac
 
+# WSL keeps the resolver file under /mnt (/etc/resolv.conf is a link into /mnt/wsl), so covering
+# /mnt without it leaves the model endpoint unresolvable: the first probe failed exactly so.
+RESOLV=$(readlink -f /etc/resolv.conf)
+
+# Stage everything that comes back, in a tmpfs of our own, before covering anything.
+K=/dev/shm/.keep
+mount -t tmpfs -o mode=700 none /dev/shm
+mkdir -p "$K/ws" "$K/scr" "$K/code" "$K/py"
+touch "$K/resolv"
+mount --bind "$WS" "$K/ws"
+mount --bind "$SCR" "$K/scr"
+mount --bind "$CODE" "$K/code"
+mount --bind "$PYROOT" "$K/py"
+mount --bind "$RESOLV" "$K/resolv"
+
 mount -t tmpfs -o mode=755 none /mnt
-mkdir -p /mnt/.keep/ws /mnt/.keep/scr /mnt/.keep/code /mnt/.keep/py
-mount --bind "$WS" /mnt/.keep/ws
-mount --bind "$SCR" /mnt/.keep/scr
-mount --bind "$CODE" /mnt/.keep/code
-mount --bind "$PYROOT" /mnt/.keep/py
-
 mount -t tmpfs -o mode=755 none "$REAL_HOME"
-mkdir -p "$WS" "$SCR" "$PYROOT"
-mount --bind /mnt/.keep/ws "$WS"
-mount --bind /mnt/.keep/scr "$SCR"
-mount --bind /mnt/.keep/py "$PYROOT"
-mount -o remount,bind,ro "$PYROOT"
-
 mount -t tmpfs -o mode=1777 none /tmp
-mkdir -p "$CODE"
-mount --bind /mnt/.keep/code "$CODE"
-mount -o remount,bind,ro "$CODE"
+[ -d /var/tmp ] && mount -t tmpfs -o mode=1777 none /var/tmp
 
-for d in /var/tmp /dev/shm; do
-  [ -d "$d" ] && mount -t tmpfs -o mode=1777 none "$d"
-done
+mkdir -p "$WS" "$SCR" "$PYROOT" "$CODE" "$(dirname "$RESOLV")"
+[ -e "$RESOLV" ] || touch "$RESOLV"
+mount --bind "$K/ws" "$WS"
+mount --bind "$K/scr" "$SCR"
+mount --bind "$K/py" "$PYROOT"
+mount -o remount,bind,ro "$PYROOT"
+mount --bind "$K/code" "$CODE"
+mount -o remount,bind,ro "$CODE"
+mount --bind "$K/resolv" "$RESOLV"
+mount -o remount,bind,ro "$RESOLV"
+
 for s in /var/run/docker.sock /run/docker.sock; do
   if [ -S "$s" ]; then mount --bind /dev/null "$s" 2>/dev/null || true; fi
 done
 
-umount /mnt/.keep/ws /mnt/.keep/scr /mnt/.keep/code /mnt/.keep/py
-rmdir /mnt/.keep/ws /mnt/.keep/scr /mnt/.keep/code /mnt/.keep/py /mnt/.keep
+umount "$K/ws" "$K/scr" "$K/code" "$K/py" "$K/resolv"
+umount /dev/shm
+mount -t tmpfs -o mode=1777 none /dev/shm
 
 # The directories the tmpfs mounts created belong to this namespace's root, which is the invoking
 # user outside; the solve runs as that user again below.

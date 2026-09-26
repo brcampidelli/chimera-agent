@@ -252,3 +252,7 @@ Nothing a solve sees changes, and no data is discarded: the cutoff only decides 
 - **Machine mechanics, no effect on what a model sees.** The driver's main loop waits with a timeout, so its SIGTERM handler runs on time: in block 3 it waited for the next solve to finish before acting. The halt tally counts the whole run.
 
 **What this cannot fix.** The breach says something about D itself: it goes looking outside its workspace for the answer. That is a finding about the model's behaviour as an agent, reported beside its score. It is not something the sandbox measures.
+
+**Amendment 3, the probe's first reading (04:01).** Every disk and network check held. All four pinned calls failed with a DNS error: on WSL `/etc/resolv.conf` links into `/mnt/wsl`, which the `/mnt` cover hid.
+
+The fix is in `sandbox.sh`, before the restart. The resolver file is bound back read-only, and the staging moved to a private tmpfs on `/dev/shm`, which is covered again afterwards. The probe is re-run, and nothing started in between.
