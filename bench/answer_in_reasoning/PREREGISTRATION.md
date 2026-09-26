@@ -97,3 +97,35 @@ OpenRouter's billed `usage.cost` where the batch response carries it, else token
 §2 (halts leave the denominators), §3 (route pinned, fallbacks off; cache: temperature 0.3, so the
 gateway's exact-match cache is not used), §4 (this is the interface measurement). No judge, no
 comparison between arms, so §5's floor and McNemar do not apply.
+
+## Amendment 1 — 2026-09-26, after the registered run, before any further call
+
+**What the registered run showed** (its rows are kept in `results/`, unchanged, and are the run this
+pre-registration decides on). M1 held: `reasoning_content` on 20/20 batch calls, the raw `reasoning`
+under `provider_specific_fields` equal to it on 20/20, and `reasoning_content` deltas on 6/6 streams.
+13 of 26 calls were flagged. **P3 failed:** the reader recovered 7 of the 13, each the model's final
+object (in two of them a draft object with a different `p` stood just before the final one, and the
+final was taken). The other six end in **prose** — a markdown explanation naming the verdict
+("justifies human review", "**Not BLOCK:**") — with no object at the end. The run kept only the
+last 400 characters of each reasoning, so it cannot say whether an object of the schema appears
+EARLIER in those six, followed by the prose.
+
+**Why that matters.** If it does, the end-of-reasoning rule is stricter than the content path on this
+prompt (the content path reads the first object and the option word anywhere), and a lenient rule
+would recover those calls; if it does not, the model wrote no JSON at all and the rule loses nothing.
+It decides what the coordinator is told about the rule, not the setting (which stays off either way).
+
+**The follow-up, fixed here.** The same 20 batch calls, same request, route and settings, once more
+(`probe.py --amendment1 --prior-usd 0.06212`), keeping the **whole** reasoning of each flagged call
+in `results/amendment1/rows.json`. For each flagged call: does the end rule recover it; is there an
+object with both keys anywhere (H11's rule, `last_object_anywhere`); how many characters follow that
+object; does the last option word after it restate the object's verdict; is there any `{` at all.
+Read by eye as well: every flagged reasoning's last object and what follows it.
+
+**Reading.** Reported as counts, no test. If most unrecovered flagged calls carry an earlier object
+followed by prose that restates its verdict, the report says the end rule loses answers on this
+prompt and names the lenient alternative (last object, only when the prose after it restates the same
+option) as a candidate for its own measurement; if they carry no object, the end rule stands as is.
+
+**Budget.** Spent: US$ 0.0621. This follow-up: 20 calls, worst case US$ 0.108, so ≤ US$ 0.171 in all;
+the stop at US$ 0.25 and the cap at US$ 0.30 stand (the prior spend is counted by `--prior-usd`).

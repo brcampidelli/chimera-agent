@@ -1,0 +1,41 @@
+{
+ "calls": 26,
+ "answered_calls": 26,
+ "halts": 0,
+ "usd": 0.06212,
+ "batch": {
+  "n": 20,
+  "flagged": 10,
+  "flagged_ci95": [
+   0.299,
+   0.701
+  ],
+  "empty_not_flagged": 0,
+  "recovered_of_flagged": 5,
+  "providers": [
+   "Novita"
+  ],
+  "finish_reasons": [
+   "stop"
+  ],
+  "reasoning_content_present": 20,
+  "psf_reasoning_equals": 20
+ },
+ "stream": {
+  "n": 6,
+  "flagged": 3,
+  "flagged_ci95": [
+   0.188,
+   0.812
+  ],
+  "empty_not_flagged": 0,
+  "recovered_of_flagged": 2,
+  "providers": [
+   ""
+  ],
+  "finish_reasons": [
+   "stop"
+  ],
+  "calls_with_reasoning_content_deltas": 6
+ }
+}

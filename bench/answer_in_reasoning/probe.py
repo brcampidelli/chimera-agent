@@ -56,6 +56,8 @@ OUT = Path(__file__).resolve().parent / "results"
 
 _RAW = threading.local()
 _SPENT = [0.0]
+#: Amendment 1: keep the whole reasoning of a flagged call (batch route only).
+KEEP_FULL = [False]
 _LOCK = threading.Lock()
 
 
@@ -155,7 +157,7 @@ def one(call: dict[str, Any]) -> dict[str, Any]:
         recovered = answer_at_end_of_reasoning(result.reasoning, backend.answer_keys(DANGER))
     text = result.content if result.content.strip() else recovered
     reading = backend.read(text, DANGER)
-    return {
+    row = {
         **{k: v for k, v in call.items() if k != "state"},
         "provider": result.provider, "generation_id": result.generation_id,
         "finish_reason": result.finish_reason, "content_empty": not result.content.strip(),
@@ -165,6 +167,48 @@ def one(call: dict[str, Any]) -> dict[str, Any]:
         "choice": reading.choice, "p": reading.p,
         "prompt": prompt, "completion": completion, "usd": usd, "billed": billed is not None,
         "seconds": round(time.time() - started, 1), "raw": raw,
+    }
+    if KEEP_FULL[0] and result.answer_in_reasoning:
+        return amendment_row(row, result.reasoning)
+    return row
+
+
+def last_object_anywhere(reasoning: str, keys: tuple[str, ...]) -> tuple[str, int]:
+    """Amendment 1: H11's rule, for comparison only — the last valid object carrying ``keys``
+    anywhere in the reasoning, and where it ends. ("", -1) when there is none."""
+    decoder = json.JSONDecoder(strict=False)
+    pos = reasoning.rfind("{")
+    while pos != -1:
+        try:
+            obj, end = decoder.raw_decode(reasoning, pos)
+        except json.JSONDecodeError:
+            obj, end = None, pos
+        if isinstance(obj, dict) and all(k in obj for k in keys):
+            return reasoning[pos:end], end
+        pos = reasoning.rfind("{", 0, pos)
+    return "", -1
+
+
+def amendment_row(row: dict[str, Any], reasoning: str) -> dict[str, Any]:
+    """What precedes a prose tail: is there an object of the schema earlier, and what follows it."""
+    import re
+
+    from chimera.decisions.governance import DANGER
+    from chimera.decisions.hosted import HostedVerbalizedBackend
+
+    keys = HostedVerbalizedBackend.answer_keys(DANGER)
+    found, end = last_object_anywhere(reasoning, keys)
+    after = reasoning[end:] if found else ""
+    words = re.findall(r"\b(BLOCK|REVIEW|ALLOW)\b", after)
+    verdict = ""
+    if found:
+        verdict = str(json.loads(found, strict=False).get(DANGER.key) or "").upper()
+    return {
+        **row, "reasoning": reasoning,
+        "object_anywhere": found, "chars_after_object": len(after.strip()) if found else None,
+        "last_word_after_object": words[-1] if words else "",
+        "after_restates_verdict": bool(found and words and words[-1] == verdict),
+        "json_anywhere": "{" in reasoning,
     }
 
 
@@ -208,11 +252,21 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--amendment1", action="store_true",
+                        help="the 20 batch calls again, keeping a flagged call's whole reasoning")
+    parser.add_argument("--prior-usd", type=float, default=0.0,
+                        help="spend already made under this pre-registration, counted to the cap")
     args = parser.parse_args()
     calls = plan()
-    worst = sum(600 * PRICE_PROMPT + 2000 * PRICE_COMPLETION for _ in calls)
-    print(f"{len(calls)} calls ({BATCH_ITEMS} batch, {STREAM_ITEMS} stream) to {MODEL} pinned to "
-          f"{PROVIDER}; worst case ~US$ {worst:.3f} (cap {CAP_USD}, stop {STOP_USD})")
+    out = OUT
+    if args.amendment1:
+        calls = [c for c in calls if c["route"] == "batch"]
+        KEEP_FULL[0] = True
+        out = OUT / "amendment1"
+    _SPENT[0] = args.prior_usd
+    worst = args.prior_usd + sum(600 * PRICE_PROMPT + 2000 * PRICE_COMPLETION for _ in calls)
+    print(f"{len(calls)} calls to {MODEL} pinned to {PROVIDER}; prior US$ {args.prior_usd:.4f}; "
+          f"worst case ~US$ {worst:.3f} (cap {CAP_USD}, stop {STOP_USD})")
     if worst > CAP_USD:
         print("worst case above the cap; not running")
         return 2
@@ -223,10 +277,24 @@ def main() -> int:
     _install_capture()
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:
         rows = list(pool.map(one, calls))
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "rows.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False), encoding="utf-8")
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "rows.json").write_text(json.dumps(rows, indent=1, ensure_ascii=False), encoding="utf-8")
     result = summary(rows)
-    (OUT / "summary.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
+    if args.amendment1:
+        result = {k: v for k, v in result.items() if k != "stream"}
+        flagged = [r for r in rows if r.get("answer_in_reasoning")]
+        result["amendment1"] = {
+            "flagged": len(flagged),
+            "end_rule_recovered": sum(r["recovered"] for r in flagged),
+            "object_anywhere": sum(bool(r["object_anywhere"]) for r in flagged),
+            "object_anywhere_not_at_end": sum(
+                bool(r["object_anywhere"]) and not r["recovered"] for r in flagged),
+            "of_those_prose_restates_verdict": sum(
+                bool(r["object_anywhere"]) and not r["recovered"] and r["after_restates_verdict"]
+                for r in flagged),
+            "no_brace_at_all": sum(not r["json_anywhere"] for r in flagged),
+        }
+    (out / "summary.json").write_text(json.dumps(result, indent=1), encoding="utf-8")
     print(json.dumps(result, indent=1))
     return 0
 
