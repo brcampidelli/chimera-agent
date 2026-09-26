@@ -252,6 +252,10 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
     def task(idx: int, inst: dict[str, Any], arm: str) -> str:
         iid = inst["instance_id"]
         try:
+            # Checked first: after the cutoff an item must not be admitted or have its template built
+            # (block 1 spent its last 25 minutes cloning templates for solves that never started).
+            if start_until and time.monotonic() - block_start > start_until:
+                return f"{arm}>"  # not started; the next block runs it
             with item_lock[iid]:
                 if iid not in admitted:
                     # The budget is checked per ITEM, when its first arm starts, so an admitted item
@@ -269,7 +273,7 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
             if arm in halted_arms:
                 return f"{arm}-"
             if start_until and time.monotonic() - block_start > start_until:
-                return f"{arm}>"  # not started; the next block runs it
+                return f"{arm}>"  # the item was admitted before the cutoff; this arm waits for the next block
             row = solve_with_retry(inst, arm)
             row["item_index"] = idx
             with _LOCK:

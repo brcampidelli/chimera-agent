@@ -208,3 +208,9 @@ That is deliberate. For the model every fresh install spends on, −5 pp is the 
   - The driver now kills each such solve's process group on SIGTERM, and appends the calls it had made (from a per-solve call log) to `results/killed_solves.jsonl`.
   - That spend counts against the cap. The solve is re-run from scratch, and nothing partial is graded.
   - The runner also kills any orphan solve of this bench before a block starts.
+
+## Amendment 2 — 2026-09-26, after main block 1: the start cutoff is checked before an item is admitted
+
+Block 1 recorded 68 solves and killed none. But its cutoff was checked only after an item had been admitted and its template built, so the block spent its last 25 minutes cloning django templates for solves that never started. The cutoff is now checked first.
+
+Nothing a solve sees changes, and no data is discarded: the cutoff only decides when a solve starts, and every recorded solve ran whole.
