@@ -23,7 +23,7 @@ for p in (REPO, REPO / "bench" / "prompt_overlays", HERE):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from bakeoff import MAIN, PILOT, RESULTS, SLICE, load_jsonl, solve_usd  # noqa: E402
+from bakeoff import KILLED, MAIN, PILOT, RESULTS, SLICE, load_jsonl, solve_usd  # noqa: E402
 from bakeoff_arms import ARMS, ORDER, cost  # noqa: E402
 from report import (  # noqa: E402  — bench/prompt_overlays/report.py
     DJANGO_FETCH,
@@ -256,8 +256,9 @@ def report(phase: str = "main") -> dict[str, Any]:
                                  if (c.get("provider") or "").lower() != ARMS[a].provider.lower())
                           for a in arms_present},
     }
+    out["usd_killed_at_block_end"] = round(sum(solve_usd(r) for r in load_jsonl(KILLED)), 4)
     out["usd_all"] = round(sum(solve_usd(r) + solve_usd(r, calls_key="retry_calls")
-                               for path in (PILOT, MAIN) for r in load_jsonl(path)), 4)
+                               for path in (PILOT, MAIN, KILLED) for r in load_jsonl(path)), 4)
     name = "summary.json" if phase == "main" else "pilot_summary.json"
     (RESULTS / name).write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
     return out

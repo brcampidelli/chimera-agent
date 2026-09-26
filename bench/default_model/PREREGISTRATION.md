@@ -176,3 +176,35 @@ That is deliberate. For the model every fresh install spends on, −5 pp is the 
 - **Settings.** Temperature is 0.2 where honoured and ignored on G. Reasoning effort is each model's default. Another setting could change any arm's result, and no arm was tuned.
 - **Small differences.** This n cannot tell A from a candidate within about ±8 pp (see the rule).
 - **An enforced wall beyond the proxy.** A command that unsets the proxy is counted, not stopped (H4/H5 Amendment 2).
+
+## Amendment 1 — 2026-09-26, after the pilot and before the main run: a registered stop overridden, and three harness mechanics
+
+**What the probe and the pilot showed.**
+- **Probe.** The wall holds. Each arm returned a parsed `read_file` call from its pinned provider. The billed cost equals the computed one on every call. G's billed 1.43e-5 USD is the standard endpoint's 0.10/0.50, not flex or fast. US$ 0.0001.
+- **Gate 1.** Every arm finished 8/8 solves, with 0 halts and 0 solves without a tool call. No arm is dropped.
+- **Gate 2 fired.** The pooled resolve rate is **29/32 = 90.6%**, above the registered 90% ceiling. The registered consequence is to stop and report. The first 8 items are 4 from each stratum, so this is not a stratum imbalance.
+- **Sizing.** Mean US$ per solve: A 0.0075, D 0.0145, G 0.0041, Q 0.0049; per item 0.0310; spend 0.248. So `n = min(208, ⌊(13 − 0.248) / (1.25 · 0.0310)⌋) = 208`, the whole slice.
+
+**The main run goes ahead. This overrides a registered stop, and this amendment was written after the gate's result was seen.** Every reading of the main run carries that label. The reasons:
+
+1. **Gate 2 guards one of the two paths of the adoption rule, not both.** A rate near the ceiling leaves little room for the "significantly better" path. It does the opposite to the paths the pilot says are live:
+   - it lowers p_d, which narrows the paired interval that the −5 pp bound is read on. At p_d ≈ 0.15 and n = 208, the half-width is about ±5 pp, against the ±8 pp the registration assumed;
+   - it does not touch cost per resolved at all. G and Q ran cheaper per solve than A in the pilot.
+
+   A stop would keep A by default, without measuring the comparisons this pilot says the rule can make.
+2. **The override changes whether data are collected, not how they are read.** No pilot solve enters a comparison, and the main run's data are fresh. The adoption rule, its margin, the sizing and the metrics are unchanged.
+3. **The gate's estimate is thin.** It rests on 8 items, and one more failure among 32 solves would have read 87.5%.
+
+**The cost to the reading.** The superiority path now has little power, and the results report the main run's pooled rate beside the decision. A reader who holds registered stops as absolute should read the decision below as not made.
+
+**Harness mechanics.** These do not change what any model sees, and apply to the main run only (the pilot ran without them).
+- **(a) `LITELLM_LOCAL_MODEL_COST_MAP=True` in the solve environment.**
+  - Behind the wall, LiteLLM's remote cost-map fetch fails and it keeps its bundled copy; the pilot's logs say so.
+  - The variable skips the three retries through the dead proxy. `import litellm` measured 80 s, then 37 s with the variable, on this machine under load.
+  - The map is the same either way.
+- **(b) Block start cutoff.** In a main block (`timeout 3000`), no solve starts after 1500 s. A solve not started runs in the next block. The point is that in-flight solves finish inside the block.
+- **(c) Solves cut at a block's end.**
+  - Each solve runs in its own session, so the driver's `timeout` did not reach it. It would have outlived the driver, and collided with the next block's copy of the same item and arm, which uses the same workspace path.
+  - The driver now kills each such solve's process group on SIGTERM, and appends the calls it had made (from a per-solve call log) to `results/killed_solves.jsonl`.
+  - That spend counts against the cap. The solve is re-run from scratch, and nothing partial is graded.
+  - The runner also kills any orphan solve of this bench before a block starts.

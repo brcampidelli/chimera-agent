@@ -16,6 +16,7 @@ already on file.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import os
@@ -43,6 +44,9 @@ POOL = REPO / "bench" / "prompt_overlays" / "results" / "pool_django.jsonl"
 SLICE = RESULTS / "slice.jsonl"
 PILOT = RESULTS / "pilot_solves.jsonl"
 MAIN = RESULTS / "main_solves.jsonl"
+#: Amendment 1: solves cut at a block's end, with the calls they had made. Never graded or paired;
+#: their spend counts against the cap.
+KILLED = RESULTS / "killed_solves.jsonl"
 STRATA = ("<15 min fix", "15 min - 1 hour")
 
 PILOT_N = 8
@@ -74,7 +78,7 @@ def solve_usd(row: dict[str, Any], *, calls_key: str = "calls") -> float:
 
 def spent() -> float:
     total = 0.0
-    for path in (PILOT, MAIN):
+    for path in (PILOT, MAIN, KILLED):
         for r in load_jsonl(path):
             total += solve_usd(r) + solve_usd(r, calls_key="retry_calls")
     probe = RESULTS / "probe.json"
@@ -123,6 +127,32 @@ def _rm(path: Path, under: Path) -> None:
         subprocess.run(["rm", "-rf", s], check=False)
 
 
+#: Amendment 1: the solves in flight, so a block's end can kill them and record what they spent.
+_IN_FLIGHT: dict[int, tuple[Path, dict[str, Any], str, Path]] = {}
+#: Amendment 1: set for the main run only (see PREREGISTRATION.md). Behind the wall LiteLLM's
+#: remote cost-map fetch always fails and it keeps its bundled copy; this skips the three retries.
+_SOLVE_ENV_EXTRA: dict[str, str] = {}
+
+
+def _on_block_end(signum: int, frame: Any) -> None:
+    """SIGTERM from the block's `timeout`: kill every solve in flight (each is its own session, so
+    it would otherwise outlive the driver and collide with the next block's copy of it), record the
+    calls each had made, and exit. Nothing partial is kept as a solve; its spend is kept."""
+    with _LOCK:
+        flying = list(_IN_FLIGHT.items())
+        for pid, (scratch, inst, arm, _ws) in flying:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(pid, signal.SIGKILL)
+            log = scratch / "calls.jsonl"
+            calls = [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines()
+                     if ln.strip()] if log.exists() else []
+            with KILLED.open("a", encoding="utf-8", newline="\n") as fh:
+                fh.write(json.dumps({"instance_id": inst["instance_id"], "arm": arm,
+                                     "killed": "block end", "calls": calls}) + "\n")
+    print(f"BLOCK END: killed {len(flying)} solves in flight; their calls are in {KILLED.name}", flush=True)
+    os._exit(143)
+
+
 def run_solve(inst: dict[str, Any], arm: str) -> dict[str, Any]:
     work = _work_dir()
     scratch = Path(tempfile.mkdtemp(prefix=f"dflt-{arm}-", dir=str(work)))
@@ -131,10 +161,15 @@ def run_solve(inst: dict[str, Any], arm: str) -> dict[str, Any]:
     home.mkdir()
     inst_path.write_text(json.dumps(inst), encoding="utf-8")
     ws = work / f"{arm}__{inst['instance_id']}"
+    env = _child_env(home)
+    env["BAKEOFF_CALLS_LOG"] = str(scratch / "calls.jsonl")
+    env.update(_SOLVE_ENV_EXTRA)
     started = time.monotonic()
-    proc = subprocess.Popen([sys.executable, str(HERE / "bakeoff_solve.py"), str(inst_path), arm, str(out_path)],
-                            env=_child_env(home), stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
-                            start_new_session=True)
+    with _LOCK:
+        proc = subprocess.Popen([sys.executable, str(HERE / "bakeoff_solve.py"), str(inst_path), arm,
+                                 str(out_path)], env=env, stdout=subprocess.DEVNULL,
+                                stderr=subprocess.PIPE, start_new_session=True)
+        _IN_FLIGHT[proc.pid] = (scratch, inst, arm, ws)
     timed_out = False
     try:
         _, err = proc.communicate(timeout=TIMEOUT_S)
@@ -142,6 +177,9 @@ def run_solve(inst: dict[str, Any], arm: str) -> dict[str, Any]:
         timed_out = True
         os.killpg(proc.pid, signal.SIGKILL)
         _, err = proc.communicate()
+    finally:
+        with _LOCK:
+            _IN_FLIGHT.pop(proc.pid, None)
     if out_path.exists() and not timed_out:
         row = json.loads(out_path.read_text(encoding="utf-8"))
     else:
@@ -181,12 +219,21 @@ def ensure_reference() -> None:
         raise SystemExit(f"no django reference at {ref}; the setup script clones it")
 
 
-def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Path, workers: int) -> None:
+def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Path, workers: int,
+              start_until: float = 0.0) -> None:
+    """``start_until`` (Amendment 1): seconds into this block after which no solve STARTS; a solve
+    not started runs in the next block. 0 means no cutoff (the pilot ran without one)."""
     from solve_one import build_template, template_path  # bench/prompt_overlays
 
     assert_frozen()
     ensure_reference()
     work = _work_dir()
+    # No solve of this bench is in flight when a driver starts (the runner checks), so a scratch
+    # dir left by a killed block is garbage.
+    for leftover in work.glob("dflt-*"):
+        _rm(leftover, work)
+    signal.signal(signal.SIGTERM, _on_block_end)
+    block_start = time.monotonic()
     done = {(r["instance_id"], r["arm"]) for r in load_jsonl(out)}
     state: dict[str, Any] = {"stopped": "", "usd": spent()}
     admitted: dict[str, bool] = {}
@@ -221,6 +268,8 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
                 return f"{arm}$"
             if arm in halted_arms:
                 return f"{arm}-"
+            if start_until and time.monotonic() - block_start > start_until:
+                return f"{arm}>"  # not started; the next block runs it
             row = solve_with_retry(inst, arm)
             row["item_index"] = idx
             with _LOCK:
@@ -395,6 +444,7 @@ if __name__ == "__main__":
     m.add_argument("--n", type=int, required=True)
     m.add_argument("--arms", default=",".join(ORDER))
     m.add_argument("--workers", type=int, default=16)
+    m.add_argument("--start-until", type=float, default=1500.0)
     pr = sub.add_parser("predictions")
     pr.add_argument("phase", choices=("pilot", "main"))
     pr.add_argument("outdir", type=Path)
@@ -413,6 +463,8 @@ if __name__ == "__main__":
         arms = [a for a in args.arms.split(",") if a]
         if "A" not in arms or any(a not in ARMS for a in arms):
             raise SystemExit(f"bad arms {arms}")
-        run_items(list(enumerate(load_jsonl(SLICE)[: args.n])), arms, MAIN, args.workers)
+        _SOLVE_ENV_EXTRA["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"  # Amendment 1
+        run_items(list(enumerate(load_jsonl(SLICE)[: args.n])), arms, MAIN, args.workers,
+                  start_until=args.start_until)
     elif args.cmd == "predictions":
         predictions(args.phase, args.outdir)

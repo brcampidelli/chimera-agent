@@ -1,0 +1,145 @@
+{
+  "wall": {
+    "curl_github": {
+      "blocked": true,
+      "rc": 7,
+      "tail": "000curl: (7) Failed to connect to 127.0.0.1 port 9 after 4 ms: Couldn't connect to server\n"
+    },
+    "pip_download": {
+      "blocked": true,
+      "rc": 1,
+      "tail": "/usr/bin/python3: No module named pip\n"
+    },
+    "git_ls_remote": {
+      "blocked": true,
+      "rc": 128,
+      "tail": "fatal: unable to access 'https://github.com/django/django/': Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server\n"
+    },
+    "python_urllib": {
+      "blocked": true,
+      "rc": 1,
+      "tail": "le \"/usr/lib/python3.12/urllib/request.py\", line 1347, in do_open\n    raise URLError(err)\nurllib.error.URLError: <urlopen error [Errno 111] Connection refused>\n"
+    }
+  },
+  "arms": {
+    "A": {
+      "tool_call_parsed": true,
+      "served": "DeepInfra",
+      "on_pin": true,
+      "rec": {
+        "prompt": 278,
+        "completion": 63,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 2.802e-05,
+        "reasoning": 17,
+        "gen_id": "gen-1790396254-UrbXdyTuF1p6EputguNM",
+        "seconds": 1.6
+      },
+      "calls": [
+        [
+          "read_file",
+          {
+            "path": "setup.py"
+          }
+        ]
+      ],
+      "tail": ""
+    },
+    "D": {
+      "tool_call_parsed": true,
+      "served": "DeepInfra",
+      "on_pin": true,
+      "rec": {
+        "prompt": 293,
+        "completion": 49,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 6.16e-05,
+        "reasoning": 0,
+        "gen_id": "gen-1790396391-HuM9dmOVMcKLq3fbxESL",
+        "seconds": 2.03
+      },
+      "calls": [
+        [
+          "read_file",
+          {
+            "path": "setup.py"
+          }
+        ]
+      ],
+      "tail": ""
+    },
+    "G": {
+      "tool_call_parsed": true,
+      "served": "OpenAI",
+      "on_pin": true,
+      "rec": {
+        "prompt": 48,
+        "completion": 19,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 1.43e-05,
+        "reasoning": 0,
+        "gen_id": "gen-1790396425-7lngi7Jg6tRxNpgNFgwo",
+        "seconds": 1.37
+      },
+      "calls": [
+        [
+          "read_file",
+          {
+            "path": "setup.py"
+          }
+        ]
+      ],
+      "tail": ""
+    },
+    "Q": {
+      "tool_call_parsed": true,
+      "served": "Alibaba",
+      "on_pin": true,
+      "rec": {
+        "prompt": 273,
+        "completion": 199,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 3.406e-05,
+        "reasoning": 171,
+        "gen_id": "gen-1790396430-YgHXtUcrsXPnwwXC0JB5",
+        "seconds": 3.79
+      },
+      "calls": [
+        [
+          "read_file",
+          {
+            "path": "setup.py"
+          }
+        ]
+      ],
+      "tail": ""
+    }
+  },
+  "wall_holds": true,
+  "arms_ok": true,
+  "usd": 0.00013798
+}

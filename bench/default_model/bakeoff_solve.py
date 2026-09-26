@@ -19,6 +19,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import sys
 import time
 import traceback
@@ -98,7 +99,7 @@ class Recorder:
         before = len(_TAP)
         result = self.gateway.complete(messages, **kwargs)
         raw = _TAP[-1] if len(_TAP) > before else {}
-        self.calls.append({
+        self._record({
             "prompt": result.prompt_tokens, "completion": result.completion_tokens,
             "cache_read": result.cache_read_tokens, "provider": result.provider,
             "finish": result.finish_reason, "temperature": kwargs.get("temperature"),
@@ -108,6 +109,16 @@ class Recorder:
             "seconds": round(time.monotonic() - started, 2),
         })
         return result
+
+    def _record(self, call: dict[str, Any]) -> None:
+        """Keep the call, and (Amendment 1) append it to the driver's per-solve log as it happens,
+        so a solve cut at a block's end still leaves what it spent."""
+        self.calls.append(call)
+        path = os.environ.get("BAKEOFF_CALLS_LOG")
+        if path:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(call) + "\n")
+                fh.flush()
 
 
 def tool_errors(transcript: list[Any]) -> dict[str, int]:
