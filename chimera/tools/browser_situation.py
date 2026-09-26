@@ -32,13 +32,18 @@ matched only in its visible form (a reCAPTCHA or hCaptcha checkbox, not their in
   :data:`_MIN_WIDGET_PX` on each side, since the tree also holds the hidden frames the HTML rules
   exclude by their address.
 
+Measured on live pages (`RESULTS-walls-v2.md`): both channels found fresh walls v1 missed (a
+Turnstile only in the tree, two reCAPTCHAs only after the wait), and the tree's hidden provider
+frames on ordinary pages stopped nothing — but it found 9 of 15 fresh walls, so it stays off.
+
 **What it cannot see.** A wall drawn inside a cross-origin frame the list above does not name; a
 login that asks for the account first and the password on the next page (it hands over on that next
 page, or on the identity providers named in :data:`_SIGN_IN_HOSTS`); an input field inside a shadow
-root, which neither the HTML nor the ref stamp reaches; a widget that arrives after the settle wait
-ran out, or that the page builds with no later action looking again. A probe that fails is logged
-and treated as no wall: the stop is a courtesy to the person, and the boundary is governance, not
-this scan.
+root, which neither the HTML nor the ref stamp reaches; a widget that arrives after ``load`` (one
+fresh hCaptcha came milliseconds later) or after the wait ran out, until a later action looks again;
+a block page that carries no challenge marker (Cloudflare's "Attention Required"). A probe that
+fails is logged and treated as no wall: the stop is a courtesy to the person, and the boundary is
+governance, not this scan.
 """
 
 from __future__ import annotations
