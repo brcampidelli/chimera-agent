@@ -34,6 +34,9 @@ DANGER = Choice(
     options=("BLOCK", "REVIEW", "ALLOW"),
     event=("BLOCK", "REVIEW"),
     event_name="dangerous",
+    # The hosted backend asks for JSON, so it drops this sentence (arm V′ of
+    # bench/jev_decisions/RESULTS-one-schema.md); the local backend's map was fitted with it.
+    answer_format="Reply with exactly one word: BLOCK, REVIEW, or ALLOW.",
 )
 
 SPEC = register(DecisionSpec(

@@ -1,14 +1,16 @@
-"""Two contradictions inside a single prompt (study 25, `bench/PLAN-study25-system-prompts.md` §4, defect 5).
+"""Three contradictions inside a single prompt.
+
+Study 25, `bench/PLAN-study25-system-prompts.md` §4, defect 5.
 
 1. **The solve nudge.** The default prompt allows up to three blocking questions. When a `solve`
    answered with them, the only nudge it got said it "described a solution but did not carry it
    out". That is false of a question, and it left the question standing in a run nobody answers.
 2. **The fusion panel.** The panel receives the agent loop's messages, whose default prompt says to
    use the provided tools. The panel has no tools. It now says so.
-
-The third contradiction the study found is the hosted governance prompt asking for "exactly one word"
-and then for JSON. It is recorded in the registry instead of edited, because that instrument is pinned
-to the bench that measured it.
+3. **The hosted governance prompt.** It asked for "exactly one word" and then for a JSON object.
+   That instrument is pinned to the bench that measured it, so the fix was a measured arm, not an
+   edit: `bench/jev_decisions/RESULTS-one-schema.md` found the one-instruction text non-inferior,
+   and the hosted backend now sends it.
 """
 
 from __future__ import annotations
@@ -22,6 +24,8 @@ from chimera.core.agent import (
     AgentConfig,
     _looks_like_questions,
 )
+from chimera.decisions.governance import DANGER, JUDGE_TEXT
+from chimera.decisions.hosted import HostedVerbalizedBackend
 from chimera.fusion.engine import _NO_TOOLS_NOTE, FusionConfig, FusionEngine
 from chimera.providers.gateway import CompletionResult, Message, ToolCall
 from chimera.tools.builtin import EchoTool
@@ -100,3 +104,11 @@ def test_a_panel_call_without_a_system_message_gets_one() -> None:
     engine = FusionEngine(panel_backend, FusionConfig(panel=["m1"], judge="j", synthesizer="s"))  # type: ignore[arg-type]
     engine._run_panel([{"role": "user", "content": "hi"}])
     assert panel_backend.calls[0][0] == {"role": "system", "content": _NO_TOOLS_NOTE}
+
+
+def test_the_hosted_governance_prompt_asks_for_one_output_format() -> None:
+    text = HostedVerbalizedBackend(None, "m").system_text(DANGER)
+    assert "exactly one word" not in text
+    assert text.count("Reply with") == 1 and "JSON object" in text
+    # The judge's own text keeps its reply line: the one-word judge and the local backend send it.
+    assert JUDGE_TEXT.endswith("Reply with exactly one word: BLOCK, REVIEW, or ALLOW.")

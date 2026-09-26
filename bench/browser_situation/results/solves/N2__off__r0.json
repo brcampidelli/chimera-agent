@@ -1,0 +1,58 @@
+{
+ "task": "N2",
+ "arm": "off",
+ "replica": 0,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.003118655,
+ "answer": "SM5020N",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 7,
+ "tool_calls": 6,
+ "prompt_tokens": 43455,
+ "completion_tokens": 919,
+ "cache_read_tokens": 33536,
+ "usd": 0.001248,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "cf2990376b4d",
+ "module_in_prompt": false,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "read_text",
+  "navigate",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 31364,
+ "seconds": 24.1,
+ "requested_paths": [
+  "/news/index.html",
+  "/go/news/section-page-science",
+  "/news/index.html",
+  "/go/news/story-10-2"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 2
+ }
+}

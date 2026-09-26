@@ -168,6 +168,7 @@ class MessagingManager:
                 memory=self._memory,
                 graph=self._graph,
                 remember_from_chat=self._settings.remember_from_chat,
+                real_history=self._settings.chat_real_history,
             )
 
         return MessageGateway(factory).on_message

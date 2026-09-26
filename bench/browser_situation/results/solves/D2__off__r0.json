@@ -1,0 +1,47 @@
+{
+ "task": "D2",
+ "arm": "off",
+ "replica": 0,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.001303655,
+ "answer": "37.5 seconds",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 3,
+ "tool_calls": 2,
+ "prompt_tokens": 19303,
+ "completion_tokens": 153,
+ "cache_read_tokens": 2304,
+ "usd": 0.000473,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "2adc7fccec88",
+ "module_in_prompt": false,
+ "browser_calls": [
+  "navigate",
+  "find"
+ ],
+ "observation_chars": 24186,
+ "seconds": 8.1,
+ "requested_paths": [
+  "/docs/widgets-core.html"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}

@@ -18,8 +18,10 @@ byte where a map depends on it:
   fitted leave-one-family-out it reaches Brier 0.135, ECE 0.085 — at the floor — and the hosted
   judge's operating point, at US$ 0 and 0.75 s a call. **The default.**
 * :class:`~chimera.decisions.hosted.HostedVerbalizedBackend` — the configured chat model asked for
-  a verbalized probability with the over-confidence advisory, reasoning off, a wide budget and one
-  re-ask on an empty answer. AUROC 0.886, Brier 0.097, ECE 0.051 on the same slice; 4–5 s a call.
+  a verbalized probability with the over-confidence advisory, the model's default reasoning (the
+  "reasoning off" it was measured with never reached the provider — see its module docstring), a
+  wide budget, one output format, and one re-ask on an empty answer. AUROC 0.886, Brier 0.097,
+  ECE 0.051 on the same slice; 4–5 s a call.
 * :class:`~chimera.decisions.openrouter.OpenRouterDecisionsBackend` — OpenRouter's Decisions API
   (a typed-decision model behind it, pinned), 0.34 s a call, deterministic, 5–8× fewer framing flips
   than either model backend — and over-confident in the middle of its scale (p̄ 0.60 → 27% correct),

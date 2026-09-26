@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 from chimera.config import get_settings
-from chimera.providers.gateway import Message, MissingCredentialsError
+from chimera.providers.gateway import CredentialRejectedError, Message, MissingCredentialsError
 
 
 def _short(error: str, *, limit: int = 200) -> str:
@@ -47,6 +47,12 @@ def test_provider(model: str | None = None) -> dict[str, Any]:
             max_tokens=1,
             timeout=20,  # a hung provider must fail the test in ~20s, not block the request
         )
+    except CredentialRejectedError as exc:
+        # Before the branch below, which it would otherwise fall into as a subclass: a key the
+        # provider refused, an empty balance or a 429 is a key that IS configured, and a 429 from
+        # the provider's shared pool is one the key had nothing to do with. The gateway's message
+        # says which; "No provider key configured" said the one thing that was false in all three.
+        return {"ok": False, "model": resolved, "error": _short(str(exc))}
     except MissingCredentialsError:
         return {"ok": False, "model": resolved, "error": "No provider key configured."}
     except Exception as exc:  # noqa: BLE001 — any provider/network error is a failed test, not a crash

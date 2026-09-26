@@ -1,0 +1,124 @@
+{
+  "flat": {
+    "requests": 17,
+    "chars_sent": 56428,
+    "chars_reusable": 37790,
+    "chars_not_reusable": 18638,
+    "reusable_share": 0.6697,
+    "first_request_of_each_turn": [
+      {
+        "turn": 1,
+        "sent": 2113,
+        "reusable": 0
+      },
+      {
+        "turn": 2,
+        "sent": 2413,
+        "reusable": 1669
+      },
+      {
+        "turn": 3,
+        "sent": 2720,
+        "reusable": 1669
+      },
+      {
+        "turn": 4,
+        "sent": 3001,
+        "reusable": 1669
+      },
+      {
+        "turn": 5,
+        "sent": 3288,
+        "reusable": 1669
+      },
+      {
+        "turn": 6,
+        "sent": 3556,
+        "reusable": 1668
+      },
+      {
+        "turn": 7,
+        "sent": 3878,
+        "reusable": 1669
+      },
+      {
+        "turn": 8,
+        "sent": 3850,
+        "reusable": 1669
+      },
+      {
+        "turn": 9,
+        "sent": 3847,
+        "reusable": 1669
+      },
+      {
+        "turn": 10,
+        "sent": 3851,
+        "reusable": 1669
+      }
+    ],
+    "first_requests_turns_2_7_reusable": 10013,
+    "first_requests_turns_8_10_reusable": 5007
+  },
+  "real": {
+    "requests": 17,
+    "chars_sent": 65723,
+    "chars_reusable": 45395,
+    "chars_not_reusable": 20328,
+    "reusable_share": 0.6907,
+    "first_request_of_each_turn": [
+      {
+        "turn": 1,
+        "sent": 2196,
+        "reusable": 0
+      },
+      {
+        "turn": 2,
+        "sent": 2643,
+        "reusable": 1414
+      },
+      {
+        "turn": 3,
+        "sent": 2956,
+        "reusable": 1872
+      },
+      {
+        "turn": 4,
+        "sent": 3569,
+        "reusable": 2162
+      },
+      {
+        "turn": 5,
+        "sent": 3862,
+        "reusable": 2782
+      },
+      {
+        "turn": 6,
+        "sent": 4299,
+        "reusable": 3074
+      },
+      {
+        "turn": 7,
+        "sent": 4627,
+        "reusable": 3540
+      },
+      {
+        "turn": 8,
+        "sent": 4762,
+        "reusable": 1414
+      },
+      {
+        "turn": 9,
+        "sent": 4759,
+        "reusable": 1414
+      },
+      {
+        "turn": 10,
+        "sent": 4600,
+        "reusable": 1414
+      }
+    ],
+    "first_requests_turns_2_7_reusable": 14844,
+    "first_requests_turns_8_10_reusable": 4242
+  }
+}

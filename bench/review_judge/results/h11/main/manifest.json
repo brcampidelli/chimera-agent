@@ -1,0 +1,64 @@
+{
+  "blocks": [
+    {
+      "started": 1790386689.9,
+      "seconds": 2653.6,
+      "wrote": 287,
+      "rows_after": 287,
+      "usd_after": 3.4798,
+      "stop": null,
+      "workers": 12
+    },
+    {
+      "started": 1790389469.2,
+      "seconds": 2461.6,
+      "wrote": 308,
+      "rows_after": 595,
+      "usd_after": 5.972,
+      "stop": null,
+      "workers": 12
+    },
+    {
+      "started": 1790392321.1,
+      "seconds": 2468.4,
+      "wrote": 219,
+      "rows_after": 814,
+      "usd_after": 7.8774,
+      "stop": null,
+      "workers": 12
+    }
+  ],
+  "mode": "run",
+  "judge_model": "openrouter/deepseek/deepseek-r1",
+  "provider_pin": {
+    "order": [
+      "Novita"
+    ],
+    "allow_fallbacks": false,
+    "how": "extra_body on every call"
+  },
+  "price_usd_per_token": {
+    "prompt": 7e-07,
+    "completion": 2.5e-06
+  },
+  "temperature": 0.0,
+  "thinking": "not passed \u2014 the model's default reasoning, as in the August runs",
+  "seed": 20260819,
+  "window_lines": 60,
+  "replay_n": 200,
+  "prompt_sha": {
+    "A": "60a2749ed8c9",
+    "T": "5548fe16010b"
+  },
+  "a_prompt_sha_published": "60a2749ed8c9",
+  "settings": {
+    "cache": false,
+    "prompt_cache": false,
+    "completion_ceiling": 0,
+    "request_timeout": 600.0,
+    "provider_order_env": "",
+    "fallback_models": []
+  },
+  "chimera_version": "0.61.2",
+  "litellm_version": "1.102.1"
+}

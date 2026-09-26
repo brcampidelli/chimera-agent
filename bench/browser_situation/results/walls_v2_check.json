@@ -1,0 +1,236 @@
+{
+ "summary": {
+  "pages": 32,
+  "handovers": [],
+  "different_observations": [],
+  "errors": [],
+  "on_seconds_max": 0.537,
+  "m2_still_valid": true
+ },
+ "rows": [
+  {
+   "path": "/docs/widgets-core.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.126,
+   "error": false
+  },
+  {
+   "path": "/go/docs/changelog",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.022,
+   "error": false
+  },
+  {
+   "path": "/go/docs/module-sensors-thermal",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.031,
+   "error": false
+  },
+  {
+   "path": "/forum/thread-4412.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.045,
+   "error": false
+  },
+  {
+   "path": "/go/forum/user-ines_r",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.025,
+   "error": false
+  },
+  {
+   "path": "/go/forum/user-halvard_n",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.023,
+   "error": false
+  },
+  {
+   "path": "/go/forum/reply-c119",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.023,
+   "error": false
+  },
+  {
+   "path": "/go/forum/thread-4412-page-2",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.025,
+   "error": false
+  },
+  {
+   "path": "/gov/services.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.038,
+   "error": false
+  },
+  {
+   "path": "/go/gov/renew-your-passport",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.023,
+   "error": false
+  },
+  {
+   "path": "/go/gov/ombudsman",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.022,
+   "error": false
+  },
+  {
+   "path": "/news/index.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.055,
+   "error": false
+  },
+  {
+   "path": "/go/news/top-story",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.023,
+   "error": false
+  },
+  {
+   "path": "/go/news/story-10-2",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.02,
+   "error": false
+  },
+  {
+   "path": "/go/news/corrections",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.022,
+   "error": false
+  },
+  {
+   "path": "/pkg/acme-widgets.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.068,
+   "error": false
+  },
+  {
+   "path": "/go/pkg/readme-issue-tracker",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.022,
+   "error": false
+  },
+  {
+   "path": "/go/pkg/project-issues",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.021,
+   "error": false
+  },
+  {
+   "path": "/go/pkg/release-3.8.2",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.02,
+   "error": false
+  },
+  {
+   "path": "/repo/acme-widgets.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.047,
+   "error": false
+  },
+  {
+   "path": "/go/repo/tab-issues",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.019,
+   "error": false
+  },
+  {
+   "path": "/go/repo/file-contributing-md",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.02,
+   "error": false
+  },
+  {
+   "path": "/go/repo/discussion-forum",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.019,
+   "error": false
+  },
+  {
+   "path": "/shop/lamps.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.076,
+   "error": false
+  },
+  {
+   "path": "/shop/search.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.024,
+   "error": false
+  },
+  {
+   "path": "/go/shop/lamps-page-3",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.018,
+   "error": false
+  },
+  {
+   "path": "/go/shop/cart",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.021,
+   "error": false
+  },
+  {
+   "path": "/wiki/tidal-power.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.537,
+   "error": false
+  },
+  {
+   "path": "/go/wiki/rance-tidal-power-station",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.112,
+   "error": false
+  },
+  {
+   "path": "/go/wiki/dynamic-tidal-power",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.086,
+   "error": false
+  },
+  {
+   "path": "/go/wiki/book-barrages-and-their-discontents",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.107,
+   "error": false
+  },
+  {
+   "path": "/shop/product.html",
+   "same": true,
+   "handover": "",
+   "on_seconds": 0.086,
+   "error": false
+  }
+ ]
+}

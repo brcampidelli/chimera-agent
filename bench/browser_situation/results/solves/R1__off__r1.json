@@ -1,0 +1,50 @@
+{
+ "task": "R1",
+ "arm": "off",
+ "replica": 1,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.00078304,
+ "answer": "BQ9086C",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 4,
+ "tool_calls": 3,
+ "prompt_tokens": 10816,
+ "completion_tokens": 250,
+ "cache_read_tokens": 5376,
+ "usd": 0.000318,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "cf2990376b4d",
+ "module_in_prompt": false,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 6130,
+ "seconds": 27.8,
+ "requested_paths": [
+  "/repo/acme-widgets.html",
+  "/go/repo/tab-issues"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}

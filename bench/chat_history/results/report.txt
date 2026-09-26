@@ -1,0 +1,17 @@
+model openrouter/deepseek/deepseek-v4-flash-0731 via DeepInfra  units 128/128  US$0.2934 (+0.0207 before)  stop: none
+
+  FLAT: 119/128 = 0.930 [0.872, 0.963]  halts 0  no-code 2  empty replies 0  US$0.1438 (per success 0.00121)  prompt 856186 cached 327936 (0.383)  final out 1058  skills in 640/640 calls  53s/conv
+  REAL: 114/128 = 0.891 [0.825, 0.934]  halts 0  no-code 1  empty replies 0  US$0.1392 (per success 0.00122)  prompt 763021 cached 328960 (0.431)  final out 1117  skills in 380/640 calls  56s/conv
+NOHIST: 1/32 = 0.031 [0.006, 0.157]  halts 0  no-code 25  empty replies 0  US$0.0104 (per success 0.01040)  prompt 19584 cached 8192 (0.418)  final out 1602  skills in 32/32 calls  29s/conv
+
+positive control: NOHIST 0.031 vs FLAT r0 0.938 -> holds True
+standing check: REAL r0 0.875 (H7 SHARDED-A 29/32 = 0.906; >= 0.75) -> holds True
+PRIMARY REAL - FLAT: task-level mean -0.039, cluster bootstrap 95% [-0.102, +0.016] over 32 tasks; sign-flip p=0.3438
+  pairs n=128: 0.891 vs 0.930, diff -0.039 Newcombe [-0.103, +0.022], FLAT-only 10 REAL-only 5, McNemar p=0.3018
+non-inferior (lower >= -0.10): False; harmful: False; guards {'no_code': True, 'cost_per_success': True, 'halts': True}
+replay floor FLAT: mixed tasks 6/32, pairwise disagreement 0.099
+replay floor REAL: mixed tasks 7/32, pairwise disagreement 0.125
+
+cache: {"offline_flat_not_reusable": 18638, "offline_real_not_reusable": 20328, "offline_flat_share": 0.6697, "offline_real_share": 0.6907, "live_real_fewer_uncached_in_both_orders": false, "live_flat_uncached": 25252, "live_real_uncached": 39216, "live_flat_share": 0.8421, "live_real_share": 0.7648, "live_usd": 0.020731979999999997}
+
+VERDICT: NOT SHOWN NON-INFERIOR: do not recommend flipping

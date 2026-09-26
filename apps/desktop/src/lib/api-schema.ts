@@ -3316,6 +3316,11 @@ export interface components {
             side_effects: string[];
             /** Success */
             success: boolean;
+            /**
+             * System Sha
+             * @default
+             */
+            system_sha: string;
             /** Verified */
             verified: boolean;
             /** Verify Output */
@@ -4000,6 +4005,7 @@ export interface components {
             autonomy: components["schemas"]["AutonomyCfgOut"];
             browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
+            experimental?: components["schemas"]["ExperimentalCfgOut"];
             fusion?: components["schemas"]["FusionCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
@@ -4821,6 +4827,32 @@ export interface components {
             timeout: number;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * ExperimentalCfgOut
+         * @description Three study-25 modules that ship behind a switch, each OFF because its measurement did not
+         *     recommend it (the reason sits beside each field in ``chimera/config.py``).
+         *
+         *     Readable here so the Settings screen can offer them with the measured caveat on the row, instead
+         *     of leaving them to people who read the source. Defaults mirror ``Settings``: a server that does
+         *     not send this block is a server where all three are off.
+         */
+        ExperimentalCfgOut: {
+            /**
+             * Browser Situation
+             * @default false
+             */
+            browser_situation: boolean;
+            /**
+             * Explorer Contract
+             * @default false
+             */
+            explorer_contract: boolean;
+            /**
+             * Research Agent
+             * @default false
+             */
+            research_agent: boolean;
         };
         /**
          * ExternalAgentOut

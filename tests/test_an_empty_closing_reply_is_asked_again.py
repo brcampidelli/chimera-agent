@@ -76,3 +76,49 @@ def test_the_loop_breaker_closing_is_asked_again_too() -> None:
     assert result.stopped_reason == "tool_loop"
     assert result.answer == "Stopped repeating echo; nothing else to do."
     assert len(backend.closing_prompts) == 2
+
+
+# --------------------------------------------------- the natural ending, found by bench/web_research
+
+
+class _Natural:
+    """One tool call, then a natural ending (no tool call) with `ending` as its text; the closing
+    calls — made without tools — answer from `closings`."""
+
+    def __init__(self, ending: str, closings: list[str]) -> None:
+        self.ending = ending
+        self.closings = list(closings)
+        self.calls = 0
+        self.closing_prompts: list[str] = []
+
+    def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+        self.calls += 1
+        if tools is None:
+            self.closing_prompts.append(str(messages[-1]["content"]))
+            return CompletionResult(content=self.closings.pop(0), model="fake")
+        if self.calls == 1:
+            return TOOL_TURN
+        return CompletionResult(content=self.ending, model="fake")
+
+
+def test_an_empty_natural_ending_is_asked_once_more() -> None:
+    backend = _Natural("", ["Echoed x; that was the whole task."])
+    result = Agent(backend, _registry(), AgentConfig(max_steps=8)).run("echo x")
+    assert result.stopped_reason == "final"
+    assert result.answer == "Echoed x; that was the whole task."
+    assert backend.closing_prompts == [_EMPTY_CLOSE_NUDGE]
+
+
+def test_a_natural_ending_with_text_costs_no_extra_call() -> None:
+    backend = _Natural("Echoed x.", ["never asked"])
+    result = Agent(backend, _registry(), AgentConfig(max_steps=8)).run("echo x")
+    assert result.answer == "Echoed x."
+    assert backend.closing_prompts == []
+
+
+def test_an_empty_natural_ending_asked_twice_says_so() -> None:
+    backend = _Natural("", [""])
+    result = Agent(backend, _registry(), AgentConfig(max_steps=8)).run("echo x")
+    assert result.stopped_reason == "final"
+    assert result.answer.startswith("(No final answer:")
+    assert "echo" in result.answer

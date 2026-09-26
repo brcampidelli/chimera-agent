@@ -23,6 +23,7 @@ import pytest
 
 from chimera.config import Settings
 from chimera.providers.catalog import _PRESETS, PROVIDERS
+from chimera.review.family import MEASURED_REVIEWERS
 
 #: Substrings that mark a slug as one a vendor may withdraw or repoint under you.
 FRAGIL = ("preview", "-beta", "-exp", ":free", "-latest")
@@ -59,6 +60,9 @@ def _todos_os_padroes() -> dict[str, str]:
             tudo[f"_PRESETS[{modo}].{papel}"] = getattr(escada, papel)
     for p in PROVIDERS:
         tudo[f"PROVIDERS[{p.label}].default_model"] = p.default_model
+    # The reviewer `chimera review` picks when nobody names one is a default like any other.
+    for i, m in enumerate(MEASURED_REVIEWERS):
+        tudo[f"MEASURED_REVIEWERS[{i}]"] = m
     return tudo
 
 

@@ -1,0 +1,181 @@
+"""The reviewer comes from a different model family than the author, unless someone chose otherwise.
+
+`chimera.api.roles.review_model_for` stops the reviewer being the same model as the editor. A
+sibling from the same vendor shares the author's training and taste, so the family is the unit here
+(study 25 §2.9). A slug is a route, so the family is read from the vendor segment when there is one.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+from pathlib import Path
+
+import pytest
+
+from chimera.cli import review_cmd
+from chimera.config import get_settings
+from chimera.review import CautiousVerifier, choose_reviewer, collect, model_family, review
+from chimera.review.family import MEASURED_REVIEWERS
+from tests.review_fakes import FakeBackend, finder_json, finding, repo_with_change
+
+DEEPSEEK = "openrouter/deepseek/deepseek-v4-flash-0731"
+GLM = "openrouter/z-ai/glm-5.3"
+LUNA = "openrouter/openai/gpt-6-luna"
+MISTRAL = "openrouter/mistralai/mistral-small-3.2-24b-instruct"
+OPUS = "openrouter/anthropic/claude-opus-5"
+
+
+@pytest.mark.parametrize(("slug", "family"), [
+    (DEEPSEEK, "deepseek"),
+    ("deepseek/deepseek-chat", "deepseek"),
+    (GLM, "zhipu"),
+    (OPUS, "anthropic"),
+    ("anthropic/claude-opus-5", "anthropic"),
+    ("gemini/gemini-3.6-flash", "google"),
+    ("openai/gpt-5.6", "openai"),
+    ("openrouter/openai/gpt-oss-20b", "openai"),
+    (MISTRAL, "mistral"),
+    ("openrouter/moonshotai/kimi-k2", "moonshot"),
+    ("ollama_chat/qwen3:4b", "qwen"),
+    ("ollama/llama3", "meta"),
+])
+def test_a_slug_is_read_to_its_family(slug: str, family: str) -> None:
+    assert model_family(slug) == family
+
+
+def test_without_a_measured_reviewer_the_strongest_rung_of_another_family_reviews() -> None:
+    choice = choose_reviewer(DEEPSEEK, ladder=[GLM, DEEPSEEK, MISTRAL])
+
+    assert (choice.model, choice.source, choice.same_family) == (GLM, "tier ladder", False)
+
+
+def test_a_measured_reviewer_comes_before_the_ladder() -> None:
+    """`bench/review_reviewer`: the ladder's top rung came back empty on one review in five."""
+    choice = choose_reviewer(DEEPSEEK, measured=[LUNA, DEEPSEEK], ladder=[GLM])
+
+    assert (choice.model, choice.source, choice.same_family) == (LUNA, "measured", False)
+
+
+def test_an_author_from_the_first_measured_family_gets_the_next_entry() -> None:
+    choice = choose_reviewer(LUNA, measured=[LUNA, DEEPSEEK], ladder=[GLM])
+
+    assert (choice.model, choice.source) == (DEEPSEEK, "measured")
+
+
+def test_a_measured_reviewer_no_key_can_call_falls_through_to_the_ladder() -> None:
+    choice = choose_reviewer(DEEPSEEK, measured=[LUNA], ladder=[GLM], reachable={GLM})
+
+    assert (choice.model, choice.source) == (GLM, "tier ladder")
+
+
+def test_the_measured_list_leaves_no_author_without_another_family() -> None:
+    """Two families at least, so an author from either still gets a measured reviewer."""
+    families = [model_family(m) for m in MEASURED_REVIEWERS]
+
+    assert len(set(families)) >= 2
+    for author in MEASURED_REVIEWERS:
+        assert choose_reviewer(author, measured=MEASURED_REVIEWERS).source == "measured"
+
+
+def test_a_ladder_of_one_family_falls_through_to_the_panel() -> None:
+    choice = choose_reviewer(DEEPSEEK, ladder=[DEEPSEEK, DEEPSEEK], panel=[DEEPSEEK, OPUS])
+
+    assert (choice.model, choice.family) == (OPUS, "anthropic")
+
+
+def test_a_model_no_key_can_call_is_skipped() -> None:
+    choice = choose_reviewer(DEEPSEEK, ladder=[GLM, MISTRAL], reachable={MISTRAL})
+
+    assert choice.model == MISTRAL
+
+
+def test_with_nothing_else_reachable_the_author_reviews_and_it_is_said(tmp_path: Path) -> None:
+    choice = choose_reviewer(DEEPSEEK, ladder=[GLM], reachable=set())
+    report = review(collect(repo_with_change(tmp_path)), FakeBackend(finder_json([])), choice,
+                    CautiousVerifier(FakeBackend(""), choice.model))
+
+    assert (choice.model, choice.source, choice.same_family) == (DEEPSEEK, "fallback", True)
+    assert report.reviewer.same_family is True
+    assert any("shares its blind spots" in note for note in report.notes)
+
+
+def test_a_named_reviewer_is_honoured_even_from_the_authors_family() -> None:
+    choice = choose_reviewer(DEEPSEEK, explicit="deepseek/deepseek-chat", ladder=[GLM])
+
+    assert (choice.model, choice.source) == ("deepseek/deepseek-chat", "flag")
+    assert choice.same_family is True
+
+
+def test_both_stages_run_on_the_reviewer_not_the_author(tmp_path: Path) -> None:
+    choice = choose_reviewer(DEEPSEEK, ladder=[GLM])
+    backend = FakeBackend(finder_json([finding("calc.py", 11)]))
+
+    verifier = CautiousVerifier(backend, choice.model)
+    review(collect(repo_with_change(tmp_path)), backend, choice, verifier)
+
+    assert {model for _, _, model in backend.calls} == {GLM}
+
+
+@pytest.fixture
+def _settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[pytest.MonkeyPatch]:
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
+    for var in ("CHIMERA_REVIEW_MODEL", "CHIMERA_DEFAULT_MODEL", "CHIMERA_WEAK_MODEL",
+                "CHIMERA_MID_MODEL", "CHIMERA_ORCHESTRATOR_MODEL", "CHIMERA_FUSION_PANEL"):
+        monkeypatch.delenv(var, raising=False)
+    get_settings.cache_clear()
+    yield monkeypatch
+    get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("mode", ["auto", "balanced", "cheap", "premium"])
+def test_the_command_picks_another_family_under_every_cost_mode(
+    _settings: pytest.MonkeyPatch, mode: str
+) -> None:
+    _settings.setenv("CHIMERA_COST_MODE", mode)
+    get_settings.cache_clear()
+    author = get_settings().default_model
+
+    choice = review_cmd._reviewer(author, "")
+
+    assert model_family(author) == "openai"
+    assert choice.family != "openai", choice
+
+
+@pytest.mark.parametrize("mode", ["auto", "balanced", "cheap", "premium"])
+def test_the_command_reviews_the_default_model_with_the_other_measured_reviewer(
+    _settings: pytest.MonkeyPatch, mode: str
+) -> None:
+    """The default model IS `bench/review_reviewer`'s winner since the SWE-bench bake-off, so its
+    work goes to the bench's reference, whatever the cost mode's ladder holds."""
+    _settings.setenv("CHIMERA_COST_MODE", mode)
+    get_settings.cache_clear()
+
+    choice = review_cmd._reviewer(get_settings().default_model, "")
+
+    assert (choice.model, choice.source) == (DEEPSEEK, "measured")
+
+
+def test_the_command_gives_an_author_of_a_third_family_the_bench_winner_first(
+    _settings: pytest.MonkeyPatch,
+) -> None:
+    choice = review_cmd._reviewer(GLM, "")
+
+    assert (choice.model, choice.source) == (LUNA, "measured")
+
+
+def test_the_command_reviews_the_winners_own_work_with_the_benchs_reference(
+    _settings: pytest.MonkeyPatch,
+) -> None:
+    choice = review_cmd._reviewer(LUNA, "")
+
+    assert (choice.model, choice.source) == (DEEPSEEK, "measured")
+
+
+def test_the_setting_names_the_reviewer(_settings: pytest.MonkeyPatch) -> None:
+    _settings.setenv("CHIMERA_REVIEW_MODEL", OPUS)
+    get_settings.cache_clear()
+
+    choice = review_cmd._reviewer(DEEPSEEK, "")
+
+    assert (choice.model, choice.source) == (OPUS, "setting")

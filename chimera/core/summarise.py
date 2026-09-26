@@ -23,12 +23,17 @@ and decisions, which are the part with no other route back into the prompt.
 **What it must never do** is invent. A summary is believed in a way a note is not, so the prompt
 forbids inference and the fallback on any failure is the structural note rather than silence: a
 compaction that could not summarise must still compact.
+
+**What it costs is the run's.** The call is made inside `Agent.run`, between two steps, so it is
+charged to that run's tally and spend ceiling the way the tool router's call is: the moment it
+returns, whatever the reply turns out to be. Before this, the Code screen sent this on every turn
+and its call reached neither the turn's receipt nor `usage.jsonl`.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Protocol
 
 from chimera.telemetry import get_logger
 
@@ -84,34 +89,54 @@ def _leaks_tool_markup(text: str) -> bool:
     return any(marker in text for marker in _TOOL_MARKUP)
 
 
+class Summariser(Protocol):
+    """What :func:`rule_summariser` builds: ``compact()``'s ``summarise``, plus the run's meters.
+
+    ``usage`` and ``spend`` are duck-typed the way :meth:`chimera.core.tool_router.ToolRouter.pick`
+    takes them: anything with ``add(result)`` and ``record_result(result)``. ``compact()`` passes
+    neither, so it can be handed this unchanged; the loop binds them per run.
+    """
+
+    def __call__(self, older: list[Any], *, usage: Any = None, spend: Any = None) -> str: ...
+
+
 def rule_summariser(
     backend: Any,
     model: str | None = None,
     *,
     fallback: Callable[[list[Any]], str] | None = None,
-) -> Callable[[list[Any]], str]:
+) -> Summariser:
     """Build the `summarise` callable `compact()` accepts.
 
     ``fallback`` is what is used when the model returns nothing usable, and defaults to the
     structural note. That is not defensive decoration: the alternative is a compaction that silently
     replaces a span with an empty string, which is the one outcome strictly worse than either arm.
+
+    A call that returned is charged to ``usage`` and ``spend`` before its reply is read, so an empty
+    answer, a NONE or a leak of tool-call markup, each of which falls back to the note, is still
+    paid for. A call that raised cost nothing and charges nothing.
     """
     from chimera.core.context_budget import _structural_note
 
     to_note = fallback or _structural_note
 
-    def summarise(older: list[Any]) -> str:
+    def summarise(older: list[Any], *, usage: Any = None, spend: Any = None) -> str:
         body = _flatten(older)
         if not body.strip():
             return to_note(older)
         try:
             from chimera.providers.gateway import Message
 
-            answer = backend.complete(
+            result = backend.complete(
                 [Message(role="system", content=SYSTEM), Message(role="user", content=body)],
                 model=model,
                 temperature=0.0,
-            ).content
+            )
+            if usage is not None:
+                usage.add(result)
+            if spend is not None:
+                spend.record_result(result)
+            answer = result.content
         except Exception as exc:  # noqa: BLE001 — a compaction must not fail on a summariser
             _log.warning("compaction summariser failed, using the structural note: %s", exc)
             return to_note(older)

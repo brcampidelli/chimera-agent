@@ -24,7 +24,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 if TYPE_CHECKING:
     from chimera.core.context_budget import RunState
@@ -71,6 +71,12 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("core.autonomous")
 
+#: How the solve loop ended, one word per return site (:attr:`AutonomousResult.ending`). Typed so a
+#: return that names an ending nobody declared fails the type check, not a reader of the receipt.
+Ending = Literal[
+    "success", "no_op", "exhausted", "cancelled", "spend", "paused", "denied", "handover", "unknown"
+]
+
 #: Per side of a remembered fact — the task's opening line and the answer's. A fact is
 #: recalled into a later run's context, so its size is a recurring cost, not a one-off.
 _FACT_CHARS = 160
@@ -104,6 +110,15 @@ def _cache_read_tokens(steplog: Any) -> int | None:
 def _provider(steplog: Any) -> str:
     """The first provider a step named — the route that actually answered, not the id we asked."""
     return StepLog(steps=list(getattr(steplog, "steps", ()) or ())).provider
+
+
+def _system_sha(agent_result: Any) -> str:
+    """The fingerprint the worker's own step log recorded — read, never recomputed.
+
+    Recomputing it here from a prompt string would be a second place for the receipt and the trace
+    line to disagree about which instructions ran; the step log is what the trace was written from.
+    """
+    return str(getattr(getattr(agent_result, "steplog", None), "system_sha", "") or "")
 
 
 def _side_effects(steplog: Any) -> list[str]:
@@ -355,6 +370,11 @@ class Attempt:
     failure_class: str = ""
     #: The exact field or line the detector fired on, so the receipt says WHY and not only what.
     failure_evidence: str = ""
+    #: The fingerprint of the system message this attempt's worker ran with
+    #: (:func:`chimera.prompts.fingerprint`), or "" when the worker reported none. Per attempt
+    #: because one attempt is one agent run, which composes its system message afresh: a behaviour
+    #: change between two attempts, or two runs, can then be traced to a change in the instructions.
+    system_sha: str = ""
 
 
 @dataclass
@@ -364,11 +384,17 @@ class AutonomousResult:
     attempts: list[Attempt] = field(default_factory=list)
     plan: Plan | None = None
     paused: bool = False  # interrupted for human approval (see AutonomousAgent.pause_on_taint)
-    stopped_reason: str = ""  # why the loop ended early; "cancelled" on a cooperative stop, else ""
+    #: Why the loop ended early — "cancelled", "spend" or "handover", the worker's own word for
+    #: cutting an attempt short — else "".
+    stopped_reason: str = ""
 
-    ending: str = "unknown"
+    ending: Ending = "unknown"
     """How the loop ended, always one word, set at every return: ``success`` | ``no_op`` |
-    ``exhausted`` | ``cancelled`` | ``spend`` | ``paused`` | ``denied``.
+    ``exhausted`` | ``cancelled`` | ``spend`` | ``paused`` | ``denied`` | ``handover``.
+
+    ``handover`` (study 25, S11) is the browser meeting a page only the person can pass — a sign-in,
+    a two-step code, a captcha, a payment. It is terminal and it is not a failure: nothing retried
+    it, nothing graded it, and the answer opens with the page and what it asks for.
 
     ``stopped_reason`` cannot answer this and was never meant to: it is written at two sites and is
     empty for every other ending, so a run that succeeded, a run that used up its attempts and a run
@@ -389,9 +415,9 @@ class AutonomousResult:
     """Were the failures repeating themselves when the loop ended? ``None`` = nobody looked.
 
     Two ways to get ``None``, and both are "not measured": no ``StagnationDetector`` was configured,
-    or the run stopped at an ending that does not summarise its failures — ``paused`` and ``denied``
-    are waiting on a person, not finished. ``None`` is not ``False``: a run nobody watched has not
-    been found un-stalled, and the two are different claims — the same distinction
+    or the run stopped at an ending that does not summarise its failures — ``paused``, ``denied``
+    and ``handover`` are waiting on a person, not finished. ``None`` is not ``False``: a run nobody
+    watched has not been found un-stalled, and the two are different claims — the same distinction
     ``delivered_matches_verified`` makes on the receipt.
 
     This is a fact recorded *beside* the ending, never as the ending itself. The detector injects a
@@ -985,6 +1011,13 @@ class AutonomousAgent:
                 return self._finalize_capped(
                     task, attempts, plan, thread_id, agent_result, index
                 )
+            # The third way a worker cuts itself short (study 25, S11): the browser met a page only
+            # the person can pass. Verifying it would grade a run that stopped on purpose, and a
+            # retry would walk the next attempt into the same sign-in or captcha.
+            if getattr(agent_result, "stopped_reason", "") == "handover":
+                return self._finalize_handover(
+                    task, attempts, plan, thread_id, agent_result, index, snapshot
+                )
             answer = agent_result.answer
             # Surface a degrading trajectory where a person will see it, not only in the trace. It
             # is advisory: the attempt is judged on its result as always, and the run continues.
@@ -1245,6 +1278,7 @@ class AutonomousAgent:
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
             attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
+            attempt.system_sha = _system_sha(agent_result)
             # What the attempt DID, read off the same result as the id above and for the same
             # reason: the worker is what knows, and re-deriving it here would be a second place for
             # the two to disagree.
@@ -1518,6 +1552,41 @@ class AutonomousAgent:
         self._persist_receipt(result, task)
         return result
 
+    def _finalize_handover(
+        self,
+        task: str,
+        attempts: list[Attempt],
+        plan: Plan | None,
+        thread_id: str | None,
+        agent_result: AgentResult,
+        index: int,
+        snapshot: Any = None,
+    ) -> AutonomousResult:
+        """The browser handed a page to the person: stop, and give them the run as it stands.
+
+        Shaped on `_finalize_cancelled`, and for its reasons. A sign-in or a captcha is not evidence
+        the approach was wrong, so nothing is distilled and no card is debited; the attempt is not
+        verified or reviewed, because it stopped where the task needs the person, and no attempt
+        follows, because the page asks the next one the same thing. Whatever the attempt wrote is
+        recorded and kept, not reverted: the person picks the task up from where it stopped.
+
+        The worker's answer is the answer. It opens with the harness's own line naming the page and
+        what it asks for (`Wall.for_person`), so every surface that shows only the answer shows the
+        handover. ``stagnant`` stays ``None``: like ``paused``, this ending waits on a person and
+        summarises no failures.
+        """
+        attempts = [*attempts, self._partial_attempt(agent_result, index, snapshot)]
+        self._emit(_ev_status("handed over to the person"))
+        self._clear_checkpoint(thread_id)
+        last = agent_result.answer or (attempts[-1].answer if attempts else "")
+        self._emit(_ev_final(False, last))
+        result = AutonomousResult(
+            answer=last, success=False, attempts=attempts, plan=plan, stopped_reason="handover",
+            ending="handover",
+        )
+        self._persist_receipt(result, task)
+        return result
+
     def _partial_attempt(self, agent_result: Any, index: int, snapshot: Any = None) -> Attempt:
         """An attempt that was cut short: what it cost, and what it left on disk.
 
@@ -1539,6 +1608,8 @@ class AutonomousAgent:
         )
         parcial.model = str(getattr(agent_result, "model", "") or "")
         parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
+        # A cut-short attempt still sent its instructions, and was paid for under them.
+        parcial.system_sha = _system_sha(agent_result)
         parcial.evidence = "none"
         if snapshot is not None and self.guard is not None:
             # Measured, not assumed, and the same call the verified path makes. `diff_productive:

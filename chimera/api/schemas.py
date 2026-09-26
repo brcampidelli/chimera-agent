@@ -560,6 +560,20 @@ class BrowserCfgOut(BaseModel):
     headless: bool = True
 
 
+class ExperimentalCfgOut(BaseModel):
+    """Three study-25 modules that ship behind a switch, each OFF because its measurement did not
+    recommend it (the reason sits beside each field in ``chimera/config.py``).
+
+    Readable here so the Settings screen can offer them with the measured caveat on the row, instead
+    of leaving them to people who read the source. Defaults mirror ``Settings``: a server that does
+    not send this block is a server where all three are off.
+    """
+
+    browser_situation: bool = False
+    research_agent: bool = False
+    explorer_contract: bool = False
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -567,6 +581,7 @@ class ConfigOut(BaseModel):
     cache: CacheCfgOut
     sandbox: SandboxCfgOut
     browser: BrowserCfgOut = Field(default_factory=BrowserCfgOut)
+    experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
@@ -1441,6 +1456,13 @@ class AttemptReceiptOut(BaseModel):
     # render the unknown as its own state; deriving it by absence is how the third state decays.
     diff_productive: bool | None
     side_effects: list[str]  # out-of-checkout effects performed (send_email, http_post, …)
+    system_sha: str = ""
+    """The fingerprint of the system message this attempt ran under (twelve hex characters), the
+    same value its trace line carries. Empty for a receipt written before the field existed.
+
+    On the wire so a change in what a run did can be set beside a change in what it was told: two
+    attempts with different values were not given the same instructions, whatever else they
+    share."""
 
 
 class RunReceiptOut(BaseModel):
@@ -1454,7 +1476,7 @@ class RunReceiptOut(BaseModel):
 
     stopped_reason: str = ""
     """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
-    ``cancelled``. Empty for a receipt written before the field existed.
+    ``cancelled`` | ``handover``. Empty for a receipt written before the field existed.
 
     On the wire because a Runs list without it renders three different endings as one: the run the
     user cancelled, the run the dollar ceiling cut off, and the run whose work the verifier rejected
@@ -1463,11 +1485,12 @@ class RunReceiptOut(BaseModel):
 
     ending: str = "unknown"
     """How the solve loop ended: ``success`` | ``no_op`` | ``exhausted`` | ``cancelled`` | ``spend``
-    | ``paused`` | ``denied``. ``unknown`` for a receipt written before the field existed.
+    | ``paused`` | ``denied`` | ``handover``. ``unknown`` for a receipt written before the field
+    existed.
 
     On the wire for the reason the field above gives and does not finish. ``stopped_reason`` is the
-    *turn* loop's word, and the solve loop writes it at two sites only — so the run that used up its
-    attempts, the one whose answer a person refused, and the one that succeeded while changing
+    *turn* loop's word, and the solve loop writes it at three sites only — so the run that used up
+    its attempts, the one whose answer a person refused, and the one that succeeded while changing
     nothing on disk still arrive here as the same blank. This is the one field that separates them,
     and it is set at every return rather than at the interesting ones."""
 

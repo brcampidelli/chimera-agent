@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
 from chimera.providers.cache import CompletionCache
+from chimera.providers.catalog import max_output_for
 from chimera.providers.discovery import LOCAL_MODEL_PREFIXES, is_local_model
 from chimera.providers.failover import (
     CredentialPool,
@@ -31,6 +32,7 @@ from chimera.providers.failover import (
     RecoveryAction,
     action_for,
     classify,
+    rate_limit_origin,
     trace_of,
 )
 from chimera.providers.prompt_cache import apply_cache_control
@@ -160,6 +162,33 @@ class CompletionResult(BaseModel):
     half-written tool-call argument, or lose the call entirely — and the loop then blames the model
     for an empty-argument failure, or for "describing a plan instead of acting", when the sentence
     was severed mid-word."""
+
+    reasoning: str = Field(default="", repr=False, exclude=True)
+    """The model's reasoning, as the route returned it beside the answer. Never the answer.
+
+    litellm names it ``reasoning_content`` on the message and on each streamed delta; OpenRouter
+    sends ``reasoning`` and litellm renames it (see :func:`_reasoning_of`). Kept for
+    :attr:`answer_in_reasoning` and for the callers that read a structured answer back out of it on
+    purpose. Off ``repr`` and out of ``model_dump``: it is the model's thought trace, and a log
+    line, a receipt or a response body that serialises a result must not carry it by accident."""
+
+    answer_in_reasoning: bool = False
+    """The reply had no text and no tool call, stopped with ``stop``, and carried reasoning: the
+    route filed the model's whole output as reasoning.
+
+    Measured on 2026-09-25 (`bench/review_judge/RESULTS-h11.md`, S5): ``deepseek-r1`` pinned to
+    Novita did this on 353 of 814 calls of one prompt and 305 of 814 of another. The model never
+    closed its reasoning, and the provider put the final answer, the JSON the prompt asked for, at
+    the end of ``reasoning_content`` with ``content`` empty. The gateway read ``content`` only, so
+    every caller got an empty answer with ``stop`` and no error.
+
+    The answer is **not** moved into ``content``. Reasoning is a thought trace: returned as the
+    answer it would be shown to the person, and it can end on a draft. A caller that expects a
+    structured answer may read an object of its own schema from the end of :attr:`reasoning`
+    (:func:`chimera.providers.thinking.answer_at_end_of_reasoning`) and says so on its receipt; a
+    caller that expects prose treats the reply as empty, as before, and can now say why. False on a
+    reply with text, on a tool call, on ``length`` (that is :attr:`truncated`) and on an empty
+    reply that carried no reasoning either."""
 
     logprobs: list[dict[str, Any]] | None = Field(default=None, repr=False)
     """The token log-probabilities the route returned, one entry per generated token, as plain
@@ -301,6 +330,10 @@ class CredentialRejectedError(MissingCredentialsError):
 
     Without this, a typo'd, expired or credit-exhausted key produced a raw provider stack trace,
     while a *missing* key produced a helpful message — the common failure got the worse experience.
+
+    A 429 from the provider's shared pool travels through this class too, for the same clean
+    rendering, although the key was accepted; its message says so (see :func:`_credential_error`).
+    A caller that shows its own sentence for this class instead of the message would be wrong there.
     """
 
 
@@ -316,6 +349,11 @@ def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
     the wrong one wastes their night: a rate limit resets on its own, an empty account does not. It
     used to land in UNKNOWN, which returns None here — so the single most likely failure for a
     prepaid provider was the one that surfaced as a raw exception with no advice at all.
+
+    A 429 is not always the key's. Behind OpenRouter it is often the provider's shared pool, with
+    the key accepted, and "every configured provider key is rate-limited" sent people to rotate a
+    key that was fine. The sentence now follows what the reply says (:func:`rate_limit_origin`):
+    the provider's side, the key's, or — when the reply does not say — that it does not.
     """
     reason = classify(exc)
     if reason is FailoverReason.AUTH:
@@ -325,8 +363,28 @@ def _credential_error(exc: BaseException) -> CredentialRejectedError | None:
         what = "Every configured provider key is out of credit (402)."
         fix = "Top up the account, or add a key billed to another one — waiting will not clear this"
     elif reason is FailoverReason.RATE_LIMIT:
-        what = "Every configured provider key is rate-limited."
-        fix = "Wait for the limit to reset, or add another key"
+        origin = rate_limit_origin(exc)
+        if origin.side == "upstream":
+            # No list of key variables here: nothing about the key needs changing.
+            who = origin.provider or "The provider behind the router"
+            label = f" ({origin.source})" if origin.source else ""
+            return CredentialRejectedError(
+                f"Rate-limited upstream: {who} is out of capacity for this model{label}. The limit"
+                " is on the provider's side, not on your key, which the router accepted. Retry"
+                " shortly, or choose another model."
+                f"{trace_of(exc).as_suffix()} Provider said: {exc}"
+            )
+        if origin.side == "key":
+            what = "Every configured provider key is rate-limited."
+            fix = "Wait for the limit to reset, or add another key"
+        else:
+            said = [part for part in (origin.provider, origin.source) if part]
+            named = f" ({', '.join(said)})" if said else ""
+            what = (
+                f"Rate-limited (429){named}, and the reply does not say whether the limit is on"
+                " your key or on the provider's own capacity."
+            )
+            fix = "Retry shortly; if it persists, add another key or choose another model"
     else:
         return None
     return CredentialRejectedError(
@@ -575,7 +633,8 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        max_tokens = self._bounded(max_tokens)
+        budget = max_tokens  # the caller's; each fallback below is bounded for its own routes
+        max_tokens = self._bounded(budget, resolved)
 
         # `thinking` reaches the provider here too. Until 2026-09-25 only `stream_complete` passed it,
         # so every blocking call that asked for reasoning off — `decisions.hosted`, the agent loop
@@ -628,6 +687,9 @@ class LLMGateway:
             candidate_extra = (
                 extra if candidate == resolved else self._provider_kwargs(candidate, thinking=thinking)
             )
+            candidate_max = (
+                max_tokens if candidate == resolved else self._bounded(budget, candidate)
+            )
             for api_key in api_keys:
                 call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, kwargs)
                 if api_key:
@@ -641,7 +703,7 @@ class LLMGateway:
                         model=candidate,
                         messages=call_messages,
                         temperature=temperature,
-                        max_tokens=max_tokens,
+                        max_tokens=candidate_max,
                         tools=tools,
                         **call_kwargs,
                     )
@@ -731,7 +793,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        max_tokens = self._bounded(max_tokens)
+        max_tokens = self._bounded(max_tokens, resolved)
 
         call_kwargs: dict[str, Any] = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
@@ -755,17 +817,27 @@ class LLMGateway:
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
 
-    def _bounded(self, max_tokens: int | None) -> int | None:
+    def _bounded(self, max_tokens: int | None, model: str = "") -> int | None:
         """The caller's `max_tokens`, or the deployment's completion ceiling when the caller set none.
 
         `Settings.completion_ceiling` says why: a reasoning model with no bound can spend the
         provider's whole ceiling thinking and return nothing, at the price of everything it thought.
         A caller that chose a budget keeps it; 0 keeps the provider's ceiling.
+
+        The ceiling is lowered to what every route of ``model`` serves, when the catalogue records
+        that (:attr:`chimera.providers.catalog.CatalogEntry.max_output`). OpenRouter reads
+        ``max_tokens`` as a route filter, so a ceiling above most routes' limit is not a bound but a
+        choice of provider: it sent every tool-free call to the preset weak rung to the one route
+        that lists more, which then answered 429 with nothing left to fall back to. Lowered, never
+        raised, and only the gateway's own number: a budget the caller chose goes out as chosen.
         """
         if max_tokens is not None:
             return max_tokens
         ceiling = int(getattr(self.settings, "completion_ceiling", 0) or 0)
-        return ceiling if ceiling > 0 else None
+        if ceiling <= 0:
+            return None
+        served = max_output_for(model)
+        return served if served is not None and served < ceiling else ceiling
 
     def _think_filter(self) -> ThinkFilter | None:
         """A fresh filter per call, or None when the user asked to keep the tags.
@@ -797,7 +869,7 @@ class LLMGateway:
 
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
-        max_tokens = self._bounded(max_tokens)
+        max_tokens = self._bounded(max_tokens, resolved)
         call_kwargs = _call_kwargs(self._provider_kwargs(), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
@@ -843,8 +915,9 @@ class LLMGateway:
         ``tool_calls``. Like :meth:`stream`, this is one direct call: NO fallback chain and NO cache
         (both meaningless for a live stream). Callers that need those keep using :meth:`complete`.
         """
-        max_tokens = self._bounded(max_tokens)
+        budget = max_tokens  # the caller's, handed on as such if this falls back to `complete`
         resolved = self._resolve_model(model)
+        max_tokens = self._bounded(budget, resolved)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
         call_kwargs = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
@@ -852,6 +925,7 @@ class LLMGateway:
         if keys:
             call_kwargs["api_key"] = keys[0]
         content: list[str] = []
+        reasoning: list[str] = []
         tool_acc: dict[int, dict[str, Any]] = {}
         usage: dict[str, int | None] = {}
         finish_reason = ""
@@ -885,7 +959,9 @@ class LLMGateway:
                 # learned — see `CompletionResult.generation_id`.
                 if not generation_id:
                     generation_id = str(getattr(chunk, "id", "") or "")
-                razao = self._consume_chunk(chunk, content, tool_acc, usage, think, on_delta)
+                razao = self._consume_chunk(
+                    chunk, content, tool_acc, usage, think, on_delta, reasoning=reasoning
+                )
                 if razao:
                     finish_reason = razao
         except Exception as exc:
@@ -903,7 +979,7 @@ class LLMGateway:
                 raise
             _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
             return self.complete(
-                messages, model=model, temperature=temperature, max_tokens=max_tokens, tools=tools,
+                messages, model=model, temperature=temperature, max_tokens=budget, tools=tools,
                 **kwargs,
             )
         if think:
@@ -912,10 +988,17 @@ class LLMGateway:
                 content.append(tail)
                 if on_delta is not None:
                     on_delta(tail)
+        text, thought = "".join(content), "".join(reasoning)
+        tool_calls = _finalize_stream_tool_calls(tool_acc)
+        # The same rule as the batch path, over the whole stream: the reasoning deltas were never
+        # shown (`on_delta` gets content only), so a stream that carried nothing else ends empty.
+        filed = _answer_filed_as_reasoning(text, thought, finish_reason, tool_calls)
+        if filed:
+            _warn_answer_in_reasoning(resolved, provider, generation_id, len(thought))
         return CompletionResult(
-            content="".join(content),
+            content=text,
             model=resolved,
-            tool_calls=_finalize_stream_tool_calls(tool_acc),
+            tool_calls=tool_calls,
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
             cache_read_tokens=usage.get("cache_read_tokens"),
@@ -924,6 +1007,8 @@ class LLMGateway:
             truncated=finish_reason == "length",
             provider=provider,
             generation_id=generation_id,
+            reasoning=thought,
+            answer_in_reasoning=filed,
         )
 
     @staticmethod
@@ -945,8 +1030,19 @@ class LLMGateway:
         usage: dict[str, Any],
         think: ThinkFilter | None,
         on_delta: Callable[[str], None] | None,
+        *,
+        reasoning: list[str] | None = None,
     ) -> str:
-        """Fold one streamed chunk into the accumulating result; return its stop reason, if any."""
+        """Fold one streamed chunk into the accumulating result; return its stop reason, if any.
+
+        ``reasoning`` collects the chunk's reasoning delta beside the content, never into it and
+        never through ``on_delta``: it is kept only so the end of the stream can tell an answer
+        the route filed as reasoning from a reply that was empty
+        (:func:`_answer_filed_as_reasoning`)."""
+        if reasoning is not None:
+            thought = _delta_reasoning(chunk)
+            if thought:
+                reasoning.append(thought)
         text = _delta_text(chunk)
         if text:
             # Filtered BEFORE it is accumulated, not only before it is displayed. The reasoning
@@ -989,6 +1085,7 @@ class LLMGateway:
     @staticmethod
     def _normalize(response: Any, model: str) -> CompletionResult:
         content = ""
+        reasoning = ""
         tool_calls: list[ToolCall] | None = None
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
@@ -1000,8 +1097,14 @@ class LLMGateway:
             # how one of them quietly stops handling code fences.
             content = strip_think(message.content or "")
             tool_calls = LLMGateway._parse_tool_calls(message)
+            reasoning = _reasoning_of(message)
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
+        provider = str(getattr(response, "provider", "") or "")
+        generation_id = str(getattr(response, "id", "") or "")
+        filed = _answer_filed_as_reasoning(content, reasoning, finish_reason, tool_calls)
+        if filed:
+            _warn_answer_in_reasoning(model, provider, generation_id, len(reasoning))
         cache_read_tokens: int | None = None
         cache_write_tokens: int | None = None
         usage = getattr(response, "usage", None)
@@ -1024,8 +1127,10 @@ class LLMGateway:
             cache_write_tokens=cache_write_tokens,
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
-            provider=str(getattr(response, "provider", "") or ""),
-            generation_id=str(getattr(response, "id", "") or ""),
+            provider=provider,
+            generation_id=generation_id,
+            reasoning=reasoning,
+            answer_in_reasoning=filed,
             logprobs=logprobs,
         )
 
@@ -1120,6 +1225,65 @@ def _delta_text(chunk: Any) -> str:
         return str(delta.content or "")
     except (AttributeError, IndexError, TypeError):
         return ""
+
+
+def _reasoning_of(part: Any) -> str:
+    """The reasoning a batch message or a streamed delta carries, or "".
+
+    One reader for both shapes. litellm 1.99 names the field ``reasoning_content`` on each:
+    OpenRouter sends ``reasoning``, and litellm renames it on the way in
+    (`_extract_reasoning_content` for a message; the OpenRouter stream handler copies it onto every
+    delta). A batch message also keeps the raw ``reasoning`` under ``provider_specific_fields``,
+    which is read when the renamed field is absent. Measured live on 2026-09-26
+    (`bench/answer_in_reasoning`): the renamed field on 20/20 batch calls with the raw copy equal to
+    it, and on the deltas of 6/6 streams. Only a string counts: an odd shape reads as no reasoning,
+    never as some."""
+    value = getattr(part, "reasoning_content", None)
+    if isinstance(value, str) and value:
+        return value
+    fields = getattr(part, "provider_specific_fields", None)
+    if isinstance(fields, dict):
+        raw = fields.get("reasoning")
+        if isinstance(raw, str):
+            return raw
+    return ""
+
+
+def _delta_reasoning(chunk: Any) -> str:
+    """The reasoning piece of one streamed chunk, defensively (empty on any shape)."""
+    try:
+        return _reasoning_of(chunk.choices[0].delta)
+    except (AttributeError, IndexError, TypeError):
+        return ""
+
+
+def _answer_filed_as_reasoning(
+    content: str, reasoning: str, finish_reason: str, tool_calls: list[ToolCall] | None
+) -> bool:
+    """Whether a reply is the route filing the model's output as reasoning (see
+    :attr:`CompletionResult.answer_in_reasoning`).
+
+    All four parts are needed. ``stop`` separates it from a reply cut at the ceiling, whose
+    reasoning spent the budget and holds no finished answer; the reasoning separates it from a
+    reply that was simply empty; text or a tool call means the model did answer."""
+    return (
+        not content.strip()
+        and not tool_calls
+        and finish_reason == "stop"
+        and bool(reasoning.strip())
+    )
+
+
+def _warn_answer_in_reasoning(model: str, provider: str, generation_id: str, chars: int) -> None:
+    """One line per occurrence, naming the route. The reasoning itself is never logged."""
+    _log.warning(
+        "model %s (provider %s, generation %s) stopped with no answer text and %d characters of "
+        "reasoning: the route filed the answer as reasoning, and it is not read as the answer",
+        model,
+        provider or "not reported",
+        generation_id or "not reported",
+        chars,
+    )
 
 
 def _delta_tool_calls(chunk: Any, acc: dict[int, dict[str, Any]]) -> None:

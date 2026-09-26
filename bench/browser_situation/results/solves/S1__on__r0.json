@@ -1,0 +1,52 @@
+{
+ "task": "S1",
+ "arm": "on",
+ "replica": 0,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.0014018700000000002,
+ "answer": "Petite Brass Candle Lamp ($24.90)",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 5,
+ "tool_calls": 4,
+ "prompt_tokens": 19726,
+ "completion_tokens": 374,
+ "cache_read_tokens": 14592,
+ "usd": 0.000553,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "cd526d3bc0b1",
+ "module_in_prompt": true,
+ "browser_calls": [
+  "navigate",
+  "type",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 11497,
+ "seconds": 8.8,
+ "requested_paths": [
+  "/shop/lamps.html",
+  "/shop/search.html"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}

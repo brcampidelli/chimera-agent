@@ -24,13 +24,16 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.governance.ledger_tool import fence
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
+
+if TYPE_CHECKING:
+    from chimera.tools.browser_situation import BrowserSituation
 
 _log = get_logger("tools.browser")
 
@@ -333,7 +336,12 @@ class BrowserTool(Tool):
         workspace: Path | None = None,
         write_region: WriteRegion | None = None,
         viewport_first: bool = False,
+        situation: BrowserSituation | None = None,
     ) -> None:
+        # Study 25, S11 (`chimera.tools.browser_situation`): every action through the situation's
+        # harness half — a page that needs the person hands over, a private store is refused. None,
+        # the default, and the dispatch below is exactly what it was.
+        self.situation = situation
         # The driver is built lazily on first use so importing this tool never needs Playwright.
         self._driver = driver
         self._own_driver = driver is None
@@ -410,6 +418,11 @@ class BrowserTool(Tool):
             self._announce(action)
 
     def _act(self, action: str, driver: BrowserDriver, kwargs: dict[str, Any]) -> str:
+        if self.situation is None:
+            return self._dispatch(action, driver, kwargs)
+        return self.situation.act(action, driver, kwargs, self._dispatch)
+
+    def _dispatch(self, action: str, driver: BrowserDriver, kwargs: dict[str, Any]) -> str:
         # SSRF guard: a navigate target is a model-/content-supplied URL, so re-check every hop the
         # same way http_get/download do — reject non-http(s) and hosts that resolve to private IPs.
         from chimera.scrape.ssrf import check_url

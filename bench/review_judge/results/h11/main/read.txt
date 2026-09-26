@@ -1,0 +1,89 @@
+== 1. guards
+  August C − A in precision, out of sample: +4.5 [+2.0, +7.1] · read_h11.py +4.5 [+2.0, +7.1] · published +4.5 [+2.0, +7.1] ok
+  the adoption rule on null deltas fires: False ok
+  rows 814 (registered 814) · unique True · all out of sample by the August keys True · replay arm on exactly order < 200 True
+  served by {'novita': 1828} · pinned to novita only True
+  prompt sha A 60a2749ed8c9 T 5548fe16010b · frozen 60a2749ed8c9 / 5548fe16010b True
+  GUARDS PASSED
+
+== 1b. Amendment 3 — empty-content calls re-read from their stored reasoning tail
+  verdicts that moved (arm, as run → re-read): {('A', 'unparsed', 'approve'): 1, ('T', 'unparsed', 'confirmed'): 1}
+  A   as run {'approve': 741, 'reject': 72, 'unparsed': 1}
+  T   as run {'confirmed': 705, 'plausible': 52, 'refuted': 55, 'unparsed': 2}
+  A2  as run {'approve': 184, 'reject': 16}
+
+== 2. what each arm answered (unparsed and call_failed apart)
+  A   n=814  {'approve': 742, 'reject': 72} · truncated 0 · retried 1
+      answer from {'content': 460, 'reasoning': 353, 'none': 1} · verdict by source {('content', 'approve'): 415, ('content', 'reject'): 45, ('none', 'approve'): 1, ('reasoning', 'approve'): 326, ('reasoning', 'reject'): 27}
+  T   n=814  {'confirmed': 706, 'plausible': 52, 'refuted': 55, 'unparsed': 1} · truncated 0 · retried 1
+      answer from {'content': 507, 'reasoning': 305, 'none': 2} · verdict by source {('content', 'confirmed'): 440, ('content', 'plausible'): 35, ('content', 'refuted'): 32, ('none', 'confirmed'): 1, ('none', 'unparsed'): 1, ('reasoning', 'confirmed'): 265, ('reasoning', 'plausible'): 17, ('reasoning', 'refuted'): 23}
+  A2  n=200  {'approve': 184, 'reject': 16} · truncated 0 · retried 1
+      answer from {'content': 111, 'reasoning': 89} · verdict by source {('content', 'approve'): 103, ('content', 'reject'): 8, ('reasoning', 'approve'): 81, ('reasoning', 'reject'): 8}
+  T parsed by: {'json': 811, 'pattern': 2, 'none': 1}
+  T state by label:
+    correct   n=632  confirmed 569 (90.0%) · plausible 32 (5.1%) · refuted 30 (4.7%)
+    incorrect n=182  confirmed 137 (75.3%) · plausible 20 (11.0%) · refuted 25 (13.7%)
+
+== 3. control — does the fresh arm A reproduce the published one? (same items)
+  fresh A   keeps correct 93.7% [91.5%, 95.3%] · catches bad 17.6% (32/182) · precision 79.8%
+  August A  keeps correct 92.4% [90.1%, 94.2%] · catches bad 17.0% (31/182) · precision 79.5%
+  same verdict on 761/814 items (93.5%) — different day, different route
+  control bands {'keeps correct': (0.884, 0.964), 'catches bad': (0.09, 0.25)}: REPRODUCES the published arm A
+
+== 4. replay floor — arm A twice on the first 200 items, same session
+  paired 200 · flips 13 (6.5%): 9/159 correct, 4/41 incorrect
+  A2 − A: Δ precision -1.2 [-3.1, +0.5] · Δ recall of correct -1.9 [-5.7, +1.9]
+  the adoption rule applied to the replay fires: False (ok)
+
+== 5. primary — each operating point against arm A, paired over the same items
+  paired bootstrap within label, seed 20260819, 10,000 draws, percentile 95% (as read_h11.py);
+  Δ recall also by McNemar-Wilson (chimera/eval/paired.py, as read_full.py) as a cross-check
+  paired items 813 (631 correct, 182 incorrect) · keep-all precision 77.6%
+  A                       precision 79.8% [76.7%, 82.5%] · recall of correct 93.7% [91.5%, 95.3%] · catches bad 17.6%
+  T, drop only refuted    precision 79.3% [76.3%, 82.0%] · recall of correct 95.2% [93.3%, 96.6%] · catches bad 13.7% · keeps 93.2%
+     Δ precision -0.5 pp [-1.5, +0.5] · Δ recall of correct +1.6 pp [-0.2, +3.5] (McNemar-Wilson [-0.2, +3.1], discordant: A only 12, T only 22) · ΔJ -2.3
+     rule: precision lower bound > 0 False · gain > replay floor +1.2 pp False · recall lower bound ≥ -2.0 pp True → not adopted at this point
+  T, keep only confirmed  precision 80.6% [77.5%, 83.3%] · recall of correct 90.2% [87.6%, 92.3%] · catches bad 24.7% · keeps 86.8%
+     Δ precision +0.8 pp [-0.5, +2.2] · Δ recall of correct -3.5 pp [-5.9, -1.1] (McNemar-Wilson [-5.4, -1.1], discordant: A only 40, T only 18) · ΔJ +3.7
+     rule: precision lower bound > 0 False · gain > replay floor +1.2 pp False · recall lower bound ≥ -2.0 pp False → not adopted at this point
+
+== 6. secondary (registered, not decided on)
+  S1 separation: AUC A (binary) 0.556 · T (three ordered states) 0.575 · Δ +1.9 points [-1.2, +5.1]
+  S3 quote in the diff shown, by state (True / False / empty):
+    confirmed   701 /    5 /    0
+    plausible    50 /    0 /    2
+    refuted      43 /    2 /   10
+    confirmed with quote_in_diff=True : precision 80.5% (n=701)
+    confirmed with quote_in_diff=False: precision 100.0% (n=5)
+  S4 unparsed counted as kept (fail-open), both arms:
+    drop only refuted    n=814 Δ precision -0.5 [-1.5, +0.5] · Δ recall of correct +1.6 [-0.2, +3.5]
+    keep only confirmed  n=814 Δ precision +0.8 [-0.4, +2.2] · Δ recall of correct -3.5 [-5.9, -1.1]
+
+== 7. uninformative conditions
+  A unparsed 0/814 (0.0%) 
+  A call_failed 0/814 (0.0%) 
+  T unparsed 1/814 (0.1%) 
+  T call_failed 0/814 (0.0%) 
+  paired items 813 (≥ 700) · T's largest state share 86.8% · replay passes the rule False
+  → none fires
+
+== 8. cost (tokens × the provider's listed price)
+  A   814 calls · prompt 576,888 · completion 898,305 · US$ 2.650 · US$ 0.00326/call · median 45s/call · OpenRouter billed US$ 2.650 on the 814 calls that reported it
+  T   814 calls · prompt 620,803 · completion 1,481,709 · US$ 4.139 · US$ 0.00508/call · median 64s/call · OpenRouter billed US$ 4.039 on the 814 calls that reported it
+  A2  200 calls · prompt 144,247 · completion 249,597 · US$ 0.725 · US$ 0.00362/call · median 49s/call · OpenRouter billed US$ 0.725 on the 200 calls that reported it
+  main US$ 7.513 + pilot US$ 0.177 = US$ 7.690 (cap US$ 9.00)
+
+== 9. predictions (bands fixed before the run)
+  T confirmed share                          predicted [+0.550, +0.800] measured +0.868 ABOVE
+  T plausible share                          predicted [+0.100, +0.350] measured +0.064 BELOW
+  T refuted share                            predicted [+0.050, +0.150] measured +0.068 inside
+  drop only refuted: Δ precision             predicted [-0.010, +0.020] measured -0.005 inside
+  drop only refuted: Δ recall of correct     predicted [-0.030, +0.030] measured +0.016 inside
+  keep only confirmed: Δ precision           predicted [+0.010, +0.060] measured +0.008 BELOW
+  keep only confirmed: Δ recall of correct   predicted [-0.350, -0.100] measured -0.035 ABOVE
+  Δ AUC (T ordinal − A binary)               predicted [+0.020, +0.080] measured +0.019 BELOW
+  replay flip rate                           predicted [+0.050, +0.120] measured +0.065 inside
+  fresh A keeps correct                      predicted [+0.880, +0.960] measured +0.937 inside
+  fresh A catches bad                        predicted [+0.100, +0.250] measured +0.176 inside
+
+== 10. decision under the registered rule: NOT ADOPTED at either operating point

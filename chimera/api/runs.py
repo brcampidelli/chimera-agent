@@ -127,6 +127,11 @@ class AttemptReceipt(BaseModel):
     #: is not ``unknown``: that is a classification whose detectors all declined.
     failure_class: str = ""
     failure_evidence: str = ""
+    #: Which instructions this attempt ran under: the twelve-hex fingerprint of its system message,
+    #: as the worker's step log recorded it and the trace line carries it. Empty for an attempt that
+    #: reported none, and for every receipt written before this field existed — "not recorded", not
+    #: "no prompt". Two attempts with different values were not given the same instructions.
+    system_sha: str = ""
 
 
 class RunReceipt(BaseModel):
@@ -165,7 +170,7 @@ class RunReceipt(BaseModel):
 
     stopped_reason: str = ""
     """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
-    ``cancelled``.
+    ``cancelled`` | ``handover``.
 
     The loop has always known this — it is assigned at one place per value, reaches ``traces.jsonl``
     and the SSE ``done`` frame, and draws a badge on screen. It stopped at this boundary, so a run
@@ -179,13 +184,13 @@ class RunReceipt(BaseModel):
 
     ending: str = "unknown"
     """How the solve loop ended: ``success`` | ``no_op`` | ``exhausted`` | ``cancelled`` | ``spend``
-    | ``paused`` | ``denied``. Set at every return; see ``AutonomousResult.ending``.
+    | ``paused`` | ``denied`` | ``handover``. Set at every return; see ``AutonomousResult.ending``.
 
     Distinct from ``stopped_reason`` above, which is the *turn* loop's vocabulary and is empty for
-    every ending the solve loop has that is not ``cancelled`` or ``spend``. Until this field the
-    durable record could not separate a run that finished from one that used up its attempts, nor
-    a success that changed a file from one that changed nothing: all three wrote ``success`` and a
-    blank. ``unknown`` marks a row written before the field existed."""
+    every ending the solve loop has that is not ``cancelled``, ``spend`` or ``handover``. Until this
+    field the durable record could not separate a run that finished from one that used up its
+    attempts, nor a success that changed a file from one that changed nothing: all three wrote
+    ``success`` and a blank. ``unknown`` marks a row written before the field existed."""
 
     stagnant: bool | None = None
     """Were the failures repeating when it ended? ``None`` = nobody looked (no detector, or an ending
@@ -318,6 +323,7 @@ def build_receipt(
             verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
             failure_class=str(getattr(a, "failure_class", "") or ""),
             failure_evidence=str(getattr(a, "failure_evidence", "") or "")[:500],
+            system_sha=str(getattr(a, "system_sha", "") or ""),
         )
         for a in result.attempts
     ]

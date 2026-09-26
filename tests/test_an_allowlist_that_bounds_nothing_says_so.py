@@ -50,6 +50,42 @@ def _registry(*names: str) -> ToolRegistry:
     return registry
 
 
+def test_a_list_naming_a_tool_the_registry_lacks_does_not_warn(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The warning is about what the session CAN do, so it reads the tools kept, not the names the
+    list spells: `code_interpreter` on the list of a registry that has none keeps nothing that runs
+    code. Found by study 25's `/review` bench on this file's own history (924aaa76)."""
+    recorded: list[dict] = []
+
+    class _Audit:
+        def record(self, kind: str, payload: dict) -> None:
+            recorded.append(payload)
+
+    with caplog.at_level(logging.WARNING, logger="chimera.governance.allowlist"):
+        kept = restrict_registry(
+            _registry("read_file"),
+            allow=["read_file", "code_interpreter"],
+            audit=_Audit(),  # type: ignore[arg-type]
+        )
+    assert kept.names() == ["read_file"]
+    assert "code_interpreter" not in caplog.text
+    # Nothing was excluded and nothing that runs code was kept, so there is no trail to write —
+    # and above all no `arbitrary_code_kept` naming a tool the session cannot call.
+    assert all(not entry["arbitrary_code_kept"] for entry in recorded)
+
+    # The same list on a registry that DOES hold an arbitrary-code tool still warns and records it.
+    recorded.clear()
+    with caplog.at_level(logging.WARNING, logger="chimera.governance.allowlist"):
+        restrict_registry(
+            _registry("read_file", "run_shell"),
+            allow=["read_file", "run_shell", "code_interpreter"],
+            audit=_Audit(),  # type: ignore[arg-type]
+        )
+    assert "run_shell" in caplog.text
+    assert recorded and recorded[0]["arbitrary_code_kept"] == ["run_shell"]
+
+
 def test_the_three_tools_that_make_a_list_meaningless_are_named() -> None:
     """Pinned as a set rather than checked ad hoc: a fourth arbitrary-code tool added later has to
     be added here too, and the test that fails is the one that says why."""

@@ -53,11 +53,23 @@ def restrict_registry(
     allow_set = None if allow is None else {name.strip() for name in allow if name.strip()}
     deny_set = {name.strip() for name in (deny or ()) if name.strip()}
 
+    kept = ToolRegistry()
+    excluded: list[str] = []
+    for tool in registry.tools():
+        permitted = (allow_set is None or tool.name in allow_set) and tool.name not in deny_set
+        if permitted:
+            kept.register(tool)
+        else:
+            excluded.append(tool.name)
+
     # Said once, where the list is applied, because this is the only place that knows an allowlist
-    # is in force AND which names it kept. WARNING rather than debug: the whole value of an
+    # is in force AND which tools it kept. WARNING rather than debug: the whole value of an
     # allowlist is the belief that it bounds the session, and a list that does not is a belief
-    # someone is acting on. See :data:`ARBITRARY_CODE`.
-    escapes = sorted((allow_set - deny_set) & ARBITRARY_CODE) if allow_set is not None else []
+    # someone is acting on. See :data:`ARBITRARY_CODE`. Read off the tools KEPT, not the names the
+    # list spells: a list naming `code_interpreter` on a registry that has none keeps nothing that
+    # runs code, and warning about it was a false alarm (study 25's /review bench found it).
+    kept_names = {tool.name for tool in kept.tools()}
+    escapes = sorted(kept_names & ARBITRARY_CODE) if allow_set is not None else []
     if escapes:
         _log.warning(
             "the tool allowlist keeps %s, which run code this session wrote — so the list bounds "
@@ -67,15 +79,6 @@ def restrict_registry(
             ", ".join(escapes),
             " / ".join(escapes),
         )
-
-    kept = ToolRegistry()
-    excluded: list[str] = []
-    for tool in registry.tools():
-        permitted = (allow_set is None or tool.name in allow_set) and tool.name not in deny_set
-        if permitted:
-            kept.register(tool)
-        else:
-            excluded.append(tool.name)
 
     if excluded:
         _log.debug(

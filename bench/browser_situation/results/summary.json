@@ -1,0 +1,61 @@
+{
+ "pairs": 48,
+ "b_off_only": 2,
+ "c_on_only": 1,
+ "mcnemar_p": 1.0,
+ "lost_in_both_replicas": [],
+ "off_replica_flips": 1,
+ "prompt_token_ratio_on_off": 0.924,
+ "off": {
+  "solves": 48,
+  "success": 45,
+  "handovers": 0,
+  "mean_prompt_tokens": 26022,
+  "mean_uncached_prompt_tokens": 10576,
+  "mean_tool_calls": 3.46,
+  "mean_steps": 4.31,
+  "usd": 0.032398,
+  "usd_per_success": 0.00072,
+  "behaviour": {
+   "second_look": 1,
+   "read_after_action": 1,
+   "same_path_twice": 0,
+   "navigations": 50
+  },
+  "failed": [
+   "N2r1",
+   "S3r0",
+   "S3r1"
+  ],
+  "providers": [
+   "DeepInfra"
+  ]
+ },
+ "on": {
+  "solves": 48,
+  "success": 44,
+  "handovers": 0,
+  "mean_prompt_tokens": 24042,
+  "mean_uncached_prompt_tokens": 10469,
+  "mean_tool_calls": 3.35,
+  "mean_steps": 4.21,
+  "usd": 0.029898,
+  "usd_per_success": 0.000679,
+  "behaviour": {
+   "second_look": 3,
+   "read_after_action": 3,
+   "same_path_twice": 0,
+   "navigations": 49
+  },
+  "failed": [
+   "F1r0",
+   "P1r0",
+   "S3r0",
+   "S3r1"
+  ],
+  "providers": [
+   "DeepInfra"
+  ]
+ },
+ "decision": "no harm detected"
+}

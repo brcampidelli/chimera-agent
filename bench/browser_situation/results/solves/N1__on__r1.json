@@ -1,0 +1,52 @@
+{
+ "task": "N1",
+ "arm": "on",
+ "replica": 1,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.0016093499999999998,
+ "answer": "KH1850B",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 5,
+ "tool_calls": 4,
+ "prompt_tokens": 23174,
+ "completion_tokens": 322,
+ "cache_read_tokens": 17664,
+ "usd": 0.000612,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "6e4bb3ee63e1",
+ "module_in_prompt": true,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "navigate",
+  "read_text"
+ ],
+ "observation_chars": 16231,
+ "seconds": 29.2,
+ "requested_paths": [
+  "/news/index.html",
+  "/go/news/top-story"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 2
+ }
+}

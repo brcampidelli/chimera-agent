@@ -1,0 +1,2084 @@
+{
+ "deepseek/deepseek-v4-flash": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Relace",
+    "tag": "relace/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "OpenInference",
+    "tag": "open-inference/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Baidu",
+    "tag": "baidu/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "StreamLake",
+    "tag": "streamlake/fp8",
+    "max_completion_tokens": 384000,
+    "context_length": 1024000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp8",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "GMICloud",
+    "tag": "gmicloud/fp8",
+    "max_completion_tokens": 943717,
+    "context_length": 1048575,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Venice",
+    "tag": "venice",
+    "max_completion_tokens": 32768,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DigitalOcean",
+    "tag": "digitalocean",
+    "max_completion_tokens": 384000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "SiliconFlow",
+    "tag": "siliconflow/fp8",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Alibaba",
+    "tag": "alibaba/fp8",
+    "max_completion_tokens": 393216,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AtlasCloud",
+    "tag": "atlas-cloud/fp4",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "NextBit",
+    "tag": "nextbit/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mancer 2",
+    "tag": "mancer/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/us",
+    "max_completion_tokens": 384000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 16
+ },
+ "mistralai/mistral-small-3.2-24b-instruct": {
+  "preset": true,
+  "endpoints": [
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp8",
+    "max_completion_tokens": 16384,
+    "context_length": 128000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/bf16",
+    "max_completion_tokens": 32768,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Venice",
+    "tag": "venice/fp8",
+    "max_completion_tokens": 16384,
+    "context_length": 256000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mistral",
+    "tag": "mistral/eu",
+    "max_completion_tokens": 26214,
+    "context_length": 32768,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 0
+ },
+ "meta-llama/llama-3.3-70b-instruct": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/turbo",
+    "max_completion_tokens": 16384,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/bf16",
+    "max_completion_tokens": 11059,
+    "context_length": 12288,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AkashML",
+    "tag": "akashml/fp8",
+    "max_completion_tokens": 128000,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/fp8",
+    "max_completion_tokens": 16384,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Cloudflare",
+    "tag": "cloudflare/fp8",
+    "max_completion_tokens": 21600,
+    "context_length": 24000,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "SambaNova",
+    "tag": "sambanova-turbo",
+    "max_completion_tokens": 3072,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Groq",
+    "tag": "groq",
+    "max_completion_tokens": 32768,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "CoreWeave",
+    "tag": "coreweave/fp16",
+    "max_completion_tokens": 115200,
+    "context_length": 128000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/us-central1",
+    "max_completion_tokens": 8192,
+    "context_length": 128000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex",
+    "max_completion_tokens": 115200,
+    "context_length": 128000,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Together",
+    "tag": "together",
+    "max_completion_tokens": 2048,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 3
+ },
+ "openai/gpt-oss-20b": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Darkbloom",
+    "tag": "darkbloom/fp8",
+    "max_completion_tokens": 32768,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AkashML",
+    "tag": "akashml/fp4",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DekaLLM",
+    "tag": "dekallm/bf16",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "CoreWeave",
+    "tag": "coreweave/fp4",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/bf16",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/fp4",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp4",
+    "max_completion_tokens": 32768,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "SiliconFlow",
+    "tag": "siliconflow/fp8",
+    "max_completion_tokens": 8192,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock/eu-west-1",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/us-central1",
+    "max_completion_tokens": 32768,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": -2
+   },
+   {
+    "provider": "Groq",
+    "tag": "groq",
+    "max_completion_tokens": 65536,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 9
+ },
+ "deepseek/deepseek-v4-flash-0731": {
+  "preset": true,
+  "endpoints": [
+   {
+    "provider": "Relace",
+    "tag": "relace/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Sail Research",
+    "tag": "sail-research/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Sail Research",
+    "tag": "sail-research/us",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "OpenInference",
+    "tag": "open-inference/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Inceptron",
+    "tag": "inceptron/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "StreamLake",
+    "tag": "streamlake/fp8",
+    "max_completion_tokens": 384000,
+    "context_length": 1024000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Baidu",
+    "tag": "baidu/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp8",
+    "max_completion_tokens": 384000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Wafer",
+    "tag": "wafer/fast",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Reka",
+    "tag": "reka",
+    "max_completion_tokens": 131072,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Makora",
+    "tag": "makora",
+    "max_completion_tokens": 384000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DigitalOcean",
+    "tag": "digitalocean",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fp8",
+    "max_completion_tokens": 384000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fp8",
+    "max_completion_tokens": 384000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "CoreWeave",
+    "tag": "coreweave/fp8",
+    "max_completion_tokens": 235929,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Nebius",
+    "tag": "nebius/fp8",
+    "max_completion_tokens": 921600,
+    "context_length": 1024000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Cohere",
+    "tag": "cohere",
+    "max_completion_tokens": 384000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Together",
+    "tag": "together",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Morph",
+    "tag": "morph/bf16",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Venice",
+    "tag": "venice",
+    "max_completion_tokens": 32768,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mancer 2",
+    "tag": "mancer/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Fireworks",
+    "tag": "fireworks",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": -5
+   },
+   {
+    "provider": "SiliconFlow",
+    "tag": "siliconflow/fp8",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "GMICloud",
+    "tag": "gmicloud/fp8",
+    "max_completion_tokens": 943717,
+    "context_length": 1048575,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "NextBit",
+    "tag": "nextbit/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Alibaba",
+    "tag": "alibaba",
+    "max_completion_tokens": 393216,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Phala",
+    "tag": "phala",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AtlasCloud",
+    "tag": "atlas-cloud/fp4",
+    "max_completion_tokens": 393216,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Cloudflare",
+    "tag": "cloudflare",
+    "max_completion_tokens": 1179648,
+    "context_length": 1310720,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 31
+ },
+ "z-ai/glm-5.3-flash": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Relace",
+    "tag": "relace",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "InferenceNet",
+    "tag": "inference-net/fp4",
+    "max_completion_tokens": 128000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Sail Research",
+    "tag": "sail-research/us",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Sail Research",
+    "tag": "sail-research/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "OpenInference",
+    "tag": "open-inference/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp4",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "GMICloud",
+    "tag": "gmicloud/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Inceptron",
+    "tag": "inceptron/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Decart",
+    "tag": "decart/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": -2
+   },
+   {
+    "provider": "Phala",
+    "tag": "phala/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "StreamLake",
+    "tag": "streamlake/fp8",
+    "max_completion_tokens": 128000,
+    "context_length": 1024000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Modal",
+    "tag": "modal/nvfp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Near AI",
+    "tag": "near-ai/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Crusoe",
+    "tag": "crusoe/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "CoreWeave",
+    "tag": "coreweave/nvfp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AtlasCloud",
+    "tag": "atlas-cloud/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Fireworks",
+    "tag": "fireworks",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": -2
+   },
+   {
+    "provider": "Friendli",
+    "tag": "friendli",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "SiliconFlow",
+    "tag": "siliconflow/fp8",
+    "max_completion_tokens": 262144,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DigitalOcean",
+    "tag": "digitalocean",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Wafer",
+    "tag": "wafer",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Together",
+    "tag": "together",
+    "max_completion_tokens": 943717,
+    "context_length": 1048575,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Reka",
+    "tag": "reka",
+    "max_completion_tokens": 235929,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Venice",
+    "tag": "venice",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Io Net",
+    "tag": "io-net/fp8",
+    "max_completion_tokens": 65536,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Z.AI",
+    "tag": "z-ai/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "NextBit",
+    "tag": "nextbit/fp8",
+    "max_completion_tokens": 128000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Morph",
+    "tag": "morph/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Cloudflare",
+    "tag": "cloudflare",
+    "max_completion_tokens": 1179648,
+    "context_length": 1310720,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 33
+ },
+ "deepseek/deepseek-chat-v3.1": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp4",
+    "max_completion_tokens": 32768,
+    "context_length": 163840,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "SiliconFlow",
+    "tag": "siliconflow/fp8",
+    "max_completion_tokens": 147456,
+    "context_length": 163840,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 32768,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AtlasCloud",
+    "tag": "atlas-cloud/fp8",
+    "max_completion_tokens": 65536,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "CoreWeave",
+    "tag": "coreweave/fp8",
+    "max_completion_tokens": 144900,
+    "context_length": 161000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mara",
+    "tag": "mara",
+    "max_completion_tokens": 117964,
+    "context_length": 131072,
+    "tools": false,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/us-west2",
+    "max_completion_tokens": 32768,
+    "context_length": 163840,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": -5
+   },
+   {
+    "provider": "SambaNova",
+    "tag": "sambanova/fp8",
+    "max_completion_tokens": 7168,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 5
+ },
+ "z-ai/glm-4.6": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Venice",
+    "tag": "venice/fp4",
+    "max_completion_tokens": 16384,
+    "context_length": 198000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp4",
+    "max_completion_tokens": 131072,
+    "context_length": 202752,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/bf16",
+    "max_completion_tokens": 131072,
+    "context_length": 204800,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Z.AI",
+    "tag": "z-ai/fp4",
+    "max_completion_tokens": 131072,
+    "context_length": 202752,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 3
+ },
+ "google/gemini-2.5-flash": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Google",
+    "tag": "google-vertex/eu",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global/priority",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio/flex",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": -5
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio/priority",
+    "max_completion_tokens": 65535,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 7
+ },
+ "openai/gpt-5.6-luna": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "OpenAI",
+    "tag": "openai/flex",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "OpenAI",
+    "tag": "openai",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/us",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock/us-east-1",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/eu",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "OpenAI",
+    "tag": "openai/fast",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 7
+ },
+ "qwen/qwen3-coder": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Google",
+    "tag": "google-vertex/us-south1",
+    "max_completion_tokens": 65536,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/turbo",
+    "max_completion_tokens": 65536,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Venice",
+    "tag": "venice/fp8",
+    "max_completion_tokens": 65536,
+    "context_length": 256000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 65536,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": -5
+   },
+   {
+    "provider": "Alibaba",
+    "tag": "alibaba/opensource",
+    "max_completion_tokens": 65536,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 5
+ },
+ "z-ai/glm-5.3": {
+  "preset": true,
+  "endpoints": [
+   {
+    "provider": "Baidu",
+    "tag": "baidu/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Inceptron",
+    "tag": "inceptron/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Relace",
+    "tag": "relace",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DeepInfra",
+    "tag": "deepinfra/fp4",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Reka",
+    "tag": "reka",
+    "max_completion_tokens": 235929,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "InferenceNet",
+    "tag": "inference-net",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Io Net",
+    "tag": "io-net/fp8",
+    "max_completion_tokens": 65536,
+    "context_length": 262124,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Sail Research",
+    "tag": "sail-research/us",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Sail Research",
+    "tag": "sail-research/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Morph",
+    "tag": "morph/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Phala",
+    "tag": "phala",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "DigitalOcean",
+    "tag": "digitalocean",
+    "max_completion_tokens": 128000,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "GMICloud",
+    "tag": "gmicloud/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Makora",
+    "tag": "makora/fp4",
+    "max_completion_tokens": 128000,
+    "context_length": 980000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "SiliconFlow",
+    "tag": "siliconflow/fp8",
+    "max_completion_tokens": 262144,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Alibaba",
+    "tag": "alibaba",
+    "max_completion_tokens": 131072,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Decart",
+    "tag": "decart/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Friendli",
+    "tag": "friendli",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AkashML",
+    "tag": "akashml/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mistral",
+    "tag": "mistral/zdr",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Wafer",
+    "tag": "wafer/us",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fp4",
+    "max_completion_tokens": 262144,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mistral",
+    "tag": "mistral/nvfp4",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Crusoe",
+    "tag": "crusoe/fp4",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "PrimeIntellect",
+    "tag": "primeintellect",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Wafer",
+    "tag": "wafer",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Venice",
+    "tag": "venice",
+    "max_completion_tokens": 131072,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Together",
+    "tag": "together",
+    "max_completion_tokens": 943717,
+    "context_length": 1048575,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Parasail",
+    "tag": "parasail/fp8",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Modal",
+    "tag": "modal",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fp4",
+    "max_completion_tokens": 262144,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Fireworks",
+    "tag": "fireworks",
+    "max_completion_tokens": 943718,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Cloudflare",
+    "tag": "cloudflare",
+    "max_completion_tokens": 1179648,
+    "context_length": 1310720,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "AtlasCloud",
+    "tag": "atlas-cloud/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Z.AI",
+    "tag": "z-ai/fp8",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Mistral",
+    "tag": "mistral/nvfp4",
+    "max_completion_tokens": 131072,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fast",
+    "max_completion_tokens": 262144,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "BaseTen",
+    "tag": "baseten/fast",
+    "max_completion_tokens": 262144,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Alibaba",
+    "tag": "alibaba/fast",
+    "max_completion_tokens": 131072,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 40
+ },
+ "deepseek/deepseek-r1": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 16000,
+    "context_length": 64000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 0
+ },
+ "moonshotai/kimi-k2": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Novita",
+    "tag": "novita/fp8",
+    "max_completion_tokens": 98304,
+    "context_length": 131072,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 1
+ },
+ "openai/gpt-5.5": {
+  "preset": true,
+  "endpoints": [
+   {
+    "provider": "OpenAI",
+    "tag": "openai/flex",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "OpenAI",
+    "tag": "openai",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/us",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/eu",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock/us-east-1",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "OpenAI",
+    "tag": "openai/fast",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 7
+ },
+ "openai/gpt-6-sol": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "OpenAI",
+    "tag": "openai/flex",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "OpenAI",
+    "tag": "openai",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/us",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/eu",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": false,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock/us-east-1",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "OpenAI",
+    "tag": "openai/fast",
+    "max_completion_tokens": 128000,
+    "context_length": 1050000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 7
+ },
+ "google/gemini-3.8-flash": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio/flex",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global/flex",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio/priority",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global/priority",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 6
+ },
+ "google/gemini-3.1-pro-preview": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global/flex",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio/flex",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global/priority",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google AI Studio",
+    "tag": "google-ai-studio/priority",
+    "max_completion_tokens": 65536,
+    "context_length": 1048576,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 6
+ },
+ "anthropic/claude-opus-5": {
+  "preset": true,
+  "endpoints": [
+   {
+    "provider": "Claude Platform on AWS",
+    "tag": "claude-on-aws",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/global",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/global",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Anthropic",
+    "tag": "anthropic",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock/eu-west-1",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Azure",
+    "tag": "azure/us",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/us",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Google",
+    "tag": "google-vertex/europe",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Amazon Bedrock",
+    "tag": "amazon-bedrock/us-east-1",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   },
+   {
+    "provider": "Anthropic",
+    "tag": "anthropic/fast",
+    "max_completion_tokens": 128000,
+    "context_length": 1000000,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 11
+ },
+ "qwen/qwen3-max": {
+  "preset": false,
+  "endpoints": [
+   {
+    "provider": "Alibaba",
+    "tag": "alibaba",
+    "max_completion_tokens": 65536,
+    "context_length": 262144,
+    "tools": true,
+    "max_tokens_param": true,
+    "status": 0
+   }
+  ],
+  "tools_and_32k": 1
+ }
+}

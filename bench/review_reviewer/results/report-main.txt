@@ -1,0 +1,58 @@
+rows 30 · replicas 2 · US$ 0.1947 · stopped: {'M': 'stop rule: 2/10 transport errors'} · fixtures b2f9e29a5fd3
+
+[D] openrouter/deepseek/deepseek-v4-flash-0731 via DeepInfra  turns 60, ran 60, halted 0, transport failures 0
+  incomplete reviews               0/60 = 0.0% [0.0%, 6.0%]  causes {}
+  recall, a hit shown (±3)       34/40 = 85.0% [70.9%, 92.9%]
+    finder recall, before verifier 35/40 = 87.5% [73.9%, 94.5%]
+    incomplete counted as a miss   34/40 = 85.0% [70.9%, 92.9%]
+    replica 1: 18/20 shown, 18/20 located
+    replica 2: 16/20 shown, 17/20 located
+  clean diffs: 9 shown of 10 anchored over 10, 10 shown of 11 anchored over 10; per 10 diffs after the verifier 9.5 (before 10.5)
+  cost US$ 0.0612, per review US$ 0.00102 · tokens 182828/279201 · cache read 55040 · finder median 32.2s
+
+[L] openrouter/openai/gpt-6-luna via OpenAI  turns 60, ran 60, halted 0, transport failures 0
+  incomplete reviews               0/60 = 0.0% [0.0%, 6.0%]  causes {}
+  recall, a hit shown (±3)       39/40 = 97.5% [87.1%, 99.6%]
+    finder recall, before verifier 39/40 = 97.5% [87.1%, 99.6%]
+    incomplete counted as a miss   39/40 = 97.5% [87.1%, 99.6%]
+    replica 1: 20/20 shown, 20/20 located
+    replica 2: 19/20 shown, 19/20 located
+  clean diffs: 9 shown of 9 anchored over 10, 8 shown of 8 anchored over 10; per 10 diffs after the verifier 8.5 (before 8.5)
+  cost US$ 0.0604, per review US$ 0.001007 · tokens 185741/83659 · cache read 54597 · finder median 10.4s
+
+[Q] openrouter/qwen/qwen3.7-flash via Alibaba  turns 60, ran 60, halted 0, transport failures 0
+  incomplete reviews               3/60 = 5.0% [1.7%, 13.7%]  causes {'ceiling': 2, 'unreadable': 1}
+  recall, a hit shown (±3)       27/38 = 71.1% [55.2%, 83.0%]
+    finder recall, before verifier 28/38 = 73.7% [58.0%, 85.0%]
+    incomplete counted as a miss   27/40 = 67.5% [52.0%, 79.9%]
+    replica 1: 14/19 shown, 14/19 located
+    replica 2: 13/19 shown, 14/19 located
+  clean diffs: 9 shown of 12 anchored over 9, 16 shown of 16 anchored over 10; per 10 diffs after the verifier 13.0 (before 14.67)
+  cost US$ 0.0702, per review US$ 0.00117 · tokens 207975/491829 · cache read 34304 · finder median 68.2s
+
+[M] openrouter/mistralai/mistral-small-3.2-24b-instruct via Parasail  turns 60, ran 10, halted 50, transport failures 2
+  incomplete reviews               0/8 = 0.0% [0.0%, 32.4%]  causes {}
+  recall, a hit shown (±3)       1/7 = 14.3% [2.6%, 51.3%]
+    finder recall, before verifier 1/7 = 14.3% [2.6%, 51.3%]
+    incomplete counted as a miss   1/7 = 14.3% [2.6%, 51.3%]
+    replica 1: 1/4 shown, 1/4 located
+    replica 2: 0/3 shown, 0/3 located
+  clean diffs: 2 shown of 2 anchored over 1; per 10 diffs after the verifier 20.0 (before 20.0)
+  cost US$ 0.0029, per review US$ 0.00029 · tokens 20488/3528 · cache read 7968 · finder median 4.8s
+
+POSITIVE CONTROL D replica 1 finder recall 18/20 against S15's 17/20: reproduced
+FLOOR replica disagreement on a shown hit, seeded items with every replica done:
+  D: 6/20
+  L: 1/20
+  Q: 2/18
+  M: 0/3
+PAIRED against D, replica 1, a shown hit (reported, not decided on):
+  L on 20: only D 0, only L 2, exact McNemar p = 0.5
+  Q on 19: only D 3, only Q 0, exact McNemar p = 0.25
+  M on 4: only D 3, only M 0, exact McNemar p = 0.25
+
+DECISION (frozen rule)
+  L: qualifies, US$ 0.00101 per review
+  Q: does not qualify (recall 71.1% < D's 85.0% - 10 pp; clean findings 13.0 > D's 9.5 + 2)
+  M: does not qualify (not measured: stop rule: 2/10 transport errors)
+  chosen: L (openrouter/openai/gpt-6-luna), the cheapest qualifying

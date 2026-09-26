@@ -82,9 +82,37 @@ def is_untrusted_output(tool: Any) -> bool:
 _REFUSAL_MARK = "\u26d4"  # ⛔
 
 
-def refusal(text: str) -> str:
-    """Build a refusal observation. Every gate that declines to run a tool must go through here."""
-    return f"{_REFUSAL_MARK} {text}"
+class Refusal(str):
+    """A refusal :func:`refusal` built: our own words, known by type rather than by their first
+    character.
+
+    The mark is enough for the loop, which only asks whether a call ran. It is not enough for the
+    taint layer, which lets our refusal out of the data fence (``fence_observation``) and must never
+    let a page out. A page, an MCP server or an email can begin with the same character, and text
+    cannot tell the two apart. The type can: nothing that arrives from outside is built here.
+    """
+
+    __slots__ = ()
+
+
+def refusal(text: str) -> Refusal:
+    """Build a refusal observation. Every gate that declines to run a tool must go through here.
+
+    The model reads a refusal outside the data fence, even from a fetch tool, so ``text`` must be
+    ours: a reason, a rule's name, a fixed remedy. Never a fetched body or a remote error, which
+    belong in an ``error:`` result, where the fence keeps them.
+    """
+    return Refusal(f"{_REFUSAL_MARK} {text}")
+
+
+def tool_raised(name: str, exc: BaseException) -> str:
+    """The observation for a tool that raised instead of answering.
+
+    One sentence for every layer that catches: the loop (`Agent._run_tool`), and the taint layer for
+    a tool whose exception can carry remote text (`LedgeredTool`, `MCPTool`), which then fences it.
+    The model reads the same failure whoever caught it.
+    """
+    return f"error: tool {name!r} failed: {exc}"
 
 
 def is_refusal(observation: str) -> bool:

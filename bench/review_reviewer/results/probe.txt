@@ -1,0 +1,4 @@
+D openrouter/deepseek/deepseek-v4-flash-0731 via DeepInfra: tokens 11/43 billed US$ 0.00000840 ours US$ 0.00000840 ratio 1.000
+L openrouter/openai/gpt-6-luna via OpenAI: tokens 13/5 billed US$ 0.00000380 ours US$ 0.00000380 ratio 1.000
+Q openrouter/qwen/qwen3.7-flash via Alibaba: tokens 17/151 billed US$ 0.00002014 ours US$ 0.00002014 ratio 1.000
+M openrouter/mistralai/mistral-small-3.2-24b-instruct via DeepInfra: tokens 10/2 billed US$ 0.00000115 ours US$ 0.00000115 ratio 1.000

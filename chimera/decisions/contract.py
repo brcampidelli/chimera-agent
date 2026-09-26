@@ -51,6 +51,12 @@ class Choice:
     event_name: str = ""
     """What ``p`` is the probability *of*, for the backend that asks the model to write it:
     ``p_dangerous``. Defaults to the key."""
+    answer_format: str = ""
+    """The sentence that ends ``instructions`` and says how to write the answer — the one-word
+    judge's "Reply with exactly one word: …". A backend that asks for its own format sends
+    :meth:`framing` instead, so the model reads one output instruction and not two
+    (`bench/jev_decisions/RESULTS-one-schema.md`). A backend whose instrument was measured with the
+    sentence keeps ``instructions`` whole. Empty: the framing has no such sentence."""
 
     def __post_init__(self) -> None:
         if not self.key.strip():
@@ -65,10 +71,21 @@ class Choice:
             raise ValueError(f"event names options the question does not have: {unknown}")
         if len(self.event) == len(self.options):
             raise ValueError("an event over every option has probability 1 by construction")
+        # A declared sentence that is not where framing() cuts would be sent anyway, beside the
+        # backend's own format: the two-instruction prompt this field exists to prevent.
+        if self.answer_format and not self.instructions.endswith(self.answer_format):
+            raise ValueError("answer_format must be the sentence the instructions end with")
 
     @property
     def p_name(self) -> str:
         return self.event_name or self.key
+
+    def framing(self) -> str:
+        """The instructions without their :attr:`answer_format` sentence, for a backend that asks
+        for its own format; the instructions unchanged when they declare none."""
+        if not self.answer_format:
+            return self.instructions
+        return self.instructions[: -len(self.answer_format)].rstrip()
 
     def neutral(self) -> NeutralChoice:
         """This question with neutral option identifiers — ``A``, ``B``, ``C``… — and the meaning
@@ -88,6 +105,7 @@ class Choice:
         choice = Choice(
             key=self.key, instructions=self.instructions, options=letters, criteria=criteria,
             event=tuple(to_letter[e] for e in self.event), event_name=self.event_name,
+            answer_format=self.answer_format,
         )
         return NeutralChoice(choice=choice, to_original=to_original)
 
@@ -172,6 +190,12 @@ class Reading:
     alias ``typesafe/jev-1.13``, ``qwen3:4b@Q4_K_M`` behind the tag ``qwen3:4b``. Empty when the
     route does not say (every gateway in study 21 hid it). A map is fitted on one build; the Decider
     refuses to apply it to another."""
+    answer_from: str = ""
+    """Empty when the answer came as the reply's text, the ordinary path. ``reasoning``: the route
+    filed the reply as reasoning and the backend read its JSON from the end of it (see
+    ``CHIMERA_ANSWER_FROM_REASONING``). ``reasoning_unread``: the last reply was filed that way and
+    nothing was read from it, so an empty reading is the route's doing, not a model that said
+    nothing."""
 
 
 @runtime_checkable
@@ -224,6 +248,10 @@ class Answer:
     log_id: str = ""
     """The id of this answer's line in the decision log, when the Decider keeps one — what an
     outcome later names to label it. Empty without a log, or when the line could not be written."""
+    answer_from: str = ""
+    """Where the backend read the answer, when not from the reply's text (see
+    :attr:`Reading.answer_from`). On the receipt only when set, so whoever reads the log, or refits
+    a map on it, can tell such a row apart; nothing filters it out on its own."""
 
     @property
     def answered(self) -> bool:
@@ -281,6 +309,8 @@ class Answer:
             out["cached"] = True
         if self.log_id:
             out["log_id"] = self.log_id
+        if self.answer_from:
+            out["answer_from"] = self.answer_from
         if self.halt:
             out["halt"] = self.halt
         return out
@@ -393,7 +423,7 @@ class Decider:
             calibrated=usable is not None and raw_p is not None, map=found.id if found is not None else None,
             mass=reading.mass, seconds=seconds, usd=reading.usd, halt=halt, raw=reading.raw,
             logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
-            cached=cached is not None,
+            cached=cached is not None, answer_from=reading.answer_from,
         )
         if self.log is not None:
             # Every answer, halts included: a halt is a fact about availability the report counts.

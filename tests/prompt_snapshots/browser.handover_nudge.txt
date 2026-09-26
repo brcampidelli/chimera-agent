@@ -1,0 +1,1 @@
+The browser stopped at a page that needs the person: {wall}. Do not call tools. Write your final answer now: what the page asks them to do, and what you did before it.

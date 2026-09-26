@@ -1,0 +1,949 @@
+{
+ "arms": {
+  "D": {
+   "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+   "provider": "DeepInfra",
+   "price_per_m": [
+    0.06,
+    0.18
+   ],
+   "guard": 0.15
+  },
+  "L": {
+   "model": "openrouter/openai/gpt-6-luna",
+   "provider": "OpenAI",
+   "price_per_m": [
+    0.1,
+    0.5
+   ],
+   "guard": 0.75
+  },
+  "Q": {
+   "model": "openrouter/qwen/qwen3.7-flash",
+   "provider": "Alibaba",
+   "price_per_m": [
+    0.03,
+    0.13
+   ],
+   "guard": 0.25
+  },
+  "M": {
+   "model": "openrouter/mistralai/mistral-small-3.2-24b-instruct",
+   "provider": "DeepInfra",
+   "price_per_m": [
+    0.075,
+    0.2
+   ],
+   "guard": 0.1
+  }
+ },
+ "replicas": 1,
+ "tol": 3,
+ "order": [
+  "8ac471ce",
+  "12116dda",
+  "d36ce2f3"
+ ],
+ "stopped": {},
+ "usd": 0.0143,
+ "usd_by_arm": {
+  "D": 0.004,
+  "L": 0.0056,
+  "Q": 0.0048,
+  "M": 0.0
+ },
+ "fixtures_sha": "b2f9e29a5fd3",
+ "finder_prompt_sha": "3a480dab0478",
+ "verifier_prompt_sha": "ee9d780a9f4b",
+ "rows": [
+  {
+   "commit": "8ac471ce",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/repomap.py",
+    "line": 58,
+    "defect": "the ignore set holds names, so a path never matches and worktrees are still walked",
+    "category": "wrong constant"
+   },
+   "runs": {
+    "D": [
+     {
+      "status": "no_findings",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 907,
+        "completion": 1054,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 26.1,
+        "content": "{\"findings\": [], \"residual_risks\": [\"The new ignore entry may not be matched on Windows if path separators (backslashes) are compared against the forward-slash literal '.claude/worktrees' and the matching logic does not normalize paths.\", \"The ignore set might be applied after directory traversal, so the worktrees directory could still be scanned (causing wasted work) even if its contents are eventually ignored.\", \"The change assumes the only problematic location is '.claude/worktrees'; other agent harnesses could place worktrees elsewhere, and those would still pollute the map.\"], \"untested_paths\": [\"No test in the diff exercises the behavior when a '.claude/worktrees' directory exists, so the claimed fix (map budget restored, app.py present) is not verified.\", \"No test checks that the new ignore entry is actually effective with the current path-matching implementation.\"]}"
+       }
+      ],
+      "usd": 0.00024413999999999998,
+      "error": null
+     }
+    ],
+    "L": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 58,
+        "priority": "P2",
+        "confidence": 0.84,
+        "title": "Worktree ignore entry may not match directory components",
+        "evidence": "The ignore set adds `\".claude/worktrees\"`, while its other entries are individual directory names such as `\".git\"` and `\"node_modules\"`.",
+        "consequence": "If the walker matches ignored directories by component name, neither `.claude` nor `worktrees` matches this combined string, so worktree checkouts are still traversed and can crowd out the repository’s own files in the map.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 58,
+        "priority": "P2",
+        "confidence": 0.84,
+        "title": "Worktree ignore entry may not match directory components",
+        "evidence": "The ignore set adds `\".claude/worktrees\"`, while its other entries are individual directory names such as `\".git\"` and `\"node_modules\"`.",
+        "consequence": "If the walker matches ignored directories by component name, neither `.claude` nor `worktrees` matches this combined string, so worktree checkouts are still traversed and can crowd out the repository’s own files in the map.",
+        "anchor": "kept"
+       }
+      ],
+      "verified": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 58,
+        "priority": "P2",
+        "confidence": 0.84,
+        "title": "Worktree ignore entry may not match directory components",
+        "evidence": "The ignore set adds `\".claude/worktrees\"`, while its other entries are individual directory names such as `\".git\"` and `\"node_modules\"`.",
+        "consequence": "If the walker matches ignored directories by component name, neither `.claude` nor `worktrees` matches this combined string, so worktree checkouts are still traversed and can crowd out the repository’s own files in the map.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The diff adds the combined string `.claude/worktrees` to a set otherwise containing directory names; if the walker checks directory components, neither component matches it."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 912,
+        "completion": 704,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 6.4,
+        "content": "{\"findings\":[{\"file\":\"chimera/core/repomap.py\",\"line\":58,\"priority\":\"P2\",\"title\":\"Worktree ignore entry may not match directory components\",\"evidence\":\"The ignore set adds `\\\".claude/worktrees\\\"`, while its other entries are individual directory names such as `\\\".git\\\"` and `\\\"node_modules\\\"`.\",\"consequence\":\"If the walker matches ignored directories by component name, neither `.claude` nor `worktrees` matches this combined string, so worktree checkouts are still traversed and can crowd out the repository’s own files in the map.\",\"confidence\":0.84}],\"residual_risks\":[\"The diff does not show the ignore-matching logic, so it cannot establish whether combined relative paths are supported.\"],\"untested_paths\":[\"No test in the diff exercises traversal of `.claude/worktrees` or verifies that the repository’s own entry-point files remain in the map.\"]}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 844,
+        "completion": 233,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 2.8,
+        "content": "{\"reason\":\"The diff adds the combined string `.claude/worktrees` to a set otherwise containing directory names; if the walker checks directory components, neither component matches it.\",\"verdict\":\"keep\"}"
+       }
+      ],
+      "usd": 0.0006441,
+      "error": null
+     }
+    ],
+    "Q": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 58,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Path separator in `_DEFAULT_IGNORE` entry may prevent directory matching",
+        "evidence": "+     \".claude/worktrees\",",
+        "consequence": "If `_DEFAULT_IGNORE` is matched against individual path components (e.g., `path.name` or `path.parts`), the forward slash prevents a match. The directory remains unignored, causing the duplicate-file mapping issue described in the comments.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 58,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Path separator in `_DEFAULT_IGNORE` entry may prevent directory matching",
+        "evidence": "+     \".claude/worktrees\",",
+        "consequence": "If `_DEFAULT_IGNORE` is matched against individual path components (e.g., `path.name` or `path.parts`), the forward slash prevents a match. The directory remains unignored, causing the duplicate-file mapping issue described in the comments.",
+        "anchor": "kept"
+       }
+      ],
+      "verified": [
+       {
+        "file": "chimera/core/repomap.py",
+        "line": 58,
+        "priority": "P2",
+        "confidence": 0.7,
+        "title": "Path separator in `_DEFAULT_IGNORE` entry may prevent directory matching",
+        "evidence": "+     \".claude/worktrees\",",
+        "consequence": "If `_DEFAULT_IGNORE` is matched against individual path components (e.g., `path.name` or `path.parts`), the forward slash prevents a match. The directory remains unignored, causing the duplicate-file mapping issue described in the comments.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The diff explicitly adds the string containing a forward slash to the _DEFAULT_IGNORE set, directly matching the finding's identified code."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 979,
+        "completion": 2894,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 39.0,
+        "content": "{\"findings\": [{\"file\": \"chimera/core/repomap.py\", \"line\": 58, \"priority\": \"P2\", \"title\": \"Path separator in `_DEFAULT_IGNORE` entry may prevent directory matching\", \"evidence\": \"+     \\\".claude/worktrees\\\",\", \"consequence\": \"If `_DEFAULT_IGNORE` is matched against individual path components (e.g., `path.name` or `path.parts`), the forward slash prevents a match. The directory remains unignored, causing the duplicate-file mapping issue described in the comments.\", \"confidence\": 0.7}], \"residual_risks\": [\"The actual implementation of `_DEFAULT_IGNORE` matching is not visible in the diff. If the code joins path parts with `/` before comparison, the pattern would work as intended.\"], \"untested_paths\": [\"The diff does not include tests verifying that `.claude/worktrees/` directories are correctly ignored or that duplicate mapping is prevented.\"]}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 891,
+        "completion": 1259,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 17.0,
+        "content": "{\"reason\": \"The diff explicitly adds the string containing a forward slash to the _DEFAULT_IGNORE set, directly matching the finding's identified code.\", \"verdict\": \"keep\"}"
+       }
+      ],
+      "usd": 0.00059599,
+      "error": null
+     }
+    ],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "NotFoundError: litellm.NotFoundError: NotFoundError: OpenrouterException - {\"error\":{\"message\":\"No endpoints found for mistralai/mistral-small-3.2-24b-instruct. Every candidate endpoint was removed during routing: Filter by Regional Surcharge removed mistral/eu; Filter by Context Length removed deep",
+        "seconds": 0.6
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "12116dda",
+   "kind": "seeded",
+   "seed": {
+    "path": "chimera/core/autonomous.py",
+    "line": 1257,
+    "defect": "every reverted attempt of a run overwrites the same file",
+    "category": "collision"
+   },
+   "runs": {
+    "D": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P1",
+        "confidence": 0.9,
+        "title": "Saved reverted diffs overwrite each other for attempts in the same run",
+        "evidence": "destino = (self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\")",
+        "consequence": "When a run has more than one reverted attempt, each attempt writes its diff to the same file (keyed only by run_id), so a later attempt overwrites the earlier one, losing the earlier attempt's work — defeating the purpose of preservation. If run_id is empty, all runs share \"run.diff\".",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P1",
+        "confidence": 0.9,
+        "title": "Saved reverted diffs overwrite each other for attempts in the same run",
+        "evidence": "destino = (self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\")",
+        "consequence": "When a run has more than one reverted attempt, each attempt writes its diff to the same file (keyed only by run_id), so a later attempt overwrites the earlier one, losing the earlier attempt's work — defeating the purpose of preservation. If run_id is empty, all runs share \"run.diff\".",
+        "anchor": "kept"
+       }
+      ],
+      "verified": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P1",
+        "confidence": 0.9,
+        "title": "Saved reverted diffs overwrite each other for attempts in the same run",
+        "evidence": "destino = (self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\")",
+        "consequence": "When a run has more than one reverted attempt, each attempt writes its diff to the same file (keyed only by run_id), so a later attempt overwrites the earlier one, losing the earlier attempt's work — defeating the purpose of preservation. If run_id is empty, all runs share \"run.diff\".",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The diff's destino path is keyed only by attempt.run_id (or 'run'), so multiple reverted attempts in the same run overwrite the same .diff file; no line contradicts this."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 3128,
+        "completion": 3443,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 41.8,
+        "content": "{\n  \"findings\": [\n    {\n      \"file\": \"chimera/core/autonomous.py\",\n      \"line\": 1257,\n      \"priority\": \"P1\",\n      \"title\": \"Saved reverted diffs overwrite each other for attempts in the same run\",\n      \"evidence\": \"destino = (self.run_log.parent / \\\"discarded\\\" / f\\\"{attempt.run_id or 'run'}.diff\\\")\",\n      \"consequence\": \"When a run has more than one reverted attempt, each attempt writes its diff to the same file (keyed only by run_id), so a later attempt overwrites the earlier one, losing the earlier attempt's work — defeating the purpose of preservation. If run_id is empty, all runs share \\\"run.diff\\\".\",\n      \"confidence\": 0.9\n    }\n  ],\n  \"residual_risks\": [\n    \"The method writes only the unified diff, not the full workspace state; if the diff generation itself is lossy (e.g., binary files), the preserved data may be incomplete.\",\n    \"Writing is best-effort; a disk failure or permissions error silently returns \\\"\\\" and the work is lost, though this is by design.\"\n  ],\n  \"untested_paths\": [\n    \"The `_preserve_discarded` method is only called in the failure path with a guard and snapshot; no tests in the diff exercise it.\",\n    \"The behavior when `attempt.run_id` is empty (fallback to \\\"run\\\") is untested.\",\n    \"The interaction of multiple reverted attempts in a single run is untested.\"\n  ]\n}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1469,
+        "completion": 558,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 12.9,
+        "content": "{\"reason\": \"The diff's destino path is keyed only by attempt.run_id (or 'run'), so multiple reverted attempts in the same run overwrite the same .diff file; no line contradicts this.\", \"verdict\": \"keep\"}"
+       }
+      ],
+      "usd": 0.000996,
+      "error": null
+     }
+    ],
+    "L": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P0",
+        "confidence": 0.76,
+        "title": "Untrusted run IDs can escape the discarded directory",
+        "evidence": "`self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\"` uses `attempt.run_id` as a path component without validation.",
+        "consequence": "If a worker or other caller can supply a run ID containing path separators or an absolute path, the write can escape `discarded` and truncate or create a `.diff` file elsewhere. This is a path traversal/write vulnerability.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P2",
+        "confidence": 0.97,
+        "title": "Attempts without unique run IDs overwrite preserved work",
+        "evidence": "`attempt.run_id or 'run'` gives every attempt with an empty run ID the same destination, `discarded/run.diff`.",
+        "consequence": "When multiple reverted attempts lack run IDs, each later write replaces the earlier saved diff; earlier receipts then point to a file containing different work, losing the recovery data this change is intended to preserve.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P0",
+        "confidence": 0.76,
+        "title": "Untrusted run IDs can escape the discarded directory",
+        "evidence": "`self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\"` uses `attempt.run_id` as a path component without validation.",
+        "consequence": "If a worker or other caller can supply a run ID containing path separators or an absolute path, the write can escape `discarded` and truncate or create a `.diff` file elsewhere. This is a path traversal/write vulnerability.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P2",
+        "confidence": 0.97,
+        "title": "Attempts without unique run IDs overwrite preserved work",
+        "evidence": "`attempt.run_id or 'run'` gives every attempt with an empty run ID the same destination, `discarded/run.diff`.",
+        "consequence": "When multiple reverted attempts lack run IDs, each later write replaces the earlier saved diff; earlier receipts then point to a file containing different work, losing the recovery data this change is intended to preserve.",
+        "anchor": "kept"
+       }
+      ],
+      "verified": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P0",
+        "confidence": 0.76,
+        "title": "Untrusted run IDs can escape the discarded directory",
+        "evidence": "`self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\"` uses `attempt.run_id` as a path component without validation.",
+        "consequence": "If a worker or other caller can supply a run ID containing path separators or an absolute path, the write can escape `discarded` and truncate or create a `.diff` file elsewhere. This is a path traversal/write vulnerability.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The diff writes `attempt.run_id` directly into the path without validation, so separators or an absolute run ID can escape `discarded`."
+       },
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P2",
+        "confidence": 0.97,
+        "title": "Attempts without unique run IDs overwrite preserved work",
+        "evidence": "`attempt.run_id or 'run'` gives every attempt with an empty run ID the same destination, `discarded/run.diff`.",
+        "consequence": "When multiple reverted attempts lack run IDs, each later write replaces the earlier saved diff; earlier receipts then point to a file containing different work, losing the recovery data this change is intended to preserve.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The destination uses only `attempt.run_id or 'run'`, so attempts with empty IDs overwrite `discarded/run.diff`."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 3121,
+        "completion": 2470,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 18.0,
+        "content": "{\"findings\":[{\"file\":\"chimera/core/autonomous.py\",\"line\":1257,\"priority\":\"P0\",\"title\":\"Untrusted run IDs can escape the discarded directory\",\"evidence\":\"`self.run_log.parent / \\\"discarded\\\" / f\\\"{attempt.run_id or 'run'}.diff\\\"` uses `attempt.run_id` as a path component without validation.\",\"consequence\":\"If a worker or other caller can supply a run ID containing path separators or an absolute path, the write can escape `discarded` and truncate or create a `.diff` file elsewhere. This is a path traversal/write vulnerability.\",\"confidence\":0.76},{\"file\":\"chimera/core/autonomous.py\",\"line\":1257,\"priority\":\"P2\",\"title\":\"Attempts without unique run IDs overwrite preserved work\",\"evidence\":\"`attempt.run_id or 'run'` gives every attempt with an empty run ID the same destination, `discarded/run.diff`.\",\"consequence\":\"When multiple reverted attempts lack run IDs, each later write replaces the earlier saved diff; earlier receipts then point to a file containing different work, losing the recovery data this change is intended to preserve.\",\"confidence\":0.97}],\"residual_risks\":[\"The diff does not show whether run IDs are validated or guaranteed unique before reaching this method.\",\"The saved artifact is a unified diff rather than a full file snapshot; the diff does not establish whether all changed file types and contents can be reconstructed from it.\"],\"untested_paths\":[\"No tests in the diff exercise saving a reverted attempt, preservation failures, repeated attempts with empty or duplicate run IDs, or path-like run IDs.\"]}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1374,
+        "completion": 152,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 2.1,
+        "content": "{\"reason\":\"The diff writes `attempt.run_id` directly into the path without validation, so separators or an absolute run ID can escape `discarded`.\",\"verdict\":\"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1357,
+        "completion": 118,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 1.9,
+        "content": "{\"reason\":\"The destination uses only `attempt.run_id or 'run'`, so attempts with empty IDs overwrite `discarded/run.diff`.\",\"verdict\":\"keep\"}"
+       }
+      ],
+      "usd": 0.0019552,
+      "error": null
+     }
+    ],
+    "Q": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P2",
+        "confidence": 0.9,
+        "title": "Failed attempt diffs overwrite each other within the same run",
+        "evidence": "destino = (\n                self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\"\n            )\n...\n            destino.write_text(\"\\n\".join(corpo), encoding=\"utf-8\")",
+        "consequence": "The filename is constructed solely from `run_id` (or a hardcoded 'run'), ignoring the attempt `index`. If a single run generates multiple failed attempts, each call to `_preserve_discarded` overwrites the previous `.diff` file. Only the last failed attempt's full diff is preserved, causing silent data loss for earlier failures.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P2",
+        "confidence": 0.9,
+        "title": "Failed attempt diffs overwrite each other within the same run",
+        "evidence": "destino = (\n                self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\"\n            )\n...\n            destino.write_text(\"\\n\".join(corpo), encoding=\"utf-8\")",
+        "consequence": "The filename is constructed solely from `run_id` (or a hardcoded 'run'), ignoring the attempt `index`. If a single run generates multiple failed attempts, each call to `_preserve_discarded` overwrites the previous `.diff` file. Only the last failed attempt's full diff is preserved, causing silent data loss for earlier failures.",
+        "anchor": "kept"
+       }
+      ],
+      "verified": [
+       {
+        "file": "chimera/core/autonomous.py",
+        "line": 1257,
+        "priority": "P2",
+        "confidence": 0.9,
+        "title": "Failed attempt diffs overwrite each other within the same run",
+        "evidence": "destino = (\n                self.run_log.parent / \"discarded\" / f\"{attempt.run_id or 'run'}.diff\"\n            )\n...\n            destino.write_text(\"\\n\".join(corpo), encoding=\"utf-8\")",
+        "consequence": "The filename is constructed solely from `run_id` (or a hardcoded 'run'), ignoring the attempt `index`. If a single run generates multiple failed attempts, each call to `_preserve_discarded` overwrites the previous `.diff` file. Only the last failed attempt's full diff is preserved, causing silent data loss for earlier failures.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "Line 1257 constructs the filename using only `attempt.run_id`, while the `index` parameter is only used in a comment string, confirming that multiple failed attempts in the same run will overwrite the same file."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 3555,
+        "completion": 7708,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 92.0,
+        "content": "{\n  \"findings\": [\n    {\n      \"file\": \"chimera/core/autonomous.py\",\n      \"line\": 1257,\n      \"priority\": \"P2\",\n      \"title\": \"Failed attempt diffs overwrite each other within the same run\",\n      \"evidence\": \"destino = (\\n                self.run_log.parent / \\\"discarded\\\" / f\\\"{attempt.run_id or 'run'}.diff\\\"\\n            )\\n...\\n            destino.write_text(\\\"\\\\n\\\".join(corpo), encoding=\\\"utf-8\\\")\",\n      \"consequence\": \"The filename is constructed solely from `run_id` (or a hardcoded 'run'), ignoring the attempt `index`. If a single run generates multiple failed attempts, each call to `_preserve_discarded` overwrites the previous `.diff` file. Only the last failed attempt's full diff is preserved, causing silent data loss for earlier failures.\",\n      \"confidence\": 0.9\n    }\n  ],\n  \"residual_risks\": [\n    \"Direct attribute access `attempt.run_id` at line 1257 assumes the field exists on `Attempt`. While the broad `except Exception` prevents a crash, it masks potential schema mismatches and differs from the defensive `getattr` pattern used in `build_receipt`.\",\n    \"`self.run_log` is implicitly assumed to be a `pathlib.Path` to support `/` and `.parent`. If it is ever a plain string, path construction will raise `TypeError` before entering the `try` block.\",\n    \"If multiple agent processes share the same `run_log` parent directory, concurrent calls to `_preserve_discarded` could race on creating the `discarded/` directory or writing files.\"\n  ],\n  \"untested_paths\": [\n    \"Execution paths where a run contains two or more failed attempts, triggering the overwrite behavior.\",\n    \"Early-return branches where `self.run_log` is `None` or `attempt.diffs` is empty.\",\n    \"Failure modes during `destino.write_text` (e.g., disk full, permission denied), verifying that warnings are logged and execution continues unaffected.\",\n    \"Downstream consumption of `discarded_at` in `build_receipt` and any UI or audit tools reading the receipt.\"\n  ]\n}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1591,
+        "completion": 1611,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 18.7,
+        "content": "{\"reason\": \"Line 1257 constructs the filename using only `attempt.run_id`, while the `index` parameter is only used in a comment string, confirming that multiple failed attempts in the same run will overwrite the same file.\", \"verdict\": \"keep\"}"
+       }
+      ],
+      "usd": 0.00136585,
+      "error": null
+     }
+    ],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "NotFoundError: litellm.NotFoundError: NotFoundError: OpenrouterException - {\"error\":{\"message\":\"No endpoints found for mistralai/mistral-small-3.2-24b-instruct. Every candidate endpoint was removed during routing: Filter by Regional Surcharge removed mistral/eu; Filter by Context Length removed deep",
+        "seconds": 0.1
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     }
+    ]
+   }
+  },
+  {
+   "commit": "d36ce2f3",
+   "kind": "clean",
+   "seed": null,
+   "runs": {
+    "D": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.95,
+        "title": "Missing `python -m pip` invocation form",
+        "evidence": "\\b(?:pip3?|pipx|uv\\s+pip|uv\\s+tool)\\s+install\\b",
+        "consequence": "The very common `python -m pip install somepkg` (and `python3 -m pip install ...`) is not matched because the pattern only looks for `pip`, `pip3`, `pipx`, or `uv` subcommands, so these installs escape review.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.9,
+        "title": "Negative lookahead suppresses rule when a requirements file is combined with a package name",
+        "evidence": "(?![^\\n]*\\s(?:-r|--requirement)\\b)",
+        "consequence": "Commands like `pip install somepkg -r requirements.txt` install a named package but are not flagged because the negative lookahead excludes the whole match whenever `-r` or `--requirement` appears anywhere on the line, even when a name is also present.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.8,
+        "title": "Option pattern does not consume option values, causing false negatives for installs with valued options",
+        "evidence": "(?:\\s+-[-\\w=]+)*\\s+['\"]?(?![-./~\\\\])[A-Za-z][\\w.\\-]*",
+        "consequence": "Commands like `pip install --target /tmp somepkg` or `npm install --prefix ./dir somepkg` do not match because the option value is misinterpreted as the package name (and fails the name start check), so the actual package name is never seen and the rule does not fire.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [],
+      "verified": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.95,
+        "title": "Missing `python -m pip` invocation form",
+        "evidence": "\\b(?:pip3?|pipx|uv\\s+pip|uv\\s+tool)\\s+install\\b",
+        "consequence": "The very common `python -m pip install somepkg` (and `python3 -m pip install ...`) is not matched because the pattern only looks for `pip`, `pip3`, `pipx`, or `uv` subcommands, so these installs escape review.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The new package_install regex at policy.py:154 matches pip/pip3/pipx/uv but not `python -m pip install`, so the described gap is real."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.9,
+        "title": "Negative lookahead suppresses rule when a requirements file is combined with a package name",
+        "evidence": "(?![^\\n]*\\s(?:-r|--requirement)\\b)",
+        "consequence": "Commands like `pip install somepkg -r requirements.txt` install a named package but are not flagged because the negative lookahead excludes the whole match whenever `-r` or `--requirement` appears anywhere on the line, even when a name is also present.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The finding accurately describes the negative lookahead in the new package_install rule; the diff includes that pattern, and it indeed suppresses matches when -r/--requirement appears later on the line even if a package name is present."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.8,
+        "title": "Option pattern does not consume option values, causing false negatives for installs with valued options",
+        "evidence": "(?:\\s+-[-\\w=]+)*\\s+['\"]?(?![-./~\\\\])[A-Za-z][\\w.\\-]*",
+        "consequence": "Commands like `pip install --target /tmp somepkg` or `npm install --prefix ./dir somepkg` do not match because the option value is misinterpreted as the package name (and fails the name start check), so the actual package name is never seen and the rule does not fire.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The pattern's option group matches only the option token, not its value, so a value like `/tmp` fails the name-start negative lookahead and the command is missed."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 1515,
+        "completion": 11285,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 148.4,
+        "content": "{\n  \"findings\": [\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 154,\n      \"priority\": \"P1\",\n      \"title\": \"Negative lookahead suppresses rule when a requirements file is combined with a package name\",\n      \"evidence\": \"(?![^\\\\n]*\\\\s(?:-r|--requirement)\\\\b)\",\n      \"consequence\": \"Commands like `pip install somepkg -r requirements.txt` install a named package but are not flagged because the negative lookahead excludes the whole match whenever `-r` or `--requirement` appears anywhere on the line, even when a name is also present.\",\n      \"confidence\": 0.9\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 154,\n      \"priority\": \"P1\",\n      \"title\": \"Option pattern does not consume option values, causing false negatives for installs with valued options\",\n      \"evidence\": \"(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w.\\\\-]*\",\n      \"consequence\": \"Commands like `pip install --target /tmp somepkg` or `npm install --prefix ./dir somepkg` do not match because the option value is misinterpreted as the package name (and fails the name start check), so the actual package name is never seen and the rule does not fire.\",\n      \"confidence\": 0.8\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 154,\n      \"priority\": \"P1\",\n      \"title\": \"Missing `python -m pip` invocation form\",\n      \"evidence\": \"\\\\b(?:pip3?|pipx|uv\\\\s+pip|uv\\\\s+tool)\\\\s+install\\\\b\",\n      \"consequence\": \"The very common `python -m pip install somepkg` (and `python3 -m pip install ...`) is not matched because the pattern only looks for `pip`, `pip3`, `pipx`, or `uv` subcommands, so these installs escape review.\",\n      \"confidence\": 0.95\n    }\n  ],\n  \"residual_risks\": [\n    \"The rule covers only a subset of package managers (pip, uv, npm, yarn, pnpm, cargo, apt, brew, gem, go); other tools like conda, pipenv, poetry, and maven are not handled.\",\n    \"The regex may produce false positives for URL-based installs (e.g., `npm install https://...`) by matching the URL scheme as a package name, though the comment indicates URL installs are intended to be flagged.\",\n    \"Options with values appearing before the package name are not correctly handled, which can cause both false negatives (as reported) and potential false positives if the value looks like a name.\",\n    \"The rule does not consider `--requirement` with an equals sign (e.g., `--requirement=req.txt`), leading to inconsistent behavior.\",\n    \"Commands using `python -m pip` or `python3 -m pip` are not matched, as reported.\"\n  ],\n  \"untested_paths\": [\n    \"No tests are added in this diff for the new `package_install` rule, so its behavior across the many package managers and option permutations is unverified.\",\n    \"No tests cover combinations of options with values, requirements-file flags, or the `python -m pip` invocation form.\"\n  ]\n}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1530,
+        "completion": 401,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 5.2,
+        "content": "{\"reason\": \"The new package_install regex at policy.py:154 matches pip/pip3/pipx/uv but not `python -m pip install`, so the described gap is real.\", \"verdict\": \"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1446,
+        "completion": 569,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 5.1,
+        "content": "{\"reason\": \"The finding accurately describes the negative lookahead in the new package_install rule; the diff includes that pattern, and it indeed suppresses matches when -r/--requirement appears later on the line even if a package name is present.\", \"verdict\": \"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1469,
+        "completion": 1055,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "stop",
+        "seconds": 10.7,
+        "content": "{\"reason\": \"The pattern's option group matches only the option token, not its value, so a value like `/tmp` fails the name-start negative lookahead and the command is missed.\", \"verdict\": \"keep\"}"
+       }
+      ],
+      "usd": 0.0027533999999999996,
+      "error": null
+     }
+    ],
+    "L": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.98,
+        "title": "Common `python -m pip` installs bypass the review rule",
+        "evidence": "The pip command pattern starts with `\\b(?:pip3?|pipx|uv\\s+pip|uv\\s+tool)\\s+install\\b`.",
+        "consequence": "A command such as `python -m pip install untrusted-helper` does not match, so an agent can install a named package without this rule requesting review.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P2",
+        "confidence": 0.99,
+        "title": "A requirements-file option suppresses review even when the command also installs a named package",
+        "evidence": "The pip pattern has the negative lookahead `(?![^\\n]*\\s(?:-r|--requirement)\\b` before matching a package name.",
+        "consequence": "A command such as `pip install untrusted-helper -r requirements.txt` is excluded entirely, even though it installs the named package as well as the requirements. The same can happen when another command containing `-r` follows on the same line.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P2",
+        "confidence": 0.96,
+        "title": "Options written with `=value` can prevent a package install from matching",
+        "evidence": "The option pattern is `(?:\\s+-[-\\w=]+)*\\s+`; for example, it cannot consume `--index-url=https://...` as one option.",
+        "consequence": "Commands such as `pip install --index-url=https://example.invalid/simple untrusted-helper` fail to match because the pattern stops at the colon and never reaches the package name. The same issue affects options such as npm's `--registry=https://...`.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 155,
+        "priority": "P2",
+        "confidence": 0.96,
+        "title": "Valid package names beginning with a digit are not detected",
+        "evidence": "The package-name pattern requires `[A-Za-z]` as its first character.",
+        "consequence": "Valid names such as `2to3` or `3to2` are not matched by `pip install 2to3` or `uv add 2to3`, so those installs avoid review.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [],
+      "verified": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P1",
+        "confidence": 0.98,
+        "title": "Common `python -m pip` installs bypass the review rule",
+        "evidence": "The pip command pattern starts with `\\b(?:pip3?|pipx|uv\\s+pip|uv\\s+tool)\\s+install\\b`.",
+        "consequence": "A command such as `python -m pip install untrusted-helper` does not match, so an agent can install a named package without this rule requesting review.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The added pip pattern accepts `pip`/`pip3` but not `python -m pip`, so that command is not matched by this rule."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P2",
+        "confidence": 0.99,
+        "title": "A requirements-file option suppresses review even when the command also installs a named package",
+        "evidence": "The pip pattern has the negative lookahead `(?![^\\n]*\\s(?:-r|--requirement)\\b` before matching a package name.",
+        "consequence": "A command such as `pip install untrusted-helper -r requirements.txt` is excluded entirely, even though it installs the named package as well as the requirements. The same can happen when another command containing `-r` follows on the same line.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The negative lookahead rejects the pip install match if any later text on the same line contains `-r` or `--requirement`, including when a named package is also installed."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 154,
+        "priority": "P2",
+        "confidence": 0.96,
+        "title": "Options written with `=value` can prevent a package install from matching",
+        "evidence": "The option pattern is `(?:\\s+-[-\\w=]+)*\\s+`; for example, it cannot consume `--index-url=https://...` as one option.",
+        "consequence": "Commands such as `pip install --index-url=https://example.invalid/simple untrusted-helper` fail to match because the pattern stops at the colon and never reaches the package name. The same issue affects options such as npm's `--registry=https://...`.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The option class excludes `:` and `/`, so `--index-url=https://...` cannot be consumed as an option, and the following package name cannot match because the pattern requires whitespace immediately after the options."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 155,
+        "priority": "P2",
+        "confidence": 0.96,
+        "title": "Valid package names beginning with a digit are not detected",
+        "evidence": "The package-name pattern requires `[A-Za-z]` as its first character.",
+        "consequence": "Valid names such as `2to3` or `3to2` are not matched by `pip install 2to3` or `uv add 2to3`, so those installs avoid review.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The pip/uv name branches require `[A-Za-z]` as the first character, so digit-leading names such as `2to3` do not match."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 1514,
+        "completion": 3794,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 29.3,
+        "content": "{\n  \"findings\": [\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 154,\n      \"priority\": \"P1\",\n      \"title\": \"Common `python -m pip` installs bypass the review rule\",\n      \"evidence\": \"The pip command pattern starts with `\\\\b(?:pip3?|pipx|uv\\\\s+pip|uv\\\\s+tool)\\\\s+install\\\\b`.\",\n      \"consequence\": \"A command such as `python -m pip install untrusted-helper` does not match, so an agent can install a named package without this rule requesting review.\",\n      \"confidence\": 0.98\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 154,\n      \"priority\": \"P2\",\n      \"title\": \"Options written with `=value` can prevent a package install from matching\",\n      \"evidence\": \"The option pattern is `(?:\\\\s+-[-\\\\w=]+)*\\\\s+`; for example, it cannot consume `--index-url=https://...` as one option.\",\n      \"consequence\": \"Commands such as `pip install --index-url=https://example.invalid/simple untrusted-helper` fail to match because the pattern stops at the colon and never reaches the package name. The same issue affects options such as npm's `--registry=https://...`.\",\n      \"confidence\": 0.96\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 154,\n      \"priority\": \"P2\",\n      \"title\": \"A requirements-file option suppresses review even when the command also installs a named package\",\n      \"evidence\": \"The pip pattern has the negative lookahead `(?![^\\\\n]*\\\\s(?:-r|--requirement)\\\\b` before matching a package name.\",\n      \"consequence\": \"A command such as `pip install untrusted-helper -r requirements.txt` is excluded entirely, even though it installs the named package as well as the requirements. The same can happen when another command containing `-r` follows on the same line.\",\n      \"confidence\": 0.99\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 155,\n      \"priority\": \"P2\",\n      \"title\": \"Valid package names beginning with a digit are not detected\",\n      \"evidence\": \"The package-name pattern requires `[A-Za-z]` as its first character.\",\n      \"consequence\": \"Valid names such as `2to3` or `3to2` are not matched by `pip install 2to3` or `uv add 2to3`, so those installs avoid review.\",\n      \"confidence\": 0.96\n    }\n  ],\n  \"residual_risks\": [\n    \"The diff does not show how `_pattern` is applied to shell commands, so tokenization, multiline handling, and interactions with other rules cannot be verified.\"\n  ],\n  \"untested_paths\": [\n    \"No tests are included for the new rule, including `python -m pip`, options with `=value`, mixed `-r` and named-package installs, or package names beginning with digits.\"\n  ]\n}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1434,
+        "completion": 103,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 2.7,
+        "content": "{\"reason\":\"The added pip pattern accepts `pip`/`pip3` but not `python -m pip`, so that command is not matched by this rule.\",\"verdict\":\"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1457,
+        "completion": 160,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 3.8,
+        "content": "{\"reason\":\"The negative lookahead rejects the pip install match if any later text on the same line contains `-r` or `--requirement`, including when a named package is also installed.\",\"verdict\":\"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1461,
+        "completion": 238,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 2.6,
+        "content": "{\"reason\":\"The option class excludes `:` and `/`, so `--index-url=https://...` cannot be consumed as an option, and the following package name cannot match because the pattern requires whitespace immediately after the options.\",\"verdict\":\"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1427,
+        "completion": 180,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "stop",
+        "seconds": 2.1,
+        "content": "{\"reason\":\"The pip/uv name branches require `[A-Za-z]` as the first character, so digit-leading names such as `2to3` do not match.\",\"verdict\":\"keep\"}"
+       }
+      ],
+      "usd": 0.0029668000000000003,
+      "error": null
+     }
+    ],
+    "Q": [
+     {
+      "status": "findings",
+      "findings": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 155,
+        "priority": "P2",
+        "confidence": 0.85,
+        "title": "Flag value arguments misidentified as package names",
+        "evidence": "r\"(?:\\s+-[-\\w=]+)*\\s+['\\\"]?(?![-./~\\\\])[A-Za-z][\\w.\\-]*(?:\\[[^\\]]*\\])?(?:[=<>!~]=?\\S*)?\"",
+        "consequence": "Commands using flags that accept URL or path values (e.g., `pip install --index-url https://pypi.org/simple requests`) will incorrectly match the URL portion as the package name. This triggers a false-positive review and confuses reviewers by claiming a URL is being installed by name.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 155,
+        "priority": "P3",
+        "confidence": 0.7,
+        "title": "VCS URLs (git+, hg+, svn+) match the package name pattern",
+        "evidence": "r\"(?:\\s+-[-\\w=]+)*\\s+['\\\"]?(?![-./~\\\\])[A-Za-z][\\w.\\-]*(?:\\[[^\\]]*\\])?(?:[=<>!~]=?\\S*)?\"",
+        "consequence": "Direct VCS installation commands like `pip install git+https://github.com/user/repo` will match because they start with a letter and aren't blocked by the path exclusion. While VCS installs are also risky, they bypass the package index entirely, making the rule's description ('resolves to whatever the index holds under it') inaccurate for these cases.",
+        "anchor": "kept"
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 163,
+        "priority": "P3",
+        "confidence": 0.6,
+        "title": "`go get` and `go install` trigger false positives for deprecated/binary installs",
+        "evidence": "r\"|go\\s+(?:get|install))(?:\\s+-[-\\w=]+)*\\s+['\\\"]?(?![-./~\\\\])[A-Za-z][\\w./@\\-]*\"",
+        "consequence": "`go get` is deprecated in modern Go modules, and `go install` typically installs CLI binaries rather than library dependencies. This rule will fire on these commands, generating noisy reviews for actions that fall outside the stated intent of catching library package installs.",
+        "anchor": "kept"
+       }
+      ],
+      "hits": [],
+      "verified": [
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 155,
+        "priority": "P2",
+        "confidence": 0.85,
+        "title": "Flag value arguments misidentified as package names",
+        "evidence": "r\"(?:\\s+-[-\\w=]+)*\\s+['\\\"]?(?![-./~\\\\])[A-Za-z][\\w.\\-]*(?:\\[[^\\]]*\\])?(?:[=<>!~]=?\\S*)?\"",
+        "consequence": "Commands using flags that accept URL or path values (e.g., `pip install --index-url https://pypi.org/simple requests`) will incorrectly match the URL portion as the package name. This triggers a false-positive review and confuses reviewers by claiming a URL is being installed by name.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The regex `(?:\\\\s+-[-\\\\w=]+)*` stops at flags with values containing non-word characters, leaving URLs to be incorrectly captured by the subsequent package name pattern."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 155,
+        "priority": "P3",
+        "confidence": 0.7,
+        "title": "VCS URLs (git+, hg+, svn+) match the package name pattern",
+        "evidence": "r\"(?:\\s+-[-\\w=]+)*\\s+['\\\"]?(?![-./~\\\\])[A-Za-z][\\w.\\-]*(?:\\[[^\\]]*\\])?(?:[=<>!~]=?\\S*)?\"",
+        "consequence": "Direct VCS installation commands like `pip install git+https://github.com/user/repo` will match because they start with a letter and aren't blocked by the path exclusion. While VCS installs are also risky, they bypass the package index entirely, making the rule's description ('resolves to whatever the index holds under it') inaccurate for these cases.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "Line 155 contains the exact regex cited, which lacks any exclusion for `+` or VCS schemes, confirming that such URLs will match the pattern and trigger the rule."
+       },
+       {
+        "file": "chimera/governance/policy.py",
+        "line": 163,
+        "priority": "P3",
+        "confidence": 0.6,
+        "title": "`go get` and `go install` trigger false positives for deprecated/binary installs",
+        "evidence": "r\"|go\\s+(?:get|install))(?:\\s+-[-\\w=]+)*\\s+['\\\"]?(?![-./~\\\\])[A-Za-z][\\w./@\\-]*\"",
+        "consequence": "`go get` is deprecated in modern Go modules, and `go install` typically installs CLI binaries rather than library dependencies. This rule will fire on these commands, generating noisy reviews for actions that fall outside the stated intent of catching library package installs.",
+        "anchor": "kept",
+        "verdict": "kept",
+        "label": "keep",
+        "reason": "The diff explicitly adds the `go\\\\s+(?:get|install)` pattern on line 163, confirming the finding that these commands are included and will trigger the rule as described."
+       }
+      ],
+      "log": [
+       {
+        "role": "finder",
+        "prompt": 1673,
+        "completion": 13493,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 150.4,
+        "content": "```json\n{\n  \"findings\": [\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 155,\n      \"priority\": \"P2\",\n      \"title\": \"Flag value arguments misidentified as package names\",\n      \"evidence\": \"r\\\"(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w.\\\\-]*(?:\\\\[[^\\\\]]*\\\\])?(?:[=<>!~]=?\\\\S*)?\\\"\",\n      \"consequence\": \"Commands using flags that accept URL or path values (e.g., `pip install --index-url https://pypi.org/simple requests`) will incorrectly match the URL portion as the package name. This triggers a false-positive review and confuses reviewers by claiming a URL is being installed by name.\",\n      \"confidence\": 0.85\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 163,\n      \"priority\": \"P3\",\n      \"title\": \"`go get` and `go install` trigger false positives for deprecated/binary installs\",\n      \"evidence\": \"r\\\"|go\\\\s+(?:get|install))(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w./@\\\\-]*\\\"\",\n      \"consequence\": \"`go get` is deprecated in modern Go modules, and `go install` typically installs CLI binaries rather than library dependencies. This rule will fire on these commands, generating noisy reviews for actions that fall outside the stated intent of catching library package installs.\",\n      \"confidence\": 0.6\n    },\n    {\n      \"file\": \"chimera/governance/policy.py\",\n      \"line\": 155,\n      \"priority\": \"P3\",\n      \"title\": \"VCS URLs (git+, hg+, svn+) match the package name pattern\",\n      \"evidence\": \"r\\\"(?:\\\\s+-[-\\\\w=]+)*\\\\s+['\\\\\\\"]?(?![-./~\\\\\\\\])[A-Za-z][\\\\w.\\\\-]*(?:\\\\[[^\\\\]]*\\\\])?(?:[=<>!~]=?\\\\S*)?\\\"\",\n      \"consequence\": \"Direct VCS installation commands like `pip install git+https://github.com/user/repo` will match because they start with a letter and aren't blocked by the path exclusion. While VCS installs are also risky, they bypass the package index entirely, making the rule's description ('resolves to whatever the index holds under it') inaccurate for these cases.\",\n      \"confidence\": 0.7\n    }\n  ],\n  \"residual_risks\": [\n    \"The `_pattern` helper's internal compilation flags (e.g., MULTILINE, DOTALL) are unknown; if it processes input differently than assumed, regex behavior may shift.\",\n    \"The regex assumes single-line command execution; multi-line shell constructs or heredocs will not be analyzed.\",\n    \"Complex flag-value pairs requiring quoting or spaces (e.g., `--config-settings key=value`) may break the simple `(?:\\\\s+-[-\\\\w=]+)*` flag parser.\"\n  ],\n  \"untested_paths\": [\n    \"Commands with mixed short/long flags and names (e.g., `pip install -q --upgrade package`)\",\n    \"Scoped npm packages with versions and extras (e.g., `npm install @scope/pkg@^1.0.0 --optional`)\",\n    \"`uv add` with feature flags or version specifiers (e.g., `uv add package[dev]>=1.0`)\",\n    \"`cargo add` with path/git dependencies or features\",\n    \"`apt install` with metapackages or virtual package names\"\n  ]\n}\n```"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1636,
+        "completion": 2284,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 25.5,
+        "content": "{\"reason\": \"The regex `(?:\\\\s+-[-\\\\w=]+)*` stops at flags with values containing non-word characters, leaving URLs to be incorrectly captured by the subsequent package name pattern.\", \"verdict\": \"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1657,
+        "completion": 2564,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 31.5,
+        "content": "{\"reason\": \"Line 155 contains the exact regex cited, which lacks any exclusion for `+` or VCS schemes, confirming that such URLs will match the pattern and trigger the rule.\", \"verdict\": \"keep\"}"
+       },
+       {
+        "role": "verifier",
+        "prompt": 1558,
+        "completion": 1857,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "stop",
+        "seconds": 23.0,
+        "content": "{\"reason\": \"The diff explicitly adds the `go\\\\s+(?:get|install)` pattern on line 163, confirming the finding that these commands are included and will trigger the rule as described.\", \"verdict\": \"keep\"}"
+       }
+      ],
+      "usd": 0.00282146,
+      "error": null
+     }
+    ],
+    "M": [
+     {
+      "status": "incomplete",
+      "findings": [],
+      "hits": [],
+      "verified": [],
+      "log": [
+       {
+        "role": "finder",
+        "error": "NotFoundError: litellm.NotFoundError: NotFoundError: OpenrouterException - {\"error\":{\"message\":\"No endpoints found for mistralai/mistral-small-3.2-24b-instruct. Every candidate endpoint was removed during routing: Filter by Regional Surcharge removed mistral/eu; Filter by Context Length removed deep",
+        "seconds": 0.5
+       }
+      ],
+      "usd": 0.0,
+      "error": null
+     }
+    ]
+   }
+  }
+ ]
+}

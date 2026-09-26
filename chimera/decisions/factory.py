@@ -42,7 +42,10 @@ def build_backend(settings: Any, *, gateway: Any | None = None) -> DecisionBacke
             from chimera.providers import LLMGateway
 
             gateway = LLMGateway(settings)
-        return HostedVerbalizedBackend(gateway, model or settings.fusion_judge)
+        return HostedVerbalizedBackend(
+            gateway, model or settings.fusion_judge,
+            answer_from_reasoning=bool(getattr(settings, "answer_from_reasoning", False)),
+        )
     if name == "openrouter_decisions":
         from chimera.decisions.openrouter import DEFAULT_MODEL as VENDOR_MODEL
         from chimera.decisions.openrouter import OpenRouterDecisionsBackend

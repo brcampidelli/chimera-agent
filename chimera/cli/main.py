@@ -47,6 +47,8 @@ if TYPE_CHECKING:
     from chimera.evolution import Playbook
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
+    from chimera.memory.extract import MemoryExtractor
+    from chimera.orchestration.metering import MeteredBackend
     from chimera.pet import Pet, PetStore
     from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
@@ -1281,7 +1283,9 @@ def _replayed_provenance(session: Any) -> list[str]:
     clean; this is the same window, read for the same reason one line further out. Read BEFORE the
     turn runs, because ``send_verbose`` appends the new exchange and would shift the window by one.
     """
-    return [turn.provenance for turn in session.turns[-session.max_history :] if turn.restored]
+    from chimera.interface.session import recent_turns
+
+    return [turn.provenance for turn in recent_turns(session.turns, session.max_history) if turn.restored]
 
 
 def _render_turn(
@@ -1902,11 +1906,15 @@ def chat(
             # The setting existed and no terminal surface passed it, so "remember that…" was
             # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # Recall narrowed to the folder this conversation is open on, exactly as the coding
             # turn does it. `--workspace` decided which files the tools could touch and said
             # nothing about which project's memory arrived, so a note from one codebase turned up
             # as context in a chat about another.
             project=project_key(workspace),
+            # The thread's id when the spend is written: `/new` rebinds `active` below.
+            extractor=_memory_extractor(settings, mem, lambda: active),
+            cite_facts=settings.memory_extract,
         ),
         store,
     )
@@ -1932,14 +1940,14 @@ def chat(
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if not message:
             continue
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if head == "/help":
             _print_help(commands)
@@ -1990,7 +1998,7 @@ def chat(
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if outcome != "ok":
             continue
@@ -2103,9 +2111,12 @@ def assist(
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
+        real_history=settings.chat_real_history,
         # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
         project=project_key(workspace),
+        extractor=_memory_extractor(settings, mem, usage_session),
+        cite_facts=settings.memory_extract,
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2134,7 +2145,7 @@ def assist(
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if not message:
@@ -2142,7 +2153,7 @@ def assist(
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if head == "/help":
@@ -2209,7 +2220,7 @@ def assist(
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if outcome != "ok":
@@ -2412,6 +2423,7 @@ def tui(
             graph=_recall_graph(mem),
             profile=_session_profile(mem),
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # Recall narrowed to the folder this app was opened on, exactly as `chat` and `assist`
             # do it. This surface takes a `--workspace` too, and until now that argument decided
             # which files the tools could touch and said nothing about which project's memory
@@ -2421,6 +2433,10 @@ def tui(
             # nothing the scoped write produced, which is the defect underneath #401 and shows up
             # as memory that is simply never recalled.
             project=project_key(workspace),
+            # Filed where the screen files its turns, which follows a `/reset`; read when the
+            # spend is written, by which time `screen` exists.
+            extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
+            cite_facts=settings.memory_extract,
         ),
         store,
     )
@@ -2566,6 +2582,7 @@ def serve(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # `None` when governance is off — the shipped default, under which `governed_profile`
             # returns before it builds a ledger and never calls `_hold`. A hook wired to nothing
             # would be a lie about what this surface has; no hook is the truth, and it also keeps
@@ -2935,6 +2952,7 @@ def desktop_app(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=live.remember_from_chat,
+            real_history=live.chat_real_history,
             # The ledger is built once per conversation and the instruction is known once per TURN,
             # which is the whole reason `CHIMERA_TAINT_AUTHORITY` did nothing here: a ledger nobody
             # tells answers `unknown` for every fetch, and the narrowing treats that exactly as it
@@ -3389,6 +3407,8 @@ def _serve_platform(
             runner,
             memory=memory,
             graph=graph,
+            # The path `serve --discord` runs, which is the production bot.
+            real_history=get_settings().chat_real_history,
             # `None` under the shipped `CHIMERA_GOVERNANCE=off`, where no ledger is built at all.
             on_turn_start=(
                 None
@@ -4533,6 +4553,15 @@ def solve(
 
         region = WriteRegion(write_region.split(","), ws) if write_region else None
         registry = default_registry(ws, write_region=region)
+        # The web research sub-agent (study 25, S12), when switched on. Before the allowlist, so
+        # the lists reach it by name like a built-in; it draws its web tools from the FINAL
+        # registry, resolved late, for the reason the subagent below gives.
+        if settings.research_agent:
+            from chimera.core.research import ResearchWebTool
+
+            registry.register(
+                ResearchWebTool(gateway, lambda: registry, model=roles.models.explore or model)
+            )
         # Per-session grant first (issue #4): scope the native tools before the meta-tools
         # (explorer/subagents) are added, so subagents inherit the same allowlist.
         from chimera.governance import AuditLog
@@ -4548,7 +4577,8 @@ def solve(
             # A narrow localisation question does not need the editor's model.
             registry.register(
                 ExploreRepositoryTool(
-                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps
+                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps,
+                    contract=settings.explorer_contract,
                 )
             )
         if subagents:
@@ -4800,6 +4830,11 @@ def solve(
 
     console.print(result.answer)
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
+    if getattr(result, "ending", "") == "handover":
+        # Not a failure, and not done either: the page needs the person (study 25, S11). The exit
+        # code below stays 1 all the same, because a script reading 0 as "the task is done" must
+        # not read it here.
+        status = "[yellow]handed over to you[/yellow]"
     # `ending` says WHICH of the endings this was; `success` alone cannot. A run that used up its
     # attempts, one the person cancelled, one cut off at the dollar ceiling and one that succeeded
     # while changing nothing on disk all printed the same two words before this.
@@ -5222,11 +5257,18 @@ def explore(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Repository root to explore."),
     model: str = typer.Option(None, "--model", "-m", help="Model for the explorer (a cheap one is fine)."),
     max_turns: int = typer.Option(8, "--max-turns", help="Max exploration turns."),
+    thoroughness: str = typer.Option(
+        "medium", "--thoroughness",
+        help="quick, medium or thorough: halves, keeps or doubles --max-turns. "
+        "Read only when CHIMERA_EXPLORER_CONTRACT is on.",
+    ),
 ) -> None:
     """Locate relevant code via the isolated Context Explorer subagent (FastContext-style).
 
     Returns only a compact file:line evidence block — the exploration turns never touch your
     context. A cheap model is usually the right call here; localization is a narrow task.
+    With CHIMERA_EXPLORER_CONTRACT on, it returns findings with a location each, a gaps section,
+    and a check of every cited location against the workspace.
     """
     from chimera.core import ContextExplorer
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -5234,19 +5276,53 @@ def explore(
     if not get_settings().can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
+    from uuid import uuid4
+
+    from chimera.api.usage import record_spend
+    from chimera.core.agent import partial_spend
+
     explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
+    # One row in the usage log per exploration, under its own id: it is a run of its own, and the
+    # Cost screen could not see it. Written on the way out whatever happened, like a failed turn's.
+    usage_id = f"explore:{uuid4().hex[:12]}"
     try:
-        result = explorer.explore(query)
-    except MissingCredentialsError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
+        result = explorer.explore(query, thoroughness.strip().lower())
+    except Exception as exc:
+        spent = partial_spend(exc)
+        if spent is not None and (spent.prompt_tokens or spent.completion_tokens):
+            record_spend(
+                get_settings().home, session_id=usage_id, model=spent.model,
+                prompt_tokens=spent.prompt_tokens, completion_tokens=spent.completion_tokens,
+                usd=spent.usd,
+            )
+        if isinstance(exc, MissingCredentialsError):
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from exc
+        raise
+    record_spend(
+        get_settings().home, session_id=usage_id, model=result.model,
+        prompt_tokens=result.prompt_tokens, completion_tokens=result.completion_tokens,
+        usd=result.usd, tools=result.tool_calls,
+    )
+    # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
+    cost = "cost unknown (a call had no price)" if result.usd is None else f"${result.usd:.4f}"
+    if result.check is not None:
+        # Plain text: the report and the receipt both carry square brackets rich would eat.
+        console.print(result.as_context(), markup=False, highlight=False)
+        console.print(
+            f"[dim]{result.turns} turn(s), {result.tool_calls} tool call(s) · {cost}[/dim]"
+        )
+        return
     if not result.evidence:
-        console.print("[dim]no relevant locations found[/dim]")
+        console.print(f"[dim]no relevant locations found · {cost}[/dim]")
         return
     for ev in result.evidence:
         loc = f"[cyan]{ev.path}[/cyan]" + (f":[yellow]{ev.lines}[/yellow]" if ev.lines else "")
         console.print(f"  {loc}" + (f" [dim]— {ev.note}[/dim]" if ev.note else ""))
-    console.print(f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
+    console.print(
+        f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), "
+        f"{result.tool_calls} tool call(s) · {cost}[/dim]"
+    )
 
 
 @app.command()
@@ -5984,6 +6060,9 @@ app.add_typer(decisions_app, name="decisions")
 from chimera.cli.decide_cmd import decide as _decide  # noqa: E402
 
 app.command("decide")(_decide)
+from chimera.cli.review_cmd import review as _review  # noqa: E402
+
+app.command("review")(_review)
 
 
 # --- cron subcommands ---------------------------------------------------------
@@ -6858,22 +6937,55 @@ def _emit_skill_nudges(session: object, known_skills: list[str], already: set[st
             )
 
 
-def _maybe_autoconsolidate(memory: MemoryManager | None, settings: Settings) -> None:
-    """On session end, consolidate memory if it outgrew the budget (opt-in)."""
+def _maybe_autoconsolidate(
+    memory: MemoryManager | None, settings: Settings, usage_id: str = ""
+) -> None:
+    """On session end, consolidate memory if it outgrew the budget (opt-in).
+
+    The merges are model calls, metered and written to the usage log under ``usage_id``, the
+    conversation that just ended, as :data:`chimera.api.usage.TIDY_KIND`: added to its spend and
+    not counted as a turn of it. A merge that failed part-way still bills the merges it paid for.
+    """
     if memory is None or not settings.auto_consolidate:
         return
+    from chimera.orchestration.metering import MeteredBackend as _Meter
+
+    meter: MeteredBackend | None = None
     try:
         from chimera.memory.consolidate import model_summarizer
         from chimera.providers import LLMGateway
 
-        removed = memory.autoconsolidate(
-            model_summarizer(LLMGateway()), max_items=settings.memory_budget
-        )
+        meter = _Meter(LLMGateway(), label="tidy")
+        removed = memory.autoconsolidate(model_summarizer(meter), max_items=settings.memory_budget)
     except Exception as exc:  # noqa: BLE001 — best-effort cleanup, never break exit
+        _record_tidy_spend(settings, meter, usage_id)
         console.print(f"[dim]auto-consolidate skipped: {exc}[/dim]")
         return
+    _record_tidy_spend(settings, meter, usage_id)
     if removed:
         console.print(f"[dim]🧹 consolidated {removed} redundant memory item(s)[/dim]")
+
+
+def _record_tidy_spend(settings: Settings, meter: MeteredBackend | None, usage_id: str) -> None:
+    """Write what the tidy's merges cost, when it made any (see `_maybe_autoconsolidate`)."""
+    from chimera.api.usage import TIDY_KIND
+
+    _record_merge_spend(settings, meter, usage_id or "memory-tidy", route_kind=TIDY_KIND)
+
+
+def _record_merge_spend(
+    settings: Settings, meter: MeteredBackend | None, usage_id: str, *, route_kind: str | None
+) -> None:
+    """One usage row for the memory merges ``meter`` saw, or none when it saw no call returned."""
+    if meter is None or not meter.calls:
+        return
+    from chimera.api.usage import record_spend
+
+    record_spend(
+        settings.home, session_id=usage_id, model=meter.last_model,
+        prompt_tokens=meter.prompt_tokens, completion_tokens=meter.completion_tokens,
+        usd=meter.usd, route_kind=route_kind,
+    )
 
 
 def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
@@ -6887,6 +6999,25 @@ def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
     # reach the prompt unlabeled. Excluding them keeps entity recall honest (they still recall via
     # search, which labels them).
     return build_graph([i.content for i in memory.store.all() if i.provenance == "clean"])
+
+
+def _memory_extractor(
+    settings: Settings, memory: MemoryManager | None, usage_id: str | Callable[[], str]
+) -> MemoryExtractor | None:
+    """The after-turn extractor for a terminal conversation, or None (study 25 S13).
+
+    None unless ``CHIMERA_MEMORY_EXTRACT`` is on and there is a memory to write to. A terminal is a
+    conversation with the owner, which is what makes the user's words theirs to keep; the messaging
+    bots are not wired, because anyone who can reach the bot would be writing the owner's memory.
+
+    ``usage_id`` is what the turns of this conversation are filed under in the usage log, so the
+    extraction's cost lands beside them. A callable where ``/new`` can replace the thread.
+    """
+    if memory is None or not settings.memory_extract:
+        return None
+    from chimera.memory.extract import MemoryExtractor
+
+    return MemoryExtractor(memory, usage_home=Path(settings.home), usage_id=usage_id)
 
 
 @memory_app.command("add")
@@ -6968,20 +7099,33 @@ def memory_consolidate(
     ),
 ) -> None:
     """Merge clusters of similar memories into one LLM-summarised fact (opt-in write)."""
+    from uuid import uuid4
+
     from chimera.memory.consolidate import model_summarizer
+    from chimera.orchestration.metering import MeteredBackend as _Meter
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     if not get_settings().can_answer():
         console.print("[red]no provider API key configured, and no local model[/red] — set one to summarise")
         raise typer.Exit(1)
+    # Each merge is a model call, metered here and written as one row of this command's own: it
+    # belongs to no conversation, and the Cost screen could not see it. Written on the way out
+    # whatever happened, so a run that failed part-way bills the merges it paid for.
+    meter = _Meter(LLMGateway(), label="consolidate")
+    usage_id = f"consolidate:{uuid4().hex[:12]}"
     try:
-        removed = _memory_manager().consolidate(
-            model_summarizer(LLMGateway()), threshold=threshold
-        )
+        removed = _memory_manager().consolidate(model_summarizer(meter), threshold=threshold)
     except MissingCredentialsError as exc:
+        _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
-    console.print(f"consolidated: merged away {removed} redundant memory item(s)")
+    except Exception:
+        _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
+        raise
+    _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
+    # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
+    cost = "cost unknown (a merge had no price)" if meter.usd is None else f"${meter.usd:.4f}"
+    console.print(f"consolidated: merged away {removed} redundant memory item(s) · {cost}")
 
 
 @memory_app.command("graph")

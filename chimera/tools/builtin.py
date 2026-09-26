@@ -229,11 +229,19 @@ def default_registry(
     if importlib.util.find_spec("playwright") is not None:
         from chimera.tools.browser import BrowserTool
 
+        # Study 25, S11: the same tool, with the situation's harness half when the owner turned the
+        # module on — the one setting that also adds its rules to the loop's prompt (`Agent`).
+        situation = None
+        if settings.browser_situation:
+            from chimera.tools.browser_situation import BrowserSituation
+
+            situation = BrowserSituation()
         registry.register(
             BrowserTool(
                 headless=settings.browser_headless,
                 workspace=workspace,
                 write_region=write_region,
+                situation=situation,
             )
         )
     return registry

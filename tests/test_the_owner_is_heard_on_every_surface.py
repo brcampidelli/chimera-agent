@@ -51,6 +51,7 @@ EXEMPT: dict[tuple[str, str], str] = {
     ("chimera/cli/main.py", "_right_hand_builder"): "the scenarios bench; the prompt is the instrument",
     ("chimera/core/agent.py", "Agent"): "the default config of the class itself",
     ("chimera/core/explorer.py", "ContextExplorer"): "answers the main agent with file locations",
+    ("chimera/core/research.py", "WebResearcher"): "answers the main agent, which answers the person",
     ("chimera/core/subagent.py", "SubAgentTool"): "answers the main agent, which answers the person",
     ("chimera/kanban/lanes.py", "SolveLane"): "a board lane; its output is a card, not a reply",
     ("chimera/kanban/lanes.py", "AgentLane"): "passes the lane's role through `instructions`",

@@ -123,6 +123,12 @@ _EDITABLE_SETTINGS = {
     # allow`, which says yes to everything escalated — a setting only reachable by reading the source
     # would make the blunt answer the only discoverable one.
     "CHIMERA_EGRESS_ALLOW",
+    # The Experimental group: three study-25 modules whose measurements did not recommend them, so
+    # they stay off. Editable anyway, because a switch that only exists in `.env` is a choice only
+    # people who read the source can make — the screen shows each one with what was measured.
+    "CHIMERA_BROWSER_SITUATION",
+    "CHIMERA_RESEARCH_AGENT",
+    "CHIMERA_EXPLORER_CONTRACT",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -169,6 +175,11 @@ APPLIES_WHEN: dict[str, str] = {
     # onto the screen of a browser that is already running headless, so the honest answer is the
     # next conversation, which is when a fresh registry (and a fresh browser) is built.
     "CHIMERA_BROWSER_HEADLESS": NEXT_CONVERSATION,
+    # Same read point: `default_registry` hands the browser its situation when it builds the tool, and
+    # the loop's config takes the flag when the agent is built. A chat keeps both for its lifetime;
+    # a Code turn builds both afresh, so there it is the next turn. The research agent and the
+    # explorer's contract are read only on the Code turn, per turn, so they are absent: next call.
+    "CHIMERA_BROWSER_SITUATION": NEXT_CONVERSATION,
     # These start something at boot — a daemon thread and a set of MCP subprocesses. Re-reading the
     # value would not undo that, so the honest answer is the relaunch, not a re-read.
     "CHIMERA_APP_CRON": NEXT_LAUNCH,
@@ -358,6 +369,11 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
         "browser": {"headless": settings.browser_headless},
+        "experimental": {
+            "browser_situation": settings.browser_situation,
+            "research_agent": settings.research_agent,
+            "explorer_contract": settings.explorer_contract,
+        },
         "autonomy": {
             "reach": settings.reach,
             "approval": settings.approval,

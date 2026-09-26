@@ -1,0 +1,759 @@
+{
+ "date": "2026-09-26",
+ "what": "OpenRouter route choice for the preset weak rung at different max_tokens, and the 429 replies seen. Probes: raw-1/raw-2 are stdlib HTTP; gateway-before/after go through LLMGateway.complete at the default ceiling, before and after the clamp.",
+ "calls": [
+  {
+   "probe": "raw-1",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "max_tokens": 32000,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.0
+  },
+  {
+   "probe": "raw-1",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "max_tokens": 16384,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.2
+  },
+  {
+   "probe": "raw-1",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "max_tokens": null,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.2
+  },
+  {
+   "probe": "raw-1",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "max_tokens": 32000,
+   "status": 429,
+   "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.2-24b-instruct is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Parasail\",\"is_byok\":false,\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\"}},\"user_id\":\"<masked>"
+  },
+  {
+   "probe": "raw-1",
+   "path": "raw HTTP",
+   "model": "deepseek/deepseek-r1",
+   "tools": true,
+   "max_tokens": 32000,
+   "status": 200,
+   "provider": "Novita",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 93,
+    "completion_tokens": 78,
+    "cost": 0.0002601
+   },
+   "seconds": 5.6
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 32000,
+   "rep": 0,
+   "status": 200,
+   "provider": "Parasail",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 106,
+    "cost": 3.261e-05
+   },
+   "seconds": 2.1
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 32000,
+   "rep": 1,
+   "status": 200,
+   "provider": "Parasail",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 106,
+    "cost": 3.261e-05
+   },
+   "seconds": 2.4
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 32000,
+   "rep": 2,
+   "status": 429,
+   "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.2-24b-instruct is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Parasail\",\"is_byok\":false,\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add yo"
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 32000,
+   "rep": 3,
+   "status": 200,
+   "provider": "Parasail",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 106,
+    "cost": 3.261e-05
+   },
+   "seconds": 3.0
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 16384,
+   "rep": 0,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 108,
+    "cost": 2.784375e-05
+   },
+   "seconds": 10.8
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 16384,
+   "rep": 1,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 118,
+    "cost": 3.034375e-05
+   },
+   "seconds": 8.9
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 16384,
+   "rep": 2,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 118,
+    "cost": 3.034375e-05
+   },
+   "seconds": 6.3
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": 16384,
+   "rep": 3,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 106,
+    "cost": 2.734375e-05
+   },
+   "seconds": 5.2
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": null,
+   "rep": 0,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 106,
+    "cost": 2.734375e-05
+   },
+   "seconds": 3.8
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": null,
+   "rep": 1,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 118,
+    "cost": 3.034375e-05
+   },
+   "seconds": 4.8
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": null,
+   "rep": 2,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 118,
+    "cost": 3.034375e-05
+   },
+   "seconds": 6.7
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": false,
+   "case": "no-tools",
+   "max_tokens": null,
+   "rep": 3,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "stop",
+   "tool_calls": false,
+   "usage": {
+    "prompt_tokens": 9,
+    "completion_tokens": 105,
+    "cost": 2.709375e-05
+   },
+   "seconds": 7.0
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 32000,
+   "rep": 0,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 5.6
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 32000,
+   "rep": 1,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.7
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 32000,
+   "rep": 2,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.3
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 32000,
+   "rep": 3,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.3
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 20000,
+   "rep": 0,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.2
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 20000,
+   "rep": 1,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.4
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 20000,
+   "rep": 2,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.3
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 20000,
+   "rep": 3,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 2.2
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 16384,
+   "rep": 0,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.0
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 16384,
+   "rep": 1,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.7
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 16384,
+   "rep": 2,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.2
+  },
+  {
+   "probe": "raw-2",
+   "path": "raw HTTP",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "tools": true,
+   "case": "tools",
+   "max_tokens": 16384,
+   "rep": 3,
+   "status": 200,
+   "provider": "Venice",
+   "finish": "tool_calls",
+   "tool_calls": true,
+   "usage": {
+    "prompt_tokens": 70,
+    "completion_tokens": 12,
+    "cost": 9.5625e-06
+   },
+   "seconds": 1.5
+  },
+  {
+   "probe": "gateway-before",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "tool_calls": true,
+   "s": 138.6
+  },
+  {
+   "probe": "gateway-before",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "tool_calls": true,
+   "s": 0.9
+  },
+  {
+   "probe": "gateway-before",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "tool_calls": true,
+   "s": 0.9
+  },
+  {
+   "probe": "gateway-before",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": false,
+   "type": "CredentialRejectedError",
+   "mro": [
+    "CredentialRejectedError",
+    "MissingCredentialsError",
+    "RuntimeError",
+    "Exception"
+   ],
+   "msg": "Every configured provider key is rate-limited. Wait for the limit to reset, or add another key — the relevant variables are ['OPENROUTER_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'DEEPSEEK_API_KEY'] (or use a local model, e.g. CHIMERA_DEFAULT_MODEL=ollama_chat/llama3, which needs no key). [status=429] Provider said: litellm.RateLimitError: RateLimitError: OpenrouterException - {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.2-24b-instruct is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Parasail\",\"is_byok\":false,\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\"}},\"user_id\":\"<masked>\"}",
+   "cause_type": "RateLimitError",
+   "cause_status": 429,
+   "cause_msg": "litellm.RateLimitError: RateLimitError: OpenrouterException - {\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"mistralai/mistral-small-3.2-24b-instruct is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Parasail\",\"is_byok\":false,\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\"}},\"user_id\":\"<masked>\"}"
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "tool_calls": true,
+   "s": 38.1
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "tool_calls": true,
+   "s": 1.3
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "tool_calls": true,
+   "s": 2.1
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 1.5
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.8
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 1.3
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.9
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.8
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 1.0
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 1.0
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 1.5
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.9
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.9
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.9
+  },
+  {
+   "probe": "gateway-after",
+   "path": "LLMGateway.complete",
+   "model": "mistralai/mistral-small-3.2-24b-instruct",
+   "arm": "no-tools@ceiling",
+   "ok": true,
+   "provider": "Venice",
+   "s": 0.7
+  }
+ ],
+ "free_model_429s": {
+  "model": "liquid/lfm-2.5-2.6b:free",
+  "requests": 40,
+  "note": "40 requests, max_tokens=1, in about a minute; every 429 was upstream, none was the router's own per-key limiter",
+  "replies": [
+   {
+    "i": 9,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   },
+   {
+    "i": 13,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   },
+   {
+    "i": 17,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   },
+   {
+    "i": 25,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   },
+   {
+    "i": 26,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   },
+   {
+    "i": 27,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   },
+   {
+    "i": 29,
+    "status": 429,
+    "body": "{\"error\":{\"message\":\"Provider returned error\",\"code\":429,\"metadata\":{\"raw\":\"liquid/lfm-2.5-2.6b:free is temporarily rate-limited upstream. Please retry shortly, or add your own key to accumulate your rate limits: https://openrouter.ai/settings/integrations\",\"provider_name\":\"Liquid\",\"is_byok\":false,\"provider_error_code\":\"rate_limit_exceeded\",\"limit_source\":\"upstream_provider_shared_pool\",\"remedy_hint\":\"Retry shortly, add your own provider key (https://openrouter.ai/settings/integrations), or route to another provider with provider routing: https://openrouter.ai/docs/features/provider-routing\",\""
+   }
+  ]
+ }
+}

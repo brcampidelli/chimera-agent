@@ -1,0 +1,50 @@
+{
+ "task": "G3",
+ "arm": "on",
+ "replica": 0,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.0007881650000000001,
+ "answer": "KP7470V",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 4,
+ "tool_calls": 3,
+ "prompt_tokens": 11141,
+ "completion_tokens": 200,
+ "cache_read_tokens": 8192,
+ "usd": 0.000309,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "6e4bb3ee63e1",
+ "module_in_prompt": true,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 6252,
+ "seconds": 9.1,
+ "requested_paths": [
+  "/gov/services.html",
+  "/go/gov/ombudsman"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}

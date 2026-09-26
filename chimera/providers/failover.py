@@ -15,10 +15,13 @@ model, then give up).
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Any, Literal
 
 
 class FailoverReason(StrEnum):
@@ -225,6 +228,78 @@ def classify(exc: BaseException) -> FailoverReason:
 def action_for(reason: FailoverReason) -> RecoveryAction:
     """The recovery action for a reason."""
     return _ACTION.get(reason, RecoveryAction.ROTATE_KEY)
+
+
+@dataclass(frozen=True)
+class RateLimitOrigin:
+    """Whose limit a 429 was, as far as the reply itself says — and nothing further.
+
+    ``upstream``: the router passed the call on and the PROVIDER behind it was out of capacity; the
+    key was accepted. ``key``: the router's own limiter refused this key. ``unknown``: the reply
+    does not say in a form read here, which is the answer for every provider but OpenRouter.
+    """
+
+    side: Literal["upstream", "key", "unknown"]
+    provider: str | None = None
+    """The provider the router names, verbatim (``Parasail``); None when it names none."""
+    source: str | None = None
+    """The router's own label for the limit, verbatim (``upstream_provider_shared_pool``)."""
+
+
+_ROUTER_BODY = re.compile(r'\{\s*"error"\s*:')
+
+
+def _router_error(exc: BaseException) -> dict[str, Any]:
+    """The ``error`` object of an OpenRouter-style body inside the exception, or ``{}``.
+
+    LiteLLM puts the response body into the message text (``OpenrouterException - {"error": …}``)
+    rather than on an attribute, so it is decoded from there. Never raises: an exception that
+    carries no such body, or a broken one, is simply a reply that says nothing about its origin.
+    """
+    text = str(exc)
+    found = _ROUTER_BODY.search(text)
+    if found is None:
+        return {}
+    try:
+        body, _ = json.JSONDecoder().raw_decode(text[found.start():])
+    except ValueError:
+        return {}
+    error = body.get("error") if isinstance(body, dict) else None
+    return error if isinstance(error, dict) else {}
+
+
+def rate_limit_origin(exc: BaseException) -> RateLimitOrigin:
+    """Read from a 429 whether the key or the provider behind the router was the one limited.
+
+    Measured on 2026-09-26: OpenRouter's reply when a provider's shared pool is out reads
+    ``"message": "Provider returned error"`` with metadata ``provider_name``, ``is_byok: false``,
+    ``limit_source: "upstream_provider_shared_pool"`` and a ``raw`` text saying the model "is
+    temporarily rate-limited upstream" — the same shape on a paid route (Parasail) and a free one.
+    The router's own limiter on a key names no provider and carries ``X-RateLimit-*`` headers in
+    its metadata; that shape is OpenRouter's published one and was not drawn here (40 free-model
+    calls in a minute drew only upstream 429s). A call that ran on the person's own provider key
+    (``is_byok``) is not called upstream: that limit may well be theirs.
+    """
+    error = _router_error(exc)
+    meta = error.get("metadata")
+    meta = meta if isinstance(meta, dict) else {}
+    named = meta.get("provider_name")
+    provider = named if isinstance(named, str) and named else None
+    label = meta.get("limit_source")
+    source = label if isinstance(label, str) and label else None
+    raw = str(meta.get("raw") or "").lower()
+    if meta.get("is_byok") is not True and (
+        (source or "").startswith("upstream") or "rate-limited upstream" in raw
+    ):
+        return RateLimitOrigin("upstream", provider, source)
+    headers = meta.get("headers")
+    limiter_headers = isinstance(headers, dict) and any(
+        str(name).lower().startswith("x-ratelimit") for name in headers
+    )
+    limiter_words = str(error.get("message") or "").lower().startswith("rate limit exceeded")
+    if provider is None and source is None and (limiter_headers or limiter_words):
+        return RateLimitOrigin("key")
+    return RateLimitOrigin("unknown", provider, source)
 
 
 class CredentialPool:

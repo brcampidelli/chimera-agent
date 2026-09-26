@@ -28,6 +28,13 @@ ran.
 - A re-run of these scripts after the fix would turn reasoning off for real. That is a different,
   unmeasured instrument, so to reproduce these numbers, drop the `thinking=False` argument.
 
+**Arm V′, 2026-09-25.** Arm V's text asks for one word and then for JSON. The same text with the
+one-word sentence removed was measured against a fresh V in `RESULTS-one-schema.md`:
+- unparsed answers: 0 of 110 in both arms;
+- ΔAUROC −0.015 [−0.046, +0.009], non-inferior at the registered 0.05 margin.
+
+The hosted backend now sends that text. V's numbers below still describe V.
+
 **Terms, read before publishing (2026-09-19).** The vendor's Master Customer Agreement (§2.3(f)) forbids
 its direct customers from publishing performance information about its service. This run did not go
 through the vendor: it went through **OpenRouter's Decisions API** (`POST /api/alpha/decisions`), under

@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
@@ -28,7 +28,7 @@ from chimera.governance.ledger import WRITE_TOOLS
 from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
-from chimera.tools.base import is_refusal
+from chimera.tools.base import is_refusal, tool_raised
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
 from chimera.tools.workspace import resolve_in_workspace
 
@@ -53,7 +53,9 @@ PARALLEL_READ_TOOLS = frozenset(
 PARALLEL_READ_WORKERS = 4
 
 if TYPE_CHECKING:
+    from chimera.core.summarise import Summariser
     from chimera.skills.registry import SkillRegistry
+    from chimera.tools.browser_situation import Wall
 
 _log = get_logger("core.agent")
 
@@ -149,18 +151,28 @@ _EMPTY_CLOSE_NUDGE = (
 )
 
 
-def _empty_close_note(tool_names: list[str]) -> str:
+def _empty_close_note(tool_names: list[str], *, filed_as_reasoning: bool = False) -> str:
     """What the run says when the model gave no closing text even when asked twice.
 
     Empty reads as "it produced nothing", which is a different claim: the tools below did run. This
-    says only what the harness knows — never that anything worked."""
+    says only what the harness knows — never that anything worked.
+
+    ``filed_as_reasoning``: one of the two replies was a route filing the model's text as reasoning
+    (`CompletionResult.answer_in_reasoning`; `deepseek-r1` on Novita did it on 37–43% of calls in
+    `bench/review_judge/RESULTS-h11.md`). The note says so, and nothing more: the reasoning is a
+    thought trace and can end on a draft, so it is never handed back as the answer."""
     counts: dict[str, int] = {}
     for name in tool_names:
         counts[name] = counts.get(name, 0) + 1
     ran = ", ".join(f"{name} ×{n}" if n > 1 else name for name, n in counts.items()) or "none"
+    filed = (
+        "The route filed the model's text as reasoning, and reasoning is not shown as an answer. "
+        if filed_as_reasoning else ""
+    )
     return (
         "(No final answer: the model returned an empty reply twice when asked to close the run. "
-        f"Tools called: {ran}. Whatever they changed is in the workspace, not in this message.)"
+        f"{filed}Tools called: {ran}. Whatever they changed is in the workspace, not in this "
+        "message.)"
     )
 
 
@@ -208,6 +220,12 @@ def _default_prefix_nonce() -> str:
     return get_settings().prefix_nonce
 
 
+def _default_browser_situation() -> bool:
+    from chimera.config import get_settings
+
+    return get_settings().browser_situation
+
+
 #: The sentence that turns the task-list schema into a task list. See `Agent.run` for the
 #: measurement that decides it is not optional.
 TODO_PROMPT = (
@@ -215,6 +233,30 @@ TODO_PROMPT = (
     "list as each one finishes. It is your own account of your progress, so keep it true: mark a "
     "step done when it is done, not when you intend to do it."
 )
+
+
+#: The closing turn when the browser handed a page to the person (study 25, S11). The run stops on
+#: the harness's reading of the page, not on the model's, so this asks only for the account of it.
+_HANDOVER_NUDGE = (
+    "The browser stopped at a page that needs the person: {wall}. Do not call tools. Write your "
+    "final answer now: what the page asks them to do, and what you did before it."
+)
+
+
+def _pending_handover(tools: ToolRegistry) -> Wall | None:
+    """The page the browser handed to the person on its last call, taken once; None otherwise.
+
+    Read off the tool itself, through any governance wrappers, rather than off the observation: a
+    wrapper fences a fetch tool's output, and a page can print anything, so neither can decide
+    whether the run stops."""
+    if "browser" not in tools:
+        return None
+    found: Any = tools.get("browser")
+    while getattr(found, "situation", None) is None and getattr(found, "inner", None) is not None:
+        found = found.inner
+    situation = getattr(found, "situation", None)
+    take = getattr(situation, "take_handover", None)
+    return take() if callable(take) else None
 
 
 def _find_tool(tools: ToolRegistry, name: str) -> Any:
@@ -300,6 +342,11 @@ class AgentConfig:
     #: Text that is true for this turn only, put in the turn context: recalled facts, a job that
     #: finished, the approved plan. Only read when :attr:`turn_context` is on.
     turn_notes: str = ""
+    #: Study 25, S11: the browser situation module, from ``CHIMERA_BROWSER_SITUATION`` (off). On, a
+    #: session that holds the browser gets the module's rules in its system prompt, and a page the
+    #: browser hands to the person ends the run as ``handover``. The registry reads the same setting
+    #: for the tool's half (`default_registry`), so one switch turns on both.
+    browser_situation: bool = field(default_factory=_default_browser_situation)
     # A cheap model picks the tool NAME before each step and the executor is given only that tool
     # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
     # (study 20 B4), it spends money of its own, and nothing outside `bench/tool_router` asks for it.
@@ -449,6 +496,117 @@ class _UsageTally:
         if cost.unpriced is not None and self.unpriced is None:
             self.unpriced = cost.unpriced
 
+    def add_nested(self, spent: NestedSpend) -> None:
+        """Fold in what a run nested inside this one spent, already priced by its own tally.
+
+        Its ``usd`` is None when one of its calls had no price, and that stays unknown here: a
+        nested total dropped as zero is the undercount this tally exists to refuse.
+        """
+        self.prompt += spent.prompt_tokens or 0
+        self.completion += spent.completion_tokens or 0
+        self.cache_read += getattr(spent, "cache_read_tokens", 0) or 0
+        self.cache_write += getattr(spent, "cache_write_tokens", 0) or 0
+        if spent.usd is not None:
+            self.usd += spent.usd
+        elif self.unpriced is None:
+            self.unpriced = spent.model or "(a nested run)"
+
+
+class NestedSpend(Protocol):
+    """What a run nested inside another spent: an :class:`AgentResult`, or the
+    :class:`PartialSpend` a failed one carries out on its exception."""
+
+    @property
+    def prompt_tokens(self) -> int: ...
+
+    @property
+    def completion_tokens(self) -> int: ...
+
+    @property
+    def usd(self) -> float | None: ...
+
+    @property
+    def model(self) -> str: ...
+
+
+@dataclass(frozen=True)
+class OpenRun:
+    """A run in progress on this thread, as a tool running inside it can see it.
+
+    A tool that runs a model of its own (the repository explorer runs a whole `Agent`) spends money
+    the loop never sees: the loop meters the calls it makes, and the tool's are made inside one
+    tool call. Such a tool hands ``spend`` to its own run, so the ceiling is checked before each of
+    its calls as before each of the loop's, then adds what that run spent with :meth:`add_nested`,
+    so the run's tokens, ``usd`` and receipt carry it.
+    """
+
+    usage: _UsageTally
+    spend: SpendBudget | None
+
+    def add_nested(self, spent: NestedSpend | None) -> None:
+        """Add a nested run's tokens and price to this run's tally. The ceiling is not charged
+        here: a nested run given ``spend`` already charged it, call by call."""
+        if spent is not None:
+            self.usage.add_nested(spent)
+
+
+#: The runs open on each thread, innermost last. Per thread because a run shares its thread with
+#: every tool it calls one at a time, and one Agent can serve runs on several threads at once. The
+#: read-only batch that runs on worker threads (`PARALLEL_READ_TOOLS`) holds no tool that runs a
+#: model, so it has nothing to charge.
+_OPEN_RUNS = threading.local()
+
+
+def _open_runs() -> list[OpenRun]:
+    runs: list[OpenRun] | None = getattr(_OPEN_RUNS, "runs", None)
+    if runs is None:
+        runs = []
+        _OPEN_RUNS.runs = runs
+    return runs
+
+
+def enclosing_run() -> OpenRun | None:
+    """The innermost :class:`Agent` run in progress on this thread, or None outside any."""
+    runs: list[OpenRun] | None = getattr(_OPEN_RUNS, "runs", None)
+    return runs[-1] if runs else None
+
+
+_Spent = TypeVar("_Spent", bound=NestedSpend)
+
+
+def run_nested(label: str, nested: Callable[[SpendBudget | None], _Spent]) -> _Spent:
+    """Run a tool's own run of a model on the bill of the run that called the tool.
+
+    ``nested`` is handed the enclosing run's ceiling (None outside any run) and returns what it
+    spent, which is added to that run with :meth:`OpenRun.add_nested`. One that raises after paying
+    adds its :class:`PartialSpend` and the raise goes on, for the loop to turn into a tool error as
+    it always has. Outside any run there is no bill to put it on, so what it spent is logged, and
+    the tool keeps the returned value for its caller to read.
+
+    One helper for every tool that delegates (the explorer, the sub-agent, the web researcher),
+    so none of them can charge the ceiling and forget the tally, or the other way round.
+    """
+    outer = enclosing_run()
+    try:
+        spent = nested(outer.spend if outer is not None else None)
+    except Exception as exc:
+        partial = partial_spend(exc)
+        if outer is not None:
+            outer.add_nested(partial)
+        elif partial is not None:
+            _log.info("%s failed outside any run after spending %s", label, _priced(partial))
+        raise
+    if outer is not None:
+        outer.add_nested(spent)
+    else:
+        _log.info("%s ran outside any run and spent %s", label, _priced(spent))
+    return spent
+
+
+def _priced(spent: NestedSpend) -> str:
+    price = "an unknown amount" if spent.usd is None else f"${spent.usd:.4f}"
+    return f"{price} ({spent.prompt_tokens} prompt + {spent.completion_tokens} completion tokens)"
+
 
 @dataclass
 class AgentResult:
@@ -458,11 +616,12 @@ class AgentResult:
     steps: int
     stopped_reason: str
     """Why the loop ended: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
-    ``cancelled`` | ``context_stuck``.
+    ``cancelled`` | ``context_stuck`` | ``handover``.
 
     ``context_stuck`` is its own value rather than folded into ``max_steps`` because the two need
     opposite responses: one is a ceiling to raise, the other is a conversation that has nothing left
-    to compact and has to be started over."""
+    to compact and has to be started over. ``handover`` (study 25, S11) is the browser meeting a page
+    only the person can pass; the answer opens with the page and what it asks for."""
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
     # Token/cost accounting, summed across every model call in the run (0 when the backend reported
@@ -508,8 +667,9 @@ class Agent:
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
         # Built once rather than per compaction, and None unless asked for: `compact()` treats
-        # None as "use the structural note", which is the behaviour every caller has today.
-        self._summarise = None
+        # None as "use the structural note", which is the behaviour every caller has today. The
+        # run's meters are bound where it is called, in `run`, because they belong to one run.
+        self._summarise: Summariser | None = None
         if self.config.summarise_compaction:
             from chimera.core.summarise import rule_summariser
 
@@ -546,6 +706,15 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{UNTRUSTED_DATA_RULE}"
         if self.config.prefix_nonce:
             system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
+        # The browser situation module (study 25, S11), only when the owner switched it on AND this
+        # session holds the browser: rules about a tool the session lacks invite calls to nothing.
+        # Right after the core, before anything retrieved: it is the same bytes for every task, so
+        # it stays in the part of the prefix a provider can cache, and the plan ranks a situation
+        # contract above a project's conventions and below the owner, who is read last.
+        if self.config.browser_situation and "browser" in self.tools:
+            from chimera.tools.browser_situation import BROWSER_SITUATION_PROMPT
+
+            system_prompt = f"{system_prompt}\n\n{BROWSER_SITUATION_PROMPT}"
         # Under `turn_context` the retrieved skills and cards change with the task, so they go to
         # the turn context instead (see `compose_turn_context`) and the system stays one string.
         skill_block = "" if self.config.turn_context else self._skill_context(task)
@@ -585,13 +754,14 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         return system_prompt
 
-    def compose_turn_context(self, task: str) -> str:
+    def compose_turn_context(self, task: str, notes: str | None = None) -> str:
         """The block that heads this turn's user message, or "" when :attr:`AgentConfig.turn_context`
         is off.
 
         Everything in it changes between turns, which is why none of it is in the system message.
         The environment comes first because it frames the rest; the notes come last, closest to the
-        user's words, because they are the most specific.
+        user's words, because they are the most specific. ``notes`` replaces
+        :attr:`AgentConfig.turn_notes` for this turn when given (see ``run``).
         """
         if not self.config.turn_context:
             return ""
@@ -601,7 +771,7 @@ class Agent:
             environment_facts(self.config.project_root),
             self._skill_context(task),
             self._card_context(task),
-            self.config.turn_notes,
+            self.config.turn_notes if notes is None else notes,
         )
 
     def _skill_context(self, task: str) -> str:
@@ -688,6 +858,7 @@ class Agent:
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
         spend: SpendBudget | None = None,
+        turn_notes: str | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
@@ -710,7 +881,52 @@ class Agent:
 
         ``on_todo`` fires with the whole task list each time the agent records one. What it carries
         is the agent's own claim about its progress — unlike ``on_edit``, which reports a diff read
-        off disk — so a consumer that renders it owes the reader that distinction."""
+        off disk — so a consumer that renders it owes the reader that distinction.
+
+        ``turn_notes`` is :attr:`AgentConfig.turn_notes` for this run only, for a caller that keeps
+        one agent across turns (``ChatSession`` under real history). Setting the config instead
+        would leave one turn's recalled facts on the agent for the next. None reads the config."""
+        usage = _UsageTally()
+        # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
+        # scheduler dispatching jobs), and a cap that carried across them would refuse the second
+        # task because the first one used its allowance.
+        #
+        # Unless the CALLER owns one. `AutonomousAgent` calls this once per ATTEMPT, so a budget
+        # built here gave a three-attempt run three separate ceilings: measured, a run asking for
+        # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
+        # calls passes its own, and every attempt then draws on the same money.
+        if spend is None and self.config.max_usd:
+            spend = SpendBudget(self.config.max_usd)
+        # Open on this thread for as long as the loop runs, so a tool that runs a model of its own
+        # can charge THIS run instead of nothing (`enclosing_run`). Closed in `finally`: a run that
+        # raised must not stay open and collect a later tool's spend.
+        runs = _open_runs()
+        runs.append(OpenRun(usage, spend))
+        try:
+            return self._run(
+                task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
+                on_edit=on_edit, on_todo=on_todo, history=history, images=images,
+                should_stop=should_stop, turn_notes=turn_notes,
+            )
+        finally:
+            runs.pop()
+
+    def _run(
+        self,
+        task: str,
+        *,
+        usage: _UsageTally,
+        spend: SpendBudget | None,
+        on_token: Callable[[str], None] | None,
+        on_tool: Callable[[ToolActivity], None] | None,
+        on_edit: Callable[[str, str], None] | None,
+        on_todo: Callable[[list[dict[str, str]]], None] | None,
+        history: list[MessageLike] | None,
+        images: list[str] | None,
+        should_stop: Callable[[], bool] | None,
+        turn_notes: str | None,
+    ) -> AgentResult:
+        """The loop of :meth:`run`, on the meters that opened it."""
         # Attached per call rather than at construction: the sink belongs to this invocation, and a
         # second turn with no sink must not keep announcing into the first turn's queue.
         # Bound here rather than at construction, and per call: the sink belongs to THIS
@@ -746,7 +962,7 @@ class Agent:
             if images
             else {"role": "user", "content": task}
         )
-        context_block = self.compose_turn_context(task)
+        context_block = self.compose_turn_context(task, turn_notes)
         turn_message: dict[str, Any] = (
             {**bare_turn, "content": f"{context_block}\n\n{task}"} if context_block else bare_turn
         )
@@ -766,17 +982,6 @@ class Agent:
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0
         tool_names: list[str] = []
-        usage = _UsageTally()
-        # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
-        # scheduler dispatching jobs), and a cap that carried across them would refuse the second
-        # task because the first one used its allowance.
-        #
-        # Unless the CALLER owns one. `AutonomousAgent` calls this once per ATTEMPT, so a budget
-        # built here gave a three-attempt run three separate ceilings: measured, a run asking for
-        # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
-        # calls passes its own, and every attempt then draws on the same money.
-        if spend is None and self.config.max_usd:
-            spend = SpendBudget(self.config.max_usd)
         steplog = StepLog()
         # Which instructions this run was given, as twelve hex characters in its trace. The
         # prompt registry snapshots every piece; this is what ties a run back to a version of them
@@ -920,7 +1125,7 @@ class Agent:
                     messages,
                     keep_recent=self.config.keep_recent,
                     state=self.run_state,
-                    summarise=self._summarise,
+                    summarise=self._metered_summariser(usage, spend),
                 )
                 if compacted:
                     record.compacted = True
@@ -972,13 +1177,31 @@ class Agent:
                     nudge = _ASSUME_NUDGE if asked else _ACTION_NUDGE
                     messages.append({"role": "user", "content": nudge})
                     continue
-                messages.append({"role": "assistant", "content": result.content})
-                return self._result(result.content, step, "final", messages, tool_calls_made,
+                answer = result.content
+                if not (answer or "").strip():
+                    # A turn can also end on its own with no tool call AND no text: the model
+                    # reasoned its answer and wrote none of it. `bench/web_research` saw it on this
+                    # ending; #619 closed the same hole at the step limit and the loop breaker. Ask
+                    # once without tools, then say so rather than hand back a blank answer.
+                    _log.info("the final reply was empty; asking once more")
+                    filed = result.answer_in_reasoning
+                    result = self._step([*messages, {"role": "user", "content": _EMPTY_CLOSE_NUDGE}],
+                                        spend=spend, tools=None, on_token=on_token, usage=usage,
+                                        model=run_model)
+                    answer = result.content
+                    if not (answer or "").strip():
+                        # Never `result.reasoning`, even when the route filed the text there.
+                        answer = _empty_close_note(
+                            tool_names, filed_as_reasoning=filed or result.answer_in_reasoning
+                        )
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "final", messages, tool_calls_made,
                                     tool_names, usage, result.model,
                                     route_meta=result.route_meta, steplog=steplog, task=task)
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
+            handover: Wall | None = None
             answered: set[str] = set()
             # A read-only batch runs together; its observations are then consumed below in the
             # model's order, exactly as the one-at-a-time path consumes them. `None` is that path.
@@ -1015,6 +1238,13 @@ class Agent:
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
                 answered.add(call.id)
+                # Study 25, S11: the browser met a page only the person can pass. The step ends
+                # here, whatever else the model asked for in it: a `browser` call is never in a
+                # batch that ran together (it is not a parallel read), so nothing after it has run.
+                if self.config.browser_situation and call.name == "browser":
+                    handover = _pending_handover(self.tools)
+                    if handover is not None:
+                        break
                 if loop_detector is not None:
                     verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
                     if verdict.tripped:
@@ -1031,13 +1261,31 @@ class Agent:
             # spinning run is what ends it. Worse, the malformed transcript is what `CodeSession`
             # persists, and its trimmer only cuts at a `user` boundary, so the session stays broken
             # for every later turn. Stubs that declare one call per step never see this.
+            stopper = (
+                "the browser handed the page to the person" if handover is not None
+                else "the tool-loop breaker stopped this step"
+            )
             for call in result.tool_calls:
                 if call.id not in answered:
                     messages.append({
                         "role": "tool",
                         "tool_call_id": call.id,
-                        "content": "error: not run — the tool-loop breaker stopped this step.",
+                        "content": f"error: not run — {stopper}.",
                     })
+            if handover is not None:
+                # No further step and no retry: the page will ask the same thing again. One closing
+                # call, like every other stop, and the answer opens with the harness's own line, so
+                # a surface that shows only the answer still shows the handover.
+                _log.info("run handed over at step %d: %s", step, handover.describe())
+                final, answer = self._close(
+                    messages, _HANDOVER_NUDGE.format(wall=handover.describe()),
+                    tool_names=tool_names, spend=spend, on_token=on_token, usage=usage,
+                    model=run_model,
+                )
+                answer = f"{handover.for_person()}\n\n{answer}"
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "handover", messages, tool_calls_made,
+                                    tool_names, usage, final.model, steplog=steplog, task=task)
             if not drift_reported:
                 drift = steplog.drift
                 if drift.drifting:
@@ -1086,6 +1334,21 @@ class Agent:
                             tool_calls_made, tool_names, usage, final.model, steplog=steplog,
                             task=task)
 
+    def _metered_summariser(
+        self, usage: _UsageTally, spend: SpendBudget | None
+    ) -> Callable[[list[Any]], str] | None:
+        """This run's compaction summariser, charging its call to the run, or None when off.
+
+        Charged the way the tool router's call is charged (`ToolRouter.pick`), so it lands in the
+        run's own line: the result's tokens and ``usd``, the partial spend a failed run carries,
+        and the spend ceiling. Not a line of its own: the call is made inside the run, between two
+        of its steps, and a turn is one row in the usage log whatever it called on the way.
+        """
+        summarise = self._summarise
+        if summarise is None:
+            return None
+        return lambda older: summarise(older, usage=usage, spend=spend)
+
     def _close(
         self,
         messages: list[MessageLike],
@@ -1107,11 +1370,14 @@ class Agent:
         if (final.content or "").strip():
             return final, final.content
         _log.info("the closing reply was empty; asking once more")
+        filed = final.answer_in_reasoning
         final = self._step([*messages, {"role": "user", "content": f"{nudge}\n\n{_EMPTY_CLOSE_NUDGE}"}],
                            spend=spend, tools=None, on_token=on_token, usage=usage, model=model)
         if (final.content or "").strip():
             return final, final.content
-        return final, _empty_close_note(tool_names)
+        # Never `final.reasoning`, even when the route filed the text there (see the note).
+        filed = filed or final.answer_in_reasoning
+        return final, _empty_close_note(tool_names, filed_as_reasoning=filed)
 
     def _step(
         self,
@@ -1263,7 +1529,7 @@ class Agent:
         for index, call in enumerate(calls):
             outcome = outcomes[str(index)]
             if outcome.error is not None:  # `_run_tool` catches everything; belt and braces
-                observations.append(f"error: tool {call.name!r} failed: {outcome.error}")
+                observations.append(tool_raised(call.name, outcome.error))
             else:
                 observations.append(str(outcome.value if outcome.value is not None else ""))
         return observations
@@ -1276,7 +1542,7 @@ class Agent:
             return f"error: unknown tool {name!r}"
         except Exception as exc:  # tools must never crash the loop
             _log.warning("tool %s failed: %s", name, exc)
-            return f"error: tool {name!r} failed: {exc}"
+            return tool_raised(name, exc)
 
     def _edit_before(
         self, name: str, arguments: dict[str, Any]
