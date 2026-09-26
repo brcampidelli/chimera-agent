@@ -6968,14 +6968,23 @@ def _maybe_autoconsolidate(
 
 def _record_tidy_spend(settings: Settings, meter: MeteredBackend | None, usage_id: str) -> None:
     """Write what the tidy's merges cost, when it made any (see `_maybe_autoconsolidate`)."""
+    from chimera.api.usage import TIDY_KIND
+
+    _record_merge_spend(settings, meter, usage_id or "memory-tidy", route_kind=TIDY_KIND)
+
+
+def _record_merge_spend(
+    settings: Settings, meter: MeteredBackend | None, usage_id: str, *, route_kind: str | None
+) -> None:
+    """One usage row for the memory merges ``meter`` saw, or none when it saw no call returned."""
     if meter is None or not meter.calls:
         return
-    from chimera.api.usage import TIDY_KIND, record_spend
+    from chimera.api.usage import record_spend
 
     record_spend(
-        settings.home, session_id=usage_id or "memory-tidy", model=meter.last_model,
+        settings.home, session_id=usage_id, model=meter.last_model,
         prompt_tokens=meter.prompt_tokens, completion_tokens=meter.completion_tokens,
-        usd=meter.usd, route_kind=TIDY_KIND,
+        usd=meter.usd, route_kind=route_kind,
     )
 
 
@@ -7090,20 +7099,33 @@ def memory_consolidate(
     ),
 ) -> None:
     """Merge clusters of similar memories into one LLM-summarised fact (opt-in write)."""
+    from uuid import uuid4
+
     from chimera.memory.consolidate import model_summarizer
+    from chimera.orchestration.metering import MeteredBackend as _Meter
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     if not get_settings().can_answer():
         console.print("[red]no provider API key configured, and no local model[/red] — set one to summarise")
         raise typer.Exit(1)
+    # Each merge is a model call, metered here and written as one row of this command's own: it
+    # belongs to no conversation, and the Cost screen could not see it. Written on the way out
+    # whatever happened, so a run that failed part-way bills the merges it paid for.
+    meter = _Meter(LLMGateway(), label="consolidate")
+    usage_id = f"consolidate:{uuid4().hex[:12]}"
     try:
-        removed = _memory_manager().consolidate(
-            model_summarizer(LLMGateway()), threshold=threshold
-        )
+        removed = _memory_manager().consolidate(model_summarizer(meter), threshold=threshold)
     except MissingCredentialsError as exc:
+        _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
-    console.print(f"consolidated: merged away {removed} redundant memory item(s)")
+    except Exception:
+        _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
+        raise
+    _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
+    # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
+    cost = "cost unknown (a merge had no price)" if meter.usd is None else f"${meter.usd:.4f}"
+    console.print(f"consolidated: merged away {removed} redundant memory item(s) · {cost}")
 
 
 @memory_app.command("graph")
