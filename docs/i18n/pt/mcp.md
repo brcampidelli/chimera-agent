@@ -1,5 +1,5 @@
 ---
-source_sha256: 32a7d80a9e508e738b930dbf71e8edcc9a15e2366ad7c15ba6033a2ff5833b56
+source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
 ---
 
 # Conectando servidores MCP
@@ -111,6 +111,50 @@ config:
 funciona sem uma). Adicione `--fuse` para rotear os turnos profundos do solver através da fusão,
 `--no-memory` para pular o recall. Como o stdio é o fio de transporte, todos os logs vão para o
 stderr — o stdout carrega só o protocolo.
+
+## Deixar o Claude operar o app desktop
+
+`chimera serve --mcp` monta um agente próprio. `chimera mcp desktop` não monta nada: é um
+controle remoto do app desktop **que você já tem aberto**, então o Claude vê as mesmas
+conversas, execuções e aprovações que você, e o que ele inicia roda sob a governança do app,
+nas telas do app.
+
+1. No app, abra **Configurações → Claude** e ligue **Permitir que o Claude opere este app**.
+2. Registre o servidor no Claude Code (ou ponha o mesmo comando na config do Claude Desktop):
+
+   ```bash
+   claude mcp add chimera-desktop -- chimera mcp desktop
+   ```
+
+Com a primeira chave ligada, o Claude pode ler e iniciar conversas (`desktop_send`),
+execuções, lotes, quadros e jobs de cron, buscar e editar a memória, e ler arquivos e o estado
+do git. Uma execução que ele inicia leva a postura que você configurou, e um pedido que tenta
+ampliá-la — um comando `verify`, execução no host, outro agente, aprovação automática — é
+recusado. As aprovações continuam com você: `desktop_approvals` só as lista. Quando um turno
+para em uma, `desktop_send` volta na hora dizendo que está esperando por você, e o turno segue
+no app; `desktop_job` informa como ele termina.
+
+A segunda chave, **Controle total**, acrescenta `desktop_approve` (responder aprovações e etapas
+com portão) e `desktop_settings` (editar configurações, a identidade do agente e agentes salvos,
+rodar um comando no Runner). Com ela ligada, o Claude pode aprovar ações sem você — e uma
+página ou mensagem com injeção de prompt lida pelo agente pode levá-lo a isso. Essas duas tools
+nem aparecem na lista enquanto ela está desligada, e o app as recusa se forem chamadas mesmo
+assim.
+
+O que nenhuma das chaves permite: ler ou gravar uma chave de API, token ou webhook. Edições de
+configuração recusam nomes de credenciais, as rotas que carregam chaves ou links de
+compartilhamento não são alcançáveis, arquivos de credenciais (`.env`, chaves privadas) não
+podem ser lidos, gravados nem buscados, e todo resultado é limpo de valores de credenciais.
+Também não dá para apontar um workspace para a pasta de dados do app, nem para uma pasta que a
+contenha (sua pasta pessoal, por exemplo): é lá que ficam as respostas das aprovações, e um
+arquivo gravado ali responderia uma.
+
+Como conecta: enquanto a chave está ligada, o app grava `~/.chimera/desktop-bridge.json` (a URL
+da sua API em loopback e um token aleatório; no POSIX legível só por você, no Windows dentro do
+seu perfil). Desligar a chave ou fechar o app apaga o arquivo e aposenta o token. Com o app
+fechado, toda tool responde "Chimera desktop is not running, or 'Allow Claude to operate this
+app' is off in Settings." O Claude lista as tools ao conectar; depois de ligar ou desligar o
+**Controle total**, reconecte o servidor (`/mcp` no Claude Code) para ver a lista nova.
 
 ## Falando A2A (agente → agente)
 

@@ -1,5 +1,5 @@
 ---
-source_sha256: 32a7d80a9e508e738b930dbf71e8edcc9a15e2366ad7c15ba6033a2ff5833b56
+source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
 ---
 
 # Connecter des serveurs MCP
@@ -113,6 +113,53 @@ configuration :
 mémoire fonctionne sans). Ajoutez `--fuse` pour router les tours profonds du solveur à travers
 la fusion, `--no-memory` pour sauter le rappel. Comme stdio est le fil de transport, tous les
 logs vont vers stderr — stdout ne porte que le protocole.
+
+## Laisser Claude piloter l'app de bureau
+
+`chimera serve --mcp` construit son propre agent. `chimera mcp desktop` ne construit rien : c'est
+une télécommande pour l'app de bureau **que vous avez déjà ouverte**, donc Claude voit les mêmes
+conversations, exécutions et approbations que vous, et ce qu'il lance tourne sous la gouvernance
+de l'app, sur ses écrans.
+
+1. Dans l'app, ouvrez **Réglages → Claude** et activez **Autoriser Claude à piloter cette app**.
+2. Enregistrez le serveur dans Claude Code (ou ajoutez la même commande à la config de Claude
+   Desktop) :
+
+   ```bash
+   claude mcp add chimera-desktop -- chimera mcp desktop
+   ```
+
+Avec le premier interrupteur activé, Claude peut lire et lancer des conversations
+(`desktop_send`), des exécutions, des lots, des tableaux et des tâches cron, chercher et modifier
+la mémoire, et lire les fichiers et l'état git. Une exécution qu'il lance porte la posture que
+vous avez configurée, et une requête qui tente de l'élargir — une commande `verify`, l'exécution
+sur l'hôte, un autre agent, l'auto-approbation — est refusée. Les approbations restent les
+vôtres : `desktop_approvals` ne fait que les lister. Quand un tour s'arrête sur l'une d'elles,
+`desktop_send` répond aussitôt qu'il vous attend, et le tour continue dans l'app ; `desktop_job`
+indique comment il se termine.
+
+Le second interrupteur, **Contrôle total**, ajoute `desktop_approve` (répondre aux approbations et
+aux étapes soumises à validation) et `desktop_settings` (modifier les réglages, l'identité de
+l'agent et les agents enregistrés, lancer une commande dans le Runner). Activé, il permet à
+Claude d'approuver des actions sans vous — et une page ou un message piégé par injection de
+prompt, lu par l'agent, pourrait l'y amener. Ces deux outils ne sont pas listés tant qu'il est
+désactivé, et l'app les refuse s'ils sont appelés malgré tout.
+
+Ce qu'aucun interrupteur ne permet : lire ou écrire une clé d'API, un jeton ou un webhook. Les
+modifications de réglages refusent les noms d'identifiants, les routes qui portent des clés ou
+des liens de partage sont inaccessibles, les fichiers d'identifiants (`.env`, clés privées) ne
+peuvent être ni lus, ni écrits, ni cherchés, et chaque résultat est nettoyé des valeurs
+d'identifiants. On ne peut pas non plus pointer un workspace vers le dossier de données de l'app,
+ni vers un dossier qui le contient (votre dossier personnel, par exemple) : c'est là que sont
+gardées les réponses aux approbations, et un fichier écrit là en validerait une.
+
+Comment ça se connecte : tant que l'interrupteur est activé, l'app écrit
+`~/.chimera/desktop-bridge.json` (l'URL de son API en loopback et un jeton aléatoire ; lisible
+par vous seul sous POSIX, dans votre profil sous Windows). Désactiver l'interrupteur ou fermer
+l'app le supprime et retire le jeton. App fermée, chaque outil répond « Chimera desktop is not
+running, or 'Allow Claude to operate this app' is off in Settings. » Claude liste les outils à la
+connexion ; après avoir activé ou désactivé **Contrôle total**, reconnectez le serveur (`/mcp`
+dans Claude Code) pour voir la nouvelle liste.
 
 ## Parler A2A (agent → agent)
 

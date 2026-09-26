@@ -1,5 +1,5 @@
 ---
-source_sha256: 32a7d80a9e508e738b930dbf71e8edcc9a15e2366ad7c15ba6033a2ff5833b56
+source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
 ---
 
 # 连接 MCP 服务器
@@ -104,6 +104,41 @@ chimera serve --mcp        # speaks MCP over stdio
 `--mcp` 需要一个 provider 密钥才能使用 `chimera_solve`/`chimera_fuse`（记忆检索则无需密钥即可
 使用）。加上 `--fuse` 可以让求解器的深度推理轮次改走融合路径，加上 `--no-memory` 则会跳过记忆
 召回。由于通信走的是 stdio，所有日志都会输出到 stderr——stdout 只携带协议数据。
+
+## 让 Claude 操作桌面应用
+
+`chimera serve --mcp` 会构建自己的智能体。`chimera mcp desktop` 什么也不构建：它是你**已经打开的**
+桌面应用的遥控器，所以 Claude 看到的对话、运行和审批与你看到的相同，它发起的一切都在应用的治理下、
+在应用的界面上运行。
+
+1. 在应用中打开 **设置 → Claude**，开启 **允许 Claude 操作此应用**。
+2. 在 Claude Code 中注册该服务器（或把同样的命令加入 Claude Desktop 的配置）：
+
+   ```bash
+   claude mcp add chimera-desktop -- chimera mcp desktop
+   ```
+
+开启第一个开关后，Claude 可以读取和发起对话（`desktop_send`）、运行、批处理、看板和 cron 任务，
+搜索和编辑记忆，读取文件和 git 状态。它发起的运行带着你配置的姿态；试图放宽姿态的请求——`verify`
+命令、在主机上执行、其他智能体、自动审批——都会被拒绝。审批始终由你决定：`desktop_approvals`
+只列出它们。当某一轮停在审批上时，`desktop_send` 会立即返回，说明正在等你，而这一轮会在应用里继续；
+`desktop_job` 会报告它如何结束。
+
+第二个开关 **完全控制** 会增加 `desktop_approve`（回答审批和带关卡的步骤）和 `desktop_settings`
+（编辑设置、智能体的身份和已保存的智能体，在 Runner 中运行命令）。开启后，Claude 可以在你不在场时
+批准操作——智能体读到的带有提示注入的网页或消息也可能诱使它这样做。关闭时，这两个工具根本不会出现在
+列表中；即便被调用，应用也会拒绝。
+
+任何开关都不允许的事：读取或写入 API 密钥、令牌或 webhook。设置编辑会拒绝凭据名称，携带密钥或
+分享链接的路由不可达，凭据文件（`.env`、私钥）无法被读取、写入或搜索，所有结果都会清除凭据值。
+也不能把工作区指向应用的数据文件夹，或包含它的文件夹（例如你的主目录）：审批的答复就保存在那里，
+写到那里的文件就等于回答了一项审批。
+
+连接方式：开关开启期间，应用会写入 `~/.chimera/desktop-bridge.json`（其回环 API 的 URL 和一个随机
+令牌；在 POSIX 上仅你可读，在 Windows 上位于你的用户配置文件内）。关闭开关或关闭应用会删除该文件并
+作废令牌。应用关闭时，每个工具都会回答 "Chimera desktop is not running, or 'Allow Claude to
+operate this app' is off in Settings."。Claude 在连接时获取工具列表；开启或关闭 **完全控制** 后，
+请重新连接服务器（在 Claude Code 中使用 `/mcp`）以看到新列表。
 
 ## 使用 A2A（agent 对 agent）
 

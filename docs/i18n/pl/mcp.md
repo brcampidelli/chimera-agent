@@ -1,5 +1,5 @@
 ---
-source_sha256: 32a7d80a9e508e738b930dbf71e8edcc9a15e2366ad7c15ba6033a2ff5833b56
+source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
 ---
 
 # Podłączanie serwerów MCP
@@ -111,6 +111,50 @@ Skieruj klienta MCP na to jako serwer stdio. Dla Claude Desktop, dodaj do jego k
 działa bez niego). Dodaj `--fuse`, by kierować głębokie tury solvera przez fuzję, `--no-memory`,
 by pominąć przywoływanie pamięci. Ponieważ nośnikiem jest stdio, wszystkie logi idą do stderr —
 stdout niesie tylko protokół.
+
+## Pozwolenie Claude na obsługę aplikacji desktop
+
+`chimera serve --mcp` buduje własnego agenta. `chimera mcp desktop` nie buduje niczego: to pilot
+do aplikacji desktop, **którą już masz otwartą**, więc Claude widzi te same rozmowy, przebiegi i
+zatwierdzenia co ty, a to, co uruchamia, działa pod nadzorem aplikacji, na jej ekranach.
+
+1. W aplikacji otwórz **Ustawienia → Claude** i włącz **Pozwól Claude obsługiwać tę aplikację**.
+2. Zarejestruj serwer w Claude Code (albo dodaj to samo polecenie do konfiguracji Claude Desktop):
+
+   ```bash
+   claude mcp add chimera-desktop -- chimera mcp desktop
+   ```
+
+Przy włączonym pierwszym przełączniku Claude może czytać i zaczynać rozmowy (`desktop_send`),
+przebiegi, partie, tablice i zadania cron, przeszukiwać i edytować pamięć oraz czytać pliki i
+stan gita. Przebieg, który uruchamia, ma postawę skonfigurowaną przez ciebie, a żądanie próbujące
+ją poszerzyć — polecenie `verify`, wykonanie na hoście, inny agent, auto-zatwierdzanie — jest
+odrzucane. Zatwierdzenia zostają przy tobie: `desktop_approvals` tylko je wylicza. Gdy tura
+zatrzyma się na którymś, `desktop_send` od razu odpowiada, że czeka na ciebie, a tura trwa dalej
+w aplikacji; `desktop_job` mówi, jak się kończy.
+
+Drugi przełącznik, **Pełna kontrola**, dodaje `desktop_approve` (odpowiadanie na zatwierdzenia i
+kroki z bramką) oraz `desktop_settings` (edycja ustawień, tożsamości agenta i zapisanych agentów,
+uruchomienie polecenia w Runnerze). Gdy jest włączony, Claude może zatwierdzać działania bez
+ciebie — a strona lub wiadomość z prompt injection przeczytana przez agenta może go do tego
+skłonić. Te dwa narzędzia w ogóle nie są wymieniane, dopóki jest wyłączony, a aplikacja je
+odrzuca, jeśli mimo to zostaną wywołane.
+
+Czego nie pozwala żaden przełącznik: czytać ani zapisywać klucza API, tokenu czy webhooka.
+Edycje ustawień odrzucają nazwy poświadczeń, trasy niosące klucze lub linki udostępniania są
+nieosiągalne, plików z poświadczeniami (`.env`, klucze prywatne) nie da się czytać, zapisywać ani
+przeszukiwać, a każdy wynik jest czyszczony z wartości poświadczeń. Nie można też wskazać
+workspace na folder danych aplikacji ani na folder, który go zawiera (np. katalog domowy): tam
+przechowywane są odpowiedzi na zatwierdzenia, a plik zapisany w tym miejscu odpowiedziałby na
+jedno z nich.
+
+Jak się łączy: dopóki przełącznik jest włączony, aplikacja zapisuje
+`~/.chimera/desktop-bridge.json` (URL swojego API na loopbacku i losowy token; w POSIX czytelny
+tylko dla ciebie, w Windows w twoim profilu). Wyłączenie przełącznika lub zamknięcie aplikacji
+usuwa plik i unieważnia token. Przy zamkniętej aplikacji każde narzędzie odpowiada „Chimera
+desktop is not running, or 'Allow Claude to operate this app' is off in Settings.” Claude
+wylicza narzędzia przy łączeniu; po włączeniu lub wyłączeniu **Pełnej kontroli** połącz serwer
+ponownie (`/mcp` w Claude Code), by zobaczyć nową listę.
 
 ## Mówienie A2A (agent → agent)
 

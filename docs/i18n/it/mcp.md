@@ -1,5 +1,5 @@
 ---
-source_sha256: 32a7d80a9e508e738b930dbf71e8edcc9a15e2366ad7c15ba6033a2ff5833b56
+source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
 ---
 
 # Connettere server MCP
@@ -112,6 +112,51 @@ configurazione:
 funziona senza). Aggiungi `--fuse` per instradare i turni profondi del solver attraverso la
 fusione, `--no-memory` per saltare il recall. Poiché stdio è il canale, tutti i log vanno su
 stderr — stdout trasporta solo il protocollo.
+
+## Lasciare che Claude usi l'app desktop
+
+`chimera serve --mcp` costruisce un proprio agente. `chimera mcp desktop` non costruisce nulla: è
+un telecomando per l'app desktop **che hai già aperta**, quindi Claude vede le stesse
+conversazioni, esecuzioni e approvazioni che vedi tu, e ciò che avvia gira sotto la governance
+dell'app, sulle sue schermate.
+
+1. Nell'app, apri **Impostazioni → Claude** e attiva **Consenti a Claude di usare questa app**.
+2. Registra il server in Claude Code (o aggiungi lo stesso comando alla config di Claude Desktop):
+
+   ```bash
+   claude mcp add chimera-desktop -- chimera mcp desktop
+   ```
+
+Con il primo interruttore attivo, Claude può leggere e avviare conversazioni (`desktop_send`),
+esecuzioni, batch, bacheche e job cron, cercare e modificare la memoria, e leggere file e stato
+git. Un'esecuzione che avvia porta la postura che hai configurato, e una richiesta che prova ad
+allargarla — un comando `verify`, esecuzione sull'host, un altro agente, auto-approvazione — viene
+rifiutata. Le approvazioni restano a te: `desktop_approvals` si limita a elencarle. Quando un
+turno si ferma su una, `desktop_send` risponde subito che ti sta aspettando, e il turno prosegue
+nell'app; `desktop_job` dice come finisce.
+
+Il secondo interruttore, **Controllo totale**, aggiunge `desktop_approve` (rispondere ad
+approvazioni e passi con cancello) e `desktop_settings` (modificare le impostazioni, l'identità
+dell'agente e gli agenti salvati, eseguire un comando nel Runner). Con esso attivo, Claude può
+approvare azioni senza di te — e una pagina o un messaggio con prompt injection letto dall'agente
+potrebbe indurlo a farlo. Questi due strumenti non compaiono affatto nell'elenco finché è spento,
+e l'app li rifiuta se vengono chiamati comunque.
+
+Ciò che nessun interruttore consente: leggere o scrivere una chiave API, un token o un webhook.
+Le modifiche alle impostazioni rifiutano i nomi di credenziali, le rotte che portano chiavi o
+link di condivisione non sono raggiungibili, i file di credenziali (`.env`, chiavi private) non
+si possono leggere, scrivere né cercare, e ogni risultato viene ripulito dai valori delle
+credenziali. Non si può nemmeno puntare un workspace alla cartella dati dell'app, né a una
+cartella che la contiene (la tua cartella home, per esempio): lì sono custodite le risposte alle
+approvazioni, e un file scritto lì ne risponderebbe una.
+
+Come si collega: finché l'interruttore è attivo, l'app scrive `~/.chimera/desktop-bridge.json`
+(l'URL della sua API in loopback e un token casuale; su POSIX leggibile solo da te, su Windows
+dentro il tuo profilo). Spegnere l'interruttore o chiudere l'app lo cancella e ritira il token.
+Ad app chiusa, ogni strumento risponde "Chimera desktop is not running, or 'Allow Claude to
+operate this app' is off in Settings." Claude elenca gli strumenti al collegamento; dopo aver
+acceso o spento **Controllo totale**, ricollega il server (`/mcp` in Claude Code) per vedere il
+nuovo elenco.
 
 ## Parlare A2A (agente → agente)
 

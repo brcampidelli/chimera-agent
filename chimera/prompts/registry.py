@@ -449,6 +449,10 @@ SECTIONS: tuple[PromptSection, ...] = (
 NOT_PROMPTS: dict[str, str] = {
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
     "chimera.migration.base:_MEMORY_NOTE": "a CLI message printed by `chimera migrate`",
+    "chimera.server.desktop_mcp:DATA_NOTE": (
+        "part of the MCP tool descriptions `chimera mcp desktop` lists to an EXTERNAL client "
+        "(Claude); no Chimera agent's prompt ever contains it"
+    ),
 }
 
 
