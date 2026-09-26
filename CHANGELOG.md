@@ -6,6 +6,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.62.0] - 2026-09-26
+### Changed
+
+- **The default agent model is now `openrouter/openai/gpt-6-luna`.** A paired bake-off ran it against `deepseek-v4-flash-0731`, `deepseek-v4.1-flash` and `qwen3.7-flash` on SWE-bench django. The run used the Chimera harness, a network wall and a disk sandbox.
+  - luna resolved **78.7% against 61.8%** on 178 paired items: **+16.9 pp [+9.8, +23.7]**, Holm-adjusted McNemar p = 3e-5.
+  - It did so at **45% of the cost per resolved item** and with half the tokens.
+  - The tier presets, the judge and the context budgets are unchanged. Set `CHIMERA_DEFAULT_MODEL` to keep the old default. (#642, #643)
+
+- **Memory extraction is on by default.** After a turn, the model can propose facts worth keeping. Its bench recommended the switch.
+  - The bots are excluded.
+  - Its cost reaches the usage log.
+  - `CHIMERA_MEMORY_EXTRACT=0` turns it off. (#631, #637)
+
+- **Every prompt the product sends is registered and snapshotted.** A report-only lint checks them, and the system prompt's fingerprint is carried in every trace and receipt. The desktop shows it as `prompt <sha>`. Per-turn state moved out of the system message into a turn context, so the cached prefix stays stable. (#599, #606, #607, #623)
+
+### Added
+
+- **`chimera review`**, an experimental two-stage code review from another model family. The default reviewer is `gpt-6-luna`, the one `bench/review_reviewer` measured. (#630, #638)
+
+- **An Experimental card in the desktop Settings.** It holds three switches that until now existed only in `.env`: hand-over at browser walls, the web research sub-agent, and the explorer contract. All three ship **off**, because their measurements did not recommend them, and each switch says what was measured. (#627, #628, #636, #641)
+
+- **Real message history for `chat`**, behind a flag. It was measured and not adopted, so it stays off. (#626)
+
+### Fixed
+
+- **Identity and language.** The owner's identity reaches every agent a person talks to. The orchestration keeps one language rule and reads the owner last everywhere. (#600, #602)
+
+- **Security (taint).**
+  - The untrusted-data sentence survives a replaced prompt, and webhooks are fenced. (#601)
+  - A fetch tool's own refusal or error still reads as one through the fence. (#629)
+  - A taint source that raises is fenced and taints the run. (#634)
+  - The allowlist's escape warning reads the tools actually kept, not the names listed. (#632)
+
+- **Gateway.**
+  - The thinking switch reaches the provider on blocking calls too. (#615)
+  - An answer the route filed as reasoning is flagged and never made the answer. (#635)
+  - The ceiling no longer pins the weak rung to one route. (#639)
+  - A 429 now says whose limit it was. (#639)
+
+- **Agent loop.**
+  - An empty closing reply, or an empty reply on the natural ending, is asked for again. A second empty reply is reported as one. (#619, #624)
+  - A solve that asked a question is told to assume. The fusion panel is told it has no tools. (#603)
+  - A fusion grader that cannot tell abstains instead of grading zero. (#604)
+
+- **Context.** The compaction budget caps at the context the model was measured to read. The default model triggers at 102k. (#618, #620)
+
+- **Chat.** A session with `max_history=0` replays no earlier turn, instead of replaying all of them. (#625)
+
+- **Billing.** Every model call now reaches the bill: the plan gate, the summariser, tidy, the explorer, sub-agents and consolidate. (#640)
+
+- **Decisions.** The hosted backend asks for one output format. (#622)
+
+- **Catalogue.** `deepseek-v4-flash-0731` now quotes 0.022 in and 0.32 out. (#608)
+
+### Benchmarks
+
+Study 25 ran every hypothesis against a pre-registration, and the nulls are published: H1, H2/H3, H6, H7, H9, H10 and H11, useful context, and the default-model bake-off. (#598, #609–#618, #621, #633, #643)
+
 ## [0.61.2] - 2026-09-25
 ### Added
 
