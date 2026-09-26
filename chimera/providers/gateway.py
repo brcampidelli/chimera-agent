@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 
 from chimera.config import Settings, get_settings
 from chimera.providers.cache import CompletionCache
+from chimera.providers.catalog import max_output_for
 from chimera.providers.discovery import LOCAL_MODEL_PREFIXES, is_local_model
 from chimera.providers.failover import (
     CredentialPool,
@@ -602,7 +603,8 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        max_tokens = self._bounded(max_tokens)
+        budget = max_tokens  # the caller's; each fallback below is bounded for its own routes
+        max_tokens = self._bounded(budget, resolved)
 
         # `thinking` reaches the provider here too. Until 2026-09-25 only `stream_complete` passed it,
         # so every blocking call that asked for reasoning off — `decisions.hosted`, the agent loop
@@ -655,6 +657,9 @@ class LLMGateway:
             candidate_extra = (
                 extra if candidate == resolved else self._provider_kwargs(candidate, thinking=thinking)
             )
+            candidate_max = (
+                max_tokens if candidate == resolved else self._bounded(budget, candidate)
+            )
             for api_key in api_keys:
                 call_kwargs: dict[str, Any] = _call_kwargs(candidate_extra, kwargs)
                 if api_key:
@@ -668,7 +673,7 @@ class LLMGateway:
                         model=candidate,
                         messages=call_messages,
                         temperature=temperature,
-                        max_tokens=max_tokens,
+                        max_tokens=candidate_max,
                         tools=tools,
                         **call_kwargs,
                     )
@@ -758,7 +763,7 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
-        max_tokens = self._bounded(max_tokens)
+        max_tokens = self._bounded(max_tokens, resolved)
 
         call_kwargs: dict[str, Any] = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
@@ -782,17 +787,27 @@ class LLMGateway:
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
 
-    def _bounded(self, max_tokens: int | None) -> int | None:
+    def _bounded(self, max_tokens: int | None, model: str = "") -> int | None:
         """The caller's `max_tokens`, or the deployment's completion ceiling when the caller set none.
 
         `Settings.completion_ceiling` says why: a reasoning model with no bound can spend the
         provider's whole ceiling thinking and return nothing, at the price of everything it thought.
         A caller that chose a budget keeps it; 0 keeps the provider's ceiling.
+
+        The ceiling is lowered to what every route of ``model`` serves, when the catalogue records
+        that (:attr:`chimera.providers.catalog.CatalogEntry.max_output`). OpenRouter reads
+        ``max_tokens`` as a route filter, so a ceiling above most routes' limit is not a bound but a
+        choice of provider: it sent every tool-free call to the preset weak rung to the one route
+        that lists more, which then answered 429 with nothing left to fall back to. Lowered, never
+        raised, and only the gateway's own number: a budget the caller chose goes out as chosen.
         """
         if max_tokens is not None:
             return max_tokens
         ceiling = int(getattr(self.settings, "completion_ceiling", 0) or 0)
-        return ceiling if ceiling > 0 else None
+        if ceiling <= 0:
+            return None
+        served = max_output_for(model)
+        return served if served is not None and served < ceiling else ceiling
 
     def _think_filter(self) -> ThinkFilter | None:
         """A fresh filter per call, or None when the user asked to keep the tags.
@@ -824,7 +839,7 @@ class LLMGateway:
 
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
-        max_tokens = self._bounded(max_tokens)
+        max_tokens = self._bounded(max_tokens, resolved)
         call_kwargs = _call_kwargs(self._provider_kwargs(), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
@@ -870,8 +885,9 @@ class LLMGateway:
         ``tool_calls``. Like :meth:`stream`, this is one direct call: NO fallback chain and NO cache
         (both meaningless for a live stream). Callers that need those keep using :meth:`complete`.
         """
-        max_tokens = self._bounded(max_tokens)
+        budget = max_tokens  # the caller's, handed on as such if this falls back to `complete`
         resolved = self._resolve_model(model)
+        max_tokens = self._bounded(budget, resolved)
         self._require_credentials(resolved)
         self._warn_generate_prefix_with_tools(resolved, tools)
         call_kwargs = _call_kwargs(self._provider_kwargs(resolved, thinking=thinking), kwargs)
@@ -933,7 +949,7 @@ class LLMGateway:
                 raise
             _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
             return self.complete(
-                messages, model=model, temperature=temperature, max_tokens=max_tokens, tools=tools,
+                messages, model=model, temperature=temperature, max_tokens=budget, tools=tools,
                 **kwargs,
             )
         if think:
