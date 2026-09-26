@@ -368,6 +368,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/right_hand_governance"),
     _c("fence.wrapped", "chimera.governance.ledger_tool:fence", "marker", _ALL, "measured",
        "bench/right_hand_governance", render=_fence_example),
+    _c("fence.failure_note", "chimera.governance.ledger_tool:FENCED_FAILURE_NOTE", "marker", _ALL,
+       "unmeasured",
+       note="the line before a fenced tool failure, so the loop reads it as a failure; the tool's "
+            "message stays inside the fence (tests/test_a_fenced_failure_is_still_a_failure.py)"),
     _i("tool.decide_description", "chimera.tools.decide:DecideTool", "tool", ("S9",)),
     _c("tool.browser_viewport_first", "chimera.tools.browser:_VIEWPORT_FIRST_DESCRIPTION", "tool",
        ("S11",), "measured", "bench/browser_viewport_tasks (lost to the shipped description)"),
