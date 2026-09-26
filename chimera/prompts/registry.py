@@ -196,7 +196,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/compaction: 25/30 vs 6/30 (+63 pp, p=3.8e-6)"),
     _i("memory.consolidate", "chimera.memory.consolidate:model_summarizer", "call", ("S13",)),
     _c("memory.extract", "chimera.memory.extract:EXTRACT_MEMORY_SYSTEM", "call",
-       ("S2", "S3", "S13"), "unmeasured",
+       ("S2", "S3", "S13"), "measured",
+       "bench/memory_extraction: 31/31 saves correct, poison 0/16, recall 33/36; the harness "
+       "refused no wrong save and cost 2 correct ones",
        note="after a turn, off by default (CHIMERA_MEMORY_EXTRACT); the harness re-checks every "
             "proposal against the user's own words"),
     _i("memory.persona_preamble", "chimera.memory.manager:MemoryManager.profile", "volatile",
