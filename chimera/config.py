@@ -172,11 +172,22 @@ class Settings(BaseSettings):
 
     # --- Default single model (Tier 1 / cheap tasks) ---
     #
-    # DeepSeek V3.1 rather than a frontier model, and the reason is what a default IS: the model a
-    # fresh install spends money on before anyone has made a decision. This one is the `mid` rung of
-    # every cost preset, the one this repo's own benches ran on, and — at the live OpenRouter list
-    # price when this changed — $0.25/$0.95 per 1M against GPT-5.5's $5.00/$30.00. Twenty times
-    # cheaper in, thirty times cheaper out, for the questions a first conversation asks.
+    # A cheap model rather than a frontier one, and the reason is what a default IS: the model a
+    # fresh install spends money on before anyone has made a decision. When it moved off GPT-5.5 to
+    # DeepSeek the live OpenRouter list price was $0.25/$0.95 per 1M against $5.00/$30.00 — twenty
+    # times cheaper in, thirty times cheaper out, for the questions a first conversation asks.
+    #
+    # gpt-6-luna since 2026-09-26, replacing deepseek-v4-flash-0731, on the partial SWE-bench django
+    # bake-off in `bench/default-model-bakeoff`, graded by the official harness: 123/154 resolved
+    # (80%) at US$ 0.0069 per resolved instance, against 92/150 (61%) at US$ 0.0158. Unpaired and
+    # partial — the paired run is still completing — so the gap is read as large, not as exact. The
+    # same model had already won `bench/review_reviewer` (#638) as the default reviewer.
+    #
+    # This is no longer the `mid` rung of the cost presets, which still hold deepseek-v4-flash: the
+    # presets drive the tier ladder (roles, cascade, orchestration), this drives the plain agent
+    # turn, and the bake-off measured only the latter. Which rung luna should occupy is a separate,
+    # unmeasured decision. Its useful context is unmeasured too (`CatalogEntry.useful_k`), so
+    # compaction sizes itself from the window fraction for it until `bench/useful_context` runs.
     #
     # It is a floor, not a ceiling: the composer's model picker changes it per conversation and
     # offers to make any pick the standing default, and `CHIMERA_DEFAULT_MODEL` still wins over
@@ -187,7 +198,7 @@ class Settings(BaseSettings):
     # wizard SHOWS that suggestion without writing it when the user leaves it alone, so a mismatch
     # puts one slug on screen and runs another.
     default_model: str = Field(
-        default="openrouter/deepseek/deepseek-v4-flash-0731", validation_alias="CHIMERA_DEFAULT_MODEL"
+        default="openrouter/openai/gpt-6-luna", validation_alias="CHIMERA_DEFAULT_MODEL"
     )
 
     # --- Model tiers (M16): weak -> mid -> top, vendor-agnostic. Any LiteLLM/OpenRouter

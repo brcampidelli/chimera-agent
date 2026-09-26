@@ -145,7 +145,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
         # and a needle at 10/50/90% depth — 90/90 at 4k, 87/90 at 128k, every rung within −10 pp
         # of 4k. 128 is the top of the ladder that was run, so it is a lower bound.
         useful_k=128,
-        notes="the product default and the fusion judge since 2026-09-03. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421). On 2026-09-25 the live check on main turned red: the index quotes 0.022 in / 0.32 out, input cheaper and output four times dearer, so a turn that writes a lot now costs more, not less; both earlier figures stay in also_seen",
+        notes="the fusion judge since 2026-09-03, and the product default from then until 2026-09-26, when gpt-6-luna replaced it on a SWE-bench bake-off (see `Settings.default_model`); still the mid rung of the cost presets. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421). On 2026-09-25 the live check on main turned red: the index quotes 0.022 in / 0.32 out, input cheaper and output four times dearer, so a turn that writes a lot now costs more, not less; both earlier figures stay in also_seen",
     ),
     CatalogEntry(
         "openrouter/z-ai/glm-5.3-flash", "mid", "Zhipu (GLM)",
@@ -198,10 +198,13 @@ CATALOG: tuple[CatalogEntry, ...] = (
         notes="the small end of the GPT-6 line, released 2026-09-22; the default reviewer of\n"
         "        `chimera review` since `bench/review_reviewer` (2026-09-26): 39 of 40 seeded\n"
         "        reviews showed the defect and none came back incomplete, at US$ 0.0010 a review,\n"
-        "        the default model's own cost. Priced off OpenAI's standard route, which OpenRouter\n"
+        "        deepseek-v4-flash's own cost. Priced off OpenAI's standard route, which OpenRouter\n"
         "        billed exactly in that bench's probe; OpenAI also serves a flex tier at half and a\n"
         "        fast one at double. It takes no temperature, so it samples. The row is here so a\n"
-        "        review's cost is known from a cold start",
+        "        review's cost is known from a cold start. The product default since 2026-09-26:\n"
+        "        123/154 resolved on the partial SWE-bench django run of\n"
+        "        `bench/default-model-bakeoff` against 92/150 for deepseek-v4-flash-0731, unpaired.\n"
+        "        No useful_k: nobody has measured the context it still reads well",
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3-coder", "mid", "Qwen (Alibaba)",
@@ -293,12 +296,13 @@ class ProviderInfo:
 PROVIDERS: tuple[ProviderInfo, ...] = (
     # This must MATCH ``Settings.default_model``, because for OpenRouter the wizard shows the
     # suggestion WITHOUT writing it — a different slug here would put a number on screen that is not
-    # the one in use. Both moved to DeepSeek V3.1 together: see the note on `default_model` for why a
-    # first install should not start on the most expensive model in the catalogue.
+    # the one in use. The two move together, most recently to gpt-6-luna: see the note on
+    # `default_model` for the measurement, and for why a first install should not start on the most
+    # expensive model in the catalogue.
     ProviderInfo(
         "OPENROUTER_API_KEY",
         "OpenRouter",
-        "openrouter/deepseek/deepseek-v4-flash-0731",
+        "openrouter/openai/gpt-6-luna",
         "https://openrouter.ai/keys",
     ),
     # gpt-5.6-sol, via its documented alias; same $5/$30 as the 5.5 it replaces.

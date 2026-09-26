@@ -72,12 +72,14 @@ def model_family(slug: str) -> str:
 #: chose by a rule frozen before the run: the cheapest whose recall is within 10 points of the
 #: default model's, with at most 5% of reviews incomplete and at most two more findings than the
 #: default model's on ten clean diffs. gpt-6-luna qualified (39 of 40 seeded reviews showed the
-#: defect, none incomplete, at the default model's own cost per review); qwen3.7-flash did not, and
+#: defect, none incomplete, at deepseek-v4-flash's own cost per review); qwen3.7-flash did not, and
 #: mistral-small-3.2 could not be measured through the one route that serves the product's request.
 #:
-#: Two families, so every author has an entry from outside its own: the default model, measured as
-#: the reference, reviews what gpt-6-luna wrote. A list rather than a rung, because only a list says
-#: that its entries were measured at this job. Keys that call neither fall through to the ladder.
+#: Two families, so every author has an entry from outside its own: deepseek-v4-flash, the default
+#: model when this was measured and the bench's reference, reviews what gpt-6-luna wrote — which,
+#: since luna became the default model, is what a plain `chimera review` reviews. A list rather
+#: than a rung, because only a list says that its entries were measured at this job. Keys that
+#: call neither fall through to the ladder.
 MEASURED_REVIEWERS: tuple[str, ...] = (
     "openrouter/openai/gpt-6-luna",
     "openrouter/deepseek/deepseek-v4-flash-0731",

@@ -138,21 +138,22 @@ def test_the_command_picks_another_family_under_every_cost_mode(
 
     choice = review_cmd._reviewer(author, "")
 
-    assert model_family(author) == "deepseek"
-    assert choice.family != "deepseek", choice
+    assert model_family(author) == "openai"
+    assert choice.family != "openai", choice
 
 
 @pytest.mark.parametrize("mode", ["auto", "balanced", "cheap", "premium"])
-def test_the_command_reviews_the_default_model_with_the_measured_winner(
+def test_the_command_reviews_the_default_model_with_the_other_measured_reviewer(
     _settings: pytest.MonkeyPatch, mode: str
 ) -> None:
-    """The winner of `bench/review_reviewer`'s frozen rule, whatever the cost mode's ladder holds."""
+    """The default model IS `bench/review_reviewer`'s winner since the SWE-bench bake-off, so its
+    work goes to the bench's reference, whatever the cost mode's ladder holds."""
     _settings.setenv("CHIMERA_COST_MODE", mode)
     get_settings.cache_clear()
 
     choice = review_cmd._reviewer(get_settings().default_model, "")
 
-    assert (choice.model, choice.source) == (LUNA, "measured")
+    assert (choice.model, choice.source) == (DEEPSEEK, "measured")
 
 
 def test_the_command_gives_an_author_of_a_third_family_the_bench_winner_first(
@@ -163,7 +164,7 @@ def test_the_command_gives_an_author_of_a_third_family_the_bench_winner_first(
     assert (choice.model, choice.source) == (LUNA, "measured")
 
 
-def test_the_command_reviews_the_winners_own_work_with_the_default_model(
+def test_the_command_reviews_the_winners_own_work_with_the_benchs_reference(
     _settings: pytest.MonkeyPatch,
 ) -> None:
     choice = review_cmd._reviewer(LUNA, "")
