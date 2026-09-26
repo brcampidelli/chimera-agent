@@ -108,3 +108,33 @@ A dry run of the paid path, with a fake gateway, exercised both guards before th
 - **Precision.** Clean diffs may hold real defects, and findings off the seed on seeded diffs are unlabelled.
 - **Other languages, larger diffs, other days, other providers.** The set is Python only, with diffs of 2–10k characters, run on one day, on DeepInfra.
 - **The owner's identity or language.** The command does not pass them to the reviewer.
+
+## Amendment 1 — 2026-09-25, after run 1 stopped and before any of its outcomes was read
+
+**Run 1 is discarded.** It measured product `7b383f22`, cost US$ 0.686, and stopped at the registered stop rule after 13 items, when arm G reached 3 failed turns out of 13. Nothing from it enters the results. The file is kept as `results/discarded-run1.json` because it holds the evidence for this amendment.
+
+What was read before writing this:
+- the progress log, a hit-or-miss mark per turn;
+- the logs of the four failed turns.
+
+The verifier's verdicts were not read. The report the run printed was deleted unread. From the marks, D hit the seed on most items; that bears on finder recall, not on the verifier decision below.
+
+**Three defects: one in the product, two in this bench.**
+
+1. **Product: a regex in a finding voided the review.** D's finder quoted `\Z` inside a JSON string, which is not a JSON escape. The whole reply, with two correct findings, was unreadable, and the review came back `incomplete`. Fixed in `3f5e5936`, with a test that fails before it. The relaunch measures `3f5e5936`; the prompts are unchanged, with the same hashes.
+2. **Bench: the order was correlated with the assignment.** The order was shuffled with the seed that had drawn the clean items. `Random.sample` and `Random.shuffle` consume the same `randbelow` sequence, so the ten clean items landed at exactly the last ten places, and the stopped run reached none of them. `registered_order` now shuffles the two kinds apart, on a stream of their own (`"s15-order-20260925"`), and deals two seeded to one clean. Every prefix of the run holds both kinds.
+3. **Bench: the stop rule counted a product outcome as a harness failure.** All three of G's failures were its finder reasoning to the 32,000-token completion ceiling: `finish=length`, empty content, about 160 s and US$ 0.08 each. The product did what it should: it reported `incomplete`, not "no findings". That is an outcome of reviewing with this model, so it is now measured rather than stopped on:
+   - a new reported metric, **incomplete reviews** per arm, with a Wilson interval;
+   - finder recall is reported over completed reviews, as registered, and also with an incomplete review counted as a miss, which is what a user sees;
+   - the stop rule counts only `error`, a transport or harness failure.
+
+**Budget.** US$ 1.314 of the US$ 2.00 cap remains. Each arm now has its own guard: no D call starts past US$ 0.15 and no G call past US$ 0.85. Three items run at a time, so the worst case is US$ 1.24. At run 1's G cost, about US$ 0.05 a turn with the runaways included, G reaches about 17 items; D covers all 30.
+
+**Decision rule, changed before any verifier verdict was read.**
+- The keep rate is pooled over every judged hit finding in D₁, D₂ and G.
+- The 80% floor applies to each arm with at least 8 judged hit findings.
+- The uninformative clause becomes: fewer than 12 seeded items with a completed review in D₁.
+
+The reason is that G's coverage is now bounded by the budget, by design.
+
+**Workers: 3** (the text above says four).

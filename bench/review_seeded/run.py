@@ -49,7 +49,10 @@ PROVIDER = "DeepInfra"
 PRICE = {"D": (0.06, 0.18), "G": (0.5625, 2.50)}
 TOL = 3  # a finding hits the seed at the seeded file and |line - seeded line| <= TOL
 CAP_USD = 2.00
-GUARD_USD = 1.60  # no new item starts past this, leaving room for the items in flight
+#: Amendment 1: run 1 spent US$ 0.686 and was discarded, so this run has US$ 1.314. A guard per
+#: arm: no call of that arm starts past it. Worst case at three workers: 0.85 + 0.15 + three G
+#: calls of US$ 0.081 in flight (a 32k-token reply) = US$ 1.24.
+GUARD_USD = {"D": 0.15, "G": 0.85}
 ORDER_SEED = 20260925
 
 
@@ -189,7 +192,7 @@ class _OverBudget(RuntimeError):
 
 class _Budget:
     """Every call is charged as it returns, and none starts once the guard is reached. The worst
-    overshoot is one call per worker: 4 × about US$ 0.08 (a 32k-token reply on G) above the guard."""
+    overshoot is one call per worker: 3 × about US$ 0.08 (a 32k-token reply on G) above the guard."""
 
     def __init__(self, guard: float) -> None:
         self.guard = guard
@@ -290,14 +293,31 @@ def _turn(gateway: Any, fx: dict[str, Any], arm: str, root: Path, budget: _Budge
         shutil.rmtree(repo, ignore_errors=True)
 
 
+def registered_order(fixtures: list[dict[str, Any]]) -> list[int]:
+    """Amendment 1. Run 1 shuffled with the seed that had drawn the clean items, and
+    ``Random.sample`` and ``Random.shuffle`` consume the same ``randbelow`` sequence, so the ten
+    clean items landed exactly at the end and a stopped run reached none of them. Now the two
+    kinds are shuffled apart on a stream of their own and dealt two seeded to one clean, so
+    every prefix of the run holds both."""
+    rng = random.Random(f"s15-order-{ORDER_SEED}")
+    seeded = [i for i, f in enumerate(fixtures) if f["seed"]]
+    clean = [i for i, f in enumerate(fixtures) if not f["seed"]]
+    rng.shuffle(seeded)
+    rng.shuffle(clean)
+    out: list[int] = []
+    while seeded or clean:
+        out += seeded[:2] + clean[:1]
+        seeded, clean = seeded[2:], clean[1:]
+    return out
+
+
 def run(folder: Path, out: Path, workers: int) -> None:
     from chimera.providers.gateway import LLMGateway
 
     gateway = LLMGateway()
     fixtures = _fixtures(folder)
-    order = list(range(len(fixtures)))
-    random.Random(ORDER_SEED).shuffle(order)
-    budget = _Budget(GUARD_USD)
+    order = registered_order(fixtures)
+    budgets = {arm: _Budget(guard) for arm, guard in GUARD_USD.items()}
     lock = threading.Lock()
     failed = {"D": 0, "G": 0}
     turns = {"D": 0, "G": 0}
@@ -308,22 +328,25 @@ def run(folder: Path, out: Path, workers: int) -> None:
         with lock:
             if stop["why"]:
                 return None
-        if budget.exhausted():
+        if all(b.exhausted() for b in budgets.values()):
             with lock:
-                stop["why"] = stop["why"] or f"budget guard at US$ {budget.usd:.3f}"
+                stop["why"] = stop["why"] or "budget guard on both arms"
             return None
         fx = fixtures[index]
         row: dict[str, Any] = {"commit": fx["commit"], "kind": fx["kind"], "seed": fx["seed"],
                                "runs": {"D": [], "G": []}}
         with tempfile.TemporaryDirectory(prefix="s15-") as tmp:
             for arm in ("D", "G", "D"):  # registered order: D1 G1 D2
-                got = _turn(gateway, fx, arm, Path(tmp) / f"{arm}{len(row['runs'][arm])}", budget)
+                got = _turn(gateway, fx, arm, Path(tmp) / f"{arm}{len(row['runs'][arm])}",
+                            budgets[arm])
                 row["runs"][arm].append(got)
                 if got["status"] == "budget":
                     continue
                 with lock:
                     turns[arm] += 1
-                    failed[arm] += int(got["status"] in ("error", "incomplete"))
+                    # Amendment 1: only a transport or harness error counts here. An
+                    # `incomplete` review is the product's own outcome and is measured.
+                    failed[arm] += int(got["status"] == "error")
                     if turns[arm] >= 10 and failed[arm] / turns[arm] > 0.10:
                         stop["why"] = f"stop rule: arm {arm} failed {failed[arm]}/{turns[arm]}"
         return row
@@ -341,12 +364,15 @@ def run(folder: Path, out: Path, workers: int) -> None:
                 continue
             rows[futures[future]] = row
             marks = " ".join(f"{a}={''.join(mark(r) for r in row['runs'][a])}" for a in ("D", "G"))
+            spent = sum(b.usd for b in budgets.values())
             print(f"  [{n:>2}/{len(order)}] {row['kind']:6} {row['commit']} {marks}  "
-                  f"US$ {budget.usd:.3f}", flush=True)
+                  f"US$ {spent:.3f}", flush=True)
     payload = {
         "arms": ARMS, "replicas": REPLICAS, "provider": PROVIDER, "price_per_m": PRICE, "tol": TOL,
         "order": [fixtures[i]["commit"] for i in order], "stopped": stop["why"],
-        "usd": round(budget.usd, 4), "finder_prompt_sha": _sha(FINDER_SYSTEM),
+        "usd": round(sum(b.usd for b in budgets.values()), 4),
+        "usd_by_arm": {a: round(b.usd, 4) for a, b in budgets.items()},
+        "finder_prompt_sha": _sha(FINDER_SYSTEM),
         "verifier_prompt_sha": _sha(VERIFIER_SYSTEM),
         "fixtures_sha": _sha("".join(json.dumps(f, sort_keys=True) for f in fixtures)),
         "rows": [rows[i] for i in sorted(rows)],
@@ -354,7 +380,7 @@ def run(folder: Path, out: Path, workers: int) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8",
                    newline="\n")
-    print(f"\nwrote {out}  US$ {budget.usd:.4f}  stopped: {stop['why'] or 'no'}")
+    print(f"\nwrote {out}  US$ {payload['usd']:.4f}  stopped: {stop['why'] or 'no'}")
 
 
 def _sha(text: str) -> str:
@@ -406,6 +432,7 @@ def report(path: Path) -> None:
           f"{data['stopped'] or 'no'} · rows {len(rows)}")
     cells = {"D1": ("D", 0), "D2": ("D", 1), "G": ("G", 0)}
     pooled_kept = pooled_hits = 0
+    per_arm: dict[str, tuple[int, int]] = {}
     for name, (arm, rep) in cells.items():
         got = _cell(rows, arm, rep)
         seeded = [(r, x) for r, x in got if r["seed"]]
@@ -417,12 +444,22 @@ def report(path: Path) -> None:
         verified = [v for v in everything if v["label"] not in UNJUDGED]
         kept = sum(1 for v in verified if v["verdict"] != "dropped")
         e2e = sum(1 for _, x in seeded if any(v["verdict"] != "dropped" for v in x["verified"]))
-        if name in ("D1", "G"):
-            pooled_kept += kept
-            pooled_hits += len(verified)
+        # Amendment 1: every judged hit finding, from every cell, feeds the decision.
+        pooled_kept += kept
+        pooled_hits += len(verified)
+        k0, n0 = per_arm.get(arm, (0, 0))
+        per_arm[arm] = (k0 + kept, n0 + len(verified))
         unjudged = len(everything) - len(verified)
+        ran = [r["runs"][arm][rep] for r in rows if len(r["runs"][arm]) > rep
+               and r["runs"][arm][rep]["status"] != "budget"]
+        incomplete = sum(1 for x in ran if x["status"] == "incomplete")
+        seeded_ran = [(r, r["runs"][arm][rep]) for r in rows if r["seed"]
+                      and len(r["runs"][arm]) > rep
+                      and r["runs"][arm][rep]["status"] not in ("budget", "error")]
         print(f"\n[{name}] {ARMS[arm]}  halted {halted}  unjudged checks {unjudged}")
+        print(f"  incomplete reviews                 {_wilson(incomplete, len(ran))}")
         print(f"  finder recall (±{data['tol']} lines)   {_wilson(found, len(seeded))}")
+        print(f"    counting incomplete as a miss    {_wilson(found, len(seeded_ran))}")
         for tol in (0, 10):
             k = sum(1 for r, x in seeded if _hit_at(x, r["seed"], tol))
             print(f"    at ±{tol:<2} lines                 {k}/{len(seeded)}")
@@ -452,7 +489,10 @@ def report(path: Path) -> None:
                 if e.get("role") == "finder" and "seconds" in e]
         med = sorted(secs)[len(secs) // 2] if secs else 0
         print(f"  cost US$ {usd:.4f} · calls {calls} · finder call median {med}s")
-    print(f"\nPOOLED D1+G verifier keeps {_wilson(pooled_kept, pooled_hits)} of hit findings")
+    print(f"\nPOOLED D1+D2+G verifier keeps {_wilson(pooled_kept, pooled_hits)} of hit findings")
+    for arm, (k, n_) in per_arm.items():
+        floor = "applies" if n_ >= 8 else "not applied (< 8 judged hits)"
+        print(f"  arm {arm}: {_wilson(k, n_)}; the 80% floor {floor}")
     b = c = n = 0
     for row in rows:
         if not row["seed"] or not row["runs"]["D"] or not row["runs"]["G"]:
@@ -480,7 +520,7 @@ def main() -> None:
     ap.add_argument("--run", type=Path)
     ap.add_argument("--report", type=Path)
     ap.add_argument("--out", type=Path, default=HERE / "results" / "run.json")
-    ap.add_argument("--workers", type=int, default=4)
+    ap.add_argument("--workers", type=int, default=3)
     args = ap.parse_args()
     if args.build:
         build(args.build)
