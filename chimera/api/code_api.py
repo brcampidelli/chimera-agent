@@ -88,6 +88,7 @@ from chimera.tools.browser import FrameAnnouncer
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
     from chimera.core.agent import Agent
+    from chimera.orchestration.metering import MeteredBackend
     from chimera.tools import ToolRegistry
 
 _log = get_logger("api.code")
@@ -945,6 +946,33 @@ def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> 
         _log.debug("usage logging skipped: %s", exc)
 
 
+def _with_plan_call(payload: dict[str, Any], meter: MeteredBackend | None) -> dict[str, Any]:
+    """``payload`` with the plan gate's call added to what the turn spent (:mod:`plan_gate`).
+
+    The planning call is made on the turn's thread, before the loop and before the turn's row is
+    written, so it goes IN that row rather than beside it: a gated turn is still one turn on the
+    Cost screen, and the receipt under the answer says what the whole turn cost. Tokens are
+    added; the price follows :func:`~chimera.orchestration.metering.add_usd`, so an unknown price
+    on either side makes the turn's unknown instead of reading as a low total. A row that names no
+    model gets the one that answered the plan, because a row with dollars and no model is the
+    blank line the Cost screen once showed.
+
+    A meter that recorded no call leaves the payload alone: a planning call that raised cost
+    nothing, and adding its zero would change nothing but the look of the row.
+    """
+    if meter is None or not meter.calls:
+        return payload
+    from chimera.orchestration.metering import add_usd
+
+    out = dict(payload)
+    out["prompt_tokens"] = int(payload.get("prompt_tokens") or 0) + meter.prompt_tokens
+    out["completion_tokens"] = int(payload.get("completion_tokens") or 0) + meter.completion_tokens
+    out["usd"] = add_usd(payload.get("usd"), meter.usd)
+    if not out.get("model"):
+        out["model"] = meter.last_model
+    return out
+
+
 def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[str | None, int]:
     """Honour an explicit "remember that…" from the user's own message, then tidy if asked.
 
@@ -1661,6 +1689,9 @@ def register_code_api(
             emit("todo", {"items": items, "claimed": True})
 
         def work() -> None:
+            # What the plan gate's call cost, when the turn has one. Out here so the `except` below
+            # can still add it to a turn that died after the plan was paid for.
+            plan_meter: MeteredBackend | None = None
             try:
                 # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
                 #
@@ -1691,10 +1722,16 @@ def register_code_api(
                     back" to someone who had been talking to it all day. A dashboard that cannot
                     fill up is worse than an absent one: it reports zero spend as a fact.
                     """
+                    nonlocal plan_meter
                     # None on every path that did not verify — an unedited turn, an external
                     # worker's turn, a turn whose workspace had no test command. Distinct from a
                     # verdict of "none", which means we looked and there was nothing to run.
                     verdict: dict[str, Any] | None = None
+                    # Before the row, the receipt and `done` are written from it, so all three
+                    # carry the planning call: every way out of a gated turn passes here. Then
+                    # cleared, so a failure later in this function cannot bill it a second time.
+                    payload = _with_plan_call(payload, plan_meter)
+                    plan_meter = None
                     _log_usage(payload, session_id, live())
                     # Here rather than in either branch: both go through this function, and an
                     # external agent's turn is still a turn the user typed "remember that…" into.
@@ -1819,11 +1856,17 @@ def register_code_api(
                 # where a person can stop the whole thing having spent one planning call.
                 if req.plan_gate:
                     from chimera.api import plan_gate as _plan_gate
+                    from chimera.orchestration.metering import MeteredBackend as _Meter
 
+                    # One meter for the one planning call, as the calls made for a run are metered
+                    # (`chimera.orchestration.metering`). The gate's own code is untouched: the
+                    # meter is a transparent backend, and it records the moment the call returns,
+                    # so a turn that dies in the question after it still knows what it paid.
+                    plan_meter = _Meter(getattr(agent, "backend", None), label="plan")
                     verdict = _plan_gate.gate(
                         message,
                         home=Path(settings.home),
-                        backend=getattr(agent, "backend", None),
+                        backend=plan_meter,
                         model=(req.roles.plan if req.roles else None) or req.model,
                         on_plan=lambda p: emit("plan", {"steps": p.steps, "raw": p.raw}),
                         on_asked=approval_sink.emit,
@@ -1841,9 +1884,13 @@ def register_code_api(
                             "stopped_reason": f"plan_gate:{verdict.outcome}",
                             "tool_names": [],
                             "model": req.model or "",
+                            # The loop never ran, and a loop that never ran cost a known nothing;
+                            # the planning call it did pay for is added in `_verify_and_finish`.
+                            # This read None, "price unknown", with no tokens: the one call the
+                            # turn made was already known and was nowhere.
                             "prompt_tokens": 0,
                             "completion_tokens": 0,
-                            "usd": None,
+                            "usd": 0.0,
                             "tainted": False,
                             "memory_facts_used": len(facts),
                             "memory_layer": memory_layer,
@@ -1975,21 +2022,24 @@ def register_code_api(
                 # because nothing downstream can tell an invented row from a real one.
                 from chimera.core.agent import partial_spend
 
+                # The plan gate's call, when one was paid for and not yet written: an approved plan
+                # followed by a run that died is still a plan somebody paid for. The loop's part
+                # is a known zero when it never reached a model, so the sum stays known.
                 spent = partial_spend(exc)
-                if spent is not None and (spent.prompt_tokens or spent.completion_tokens):
-                    _log_usage(
-                        {
-                            "model": spent.model,
-                            "prompt_tokens": spent.prompt_tokens,
-                            "completion_tokens": spent.completion_tokens,
-                            "usd": spent.usd,
-                            "tool_names": [],
-                            "memory_facts_used": len(facts),
-                            "route_meta": None,
-                        },
-                        session_id,
-                        live(),
-                    )
+                failed = _with_plan_call(
+                    {
+                        "model": spent.model if spent is not None else "",
+                        "prompt_tokens": spent.prompt_tokens if spent is not None else 0,
+                        "completion_tokens": spent.completion_tokens if spent is not None else 0,
+                        "usd": spent.usd if spent is not None else 0.0,
+                        "tool_names": [],
+                        "memory_facts_used": len(facts),
+                        "route_meta": None,
+                    },
+                    plan_meter,
+                )
+                if failed["prompt_tokens"] or failed["completion_tokens"]:
+                    _log_usage(failed, session_id, live())
                 # An external agent's own words when we have them. "the coding turn failed" is right
                 # for the native branch, where the failure is ours to debug — but an adapter that is
                 # not installed, or that could not authenticate, has already said something more
