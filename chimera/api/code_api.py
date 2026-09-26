@@ -534,6 +534,20 @@ def assemble_registry(
         write_region=build_write_region(seams.write_region, ws),
         host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
     )
+    # The web research sub-agent (study 25, S12), when the owner switched it on. Registered BEFORE
+    # the lists below, unlike the explorer, so every one of them reaches it by name the way they
+    # reach a built-in: a request's own allowlist that does not name it narrows it away too. Its web
+    # tools are drawn from this registry late (`lambda: registry` sees the final, wrapped value, as
+    # `SubAgentTool` documents), so a denied fetch tool is denied to it and its fetches pass the
+    # kernel and the taint ledger wrapped around everything below.
+    if settings.research_agent:
+        from chimera.core.research import ResearchWebTool
+
+        registry.register(
+            ResearchWebTool(
+                gateway, lambda: registry, model=resolve_role_plan(seams, settings).models.explore
+            )
+        )
     # The owner's approver — the object the taint ledger and, since #495, the policy kernel are
     # handed below — reaches the FILE tools too, on the surface that has a person: a path outside
     # the project folder becomes a question on the screen instead of a refusal. Only when a screen
@@ -634,7 +648,10 @@ def assemble_registry(
         # than the search, so the main loop never pays for the hunt.
         explore_model = resolve_role_plan(seams, settings).models.explore
         registry.register(
-            ExploreRepositoryTool(gateway, ws, model=explore_model, max_turns=steps)
+            ExploreRepositoryTool(
+                gateway, ws, model=explore_model, max_turns=steps,
+                contract=settings.explorer_contract,
+            )
         )
     # Tools the caller brings for THIS turn — the talking model's handles on the conversation's
     # background works — registered here, before the kernel and the ledger wrap the registry, so
@@ -1029,6 +1046,34 @@ def _remember_and_tidy(
         _log.debug("auto-consolidate skipped: %s", exc)
         return fact, 0
     return fact, removed
+
+
+def _extract_after_turn(
+    message: str, answer: str, memory: Any, settings: Settings, *, tainted: bool, session_id: str
+) -> None:
+    """Keep what the user stated about themselves in this turn (study 25 S13), off the turn's path.
+
+    Called after the ``done`` frame, and the work runs on its own thread
+    (:class:`chimera.memory.extract.MemoryExtractor`), so the person has the answer before the
+    extraction's model call starts and a slow or failing call cannot delay or fail it.
+
+    ``message`` is what the user typed, not the prompt the turn was sent with: an attached document
+    is somebody else's words, and a fact must trace to the user's own.
+
+    What the call costs goes to the usage log under this conversation's ``session_id``, beside the
+    turn's own row. It cannot go IN that row: the row is written before ``done``, and the call it
+    would have to wait for is the one this function moves off the turn's path.
+    """
+    if not getattr(settings, "memory_extract", False) or memory is None or not answer.strip():
+        return
+    try:
+        from chimera.memory.extract import MemoryExtractor
+
+        MemoryExtractor(
+            memory, usage_home=Path(settings.home), usage_id=session_id
+        ).after_turn(message, answer, tainted=tainted)
+    except Exception as exc:  # noqa: BLE001 -- the turn is over and paid for; memory is extra
+        _log.debug("memory extraction skipped: %s", exc)
 
 
 #: The memory manager built here for a store the app did NOT boot with, keyed by the settings that
@@ -1552,7 +1597,10 @@ def register_code_api(
         # it is the same function the writer and the terminal now call, so one folder cannot end up
         # with two names again.
         facts, memory_layer = recall_facts(
-            req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws)
+            req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
+            # Quoted with source and date under the same switch that writes extracted facts
+            # (study 25 S13): a fact the model did not see being written is shown with its age.
+            cite=bool(getattr(live(), "memory_extract", False)),
         )
         # Created before the agent so the approver can hold it, bound to `emit` after `emit`
         # exists. Until then a question announces to nobody — and is still on disk for
@@ -1852,6 +1900,14 @@ def register_code_api(
                     except Exception as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not index the turn in the history: %s", exc)
                     emit("done", payload)
+                    # After `done`, so the answer is on screen first. Not for a background work,
+                    # whose message is a brief the talking model wrote, and not for a guest, whose
+                    # words are not the owner's: a fact is only ever about the person who said it.
+                    if background is None and not author:
+                        _extract_after_turn(
+                            req.message, str(payload.get("answer") or ""), turn_memory, live(),
+                            tainted=bool(payload.get("tainted")), session_id=session_id,
+                        )
                     if background is not None:
                         works.finished(
                             background.id, payload,

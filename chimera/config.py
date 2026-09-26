@@ -299,6 +299,18 @@ class Settings(BaseSettings):
     # There is no setting for the browser's viewport-first listing (study 24, M7). It lost on both
     # measurements, so a user could only switch it on to make the browser worse; the mode survives as
     # a constructor argument that `bench/browser_viewport_tasks` uses (see `BrowserTool.__init__`).
+    #
+    # The browser situation module (study 25, S11; `chimera/tools/browser_situation.py`). On, a
+    # session that holds the browser gets its situation rules in the system prompt, a page that needs
+    # the person (a sign-in, a two-step code, a captcha, a payment step) ends the run as `handover`,
+    # and reading cookies, site storage or saved passwords through the tool is refused. OFF by
+    # default: the rules' benefit is unmeasured, and the stop changes what a run does on a page with a
+    # login form. Measured so far: no harm on 24 browsing tasks (`bench/browser_situation`: 44/48 on,
+    # 45/48 off, no stop; still valid for walls v2 by a US$ 0 replay). Walls v2 on live pages
+    # (`bench/browser_element_list/RESULTS-walls-v2.md`): no false stop on 27 ordinary pages, 6/6
+    # walls on the in-sample set and 9/15 on a fresh one — not fit, so still off. Its named gaps: a
+    # widget drawn just after `load`, and block pages that carry no challenge marker.
+    browser_situation: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_SITUATION")
 
     # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
     # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---
@@ -380,6 +392,17 @@ class Settings(BaseSettings):
     # answered by the configured decision backend. OFF by default for the reason `edit_batch` is: a
     # schema in every prompt of every step. Nothing is gated on its answers — they go to the agent.
     decide_tool: bool = Field(default=False, validation_alias="CHIMERA_DECIDE_TOOL")
+    # --- The explorer's contract (study 25, S12; chimera/core/explorer.py). On, the explorer is
+    # asked for a thoroughness level, reports findings with a path:line each and a gaps section, and
+    # its cited locations are checked against the workspace. OFF by default: today's explorer text
+    # stays byte for byte, and the new one has no measurement of its own yet.
+    explorer_contract: bool = Field(default=False, validation_alias="CHIMERA_EXPLORER_CONTRACT")
+    # --- The web research sub-agent (study 25, S12; chimera/core/research.py). On, the Code screen
+    # and `chimera solve` gain a `research_web` tool: a sub-agent with read-only web tools whose
+    # answer carries a receipt saying which cited URLs it actually saw. OFF by default: it is a new
+    # tool schema in every prompt and a new model bill per call, earned only by its bench
+    # (bench/web_research).
+    research_agent: bool = Field(default=False, validation_alias="CHIMERA_RESEARCH_AGENT")
     # --- Where an approval question goes when there is nobody at a console.
     #
     # This is what makes the three-state gate reachable on the surfaces that need it most. A cron
@@ -518,6 +541,13 @@ class Settings(BaseSettings):
     # 7/10 against 2/15). With fallbacks on, an arm silently becomes whatever answered — the confound
     # wearing the manipulation's name. OpenRouter only: other providers may reject the field.
     provider_order: str = Field(default="", validation_alias="CHIMERA_PROVIDER_ORDER")
+
+    # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
+    # the command pick the first rung of the tier ladder whose model family differs from the
+    # author's, because a reviewer from the author's own family shares its blind spots and prefers
+    # its output (study 25 §2.9; `chimera/review/family.py`). A value here is honoured even when it
+    # is the author's family, and the report says so rather than overriding the choice.
+    review_model: str = Field(default="", validation_alias="CHIMERA_REVIEW_MODEL")
 
     # --- Messaging bot tokens (only needed for the matching `chimera serve --<platform>`) ---
     discord_bot_token: str | None = Field(
@@ -713,6 +743,21 @@ class Settings(BaseSettings):
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
     # extraction, which would pollute the store.
     remember_from_chat: bool = Field(default=False, validation_alias="CHIMERA_CHAT_MEMORY")
+    # Study 25 S13: after a chat or Code turn, one model call proposes facts the user STATED about
+    # themselves, and the harness keeps only those it can trace to the user's own words
+    # (`chimera.memory.extract`). The same switch quotes recalled facts with their source and date.
+    # On by default since `bench/memory_extraction/RESULTS.md`: 31 of 31 saves correct, 0 of 16
+    # planted facts saved, 33 of 36 stated facts kept, at about US$ 0.00002 per turn, which the
+    # usage log records. The messaging bots never extract, whatever this says: anyone who can reach
+    # a bot would be writing the owner's memory. Set CHIMERA_MEMORY_EXTRACT=0 to stop it.
+    memory_extract: bool = Field(default=True, validation_alias="CHIMERA_MEMORY_EXTRACT")
+
+    # Send a chat's earlier turns as the model's own messages, tool calls included, with the
+    # profile and recalled facts in the turn context, instead of one flattened user message
+    # (`ChatSession.real_history`). It reaches `chat`, `assist`, the TUI, the app's chat and both
+    # Discord paths. Off keeps the flattened form byte for byte; whether to flip it is measured in
+    # `bench/chat_history`, because the Discord bot in production runs this path.
+    chat_real_history: bool = Field(default=False, validation_alias="CHIMERA_CHAT_REAL_HISTORY")
 
     # Run the cron daemon inside `chimera app` (the desktop backend), so scheduled jobs fire while
     # the app is open — the whole point of a proactive assistant. Defaults ON: a "briefing at 7am"
@@ -899,6 +944,20 @@ class Settings(BaseSettings):
     # the model and does not apply to another, and the receipt says so (`calibrated: false`).
     decision_backend: str = Field(default="local_logprob", validation_alias="CHIMERA_DECISION_BACKEND")
     decision_model: str = Field(default="", validation_alias="CHIMERA_DECISION_MODEL")
+    # --- A structured answer the route filed as reasoning. Some routes return a reasoning model's
+    # whole reply as reasoning, with `content` empty and `finish_reason` "stop" (`deepseek-r1` on
+    # Novita, 37-43% of calls in `bench/review_judge/RESULTS-h11.md`, 13/26 in
+    # `bench/answer_in_reasoning`); the gateway flags it (`CompletionResult.answer_in_reasoning`)
+    # and never makes the reasoning the answer. On, a caller that asked for JSON reads an object of
+    # its own schema from the END of the reasoning, and its receipt says `answer_from: reasoning`;
+    # today that caller is the hosted decision backend. Off (the default), it re-asks once as it
+    # always did, and a reading that still came back that way says `answer_from: reasoning_unread`.
+    # Off because a recovered reading has not been measured against a re-asked one on the same
+    # items: a map fitted on one path is not known to fit the other. The agent loop never reads
+    # prose from reasoning, whatever this says. ---
+    answer_from_reasoning: bool = Field(
+        default=False, validation_alias="CHIMERA_ANSWER_FROM_REASONING"
+    )
 
     # --- The REVIEW band (`chimera/governance/band.py`): off | on. With it on, and only under
     # `observe` or `enforce`, a tool call the lexical rules did not match is put to the decision

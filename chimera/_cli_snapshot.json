@@ -2166,7 +2166,7 @@
     },
     {
       "deprecated": false,
-      "help": "Locate relevant code via the isolated Context Explorer subagent (FastContext-style).\n\nReturns only a compact file:line evidence block \u2014 the exploration turns never touch your\ncontext. A cheap model is usually the right call here; localization is a narrow task.",
+      "help": "Locate relevant code via the isolated Context Explorer subagent (FastContext-style).\n\nReturns only a compact file:line evidence block \u2014 the exploration turns never touch your\ncontext. A cheap model is usually the right call here; localization is a narrow task.\nWith CHIMERA_EXPLORER_CONTRACT on, it returns findings with a location each, a gaps section,\nand a check of every cited location against the workspace.",
       "hidden": false,
       "name": "explore",
       "params": [
@@ -2213,6 +2213,17 @@
           ],
           "required": false,
           "type": "int"
+        },
+        {
+          "default": "'medium'",
+          "help": "quick, medium or thorough: halves, keeps or doubles --max-turns. Read only when CHIMERA_EXPLORER_CONTRACT is on.",
+          "kind": "option",
+          "name": "thoroughness",
+          "opts": [
+            "--thoroughness"
+          ],
+          "required": false,
+          "type": "str"
         }
       ],
       "path": "explore"
@@ -4014,6 +4025,109 @@
       "name": "redteam",
       "params": [],
       "path": "redteam"
+    },
+    {
+      "deprecated": false,
+      "help": "[experimental] Review a change: findings first, P0 to P3, from a model of another family.\n\nA finder reports every defect it sees with a confidence; a separate verifier drops a finding\nonly when the diff does not show the code it describes or contradicts it. Each finding carries\nfile:line, the evidence and the consequence. When nothing survives, the review says \"no\nfindings\" and lists the residual risks and untested paths; a review that could not finish says\n\"incomplete\" instead. Untracked files are not reviewed.",
+      "hidden": false,
+      "name": "review",
+      "params": [
+        {
+          "help": "A revision range, such as main..HEAD. Omit it to review the working tree.",
+          "kind": "argument",
+          "name": "revision_range",
+          "opts": [
+            "revision_range"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Review the working tree against its merge base with this ref (default: main).",
+          "kind": "option",
+          "name": "base",
+          "opts": [
+            "--base"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "'.'",
+          "help": "The repository to review.",
+          "kind": "option",
+          "name": "repo",
+          "opts": [
+            "--repo"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Print only the report, as JSON (schema chimera.review/1).",
+          "kind": "option",
+          "name": "as_json",
+          "opts": [
+            "--json"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "''",
+          "help": "Review with this model (default: CHIMERA_REVIEW_MODEL, else another family's).",
+          "kind": "option",
+          "name": "reviewer_model",
+          "opts": [
+            "--reviewer-model"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "default": "''",
+          "help": "The model that wrote the change (default: CHIMERA_DEFAULT_MODEL).",
+          "kind": "option",
+          "name": "author_model",
+          "opts": [
+            "--author-model"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Show every located finding, without the second-stage check.",
+          "kind": "option",
+          "name": "no_verify",
+          "opts": [
+            "--no-verify"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Also list the findings the checks dropped, with the reason.",
+          "kind": "option",
+          "name": "show_dropped",
+          "opts": [
+            "--show-dropped"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": "10",
+          "help": "Lines of context around each change.",
+          "kind": "option",
+          "name": "context",
+          "opts": [
+            "--context"
+          ],
+          "required": false,
+          "type": "int"
+        }
+      ],
+      "path": "review"
     },
     {
       "deprecated": false,

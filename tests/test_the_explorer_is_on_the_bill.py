@@ -23,7 +23,7 @@ import chimera.fusion.receipts as receipts
 from chimera.api.usage import load_usage
 from chimera.config import get_settings
 from chimera.core import Agent, AgentConfig, ExploreRepositoryTool
-from chimera.core.explorer import EXPLORER_SYSTEM
+from chimera.core.explorer import EXPLORER_CONTRACT_SYSTEM, EXPLORER_SYSTEM
 from chimera.fusion.receipts import ModelPrice
 from chimera.providers.gateway import CompletionResult, ToolCall
 from chimera.tools import ToolRegistry
@@ -68,7 +68,8 @@ class _Model:
         self.outer_calls = 0
 
     def complete(self, messages: list[Any], **_k: Any) -> CompletionResult:
-        if EXPLORER_SYSTEM[:60] in _system_of(messages):
+        system = _system_of(messages)
+        if EXPLORER_SYSTEM[:60] in system or EXPLORER_CONTRACT_SYSTEM[:60] in system:
             self.explorer_calls += 1
             step = self.explore.pop(0) if self.explore else "answer"
             if step == "boom":
@@ -89,16 +90,20 @@ class _Model:
         return CompletionResult(content="done", model=OUTER_MODEL, prompt_tokens=self.outer_tokens)
 
 
-def _turn(backend: _Model, tmp_path: Path, **config: Any) -> Any:
+def _turn(backend: _Model, tmp_path: Path, *, contract: bool = False, **config: Any) -> Any:
     registry = ToolRegistry()
-    registry.register(ExploreRepositoryTool(backend, tmp_path, max_turns=3))
+    registry.register(ExploreRepositoryTool(backend, tmp_path, max_turns=3, contract=contract))
     return Agent(backend, registry, AgentConfig(max_steps=4, **config)).run("fix the parser")
 
 
-def test_inside_a_turn_the_explorer_is_in_the_turns_tokens_and_price(tmp_path: Path) -> None:
+@pytest.mark.parametrize("contract", [False, True], ids=["plain", "contract"])
+def test_inside_a_turn_the_explorer_is_in_the_turns_tokens_and_price(
+    tmp_path: Path, contract: bool
+) -> None:
+    """Both of the explorer's paths: today's, and the contract behind CHIMERA_EXPLORER_CONTRACT."""
     backend = _Model(["answer"])
 
-    result = _turn(backend, tmp_path)
+    result = _turn(backend, tmp_path, contract=contract)
 
     assert backend.explorer_calls == 1 and result.stopped_reason == "final"
     assert result.prompt_tokens == 20 + 2000

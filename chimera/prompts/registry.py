@@ -108,6 +108,32 @@ def _restored_labels() -> str:
     return "\n".join(f"{key}:{label}" for key, label in sorted(_RESTORED.items()))
 
 
+def _explorer_contract_task() -> str:
+    from chimera.core.explorer import _CONTRACT_TEMPLATE, THOROUGHNESS, thoroughness_steps
+
+    return "\n\n---\n\n".join(
+        _CONTRACT_TEMPLATE.format(
+            level=level, steps=thoroughness_steps(level, 8), query="<the caller's query>"
+        )
+        for level in THOROUGHNESS
+    )
+
+
+def _research_task() -> str:
+    from chimera.core.explorer import THOROUGHNESS, thoroughness_steps
+    from chimera.core.research import _TASK_TEMPLATE, DEFAULT_RESEARCH_STEPS, SEARCH_BUDGET_NOTE
+
+    return "\n\n---\n\n".join(
+        _TASK_TEMPLATE.format(
+            level=level,
+            budget=SEARCH_BUDGET_NOTE[level],
+            steps=thoroughness_steps(level, DEFAULT_RESEARCH_STEPS),
+            question="<the caller's question>",
+        )
+        for level in THOROUGHNESS
+    )
+
+
 def _fence_example() -> str:
     from chimera.governance.ledger_tool import fence
 
@@ -164,8 +190,13 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="asked once when the closing reply is empty; the failure is measured (6/10 at max_steps in "
             "bench/unattended_claims), the sentence's effect is not"),
     _i("loop.empty_close_note", "chimera.core.agent:_empty_close_note", "turn", _LOOP,
-       note="the harness's own words when the closing reply is empty twice; never a claim of success"),
+       note="the harness's own words when the closing reply is empty twice; never a claim of "
+            "success; one more sentence when the route filed the model's text as reasoning, which "
+            "is never shown as the answer"),
     _i("loop.unanswered_call_stub", "chimera.core.agent:Agent.run", "turn", _LOOP),
+    _i("loop.tool_raised", "chimera.tools.base:tool_raised", "turn", _LOOP,
+       note="the observation for a tool that raised; a taint source's is fenced behind "
+            "fence.failure_note, by the ledger or by the MCP tool itself"),
     _i("loop.prefix_nonce", "chimera.core.agent:Agent.run", "core", ("eval",),
        note="bench instrument only; empty unless CHIMERA_PREFIX_NONCE is set"),
     _c("loop.skills_header", "chimera.skills.retrieval:SKILLS_HEADER", "volatile", _ALL, "unmeasured",
@@ -183,9 +214,13 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("context.open", "chimera.prompts.context:TURN_CONTEXT_OPEN", "volatile", _ALL, "unmeasured",
        note="heads the turn's user message; the transcript keeps the message bare"),
     _c("context.close", "chimera.prompts.context:TURN_CONTEXT_CLOSE", "volatile", _ALL, "unmeasured"),
-    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile", ("S2", "S4"),
-       "unmeasured", note="recalled facts, labelled as recall that the present overrides"),
+    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile",
+       ("S2", "S3", "S4", "S10"), "unmeasured",
+       note="recalled facts, labelled as recall that the present overrides; chat sends it under "
+            "CHIMERA_CHAT_REAL_HISTORY"),
     _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
+    _i("context.cited_fact", "chimera.prompts.context:cited_fact", "volatile", ("S2", "S3"),
+       note="a recalled fact quoted with its source and date; only under CHIMERA_MEMORY_EXTRACT"),
     # ---- compaction and memory -----------------------------------------------------------------
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
        "measured", "bench/compaction: fired 0 times in 137 real runs"),
@@ -193,6 +228,12 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("compaction.summariser", "chimera.core.summarise:SYSTEM", "call", ("S13", "S2"), "measured",
        "bench/compaction: 25/30 vs 6/30 (+63 pp, p=3.8e-6)"),
     _i("memory.consolidate", "chimera.memory.consolidate:model_summarizer", "call", ("S13",)),
+    _c("memory.extract", "chimera.memory.extract:EXTRACT_MEMORY_SYSTEM", "call",
+       ("S2", "S3", "S13"), "measured",
+       "bench/memory_extraction: 31/31 saves correct, poison 0/16, recall 33/36; the harness "
+       "refused no wrong save and cost 2 correct ones",
+       note="after a chat or Code turn, on by default (CHIMERA_MEMORY_EXTRACT), never on the "
+            "messaging bots; the harness re-checks every proposal against the user's own words"),
     _i("memory.persona_preamble", "chimera.memory.manager:MemoryManager.profile", "volatile",
        ("S3", "S10")),
     # ---- the tool router (off by default; #537 measured it worse) ------------------------------
@@ -219,6 +260,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/harness_bench arm C (+0.003, inside SD 0.073)"),
     # ---- terminal chat, Discord, webhooks ------------------------------------------------------
     _i("chat.layout", "chimera.interface.session:ChatSession._assemble", "volatile", ("S3", "S10")),
+    _i("chat.history_messages", "chimera.interface.session:_as_messages", "volatile",
+       ("S3", "S10"), note="CHIMERA_CHAT_REAL_HISTORY: a restored turn's label and data fence, "
+                           "carried into its assistant message; bench/chat_history"),
     _c("chat.restored_labels", "chimera.interface.session:_RESTORED", "volatile", ("S3", "S10"),
        "unmeasured", render=_restored_labels),
     _i("chat.profile", "chimera.interface.profile:render_profile", "volatile", ("S3", "S10")),
@@ -273,6 +317,23 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("explorer.system", "chimera.core.explorer:EXPLORER_SYSTEM", "situation", ("S12",),
        "unmeasured"),
     _i("explorer.task", "chimera.core.explorer:ContextExplorer.explore", "turn", ("S12",)),
+    _c("explorer.contract", "chimera.core.explorer:EXPLORER_CONTRACT_SYSTEM", "situation", ("S12",),
+       "unmeasured",
+       note="replaces explorer.system under CHIMERA_EXPLORER_CONTRACT, off by default"),
+    _c("explorer.contract_task", "chimera.core.explorer:_CONTRACT_TEMPLATE", "turn", ("S12",),
+       "unmeasured", render=_explorer_contract_task,
+       note="one rendering per thoroughness level, at the default ceiling of 8 steps"),
+    _i("explorer.location_receipt", "chimera.core.explorer:LocationCheck.receipt", "tool", ("S12",),
+       note="the harness's words after a contract report; never the explorer's"),
+    _c("research.system", "chimera.core.research:RESEARCH_SYSTEM", "situation", ("S12",),
+       "unmeasured",
+       note="behind CHIMERA_RESEARCH_AGENT, off. bench/web_research was uninformative (the plain "
+            "loop sat at the ceiling, 66/72) and the module cost 4.9x the tokens"),
+    _c("research.task", "chimera.core.research:_TASK_TEMPLATE", "turn", ("S12",), "unmeasured",
+       render=_research_task, note="one rendering per thoroughness level, at the default 12 steps"),
+    _i("research.tool_description", "chimera.core.research:ResearchWebTool", "tool", ("S12",)),
+    _i("research.source_receipt", "chimera.core.research:CitationCheck.receipt", "tool", ("S12",),
+       note="the harness's citation check, appended to the answer; the prompt only asks"),
     _i("brief.recipe", "chimera.orchestration.brief:brief_task", "turn", ("S5", "S10")),
     _c("spec.draft", "chimera.orchestration.draft:_SYSTEM", "call", ("S14",), "unmeasured"),
     # ---- fusion --------------------------------------------------------------------------------
@@ -297,6 +358,18 @@ SECTIONS: tuple[PromptSection, ...] = (
        ("S8",), "measured", "bench/blind_audit: blind form caught 19/23, cries wolf on half"),
     _c("envelope.blind_compare", "chimera.orchestration.envelope_verify:COMPARE_SYSTEM", "call",
        ("S8",), "measured", "bench/blind_audit"),
+    # ---- code review (`chimera review`, experimental) -------------------------------------------
+    _c("review.finder", "chimera.review.finder:FINDER_SYSTEM", "call", ("S15",), "measured",
+       "bench/review_seeded: seeded recall 17/20 (deepseek), 11/11 (glm-5.3; 4/18 incomplete)",
+       note="coverage stage: every defect with a confidence, never told to narrow"),
+    _i("review.finder_request", "chimera.review.finder:finder_request", "turn", ("S15",),
+       note="the rendered diff, fenced"),
+    _c("review.verifier", "chimera.review.verifier:VERIFIER_SYSTEM", "call", ("S15",), "measured",
+       "bench/review_seeded: kept 56/57 seeded hits; dropped 2/29 clean-diff findings",
+       note="bench/review_judge arm A's stance and grounds, reworded; that bench measured A's "
+            "bytes, not these"),
+    _i("review.verifier_request", "chimera.review.verifier:verifier_request", "turn", ("S15",),
+       note="one finding and its diff window, fenced"),
     # ---- governance and typed decisions --------------------------------------------------------
     _c("governance.judge", "chimera.decisions.governance:JUDGE_TEXT", "call", ("S9",), "measured",
        "bench/governance_judge (9/9, 0/10); bench/perturbation_floor (framing: 8–9 of 14 to ALLOW)"),
@@ -320,9 +393,26 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/right_hand_governance"),
     _c("fence.wrapped", "chimera.governance.ledger_tool:fence", "marker", _ALL, "measured",
        "bench/right_hand_governance", render=_fence_example),
+    _c("fence.failure_note", "chimera.governance.ledger_tool:FENCED_FAILURE_NOTE", "marker", _ALL,
+       "unmeasured",
+       note="the line before a fenced tool failure, so the loop reads it as a failure; the tool's "
+            "message stays inside the fence (tests/test_a_fenced_failure_is_still_a_failure.py)"),
     _i("tool.decide_description", "chimera.tools.decide:DecideTool", "tool", ("S9",)),
     _c("tool.browser_viewport_first", "chimera.tools.browser:_VIEWPORT_FIRST_DESCRIPTION", "tool",
        ("S11",), "measured", "bench/browser_viewport_tasks (lost to the shipped description)"),
+    # ---- the browser situation (study 25, S11; off unless CHIMERA_BROWSER_SITUATION) ------------
+    _c("browser.situation", "chimera.tools.browser_situation:BROWSER_SITUATION_PROMPT", "situation",
+       ("S11",), "unmeasured",
+       note="added only with the flag and the browser in the registry; bench/browser_situation "
+            "found no harm (44/48 vs 45/48) and could not measure a benefit"),
+    _c("browser.handover_nudge", "chimera.core.agent:_HANDOVER_NUDGE", "turn", ("S11",), "unmeasured",
+       note="the closing turn after the browser hands a page to the person"),
+    _i("browser.handover_observation", "chimera.tools.browser_situation:Wall.observation", "tool",
+       ("S11",), note="returned instead of the page; fixed words plus the page's host and path"),
+    _i("browser.handover_line", "chimera.tools.browser_situation:Wall.for_person", "turn", ("S11",),
+       note="opens the run's answer on a handover, so it is in the transcript later turns read"),
+    _i("browser.private_store_refusal",
+       "chimera.tools.browser_situation:private_store_refusal", "tool", ("S11",)),
     # ---- self-evolution ------------------------------------------------------------------------
     _c("evolution.propose", "chimera.evolution.evolver:_PROPOSE_SYSTEM", "call", ("S13",), "null",
        "bench/learning_lift"),

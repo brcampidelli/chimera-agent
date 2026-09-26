@@ -1,0 +1,578 @@
+{
+ "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+ "provider": "DeepInfra",
+ "tools": 26,
+ "orders": [
+  {
+   "order": [
+    "flat",
+    "real"
+   ],
+   "runs": {
+    "flat": {
+     "uncached_tokens_without_first": 16738,
+     "nonce": "a2c4be6c",
+     "prompt_tokens": 84642,
+     "cached_tokens": 63232,
+     "cached_share": 0.7471,
+     "prompt_tokens_without_first": 79970,
+     "cached_tokens_without_first": 63232,
+     "cached_share_without_first": 0.7907,
+     "providers": [
+      "DeepInfra"
+     ],
+     "usd": 0.00508158,
+     "rows": [
+      {
+       "request": 0,
+       "prompt_tokens": 4672,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 1,
+       "prompt_tokens": 4738,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 2,
+       "prompt_tokens": 4742,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 3,
+       "prompt_tokens": 4816,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 4,
+       "prompt_tokens": 4882,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 5,
+       "prompt_tokens": 4948,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 6,
+       "prompt_tokens": 4885,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 7,
+       "prompt_tokens": 4956,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 8,
+       "prompt_tokens": 5022,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 9,
+       "prompt_tokens": 5021,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 10,
+       "prompt_tokens": 5101,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 11,
+       "prompt_tokens": 5167,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 12,
+       "prompt_tokens": 5233,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 13,
+       "prompt_tokens": 5096,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 14,
+       "prompt_tokens": 5101,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 15,
+       "prompt_tokens": 5167,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 16,
+       "prompt_tokens": 5095,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      }
+     ]
+    },
+    "real": {
+     "uncached_tokens_without_first": 21152,
+     "nonce": "0e5e9166",
+     "prompt_tokens": 88048,
+     "cached_tokens": 62208,
+     "cached_share": 0.7065,
+     "prompt_tokens_without_first": 83360,
+     "cached_tokens_without_first": 62208,
+     "cached_share_without_first": 0.7463,
+     "providers": [
+      "DeepInfra"
+     ],
+     "usd": 0.005285939999999999,
+     "rows": [
+      {
+       "request": 0,
+       "prompt_tokens": 4688,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 1,
+       "prompt_tokens": 4754,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 2,
+       "prompt_tokens": 4820,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 3,
+       "prompt_tokens": 4894,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 4,
+       "prompt_tokens": 4960,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 5,
+       "prompt_tokens": 5026,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 6,
+       "prompt_tokens": 5096,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 7,
+       "prompt_tokens": 5168,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 8,
+       "prompt_tokens": 5234,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 9,
+       "prompt_tokens": 5299,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 10,
+       "prompt_tokens": 5379,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 11,
+       "prompt_tokens": 5445,
+       "cached_tokens": 5120,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 12,
+       "prompt_tokens": 5511,
+       "cached_tokens": 5376,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 13,
+       "prompt_tokens": 5440,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 14,
+       "prompt_tokens": 5447,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 15,
+       "prompt_tokens": 5513,
+       "cached_tokens": 5376,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 16,
+       "prompt_tokens": 5374,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "order": [
+    "real",
+    "flat"
+   ],
+   "runs": {
+    "real": {
+     "uncached_tokens_without_first": 18064,
+     "nonce": "d9d83cd5",
+     "prompt_tokens": 88031,
+     "cached_tokens": 69376,
+     "cached_share": 0.7881,
+     "prompt_tokens_without_first": 83344,
+     "cached_tokens_without_first": 65280,
+     "cached_share_without_first": 0.7833,
+     "providers": [
+      "DeepInfra"
+     ],
+     "usd": 0.005284919999999999,
+     "rows": [
+      {
+       "request": 0,
+       "prompt_tokens": 4687,
+       "cached_tokens": 4096,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 1,
+       "prompt_tokens": 4753,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 2,
+       "prompt_tokens": 4819,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 3,
+       "prompt_tokens": 4893,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 4,
+       "prompt_tokens": 4959,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 5,
+       "prompt_tokens": 5025,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 6,
+       "prompt_tokens": 5095,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 7,
+       "prompt_tokens": 5167,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 8,
+       "prompt_tokens": 5233,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 9,
+       "prompt_tokens": 5298,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 10,
+       "prompt_tokens": 5378,
+       "cached_tokens": 4096,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 11,
+       "prompt_tokens": 5444,
+       "cached_tokens": 5120,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 12,
+       "prompt_tokens": 5510,
+       "cached_tokens": 5376,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 13,
+       "prompt_tokens": 5439,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 14,
+       "prompt_tokens": 5446,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 15,
+       "prompt_tokens": 5512,
+       "cached_tokens": 5376,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 16,
+       "prompt_tokens": 5373,
+       "cached_tokens": 4096,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      }
+     ]
+    },
+    "flat": {
+     "uncached_tokens_without_first": 8514,
+     "nonce": "17bde421",
+     "prompt_tokens": 84608,
+     "cached_tokens": 71424,
+     "cached_share": 0.8442,
+     "prompt_tokens_without_first": 79938,
+     "cached_tokens_without_first": 71424,
+     "cached_share_without_first": 0.8935,
+     "providers": [
+      "DeepInfra"
+     ],
+     "usd": 0.00507954,
+     "rows": [
+      {
+       "request": 0,
+       "prompt_tokens": 4670,
+       "cached_tokens": 0,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 1,
+       "prompt_tokens": 4736,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 2,
+       "prompt_tokens": 4740,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 3,
+       "prompt_tokens": 4814,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 4,
+       "prompt_tokens": 4880,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 5,
+       "prompt_tokens": 4946,
+       "cached_tokens": 4608,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 6,
+       "prompt_tokens": 4883,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 7,
+       "prompt_tokens": 4954,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 8,
+       "prompt_tokens": 5020,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 9,
+       "prompt_tokens": 5019,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 10,
+       "prompt_tokens": 5099,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 11,
+       "prompt_tokens": 5165,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 12,
+       "prompt_tokens": 5231,
+       "cached_tokens": 4864,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 13,
+       "prompt_tokens": 5094,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 14,
+       "prompt_tokens": 5099,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 15,
+       "prompt_tokens": 5165,
+       "cached_tokens": 4096,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      },
+      {
+       "request": 16,
+       "prompt_tokens": 5093,
+       "cached_tokens": 4352,
+       "completion_tokens": 1,
+       "provider": "DeepInfra"
+      }
+     ]
+    }
+   }
+  }
+ ],
+ "pooled_without_first": {
+  "flat": {
+   "prompt": 159908,
+   "cached": 134656,
+   "uncached": 25252,
+   "share": 0.8421
+  },
+  "real": {
+   "prompt": 166704,
+   "cached": 127488,
+   "uncached": 39216,
+   "share": 0.7648
+  }
+ },
+ "usd": 0.020731979999999997
+}

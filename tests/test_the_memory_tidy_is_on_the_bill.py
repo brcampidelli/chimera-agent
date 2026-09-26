@@ -99,9 +99,11 @@ def _turn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, message: str) -> str:
     memory.add("The user lives in Belo Horizonte", "semantic")
     ws = tmp_path / "ws"
     ws.mkdir(exist_ok=True)
+    # Extraction off: it is a model call of its own after the turn, on its own row
+    # (`test_the_memory_extraction_is_on_the_bill.py`), and this file counts the turn's calls.
     settings = Settings(  # type: ignore[call-arg]
         CHIMERA_HOME=str(home), CHIMERA_CHAT_MEMORY=True, CHIMERA_AUTO_CONSOLIDATE=True,
-        CHIMERA_MEMORY_BUDGET=2,
+        CHIMERA_MEMORY_BUDGET=2, CHIMERA_MEMORY_EXTRACT=False,
     )
     client = TestClient(build_api_app(
         lambda: ChatSession(Agent(_Gateway(), ToolRegistry())), workspace=ws, settings=settings,

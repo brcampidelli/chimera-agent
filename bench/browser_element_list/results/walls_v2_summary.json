@@ -1,0 +1,218 @@
+{
+  "settle_seconds": 2.0,
+  "A": {
+    "verdict": {
+      "pages": 28,
+      "loaded": 23,
+      "failed": [
+        [
+          "https://github.com/brcampidelli/chimera-agent",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://g1.globo.com/",
+          "TimeoutError: Page.inner_text: Timeout 30000ms exceeded.\nCall log:\n  - waiting f"
+        ],
+        [
+          "https://www.reddit.com/r/Python/",
+          "error: browser action failed: Page.evaluate: Execution context was destroyed, mo"
+        ],
+        [
+          "https://huggingface.co/models",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://stripe-payments-demo.appspot.com/",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ]
+      ],
+      "excluded": [
+        [
+          "https://www.nytimes.com/",
+          "captcha",
+          "a DataDome challenge"
+        ]
+      ],
+      "ordinary": 14,
+      "false_handovers": [],
+      "walls": 6,
+      "walls_found_with_kind": 6,
+      "missed": [],
+      "invalid_controls": [
+        "https://accounts.google.com/",
+        "https://checkout.stripe.dev/preview"
+      ],
+      "fit": true
+    },
+    "timing": {
+      "n": 14,
+      "settle_median_s": 0.003,
+      "settle_p90_s": 0.845,
+      "settle_max_s": 2.08,
+      "at_the_bound": 1,
+      "overhead_median_s": 0.526,
+      "overhead_max_s": 44.926
+    },
+    "v1_detector_on_this_load": {
+      "false_handovers": 0,
+      "walls_found_with_kind": 3,
+      "walls": 6
+    },
+    "verdict_under_the_v1_label": {
+      "pages": 28,
+      "loaded": 23,
+      "failed": [
+        [
+          "https://github.com/brcampidelli/chimera-agent",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://g1.globo.com/",
+          "TimeoutError: Page.inner_text: Timeout 30000ms exceeded.\nCall log:\n  - waiting f"
+        ],
+        [
+          "https://www.reddit.com/r/Python/",
+          "error: browser action failed: Page.evaluate: Execution context was destroyed, mo"
+        ],
+        [
+          "https://huggingface.co/models",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://stripe-payments-demo.appspot.com/",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ]
+      ],
+      "excluded": [],
+      "ordinary": 15,
+      "false_handovers": [
+        [
+          "https://www.nytimes.com/",
+          "captcha",
+          "a DataDome challenge"
+        ]
+      ],
+      "walls": 6,
+      "walls_found_with_kind": 5,
+      "missed": [
+        [
+          "https://gitlab.com/users/sign_in",
+          "login",
+          "captcha"
+        ]
+      ],
+      "invalid_controls": [
+        "https://accounts.google.com/",
+        "https://checkout.stripe.dev/preview"
+      ],
+      "fit": false
+    }
+  },
+  "B": {
+    "verdict": {
+      "pages": 41,
+      "loaded": 35,
+      "failed": [
+        [
+          "https://crates.io/crates/serde",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://www.uol.com.br/",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://www.estadao.com.br/",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://www.youtube.com/",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://www.shopify.com/pricing",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ],
+        [
+          "https://www.digitalocean.com/pricing",
+          "error: browser action failed: Page.goto: Timeout 30000ms exceeded.\nCall log:\n  -"
+        ]
+      ],
+      "excluded": [
+        [
+          "https://edition.cnn.com/",
+          "none",
+          ""
+        ],
+        [
+          "https://www.imdb.com/chart/top/",
+          "none",
+          ""
+        ],
+        [
+          "https://www.booking.com/",
+          "none",
+          ""
+        ]
+      ],
+      "ordinary": 13,
+      "false_handovers": [],
+      "walls": 15,
+      "walls_found_with_kind": 9,
+      "missed": [
+        [
+          "https://medium.com/",
+          "captcha",
+          "none"
+        ],
+        [
+          "https://2captcha.com/demo/hcaptcha",
+          "captcha",
+          "none"
+        ],
+        [
+          "https://nopecha.com/demo/hcaptcha",
+          "captcha",
+          "none"
+        ],
+        [
+          "https://2captcha.com/demo/recaptcha-v2",
+          "captcha",
+          "none"
+        ],
+        [
+          "https://login.salesforce.com/",
+          "login",
+          "none"
+        ],
+        [
+          "https://stripe.github.io/elements-examples/",
+          "payment",
+          "none"
+        ]
+      ],
+      "invalid_controls": [
+        "https://2captcha.com/demo/cloudflare-turnstile",
+        "https://huggingface.co/login",
+        "https://discord.com/login",
+        "https://account.proton.me/login"
+      ],
+      "fit": false
+    },
+    "timing": {
+      "n": 13,
+      "settle_median_s": 0.428,
+      "settle_p90_s": 2.05,
+      "settle_max_s": 2.176,
+      "at_the_bound": 4,
+      "overhead_median_s": 3.866,
+      "overhead_max_s": 30.743
+    },
+    "v1_detector_on_this_load": {
+      "false_handovers": 0,
+      "walls_found_with_kind": 6,
+      "walls": 15
+    }
+  },
+  "candidate_for_default_on_pending_m2_check": false
+}

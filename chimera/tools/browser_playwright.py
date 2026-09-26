@@ -248,6 +248,45 @@ class PlaywrightDriver:
     def page_text(self) -> str:
         return str(self._page.inner_text("body"))  # visible text; fallback + basis for find
 
+    @property
+    def url(self) -> str:
+        """The loaded page's address, after redirects — what a browser handover names (study 25,
+        S11). Not in the `BrowserDriver` protocol: the handover reads it when a driver has it."""
+        return str(self._page.url)
+
+    def settle(self, seconds: float) -> None:
+        """Wait at most ``seconds`` for the page's ``load`` event (study 25, S11, walls v2).
+
+        Every page action returns at ``domcontentloaded``, which comes before the scripts and
+        frames a page loads asynchronously. Measured on the hCaptcha demo: no checkbox frame at
+        ``domcontentloaded``, the frame there 0.18 s later, at ``load``. A page still loading when
+        the time runs out is read as it is — the wait is a bound, never a condition. Not in the
+        `BrowserDriver` protocol: the browser situation calls it when a driver has it.
+        """
+        with contextlib.suppress(Exception):  # a timeout, or a page that navigated meanwhile
+            self._page.wait_for_load_state("load", timeout=seconds * 1000)
+
+    def frame_boxes(self, keep: Callable[[str], bool]) -> list[tuple[str, float, float]]:
+        """Each frame whose address ``keep`` accepts, with the size it is drawn at (0 × 0 if not).
+
+        Read off the browser's frame tree, not the page's HTML, because the HTML cannot show a
+        frame inside a shadow root, and a closed shadow root cannot be walked from the page at
+        all. Measured on the Turnstile demo: its frame sits in a **closed** root, invisible to
+        ``page.content()`` and to any script walking open roots, and present in this tree with
+        its 300 × 65 box. Frames nested in other frames are in the tree too. ``keep`` is asked
+        first so only the frames it wants cost the two round trips a box takes. Not in the
+        `BrowserDriver` protocol, like :meth:`settle`.
+        """
+        found: list[tuple[str, float, float]] = []
+        for frame in self._page.frames:
+            if frame is self._page.main_frame or not keep(frame.url):
+                continue
+            box = None
+            with contextlib.suppress(Exception):  # a frame detached while it was being read
+                box = frame.frame_element().bounding_box()
+            found.append((frame.url, box["width"], box["height"]) if box else (frame.url, 0.0, 0.0))
+        return found
+
     def screenshot(self, path: str) -> None:
         self._page.screenshot(path=path, full_page=True)  # a real full-page PNG of the current page
 

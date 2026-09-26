@@ -9,13 +9,21 @@ command, the TUI, and the messaging gateway all reuse it unchanged.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
 from chimera.core.agent import AgentResult, ToolActivity
+from chimera.core.code_session import _accepts, _as_dict
 from chimera.memory.gate import MemoryGate
 from chimera.memory.models import EVERY_PROJECT, MemoryItem
+from chimera.providers.gateway import MessageLike
+from chimera.telemetry import get_logger
+
+_log = get_logger("interface.session")
+
+_log = logging.getLogger("chimera.interface.session")
 
 #: What is known about untrusted content in one stored turn.
 #:
@@ -46,6 +54,25 @@ class SupportsRun(Protocol):
     ) -> AgentResult: ...
 
 
+class SupportsHistoryRun(Protocol):
+    """An agent loop that can also take earlier turns as messages and this turn's notes.
+
+    Separate from :class:`SupportsRun` because that protocol is published and an implementation
+    written against it is valid without either keyword. :meth:`ChatSession._real_history_ready`
+    reads the signature before it relies on this one.
+    """
+
+    def run(
+        self,
+        task: str,
+        *,
+        on_token: Callable[[str], None] | None = ...,
+        on_tool: Callable[[ToolActivity], None] | None = ...,
+        history: list[MessageLike] | None = ...,
+        turn_notes: str | None = ...,
+    ) -> AgentResult: ...
+
+
 class SupportsRecall(Protocol):
     """Long-term memory: keyword recall over stored facts."""
 
@@ -56,6 +83,12 @@ class SupportsRelated(Protocol):
     """Graph memory: recall facts linked to entities mentioned in the query."""
 
     def related_facts(self, query: str, k: int = 5) -> list[str]: ...
+
+
+class SupportsAfterTurn(Protocol):
+    """Memory extraction after a finished turn (:class:`chimera.memory.extract.MemoryExtractor`)."""
+
+    def after_turn(self, user_message: str, answer: str, *, tainted: bool = ...) -> None: ...
 
 
 @dataclass
@@ -81,6 +114,56 @@ class ChatTurn:
     assistant: str
     provenance: str = UNKNOWN
     restored: bool = False
+    #: The model's own messages for this turn, from the user's words to the reply, tool calls
+    #: included, when the turn ran in this process under :attr:`ChatSession.real_history`.
+    #:
+    #: Not persisted, and outside equality, like ``restored``: it is this process's view of the turn.
+    #: The session file keeps the prose pair it has always kept, so a file written in either mode
+    #: loads in both, and a turn that comes back from disk is replayed as a user/assistant pair.
+    #: Keeping tool results on disk would also keep whatever a fetched page said, beyond the run
+    #: that fetched it, which is a separate decision from this one.
+    messages: list[dict[str, Any]] | None = field(default=None, repr=False, compare=False)
+
+
+def _as_messages(turn: ChatTurn) -> list[dict[str, Any]]:
+    """A turn with no recorded messages, as the user/assistant pair a model would have produced.
+
+    The trust treatment is :func:`_replay`'s, carried into the assistant message because a message
+    list has no role label to put it on. A restored turn opens with its label, and one not known to
+    be clean has its reply inside the data fence: the model did not just say it, and the run that
+    could vouch for it is over. The label goes into the text sent, never into ``turn.assistant``,
+    which is what the session file keeps.
+    """
+    reply = turn.assistant
+    if turn.restored:
+        from chimera.governance.ledger_tool import fence
+
+        label = _RESTORED.get(turn.provenance, _RESTORED[UNKNOWN]).strip()
+        body = turn.assistant if turn.provenance == CLEAN else fence(turn.assistant)
+        reply = f"{label}\n{body}"
+    return [{"role": "user", "content": turn.user}, {"role": "assistant", "content": reply}]
+
+
+def _turn_messages(result: AgentResult, message: str) -> list[dict[str, Any]] | None:
+    """This turn's part of the run's transcript, or None when it cannot be found intact.
+
+    It starts at the last user message that is the person's own words, which is where the turn
+    began: a nudge the loop adds mid-turn says something else, and every earlier turn is before it.
+    It must end on the reply the person was shown. When either end is missing (a compaction folded
+    the turn's message into a summary, or the run ended without an assistant message), the turn is
+    kept as its prose pair instead: a shorter history is a degradation, a history the model never
+    saw is a fabrication.
+    """
+    body = [_as_dict(m) for m in result.transcript]
+    body = [m for m in body if m.get("role") != "system"]
+    for start in range(len(body) - 1, -1, -1):
+        if body[start].get("role") == "user" and body[start].get("content") == message:
+            segment = body[start:]
+            last = segment[-1]
+            if last.get("role") == "assistant" and last.get("content") == result.answer:
+                return segment
+            return None
+    return None
 
 
 @dataclass(frozen=True)
@@ -167,6 +250,15 @@ _RESTORED = {
     UNKNOWN: " [restored from the saved transcript; provenance was not recorded]",
     TAINTED: " [restored from the saved transcript; untrusted content had entered this conversation]",
 }
+
+
+def recent_turns(turns: list[ChatTurn], size: int) -> list[ChatTurn]:
+    """The last ``size`` turns: the window a prompt replays.
+
+    ``turns[-size:]`` is the obvious spelling and it is wrong at 0: ``turns[-0:]`` is the whole list,
+    so a session asked to replay no history replayed all of it — every turn, growing without bound.
+    """
+    return turns[-size:] if size > 0 else []
 
 
 def _replay(turns: list[ChatTurn]) -> str:
@@ -331,6 +423,26 @@ class ChatSession:
     #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which has a screen. An
     #: announcer with nothing bound announces to nobody, which is exactly what those want.
     approval_sink: Any = None
+    #: Study 25 S13, behind ``CHIMERA_MEMORY_EXTRACT``: handed each finished turn, to keep what the
+    #: user stated about themselves. ``None`` by default, which is byte-identical to before: this
+    #: class also serves the messaging gateway, ``/v1/chat/completions`` and every bench.
+    extractor: SupportsAfterTurn | None = None
+    #: Quote recalled facts with their source and date, in the turn-context header's words. Off by
+    #: default, for the same reason as ``extractor``; the terminal surfaces tie both to one setting.
+    cite_facts: bool = False
+    #: Send the earlier turns as the model's own messages, and the profile and recalled facts in the
+    #: turn context, instead of flattening all of it into one user message.
+    #:
+    #: The flattened form loses every earlier tool call, and nothing after the system message can be
+    #: cached, because the block opens with text that changes every turn (study 25, §7 S2/S3). Here
+    #: the window is the same ``max_history`` turns, each one starting at its user message, so the
+    #: list is only ever cut where a turn begins.
+    #:
+    #: ``False`` by default, which keeps the flattened form byte for byte: it is what the Discord
+    #: bot and the benches send today, and flipping it is decided by `bench/chat_history`, not
+    #: here. On, it still flattens for an agent that cannot take ``history`` and ``turn_notes`` or
+    #: has no turn context, because the facts would otherwise have nowhere to go.
+    real_history: bool = False
     turns: list[ChatTurn] = field(default_factory=list)
 
     def _begin_turn(self, message: str) -> None:
@@ -347,19 +459,25 @@ class ChatSession:
     def send(self, message: str) -> str:
         """Run one user message through the agent and record the exchange."""
         self._begin_turn(message)
-        result = self.agent.run(self._compose(message))
-        self._record(
-            message,
-            result.answer,
-            turn_provenance(
-                list(result.tool_names), None, already_tainted=self._thread_tainted()
-            ),
+        messages: list[dict[str, Any]] | None = None
+        if self._real_history_ready():
+            facts, _layer = self._recall(message)
+            result = self._run_with_history(message, facts)
+            messages = _turn_messages(result, message)
+        else:
+            result = self.agent.run(self._compose(message))
+        provenance = turn_provenance(
+            list(result.tool_names), None, already_tainted=self._thread_tainted()
         )
+        self._record(message, result.answer, provenance)
+        self._keep_messages(message, messages)
         # `remember_from_chat` used to mean two different things depending on which method you
         # called: `send_verbose` honoured it and `send` did not. So every surface built on `send`
         # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
-        # true in the config and false in the product.
+        # true in the config and false in the product. The extraction below is called from both
+        # for the same reason.
         self._maybe_remember(message)
+        self._maybe_extract(message, result.answer, provenance)
         return result.answer
 
     def send_verbose(
@@ -392,12 +510,21 @@ class ChatSession:
             if on_tool is not None:
                 on_tool(activity)
 
-        result = self.agent.run(self._assemble(message, facts), on_token=on_token, on_tool=watch)
+        messages: list[dict[str, Any]] | None = None
+        if self._real_history_ready():
+            result = self._run_with_history(message, facts, on_token=on_token, on_tool=watch)
+            messages = _turn_messages(result, message)
+        else:
+            result = self.agent.run(
+                self._assemble(message, facts), on_token=on_token, on_tool=watch
+            )
         provenance = turn_provenance(
             list(result.tool_names), observed, already_tainted=self._thread_tainted()
         )
         self._record(message, result.answer, provenance)
+        self._keep_messages(message, messages)
         saved = self._maybe_remember(message)
+        self._maybe_extract(message, result.answer, provenance)
         return TurnReport(
             answer=result.answer,
             declined=declined,
@@ -443,6 +570,22 @@ class ChatSession:
         write(fact, source="chat")  # deduped; clean provenance (the user asked for it directly)
         return fact
 
+    def _maybe_extract(self, message: str, answer: str, provenance: str) -> None:
+        """Hand the finished turn to the extractor, after the explicit "remember that…" above.
+
+        After it, so a fact the user asked for by name is already stored and the extraction reads
+        it as a duplicate rather than writing it twice. A turn whose provenance is not known to be
+        clean is passed as tainted, the reading ``read_provenance`` gives it everywhere else. The
+        extractor runs off this thread and swallows its own errors; the guard here covers the one
+        call that hands the turn over, because nothing about memory may cost the answer.
+        """
+        if self.extractor is None:
+            return
+        try:
+            self.extractor.after_turn(message, answer, tainted=provenance != CLEAN)
+        except Exception as exc:  # noqa: BLE001 — the answer is already recorded; memory is extra
+            _log.warning("memory extraction could not start: %s", exc)
+
     def _thread_tainted(self) -> bool:
         """Has untrusted content already entered this conversation?
 
@@ -455,6 +598,83 @@ class ChatSession:
         self.turns.append(ChatTurn(user=message, assistant=answer, provenance=provenance))
         if self.max_turns is not None and len(self.turns) > self.max_turns:
             del self.turns[: -self.max_turns]
+
+    def _keep_messages(self, message: str, messages: list[dict[str, Any]] | None) -> None:
+        """Attach the turn's own messages to the turn :meth:`_record` just wrote.
+
+        A step of its own rather than a fourth argument to ``_record``, because ``_record`` is
+        overridden (the scenario suite cuts the threading wire there) and a changed signature breaks
+        every override in the flattened default too. A record that kept nothing gets nothing.
+        """
+        if messages is not None and self.turns and self.turns[-1].user == message:
+            self.turns[-1].messages = messages
+
+    def _real_history_ready(self) -> bool:
+        """Whether this turn goes out as real history: the setting is on AND the agent can take it.
+
+        Read from the agent rather than assumed, for the reason ``CodeSession._accepts`` gives:
+        :class:`SupportsRun` is published, and an agent written against it has neither keyword. The
+        turn context is checked too, because without it the notes are never read, and a turn that
+        silently lost its recalled facts would be worse than one that flattened them.
+        """
+        if not self.real_history:
+            return False
+        run = self.agent.run
+        config = getattr(self.agent, "config", None)
+        ready = (
+            _accepts(run, "history")
+            and _accepts(run, "turn_notes")
+            and bool(getattr(config, "turn_context", False))
+        )
+        if not ready:
+            _log.debug("real history asked for, but this agent cannot take it; flattening")
+        return ready
+
+    def _history(self) -> list[MessageLike]:
+        """The earlier turns inside the window, as messages, oldest first.
+
+        Every turn contributes from its own user message, so the list always starts where a turn
+        starts and a tool result is never separated from the call it answers. Copies, so a run that
+        edits its message list cannot reach back into the record.
+        """
+        if self.max_history <= 0:
+            return []
+        out: list[MessageLike] = []
+        for turn in self.turns[-self.max_history :]:
+            out.extend(dict(m) for m in (turn.messages or _as_messages(turn)))
+        return out
+
+    def _turn_notes(self, facts: list[str]) -> str:
+        """The profile and the recalled facts, for the turn context rather than the history.
+
+        The same two things :meth:`_assemble` puts at the head of its block, in the same order. Here
+        they head the turn's own message, which the loop gives back bare when the run ends, so the
+        history never holds a copy that was true of an earlier question.
+        """
+        from chimera.prompts.context import facts_block
+
+        return "\n\n".join(part for part in (self.profile, facts_block(facts)) if part)
+
+    def _run_with_history(
+        self,
+        message: str,
+        facts: list[str],
+        *,
+        on_token: Callable[[str], None] | None = None,
+        on_tool: Callable[[ToolActivity], None] | None = None,
+    ) -> AgentResult:
+        run = cast(SupportsHistoryRun, self.agent).run
+        if on_token is None and on_tool is None:
+            # `send` has never passed callbacks, and an agent that takes history is not thereby
+            # promised to take them as well.
+            return run(message, history=self._history(), turn_notes=self._turn_notes(facts))
+        return run(
+            message,
+            on_token=on_token,
+            on_tool=on_tool,
+            history=self._history(),
+            turn_notes=self._turn_notes(facts),
+        )
 
     def reset(self) -> None:
         """Forget the conversation (long-term memory is untouched)."""
@@ -490,6 +710,7 @@ class ChatSession:
             gate=self.gate,
             k=self.memory_k,
             project=self.project,
+            cite=self.cite_facts,
         )
 
     def _compose(self, message: str) -> str:
@@ -501,12 +722,38 @@ class ChatSession:
         parts: list[str] = []
         if self.profile:  # persistent persona preamble — cross-session personalization
             parts.append(self.profile)
-        if facts:
+        if facts and self.cite_facts:
+            # The turn context's header, which says what a quoted fact is: recall, possibly stale.
+            from chimera.prompts.context import facts_block
+
+            parts.append(facts_block(facts))
+        elif facts:
             parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
-        if self.turns:
-            parts.append(_replay(self.turns[-self.max_history :]))
+        window = recent_turns(self.turns, self.max_history)
+        if window:
+            parts.append(_replay(window))
         parts.append(f"User: {message}")
         return "\n\n".join(parts)
+
+
+def _recalled(item: Any, cite: bool) -> str:
+    """A recalled record as the prompt shows it: bare text, or quoted with source and date."""
+    if not cite:
+        return str(item.content)
+    from chimera.prompts.context import cited_fact
+
+    return cited_fact(
+        str(item.content),
+        source=str(getattr(item, "source", "") or ""),
+        saved=getattr(item, "created_at", None),
+    )
+
+
+def _linked(text: str) -> str:
+    """A graph-linked fact, quoted: the graph hands back text, not the record it came from."""
+    import json
+
+    return f"{json.dumps(text, ensure_ascii=False)} (source: linked by entity, date not recorded)"
 
 
 #: Sentinel for "the caller said nothing about a gate", which is not the same as "no gate".
@@ -530,6 +777,7 @@ def recall_facts(
     k: int = 3,
     search: Any = None,
     project: str | None = EVERY_PROJECT,
+    cite: bool = False,
 ) -> tuple[list[str], str | None]:
     """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
 
@@ -542,10 +790,19 @@ def recall_facts(
     folder open is not a project; a surface that has one passes it.
 
     ``gate`` defaults to a real :class:`MemoryGate`. Pass ``None`` to opt out explicitly.
+
+    ``cite`` (study 25 S13, behind ``CHIMERA_MEMORY_EXTRACT``) quotes each fact and names its source
+    and the date it was written (:func:`chimera.prompts.context.cited_fact`). Off, the facts are the
+    bare text they have always been. A graph-linked fact is a string with no record behind it here,
+    so it is quoted and says that its source is the entity link.
     """
     if gate is _GATE_UNSET:
         gate = MemoryGate()
     facts: list[str] = []
+    #: The stored texts behind ``facts``. With ``cite`` on, a rendered line no longer equals the text
+    #: a graph link hands back, so the dedup below compares against these instead. Off, the dedup is
+    #: the one it always was.
+    seen: set[str] = set()
     layers: list[str] = []
     if memory is not None:
         captured: dict[str, str] = {}
@@ -574,7 +831,7 @@ def recall_facts(
             # verified. Dropping the label here (taking .content raw) was a taint leak — a poisoned
             # memory could re-enter the next turn's prompt looking clean.
             facts = [
-                item.content
+                _recalled(item, cite)
                 + (
                     " [unverified: learned from untrusted content]"
                     if getattr(item, "provenance", "clean") == "tainted"
@@ -582,6 +839,7 @@ def recall_facts(
                 )
                 for item in items
             ]
+            seen.update(item.content for item in items)
             if "layer" in captured:
                 layers.append(captured["layer"])
     if graph is not None:
@@ -592,8 +850,10 @@ def recall_facts(
             # Entity-linked facts skip the keyword-similarity gate (they intentionally may not
             # overlap the query), but they must STILL pass the injection check — a graph-reachable
             # tainted memory could otherwise inject override text the gate exists to block.
-            if related not in facts and (gate is None or gate.is_clean(related)):
-                facts.append(related)
+            duplicate = related in facts or (cite and related in seen)
+            if not duplicate and (gate is None or gate.is_clean(related)):
+                facts.append(_linked(related) if cite else related)
+                seen.add(related)
                 graph_added += 1
         if graph_added:
             layers.append("graph")

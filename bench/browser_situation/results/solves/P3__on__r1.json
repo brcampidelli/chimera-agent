@@ -1,0 +1,51 @@
+{
+ "task": "P3",
+ "arm": "on",
+ "replica": 1,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.00167642,
+ "answer": "42baff7dbc66",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 5,
+ "tool_calls": 4,
+ "prompt_tokens": 23748,
+ "completion_tokens": 415,
+ "cache_read_tokens": 11008,
+ "usd": 0.000655,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "cd526d3bc0b1",
+ "module_in_prompt": true,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 17830,
+ "seconds": 25.4,
+ "requested_paths": [
+  "/pkg/acme-widgets.html"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}
