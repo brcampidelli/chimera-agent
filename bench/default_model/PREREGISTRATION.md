@@ -331,3 +331,24 @@ That is the route's reliability, not the model's. Left as it is, the per-arm hal
 3. **Spend accounting.** The four solves stopped by hand for the vhdx compaction were recorded twice: by the stop, and again by the next driver's harvest of their call logs. `unique_rows` counts each once, keyed on its first call's generation id. Spend so far is US$ 5.21.
 
 **A finding for the product, not for this decision.** One 429 on a one-key pool ends a `chimera solve` run at once. The run gets no backoff and no wait for the 60 s cooldown the pool itself sets. It is reported to the coordinator.
+
+## Amendment 6 — 2026-09-26, the owner stops the main run early, after reading a partial
+
+**What happened.** The owner read the partial below (`results/summary.json`, 199 items) and stopped the run: *"não precisamos de mais item, estamos com uma boa diferença"*. The partial had already led him to make luna the product default (#642).
+
+**This is an optional stop, and it is labelled as one.**
+- The registered design ran to the cap, not to a significance threshold.
+- Stopping after looking at the numbers inflates the type-I error of a single test.
+- The margin is far from the edge, though:
+  - G vs A, Holm-adjusted p = 3e-5, n = 178 pairs, Newcombe 95% +9.8 to +23.7 pp.
+  - Without the leak-risk items, p = 0.004, delta +13.2 pp.
+- A peeking correction of any usual size (Pocock-style, alpha about 0.02 at a handful of looks) does not move the decision.
+- The D, Q and A comparisons stay null. They are read as null, not as "no difference".
+
+**Left open:**
+- 35 rate-limit halts on Q and 3 on A were not re-run (Amendment 5, step 2). Q's numbers carry that hole.
+- Two in-flight solves were killed at the stop and are not counted.
+
+**Final spend:** US$ 8.82 of the US$ 15 cap, discarded runs included.
+
+**Decision under the frozen rule:** G (`openrouter/openai/gpt-6-luna`) replaces A as the default. It is the only qualifier, winning both on cost per resolved item and on significance.

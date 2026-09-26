@@ -1,0 +1,472 @@
+{
+  "phase": "--help",
+  "slice": 208,
+  "items": 8,
+  "arms": {
+    "A": {
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "pinned": "DeepInfra",
+      "solves": 8,
+      "resolved": 0,
+      "graded": 1,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.7935
+      ],
+      "halted_error": 0,
+      "timeouts": 0,
+      "retried": 0,
+      "harness_errors": 0,
+      "empty_patch": 1,
+      "stopped": {
+        "final": 1,
+        "max_steps": 7
+      },
+      "empty_close_note": 2,
+      "empty_natural_final": 0,
+      "empty_calls": 7,
+      "calls": 240,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 24
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 28.5,
+      "mean_seconds": 646.7375,
+      "mean_tokens": 298695.25,
+      "mean_prompt": 290685.125,
+      "mean_completion": 8010.125,
+      "mean_reasoning": 4686.25,
+      "cache_read_share": 0.8699,
+      "mean_usd": 0.0075,
+      "usd_total": 0.06,
+      "usd_computed_total": 0.06,
+      "usd_billed_total": 0.06,
+      "billed_reported_calls": 240,
+      "usd_per_resolved": null,
+      "providers": {
+        "DeepInfra": 240
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 8,
+      "django_fetch": 1,
+      "wall_bypass_tries": 0
+    },
+    "D": {
+      "model": "openrouter/deepseek/deepseek-v4.1-flash",
+      "pinned": "DeepInfra",
+      "solves": 8,
+      "resolved": 0,
+      "graded": 0,
+      "rate": null,
+      "wilson95": null,
+      "halted_error": 0,
+      "timeouts": 0,
+      "retried": 0,
+      "harness_errors": 0,
+      "empty_patch": 0,
+      "stopped": {
+        "max_steps": 8
+      },
+      "empty_close_note": 0,
+      "empty_natural_final": 0,
+      "empty_calls": 3,
+      "calls": 251,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 18
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 30,
+      "mean_seconds": 786.35,
+      "mean_tokens": 370957.5,
+      "mean_prompt": 351296.25,
+      "mean_completion": 19661.25,
+      "mean_reasoning": 15514.75,
+      "cache_read_share": 0.8995,
+      "mean_usd": 0.01453,
+      "usd_total": 0.1162,
+      "usd_computed_total": 0.1162,
+      "usd_billed_total": 0.1162,
+      "billed_reported_calls": 251,
+      "usd_per_resolved": null,
+      "providers": {
+        "DeepInfra": 251
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 8,
+      "django_fetch": 1,
+      "wall_bypass_tries": 0
+    },
+    "G": {
+      "model": "openrouter/openai/gpt-6-luna",
+      "pinned": "OpenAI",
+      "solves": 8,
+      "resolved": 0,
+      "graded": 0,
+      "rate": null,
+      "wilson95": null,
+      "halted_error": 0,
+      "timeouts": 0,
+      "retried": 0,
+      "harness_errors": 0,
+      "empty_patch": 0,
+      "stopped": {
+        "final": 8
+      },
+      "empty_close_note": 0,
+      "empty_natural_final": 0,
+      "empty_calls": 0,
+      "calls": 121,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {},
+      "dropped_tool_calls": 0,
+      "mean_steps": 15.125,
+      "mean_seconds": 375.5125,
+      "mean_tokens": 120311.5,
+      "mean_prompt": 116536.25,
+      "mean_completion": 3775.25,
+      "mean_reasoning": 2483.375,
+      "cache_read_share": 0.924,
+      "mean_usd": 0.00407,
+      "usd_total": 0.0326,
+      "usd_computed_total": 0.0308,
+      "usd_billed_total": 0.0326,
+      "billed_reported_calls": 121,
+      "usd_per_resolved": null,
+      "providers": {
+        "OpenAI": 121
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 1,
+      "django_fetch": 0,
+      "wall_bypass_tries": 0
+    },
+    "Q": {
+      "model": "openrouter/qwen/qwen3.7-flash",
+      "pinned": "Alibaba",
+      "solves": 8,
+      "resolved": 0,
+      "graded": 0,
+      "rate": null,
+      "wilson95": null,
+      "halted_error": 0,
+      "timeouts": 0,
+      "retried": 0,
+      "harness_errors": 0,
+      "empty_patch": 0,
+      "stopped": {
+        "max_steps": 6,
+        "final": 2
+      },
+      "empty_close_note": 0,
+      "empty_natural_final": 0,
+      "empty_calls": 0,
+      "calls": 243,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 9
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 29.375,
+      "mean_seconds": 528.575,
+      "mean_tokens": 270536.25,
+      "mean_prompt": 262555.375,
+      "mean_completion": 7980.875,
+      "mean_reasoning": 3954.625,
+      "cache_read_share": 0.6318,
+      "mean_usd": 0.00493,
+      "usd_total": 0.0395,
+      "usd_computed_total": 0.0395,
+      "usd_billed_total": 0.0395,
+      "billed_reported_calls": 243,
+      "usd_per_resolved": null,
+      "providers": {
+        "Alibaba": 243
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 8,
+      "django_fetch": 1,
+      "wall_bypass_tries": 0
+    }
+  },
+  "pooled_rate": 0.0,
+  "vs_A": {
+    "D": {
+      "n": 0
+    },
+    "G": {
+      "n": 0
+    },
+    "Q": {
+      "n": 0
+    }
+  },
+  "checks": {
+    "system_sha_per_arm": {
+      "G": 1,
+      "A": 1,
+      "Q": 1,
+      "D": 1
+    },
+    "same_system_in_every_arm": true,
+    "starts_with_default": true,
+    "off_pin_calls": {
+      "A": 0,
+      "D": 0,
+      "G": 0,
+      "Q": 0
+    }
+  },
+  "ratelimited_halts_rerun": {},
+  "ratelimited_halts_left": {},
+  "usd_killed_at_block_end": 0.1996,
+  "usd_discarded_before_amendment3": 1.041,
+  "usd_all": 8.823,
+  "disk_scan": {
+    "discarded_main_before_amendment3": {
+      "per_arm": {
+        "A": {
+          "solves": 27,
+          "source_touch": 1,
+          "broad_search": 20,
+          "other_path": 16
+        },
+        "D": {
+          "solves": 28,
+          "source_touch": 16,
+          "broad_search": 27,
+          "other_path": 25
+        },
+        "G": {
+          "solves": 31,
+          "source_touch": 0,
+          "broad_search": 1,
+          "other_path": 2
+        },
+        "Q": {
+          "solves": 29,
+          "source_touch": 0,
+          "broad_search": 9,
+          "other_path": 2
+        }
+      },
+      "source_items": {
+        "django__django-11555": [
+          "D"
+        ],
+        "django__django-11740": [
+          "D"
+        ],
+        "django__django-11880": [
+          "A"
+        ],
+        "django__django-11964": [
+          "D"
+        ],
+        "django__django-12276": [
+          "D"
+        ],
+        "django__django-12774": [
+          "D"
+        ],
+        "django__django-13121": [
+          "D"
+        ],
+        "django__django-13512": [
+          "D"
+        ],
+        "django__django-13807": [
+          "D"
+        ],
+        "django__django-13809": [
+          "D"
+        ],
+        "django__django-13820": [
+          "D"
+        ],
+        "django__django-14580": [
+          "D"
+        ],
+        "django__django-15280": [
+          "D"
+        ],
+        "django__django-15563": [
+          "D"
+        ],
+        "django__django-15695": [
+          "D"
+        ],
+        "django__django-15731": [
+          "D"
+        ],
+        "django__django-16502": [
+          "D"
+        ]
+      },
+      "detail": [
+        {
+          "instance_id": "django__django-11880",
+          "arm": "A",
+          "source": [
+            "/home/brcamp/dflt-h45-work/A__django__django-1"
+          ]
+        },
+        {
+          "instance_id": "django__django-15731",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-13809",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/h45-cache"
+          ]
+        },
+        {
+          "instance_id": "django__django-15563",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-cache/django-ref",
+            "/home/brcamp/h45-cache/django-ref/django/db/models/sql/compiler.py",
+            "/home/brcamp/h45-cache/django-ref/django/db/models/sql/subqueries.py"
+          ]
+        },
+        {
+          "instance_id": "django__django-11740",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-12774",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/dflt-grade/*.sh",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-13512",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-h45-work/templates/",
+            "/home/brcamp/dflt-h45-work/templates/django__django-13512/*.json",
+            "/home/brcamp/h45-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-16502",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-15695",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/dflt-h45-work/templates/django__django-15695",
+            "/home/brcamp/h45-cache/django-ref",
+            "/home/brcamp/h45-cache/django-ref/django/db/migrations/operations/models.py"
+          ]
+        },
+        {
+          "instance_id": "django__django-11964",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-15280",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-12276",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/dflt-grade/main",
+            "/home/brcamp/dflt-grade/main/grade_A.log",
+            "/home/brcamp/dflt-grade/main/logs",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-grade",
+            "/home/brcamp/h45-grade/main",
+            "/home/brcamp/h45-work/B__django__django-15695",
+            "/home/brcamp/h45-work/templates/*",
+            "/home/brcamp/h45-work/templates/django__django-12276",
+            "/home/brcamp/h45-work/templates/django__django-12276/*"
+          ]
+        },
+        {
+          "instance_id": "django__django-13121",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/dflt-grade/*.sh",
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-11555",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-h45-work/D__django__django-11555/../D__django__django-12276"
+          ]
+        },
+        {
+          "instance_id": "django__django-13820",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/h45-cache"
+          ]
+        },
+        {
+          "instance_id": "django__django-14580",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-grade/*.sh"
+          ]
+        },
+        {
+          "instance_id": "django__django-13807",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/h45-grade"
+          ]
+        }
+      ]
+    }
+  }
+}

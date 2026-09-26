@@ -1,0 +1,1054 @@
+{
+  "phase": "main",
+  "slice": 208,
+  "items": 199,
+  "arms": {
+    "A": {
+      "model": "openrouter/deepseek/deepseek-v4-flash-0731",
+      "pinned": "DeepInfra",
+      "solves": 196,
+      "resolved": 110,
+      "graded": 181,
+      "rate": 0.6077,
+      "wilson95": [
+        0.5351,
+        0.6759
+      ],
+      "halted_error": 3,
+      "timeouts": 2,
+      "retried": 5,
+      "harness_errors": 10,
+      "empty_patch": 36,
+      "stopped": {
+        "max_steps": 140,
+        "final": 51
+      },
+      "empty_close_note": 37,
+      "empty_natural_final": 1,
+      "empty_calls": 111,
+      "calls": 5418,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 147,
+        "unknown_tool": 1
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 27.1623,
+      "mean_seconds": 230.6555,
+      "mean_tokens": 300263.59686,
+      "mean_prompt": 284779.68063,
+      "mean_completion": 15483.91623,
+      "mean_reasoning": 12386,
+      "cache_read_share": 0.8634,
+      "mean_usd": 0.00881,
+      "usd_total": 1.6942,
+      "usd_computed_total": 1.6842,
+      "usd_billed_total": 1.6842,
+      "billed_reported_calls": 5418,
+      "usd_per_resolved": 0.0153,
+      "providers": {
+        "DeepInfra": 5418
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 155,
+      "django_fetch": 26,
+      "wall_bypass_tries": 2
+    },
+    "D": {
+      "model": "openrouter/deepseek/deepseek-v4.1-flash",
+      "pinned": "DeepInfra",
+      "solves": 195,
+      "resolved": 112,
+      "graded": 180,
+      "rate": 0.6222,
+      "wilson95": [
+        0.5495,
+        0.6898
+      ],
+      "halted_error": 0,
+      "timeouts": 7,
+      "retried": 0,
+      "harness_errors": 8,
+      "empty_patch": 52,
+      "stopped": {
+        "max_steps": 168,
+        "final": 20
+      },
+      "empty_close_note": 23,
+      "empty_natural_final": 0,
+      "empty_calls": 123,
+      "calls": 5800,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 100,
+        "unknown_tool": 3
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 29.42553,
+      "mean_seconds": 470.79149,
+      "mean_tokens": 389057.72872,
+      "mean_prompt": 361866.19681,
+      "mean_completion": 27191.53191,
+      "mean_reasoning": 22667.19149,
+      "cache_read_share": 0.8847,
+      "mean_usd": 0.01861,
+      "usd_total": 3.4981,
+      "usd_computed_total": 3.4981,
+      "usd_billed_total": 3.4981,
+      "billed_reported_calls": 5800,
+      "usd_per_resolved": 0.03123,
+      "providers": {
+        "DeepInfra": 5800
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 148,
+      "django_fetch": 75,
+      "wall_bypass_tries": 13
+    },
+    "G": {
+      "model": "openrouter/openai/gpt-6-luna",
+      "pinned": "OpenAI",
+      "solves": 199,
+      "resolved": 142,
+      "graded": 185,
+      "rate": 0.7676,
+      "wilson95": [
+        0.7016,
+        0.8226
+      ],
+      "halted_error": 0,
+      "timeouts": 0,
+      "retried": 0,
+      "harness_errors": 14,
+      "empty_patch": 0,
+      "stopped": {
+        "final": 192,
+        "max_steps": 7
+      },
+      "empty_close_note": 0,
+      "empty_natural_final": 0,
+      "empty_calls": 0,
+      "calls": 3227,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 62
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 16.1809,
+      "mean_seconds": 73.98141,
+      "mean_tokens": 151593.25126,
+      "mean_prompt": 147103.54271,
+      "mean_completion": 4489.70854,
+      "mean_reasoning": 3012.33668,
+      "cache_read_share": 0.9254,
+      "mean_usd": 0.00498,
+      "usd_total": 0.9901,
+      "usd_computed_total": 0.936,
+      "usd_billed_total": 0.9901,
+      "billed_reported_calls": 3227,
+      "usd_per_resolved": 0.00697,
+      "providers": {
+        "OpenAI": 3227
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 8,
+      "django_fetch": 0,
+      "wall_bypass_tries": 0
+    },
+    "Q": {
+      "model": "openrouter/qwen/qwen3.7-flash",
+      "pinned": "Alibaba",
+      "solves": 197,
+      "resolved": 89,
+      "graded": 157,
+      "rate": 0.5669,
+      "wilson95": [
+        0.4887,
+        0.6419
+      ],
+      "halted_error": 35,
+      "timeouts": 0,
+      "retried": 65,
+      "harness_errors": 5,
+      "empty_patch": 19,
+      "stopped": {
+        "max_steps": 104,
+        "final": 58
+      },
+      "empty_close_note": 25,
+      "empty_natural_final": 8,
+      "empty_calls": 12,
+      "calls": 4810,
+      "zero_tool_call_solves": 0,
+      "tool_errors": {
+        "other": 56
+      },
+      "dropped_tool_calls": 0,
+      "mean_steps": 26.75926,
+      "mean_seconds": 182.68827,
+      "mean_tokens": 286302.44444,
+      "mean_prompt": 274807.48148,
+      "mean_completion": 11494.96296,
+      "mean_reasoning": 8254.01235,
+      "cache_read_share": 0.5925,
+      "mean_usd": 0.0059,
+      "usd_total": 1.1517,
+      "usd_computed_total": 0.9945,
+      "usd_billed_total": 1.0093,
+      "billed_reported_calls": 4810,
+      "usd_per_resolved": 0.01073,
+      "providers": {
+        "Alibaba": 4810
+      },
+      "temperatures_sent": [
+        "0.2"
+      ],
+      "net_commands": 125,
+      "django_fetch": 9,
+      "wall_bypass_tries": 0
+    }
+  },
+  "pooled_rate": 0.6444,
+  "vs_A": {
+    "D": {
+      "n": 174,
+      "both": 88,
+      "new_only": 22,
+      "ref_only": 20,
+      "neither": 44,
+      "rate_ref": 0.6207,
+      "rate_new": 0.6322,
+      "delta": 0.0115,
+      "newcombe95": [
+        -0.0619,
+        0.0846
+      ],
+      "mcnemar_p": 0.87761,
+      "p_d": 0.2414,
+      "tokens_new_fewer": 41,
+      "tokens_new_more": 133,
+      "tokens_ratio": [
+        1.326,
+        1.2505,
+        1.4072
+      ],
+      "usd_ratio": [
+        2.2068,
+        2.004,
+        2.4244
+      ],
+      "usd_per_resolved_ratio": [
+        2.1666,
+        1.8311,
+        2.5568
+      ],
+      "non_inferior": false,
+      "cheaper_per_resolved": false,
+      "superior": false
+    },
+    "G": {
+      "n": 178,
+      "both": 103,
+      "new_only": 37,
+      "ref_only": 7,
+      "neither": 31,
+      "rate_ref": 0.618,
+      "rate_new": 0.7865,
+      "delta": 0.1685,
+      "newcombe95": [
+        0.0983,
+        0.2371
+      ],
+      "mcnemar_p": 1e-05,
+      "p_d": 0.2472,
+      "tokens_new_fewer": 151,
+      "tokens_new_more": 27,
+      "tokens_ratio": [
+        0.5147,
+        0.4697,
+        0.5651
+      ],
+      "usd_ratio": [
+        0.5736,
+        0.5199,
+        0.6345
+      ],
+      "usd_per_resolved_ratio": [
+        0.4507,
+        0.3901,
+        0.5159
+      ],
+      "non_inferior": true,
+      "cheaper_per_resolved": true,
+      "superior": true
+    },
+    "Q": {
+      "n": 151,
+      "both": 74,
+      "new_only": 13,
+      "ref_only": 17,
+      "neither": 47,
+      "rate_ref": 0.6026,
+      "rate_new": 0.5762,
+      "delta": -0.0265,
+      "newcombe95": [
+        -0.0976,
+        0.0452
+      ],
+      "mcnemar_p": 0.58466,
+      "p_d": 0.1987,
+      "tokens_new_fewer": 85,
+      "tokens_new_more": 66,
+      "tokens_ratio": [
+        0.9575,
+        0.8925,
+        1.0263
+      ],
+      "usd_ratio": [
+        0.6585,
+        0.598,
+        0.727
+      ],
+      "usd_per_resolved_ratio": [
+        0.6888,
+        0.5801,
+        0.8198
+      ],
+      "non_inferior": false,
+      "cheaper_per_resolved": true,
+      "superior": false
+    }
+  },
+  "eligibility": {
+    "A": {
+      "halt_rule_stopped": false,
+      "on_pin_share": 1.0,
+      "eligible": true
+    },
+    "D": {
+      "halt_rule_stopped": false,
+      "on_pin_share": 1.0,
+      "eligible": true
+    },
+    "G": {
+      "halt_rule_stopped": false,
+      "on_pin_share": 1.0,
+      "eligible": true
+    },
+    "Q": {
+      "halt_rule_stopped": false,
+      "on_pin_share": 1.0,
+      "eligible": true
+    }
+  },
+  "decision": {
+    "qualifiers": [
+      "G"
+    ],
+    "winner": "G",
+    "paths": {
+      "G": "cheaper per resolved + significantly better"
+    },
+    "common_items": 178,
+    "ranking": [
+      {
+        "arm": "G",
+        "rate": 0.7865,
+        "usd_per_resolved": 0.00635
+      }
+    ],
+    "decision": "G (openrouter/openai/gpt-6-luna) replaces A as the default"
+  },
+  "holm_mcnemar": {
+    "G": 3e-05,
+    "Q": 1.0,
+    "D": 1.0
+  },
+  "wide_margin_reading": {
+    "D": {
+      "non_inferior_at_10pp": true
+    },
+    "G": {
+      "non_inferior_at_10pp": true
+    },
+    "Q": {
+      "non_inferior_at_10pp": true
+    }
+  },
+  "vs_A_timeouts_graded": {
+    "D": {
+      "n": 181,
+      "both": 89,
+      "new_only": 22,
+      "ref_only": 21,
+      "neither": 49,
+      "rate_ref": 0.6077,
+      "rate_new": 0.6133,
+      "delta": 0.0055,
+      "newcombe95": [
+        -0.0657,
+        0.0767
+      ],
+      "mcnemar_p": 1.0,
+      "p_d": 0.2376,
+      "tokens_new_fewer": 46,
+      "tokens_new_more": 134,
+      "tokens_ratio": [
+        1.2834,
+        1.1918,
+        1.3764
+      ],
+      "usd_ratio": [
+        2.1061,
+        1.8793,
+        2.3428
+      ],
+      "usd_per_resolved_ratio": [
+        2.0871,
+        1.755,
+        2.4782
+      ],
+      "non_inferior": false,
+      "cheaper_per_resolved": false,
+      "superior": false
+    },
+    "G": {
+      "n": 179,
+      "both": 103,
+      "new_only": 37,
+      "ref_only": 7,
+      "neither": 32,
+      "rate_ref": 0.6145,
+      "rate_new": 0.7821,
+      "delta": 0.1676,
+      "newcombe95": [
+        0.0977,
+        0.2357
+      ],
+      "mcnemar_p": 1e-05,
+      "p_d": 0.2458,
+      "tokens_new_fewer": 151,
+      "tokens_new_more": 28,
+      "tokens_ratio": [
+        0.5201,
+        0.4736,
+        0.5708
+      ],
+      "usd_ratio": [
+        0.5793,
+        0.5246,
+        0.6401
+      ],
+      "usd_per_resolved_ratio": [
+        0.4551,
+        0.3951,
+        0.5218
+      ],
+      "non_inferior": true,
+      "cheaper_per_resolved": true,
+      "superior": true
+    },
+    "Q": {
+      "n": 152,
+      "both": 74,
+      "new_only": 13,
+      "ref_only": 17,
+      "neither": 48,
+      "rate_ref": 0.5987,
+      "rate_new": 0.5724,
+      "delta": -0.0263,
+      "newcombe95": [
+        -0.097,
+        0.0449
+      ],
+      "mcnemar_p": 0.58466,
+      "p_d": 0.1974,
+      "tokens_new_fewer": 85,
+      "tokens_new_more": 67,
+      "tokens_ratio": [
+        0.9642,
+        0.8992,
+        1.0339
+      ],
+      "usd_ratio": [
+        0.661,
+        0.5986,
+        0.7301
+      ],
+      "usd_per_resolved_ratio": [
+        0.6914,
+        0.5794,
+        0.8218
+      ],
+      "non_inferior": false,
+      "cheaper_per_resolved": true,
+      "superior": false
+    }
+  },
+  "leak_items": [
+    "django__django-10914",
+    "django__django-10973",
+    "django__django-10999",
+    "django__django-11087",
+    "django__django-11141",
+    "django__django-11149",
+    "django__django-11206",
+    "django__django-11276",
+    "django__django-11299",
+    "django__django-11555",
+    "django__django-11728",
+    "django__django-11790",
+    "django__django-11815",
+    "django__django-11820",
+    "django__django-11848",
+    "django__django-11964",
+    "django__django-12039",
+    "django__django-12143",
+    "django__django-12209",
+    "django__django-12262",
+    "django__django-12273",
+    "django__django-12304",
+    "django__django-12308",
+    "django__django-12663",
+    "django__django-12754",
+    "django__django-13089",
+    "django__django-13121",
+    "django__django-13158",
+    "django__django-13195",
+    "django__django-13279",
+    "django__django-13297",
+    "django__django-13315",
+    "django__django-13346",
+    "django__django-13401",
+    "django__django-13568",
+    "django__django-13794",
+    "django__django-13809",
+    "django__django-13820",
+    "django__django-14017",
+    "django__django-14034",
+    "django__django-14053",
+    "django__django-14122",
+    "django__django-14155",
+    "django__django-14170",
+    "django__django-14311",
+    "django__django-14315",
+    "django__django-14349",
+    "django__django-14376",
+    "django__django-14404",
+    "django__django-14534",
+    "django__django-14580",
+    "django__django-14725",
+    "django__django-14752",
+    "django__django-14915",
+    "django__django-15022",
+    "django__django-15037",
+    "django__django-15098",
+    "django__django-15127",
+    "django__django-15161",
+    "django__django-15252",
+    "django__django-15277",
+    "django__django-15280",
+    "django__django-15375",
+    "django__django-15382",
+    "django__django-15467",
+    "django__django-15554",
+    "django__django-15561",
+    "django__django-15563",
+    "django__django-15572",
+    "django__django-15695",
+    "django__django-15732",
+    "django__django-15814",
+    "django__django-15851",
+    "django__django-15916",
+    "django__django-15930",
+    "django__django-15973",
+    "django__django-15987",
+    "django__django-16032",
+    "django__django-16082",
+    "django__django-16145",
+    "django__django-16255",
+    "django__django-16315",
+    "django__django-16485",
+    "django__django-16502",
+    "django__django-16527",
+    "django__django-16595",
+    "django__django-16661",
+    "django__django-16667",
+    "django__django-16819",
+    "django__django-16938",
+    "django__django-16950",
+    "django__django-17084",
+    "django__django-17087"
+  ],
+  "vs_A_without_leak_items": {
+    "D": {
+      "n": 90,
+      "both": 63,
+      "new_only": 11,
+      "ref_only": 7,
+      "neither": 9,
+      "rate_ref": 0.7778,
+      "rate_new": 0.8222,
+      "delta": 0.0444,
+      "newcombe95": [
+        -0.0512,
+        0.1403
+      ],
+      "mcnemar_p": 0.48068,
+      "p_d": 0.2,
+      "tokens_new_fewer": 24,
+      "tokens_new_more": 66,
+      "tokens_ratio": [
+        1.2678,
+        1.171,
+        1.3795
+      ],
+      "usd_ratio": [
+        1.6404,
+        1.4572,
+        1.8632
+      ],
+      "usd_per_resolved_ratio": [
+        1.5517,
+        1.2756,
+        1.9041
+      ],
+      "non_inferior": false,
+      "cheaper_per_resolved": false,
+      "superior": false
+    },
+    "G": {
+      "n": 91,
+      "both": 69,
+      "new_only": 14,
+      "ref_only": 2,
+      "neither": 6,
+      "rate_ref": 0.7802,
+      "rate_new": 0.9121,
+      "delta": 0.1319,
+      "newcombe95": [
+        0.047,
+        0.2217
+      ],
+      "mcnemar_p": 0.00418,
+      "p_d": 0.1758,
+      "tokens_new_fewer": 76,
+      "tokens_new_more": 15,
+      "tokens_ratio": [
+        0.5089,
+        0.4433,
+        0.5827
+      ],
+      "usd_ratio": [
+        0.5836,
+        0.521,
+        0.654
+      ],
+      "usd_per_resolved_ratio": [
+        0.4993,
+        0.4309,
+        0.5729
+      ],
+      "non_inferior": true,
+      "cheaper_per_resolved": true,
+      "superior": true
+    },
+    "Q": {
+      "n": 73,
+      "both": 51,
+      "new_only": 4,
+      "ref_only": 5,
+      "neither": 13,
+      "rate_ref": 0.7671,
+      "rate_new": 0.7534,
+      "delta": -0.0137,
+      "newcombe95": [
+        -0.1005,
+        0.0729
+      ],
+      "mcnemar_p": 1.0,
+      "p_d": 0.1233,
+      "tokens_new_fewer": 37,
+      "tokens_new_more": 36,
+      "tokens_ratio": [
+        1.0719,
+        0.9639,
+        1.1949
+      ],
+      "usd_ratio": [
+        0.7648,
+        0.6657,
+        0.8839
+      ],
+      "usd_per_resolved_ratio": [
+        0.7787,
+        0.643,
+        0.9436
+      ],
+      "non_inferior": false,
+      "cheaper_per_resolved": true,
+      "superior": false
+    }
+  },
+  "floor_replica": {
+    "A": {
+      "disagree": 2,
+      "n": 8
+    },
+    "D": {
+      "disagree": 0,
+      "n": 3
+    },
+    "G": {
+      "disagree": 1,
+      "n": 8
+    },
+    "Q": {
+      "disagree": 3,
+      "n": 8
+    }
+  },
+  "checks": {
+    "system_sha_per_arm": {
+      "G": 1,
+      "Q": 1,
+      "A": 1,
+      "D": 1
+    },
+    "same_system_in_every_arm": true,
+    "starts_with_default": true,
+    "off_pin_calls": {
+      "A": 0,
+      "D": 0,
+      "G": 0,
+      "Q": 0
+    }
+  },
+  "ratelimited_halts_rerun": {},
+  "ratelimited_halts_left": {
+    "Q": 35,
+    "A": 3
+  },
+  "usd_killed_at_block_end": 0.1996,
+  "usd_discarded_before_amendment3": 1.041,
+  "usd_all": 8.823,
+  "disk_scan": {
+    "main_solves": {
+      "per_arm": {
+        "A": {
+          "solves": 196,
+          "source_touch": 0,
+          "broad_search": 136,
+          "other_path": 120
+        },
+        "D": {
+          "solves": 195,
+          "source_touch": 4,
+          "broad_search": 186,
+          "other_path": 184
+        },
+        "G": {
+          "solves": 199,
+          "source_touch": 0,
+          "broad_search": 0,
+          "other_path": 1
+        },
+        "Q": {
+          "solves": 197,
+          "source_touch": 0,
+          "broad_search": 54,
+          "other_path": 29
+        }
+      },
+      "source_items": {
+        "django__django-12262": [
+          "D"
+        ],
+        "django__django-12273": [
+          "D"
+        ],
+        "django__django-13809": [
+          "D"
+        ],
+        "django__django-15252": [
+          "D"
+        ]
+      },
+      "detail": [
+        {
+          "instance_id": "django__django-13809",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache/",
+            "/home/brcamp/dflt-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-15252",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/.cache/huggingface"
+          ]
+        },
+        {
+          "instance_id": "django__django-12273",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-cache/",
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/dflt-cache/django-ref/django"
+          ]
+        },
+        {
+          "instance_id": "django__django-12262",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-h45-work/D__django__django-12262/../D__django__django-12262"
+          ]
+        }
+      ]
+    },
+    "discarded_main_before_amendment3": {
+      "per_arm": {
+        "A": {
+          "solves": 27,
+          "source_touch": 1,
+          "broad_search": 20,
+          "other_path": 16
+        },
+        "D": {
+          "solves": 28,
+          "source_touch": 16,
+          "broad_search": 27,
+          "other_path": 25
+        },
+        "G": {
+          "solves": 31,
+          "source_touch": 0,
+          "broad_search": 1,
+          "other_path": 2
+        },
+        "Q": {
+          "solves": 29,
+          "source_touch": 0,
+          "broad_search": 9,
+          "other_path": 2
+        }
+      },
+      "source_items": {
+        "django__django-11555": [
+          "D"
+        ],
+        "django__django-11740": [
+          "D"
+        ],
+        "django__django-11880": [
+          "A"
+        ],
+        "django__django-11964": [
+          "D"
+        ],
+        "django__django-12276": [
+          "D"
+        ],
+        "django__django-12774": [
+          "D"
+        ],
+        "django__django-13121": [
+          "D"
+        ],
+        "django__django-13512": [
+          "D"
+        ],
+        "django__django-13807": [
+          "D"
+        ],
+        "django__django-13809": [
+          "D"
+        ],
+        "django__django-13820": [
+          "D"
+        ],
+        "django__django-14580": [
+          "D"
+        ],
+        "django__django-15280": [
+          "D"
+        ],
+        "django__django-15563": [
+          "D"
+        ],
+        "django__django-15695": [
+          "D"
+        ],
+        "django__django-15731": [
+          "D"
+        ],
+        "django__django-16502": [
+          "D"
+        ]
+      },
+      "detail": [
+        {
+          "instance_id": "django__django-11880",
+          "arm": "A",
+          "source": [
+            "/home/brcamp/dflt-h45-work/A__django__django-1"
+          ]
+        },
+        {
+          "instance_id": "django__django-15731",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-13809",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/h45-cache"
+          ]
+        },
+        {
+          "instance_id": "django__django-15563",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-cache/django-ref",
+            "/home/brcamp/h45-cache/django-ref/django/db/models/sql/compiler.py",
+            "/home/brcamp/h45-cache/django-ref/django/db/models/sql/subqueries.py"
+          ]
+        },
+        {
+          "instance_id": "django__django-11740",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-12774",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/dflt-grade/*.sh",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-13512",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-h45-work/templates/",
+            "/home/brcamp/dflt-h45-work/templates/django__django-13512/*.json",
+            "/home/brcamp/h45-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-16502",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-15695",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache/django-ref",
+            "/home/brcamp/dflt-h45-work/templates/django__django-15695",
+            "/home/brcamp/h45-cache/django-ref",
+            "/home/brcamp/h45-cache/django-ref/django/db/migrations/operations/models.py"
+          ]
+        },
+        {
+          "instance_id": "django__django-11964",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-cache/django-ref"
+          ]
+        },
+        {
+          "instance_id": "django__django-15280",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-12276",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/dflt-grade/main",
+            "/home/brcamp/dflt-grade/main/grade_A.log",
+            "/home/brcamp/dflt-grade/main/logs",
+            "/home/brcamp/h45-cache",
+            "/home/brcamp/h45-grade",
+            "/home/brcamp/h45-grade/main",
+            "/home/brcamp/h45-work/B__django__django-15695",
+            "/home/brcamp/h45-work/templates/*",
+            "/home/brcamp/h45-work/templates/django__django-12276",
+            "/home/brcamp/h45-work/templates/django__django-12276/*"
+          ]
+        },
+        {
+          "instance_id": "django__django-13121",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/dflt-grade/*.sh",
+            "/home/brcamp/h45-grade"
+          ]
+        },
+        {
+          "instance_id": "django__django-11555",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-h45-work/D__django__django-11555/../D__django__django-12276"
+          ]
+        },
+        {
+          "instance_id": "django__django-13820",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-cache",
+            "/home/brcamp/h45-cache"
+          ]
+        },
+        {
+          "instance_id": "django__django-14580",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/h45-grade/*.sh"
+          ]
+        },
+        {
+          "instance_id": "django__django-13807",
+          "arm": "D",
+          "source": [
+            "/home/brcamp/dflt-grade",
+            "/home/brcamp/h45-grade"
+          ]
+        }
+      ]
+    }
+  }
+}
