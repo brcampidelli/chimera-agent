@@ -144,3 +144,19 @@ Nothing else changes: the arms, the metrics, the selection rule and the guards a
 - **The fix does not move S15.** Of the 121 finder replies stored (S15's two runs and both pilots), exactly one reads differently: this one, unreadable before and one finding after. So D here measures the same parser S15 did on every reply S15 saw.
 
 **Changes.** The main run measures product `e44ca6c0`; the prompts are unchanged, at the same hashes. M enters the main run on Parasail as amended. Nothing else changes.
+
+## Amendment 3 — 2026-09-26, after the main run, before re-running M
+
+**What happened to M.** The main run (`results/run.json`, product `e44ca6c0`, US$ 0.195) stopped M under the registered stop rule after ten turns.
+- Two of M's finder calls came back `429` from Parasail: "temporarily rate-limited upstream", with `limit_source: upstream_provider_shared_pool`.
+- The gateway holds one OpenRouter key, so it then reported every key as rate-limited, and those reviews failed on the route.
+- D, L and Q ran all 60 turns each with no transport failure.
+
+**What I read before writing this.** The runner printed the full report, and I read it: D, L and Q's numbers and the decision, and M's partial cells. From its 7 completed seeded reviews, M showed the seed on 1. So this amendment is written knowing that L qualifies under the rule and Q does not, and that M's partial recall is low.
+
+**Why re-run M anyway.** As registered, a stopped arm cannot be chosen. The decision then reads L. But M costs about a quarter of L per review, so M is the one arm that would change the decision if it qualified. Leaving it unmeasured because of a route's rate limit would leave that question to the rate limit. The re-run cannot move the decision toward any arm except M, and only by M meeting the frozen rule on its own complete data.
+
+**The re-run.** M alone, same fixtures, order, k = 2, guard (US$ 0.10), stop rule and product `e44ca6c0`. It uses **one worker**, so M's requests reach Parasail's shared pool one at a time, not five at once.
+- Its cells replace M's in the report (`--arm-from M=results/run-M.json`). M's cells from the main run are discarded and not mixed in.
+- D, L and Q stand as measured. The re-run follows within the hour, on the same day and routes, which is what "the same session" meant for D as the reference.
+- If the stop rule stops M again, M stays not measured and the decision reads L. The route's rate limit is then reported as what it is for the product: with the product's 32,000-token ceiling, Parasail's shared pool is M's only route.

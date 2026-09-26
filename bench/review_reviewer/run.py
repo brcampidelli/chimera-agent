@@ -485,8 +485,24 @@ def _wilson(k: int, n: int) -> str:
     return s15._wilson(k, n)
 
 
-def report(path: Path) -> None:
+def _replace_arm(data: dict[str, Any], arm: str, other: Path) -> None:
+    """Amendment 3: one arm's cells from a later run of that arm alone, matched by commit."""
+    rerun = json.loads(other.read_text(encoding="utf-8"))
+    by_commit = {row["commit"]: row["runs"][arm] for row in rerun["rows"]}
+    for row in data["rows"]:
+        row["runs"][arm] = by_commit.get(row["commit"], [])
+    data["stopped"] = {a: why for a, why in data["stopped"].items() if a != arm}
+    if arm in rerun["stopped"]:
+        data["stopped"][arm] = rerun["stopped"][arm]
+    data["usd"] = round(data["usd"] - data["usd_by_arm"][arm] + rerun["usd_by_arm"][arm], 4)
+    data["usd_by_arm"][arm] = rerun["usd_by_arm"][arm]
+    print(f"arm {arm} read from {other.name} (Amendment 3)")
+
+
+def report(path: Path, replace: tuple[str, Path] | None = None) -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
+    if replace is not None:
+        _replace_arm(data, *replace)
     rows, replicas = data["rows"], data["replicas"]
     print(f"rows {len(rows)} · replicas {replicas} · US$ {data['usd']} · stopped: "
           f"{data['stopped'] or 'no'} · fixtures {data['fixtures_sha']}")
@@ -581,7 +597,8 @@ def main() -> None:
     ap.add_argument("--out", type=Path)
     ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--replicas", type=int, default=2)
-    ap.add_argument("--arms", default="".join(ORDER), help="pilot only: a subset, e.g. M")
+    ap.add_argument("--arms", default="".join(ORDER), help="a subset of the arms, e.g. M")
+    ap.add_argument("--arm-from", help="report: ARM=run.json, that arm's cells from another run")
     args = ap.parse_args()
     if args.check:
         check(args.check)
@@ -591,9 +608,11 @@ def main() -> None:
         run(args.pilot, args.out or HERE / "results" / "pilot.json", args.workers, 1, PILOT_ITEMS,
             tuple(a for a in ORDER if a in args.arms))
     elif args.run:
-        run(args.run, args.out or HERE / "results" / "run.json", args.workers, args.replicas, None)
+        run(args.run, args.out or HERE / "results" / "run.json", args.workers, args.replicas, None,
+            tuple(a for a in ORDER if a in args.arms))
     elif args.report:
-        report(args.report)
+        arm, _, other = (args.arm_from or "").partition("=")
+        report(args.report, (arm, Path(other)) if other else None)
     elif args.raw:
         raw(args.raw, 1500)
     elif args.hits:
