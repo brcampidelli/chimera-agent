@@ -301,3 +301,13 @@ Must hold:
 - **Clean-up at driver start.**
   - The driver records the call logs a killed block left behind (spend only, into `killed_solves.jsonl`).
   - It removes leftover workspaces and templates.
+
+**Amendment 4, the probe's reading (07:55).** Every check held (`results/probe_sandbox_a4.json`):
+- the three new must-fail tries were refused;
+- `/mnt` lists `wsl` and `resolv.conf` only;
+- uid 1000, with all four capability sets empty;
+- both covers refuse to unmount under a nested `unshare -rm` (exit 32, 32), with nothing under them;
+- the answer-shaped search finds only the read-only code copy (`tests/test_swe_bench.py`, a prompt snapshot, the venv's `pyvenv.cfg`, its empty `git init`, `bench/swe_bench`);
+- each arm returned a parsed tool call from its pin.
+
+Under the rule above, the 250 rows stand, and the run resumes from its file.

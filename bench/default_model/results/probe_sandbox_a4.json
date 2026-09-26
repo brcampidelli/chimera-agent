@@ -1,0 +1,196 @@
+{
+  "must_fail": {
+    "curl_github": {
+      "blocked": true,
+      "rc": 7,
+      "tail": "000curl: (7) Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server\n"
+    },
+    "git_ls_remote": {
+      "blocked": true,
+      "rc": 128,
+      "tail": "fatal: unable to access 'https://github.com/django/django/': Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server\n"
+    },
+    "python_urllib": {
+      "blocked": true,
+      "rc": 1,
+      "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/urllib/request.py\", line 1347, in do_open\n    raise URLError(err)\nurllib.error.URLError: <urlopen error [Errno 111] Connection refused>\n"
+    },
+    "django_ref": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/dflt-cache/django-ref/django': No such file or directory\nls: cannot access '/home/brcamp/h45-cache/django-ref/django': No such file or directory\n"
+    },
+    "gold_logs": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/h45-grade/gold/logs': No such file or directory\nls: cannot access '/home/brcamp/dflt-grade': No such file or directory\n"
+    },
+    "hf_cache": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/.cache/huggingface': No such file or directory\n"
+    },
+    "other_template": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/dflt-h45-work/templates': No such file or directory\n"
+    },
+    "windows_drive": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/mnt/c/Users': No such file or directory\n"
+    },
+    "docker": {
+      "blocked": true,
+      "rc": 7,
+      "tail": "curl: (7) Failed to connect to localhost port 80 after 0 ms: Couldn't connect to server\n"
+    },
+    "wsl_bind_mounts": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/mnt/wsl/docker-desktop-bind-mounts': No such file or directory\n"
+    },
+    "umount_home": {
+      "blocked": true,
+      "rc": 32,
+      "tail": "umount: /home/brcamp: must be superuser to unmount.\n"
+    },
+    "umount_mnt": {
+      "blocked": true,
+      "rc": 32,
+      "tail": "umount: /mnt: must be superuser to unmount.\n"
+    }
+  },
+  "must_hold": {
+    "mnt_listing": {
+      "ok": true,
+      "stdout": "wsl\nresolv.conf",
+      "stderr": ""
+    },
+    "no_capabilities": {
+      "ok": true,
+      "stdout": "1000\nCapInh:\t0000000000000000\nCapPrm:\t0000000000000000\nCapEff:\t0000000000000000\nCapAmb:\t0000000000000000",
+      "stderr": ""
+    },
+    "nested_uncover": {
+      "ok": true,
+      "stdout": "32 32\n/home/brcamp:\n.local\ndflt-h45-work\n\n/mnt/wsl:\nresolv.conf",
+      "stderr": ""
+    },
+    "answer_shaped_files": {
+      "ok": true,
+      "stdout": "/tmp/dflt-run/chimera/eval/swe_bench.py\n/tmp/dflt-run/tests/test_swe_bench.py\n/tmp/dflt-run/tests/prompt_snapshots/eval.swe_bench.txt\n/tmp/dflt-run/.venv/pyvenv.cfg\n/tmp/dflt-run/.git\n/tmp/dflt-run/bench/swe_bench",
+      "stderr": ""
+    },
+    "home_listing": {
+      "ok": true,
+      "stdout": ".local\ndflt-h45-work\nP__django__django-16100\ndflt-P-ae22vp8_",
+      "stderr": ""
+    },
+    "django_copies": {
+      "ok": true,
+      "stdout": "/home/brcamp/dflt-h45-work/P__django__django-16100/django/db/models/base.py",
+      "stderr": ""
+    },
+    "processes": {
+      "ok": true,
+      "stdout": "3",
+      "stderr": "your 131072x1 screen size is bogus. expect trouble\n"
+    },
+    "identity": {
+      "ok": true,
+      "stdout": "brcamp\n0\n0",
+      "stderr": ""
+    },
+    "venv": {
+      "ok": true,
+      "stdout": "imports ok",
+      "stderr": "d_context_window.json: ConnectError fetching https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json: [Errno 111] Connection refused. Falling back to local backup.\n"
+    }
+  },
+  "arms": {
+    "A": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 356,
+        "completion": 63,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 3.27e-05,
+        "reasoning": 16,
+        "gen_id": "gen-1790423741-hbzzoz2CJtAZQFN3mFeV",
+        "seconds": 1.62
+      },
+      "tail": ""
+    },
+    "D": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 293,
+        "completion": 54,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 6.37e-05,
+        "reasoning": 14,
+        "gen_id": "gen-1790423745-qbYGGmQoHvGYJG5LjHJP",
+        "seconds": 1.25
+      },
+      "tail": ""
+    },
+    "G": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 48,
+        "completion": 19,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 1.43e-05,
+        "reasoning": 0,
+        "gen_id": "gen-1790423749-MqEjag9j6RPVRBIl306n",
+        "seconds": 1.31
+      },
+      "tail": ""
+    },
+    "Q": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 273,
+        "completion": 115,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 2.314e-05,
+        "reasoning": 87,
+        "gen_id": "gen-1790423754-D2ZSLwp5woChGJR3FfgS",
+        "seconds": 2.24
+      },
+      "tail": ""
+    }
+  },
+  "wall_holds": true,
+  "arms_ok": true,
+  "usd": 0.00013384
+}
