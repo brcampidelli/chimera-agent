@@ -167,14 +167,34 @@ def holm(pvals: dict[str, float]) -> dict[str, float]:
     return out
 
 
+def eligibility(arm: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Condition 3 of the rule: the arm was not stopped by the halt rule (more than 10% halts after
+    at least 20 solves, in the order the solves were recorded), and at least 99% of its calls were
+    served by its pinned provider."""
+    mine = [r for r in rows if r["arm"] == arm]
+    stopped, halts = False, 0
+    for i, r in enumerate(mine, 1):
+        halts += bool(r.get("halted"))
+        if i >= 20 and halts / i > 0.10:
+            stopped = True
+    calls = [c for r in mine for c in r.get("calls") or []]
+    on_pin = sum(1 for c in calls if (c.get("provider") or "").lower() == ARMS[arm].provider.lower())
+    share = on_pin / len(calls) if calls else 0.0
+    return {"halt_rule_stopped": stopped, "on_pin_share": round(share, 5),
+            "eligible": not stopped and share >= 0.99}
+
+
 def decide(cmp: dict[str, dict[str, Any]], by: dict[str, dict[str, dict[str, Any]]],
-           g: dict[str, Any]) -> dict[str, Any]:
-    """The frozen rule: non-inferior at MARGIN, and cheaper per resolved or significantly better.
-    Among qualifiers: highest resolve rate on the items every qualifier and A graded, then the
-    lowest cost per resolved there. None qualifies: A stays."""
+           g: dict[str, Any], elig: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """The frozen rule: non-inferior at MARGIN, and cheaper per resolved or significantly better,
+    and eligible. Among qualifiers: highest resolve rate on the items every qualifier and A graded,
+    then the lowest cost per resolved there. None qualifies: A stays."""
     qual = [k for k, c in cmp.items() if c.get("n") and c["non_inferior"]
-            and (c["cheaper_per_resolved"] or c["superior"])]
-    out: dict[str, Any] = {"qualifiers": qual, "winner": None}
+            and (c["cheaper_per_resolved"] or c["superior"]) and elig[k]["eligible"]]
+    out: dict[str, Any] = {"qualifiers": qual, "winner": None,
+                           "paths": {k: ("cheaper per resolved" if cmp[k]["cheaper_per_resolved"] else "")
+                                     + (" + " if cmp[k]["cheaper_per_resolved"] and cmp[k]["superior"] else "")
+                                     + ("significantly better" if cmp[k]["superior"] else "") for k in qual}}
     if not qual:
         out["decision"] = "no candidate qualifies; A stays the default"
         return out
@@ -213,7 +233,9 @@ def report(phase: str = "main") -> dict[str, Any]:
     cmp = {a: compare("A", a, by, g) for a in cands}
     out["vs_A"] = {a: {k: v for k, v in c.items() if k != "_items"} for a, c in cmp.items()}
     if phase == "main":
-        out["decision"] = decide(cmp, by, g)
+        elig = {a: eligibility(a, rows) for a in arms_present}
+        out["eligibility"] = elig
+        out["decision"] = decide(cmp, by, g, elig)
         out["holm_mcnemar"] = holm({a: c["mcnemar_p"] for a, c in cmp.items() if c.get("n")})
         out["wide_margin_reading"] = {a: {"non_inferior_at_10pp": c["newcombe95"][0] >= -WIDE_MARGIN}
                                       for a, c in cmp.items() if c.get("n")}

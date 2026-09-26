@@ -241,6 +241,16 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
     left: dict[str, int] = {}
     tally: dict[str, list[int]] = {a: [0, 0] for a in arms}
     halted_arms: set[str] = set()
+    # The halt rule is over the arm's whole run, not one block: replay what is on file, in order.
+    for r in load_jsonl(out):
+        if r["arm"] in tally:
+            t = tally[r["arm"]]
+            t[0] += 1
+            t[1] += int(bool(r.get("halted")))
+            if t[0] >= 20 and t[1] / t[0] > 0.10:
+                halted_arms.add(r["arm"])
+    if halted_arms:
+        print(f"arms already stopped by the halt rule: {sorted(halted_arms)}", flush=True)
     print(f"spent so far US${state['usd']:.3f}; {len(done)} solves on file; workers {workers}", flush=True)
 
     tasks = []
