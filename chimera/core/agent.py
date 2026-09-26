@@ -585,13 +585,14 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         return system_prompt
 
-    def compose_turn_context(self, task: str) -> str:
+    def compose_turn_context(self, task: str, notes: str | None = None) -> str:
         """The block that heads this turn's user message, or "" when :attr:`AgentConfig.turn_context`
         is off.
 
         Everything in it changes between turns, which is why none of it is in the system message.
         The environment comes first because it frames the rest; the notes come last, closest to the
-        user's words, because they are the most specific.
+        user's words, because they are the most specific. ``notes`` replaces
+        :attr:`AgentConfig.turn_notes` for this turn when given (see ``run``).
         """
         if not self.config.turn_context:
             return ""
@@ -601,7 +602,7 @@ class Agent:
             environment_facts(self.config.project_root),
             self._skill_context(task),
             self._card_context(task),
-            self.config.turn_notes,
+            self.config.turn_notes if notes is None else notes,
         )
 
     def _skill_context(self, task: str) -> str:
@@ -688,6 +689,7 @@ class Agent:
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
         spend: SpendBudget | None = None,
+        turn_notes: str | None = None,
     ) -> AgentResult:
         """Run the tool loop. ``on_token`` streams model text deltas as they arrive (when the backend
         supports it); ``on_tool`` fires once per tool call with its outcome. ``on_edit`` fires with
@@ -710,7 +712,11 @@ class Agent:
 
         ``on_todo`` fires with the whole task list each time the agent records one. What it carries
         is the agent's own claim about its progress — unlike ``on_edit``, which reports a diff read
-        off disk — so a consumer that renders it owes the reader that distinction."""
+        off disk — so a consumer that renders it owes the reader that distinction.
+
+        ``turn_notes`` is :attr:`AgentConfig.turn_notes` for this run only, for a caller that keeps
+        one agent across turns (``ChatSession`` under real history). Setting the config instead
+        would leave one turn's recalled facts on the agent for the next. None reads the config."""
         # Attached per call rather than at construction: the sink belongs to this invocation, and a
         # second turn with no sink must not keep announcing into the first turn's queue.
         # Bound here rather than at construction, and per call: the sink belongs to THIS
@@ -746,7 +752,7 @@ class Agent:
             if images
             else {"role": "user", "content": task}
         )
-        context_block = self.compose_turn_context(task)
+        context_block = self.compose_turn_context(task, turn_notes)
         turn_message: dict[str, Any] = (
             {**bare_turn, "content": f"{context_block}\n\n{task}"} if context_block else bare_turn
         )
