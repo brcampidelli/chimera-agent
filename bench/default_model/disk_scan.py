@@ -27,7 +27,8 @@ from typing import Any
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
-_PATH = re.compile(r"/home/[A-Za-z0-9_.-]+(?:/[^\s'\";|&<>)(`]*)?")
+# A colon ends a path: `PYTHONPATH=/own/ws:/usr/lib/...` names two paths, not one.
+_PATH = re.compile(r"/home/[A-Za-z0-9_.-]+(?:/[^\s'\";|&<>)(`:]*)?")
 #: Paths that can hold a django other than the item's own base commit, or a grader's answer.
 _SOURCE = re.compile(
     r"(django-ref|/templates/|__django__django-\d+|-grade(?:/|$)|run_evaluation|huggingface"
