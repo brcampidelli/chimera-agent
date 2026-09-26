@@ -2121,6 +2121,9 @@
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
+          "experimental": {
+            "$ref": "#/components/schemas/ExperimentalCfgOut"
+          },
           "fusion": {
             "$ref": "#/components/schemas/FusionCfgOut"
           },
@@ -3991,6 +3994,28 @@
           "command"
         ],
         "title": "ExecRequest",
+        "type": "object"
+      },
+      "ExperimentalCfgOut": {
+        "description": "Three study-25 modules that ship behind a switch, each OFF because its measurement did not\nrecommend it (the reason sits beside each field in ``chimera/config.py``).\n\nReadable here so the Settings screen can offer them with the measured caveat on the row, instead\nof leaving them to people who read the source. Defaults mirror ``Settings``: a server that does\nnot send this block is a server where all three are off.",
+        "properties": {
+          "browser_situation": {
+            "default": false,
+            "title": "Browser Situation",
+            "type": "boolean"
+          },
+          "explorer_contract": {
+            "default": false,
+            "title": "Explorer Contract",
+            "type": "boolean"
+          },
+          "research_agent": {
+            "default": false,
+            "title": "Research Agent",
+            "type": "boolean"
+          }
+        },
+        "title": "ExperimentalCfgOut",
         "type": "object"
       },
       "ExternalAgentOut": {
