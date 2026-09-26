@@ -180,3 +180,40 @@ a design problem, an amendment is written and committed here before the main run
 - **Injection.** No page is adversarial.
 - **The web beyond English Wikipedia.** Every gold source is there.
 - **The explorer's contract.** It is not measured here at all.
+
+## Amendment 1 — 2026-09-25, after the pilot, before the main run
+
+**What the pilot showed.** The registered pilot (the first 3 items, k = 1, US$ 0.004) ran cleanly:
+tool calls were parsed and run in both arms (the §4 preflight), no errors, no stop. Both arms were
+3/3 on every metric: right, every cited URL read, a cited page holding the answer. Arm B used
+30,576 tokens per answer against A's 12,113 (5.3 steps against 2.7). The pilot's data are
+discarded, as registered.
+
+**The design problem.** Three of three is weak evidence on its own, but it points at the registered
+ceiling rule (A's primary ≥ 90% ⇒ uninformative): these items are facts a model this size often
+knows, and when it knows the answer it fetches the obvious page and cites it. A run that ends
+uninformative by construction is the failure the protocol's rule 7 exists to prevent.
+
+**Changes, all made before any main-run call:**
+
+1. **A second stratum,** `HARD` in `items.py`: 14 items built the same way, each answer a detail
+   near the end of a 2–4 page chain that a model is unlikely to know without reading it (a
+   thesis supervisor, a village, a launch year, the name of a plane). The key check now covers both
+   strata: **36/36** gold pages hold their answer, every hop page answers 200, and the adjacent-item
+   control is positive on the same 2 of 36. The answer is past the first 20,000 characters on 6 of
+   36 gold pages (the five above and Winterthur).
+2. **The primary is pooled** over both strata: 36 items × k = 2 = **72 pairs** (about 42 effective
+   observations per arm at ICC 0.706). Each stratum is also reported on its own. An exact McNemar
+   test reads only discordant pairs, so a stratum at the ceiling adds concordant pairs and cannot
+   dilute the test. The decision rule is unchanged except for scale:
+   - the ceiling and floor rules read the pooled rates (A's primary ≥ 90%; both arms' accuracy
+     < 30%);
+   - P3 becomes: B right on no fewer than A's right turns minus 6 (of 72), the same ≈ 8 pp.
+3. **Four items at a time instead of six, and the grader waits out a 429.** Wikipedia answered 429
+   to a burst of key-check fetches. The agents' tools are unchanged and both arms are equally
+   exposed; the grader's own fetches (`--check-gold`, `--verify`) retry a 429 three times, 10 s
+   apart, because a 429 says nothing about the page.
+4. **P4 is not moved.** The pilot already puts B at 2.5× A's tokens against a registered bound of
+   1.5×. The bound stays where it was registered.
+
+Nothing else changes: arms, texts, tools, model, endpoint, step ceiling, metrics, stop rule, budget.

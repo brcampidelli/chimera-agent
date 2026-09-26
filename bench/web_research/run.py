@@ -28,7 +28,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
 
-from items import ITEMS, Item  # noqa: E402
+from items import ALL, HARD, Item  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 MODEL = "openrouter/deepseek/deepseek-v4-flash-0731"
@@ -100,27 +100,38 @@ _PAGES: dict[str, tuple[int | None, str]] = {}
 
 
 def fetch_text(url: str) -> tuple[int | None, str]:
-    """A page's full text by plain HTTP, cached for the process. Never the agent's truncated view."""
-    if url not in _PAGES:
-        from chimera.scrape.fetch import fetch_page
+    """A page's full text by plain HTTP, cached for the process. Never the agent's truncated view.
 
+    Amendment 1: a 429 is waited out (up to three times, 10 s apart) rather than recorded, because
+    Wikipedia rate-limits a burst of grading fetches and a 429 says nothing about the page."""
+    import time
+
+    from chimera.scrape.fetch import fetch_page
+
+    for attempt in range(4):
+        if url in _PAGES:
+            break
         try:
             page = fetch_page(url, render="http")
-            _PAGES[url] = (page.status, page.markdown)
         except Exception as exc:  # noqa: BLE001 — an unreachable page is a failed check, not a crash
             _PAGES[url] = (None, f"error: {type(exc).__name__}: {exc}")
+            break
+        if page.status == 429 and attempt < 3:
+            time.sleep(10)
+            continue
+        _PAGES[url] = (page.status, page.markdown)
     return _PAGES[url]
 
 
 def check_gold() -> bool:
     """Every hop page answers 200; the gold page contains the answer; the next item's does not."""
     ok = True
-    for index, item in enumerate(ITEMS):
+    for index, item in enumerate(ALL):
         statuses = [fetch_text(url)[0] for url in item.sources]
         status, text = fetch_text(item.gold)
         full = any(contains(text, a) for a in item.answers)
         visible = any(contains(text[:VISIBLE_CHARS], a) for a in item.answers)
-        other = ITEMS[(index + 1) % len(ITEMS)]
+        other = ALL[(index + 1) % len(ALL)]
         control = any(contains(fetch_text(other.gold)[1], a) for a in item.answers)
         good = all(s == 200 for s in statuses) and full
         ok &= good
@@ -183,7 +194,8 @@ def _turn(backend: _Pinned, arm: str, item: Item) -> dict[str, Any]:
 
 def _item(backend: _Pinned, item: Item, replicas: int) -> dict[str, Any]:
     """One item's turns, in the registered order A1 B1 A2 B2."""
-    row: dict[str, Any] = {"id": item.id, "runs": {"A": [], "B": []}}
+    stratum = "hard" if item in HARD else "registered"
+    row: dict[str, Any] = {"id": item.id, "stratum": stratum, "runs": {"A": [], "B": []}}
     for _replica in range(replicas):
         for arm in ("A", "B"):
             row["runs"][arm].append(_turn(backend, arm, item))
@@ -193,7 +205,7 @@ def _item(backend: _Pinned, item: Item, replicas: int) -> dict[str, Any]:
 def run(out: Path, replicas: int, workers: int, only: int | None) -> None:
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    items = ITEMS[:only] if only else ITEMS
+    items = ALL[:only] if only else ALL
     backend = _Pinned()
     rows: list[dict[str, Any]] = []
     errors = {"A": 0, "B": 0}
@@ -230,7 +242,7 @@ def run(out: Path, replicas: int, workers: int, only: int | None) -> None:
                 for pending in futures:
                     pending.cancel()
                 break
-    order = [i.id for i in ITEMS]
+    order = [i.id for i in ALL]
     rows.sort(key=lambda r: order.index(r["id"]))
     out.parent.mkdir(parents=True, exist_ok=True)
     payload = {"model": MODEL, "provider": PROVIDER, "steps": STEPS, "suffix": SUFFIX, "usd": usd,
@@ -246,7 +258,7 @@ def run(out: Path, replicas: int, workers: int, only: int | None) -> None:
 def verify(path: Path) -> None:
     """Fetch every cited URL once and record, per turn, whether a cited page holds the claim."""
     payload = json.loads(path.read_text(encoding="utf-8"))
-    by_id = {i.id: i for i in ITEMS}
+    by_id = {i.id: i for i in ALL}
     for row in payload["rows"]:
         item = by_id[row["id"]]
         for arm in ("A", "B"):
@@ -289,13 +301,21 @@ def _all_seen(got: dict[str, Any]) -> bool:
 
 
 def report(path: Path) -> None:
+    """Pooled first (the registered primary, Amendment 1), then each stratum on its own."""
     payload = json.loads(path.read_text(encoding="utf-8"))
-    rows = payload["rows"]
     print(f"model {payload['model']} via {payload['provider']}  steps {payload['steps']}  "
           f"US${payload['usd']:.4f}  errors {payload['errors']}  {payload.get('stopped') or ''}")
     if not payload.get("verified"):
         print("(run --verify first for the content metric)")
+    everything = payload["rows"]
+    for label in ("pooled", "registered", "hard"):
+        rows = [r for r in everything if label == "pooled" or r.get("stratum") == label]
+        if rows:
+            print(f"\n======== {label}: {len(rows)} items")
+            _summary(rows)
 
+
+def _summary(rows: list[dict[str, Any]]) -> None:
     metrics = [
         ("PRIMARY every cited URL seen in tool output (>=1 cited)", _all_seen),
         ("GUARD answer correct", lambda g: g.get("correct")),
@@ -351,7 +371,7 @@ def main() -> None:
     ap.add_argument("--verify", type=Path)
     ap.add_argument("--report", type=Path)
     ap.add_argument("--replicas", type=int, default=2)
-    ap.add_argument("--workers", type=int, default=6)
+    ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--only", type=int, default=None, help="the first N items (a pilot)")
     ap.add_argument("--out", type=Path, default=HERE / "results" / "run.json")
     args = ap.parse_args()
