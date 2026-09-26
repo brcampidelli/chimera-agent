@@ -133,3 +133,14 @@ Conditions on reading it:
 3. **k = 2 for every arm**, per the registered projection rule: every projection fits its guard.
 
 Nothing else changes: the arms, the metrics, the selection rule and the guards are as registered.
+
+## Amendment 2 — 2026-09-26, after M's second pilot, before the main run
+
+**M's second pilot** (`results/pilot2-M-discarded.json`, US$ 0.001, discarded as registered). Parasail answered all three requests, and the probe billed it at exactly the registered 0.09 / 0.30. It took about 160 s per finder call. Two of the three replies read; the third came back `incomplete`, and reading it by eye found a **product defect, not a model failure**.
+
+- The reply quoted the regex `(?:\[[^\]]*\])?` in its evidence. In JSON that holds `\[`, a valid escape (a backslash, then `[`), beside `\]`, which is not one.
+- The repair added in `78c8eeae` (after S15's run 1) looked at one backslash at a time. It took the second half of `\` for a stray backslash, doubled it, and broke the valid pair.
+- Fixed in **`e44ca6c0`**: the repair reads each backslash with the character after it, left to right. A test fails before the fix, and putting the old repair back turns only that test red.
+- **The fix does not move S15.** Of the 121 finder replies stored (S15's two runs and both pilots), exactly one reads differently: this one, unreadable before and one finding after. So D here measures the same parser S15 did on every reply S15 saw.
+
+**Changes.** The main run measures product `e44ca6c0`; the prompts are unchanged, at the same hashes. M enters the main run on Parasail as amended. Nothing else changes.
