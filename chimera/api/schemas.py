@@ -1461,7 +1461,7 @@ class RunReceiptOut(BaseModel):
 
     stopped_reason: str = ""
     """Why the loop stopped: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
-    ``cancelled``. Empty for a receipt written before the field existed.
+    ``cancelled`` | ``handover``. Empty for a receipt written before the field existed.
 
     On the wire because a Runs list without it renders three different endings as one: the run the
     user cancelled, the run the dollar ceiling cut off, and the run whose work the verifier rejected
@@ -1470,11 +1470,12 @@ class RunReceiptOut(BaseModel):
 
     ending: str = "unknown"
     """How the solve loop ended: ``success`` | ``no_op`` | ``exhausted`` | ``cancelled`` | ``spend``
-    | ``paused`` | ``denied``. ``unknown`` for a receipt written before the field existed.
+    | ``paused`` | ``denied`` | ``handover``. ``unknown`` for a receipt written before the field
+    existed.
 
     On the wire for the reason the field above gives and does not finish. ``stopped_reason`` is the
-    *turn* loop's word, and the solve loop writes it at two sites only — so the run that used up its
-    attempts, the one whose answer a person refused, and the one that succeeded while changing
+    *turn* loop's word, and the solve loop writes it at three sites only — so the run that used up
+    its attempts, the one whose answer a person refused, and the one that succeeded while changing
     nothing on disk still arrive here as the same blank. This is the one field that separates them,
     and it is set at every return rather than at the interesting ones."""
 

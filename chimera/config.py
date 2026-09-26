@@ -306,9 +306,10 @@ class Settings(BaseSettings):
     # and reading cookies, site storage or saved passwords through the tool is refused. OFF by
     # default: the rules' benefit is unmeasured, and the stop changes what a run does on a page with a
     # login form. Measured so far: no harm on 24 browsing tasks (`bench/browser_situation`: 44/48 on,
-    # 45/48 off, no stop); on live pages no false stop on 17 ordinary pages and 6 of 9 walls handed
-    # over (`bench/browser_element_list/RESULTS-situation.md` — a late hCaptcha frame, a Turnstile
-    # in a shadow root and payment on live pages are its named gaps).
+    # 45/48 off, no stop; still valid for walls v2 by a US$ 0 replay). Walls v2 on live pages
+    # (`bench/browser_element_list/RESULTS-walls-v2.md`): no false stop on 27 ordinary pages, 6/6
+    # walls on the in-sample set and 9/15 on a fresh one — not fit, so still off. Its named gaps: a
+    # widget drawn just after `load`, and block pages that carry no challenge marker.
     browser_situation: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_SITUATION")
 
     # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
