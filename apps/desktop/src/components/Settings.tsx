@@ -1446,6 +1446,51 @@ export function Settings() {
                   </Row>
                 </Card>
 
+                {/* Three modules whose measurements did not recommend them, which is why each is off
+              and why each hint says what was measured rather than what the module promises. A
+              server that predates the `experimental` block reads as all three off: that is the
+              shipped behaviour, and showing a switch as on for a module that is not running would
+              be the one lie this card exists to avoid. */}
+                <Card title={t("settings.card.experimental")}>
+                  <Row
+                    label={t("settings.row.browserSituation")}
+                    hint={t("settings.hint.browserSituation")}
+                    applies={c.applies?.CHIMERA_BROWSER_SITUATION}
+                    env="CHIMERA_BROWSER_SITUATION"
+                  >
+                    <Toggle
+                      on={c.experimental?.browser_situation ?? false}
+                      onChange={(v) =>
+                        save({ CHIMERA_BROWSER_SITUATION: String(v) })
+                      }
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.researchAgent")}
+                    hint={t("settings.hint.researchAgent")}
+                    applies={c.applies?.CHIMERA_RESEARCH_AGENT}
+                    env="CHIMERA_RESEARCH_AGENT"
+                  >
+                    <Toggle
+                      on={c.experimental?.research_agent ?? false}
+                      onChange={(v) => save({ CHIMERA_RESEARCH_AGENT: String(v) })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.explorerContract")}
+                    hint={t("settings.hint.explorerContract")}
+                    applies={c.applies?.CHIMERA_EXPLORER_CONTRACT}
+                    env="CHIMERA_EXPLORER_CONTRACT"
+                  >
+                    <Toggle
+                      on={c.experimental?.explorer_contract ?? false}
+                      onChange={(v) =>
+                        save({ CHIMERA_EXPLORER_CONTRACT: String(v) })
+                      }
+                    />
+                  </Row>
+                </Card>
+
                 <Card title={t("settings.card.server")}>
                   <Row
                     label={t("settings.row.bearer")}
