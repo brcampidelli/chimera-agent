@@ -426,8 +426,10 @@ def cost(rows: list[dict[str, Any]], pilot_dir: Path | None) -> dict[str, Any]:
         completion = sum(c.get("completion", 0) for c in calls)
         secs = [c["seconds"] for c in calls if "seconds" in c]
         med = sorted(secs)[len(secs) // 2] if secs else 0
+        billed = [c["billed_usd"] for c in calls if isinstance(c.get("billed_usd"), (int, float))]
         print(f"  {arm:<3} {len(calls)} calls · prompt {prompt:,} · completion {completion:,} · US$ {spend:.3f} "
-              f"· US$ {spend / max(len(calls), 1):.5f}/call · median {med:.0f}s/call")
+              f"· US$ {spend / max(len(calls), 1):.5f}/call · median {med:.0f}s/call · OpenRouter billed "
+              f"US$ {sum(billed):.3f} on the {len(billed)} calls that reported it")
         out[arm] = {"calls": len(calls), "usd": spend, "prompt": prompt, "completion": completion}
         total += spend
     pilot = 0.0
