@@ -105,6 +105,16 @@ def refusal(text: str) -> Refusal:
     return Refusal(f"{_REFUSAL_MARK} {text}")
 
 
+def tool_raised(name: str, exc: BaseException) -> str:
+    """The observation for a tool that raised instead of answering.
+
+    One sentence for every layer that catches: the loop (`Agent._run_tool`), and the taint layer for
+    a tool whose exception can carry remote text (`LedgeredTool`, `MCPTool`), which then fences it.
+    The model reads the same failure whoever caught it.
+    """
+    return f"error: tool {name!r} failed: {exc}"
+
+
 def is_refusal(observation: str) -> bool:
     """True if a gate declined to run the tool, so nothing happened.
 

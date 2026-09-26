@@ -33,10 +33,13 @@ from chimera.governance.ledger import (
 )
 from chimera.governance.policy import Decision
 from chimera.governance.sanitize import sanitize_untrusted
-from chimera.tools.base import Refusal, Tool, is_untrusted_output, refusal
+from chimera.telemetry import get_logger
+from chimera.tools.base import Refusal, Tool, is_untrusted_output, refusal, tool_raised
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[SequenceAssessment], bool]
+
+_log = get_logger("governance.ledger_tool")
 
 # Spotlighting / data-fencing (a KNOWN-IMPERFECT mitigation, not a boundary): untrusted
 # fetched content is returned to the model inside explicit markers so the data/instruction
@@ -295,9 +298,24 @@ class LedgeredTool(Tool):
                 return f"[idempotent: {self.name} already executed with these args; not repeated]"
 
         # 2. Run the real tool, then record its effect for later steps to reason about.
-        result = self.inner.run(**kwargs)
-        if idem_key is not None:
-            self._idempotency_cache[idem_key] = result
+        try:
+            result = self.inner.run(**kwargs)
+        except Exception as exc:
+            # A taint source's exception is one more thing it returned. Its message can be remote
+            # text: an MCP server writes the JSON-RPC error `StdioMCPSession.call_tool` raises. Let
+            # through, it reached the model unfenced from `Agent._run_tool`, and it skipped the
+            # ledger, so the run was not tainted. Caught here it is the error the loop would have
+            # written, and it goes through the same path as a returned one: recorded, then fenced.
+            # Another tool's exception goes on to the loop, which reports it as it always has.
+            if not self._is_fetch():
+                raise
+            _log.warning("tool %s failed: %s", self.name, exc)
+            result = tool_raised(self.name, exc)
+        else:
+            # Only an answer is remembered. A raise never reached this cache before it was caught
+            # here, so a send that raised is still tried again rather than reported as done.
+            if idem_key is not None:
+                self._idempotency_cache[idem_key] = result
         self._record_effect(kwargs, result)  # ledger sees the RAW content (taint snippets)
         # Every result, whatever the tool: a contact looked up by `run_shell` or an MCP server is
         # an address the run was shown, and so is the one in a sent message's own confirmation.

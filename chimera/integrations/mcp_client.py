@@ -19,7 +19,7 @@ from typing import Any, Protocol
 
 from chimera.integrations.connectors import Connector
 from chimera.telemetry import get_logger
-from chimera.tools.base import Tool
+from chimera.tools.base import Tool, tool_raised
 
 _log = get_logger("integrations.mcp")
 
@@ -101,10 +101,18 @@ class MCPTool(Tool):
         A failure stays a failure through the fence (``fence_observation``). Fencing ``error: …``
         whole had undone the ``isError`` handling in ``StdioMCPSession.call_tool``: the answer began
         with the fence, so the loop read "connection refused" as a call that ran, on every surface.
+
+        A raise is fenced the same way. The server writes the message of a JSON-RPC error, and on a
+        surface with no ledger it reached the model raw from `Agent._run_tool`: the one reply of a
+        server's that this fence did not cover.
         """
         from chimera.governance.ledger_tool import fence_observation
 
-        result = self._caller(self._remote_name, kwargs)
+        try:
+            result = self._caller(self._remote_name, kwargs)
+        except Exception as exc:  # noqa: BLE001 — a server's failure is an answer, fenced like one
+            _log.warning("MCP tool %s failed: %s", self.name, exc)
+            return fence_observation(tool_raised(self.name, exc))
         return fence_observation(result) if result.strip() else result
 
 

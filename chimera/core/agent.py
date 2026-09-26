@@ -28,7 +28,7 @@ from chimera.governance.ledger import WRITE_TOOLS
 from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
-from chimera.tools.base import is_refusal
+from chimera.tools.base import is_refusal, tool_raised
 from chimera.tools.registry import ToolNotFoundError, ToolRegistry
 from chimera.tools.workspace import resolve_in_workspace
 
@@ -1354,7 +1354,7 @@ class Agent:
         for index, call in enumerate(calls):
             outcome = outcomes[str(index)]
             if outcome.error is not None:  # `_run_tool` catches everything; belt and braces
-                observations.append(f"error: tool {call.name!r} failed: {outcome.error}")
+                observations.append(tool_raised(call.name, outcome.error))
             else:
                 observations.append(str(outcome.value if outcome.value is not None else ""))
         return observations
@@ -1367,7 +1367,7 @@ class Agent:
             return f"error: unknown tool {name!r}"
         except Exception as exc:  # tools must never crash the loop
             _log.warning("tool %s failed: %s", name, exc)
-            return f"error: tool {name!r} failed: {exc}"
+            return tool_raised(name, exc)
 
     def _edit_before(
         self, name: str, arguments: dict[str, Any]
