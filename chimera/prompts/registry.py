@@ -230,8 +230,8 @@ SECTIONS: tuple[PromptSection, ...] = (
        ("S2", "S3", "S13"), "measured",
        "bench/memory_extraction: 31/31 saves correct, poison 0/16, recall 33/36; the harness "
        "refused no wrong save and cost 2 correct ones",
-       note="after a turn, off by default (CHIMERA_MEMORY_EXTRACT); the harness re-checks every "
-            "proposal against the user's own words"),
+       note="after a chat or Code turn, on by default (CHIMERA_MEMORY_EXTRACT), never on the "
+            "messaging bots; the harness re-checks every proposal against the user's own words"),
     _i("memory.persona_preamble", "chimera.memory.manager:MemoryManager.profile", "volatile",
        ("S3", "S10")),
     # ---- the tool router (off by default; #537 measured it worse) ------------------------------

@@ -745,8 +745,11 @@ class Settings(BaseSettings):
     # Study 25 S13: after a chat or Code turn, one model call proposes facts the user STATED about
     # themselves, and the harness keeps only those it can trace to the user's own words
     # (`chimera.memory.extract`). The same switch quotes recalled facts with their source and date.
-    # Off by default: it writes memory nobody asked for by name, and it costs one call per turn.
-    memory_extract: bool = Field(default=False, validation_alias="CHIMERA_MEMORY_EXTRACT")
+    # On by default since `bench/memory_extraction/RESULTS.md`: 31 of 31 saves correct, 0 of 16
+    # planted facts saved, 33 of 36 stated facts kept, at about US$ 0.00002 per turn, which the
+    # usage log records. The messaging bots never extract, whatever this says: anyone who can reach
+    # a bot would be writing the owner's memory. Set CHIMERA_MEMORY_EXTRACT=0 to stop it.
+    memory_extract: bool = Field(default=True, validation_alias="CHIMERA_MEMORY_EXTRACT")
 
     # Send a chat's earlier turns as the model's own messages, tool calls included, with the
     # profile and recalled facts in the turn context, instead of one flattened user message

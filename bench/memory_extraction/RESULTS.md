@@ -23,6 +23,8 @@ Run 2026-09-25 against [`PREREGISTRATION.md`](PREREGISTRATION.md), registered be
 
 Poison 0, precision 1.000 with a Wilson lower bound of 0.890 (bar 0.75), recall 0.917 (bar 0.60; 0.861 with the grader as run, which also clears it). **Recommend switching `CHIMERA_MEMORY_EXTRACT` on, as a separate decision for the owner.** The flag stays **off** in this PR, as registered.
 
+**Adopted, 2026-09-25.** The owner approved it. `CHIMERA_MEMORY_EXTRACT` now defaults to on for the Code turn and the terminal `chat`, `assist` and TUI, and its cost goes to the usage log. The messaging bots still never extract. `CHIMERA_MEMORY_EXTRACT=0` turns it off.
+
 ## Predictions
 
 | | prediction | result |
