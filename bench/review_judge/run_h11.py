@@ -204,6 +204,15 @@ def _selftest() -> None:
     assert quote_in_diff("return   x;", "@@ -1 +1 @@\n+  return x;") is True
     assert quote_in_diff("return z;", "@@ -1 +1 @@\n+  return x;") is False
     assert quote_in_diff("", "+x") is None
+    # Amendment 1: the answer at the end of a reasoning field, the shapes the probe returned.
+    tail = ('Output:\n{"reason": "draft", "verdict": "approve"}\n\n```json\n'
+            '{"reason": "final", "verdict": "reject"}\n```')
+    assert json.loads(answer_in_reasoning(tail))["reason"] == "final"
+    assert answer_in_reasoning('so: {"reason": "<one line>", "verdict": "approve" | "reject"}') == ""
+    assert answer_in_reasoning("Verdict: approve") == ""
+    got = answer_in_reasoning('x {"quote": "if (a == \\"b\\") {", "reason": "r", "verdict": "confirmed"} y')
+    assert parse_three(got)["state"] == "confirmed" and parse_three(got)["quote"] == 'if (a == "b") {'
+    assert answer_in_reasoning('{"a": {"verdict": 1}} then {"note": 2}') == '{"verdict": 1}'
 
 
 # --- the items -----------------------------------------------------------------------------------
@@ -241,23 +250,104 @@ def pilot_items() -> list[rj.Item]:
 # --- the calls -----------------------------------------------------------------------------------
 
 
+def answer_in_reasoning(reasoning: str) -> str:
+    """The last JSON object in `reasoning` that carries a `verdict` key, as written; "" if none.
+
+    Amendment 1 (PREREGISTRATION-h11.md). On this route deepseek-r1 sometimes never closes its
+    reasoning, and the provider then files the whole output — the final JSON answer included — under
+    `reasoning_content` and returns `content: None` with `finish_reason: stop`. The pilot lost 7 of
+    20 arm-A answers and 4 of 20 arm-T answers that way, and the probe that found it showed the
+    answer sitting at the end of the reasoning. Scanning from the end takes the model's LAST stated
+    answer, not a draft, and a restatement of the requested format (`"approve" | "reject"`) is not
+    valid JSON, so it is never taken for an answer.
+    """
+    decoder = json.JSONDecoder()
+    pos = reasoning.rfind("{")
+    while pos != -1:
+        try:
+            obj, end = decoder.raw_decode(reasoning, pos)
+        except json.JSONDecodeError:
+            obj, end = None, pos
+        if isinstance(obj, dict) and "verdict" in obj:
+            return reasoning[pos:end]
+        pos = reasoning.rfind("{", 0, pos)
+    return ""
+
+
+_RAW = threading.local()
+
+
+def _install_capture() -> None:
+    """Keep each thread's raw litellm response, for the one field the gateway does not carry.
+
+    The gateway's `CompletionResult` has no reasoning field, and the answer can be there (see
+    `answer_in_reasoning`). Wrapping `litellm.completion` in this process — the gateway looks it up
+    at call time — reads that field without changing a line of product code.
+    """
+    import litellm
+
+    if getattr(litellm.completion, "_h11_capture", False):
+        return
+    original = litellm.completion
+
+    def capturing(*args: Any, **kwargs: Any) -> Any:
+        _RAW.response = None
+        response = original(*args, **kwargs)
+        _RAW.response = response
+        return response
+
+    capturing._h11_capture = True  # type: ignore[attr-defined]
+    litellm.completion = capturing
+
+
+def _reasoning_and_cost(response: Any) -> tuple[str, float | None]:
+    if response is None:
+        return "", None
+    try:
+        message = response.choices[0].message
+    except (AttributeError, IndexError):
+        return "", None
+    reasoning = getattr(message, "reasoning_content", None) or ""
+    if not reasoning:
+        fields = getattr(message, "provider_specific_fields", None) or {}
+        reasoning = fields.get("reasoning") or "" if isinstance(fields, dict) else ""
+    cost = getattr(getattr(response, "usage", None), "cost", None)
+    return str(reasoning), (float(cost) if isinstance(cost, (int, float)) else None)
+
+
 class _Pinned:
     """The gateway, every call pinned to one OpenRouter provider with fallbacks off.
 
     The last reply is kept per thread, so `run_judge.ask` — which returns only the verdict — can be
     used unchanged for arm A while the row still records the route, the finish reason and the raw
     answer. Each arm call runs on its own thread.
+
+    Amendment 1: when the reply's `content` is empty, the answer is taken from the end of the
+    reasoning field (`answer_in_reasoning`) and handed to the arm's own parser as if it had been the
+    content — for both arms, identically, and only then. Where it came from is kept in the row.
     """
 
     def __init__(self) -> None:
         from chimera.providers.gateway import LLMGateway
 
+        _install_capture()
         self.gateway = LLMGateway()
         self.local = threading.local()
 
     def complete(self, messages: Any, **kwargs: Any) -> Any:
         kwargs["extra_body"] = {"provider": {"order": [PROVIDER], "allow_fallbacks": False}}
         reply = self.gateway.complete(messages, **kwargs)
+        reasoning, cost = _reasoning_and_cost(getattr(_RAW, "response", None))
+        self.local.reasoning_chars, self.local.billed = len(reasoning), cost
+        self.local.reasoning_tail = ""
+        if (getattr(reply, "content", None) or "").strip():
+            self.local.answer_from = "content"
+        else:
+            recovered = answer_in_reasoning(reasoning)
+            self.local.answer_from = "reasoning" if recovered else "none"
+            self.local.reasoning_tail = reasoning[-1500:]
+            if recovered:
+                reply = reply.model_copy(update={"content": recovered})
         self.local.last = reply
         return reply
 
@@ -271,6 +361,8 @@ def call_arm(backend: _Pinned, arm: str, item: rj.Item) -> dict[str, Any]:
     last: Exception | None = None
     for attempt in range(3):
         backend.local.last = None
+        backend.local.answer_from, backend.local.reasoning_tail = "", ""
+        backend.local.reasoning_chars, backend.local.billed = 0, None
         started = time.time()
         try:
             if arm in ("A", "A2"):
@@ -296,6 +388,10 @@ def call_arm(backend: _Pinned, arm: str, item: rj.Item) -> dict[str, Any]:
                 "truncated": bool(getattr(reply, "truncated", False)),
                 "generation_id": str(getattr(reply, "generation_id", "") or ""),
                 "prompt": prompt, "completion": completion, "usd": usd(prompt, completion),
+                "billed_usd": backend.local.billed,
+                "answer_from": backend.local.answer_from,
+                "reasoning_chars": backend.local.reasoning_chars,
+                "reasoning_tail": backend.local.reasoning_tail,
                 "attempts": attempt + 1, "started": round(started, 1),
                 "seconds": round(time.time() - started, 1),
             }
@@ -404,7 +500,7 @@ def drive(out: Path, items: list[rj.Item], replay_ids: set[str], *, workers: int
     spent = prior_usd + _spent(rows)
     per_item = (_spent(rows) / len(rows)) if rows else 0.0
     print(f"[{mode}] {len(rows)} rows on disk, {len(todo)} to go · spent so far US$ {spent:.3f} "
-          f"(pilot US$ {prior_usd:.3f}) · workers {workers} · deadline {deadline:.0f}s", flush=True)
+          f"(before this run US$ {prior_usd:.3f}) · workers {workers} · deadline {deadline:.0f}s", flush=True)
 
     backend = _Pinned()
     started = time.time()
@@ -507,6 +603,9 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=8, help="Items in flight; each runs its arms together.")
     parser.add_argument("--deadline", type=float, default=2300.0,
                         help="Seconds after which no new item starts (the block runs under timeout 3000).")
+    parser.add_argument("--prior-usd", type=float, default=0.0,
+                        help="Spend outside --pilot-dir that counts against the cap (Amendment 1: the "
+                             "void first pilot and the interface probe).")
     args = parser.parse_args()
 
     if args.dry_run:
@@ -523,9 +622,11 @@ def main() -> None:
         sys.exit("--pilot-dir is required: the projection that gates the main run reads it")
     items = out_of_sample()
     replay_ids = {item_id(i) for i in items[:REPLAY_N]}
-    prior, cost_a, cost_t = pilot_cost(args.pilot_dir)
+    pilot, cost_a, cost_t = pilot_cost(args.pilot_dir)
+    prior = pilot + args.prior_usd
     projected = prior + len(items) * (cost_a + cost_t) + REPLAY_N * cost_a
-    print(f"projection from the pilot: US$ {prior:.3f} pilot + {len(items)} x (A {cost_a:.5f} + "
+    print(f"projection from the pilot: US$ {prior:.3f} before the run (pilot {pilot:.3f} + other "
+          f"{args.prior_usd:.3f}) + {len(items)} x (A {cost_a:.5f} + "
           f"T {cost_t:.5f}) + {REPLAY_N} x A = US$ {projected:.2f} against a cap of US$ {CAP_USD:.2f}")
     if projected > CAP_USD:
         sys.exit("ABORT: the projected cost exceeds the cap (PREREGISTRATION-h11.md, stop rule 1)")

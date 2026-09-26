@@ -203,6 +203,11 @@ def answered(rows: list[dict[str, Any]]) -> dict[str, Any]:
         retried = sum(c.get("attempts", 1) > 1 for c in calls)
         print(f"  {arm:<3} n={len(calls):<4} {dict(sorted(verdicts.items()))} · truncated {truncated} "
               f"· retried {retried}")
+        # Amendment 1 (S5): where the answer was read — `content`, or the end of the reasoning field
+        # when the route returned `content` empty — and the verdicts on each side of that split.
+        split = Counter((c.get("answer_from", "-"), c["verdict"]) for c in calls)
+        sources = Counter(c.get("answer_from", "-") for c in calls)
+        print(f"      answer from {dict(sources)} · verdict by source {dict(sorted(split.items()))}")
         out[arm] = {"n": len(calls), "verdicts": dict(verdicts), "truncated": truncated,
                     "unparsed": verdicts.get("unparsed", 0), "call_failed": verdicts.get("call_failed", 0)}
     modes = Counter(r["arms"]["T"].get("parse", "-") for r in rows)

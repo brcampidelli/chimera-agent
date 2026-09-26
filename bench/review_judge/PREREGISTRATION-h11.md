@@ -211,3 +211,53 @@ together or not at all.
   (`RESULTS.md`); no verdict form reaches those.
 - **Structure against content.** T keeps A's grounds; whether the three-state form would rescue arm C's
   grounds is a different arm.
+
+## Amendment 1 — 2026-09-25, after the first pilot, before any main-run call
+
+**What fired.** The pilot clause above: arm T came back `unparsed` on 4 of 20. So did arm A, on 7 of 20,
+the same published prompt and parser that had 0 of 919 unparsed in August. Every one of those 11
+answers was an **empty `content`** with `finish_reason: stop` and a full bill of completion tokens.
+The format was not failing: all 16 readable T answers were well-formed JSON (two inside a ```json
+fence), every one of them quoted a line that is in the diff, and the parser read all 16 correctly.
+Read by eye, all 20, before this amendment was written.
+
+**What it is.** An interface defect (PROTOCOL §4), found by a probe of four direct `litellm` calls on
+two of the empty items (US$ 0.013, not through the gateway, rows not kept): in one of the four,
+`content` was `None` and the whole output — reasoning, then `Output: {…}`, then the final
+`{"reason": …, "verdict": "approve"}` inside a ```json fence — was filed under `reasoning_content`,
+with the provider's `reasoning_tokens` (1249) larger than its `completion_tokens` (1088). On this route
+the model sometimes never closes its reasoning, and the provider then puts the answer where the
+gateway does not read. The August route, whatever it was, did not.
+
+**The change — the harness, not the prompt and not the parser.**
+
+- When a reply's `content` is empty, the answer is the **last JSON object carrying a `verdict` key in
+  the reasoning field** (`run_h11.answer_in_reasoning`), handed to the arm's own parser as if it had
+  been the content. Scanning from the end takes the model's last stated answer; a restatement of the
+  requested format (`"approve" | "reject"`) is not valid JSON and is never taken. Nothing is
+  re-sampled: re-asking until `content` is non-empty would select on the form of the answer.
+- Same rule, both arms, and only on empty `content`. `run_judge.ask` still parses arm A.
+- The reasoning field is read by wrapping `litellm.completion` inside the bench process, because the
+  gateway's `CompletionResult` does not carry it. No product code changes.
+- Every call records `answer_from` (`content` | `reasoning` | `none`), the reasoning's length and, when
+  recovery ran, its last 1500 characters, so each recovered answer can be audited against its source.
+- **New secondary S5:** per arm, where the answers came from and the verdicts on each side of that
+  split. Not decided on.
+- The probe's `usage.cost` equalled tokens × the listed price on all four calls (e.g. 756 prompt / 1326
+  completion → US$ 0.0038442), so the token-based cost stands; each row now also carries `billed_usd`.
+
+**The first pilot is void.** Its rows are kept in `results/h11/pilot-void/` as the record of the defect
+and are never read. A **second pilot** runs on the same 20 items with the change in place; if either
+arm is still `unparsed` (or `answer_from: none`) on 3 or more of 20, the arm stops there, with no
+further amendment.
+
+**Budget.** Spent before the second pilot: US$ 0.1745 (void pilot) + US$ 0.0129 (probe) = US$ 0.187,
+passed to the main run as `--prior-usd` and counted against the cap. The void pilot's per-call costs —
+A US$ 0.00339, T US$ 0.00534 (T writes longer, 1918 completion tokens against A's 1154) — project the
+whole run at about US$ 0.19 + 0.17 (second pilot) + 814 × 0.00873 + 200 × 0.00339 ≈ **US$ 8.14**, under
+the cap. The projection that gates the run is recomputed from the second pilot. The stop at US$ 8.75
+stands.
+
+**Observed and not acted on.** In the void pilot, T answered `confirmed` to 14 of its 16 readable
+answers, `refuted` to 2 and `plausible` to none. The prompt stays frozen and the predictions stay as
+registered.
