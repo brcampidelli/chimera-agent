@@ -47,6 +47,7 @@ if TYPE_CHECKING:
     from chimera.evolution import Playbook
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
+    from chimera.memory.extract import MemoryExtractor
     from chimera.pet import Pet, PetStore
     from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
@@ -1907,6 +1908,8 @@ def chat(
             # nothing about which project's memory arrived, so a note from one codebase turned up
             # as context in a chat about another.
             project=project_key(workspace),
+            extractor=_memory_extractor(settings, mem),
+            cite_facts=settings.memory_extract,
         ),
         store,
     )
@@ -2106,6 +2109,8 @@ def assist(
         # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
         project=project_key(workspace),
+        extractor=_memory_extractor(settings, mem),
+        cite_facts=settings.memory_extract,
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2421,6 +2426,8 @@ def tui(
             # nothing the scoped write produced, which is the defect underneath #401 and shows up
             # as memory that is simply never recalled.
             project=project_key(workspace),
+            extractor=_memory_extractor(settings, mem),
+            cite_facts=settings.memory_extract,
         ),
         store,
     )
@@ -6887,6 +6894,20 @@ def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
     # reach the prompt unlabeled. Excluding them keeps entity recall honest (they still recall via
     # search, which labels them).
     return build_graph([i.content for i in memory.store.all() if i.provenance == "clean"])
+
+
+def _memory_extractor(settings: Settings, memory: MemoryManager | None) -> MemoryExtractor | None:
+    """The after-turn extractor for a terminal conversation, or None (study 25 S13).
+
+    None unless ``CHIMERA_MEMORY_EXTRACT`` is on and there is a memory to write to. A terminal is a
+    conversation with the owner, which is what makes the user's words theirs to keep; the messaging
+    bots are not wired, because anyone who can reach the bot would be writing the owner's memory.
+    """
+    if memory is None or not settings.memory_extract:
+        return None
+    from chimera.memory.extract import MemoryExtractor
+
+    return MemoryExtractor(memory)
 
 
 @memory_app.command("add")

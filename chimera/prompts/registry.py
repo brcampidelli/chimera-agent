@@ -186,6 +186,8 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile", ("S2", "S4"),
        "unmeasured", note="recalled facts, labelled as recall that the present overrides"),
     _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
+    _i("context.cited_fact", "chimera.prompts.context:cited_fact", "volatile", ("S2", "S3"),
+       note="a recalled fact quoted with its source and date; only under CHIMERA_MEMORY_EXTRACT"),
     # ---- compaction and memory -----------------------------------------------------------------
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
        "measured", "bench/compaction: fired 0 times in 137 real runs"),
@@ -193,6 +195,10 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("compaction.summariser", "chimera.core.summarise:SYSTEM", "call", ("S13", "S2"), "measured",
        "bench/compaction: 25/30 vs 6/30 (+63 pp, p=3.8e-6)"),
     _i("memory.consolidate", "chimera.memory.consolidate:model_summarizer", "call", ("S13",)),
+    _c("memory.extract", "chimera.memory.extract:EXTRACT_MEMORY_SYSTEM", "call",
+       ("S2", "S3", "S13"), "unmeasured",
+       note="after a turn, off by default (CHIMERA_MEMORY_EXTRACT); the harness re-checks every "
+            "proposal against the user's own words"),
     _i("memory.persona_preamble", "chimera.memory.manager:MemoryManager.profile", "volatile",
        ("S3", "S10")),
     # ---- the tool router (off by default; #537 measured it worse) ------------------------------
