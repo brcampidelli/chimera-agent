@@ -155,7 +155,16 @@ def main() -> None:
     logging.getLogger("chimera.providers.gateway").addHandler(dropped)
     try:
         _install_tap()
-        ws = po.prepare_workspace(inst, arm_name)
+        if os.environ.get("BAKEOFF_WS_READY"):
+            # Amendment 3: the driver built this copy before the sandbox hid the template it came
+            # from. The same two checks prepare_workspace makes, again, from inside.
+            ws = po.WORK / f"{arm_name}__{inst['instance_id']}"
+            status = po._run(["git", "-C", str(ws), "status", "--porcelain"]).stdout.strip()
+            if status:
+                raise RuntimeError(f"workspace not clean: {status[:200]}")
+            po.assert_no_future(ws, inst["base_commit"])
+        else:
+            ws = po.prepare_workspace(inst, arm_name)
         from chimera.core.agent import DEFAULT_SYSTEM_PROMPT, Agent, AgentConfig
         from chimera.governance.allowlist import restrict_registry
         from chimera.tools.builtin import default_registry

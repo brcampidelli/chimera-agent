@@ -23,8 +23,19 @@ for p in (REPO, REPO / "bench" / "prompt_overlays", HERE):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from bakeoff import KILLED, MAIN, PILOT, RESULTS, SLICE, load_jsonl, solve_usd  # noqa: E402
+from bakeoff import (  # noqa: E402
+    DISCARDED,
+    KILLED,
+    MAIN,
+    PILOT,
+    RESULTS,
+    SLICE,
+    load_jsonl,
+    solve_usd,
+)
 from bakeoff_arms import ARMS, ORDER, cost  # noqa: E402
+from disk_scan import classify  # noqa: E402
+from disk_scan import scan as disk_scan  # noqa: E402
 from report import (  # noqa: E402  — bench/prompt_overlays/report.py
     DJANGO_FETCH,
     NET,
@@ -241,7 +252,10 @@ def report(phase: str = "main") -> dict[str, Any]:
                                       for a, c in cmp.items() if c.get("n")}
         out["vs_A_timeouts_graded"] = {a: {k: v for k, v in compare("A", a, by, g, timeout_is_halt=False).items()
                                            if k != "_items"} for a in cands}
-        leaks = sorted({r["instance_id"] for r in rows if any(DJANGO_FETCH.search(s) for s in r.get("shell") or [])})
+        # H4/H5's network scan, and (Amendment 3) any reach for another django or a grader's answer
+        # on the local disk, which the sandbox should have made impossible.
+        leaks = sorted({r["instance_id"] for r in rows if any(DJANGO_FETCH.search(s) for s in r.get("shell") or [])}
+                       | set(disk_scan("main_solves")["source_items"]))
         out["leak_items"] = leaks
         if leaks:
             clean = {i: arms for i, arms in by.items() if i not in leaks}
@@ -254,8 +268,8 @@ def report(phase: str = "main") -> dict[str, Any]:
             gp = grades("pilot", a)
             dis = n = 0
             for r in pilot:
-                if r["arm"] != a:
-                    continue
+                if r["arm"] != a or classify(r)["source"]:
+                    continue  # Amendment 3: a pilot solve that reached for an answer is no floor
                 m = by.get(r["instance_id"], {}).get(a)
                 if not m:
                     continue
@@ -279,8 +293,14 @@ def report(phase: str = "main") -> dict[str, Any]:
                           for a in arms_present},
     }
     out["usd_killed_at_block_end"] = round(sum(solve_usd(r) for r in load_jsonl(KILLED)), 4)
+    out["usd_discarded_before_amendment3"] = round(sum(solve_usd(r) + solve_usd(r, calls_key="retry_calls")
+                                                       for p in DISCARDED for r in load_jsonl(p)), 4)
     out["usd_all"] = round(sum(solve_usd(r) + solve_usd(r, calls_key="retry_calls")
-                               for path in (PILOT, MAIN, KILLED) for r in load_jsonl(path)), 4)
+                               for path in (PILOT, MAIN, KILLED, *DISCARDED) for r in load_jsonl(path)), 4)
+    # Amendment 3: the local-disk scan, on this phase and on the discarded run it was found in.
+    out["disk_scan"] = {name: disk_scan(name) for name in
+                        (f"{phase}_solves", "discarded_main_before_amendment3")
+                        if (RESULTS / f"{name}.jsonl").exists()}
     name = "summary.json" if phase == "main" else "pilot_summary.json"
     (RESULTS / name).write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
     return out

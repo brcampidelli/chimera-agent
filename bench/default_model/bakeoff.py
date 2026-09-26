@@ -27,7 +27,7 @@ import tempfile
 import threading
 import time
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +47,10 @@ MAIN = RESULTS / "main_solves.jsonl"
 #: Amendment 1: solves cut at a block's end, with the calls they had made. Never graded or paired;
 #: their spend counts against the cap.
 KILLED = RESULTS / "killed_solves.jsonl"
+#: Amendment 3: the main run before the local-disk wall, kept as the record of the breach and of
+#: what it cost; never graded into a comparison.
+DISCARDED = (RESULTS / "discarded_main_before_amendment3.jsonl",
+             RESULTS / "discarded_killed_before_amendment3.jsonl")
 STRATA = ("<15 min fix", "15 min - 1 hour")
 
 PILOT_N = 8
@@ -78,12 +82,13 @@ def solve_usd(row: dict[str, Any], *, calls_key: str = "calls") -> float:
 
 def spent() -> float:
     total = 0.0
-    for path in (PILOT, MAIN, KILLED):
+    for path in (PILOT, MAIN, KILLED, *DISCARDED):
         for r in load_jsonl(path):
             total += solve_usd(r) + solve_usd(r, calls_key="retry_calls")
-    probe = RESULTS / "probe.json"
-    if probe.exists():
-        total += float(json.loads(probe.read_text(encoding="utf-8")).get("usd", 0.0))
+    for name in ("probe.json", "probe_sandbox.json"):
+        probe = RESULTS / name
+        if probe.exists():
+            total += float(json.loads(probe.read_text(encoding="utf-8")).get("usd", 0.0))
     return total
 
 
@@ -132,6 +137,18 @@ _IN_FLIGHT: dict[int, tuple[Path, dict[str, Any], str, Path]] = {}
 #: Amendment 1: set for the main run only (see PREREGISTRATION.md). Behind the wall LiteLLM's
 #: remote cost-map fetch always fails and it keeps its bundled copy; this skips the three retries.
 _SOLVE_ENV_EXTRA: dict[str, str] = {}
+#: Amendment 3: the local-disk wall. When set, every solve runs inside `sandbox.sh`'s namespaces
+#: and its workspace is prepared here, by the driver, before it starts.
+_SANDBOX = {"on": False}
+SANDBOX_SH = HERE / "sandbox.sh"
+
+
+def sandboxed(cmd: list[str], ws: Path, scratch: Path) -> list[str]:
+    """`cmd` wrapped in the local-disk wall (Amendment 3)."""
+    home = os.environ["HOME"]
+    return ["unshare", "--user", "--map-root-user", "--mount", "--pid", "--fork", "--mount-proc",
+            "bash", str(SANDBOX_SH), str(os.getuid()), str(os.getgid()), home,
+            str(ws), str(scratch), str(REPO), f"{home}/.local/share/uv/python", "--", *cmd]
 
 
 def _on_block_end(signum: int, frame: Any) -> None:
@@ -164,11 +181,26 @@ def run_solve(inst: dict[str, Any], arm: str) -> dict[str, Any]:
     env = _child_env(home)
     env["BAKEOFF_CALLS_LOG"] = str(scratch / "calls.jsonl")
     env.update(_SOLVE_ENV_EXTRA)
+    cmd = [sys.executable, str(HERE / "bakeoff_solve.py"), str(inst_path), arm, str(out_path)]
     started = time.monotonic()
+    if _SANDBOX["on"]:
+        import solve_one as po  # bench/prompt_overlays
+
+        try:
+            po.prepare_workspace(inst, arm)
+        except Exception as exc:  # noqa: BLE001 — a harness failure is a halt (PROTOCOL §2)
+            row = {"instance_id": inst["instance_id"], "arm": arm, "calls": [], "patch": "",
+                   "halted": f"workspace: {type(exc).__name__}: {exc}"[:400],
+                   "seconds": round(time.monotonic() - started, 1)}
+            _rm(ws, work)
+            _rm(scratch, work)
+            return row
+        env["BAKEOFF_WS_READY"] = "1"
+        (scratch / "tmp").mkdir(exist_ok=True)
+        cmd = sandboxed(cmd, ws, scratch)
     with _LOCK:
-        proc = subprocess.Popen([sys.executable, str(HERE / "bakeoff_solve.py"), str(inst_path), arm,
-                                 str(out_path)], env=env, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.PIPE, start_new_session=True)
+        proc = subprocess.Popen(cmd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                start_new_session=True)
         _IN_FLIGHT[proc.pid] = (scratch, inst, arm, ws)
     timed_out = False
     try:
@@ -310,10 +342,17 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(task, idx, inst, arm): (idx, inst, arm) for idx, inst, arm in tasks}
-        for n, fut in enumerate(as_completed(futures), 1):
-            idx, inst, arm = futures[fut]
-            print(f"  [{n:>4}/{len(tasks)}] #{idx:<3} {inst['instance_id']:<24} {fut.result():<8} "
-                  f"US${state['usd']:.3f}  {time.strftime('%H:%M:%S')}", flush=True)
+        pending, n = set(futures), 0
+        while pending:
+            # A bounded wait, not `as_completed`: the main thread must wake to run the SIGTERM
+            # handler. Blocked in an untimed lock wait it ran only when the next solve finished,
+            # which on 2026-09-26 left a stop request unanswered for minutes.
+            finished, pending = wait(pending, timeout=5, return_when=FIRST_COMPLETED)
+            for fut in finished:
+                n += 1
+                idx, inst, arm = futures[fut]
+                print(f"  [{n:>4}/{len(tasks)}] #{idx:<3} {inst['instance_id']:<24} {fut.result():<8} "
+                      f"US${state['usd']:.3f}  {time.strftime('%H:%M:%S')}", flush=True)
     if state["stopped"]:
         print(f"STOPPED: {state['stopped']}", flush=True)
     if halted_arms:
@@ -377,6 +416,99 @@ def probe(arms: list[str]) -> None:
     (RESULTS / "probe.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
     print("WALL HOLDS" if out["wall_holds"] else "WALL DOES NOT HOLD")
     print("ARMS OK" if out["arms_ok"] else "AN ARM FAILED ITS PREFLIGHT")
+    _rm(scratch, work)
+
+
+def probe_sandbox(arms: list[str]) -> None:
+    """Amendment 3's probe: from inside the local-disk wall, what a solve can and cannot reach.
+    Every try runs through the same wrapper a solve runs through, on a real workspace."""
+    import solve_one as po  # bench/prompt_overlays
+
+    assert_frozen()
+    work = _work_dir()
+    inst = load_jsonl(SLICE)[0]
+    ws = po.prepare_workspace(inst, "P")
+    scratch = Path(tempfile.mkdtemp(prefix="dflt-P-", dir=str(work)))
+    home = scratch / "home"
+    home.mkdir()
+    env = _child_env(home)
+    real_home = os.environ["HOME"]
+    own = {ws.name, scratch.name}
+    must_fail = {
+        "curl_github": "curl -sS -m 15 -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/django/django/main/README.rst",
+        "git_ls_remote": "timeout 20 git ls-remote https://github.com/django/django HEAD",
+        "python_urllib": "python3 -c \"import urllib.request;print(urllib.request.urlopen('https://pypi.org/simple/django/',timeout=15).status)\"",
+        "django_ref": f"ls {real_home}/dflt-cache/django-ref/django {real_home}/h45-cache/django-ref/django",
+        "gold_logs": f"ls {real_home}/h45-grade/gold/logs {real_home}/dflt-grade",
+        "hf_cache": f"ls {real_home}/.cache/huggingface",
+        "other_template": f"ls {work}/templates",
+        "windows_drive": "ls /mnt/c/Users",
+        "docker": "curl -sS -m 10 --unix-socket /var/run/docker.sock http://localhost/version",
+    }
+    must_hold = {
+        "home_listing": f"ls -A {real_home}; ls -A {work}",
+        "django_copies": ("find / \\( -path /proc -o -path /sys \\) -prune -o -type f "
+                          "-path '*/django/db/models/base.py' -print 2>/dev/null"),
+        "processes": "ps -e --no-headers | wc -l",
+        "identity": f"id -un; git -C {ws} status --porcelain | wc -l; git -C {ws} rev-list --all --count ^{inst['base_commit']}",
+        "venv": f"{sys.executable} -c 'import chimera, litellm; print(\"imports ok\")'",
+    }
+    out: dict[str, Any] = {"must_fail": {}, "must_hold": {}, "arms": {}}
+    for name, cmd in must_fail.items():
+        r = subprocess.run(sandboxed(["bash", "-c", cmd], ws, scratch), env=env, capture_output=True,
+                           text=True, timeout=300, check=False)
+        blocked = r.returncode != 0 or (name == "curl_github" and "200" not in r.stdout)
+        out["must_fail"][name] = {"blocked": blocked, "rc": r.returncode, "tail": (r.stdout + r.stderr)[-200:]}
+        print(f"{name:<15} blocked={blocked} rc={r.returncode} {(r.stdout + r.stderr).strip()[-90:]!r}", flush=True)
+    for name, cmd in must_hold.items():
+        r = subprocess.run(sandboxed(["bash", "-c", cmd], ws, scratch), env=env, capture_output=True,
+                           text=True, timeout=900, check=False)
+        text = r.stdout.strip()
+        if name == "home_listing":
+            # The work dir, the path down to the interpreter, and this solve's two dirs: nothing else.
+            ok = set(text.split()) <= {Path(work).name, ".local", *own}
+        elif name == "django_copies":
+            ok = bool(text) and all(line.startswith(str(ws) + "/") for line in text.splitlines())
+        elif name == "processes":
+            ok = text.isdigit() and int(text) < 10
+        elif name == "identity":
+            lines = text.splitlines()
+            ok = len(lines) == 3 and lines[0] == os.environ.get("USER", lines[0]) and lines[1:] == ["0", "0"]
+        else:
+            ok = "imports ok" in text
+        out["must_hold"][name] = {"ok": ok, "stdout": text[-400:], "stderr": r.stderr[-200:]}
+        print(f"{name:<15} ok={ok} {text[-160:]!r}", flush=True)
+    usd = 0.0
+    for arm in arms:
+        code = (
+            f"import sys, json; sys.path.insert(0, {str(HERE)!r}); import bakeoff_solve as s;"
+            f"s._install_tap(); from bakeoff_arms import ARMS; a = ARMS[{arm!r}]; r = s.Recorder(a);"
+            "tools = [{'type': 'function', 'function': {'name': 'read_file', 'description': 'Read a file.',"
+            " 'parameters': {'type': 'object', 'properties': {'path': {'type': 'string'}}, 'required': ['path']}}}];"
+            "res = r.complete([{'role': 'user', 'content': 'Use the tool to read setup.py.'}], model=a.model,"
+            " temperature=0.2, tools=tools);"
+            "print('PROBE', json.dumps({'calls': [[t.name, t.arguments] for t in (res.tool_calls or [])],"
+            " 'rec': r.calls[-1]}))"
+        )
+        res = subprocess.run(sandboxed([sys.executable, "-c", code], ws, scratch), env=env,
+                             capture_output=True, text=True, timeout=300, check=False)
+        line = next((ln for ln in res.stdout.splitlines() if ln.startswith("PROBE ")), "")
+        got = json.loads(line[6:]) if line else {}
+        rec = got.get("rec") or {}
+        ok = bool(got.get("calls")) and got["calls"][0][0] == "read_file"
+        on_pin = (rec.get("provider") or "").lower() == ARMS[arm].provider.lower()
+        usd += max(cost([rec], ARMS[arm]), float(rec.get("billed") or 0.0)) if rec else 0.0
+        out["arms"][arm] = {"tool_call_parsed": ok, "on_pin": on_pin, "rec": rec,
+                            "tail": "" if line else (res.stdout + res.stderr)[-400:]}
+        print(f"arm {arm}: tool_call_parsed={ok} on_pin={on_pin} served={rec.get('provider')!r}", flush=True)
+    out["wall_holds"] = (all(v["blocked"] for v in out["must_fail"].values())
+                         and all(v["ok"] for v in out["must_hold"].values()))
+    out["arms_ok"] = all(v["tool_call_parsed"] and v["on_pin"] for v in out["arms"].values())
+    out["usd"] = usd
+    (RESULTS / "probe_sandbox.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print("WALL HOLDS" if out["wall_holds"] else "WALL DOES NOT HOLD")
+    print("ARMS OK" if out["arms_ok"] else "AN ARM FAILED ITS PREFLIGHT")
+    _rm(ws, work)
     _rm(scratch, work)
 
 
@@ -450,6 +582,7 @@ if __name__ == "__main__":
     s.add_argument("gold", type=Path)
     pb = sub.add_parser("probe")
     pb.add_argument("--arms", default=",".join(ORDER))
+    pb.add_argument("--sandbox", action="store_true")
     p = sub.add_parser("pilot")
     p.add_argument("--workers", type=int, default=16)
     sub.add_parser("size")
@@ -465,6 +598,8 @@ if __name__ == "__main__":
     args = ap.parse_args()
     if args.cmd == "slice":
         build_slice(args.gold)
+    elif args.cmd == "probe" and args.sandbox:
+        probe_sandbox(args.arms.split(","))
     elif args.cmd == "probe":
         probe(args.arms.split(","))
     elif args.cmd == "pilot":
@@ -478,6 +613,7 @@ if __name__ == "__main__":
         if "A" not in arms or any(a not in ARMS for a in arms):
             raise SystemExit(f"bad arms {arms}")
         _SOLVE_ENV_EXTRA["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"  # Amendment 1
+        _SANDBOX["on"] = True  # Amendment 3
         run_items(list(enumerate(load_jsonl(SLICE)[: args.n])), arms, MAIN, args.workers,
                   start_until=args.start_until)
     elif args.cmd == "predictions":

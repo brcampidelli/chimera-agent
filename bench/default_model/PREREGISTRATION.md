@@ -214,3 +214,41 @@ That is deliberate. For the model every fresh install spends on, −5 pp is the 
 Block 1 recorded 68 solves and killed none. But its cutoff was checked only after an item had been admitted and its template built, so the block spent its last 25 minutes cloning django templates for solves that never started. The cutoff is now checked first.
 
 Nothing a solve sees changes, and no data is discarded: the cutoff only decides when a solve starts, and every recorded solve ran whole.
+
+## Amendment 3 — 2026-09-26, during main block 3: the wall had a hole on the local disk, the main run restarts behind a sandbox
+
+**What was found.** The rows are in `results/discarded_main_before_amendment3.jsonl` and the pilot's.
+- A solve's shell ran `find` across the grading directories, looking for a dependency. That prompted a scan of every recorded shell command (`disk_scan.py`).
+- The network wall held, but `run_shell` runs on the host, and the host holds the answers several times over:
+  - two django clones at `main` (`~/dflt-cache/django-ref`, `~/h45-cache/django-ref`), which contain every later fix;
+  - the templates and workspaces of other items;
+  - the gold run's logs, where `patch.diff` is the reference fix;
+  - the Hugging Face cache of SWE-bench;
+  - the Windows drives, with every bench's results.
+- **Arm D reached for them in 4 of 8 pilot solves and 16 of 26 main solves.** Arm A did in 1 of 27; G and Q in none.
+- It was not incidental. On `django__django-13809`, D read `runserver.py` from the reference clone at `main`, then searched its history for the ticket and ran `git show` on the upstream fix commit. On `django__django-16454`, it listed the gold run's log directory for that very instance.
+- A score that includes those solves measures copying for D, not the model.
+
+**What changes.**
+- **The main run restarts from its first item, behind a local-disk wall** (`sandbox.sh`). Each solve runs in its own user, mount and PID namespaces (`unshare`, unprivileged, probed working on this WSL).
+  - **Hidden, under empty tmpfs mounts:** the real home, `/mnt`, `/tmp`, `/var/tmp` and `/dev/shm`. The Docker socket is covered too.
+  - **Bound back at their real paths:** the solve's own workspace and scratch (read-write), the /tmp copy of the code with its venv, and the directory of the interpreter the venv points to (both read-only).
+  - **Hidden by the new PID namespace:** every other process.
+  - **Identity.** A nested user namespace maps the invoking uid back, so the solve runs as the same user with no capabilities.
+  - **Workspace.** The driver prepares it (the same `prepare_workspace`) before the sandbox hides its template, and the solve re-checks it inside (clean, no commit after `base_commit`).
+- **The network wall is unchanged.**
+- **The 115 main solves recorded before this are discarded,** with the 1 cut when the run was stopped.
+  - They are kept as the record of the breach, and none is graded into a comparison.
+  - Their spend counts against the cap (`spent()` reads them).
+  - The sizing rule still gives n = 208: spend so far is about US$ 1.55, against the US$ 13.00 stop.
+- **The pilot is not re-run.**
+  - Its gates stand as read: gate 1 counts halts and tool calls, which the breach does not change; gate 2 was already overridden (Amendment 1).
+  - Its replay floor now excludes every pilot solve with a disk touch. That leaves D's floor at 4 items, which the results say.
+- **Probe before the restart** (`bakeoff.py probe --sandbox`, saved to `results/probe_sandbox.json`), from inside the sandbox, on a real workspace:
+  - **must fail:** the network exits, listing either reference clone, the gold logs, the Hugging Face cache, another item's template, `/mnt/c`, and the Docker API;
+  - **must hold:** the real home lists only the work dir and the path to the interpreter; the work dir lists only this solve's two directories; the only `django/db/models/base.py` on the machine is the workspace's own; fewer than 10 processes are visible; `id` is the user; the workspace is clean with no later commit; the venv imports; one pinned call per arm returns a parsed tool call.
+  - If any fails, nothing runs.
+- **Scans stay on.** Every main solve's shell commands are still scanned (`disk_scan.py`). Under the sandbox a reach can only fail, and each reach is still reported and gets the sensitivity reading.
+- **Machine mechanics, no effect on what a model sees.** The driver's main loop waits with a timeout, so its SIGTERM handler runs on time: in block 3 it waited for the next solve to finish before acting. The halt tally counts the whole run.
+
+**What this cannot fix.** The breach says something about D itself: it goes looking outside its workspace for the answer. That is a finding about the model's behaviour as an agent, reported beside its score. It is not something the sandbox measures.
