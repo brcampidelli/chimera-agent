@@ -69,9 +69,18 @@ _LOCK = threading.Lock()
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Every complete line. A last line still being written by the driver is skipped, never raised."""
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    rows = []
+    for i, line in enumerate(lines):
+        try:
+            rows.append(json.loads(line))
+        except json.JSONDecodeError:
+            if i != len(lines) - 1:
+                raise
+    return rows
 
 
 def rate_limited(row: dict[str, Any]) -> bool:
@@ -185,19 +194,29 @@ def sandboxed(cmd: list[str], ws: Path, scratch: Path) -> list[str]:
 def _on_block_end(signum: int, frame: Any) -> None:
     """SIGTERM from the block's `timeout`: kill every solve in flight (each is its own session, so
     it would otherwise outlive the driver and collide with the next block's copy of it), record the
-    calls each had made, and exit. Nothing partial is kept as a solve; its spend is kept."""
-    with _LOCK:
-        flying = list(_IN_FLIGHT.items())
-        for pid, (scratch, inst, arm, _ws) in flying:
-            with contextlib.suppress(ProcessLookupError):
-                os.killpg(pid, signal.SIGKILL)
-            log = scratch / "calls.jsonl"
-            calls = [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines()
-                     if ln.strip()] if log.exists() else []
-            with KILLED.open("a", encoding="utf-8", newline="\n") as fh:
-                fh.write(json.dumps({"instance_id": inst["instance_id"], "arm": arm,
-                                     "killed": "block end", "calls": calls}) + "\n")
-    print(f"BLOCK END: killed {len(flying)} solves in flight; their calls are in {KILLED.name}", flush=True)
+    calls each had made, and exit. Nothing partial is kept as a solve; its spend is kept.
+
+    No lock and no print here. Both deadlocked on 2026-09-26: the handler runs in the main thread,
+    which may be interrupted while holding the stdout buffer's lock, and `_LOCK` can be held by a
+    worker in a slow write to the Windows drive. The dict is copied with a retry instead, and the
+    last line goes out through os.write. The runner also kills 90 s after the soft signal."""
+    flying: list[tuple[int, tuple[Path, dict[str, Any], str, Path]]] = []
+    for _ in range(5):
+        try:
+            flying = list(_IN_FLIGHT.items())
+            break
+        except RuntimeError:  # the dict changed size while being copied
+            continue
+    for pid, (scratch, inst, arm, _ws) in flying:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pid, signal.SIGKILL)
+        log = scratch / "calls.jsonl"
+        calls = [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines()
+                 if ln.strip()] if log.exists() else []
+        with KILLED.open("a", encoding="utf-8", newline="\n") as fh:
+            fh.write(json.dumps({"instance_id": inst["instance_id"], "arm": arm,
+                                 "killed": "block end", "calls": calls}) + "\n")
+    os.write(2, f"BLOCK END: killed {len(flying)} solves in flight\n".encode())
     os._exit(143)
 
 
