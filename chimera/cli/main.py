@@ -3034,6 +3034,15 @@ def desktop_app(
     url = f"http://{host}:{port}"
     if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
         Path(emit_port_file).write_text(url, encoding="utf-8")
+    # The desktop bridge learns its port only now. With "Allow Claude to operate this app" on, this
+    # writes the discovery file `chimera mcp desktop` reads; off, it only clears a stale one. A
+    # wildcard bind is reached on loopback — the bridge is for a client on THIS machine.
+    bridge_host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    desktop_bridge = api.state.desktop_bridge
+    try:
+        desktop_bridge.attach(f"http://{bridge_host}:{port}")
+    except OSError as exc:  # a bridge that cannot write its file must not keep the app from starting
+        console.print(f"[yellow]desktop bridge not started: {exc}[/yellow]")
     ui_note = "" if static_dir is not None else "  [yellow](UI not built — API only; run 'npm --prefix apps/desktop run build')[/yellow]"
     console.print(f"[bold]Chimera Desktop[/bold] on {url}  [dim](API at /api). Ctrl+C to stop.[/dim]{ui_note}")
     if open_browser and static_dir is not None:
@@ -3045,6 +3054,8 @@ def desktop_app(
     try:
         uvicorn.Server(uvicorn.Config(api, log_level="warning")).run(sockets=[sock])
     finally:
+        # First, so the token dies with the server even if a later step raises.
+        desktop_bridge.close()
         if cron_stop is not None:
             cron_stop.set()  # stop the cron daemon thread on Ctrl+C / shutdown
         messaging.stop_all()  # close any running messaging adapters
@@ -6602,6 +6613,28 @@ def mcp_test(
     for tool in tools:
         table.add_row(tool["name"], tool["description"])
     console.print(table)
+
+
+@mcp_app.command("desktop")
+def mcp_desktop() -> None:
+    """Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop).
+
+    Needs the app open with Settings > "Allow Claude to operate this app" on; the tools then call
+    the app's local bridge. Register it with: claude mcp add chimera-desktop -- chimera mcp desktop
+    """
+    import sys
+
+    from chimera.server.desktop_mcp import DesktopMCP
+
+    # stdio IS the MCP wire, so the notice goes to stderr.
+    print("chimera desktop bridge on stdio — operating the running Chimera app", file=sys.stderr)
+    try:
+        DesktopMCP().serve_stdio()
+    except ModuleNotFoundError as exc:
+        print(f"MCP SDK missing — install with: pip install 'chimera-agent[mcp]' ({exc})", file=sys.stderr)
+        raise typer.Exit(code=1) from exc
+    except KeyboardInterrupt:
+        print("stopped", file=sys.stderr)
 
 
 # --- kanban subcommands -------------------------------------------------------

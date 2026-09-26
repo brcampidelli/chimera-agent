@@ -574,6 +574,17 @@ class ExperimentalCfgOut(BaseModel):
     explorer_contract: bool = False
 
 
+class BridgeCfgOut(BaseModel):
+    """The desktop bridge's two switches (``chimera/api/desktop_bridge.py``), both off by default.
+
+    ``full`` is reported as the owner set it, not as it acts: it does nothing while ``enabled`` is
+    off, and the screen says so rather than hiding the row.
+    """
+
+    enabled: bool = False
+    full: bool = False
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -582,6 +593,7 @@ class ConfigOut(BaseModel):
     sandbox: SandboxCfgOut
     browser: BrowserCfgOut = Field(default_factory=BrowserCfgOut)
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
+    bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut

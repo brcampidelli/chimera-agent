@@ -323,6 +323,15 @@ class Settings(BaseSettings):
     # widget drawn just after `load`, and block pages that carry no challenge marker.
     browser_situation: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_SITUATION")
 
+    # --- The desktop bridge: may an MCP client (Claude Code / Claude Desktop, through
+    # `chimera mcp desktop`) operate this running app? Both OFF by default, and the second means
+    # nothing without the first (`chimera/api/desktop_bridge.py`). The first lets the client do what
+    # the screens do — read and start conversations, runs, boards — under the owner's configured
+    # posture. The second adds what the screens reserve for the person: answering approvals, and
+    # editing settings. Credentials stay out of reach with both on.
+    desktop_bridge: bool = Field(default=False, validation_alias="CHIMERA_DESKTOP_BRIDGE")
+    desktop_bridge_full: bool = Field(default=False, validation_alias="CHIMERA_DESKTOP_BRIDGE_FULL")
+
     # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
     # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---
     image_backend: str = Field(default="auto", validation_alias="CHIMERA_IMAGE_BACKEND")

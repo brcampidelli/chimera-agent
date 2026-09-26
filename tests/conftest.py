@@ -148,7 +148,9 @@ def _nobody_has_declared_the_terminal_dead() -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def _no_dotenv(
+    monkeypatch: pytest.MonkeyPatch, tmp_path_factory: pytest.TempPathFactory
+) -> Iterator[None]:
     config = dict(Settings.model_config)
     config["env_file"] = None
     monkeypatch.setattr(Settings, "model_config", config)
@@ -178,6 +180,14 @@ def _no_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     # the shipped default is a fact a test can read rather than a property of whose machine ran it.
     monkeypatch.setenv("CHIMERA_REACH", "")
     monkeypatch.delenv("CHIMERA_REACH")
+    # The desktop bridge's discovery file lives in the user's REAL home (`~/.chimera`), outside
+    # `CHIMERA_HOME` on purpose (`chimera/api/desktop_bridge.py`). Every test gets a private
+    # directory for it, so no test can write — or delete — the file of an app the developer has
+    # open. The two switches are owned for the same reason `CHIMERA_REACH` is: off, as shipped.
+    monkeypatch.setenv("CHIMERA_BRIDGE_DIR", str(tmp_path_factory.mktemp("bridge")))
+    for name in ("CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL"):
+        monkeypatch.setenv(name, "")
+        monkeypatch.delenv(name)
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

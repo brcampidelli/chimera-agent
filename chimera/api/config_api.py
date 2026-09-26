@@ -129,6 +129,11 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_BROWSER_SITUATION",
     "CHIMERA_RESEARCH_AGENT",
     "CHIMERA_EXPLORER_CONTRACT",
+    # The desktop bridge's two switches (`chimera/api/desktop_bridge.py`). The owner's, and only the
+    # owner's: the bridge refuses to write either one on Claude's behalf, even with full control on,
+    # so a client can never widen its own access.
+    "CHIMERA_DESKTOP_BRIDGE",
+    "CHIMERA_DESKTOP_BRIDGE_FULL",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -373,6 +378,12 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "browser_situation": settings.browser_situation,
             "research_agent": settings.research_agent,
             "explorer_contract": settings.explorer_contract,
+        },
+        # Whether Claude may operate this app, and whether it may also answer approvals and edit
+        # settings. Applied live: saving either one writes or removes the discovery file at once.
+        "bridge": {
+            "enabled": settings.desktop_bridge,
+            "full": settings.desktop_bridge_full,
         },
         "autonomy": {
             "reach": settings.reach,

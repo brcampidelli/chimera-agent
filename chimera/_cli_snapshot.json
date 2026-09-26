@@ -2947,6 +2947,14 @@
         },
         {
           "deprecated": false,
+          "help": "Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop).\n\nNeeds the app open with Settings > \"Allow Claude to operate this app\" on; the tools then call\nthe app's local bridge. Register it with: claude mcp add chimera-desktop -- chimera mcp desktop",
+          "hidden": false,
+          "name": "desktop",
+          "params": [],
+          "path": "mcp desktop"
+        },
+        {
+          "deprecated": false,
           "help": "List configured MCP servers (name, command + args, env key names). No connect.",
           "hidden": false,
           "name": "list",

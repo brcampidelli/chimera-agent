@@ -104,6 +104,49 @@ Point an MCP client at it as a stdio server. For Claude Desktop, add to its conf
 one). Add `--fuse` to route the solver's deep turns through fusion, `--no-memory` to skip
 recall. Because stdio is the wire, all logs go to stderr — stdout carries only the protocol.
 
+## Letting Claude operate the desktop app
+
+`chimera serve --mcp` builds its own agent. `chimera mcp desktop` builds nothing: it is a
+remote control for the desktop app **you already have open**, so Claude sees the same
+conversations, runs and approvals you do, and whatever it starts runs under the app's
+governance, on the app's screens.
+
+1. In the app, open **Settings → Claude** and turn on **Allow Claude to operate this app**.
+2. Register the server with Claude Code (or add the same command to Claude Desktop's config):
+
+   ```bash
+   claude mcp add chimera-desktop -- chimera mcp desktop
+   ```
+
+With the first switch on, Claude can read and start conversations (`desktop_send`), runs,
+batches, boards and cron jobs, search and edit memory, and read files and git state. A run
+it starts carries the posture you configured, and a request that tries to widen it — a
+`verify` command, host execution, another agent, auto-approval — is refused. Approvals
+stay with you: `desktop_approvals` lists them and nothing more. When a turn stops for one,
+`desktop_send` returns at once saying it is waiting for you, and the turn carries on in the
+app; `desktop_job` reports how it ends.
+
+The second switch, **Full control**, adds `desktop_approve` (answer approvals and gated
+steps) and `desktop_settings` (edit settings, the agent's identity and saved agents, run a
+command in the Runner). With it on, Claude can approve actions without you — and a
+prompt-injected page or message the agent reads could lead it to. Those two tools are not
+listed at all while it is off, and the app refuses them if called anyway.
+
+What neither switch allows: reading or writing an API key, token or webhook. Settings
+edits refuse credential names, the routes that carry keys or share links are not reachable,
+credential files (`.env`, private keys) cannot be read, written or searched, and every
+result is scrubbed of credential values. Nor can a call point a workspace at the app's own
+data folder, or at a folder that contains it (your home directory, for instance): that is
+where approval answers are kept, and a file written there would answer one.
+
+How it connects: while the switch is on, the app writes `~/.chimera/desktop-bridge.json`
+(the URL of its loopback API and a random token; on POSIX readable only by you, on Windows
+inside your profile). Turning the switch off or closing the app deletes it and retires the
+token. If the app is closed, every tool answers "Chimera desktop is not running, or 'Allow
+Claude to operate this app' is off in Settings." Claude lists tools when it connects, so
+after turning **Full control** on or off, reconnect the server (`/mcp` in Claude Code) to
+see the new list.
+
 ## Speaking A2A (agent → agent)
 
 MCP connects agents to *tools*; **A2A** (Agent2Agent, Linux Foundation) connects agents to

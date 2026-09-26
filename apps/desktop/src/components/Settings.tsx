@@ -400,6 +400,7 @@ function Row({
   hint,
   applies,
   env,
+  warn = false,
   children,
 }: {
   label: string;
@@ -407,13 +408,19 @@ function Row({
   applies?: string;
   /** The single env var this row writes, so the row can say when the server's environment pins it. */
   env?: string;
+  /** The hint is a warning about what switching this on allows, not a description of it. */
+  warn?: boolean;
   children: ReactNode;
 }) {
   return (
     <div className="flex items-center justify-between gap-4 px-4 py-3">
       <div className="min-w-0">
         <div className="text-sm font-medium">{label}</div>
-        {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
+        {hint && (
+          <div className={warn ? "text-xs text-warn-foreground" : "text-xs text-muted-foreground"}>
+            {hint}
+          </div>
+        )}
         <AppliesNote when={applies} />
         <PinnedNote env={env} />
       </div>
@@ -1489,6 +1496,43 @@ export function Settings() {
                       }
                     />
                   </Row>
+                </Card>
+
+                {/* The desktop bridge (`chimera/api/desktop_bridge.py`): whether Claude, through
+              `chimera mcp desktop`, may operate this running app. Both off by default. The second
+              switch is disabled rather than hidden while the first is off, so the person can read
+              what it would allow before deciding anything; its hint is a warning because what it
+              adds is the one thing the first leaves with the owner — answering approvals. Saving
+              either applies at once: the server writes or deletes the discovery file on the PATCH. */}
+                <Card title={t("settings.card.bridge")}>
+                  <Row
+                    label={t("settings.row.desktopBridge")}
+                    hint={t("settings.hint.desktopBridge")}
+                    env="CHIMERA_DESKTOP_BRIDGE"
+                  >
+                    <Toggle
+                      on={c.bridge?.enabled ?? false}
+                      onChange={(v) => save({ CHIMERA_DESKTOP_BRIDGE: String(v) })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.desktopBridgeFull")}
+                    hint={t("settings.hint.desktopBridgeFull")}
+                    env="CHIMERA_DESKTOP_BRIDGE_FULL"
+                    warn
+                  >
+                    <Switch
+                      checked={c.bridge?.full ?? false}
+                      disabled={!(c.bridge?.enabled ?? false)}
+                      label={t("settings.row.desktopBridgeFull")}
+                      onChange={(v) => save({ CHIMERA_DESKTOP_BRIDGE_FULL: String(v) })}
+                    />
+                  </Row>
+                  <p className="px-4 py-2.5 text-xs text-muted-foreground">
+                    {c.bridge?.enabled
+                      ? t("settings.note.desktopBridgeSetup")
+                      : t("settings.note.desktopBridgeNeedsFirst")}
+                  </p>
                 </Card>
 
                 <Card title={t("settings.card.server")}>

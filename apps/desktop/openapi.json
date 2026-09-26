@@ -1215,6 +1215,232 @@
         "title": "Body_upload_attachment_api_attachments_post",
         "type": "object"
       },
+      "BridgeCallIn": {
+        "additionalProperties": false,
+        "description": "One call through the bridge: a route id from the table, never a URL.",
+        "properties": {
+          "body": {
+            "title": "Body"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "wait_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Seconds"
+          }
+        },
+        "required": [
+          "route"
+        ],
+        "title": "BridgeCallIn",
+        "type": "object"
+      },
+      "BridgeCallOut": {
+        "properties": {
+          "data": {
+            "title": "Data"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BridgeJobOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "route",
+          "status"
+        ],
+        "title": "BridgeCallOut",
+        "type": "object"
+      },
+      "BridgeCfgOut": {
+        "description": "The desktop bridge's two switches (``chimera/api/desktop_bridge.py``), both off by default.\n\n``full`` is reported as the owner set it, not as it acts: it does nothing while ``enabled`` is\noff, and the screen says so rather than hiding the row.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "full": {
+            "default": false,
+            "title": "Full",
+            "type": "boolean"
+          }
+        },
+        "title": "BridgeCfgOut",
+        "type": "object"
+      },
+      "BridgeJobOut": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "elapsed_seconds": {
+            "title": "Elapsed Seconds",
+            "type": "number"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "events": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Events",
+            "type": "array"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "next": {
+            "title": "Next",
+            "type": "integer"
+          },
+          "pending_approvals": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Pending Approvals",
+            "type": "array"
+          },
+          "result": {
+            "title": "Result"
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "waiting_for_approval": {
+            "title": "Waiting For Approval",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "job_id",
+          "route",
+          "done",
+          "waiting_for_approval",
+          "pending_approvals",
+          "session_id",
+          "turn_id",
+          "text",
+          "events",
+          "next",
+          "elapsed_seconds"
+        ],
+        "title": "BridgeJobOut",
+        "type": "object"
+      },
+      "BridgeStatusOut": {
+        "properties": {
+          "app": {
+            "default": "chimera-desktop",
+            "title": "App",
+            "type": "string"
+          },
+          "conversations": {
+            "title": "Conversations",
+            "type": "integer"
+          },
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
+          "last_project": {
+            "title": "Last Project",
+            "type": "string"
+          },
+          "pending_approvals": {
+            "title": "Pending Approvals",
+            "type": "integer"
+          },
+          "projects": {
+            "title": "Projects",
+            "type": "integer"
+          },
+          "spent_today_usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spent Today Usd"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "tier",
+          "default_model",
+          "workspace",
+          "last_project",
+          "projects",
+          "conversations",
+          "spent_today_usd",
+          "pending_approvals"
+        ],
+        "title": "BridgeStatusOut",
+        "type": "object"
+      },
       "BrowserCfgOut": {
         "description": "Whether the agent's Chromium runs where you can see it.\n\nThe switch has been wired since the browser tool shipped and had no control anywhere, so the only\nway to watch a page the agent was driving was to edit ``.env`` and restart \u2014 which is the same as\nnot being able to watch it, for anyone who did not read the source.",
         "properties": {
@@ -2114,6 +2340,9 @@
           },
           "autonomy": {
             "$ref": "#/components/schemas/AutonomyCfgOut"
+          },
+          "bridge": {
+            "$ref": "#/components/schemas/BridgeCfgOut"
           },
           "browser": {
             "$ref": "#/components/schemas/BrowserCfgOut"
@@ -10147,6 +10376,130 @@
           }
         },
         "summary": "Benchmarks Endpoint"
+      }
+    },
+    "/api/bridge/call": {
+      "post": {
+        "operationId": "bridge_call_api_bridge_call_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BridgeCallIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BridgeCallOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bridge Call",
+        "tags": [
+          "bridge"
+        ]
+      }
+    },
+    "/api/bridge/jobs/{job_id}": {
+      "get": {
+        "operationId": "bridge_job_api_bridge_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Since",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "wait_seconds",
+            "required": false,
+            "schema": {
+              "default": 0.0,
+              "title": "Wait Seconds",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BridgeJobOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bridge Job",
+        "tags": [
+          "bridge"
+        ]
+      }
+    },
+    "/api/bridge/status": {
+      "get": {
+        "operationId": "bridge_status_api_bridge_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BridgeStatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Bridge Status",
+        "tags": [
+          "bridge"
+        ]
       }
     },
     "/api/chat/stream": {

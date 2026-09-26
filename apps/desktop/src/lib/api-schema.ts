@@ -210,6 +210,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/bridge/call": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bridge Call */
+        post: operations["bridge_call_api_bridge_call_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bridge/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bridge Job */
+        get: operations["bridge_job_api_bridge_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bridge/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bridge Status */
+        get: operations["bridge_status_api_bridge_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chat/stream": {
         parameters: {
             query?: never;
@@ -3505,6 +3556,113 @@ export interface components {
             file: string;
         };
         /**
+         * BridgeCallIn
+         * @description One call through the bridge: a route id from the table, never a URL.
+         */
+        BridgeCallIn: {
+            /** Body */
+            body?: unknown;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Route */
+            route: string;
+            /** Wait Seconds */
+            wait_seconds?: number | null;
+        };
+        /** BridgeCallOut */
+        BridgeCallOut: {
+            /** Data */
+            data?: unknown;
+            job?: components["schemas"]["BridgeJobOut"] | null;
+            /** Route */
+            route: string;
+            /** Status */
+            status: number;
+        };
+        /**
+         * BridgeCfgOut
+         * @description The desktop bridge's two switches (``chimera/api/desktop_bridge.py``), both off by default.
+         *
+         *     ``full`` is reported as the owner set it, not as it acts: it does nothing while ``enabled`` is
+         *     off, and the screen says so rather than hiding the row.
+         */
+        BridgeCfgOut: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Full
+             * @default false
+             */
+            full: boolean;
+        };
+        /** BridgeJobOut */
+        BridgeJobOut: {
+            /** Done */
+            done: boolean;
+            /** Elapsed Seconds */
+            elapsed_seconds: number;
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /** Events */
+            events: {
+                [key: string]: unknown;
+            }[];
+            /** Job Id */
+            job_id: string;
+            /** Next */
+            next: number;
+            /** Pending Approvals */
+            pending_approvals: {
+                [key: string]: unknown;
+            }[];
+            /** Result */
+            result?: unknown;
+            /** Route */
+            route: string;
+            /** Session Id */
+            session_id: string;
+            /** Text */
+            text: string;
+            /** Turn Id */
+            turn_id: string;
+            /** Waiting For Approval */
+            waiting_for_approval: boolean;
+        };
+        /** BridgeStatusOut */
+        BridgeStatusOut: {
+            /**
+             * App
+             * @default chimera-desktop
+             */
+            app: string;
+            /** Conversations */
+            conversations: number;
+            /** Default Model */
+            default_model: string;
+            /** Last Project */
+            last_project: string;
+            /** Pending Approvals */
+            pending_approvals: number;
+            /** Projects */
+            projects: number;
+            /** Spent Today Usd */
+            spent_today_usd: number | null;
+            /** Tier */
+            tier: string;
+            /** Version */
+            version: string;
+            /** Workspace */
+            workspace: string;
+        };
+        /**
          * BrowserCfgOut
          * @description Whether the agent's Chromium runs where you can see it.
          *
@@ -4003,6 +4161,7 @@ export interface components {
             };
             automation: components["schemas"]["AutomationCfgOut"];
             autonomy: components["schemas"]["AutonomyCfgOut"];
+            bridge?: components["schemas"]["BridgeCfgOut"];
             browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
             experimental?: components["schemas"]["ExperimentalCfgOut"];
@@ -7802,6 +7961,93 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BenchmarksOut"];
+                };
+            };
+        };
+    };
+    bridge_call_api_bridge_call_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BridgeCallIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeCallOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bridge_job_api_bridge_jobs__job_id__get: {
+        parameters: {
+            query?: {
+                since?: number;
+                wait_seconds?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeJobOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bridge_status_api_bridge_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BridgeStatusOut"];
                 };
             };
         };

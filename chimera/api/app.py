@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.benchmarks_api import benchmark_report
+from chimera.api.bridge_routes import BRIDGE_SETTINGS
 from chimera.api.code_api import (
     CodeSeams,
     assemble_registry,
@@ -40,6 +41,7 @@ from chimera.api.code_api import (
     resolve_role_plan,
     resolve_steps,
 )
+from chimera.api.desktop_bridge import DesktopBridge, register_bridge_api
 from chimera.api.governance import read_audit, run_injection_suite
 from chimera.api.maturity_api import maturity_report
 from chimera.api.roles import fusion_for_role, review_model_for
@@ -586,6 +588,9 @@ def build_api_app(
     # second directory would be one nothing ever puts a file in.
     openai_manager = SessionManager(openai_factory or factory, store)
     guard = Depends(_require_token())
+    # `chimera mcp desktop`'s door into this app — off until the owner turns it on, and inert until
+    # the CLI tells it the port (`attach`). See `chimera/api/desktop_bridge.py`.
+    desktop_bridge = DesktopBridge(live_settings)
 
     app = FastAPI(
         title="Chimera Desktop API",
@@ -634,9 +639,14 @@ def build_api_app(
         from chimera.api.config_api import patch_config
 
         try:
-            return patch_config(updates)
+            result = patch_config(updates)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # The bridge's switches apply live: saving one writes or deletes the discovery file now,
+        # rather than at a relaunch the screen would have to ask for.
+        if BRIDGE_SETTINGS & set(updates):
+            desktop_bridge.sync()
+        return result
 
     # Pools are edited by OPERATION, not by value. `PATCH /api/config` writes a string, and a string
     # is exactly what a pool must not be edited as: the client would have to know every key to change
@@ -2205,6 +2215,8 @@ def build_api_app(
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
     # stops to ask would be an assembly that refuses, and the app's screen must not be held to that.
     register_openai_compat(app, guard, openai_manager)
+    # /api/bridge/* — the only routes that take the bridge token instead of the server's guard.
+    register_bridge_api(app, desktop_bridge, live_settings=live_settings, workspace=workspace)
 
     if static_dir is not None:
         _mount_spa(app, static_dir)
