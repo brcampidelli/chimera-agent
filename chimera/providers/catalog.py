@@ -214,8 +214,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- top: orchestrator/judge class. Decompose, adjudicate, synthesize. ---
     CatalogEntry(
         "openrouter/z-ai/glm-5.3", "top", "Zhipu (GLM)",
-        1.40, 4.40, tools=True, context_k=1048, also_seen=((0.91, 2.86),),
-        notes="the top rung of `balanced` and `auto` since 2026-09-03, and the reason is the slug below rather than this one: R1 carried a 64k window into a tier that asks for 100k. This has 1310k, a third-party agentic index of 59.1 against R1's 3.1, and wrote a file in 51s against R1's 209s. It costs twice as much per token and buys a working top tier. The index read 0.91/2.86 on 2026-09-19 — a second route at two thirds of the price; the live check accepts either",
+        1.40, 4.40, tools=True, context_k=1048, also_seen=((0.91, 2.86), (0.3794, 1.1924)),
+        notes="the top rung of `balanced` and `auto` since 2026-09-03, and the reason is the slug below rather than this one: R1 carried a 64k window into a tier that asks for 100k. This has 1310k, a third-party agentic index of 59.1 against R1's 3.1, and wrote a file in 51s against R1's 209s. It costs twice as much per token and buys a working top tier. The index read 0.91/2.86 on 2026-09-19 — a second route at two thirds of the price; the live check accepts either. On 2026-09-26 the listing read 0.3794/1.1924, the cheapest of about forty routes (Baidu); the first-party Z.AI route still quotes 1.40/4.40, so that stays the row's price",
     ),
     CatalogEntry(
         "openrouter/deepseek/deepseek-r1", "top", "DeepSeek",
