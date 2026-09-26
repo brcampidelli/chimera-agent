@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
     from chimera.memory.extract import MemoryExtractor
+    from chimera.orchestration.metering import MeteredBackend
     from chimera.pet import Pet, PetStore
     from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
@@ -1939,14 +1940,14 @@ def chat(
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if not message:
             continue
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if head == "/help":
             _print_help(commands)
@@ -1997,7 +1998,7 @@ def chat(
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if outcome != "ok":
             continue
@@ -2144,7 +2145,7 @@ def assist(
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if not message:
@@ -2152,7 +2153,7 @@ def assist(
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if head == "/help":
@@ -2219,7 +2220,7 @@ def assist(
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if outcome != "ok":
@@ -6936,22 +6937,46 @@ def _emit_skill_nudges(session: object, known_skills: list[str], already: set[st
             )
 
 
-def _maybe_autoconsolidate(memory: MemoryManager | None, settings: Settings) -> None:
-    """On session end, consolidate memory if it outgrew the budget (opt-in)."""
+def _maybe_autoconsolidate(
+    memory: MemoryManager | None, settings: Settings, usage_id: str = ""
+) -> None:
+    """On session end, consolidate memory if it outgrew the budget (opt-in).
+
+    The merges are model calls, metered and written to the usage log under ``usage_id``, the
+    conversation that just ended, as :data:`chimera.api.usage.TIDY_KIND`: added to its spend and
+    not counted as a turn of it. A merge that failed part-way still bills the merges it paid for.
+    """
     if memory is None or not settings.auto_consolidate:
         return
+    from chimera.orchestration.metering import MeteredBackend as _Meter
+
+    meter: MeteredBackend | None = None
     try:
         from chimera.memory.consolidate import model_summarizer
         from chimera.providers import LLMGateway
 
-        removed = memory.autoconsolidate(
-            model_summarizer(LLMGateway()), max_items=settings.memory_budget
-        )
+        meter = _Meter(LLMGateway(), label="tidy")
+        removed = memory.autoconsolidate(model_summarizer(meter), max_items=settings.memory_budget)
     except Exception as exc:  # noqa: BLE001 — best-effort cleanup, never break exit
+        _record_tidy_spend(settings, meter, usage_id)
         console.print(f"[dim]auto-consolidate skipped: {exc}[/dim]")
         return
+    _record_tidy_spend(settings, meter, usage_id)
     if removed:
         console.print(f"[dim]🧹 consolidated {removed} redundant memory item(s)[/dim]")
+
+
+def _record_tidy_spend(settings: Settings, meter: MeteredBackend | None, usage_id: str) -> None:
+    """Write what the tidy's merges cost, when it made any (see `_maybe_autoconsolidate`)."""
+    if meter is None or not meter.calls:
+        return
+    from chimera.api.usage import TIDY_KIND, record_spend
+
+    record_spend(
+        settings.home, session_id=usage_id or "memory-tidy", model=meter.last_model,
+        prompt_tokens=meter.prompt_tokens, completion_tokens=meter.completion_tokens,
+        usd=meter.usd, route_kind=TIDY_KIND,
+    )
 
 
 def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:

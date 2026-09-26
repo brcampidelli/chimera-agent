@@ -1801,7 +1801,8 @@ def register_code_api(
                     # carry the planning call and the merge: every way out of a turn passes here.
                     # The plan's meter is then cleared, so a failure later in this function cannot
                     # bill it a second time through the `except` below.
-                    payload = _with_metered_call(_with_metered_call(payload, plan_meter), tidy_meter)
+                    payload = _with_metered_call(payload, plan_meter)
+                    payload = _with_metered_call(payload, tidy_meter)
                     plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
