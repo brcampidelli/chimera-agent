@@ -309,11 +309,18 @@ def run(
             return "T" if _transport(turn) else "E"
         return "H" if turn["hits"] else "."
 
+    # Each finished row is also appended here as it lands, so a WSL VM that dies mid-run (it has,
+    # on this machine) loses the rows in flight and not the money already spent on the others.
+    partial = out.with_suffix(".partial.jsonl")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    partial.unlink(missing_ok=True)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(item, i): i for i in order}
         for n, future in enumerate(as_completed(futures), 1):
             row = future.result()
             rows[futures[future]] = row
+            with partial.open("a", encoding="utf-8", newline="\n") as sink:
+                sink.write(json.dumps(row, ensure_ascii=False) + "\n")
             marks = " ".join(f"{a}={''.join(mark(r) for r in row['runs'][a])}" for a in ORDER)
             spent = sum(b.usd for b in budgets.values())
             print(f"  [{n:>2}/{len(order)}] {row['kind']:6} {row['commit']} {marks}  "
