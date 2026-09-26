@@ -1,9 +1,10 @@
 """The agent loop never makes a reasoning trace its answer — and says when the route filed one.
 
-A route can file a reasoning model's whole reply as reasoning (`CompletionResult.answer_in_reasoning`;
-`deepseek-r1` on Novita did it on 37–43% of calls, `bench/review_judge/RESULTS-h11.md`). The loop
-expects prose, and prose is not recovered from a thought trace: the trace would be shown to the person
-and can end on a draft. So the loop keeps the re-ask of #619/#624 and, when both replies came back
+A route can file a reasoning model's whole reply as reasoning
+(`CompletionResult.answer_in_reasoning`; `deepseek-r1` on Novita did it on 37–43% of calls,
+`bench/review_judge/RESULTS-h11.md`). The loop expects prose, and prose is not recovered from a
+thought trace: the trace would be shown to the person and can end on a draft. So the loop keeps the
+re-ask of #619/#624 and, when both replies came back
 empty, its note says the text was filed as reasoning instead of leaving "empty" unexplained. Every
 ending that asks for a closing reply is covered: the natural ending, the step limit and the loop
 breaker. Fakes only; the same path through the real gateway and LiteLLM's parser is in
@@ -50,7 +51,9 @@ class _Script:
         self.replies = list(replies)
         self.tool_turns = tool_turns
 
-    def complete(self, messages: list[Any], *, tools: Any = None, **kwargs: Any) -> CompletionResult:
+    def complete(
+        self, messages: list[Any], *, tools: Any = None, **kwargs: Any
+    ) -> CompletionResult:
         if tools is not None and self.tool_turns > 0:
             self.tool_turns -= 1
             return TOOL_TURN

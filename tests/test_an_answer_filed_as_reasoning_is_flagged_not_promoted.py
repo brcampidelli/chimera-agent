@@ -1,19 +1,19 @@
-"""A route that files the whole reply as reasoning is flagged, and the reasoning never becomes the answer.
+"""A reply the route filed as reasoning is flagged, and the reasoning never becomes the answer.
 
 `bench/review_judge/RESULTS-h11.md` (2026-09-25, S5): `deepseek-r1` pinned to Novita returned
 ``content`` empty with ``finish_reason`` "stop" on 353 of 814 calls of one prompt and 305 of 814 of
-another. The model never closed its reasoning, so the provider filed its whole output — the JSON the
-prompt asked for included — under the reasoning field. `LLMGateway._normalize` read ``content`` only,
-so every caller received "" with "stop" and no error.
+another. The model never closed its reasoning, so the provider filed its whole output — the JSON
+the prompt asked for included — under the reasoning field. `LLMGateway._normalize` read ``content``
+only, so every caller received "" with "stop" and no error.
 
-What is pinned here, offline, through LiteLLM's real OpenRouter parser (its one HTTP seam is replaced
-by a fake that answers in OpenRouter's wire format, as in
+What is pinned here, offline, through LiteLLM's real OpenRouter parser (its one HTTP seam is
+replaced by a fake that answers in OpenRouter's wire format, as in
 `test_the_adapter_returns_the_tool_call_it_was_given.py`):
 
-* the flag is set on that reply, on the batch route and on the stream, and the provider is named in a
-  warning that never quotes the reasoning;
-* it is NOT set on a reply with text, on a reply cut at the ceiling, or on an empty reply that carried
-  no reasoning either;
+* the flag is set on that reply, on the batch route and on the stream, and the provider is named
+  in a warning that never quotes the reasoning;
+* it is NOT set on a reply with text, on a reply cut at the ceiling, or on an empty reply that
+  carried no reasoning either;
 * ``content`` stays empty — the reasoning is kept beside it, out of ``repr`` and ``model_dump``;
 * the one reader that may take something back out, `answer_at_end_of_reasoning`, takes only an
   object of the caller's schema that ENDS the reasoning.
@@ -54,7 +54,9 @@ def _serve(monkeypatch: pytest.MonkeyPatch, answers: list[dict[str, Any] | bytes
     """LiteLLM's one HTTP seam, answering from ``answers`` in order."""
     wire = _Wire(list(answers))
 
-    def post(_self: Any, url: str, data: Any = None, json: Any = None, **_kw: Any) -> httpx.Response:
+    def post(
+        _self: Any, url: str, data: Any = None, json: Any = None, **_kw: Any
+    ) -> httpx.Response:
         raw = json if json is not None else data
         wire.bodies.append(_loads(raw) if isinstance(raw, str | bytes) else dict(raw or {}))
         request = httpx.Request("POST", url)
@@ -155,7 +157,8 @@ def test_a_reply_filed_as_reasoning_is_flagged_and_its_content_stays_empty(
     assert result.content == ""
     assert result.finish_reason == "stop"
     assert result.reasoning == REASONING
-    warned = [r.getMessage() for r in caplog.records if "filed the answer as reasoning" in r.getMessage()]
+    lines = [r.getMessage() for r in caplog.records]
+    warned = [line for line in lines if "filed the answer as reasoning" in line]
     assert len(warned) == 1
     assert "Novita" in warned[0] and "gen-1" in warned[0]
     assert "loop reads" not in warned[0]  # the reasoning itself is never logged
@@ -181,7 +184,9 @@ def test_a_reply_with_text_is_not_flagged_and_keeps_its_reasoning_beside_it(
     assert result.reasoning == "short thought"
 
 
-def test_a_streamed_reply_with_text_is_not_flagged(armed: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_streamed_reply_with_text_is_not_flagged(
+    armed: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     shown: list[str] = []
     result = _complete(_stream(ANSWER, "short thought"), monkeypatch, seen=shown)
     assert result.answer_in_reasoning is False
@@ -189,7 +194,9 @@ def test_a_streamed_reply_with_text_is_not_flagged(armed: None, monkeypatch: pyt
     assert "".join(shown) == ANSWER
 
 
-def test_an_empty_reply_with_no_reasoning_is_a_real_empty(armed: None, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_empty_reply_with_no_reasoning_is_a_real_empty(
+    armed: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
     result = _complete(_batch(None, None), monkeypatch)
     assert result.content == ""
     assert result.answer_in_reasoning is False
@@ -199,16 +206,22 @@ def test_a_reply_cut_at_the_ceiling_is_truncation_not_a_filed_answer(
     armed: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Reasoning that ran out of room holds no finished answer; `truncated` already names it."""
-    result = _complete(_batch(None, "still thinking about the bound when", finish="length"), monkeypatch)
+    cut = _batch(None, "still thinking about the bound when", finish="length")
+    result = _complete(cut, monkeypatch)
     assert result.truncated is True
     assert result.answer_in_reasoning is False
 
 
+def _response(message: Any) -> Any:
+    return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")],
+                           usage=None)
+
+
 def test_a_tool_call_with_reasoning_is_not_a_filed_answer() -> None:
-    call = SimpleNamespace(id="c1", function=SimpleNamespace(name="echo", arguments='{"text": "x"}'))
+    fn = SimpleNamespace(name="echo", arguments='{"text": "x"}')
+    call = SimpleNamespace(id="c1", function=fn)
     message = SimpleNamespace(content=None, tool_calls=[call], reasoning_content="I should echo x.")
-    response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=None)
-    result = LLMGateway._normalize(response, "m")  # noqa: SLF001
+    result = LLMGateway._normalize(_response(message), "m")  # noqa: SLF001
     assert result.tool_calls is not None
     assert result.answer_in_reasoning is False
 
@@ -217,8 +230,7 @@ def test_the_raw_field_is_read_when_the_renamed_one_is_absent() -> None:
     """litellm keeps OpenRouter's own ``reasoning`` under ``provider_specific_fields`` too."""
     message = SimpleNamespace(content=None, tool_calls=None,
                               provider_specific_fields={"reasoning": REASONING})
-    response = SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")], usage=None)
-    result = LLMGateway._normalize(response, "m")  # noqa: SLF001
+    result = LLMGateway._normalize(_response(message), "m")  # noqa: SLF001
     assert result.answer_in_reasoning is True
     assert result.reasoning == REASONING
 
@@ -270,7 +282,8 @@ def test_the_agent_loop_never_hands_back_the_reasoning(
     result = agent.run("judge this comment", on_token=(lambda _t: None) if streamed else None)
     assert result.answer.startswith("(No final answer:")
     assert "filed the model's text as reasoning" in result.answer
-    for text in (result.answer, *(str(m.get("content")) for m in result.transcript if isinstance(m, dict))):
+    sent = [str(m.get("content")) for m in result.transcript if isinstance(m, dict)]
+    for text in (result.answer, *sent):
         assert "loop reads" not in text and '"verdict"' not in text
 
 
@@ -319,8 +332,8 @@ def test_a_restated_format_is_not_an_answer() -> None:
 
 
 def test_the_outer_object_is_taken_not_a_nested_one() -> None:
-    nested = 'final: {"verdict": "approve", "detail": {"line": 3}}'
-    assert answer_at_end_of_reasoning(nested, ("verdict",)) == '{"verdict": "approve", "detail": {"line": 3}}'
+    outer = '{"verdict": "approve", "detail": {"line": 3}}'
+    assert answer_at_end_of_reasoning("final: " + outer, ("verdict",)) == outer
 
 
 def test_a_literal_tab_inside_a_quoted_line_is_still_the_answer() -> None:

@@ -158,12 +158,20 @@ def answer_at_end_of_reasoning(reasoning: str, keys: Collection[str]) -> str:
 
     **The object must be the last thing written**, apart from whitespace and a closing code fence.
     An object followed by more reasoning is a draft the model went on thinking about, and is never
-    taken. That rule costs nothing measured: in the reasoning tails `bench/review_judge` stored for
-    its 765 recovered answers (H11, 2026-09-25), 714 objects were followed by nothing and 51 by a
-    fence only, and this reader takes the same text that run took on all 765; on the three where the
-    run found no valid object (a final with an invalid escape among them), neither does this one. A
-    restatement of the requested format (``"approve" | "reject"``) is not valid JSON and is never
-    taken either.
+    taken. On H11's prompt that rule cost nothing: in the reasoning tails `bench/review_judge`
+    stored for its 765 recovered answers (H11, 2026-09-25), 714 objects were followed by nothing and
+    51 by a fence only, and this reader takes the same text that run took on all 765; on the three
+    where the run found no valid object (a final with an invalid escape among them), neither does
+    this one. A restatement of the requested format (``"approve" | "reject"``) is not valid JSON and
+    is never taken either.
+
+    **It is strict, and on another prompt it costs answers.** On the hosted decision backend's
+    prompt (`bench/answer_in_reasoning/RESULTS.md`, 2026-09-26) it took 13 of 22 flagged replies,
+    each the final object. The misses whose whole reasoning was kept (3 of 3) wrote the final object
+    and then a prose justification of the same verdict; they fall back to the caller's re-ask.
+    Taking an object followed by prose that names the same option is the candidate there, and it is
+    unmeasured.
+
     Control characters inside strings are accepted (``strict=False``): a quoted line of code with a
     literal tab is still the model's answer (H11, amendment 2).
     """
