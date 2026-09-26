@@ -21,17 +21,30 @@ elements with a box at snapshot time (`browser_playwright._TAG_SCRIPT`): a login
 DOM of an ordinary page does not stop anything. Frames carry no such stamp, so a provider's frame is
 matched only in its visible form (a reCAPTCHA or hCaptcha checkbox, not their invisible variants).
 
-**What it cannot see.** A wall drawn inside a cross-origin frame the list above does not name, a
+**Two gaps the live-page run named, closed in walls v2** (`bench/browser_element_list`):
+
+- *Widgets injected late.* An action that can load a document is followed by a bounded wait for the
+  page's ``load`` event before the look (:data:`SETTLE_SECONDS`), because hCaptcha's checkbox frame
+  arrived 0.18 s after ``domcontentloaded``, the moment every action returns at.
+- *Frames in shadow roots.* The driver's frame tree is read beside the HTML, since a shadow root's
+  contents are not in the serialised DOM. Turnstile's frame sits in a **closed** root, which no
+  script can walk; the tree holds it anyway. A frame from the tree counts only when drawn at least
+  :data:`_MIN_WIDGET_PX` on each side, since the tree also holds the hidden frames the HTML rules
+  exclude by their address.
+
+**What it cannot see.** A wall drawn inside a cross-origin frame the list above does not name; a
 login that asks for the account first and the password on the next page (it hands over on that next
-page, or on the identity providers named in :data:`_SIGN_IN_HOSTS`), and a wall the page builds after
-the snapshot without any later action looking again. A probe that fails is logged and treated as no
-wall: the stop is a courtesy to the person, and the boundary is governance, not this scan.
+page, or on the identity providers named in :data:`_SIGN_IN_HOSTS`); an input field inside a shadow
+root, which neither the HTML nor the ref stamp reaches; a widget that arrives after the settle wait
+ran out, or that the page builds with no later action looking again. A probe that fails is logged
+and treated as no wall: the stop is a courtesy to the person, and the boundary is governance, not
+this scan.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Any, Literal
@@ -263,13 +276,21 @@ _FIELD_WORDS: dict[str, str] = {
 }
 
 
-def detect_wall(html: str, url: str = "") -> Wall | None:
-    """The wall ``html`` shows, or None for an ordinary page. Pure: the page and its address only."""
+def is_provider_frame(address: str) -> bool:
+    """Whether a frame at ``address`` would be a wall, by address alone — which frames the driver
+    is asked to measure the box of (:func:`_drawn_frames`)."""
+    return _frame_wall({"src": address}) is not None
+
+
+def detect_wall(html: str, url: str = "", frames: Sequence[str] = ()) -> Wall | None:
+    """The wall ``html`` shows, or None for an ordinary page. Pure: the page, its address, and
+    ``frames`` — addresses of frames drawn on the page that the HTML may not show (a shadow root's),
+    read off the driver's frame tree and matched by the same rules as the HTML's frames."""
     scan = _scan(html)
     found: dict[str, str] = {}
     if scan.challenge:
         found["captcha"] = "a bot-check page"
-    for attrs in scan.frames:
+    for attrs in [*scan.frames, *({"src": address} for address in frames)]:
         hit = _frame_wall(attrs)
         if hit is not None:
             found.setdefault(hit[0], hit[1])
@@ -362,6 +383,21 @@ def private_store_refusal(action: str, kwargs: dict[str, Any]) -> str | None:
 _PAGE_ACTIONS = frozenset({"navigate", "click", "back", "read", "type", "scroll"})
 #: Reads that load a page only when they carry a ``url``.
 _URL_ACTIONS = frozenset({"read_text", "find", "screenshot"})
+#: Actions that can load a new document, and so are followed by the settle wait. `read`, `type` and
+#: `scroll` look again without it: they load nothing, and a page that never reaches ``load`` would
+#: otherwise charge the wait on every look instead of once.
+_DOCUMENT_ACTIONS = frozenset({"navigate", "click", "back"})
+
+#: The most an action that loads a document waits for the page's ``load`` event before the look.
+#: Measured on in-sample pages from WSL (walls v2 design probe): ``load`` came 0.0–0.25 s after
+#: ``domcontentloaded`` on seven of nine and 3.1 s on an ad-heavy portal, and hCaptcha's frame
+#: needed 0.18 s. Two seconds covers the widgets with room and caps the portal's cost.
+SETTLE_SECONDS = 2.0
+#: A frame from the driver's tree counts only when drawn at least this wide and this tall. The
+#: widgets a person has to use measured 300 × 65 (Turnstile) to 304 × 78 (reCAPTCHA); a hidden frame
+#: measures 0 × 0 and a tracking pixel 1 × 1. The HTML's own frames keep the address rules alone,
+#: unchanged, so the only frames this can drop are ones the HTML never showed.
+_MIN_WIDGET_PX = 20
 
 Dispatch = Callable[[str, BrowserDriver, dict[str, Any]], str]
 
@@ -374,6 +410,25 @@ def _url_of(driver: BrowserDriver) -> str:
         return ""
 
 
+def _drawn_frames(driver: BrowserDriver) -> list[str]:
+    """The provider frames the driver's frame tree holds at a usable size, or [] when it cannot say.
+
+    Its own failure is caught here rather than in the probe around it, so a frame tree that cannot
+    be read still leaves the HTML scan to run."""
+    boxes = getattr(driver, "frame_boxes", None)
+    if not callable(boxes):
+        return []
+    try:
+        return [
+            address
+            for address, width, height in boxes(is_provider_frame)
+            if width >= _MIN_WIDGET_PX and height >= _MIN_WIDGET_PX
+        ]
+    except Exception as exc:  # noqa: BLE001 — the HTML scan still runs; see the module docstring
+        _log.debug("browser frame tree unread: %s", exc)
+        return []
+
+
 class BrowserSituation:
     """The harness half of the browser situation, held by one `BrowserTool` (``situation=``).
 
@@ -384,8 +439,10 @@ class BrowserSituation:
     its page as well, which is the larger problem.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, settle_seconds: float = SETTLE_SECONDS) -> None:
         self._handover: Wall | None = None
+        #: 0 turns the settle wait off: the look then happens at ``domcontentloaded``, as in v1.
+        self.settle_seconds = settle_seconds
 
     def take_handover(self) -> Wall | None:
         """The wall the last action stopped at, once; None when there was none."""
@@ -404,13 +461,27 @@ class BrowserSituation:
             if wall is not None:
                 return self._hand_over(wall)
         result = dispatch(action, driver, kwargs)
-        loaded = action in _PAGE_ACTIONS or (
-            action in _URL_ACTIONS and str(kwargs.get("url", "") or "").strip()
-        )
-        if not loaded or result.startswith("error:"):
+        with_url = action in _URL_ACTIONS and bool(str(kwargs.get("url", "") or "").strip())
+        if not (action in _PAGE_ACTIONS or with_url) or result.startswith("error:"):
             return result
-        wall = self._probe(lambda: detect_wall(driver.page_html(), _url_of(driver)))
+        if action in _DOCUMENT_ACTIONS or with_url:
+            self._settle(driver)
+        # The element list the model reads is the one the action returned, at domcontentloaded;
+        # the wait changes only when the look happens, so on a page with no wall the observation
+        # is byte for byte what it was.
+        wall = self._probe(
+            lambda: detect_wall(driver.page_html(), _url_of(driver), _drawn_frames(driver))
+        )
         return self._hand_over(wall) if wall is not None else result
+
+    def _settle(self, driver: BrowserDriver) -> None:
+        settle = getattr(driver, "settle", None)
+        if self.settle_seconds <= 0 or not callable(settle):
+            return
+        try:
+            settle(self.settle_seconds)
+        except Exception as exc:  # noqa: BLE001 — the look still happens, on the page as it is
+            _log.debug("browser settle skipped: %s", exc)
 
     def _hand_over(self, wall: Wall) -> str:
         self._handover = wall
