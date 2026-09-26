@@ -122,7 +122,7 @@ _BARE = re.compile(r"\b(confirmed|plausible|refuted)\b", re.I)
 
 def _unescape(raw: str) -> str:
     try:
-        return str(json.loads(f'"{raw}"'))
+        return str(json.loads(f'"{raw}"', strict=False))
     except json.JSONDecodeError:
         return raw
 
@@ -143,7 +143,7 @@ def parse_three(text: str) -> dict[str, str]:
     start, end = text.find("{"), text.rfind("}")
     if start != -1 and end > start:
         try:
-            obj = json.loads(text[start : end + 1])
+            obj = json.loads(text[start : end + 1], strict=False)
         except json.JSONDecodeError:
             obj = None
         if isinstance(obj, dict):
@@ -213,6 +213,12 @@ def _selftest() -> None:
     got = answer_in_reasoning('x {"quote": "if (a == \\"b\\") {", "reason": "r", "verdict": "confirmed"} y')
     assert parse_three(got)["state"] == "confirmed" and parse_three(got)["quote"] == 'if (a == "b") {'
     assert answer_in_reasoning('{"a": {"verdict": 1}} then {"note": 2}') == '{"verdict": 1}'
+    # Amendment 2: a quoted code line indented with literal tabs, as the second pilot returned twice.
+    tabbed = '{\n  "quote": "\t\t\tawait x(\\"a\\");",\n  "reason": "r",\n  "verdict": "confirmed"\n}'
+    assert parse_three(tabbed) == {"state": "confirmed", "quote": '\t\t\tawait x("a");', "reason": "r",
+                                   "parse": "json"}
+    assert answer_in_reasoning("draft {\"verdict\": \"refuted\"} final " + tabbed) == tabbed
+    assert quote_in_diff(parse_three(tabbed)["quote"], '@@ -1 +1 @@\n+\t\t\tawait x("a");') is True
 
 
 # --- the items -----------------------------------------------------------------------------------
@@ -261,7 +267,7 @@ def answer_in_reasoning(reasoning: str) -> str:
     answer, not a draft, and a restatement of the requested format (`"approve" | "reject"`) is not
     valid JSON, so it is never taken for an answer.
     """
-    decoder = json.JSONDecoder()
+    decoder = json.JSONDecoder(strict=False)
     pos = reasoning.rfind("{")
     while pos != -1:
         try:

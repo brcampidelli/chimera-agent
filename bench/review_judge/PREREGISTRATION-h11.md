@@ -261,3 +261,36 @@ stands.
 **Observed and not acted on.** In the void pilot, T answered `confirmed` to 14 of its 16 readable
 answers, `refuted` to 2 and `plausible` to none. The prompt stays frozen and the predictions stay as
 registered.
+
+## Amendment 2 — 2026-09-25, after the second pilot, before any main-run call
+
+**The second pilot passed its gate.** Same 20 items, Amendment 1's harness: `unparsed` 0/20 in A and
+0/20 in T, `call_failed` 0, every call served by Novita. The answer came from the reasoning field on
+**11 of 20 A calls and 7 of 20 T calls**. All 18 recovered answers were read against the last 1500
+characters of their reasoning: each is the final JSON the model wrote; where a draft and a final
+both appear, the final was taken, and in no case did draft and final disagree on the verdict. Every
+T answer is well-formed; 19 of 20 quotes are found in the diff.
+
+**One parser change, from that reading.** Two T answers quoted a code line indented with **literal tab
+characters**, which strict `json.loads` rejects; the pattern fallback read both verdicts correctly,
+but the quote kept its escapes (so S3 marked one as not found), and the recovery path uses the same
+decoder — a tab-indented final answer in the reasoning would have been skipped for an earlier draft
+or for nothing. All three decodes now accept control characters inside strings (`strict=False`):
+`parse_three`, its quote unescaping, and `answer_in_reasoning`. Re-parsing every stored T answer of
+both pilots with the amended parser moves **no** verdict. Nothing else changes; the prompt stays frozen.
+
+**Cost and the gate on the run.** Measured on the second pilot: A US$ 0.00327 per call (1106 completion
+tokens), T US$ 0.00556 (2008); OpenRouter's billed `usage.cost` equals tokens × price on all 40 calls.
+Spent before the main run: US$ 0.1745 (void pilot) + 0.0129 (probe) + 0.1766 (second pilot) =
+**US$ 0.364**. Projection: 0.364 + 814 × (0.00327 + 0.00556) + 200 × 0.00327 ≈ **US$ 8.21**, under the
+US$ 9.00 cap; `run_h11.py --run` recomputes it and aborts above the cap. The stop at US$ 8.75 stands:
+if T writes longer than in the pilot, the run ends early over a seeded-random prefix whose first 200
+items carry the replay floor.
+
+**Pace.** Median seconds per call: A 45, T 93 (max 240). The main run keeps 12 items in flight (up to 36
+calls at once, all three arms of an item together), in blocks under `timeout 3000` that start no new
+item after 2300 s.
+
+**Observed and not acted on.** In the second pilot T answered confirmed 16, plausible 2, refuted 2. The
+second pilot's rows (`results/h11/pilot/`) feed the cost projection only; they are in-sample and never
+enter the read.
