@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.62.1] - 2026-09-26
+### Fixed
+
+- **The owner's block is read last again.** When `todo_write` was registered, which is every terminal and desktop session, the task-list sentence was appended after the owner's instructions. That broke the precedence study 25 set for every situation: owner > situation > project > retrieved advice, with the owner last.
+  - The sentence now sits before the project's conventions and the owner.
+  - Its wording is unchanged. (#646)
+
 ## [0.62.0] - 2026-09-26
 ### Changed
 
