@@ -1,5 +1,4 @@
-arm M read from run-M.json (Amendment 3)
-rows 30 · replicas 2 · US$ 0.1924 · stopped: {'M': 'stop rule: 8/10 transport errors'} · fixtures b2f9e29a5fd3
+rows 30 · replicas 2 · US$ 0.1947 · stopped: {'M': 'stop rule: 2/10 transport errors'} · fixtures b2f9e29a5fd3
 
 [D] openrouter/deepseek/deepseek-v4-flash-0731 via DeepInfra  turns 60, ran 60, halted 0, transport failures 0
   incomplete reviews               0/60 = 0.0% [0.0%, 6.0%]  causes {}
@@ -31,29 +30,29 @@ rows 30 · replicas 2 · US$ 0.1924 · stopped: {'M': 'stop rule: 8/10 transport
   clean diffs: 9 shown of 12 anchored over 9, 16 shown of 16 anchored over 10; per 10 diffs after the verifier 13.0 (before 14.67)
   cost US$ 0.0702, per review US$ 0.00117 · tokens 207975/491829 · cache read 34304 · finder median 68.2s
 
-[M] openrouter/mistralai/mistral-small-3.2-24b-instruct via Parasail  turns 60, ran 10, halted 50, transport failures 8
-  incomplete reviews               0/2 = 0.0% [0.0%, 65.8%]  causes {}
-  recall, a hit shown (±3)       1/2 = 50.0% [9.5%, 90.5%]
-    finder recall, before verifier 1/2 = 50.0% [9.5%, 90.5%]
-    incomplete counted as a miss   1/2 = 50.0% [9.5%, 90.5%]
-    replica 1: 0/0 shown, 0/0 located
-    replica 2: 1/2 shown, 1/2 located
-  clean diffs: ; per 10 diffs after the verifier None (before None)
-  cost US$ 0.0006, per review US$ 6.3e-05 · tokens 5269/524 · cache read 368 · finder median 4.7s
+[M] openrouter/mistralai/mistral-small-3.2-24b-instruct via Parasail  turns 60, ran 10, halted 50, transport failures 2
+  incomplete reviews               0/8 = 0.0% [0.0%, 32.4%]  causes {}
+  recall, a hit shown (±3)       1/7 = 14.3% [2.6%, 51.3%]
+    finder recall, before verifier 1/7 = 14.3% [2.6%, 51.3%]
+    incomplete counted as a miss   1/7 = 14.3% [2.6%, 51.3%]
+    replica 1: 1/4 shown, 1/4 located
+    replica 2: 0/3 shown, 0/3 located
+  clean diffs: 2 shown of 2 anchored over 1; per 10 diffs after the verifier 20.0 (before 20.0)
+  cost US$ 0.0029, per review US$ 0.00029 · tokens 20488/3528 · cache read 7968 · finder median 4.8s
 
 POSITIVE CONTROL D replica 1 finder recall 18/20 against S15's 17/20: reproduced
 FLOOR replica disagreement on a shown hit, seeded items with every replica done:
   D: 6/20
   L: 1/20
   Q: 2/18
-  M: 0/0
+  M: 0/3
 PAIRED against D, replica 1, a shown hit (reported, not decided on):
   L on 20: only D 0, only L 2, exact McNemar p = 0.5
   Q on 19: only D 3, only Q 0, exact McNemar p = 0.25
-  M on 0: only D 0, only M 0, exact McNemar p = 1
+  M on 4: only D 3, only M 0, exact McNemar p = 0.25
 
 DECISION (frozen rule)
   L: qualifies, US$ 0.00101 per review
   Q: does not qualify (recall 71.1% < D's 85.0% - 10 pp; clean findings 13.0 > D's 9.5 + 2)
-  M: does not qualify (not measured: stop rule: 8/10 transport errors)
+  M: does not qualify (not measured: stop rule: 2/10 transport errors)
   chosen: L (openrouter/openai/gpt-6-luna), the cheapest qualifying
