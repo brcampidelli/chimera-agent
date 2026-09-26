@@ -54,6 +54,7 @@ PARALLEL_READ_WORKERS = 4
 
 if TYPE_CHECKING:
     from chimera.skills.registry import SkillRegistry
+    from chimera.tools.browser_situation import Wall
 
 _log = get_logger("core.agent")
 
@@ -208,6 +209,12 @@ def _default_prefix_nonce() -> str:
     return get_settings().prefix_nonce
 
 
+def _default_browser_situation() -> bool:
+    from chimera.config import get_settings
+
+    return get_settings().browser_situation
+
+
 #: The sentence that turns the task-list schema into a task list. See `Agent.run` for the
 #: measurement that decides it is not optional.
 TODO_PROMPT = (
@@ -215,6 +222,30 @@ TODO_PROMPT = (
     "list as each one finishes. It is your own account of your progress, so keep it true: mark a "
     "step done when it is done, not when you intend to do it."
 )
+
+
+#: The closing turn when the browser handed a page to the person (study 25, S11). The run stops on
+#: the harness's reading of the page, not on the model's, so this asks only for the account of it.
+_HANDOVER_NUDGE = (
+    "The browser stopped at a page that needs the person: {wall}. Do not call tools. Write your "
+    "final answer now: what the page asks them to do, and what you did before it."
+)
+
+
+def _pending_handover(tools: ToolRegistry) -> Wall | None:
+    """The page the browser handed to the person on its last call, taken once; None otherwise.
+
+    Read off the tool itself, through any governance wrappers, rather than off the observation: a
+    wrapper fences a fetch tool's output, and a page can print anything, so neither can decide
+    whether the run stops."""
+    if "browser" not in tools:
+        return None
+    found: Any = tools.get("browser")
+    while getattr(found, "situation", None) is None and getattr(found, "inner", None) is not None:
+        found = found.inner
+    situation = getattr(found, "situation", None)
+    take = getattr(situation, "take_handover", None)
+    return take() if callable(take) else None
 
 
 def _find_tool(tools: ToolRegistry, name: str) -> Any:
@@ -300,6 +331,11 @@ class AgentConfig:
     #: Text that is true for this turn only, put in the turn context: recalled facts, a job that
     #: finished, the approved plan. Only read when :attr:`turn_context` is on.
     turn_notes: str = ""
+    #: Study 25, S11: the browser situation module, from ``CHIMERA_BROWSER_SITUATION`` (off). On, a
+    #: session that holds the browser gets the module's rules in its system prompt, and a page the
+    #: browser hands to the person ends the run as ``handover``. The registry reads the same setting
+    #: for the tool's half (`default_registry`), so one switch turns on both.
+    browser_situation: bool = field(default_factory=_default_browser_situation)
     # A cheap model picks the tool NAME before each step and the executor is given only that tool
     # (`chimera/core/tool_router.py`). Off by default: it is an experiment about cost and steps
     # (study 20 B4), it spends money of its own, and nothing outside `bench/tool_router` asks for it.
@@ -458,11 +494,12 @@ class AgentResult:
     steps: int
     stopped_reason: str
     """Why the loop ended: ``final`` | ``max_steps`` | ``tool_loop`` | ``budget`` | ``spend`` |
-    ``cancelled`` | ``context_stuck``.
+    ``cancelled`` | ``context_stuck`` | ``handover``.
 
     ``context_stuck`` is its own value rather than folded into ``max_steps`` because the two need
     opposite responses: one is a ceiling to raise, the other is a conversation that has nothing left
-    to compact and has to be started over."""
+    to compact and has to be started over. ``handover`` (study 25, S11) is the browser meeting a page
+    only the person can pass; the answer opens with the page and what it asks for."""
     transcript: list[MessageLike] = field(default_factory=list)
     tool_calls_made: int = 0
     # Token/cost accounting, summed across every model call in the run (0 when the backend reported
@@ -546,6 +583,15 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{UNTRUSTED_DATA_RULE}"
         if self.config.prefix_nonce:
             system_prompt = f"[session {self.config.prefix_nonce}]\n\n{system_prompt}"
+        # The browser situation module (study 25, S11), only when the owner switched it on AND this
+        # session holds the browser: rules about a tool the session lacks invite calls to nothing.
+        # Right after the core, before anything retrieved: it is the same bytes for every task, so
+        # it stays in the part of the prefix a provider can cache, and the plan ranks a situation
+        # contract above a project's conventions and below the owner, who is read last.
+        if self.config.browser_situation and "browser" in self.tools:
+            from chimera.tools.browser_situation import BROWSER_SITUATION_PROMPT
+
+            system_prompt = f"{system_prompt}\n\n{BROWSER_SITUATION_PROMPT}"
         # Under `turn_context` the retrieved skills and cards change with the task, so they go to
         # the turn context instead (see `compose_turn_context`) and the system stays one string.
         skill_block = "" if self.config.turn_context else self._skill_context(task)
@@ -998,6 +1044,7 @@ class Agent:
 
             messages.append(self._assistant_tool_message(result))
             tripped: str | None = None
+            handover: Wall | None = None
             answered: set[str] = set()
             # A read-only batch runs together; its observations are then consumed below in the
             # model's order, exactly as the one-at-a-time path consumes them. `None` is that path.
@@ -1034,6 +1081,13 @@ class Agent:
                     {"role": "tool", "tool_call_id": call.id, "content": observation}
                 )
                 answered.add(call.id)
+                # Study 25, S11: the browser met a page only the person can pass. The step ends
+                # here, whatever else the model asked for in it: a `browser` call is never in a
+                # batch that ran together (it is not a parallel read), so nothing after it has run.
+                if self.config.browser_situation and call.name == "browser":
+                    handover = _pending_handover(self.tools)
+                    if handover is not None:
+                        break
                 if loop_detector is not None:
                     verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
                     if verdict.tripped:
@@ -1050,13 +1104,31 @@ class Agent:
             # spinning run is what ends it. Worse, the malformed transcript is what `CodeSession`
             # persists, and its trimmer only cuts at a `user` boundary, so the session stays broken
             # for every later turn. Stubs that declare one call per step never see this.
+            stopper = (
+                "the browser handed the page to the person" if handover is not None
+                else "the tool-loop breaker stopped this step"
+            )
             for call in result.tool_calls:
                 if call.id not in answered:
                     messages.append({
                         "role": "tool",
                         "tool_call_id": call.id,
-                        "content": "error: not run — the tool-loop breaker stopped this step.",
+                        "content": f"error: not run — {stopper}.",
                     })
+            if handover is not None:
+                # No further step and no retry: the page will ask the same thing again. One closing
+                # call, like every other stop, and the answer opens with the harness's own line, so
+                # a surface that shows only the answer still shows the handover.
+                _log.info("run handed over at step %d: %s", step, handover.describe())
+                final, answer = self._close(
+                    messages, _HANDOVER_NUDGE.format(wall=handover.describe()),
+                    tool_names=tool_names, spend=spend, on_token=on_token, usage=usage,
+                    model=run_model,
+                )
+                answer = f"{handover.for_person()}\n\n{answer}"
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "handover", messages, tool_calls_made,
+                                    tool_names, usage, final.model, steplog=steplog, task=task)
             if not drift_reported:
                 drift = steplog.drift
                 if drift.drifting:

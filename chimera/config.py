@@ -299,6 +299,17 @@ class Settings(BaseSettings):
     # There is no setting for the browser's viewport-first listing (study 24, M7). It lost on both
     # measurements, so a user could only switch it on to make the browser worse; the mode survives as
     # a constructor argument that `bench/browser_viewport_tasks` uses (see `BrowserTool.__init__`).
+    #
+    # The browser situation module (study 25, S11; `chimera/tools/browser_situation.py`). On, a
+    # session that holds the browser gets its situation rules in the system prompt, a page that needs
+    # the person (a sign-in, a two-step code, a captcha, a payment step) ends the run as `handover`,
+    # and reading cookies, site storage or saved passwords through the tool is refused. OFF by
+    # default: the rules' benefit is unmeasured, and the stop changes what a run does on a page with a
+    # login form. Measured so far: no harm on 24 browsing tasks (`bench/browser_situation`: 44/48 on,
+    # 45/48 off, no stop); on live pages no false stop on 17 ordinary pages and 6 of 9 walls handed
+    # over (`bench/browser_element_list/RESULTS-situation.md` — a late hCaptcha frame, a Turnstile
+    # in a shadow root and payment on live pages are its named gaps).
+    browser_situation: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_SITUATION")
 
     # --- Image generation backend: 'auto' (hosted if an OpenAI key is set, else local diffusers),
     # 'hosted' (OpenAI), or 'local' (run FLUX/SD via the imagegen-local extra — heavy, GPU). ---

@@ -328,6 +328,19 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("tool.decide_description", "chimera.tools.decide:DecideTool", "tool", ("S9",)),
     _c("tool.browser_viewport_first", "chimera.tools.browser:_VIEWPORT_FIRST_DESCRIPTION", "tool",
        ("S11",), "measured", "bench/browser_viewport_tasks (lost to the shipped description)"),
+    # ---- the browser situation (study 25, S11; off unless CHIMERA_BROWSER_SITUATION) ------------
+    _c("browser.situation", "chimera.tools.browser_situation:BROWSER_SITUATION_PROMPT", "situation",
+       ("S11",), "unmeasured",
+       note="added only with the flag and the browser in the registry; bench/browser_situation "
+            "found no harm (44/48 vs 45/48) and could not measure a benefit"),
+    _c("browser.handover_nudge", "chimera.core.agent:_HANDOVER_NUDGE", "turn", ("S11",), "unmeasured",
+       note="the closing turn after the browser hands a page to the person"),
+    _i("browser.handover_observation", "chimera.tools.browser_situation:Wall.observation", "tool",
+       ("S11",), note="returned instead of the page; fixed words plus the page's host and path"),
+    _i("browser.handover_line", "chimera.tools.browser_situation:Wall.for_person", "turn", ("S11",),
+       note="opens the run's answer on a handover, so it is in the transcript later turns read"),
+    _i("browser.private_store_refusal",
+       "chimera.tools.browser_situation:private_store_refusal", "tool", ("S11",)),
     # ---- self-evolution ------------------------------------------------------------------------
     _c("evolution.propose", "chimera.evolution.evolver:_PROPOSE_SYSTEM", "call", ("S13",), "null",
        "bench/learning_lift"),
