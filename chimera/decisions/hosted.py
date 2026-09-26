@@ -18,6 +18,16 @@ So this backend asks for exactly what was measured:
 
 A reasoning-off call is a different instrument, and it is unmeasured: switching to it needs a run of its own before any number above applies to it. The count of answers that still came back without a number is on the receipt of each call (``p`` None, ``raw`` empty), never folded into a verdict.
 
+**One output instruction (arm V′, 2026-09-25).** Arm V's text kept the judge's "Reply with
+exactly one word" before asking for JSON. This backend now sends the question's
+:meth:`~chimera.decisions.contract.Choice.framing`, without that sentence. Measured against a fresh
+V in `bench/jev_decisions/RESULTS-one-schema.md` (55 items × 2, pinned, reasoning at default):
+- unparsed answers 0/110 in both arms;
+- ΔAUROC −0.015 [−0.046, +0.009], non-inferior at the registered 0.05 margin;
+- Brier 0.072 → 0.078 and ECE 0.059 → 0.037, both inside the floor.
+
+The numbers above are V's.
+
 Temperature 0.3 because that is what was measured (the judge's own setting); a caller that wants a
 deterministic decision passes 0 and measures again. Shares are not available on this backend: the
 model writes one number and one word, and the word is the choice.
@@ -62,7 +72,8 @@ class HostedVerbalizedBackend:
         spec = f'{{"{question.key}": {option_words(question.options)}}}'
         if question.event:
             spec = f'{{"p_{question.p_name}": <number between 0 and 1>, "{question.key}": {option_words(question.options)}}}'
-        return question.instructions + render_criteria(question) + ADVISORY + spec
+        # The framing, not the instructions: this backend's JSON is the one output instruction.
+        return question.framing() + render_criteria(question) + ADVISORY + spec
 
     def instrument(self, question: Question) -> str:
         question = as_choice(question)

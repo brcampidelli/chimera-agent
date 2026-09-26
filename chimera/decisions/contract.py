@@ -51,6 +51,12 @@ class Choice:
     event_name: str = ""
     """What ``p`` is the probability *of*, for the backend that asks the model to write it:
     ``p_dangerous``. Defaults to the key."""
+    answer_format: str = ""
+    """The sentence that ends ``instructions`` and says how to write the answer — the one-word
+    judge's "Reply with exactly one word: …". A backend that asks for its own format sends
+    :meth:`framing` instead, so the model reads one output instruction and not two
+    (`bench/jev_decisions/RESULTS-one-schema.md`). A backend whose instrument was measured with the
+    sentence keeps ``instructions`` whole. Empty: the framing has no such sentence."""
 
     def __post_init__(self) -> None:
         if not self.key.strip():
@@ -65,10 +71,21 @@ class Choice:
             raise ValueError(f"event names options the question does not have: {unknown}")
         if len(self.event) == len(self.options):
             raise ValueError("an event over every option has probability 1 by construction")
+        # A declared sentence that is not where framing() cuts would be sent anyway, beside the
+        # backend's own format: the two-instruction prompt this field exists to prevent.
+        if self.answer_format and not self.instructions.endswith(self.answer_format):
+            raise ValueError("answer_format must be the sentence the instructions end with")
 
     @property
     def p_name(self) -> str:
         return self.event_name or self.key
+
+    def framing(self) -> str:
+        """The instructions without their :attr:`answer_format` sentence, for a backend that asks
+        for its own format; the instructions unchanged when they declare none."""
+        if not self.answer_format:
+            return self.instructions
+        return self.instructions[: -len(self.answer_format)].rstrip()
 
     def neutral(self) -> NeutralChoice:
         """This question with neutral option identifiers — ``A``, ``B``, ``C``… — and the meaning
@@ -88,6 +105,7 @@ class Choice:
         choice = Choice(
             key=self.key, instructions=self.instructions, options=letters, criteria=criteria,
             event=tuple(to_letter[e] for e in self.event), event_name=self.event_name,
+            answer_format=self.answer_format,
         )
         return NeutralChoice(choice=choice, to_original=to_original)
 
