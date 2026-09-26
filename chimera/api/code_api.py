@@ -533,6 +533,20 @@ def assemble_registry(
         write_region=build_write_region(seams.write_region, ws),
         host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
     )
+    # The web research sub-agent (study 25, S12), when the owner switched it on. Registered BEFORE
+    # the lists below, unlike the explorer, so every one of them reaches it by name the way they
+    # reach a built-in: a request's own allowlist that does not name it narrows it away too. Its web
+    # tools are drawn from this registry late (`lambda: registry` sees the final, wrapped value, as
+    # `SubAgentTool` documents), so a denied fetch tool is denied to it and its fetches pass the
+    # kernel and the taint ledger wrapped around everything below.
+    if settings.research_agent:
+        from chimera.core.research import ResearchWebTool
+
+        registry.register(
+            ResearchWebTool(
+                gateway, lambda: registry, model=resolve_role_plan(seams, settings).models.explore
+            )
+        )
     # The owner's approver — the object the taint ledger and, since #495, the policy kernel are
     # handed below — reaches the FILE tools too, on the surface that has a person: a path outside
     # the project folder becomes a question on the screen instead of a refusal. Only when a screen
@@ -633,7 +647,10 @@ def assemble_registry(
         # than the search, so the main loop never pays for the hunt.
         explore_model = resolve_role_plan(seams, settings).models.explore
         registry.register(
-            ExploreRepositoryTool(gateway, ws, model=explore_model, max_turns=steps)
+            ExploreRepositoryTool(
+                gateway, ws, model=explore_model, max_turns=steps,
+                contract=settings.explorer_contract,
+            )
         )
     # Tools the caller brings for THIS turn — the talking model's handles on the conversation's
     # background works — registered here, before the kernel and the ledger wrap the registry, so
@@ -1979,6 +1996,12 @@ def register_code_api(
                         # let the stored receipt learn it when the conversation is reopened
                         # (`chimera.providers.generation`; the record exists ~10 s after the call).
                         "generation_ids": result.steplog.generation_ids,
+                        # Which instructions produced this turn: the fingerprint of the system
+                        # message, read off the same step log the trace line was written from, so
+                        # the receipt and the trace cannot name two different prompts. The turn
+                        # context is not in it — it changes every turn, and a hash of it would
+                        # differ between two turns given the same instructions (study 25, wave 0).
+                        "system_sha": result.steplog.system_sha,
                         "route_meta": result.route_meta,
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.

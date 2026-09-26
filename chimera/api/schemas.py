@@ -1441,6 +1441,13 @@ class AttemptReceiptOut(BaseModel):
     # render the unknown as its own state; deriving it by absence is how the third state decays.
     diff_productive: bool | None
     side_effects: list[str]  # out-of-checkout effects performed (send_email, http_post, …)
+    system_sha: str = ""
+    """The fingerprint of the system message this attempt ran under (twelve hex characters), the
+    same value its trace line carries. Empty for a receipt written before the field existed.
+
+    On the wire so a change in what a run did can be set beside a change in what it was told: two
+    attempts with different values were not given the same instructions, whatever else they
+    share."""
 
 
 class RunReceiptOut(BaseModel):

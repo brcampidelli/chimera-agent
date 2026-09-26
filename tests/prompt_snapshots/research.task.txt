@@ -1,0 +1,18 @@
+Thoroughness: quick (a search or two; one good source is enough). You have at most 6 tool steps.
+
+Question:
+<the caller's question>
+
+---
+
+Thoroughness: medium (a few searches; confirm it in a second source unless the first is authoritative). You have at most 12 tool steps.
+
+Question:
+<the caller's question>
+
+---
+
+Thoroughness: thorough (as many searches as independent confirmation takes). You have at most 24 tool steps.
+
+Question:
+<the caller's question>

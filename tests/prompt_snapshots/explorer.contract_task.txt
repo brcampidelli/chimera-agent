@@ -1,0 +1,18 @@
+Thoroughness: quick. You have at most 4 tool steps.
+
+What to find out:
+<the caller's query>
+
+---
+
+Thoroughness: medium. You have at most 8 tool steps.
+
+What to find out:
+<the caller's query>
+
+---
+
+Thoroughness: thorough. You have at most 16 tool steps.
+
+What to find out:
+<the caller's query>

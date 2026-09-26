@@ -1123,6 +1123,12 @@ export interface CodeTurnDone {
    *  usage — a silent route, not a miss; zero is a real answer (a route that switched and cached
    *  nothing), and the two must not be drawn alike. */
   cache_read_tokens?: number | null;
+  /** Which instructions produced this turn: twelve hex characters of the system message's SHA-256,
+   *  the same value the turn's trace line carries. Two turns with different values were not given
+   *  the same instructions, whatever else they share. The turn context — recalled facts, the plan,
+   *  the question — is not in it: that changes every turn and would make the value say nothing.
+   *  Absent on an external turn (somebody else's prompt) and on receipts older than the field. */
+  system_sha?: string;
   /** What the account was actually charged for this turn, in US$: the router's `total_cost`
    *  summed over every call. `usd` above is an estimate from the catalogue row of the model id, and
    *  one id is served by several routes at different prices. Learned on reopen, like `provider`, and

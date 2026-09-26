@@ -108,6 +108,32 @@ def _restored_labels() -> str:
     return "\n".join(f"{key}:{label}" for key, label in sorted(_RESTORED.items()))
 
 
+def _explorer_contract_task() -> str:
+    from chimera.core.explorer import _CONTRACT_TEMPLATE, THOROUGHNESS, thoroughness_steps
+
+    return "\n\n---\n\n".join(
+        _CONTRACT_TEMPLATE.format(
+            level=level, steps=thoroughness_steps(level, 8), query="<the caller's query>"
+        )
+        for level in THOROUGHNESS
+    )
+
+
+def _research_task() -> str:
+    from chimera.core.explorer import THOROUGHNESS, thoroughness_steps
+    from chimera.core.research import _TASK_TEMPLATE, DEFAULT_RESEARCH_STEPS, SEARCH_BUDGET_NOTE
+
+    return "\n\n---\n\n".join(
+        _TASK_TEMPLATE.format(
+            level=level,
+            budget=SEARCH_BUDGET_NOTE[level],
+            steps=thoroughness_steps(level, DEFAULT_RESEARCH_STEPS),
+            question="<the caller's question>",
+        )
+        for level in THOROUGHNESS
+    )
+
+
 def _fence_example() -> str:
     from chimera.governance.ledger_tool import fence
 
@@ -183,8 +209,10 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("context.open", "chimera.prompts.context:TURN_CONTEXT_OPEN", "volatile", _ALL, "unmeasured",
        note="heads the turn's user message; the transcript keeps the message bare"),
     _c("context.close", "chimera.prompts.context:TURN_CONTEXT_CLOSE", "volatile", _ALL, "unmeasured"),
-    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile", ("S2", "S4"),
-       "unmeasured", note="recalled facts, labelled as recall that the present overrides"),
+    _c("context.facts_header", "chimera.prompts.context:FACTS_HEADER", "volatile",
+       ("S2", "S3", "S4", "S10"), "unmeasured",
+       note="recalled facts, labelled as recall that the present overrides; chat sends it under "
+            "CHIMERA_CHAT_REAL_HISTORY"),
     _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
     _i("context.cited_fact", "chimera.prompts.context:cited_fact", "volatile", ("S2", "S3"),
        note="a recalled fact quoted with its source and date; only under CHIMERA_MEMORY_EXTRACT"),
@@ -227,6 +255,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/harness_bench arm C (+0.003, inside SD 0.073)"),
     # ---- terminal chat, Discord, webhooks ------------------------------------------------------
     _i("chat.layout", "chimera.interface.session:ChatSession._assemble", "volatile", ("S3", "S10")),
+    _i("chat.history_messages", "chimera.interface.session:_as_messages", "volatile",
+       ("S3", "S10"), note="CHIMERA_CHAT_REAL_HISTORY: a restored turn's label and data fence, "
+                           "carried into its assistant message; bench/chat_history"),
     _c("chat.restored_labels", "chimera.interface.session:_RESTORED", "volatile", ("S3", "S10"),
        "unmeasured", render=_restored_labels),
     _i("chat.profile", "chimera.interface.profile:render_profile", "volatile", ("S3", "S10")),
@@ -281,6 +312,23 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("explorer.system", "chimera.core.explorer:EXPLORER_SYSTEM", "situation", ("S12",),
        "unmeasured"),
     _i("explorer.task", "chimera.core.explorer:ContextExplorer.explore", "turn", ("S12",)),
+    _c("explorer.contract", "chimera.core.explorer:EXPLORER_CONTRACT_SYSTEM", "situation", ("S12",),
+       "unmeasured",
+       note="replaces explorer.system under CHIMERA_EXPLORER_CONTRACT, off by default"),
+    _c("explorer.contract_task", "chimera.core.explorer:_CONTRACT_TEMPLATE", "turn", ("S12",),
+       "unmeasured", render=_explorer_contract_task,
+       note="one rendering per thoroughness level, at the default ceiling of 8 steps"),
+    _i("explorer.location_receipt", "chimera.core.explorer:LocationCheck.receipt", "tool", ("S12",),
+       note="the harness's words after a contract report; never the explorer's"),
+    _c("research.system", "chimera.core.research:RESEARCH_SYSTEM", "situation", ("S12",),
+       "unmeasured",
+       note="behind CHIMERA_RESEARCH_AGENT, off. bench/web_research was uninformative (the plain "
+            "loop sat at the ceiling, 66/72) and the module cost 4.9x the tokens"),
+    _c("research.task", "chimera.core.research:_TASK_TEMPLATE", "turn", ("S12",), "unmeasured",
+       render=_research_task, note="one rendering per thoroughness level, at the default 12 steps"),
+    _i("research.tool_description", "chimera.core.research:ResearchWebTool", "tool", ("S12",)),
+    _i("research.source_receipt", "chimera.core.research:CitationCheck.receipt", "tool", ("S12",),
+       note="the harness's citation check, appended to the answer; the prompt only asks"),
     _i("brief.recipe", "chimera.orchestration.brief:brief_task", "turn", ("S5", "S10")),
     _c("spec.draft", "chimera.orchestration.draft:_SYSTEM", "call", ("S14",), "unmeasured"),
     # ---- fusion --------------------------------------------------------------------------------
@@ -311,10 +359,11 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("governance.hosted_advisory", "chimera.decisions.hosted:ADVISORY", "call", ("S9",), "measured",
        "bench/jev_decisions"),
     _i("governance.hosted_system", "chimera.decisions.hosted:HostedVerbalizedBackend.system_text",
-       "call", ("S9",),
-       note="asks for one word (JUDGE_TEXT) and then for JSON (ADVISORY). Left as is on purpose: "
-       "the instrument is pinned to the bench that measured it, so resolving the two is a measured "
-       "arm (plan §7 S9), not an edit"),
+       "call", ("S9",), "measured",
+       "bench/jev_decisions/RESULTS-one-schema.md (arm V′: unparsed 0/110 vs 0/110, ΔAUROC −0.015 "
+       "[−0.046, +0.009], non-inferior at 0.05)",
+       note="sends the question's framing without its one-word reply line, so JSON (ADVISORY) is "
+       "the only output instruction; the change was a measured arm (plan §7 S9 b), not an edit"),
     _i("governance.local_system", "chimera.decisions.local:LocalLogprobBackend.system_text", "call",
        ("S9",), "measured", "bench/jevbench_local (0.619)"),
     _c("governance.quarantine", "chimera.governance.quarantine:_QUARANTINE_SYSTEM", "call",
@@ -327,9 +376,26 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/right_hand_governance"),
     _c("fence.wrapped", "chimera.governance.ledger_tool:fence", "marker", _ALL, "measured",
        "bench/right_hand_governance", render=_fence_example),
+    _c("fence.failure_note", "chimera.governance.ledger_tool:FENCED_FAILURE_NOTE", "marker", _ALL,
+       "unmeasured",
+       note="the line before a fenced tool failure, so the loop reads it as a failure; the tool's "
+            "message stays inside the fence (tests/test_a_fenced_failure_is_still_a_failure.py)"),
     _i("tool.decide_description", "chimera.tools.decide:DecideTool", "tool", ("S9",)),
     _c("tool.browser_viewport_first", "chimera.tools.browser:_VIEWPORT_FIRST_DESCRIPTION", "tool",
        ("S11",), "measured", "bench/browser_viewport_tasks (lost to the shipped description)"),
+    # ---- the browser situation (study 25, S11; off unless CHIMERA_BROWSER_SITUATION) ------------
+    _c("browser.situation", "chimera.tools.browser_situation:BROWSER_SITUATION_PROMPT", "situation",
+       ("S11",), "unmeasured",
+       note="added only with the flag and the browser in the registry; bench/browser_situation "
+            "found no harm (44/48 vs 45/48) and could not measure a benefit"),
+    _c("browser.handover_nudge", "chimera.core.agent:_HANDOVER_NUDGE", "turn", ("S11",), "unmeasured",
+       note="the closing turn after the browser hands a page to the person"),
+    _i("browser.handover_observation", "chimera.tools.browser_situation:Wall.observation", "tool",
+       ("S11",), note="returned instead of the page; fixed words plus the page's host and path"),
+    _i("browser.handover_line", "chimera.tools.browser_situation:Wall.for_person", "turn", ("S11",),
+       note="opens the run's answer on a handover, so it is in the transcript later turns read"),
+    _i("browser.private_store_refusal",
+       "chimera.tools.browser_situation:private_store_refusal", "tool", ("S11",)),
     # ---- self-evolution ------------------------------------------------------------------------
     _c("evolution.propose", "chimera.evolution.evolver:_PROPOSE_SYSTEM", "call", ("S13",), "null",
        "bench/learning_lift"),

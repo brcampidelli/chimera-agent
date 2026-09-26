@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.core.agent import AgentConfig, AgentResult, ToolActivity
     from chimera.orchestration.budget import SpendBudget
+    from chimera.providers.gateway import MessageLike
 
 
 @dataclass
@@ -56,10 +57,22 @@ class BudgetedTurns:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        history: list[MessageLike] | None = None,
+        turn_notes: str | None = None,
     ) -> AgentResult:
-        """One turn, charged to the conversation's budget rather than to a fresh one."""
+        """One turn, charged to the conversation's budget rather than to a fresh one.
+
+        ``history`` and ``turn_notes`` are declared and forwarded because ``ChatSession`` reads this
+        signature to decide whether real history is possible: a wrapper that dropped them would
+        quietly turn the setting off for every conversation with a ceiling.
+        """
         result: AgentResult = self.agent.run(
-            task, on_token=on_token, on_tool=on_tool, spend=self.budget
+            task,
+            on_token=on_token,
+            on_tool=on_tool,
+            spend=self.budget,
+            history=history,
+            turn_notes=turn_notes,
         )
         return result
 

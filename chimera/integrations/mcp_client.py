@@ -97,12 +97,15 @@ class MCPTool(Tool):
         the outer fence holds. Skipping the second one by INSPECTING the string would not be safe —
         text that merely starts and ends with the markers can still carry a live instruction between
         two fenced blocks.
+
+        A failure stays a failure through the fence (``fence_observation``). Fencing ``error: …``
+        whole had undone the ``isError`` handling in ``StdioMCPSession.call_tool``: the answer began
+        with the fence, so the loop read "connection refused" as a call that ran, on every surface.
         """
-        from chimera.governance.ledger_tool import fence
-        from chimera.governance.sanitize import sanitize_untrusted
+        from chimera.governance.ledger_tool import fence_observation
 
         result = self._caller(self._remote_name, kwargs)
-        return fence(sanitize_untrusted(result)) if result.strip() else result
+        return fence_observation(result) if result.strip() else result
 
 
 class MCPConnector(Connector):

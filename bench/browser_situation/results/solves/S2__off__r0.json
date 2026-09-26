@@ -1,0 +1,50 @@
+{
+ "task": "S2",
+ "arm": "off",
+ "replica": 0,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.0006972300000000001,
+ "answer": "UT8920V",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 4,
+ "tool_calls": 3,
+ "prompt_tokens": 9742,
+ "completion_tokens": 200,
+ "cache_read_tokens": 4864,
+ "usd": 0.000278,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "cf2990376b4d",
+ "module_in_prompt": false,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 5196,
+ "seconds": 11.3,
+ "requested_paths": [
+  "/shop/lamps.html",
+  "/go/shop/lamps-page-3"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}

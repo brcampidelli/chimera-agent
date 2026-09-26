@@ -1282,7 +1282,9 @@ def _replayed_provenance(session: Any) -> list[str]:
     clean; this is the same window, read for the same reason one line further out. Read BEFORE the
     turn runs, because ``send_verbose`` appends the new exchange and would shift the window by one.
     """
-    return [turn.provenance for turn in session.turns[-session.max_history :] if turn.restored]
+    from chimera.interface.session import recent_turns
+
+    return [turn.provenance for turn in recent_turns(session.turns, session.max_history) if turn.restored]
 
 
 def _render_turn(
@@ -1903,6 +1905,7 @@ def chat(
             # The setting existed and no terminal surface passed it, so "remember that…" was
             # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # Recall narrowed to the folder this conversation is open on, exactly as the coding
             # turn does it. `--workspace` decided which files the tools could touch and said
             # nothing about which project's memory arrived, so a note from one codebase turned up
@@ -2107,6 +2110,7 @@ def assist(
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
+        real_history=settings.chat_real_history,
         # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
         project=project_key(workspace),
@@ -2418,6 +2422,7 @@ def tui(
             graph=_recall_graph(mem),
             profile=_session_profile(mem),
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # Recall narrowed to the folder this app was opened on, exactly as `chat` and `assist`
             # do it. This surface takes a `--workspace` too, and until now that argument decided
             # which files the tools could touch and said nothing about which project's memory
@@ -2576,6 +2581,7 @@ def serve(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=settings.remember_from_chat,
+            real_history=settings.chat_real_history,
             # `None` when governance is off — the shipped default, under which `governed_profile`
             # returns before it builds a ledger and never calls `_hold`. A hook wired to nothing
             # would be a lie about what this surface has; no hook is the truth, and it also keeps
@@ -2945,6 +2951,7 @@ def desktop_app(
             graph=shared_graph,
             profile=shared_profile,
             remember_from_chat=live.remember_from_chat,
+            real_history=live.chat_real_history,
             # The ledger is built once per conversation and the instruction is known once per TURN,
             # which is the whole reason `CHIMERA_TAINT_AUTHORITY` did nothing here: a ledger nobody
             # tells answers `unknown` for every fetch, and the narrowing treats that exactly as it
@@ -3399,6 +3406,8 @@ def _serve_platform(
             runner,
             memory=memory,
             graph=graph,
+            # The path `serve --discord` runs, which is the production bot.
+            real_history=get_settings().chat_real_history,
             # `None` under the shipped `CHIMERA_GOVERNANCE=off`, where no ledger is built at all.
             on_turn_start=(
                 None
@@ -4543,6 +4552,15 @@ def solve(
 
         region = WriteRegion(write_region.split(","), ws) if write_region else None
         registry = default_registry(ws, write_region=region)
+        # The web research sub-agent (study 25, S12), when switched on. Before the allowlist, so
+        # the lists reach it by name like a built-in; it draws its web tools from the FINAL
+        # registry, resolved late, for the reason the subagent below gives.
+        if settings.research_agent:
+            from chimera.core.research import ResearchWebTool
+
+            registry.register(
+                ResearchWebTool(gateway, lambda: registry, model=roles.models.explore or model)
+            )
         # Per-session grant first (issue #4): scope the native tools before the meta-tools
         # (explorer/subagents) are added, so subagents inherit the same allowlist.
         from chimera.governance import AuditLog
@@ -4558,7 +4576,8 @@ def solve(
             # A narrow localisation question does not need the editor's model.
             registry.register(
                 ExploreRepositoryTool(
-                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps
+                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps,
+                    contract=settings.explorer_contract,
                 )
             )
         if subagents:
@@ -5232,11 +5251,18 @@ def explore(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Repository root to explore."),
     model: str = typer.Option(None, "--model", "-m", help="Model for the explorer (a cheap one is fine)."),
     max_turns: int = typer.Option(8, "--max-turns", help="Max exploration turns."),
+    thoroughness: str = typer.Option(
+        "medium", "--thoroughness",
+        help="quick, medium or thorough: halves, keeps or doubles --max-turns. "
+        "Read only when CHIMERA_EXPLORER_CONTRACT is on.",
+    ),
 ) -> None:
     """Locate relevant code via the isolated Context Explorer subagent (FastContext-style).
 
     Returns only a compact file:line evidence block — the exploration turns never touch your
     context. A cheap model is usually the right call here; localization is a narrow task.
+    With CHIMERA_EXPLORER_CONTRACT on, it returns findings with a location each, a gaps section,
+    and a check of every cited location against the workspace.
     """
     from chimera.core import ContextExplorer
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -5246,10 +5272,15 @@ def explore(
         raise typer.Exit(code=1)
     explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
     try:
-        result = explorer.explore(query)
+        result = explorer.explore(query, thoroughness.strip().lower())
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
+    if result.check is not None:
+        # Plain text: the report and the receipt both carry square brackets rich would eat.
+        console.print(result.as_context(), markup=False, highlight=False)
+        console.print(f"[dim]{result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
+        return
     if not result.evidence:
         console.print("[dim]no relevant locations found[/dim]")
         return

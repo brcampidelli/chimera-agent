@@ -1,0 +1,42 @@
+{
+  "pages": 28,
+  "loaded": 27,
+  "ordinary": 18,
+  "false_handovers": [
+    [
+      "https://www.nytimes.com/",
+      "captcha",
+      "a DataDome challenge"
+    ]
+  ],
+  "walls": 9,
+  "walls_found_with_kind": 4,
+  "missed": [
+    [
+      "https://gitlab.com/users/sign_in",
+      "login",
+      "captcha"
+    ],
+    [
+      "https://accounts.hcaptcha.com/demo",
+      "captcha",
+      "none"
+    ],
+    [
+      "https://demo.turnstile.workers.dev/",
+      "captcha",
+      "login"
+    ],
+    [
+      "https://checkout.stripe.dev/preview",
+      "payment",
+      "none"
+    ],
+    [
+      "https://stripe-payments-demo.appspot.com/",
+      "payment",
+      "none"
+    ]
+  ],
+  "fit": false
+}

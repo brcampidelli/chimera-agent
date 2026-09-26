@@ -2166,7 +2166,7 @@
     },
     {
       "deprecated": false,
-      "help": "Locate relevant code via the isolated Context Explorer subagent (FastContext-style).\n\nReturns only a compact file:line evidence block \u2014 the exploration turns never touch your\ncontext. A cheap model is usually the right call here; localization is a narrow task.",
+      "help": "Locate relevant code via the isolated Context Explorer subagent (FastContext-style).\n\nReturns only a compact file:line evidence block \u2014 the exploration turns never touch your\ncontext. A cheap model is usually the right call here; localization is a narrow task.\nWith CHIMERA_EXPLORER_CONTRACT on, it returns findings with a location each, a gaps section,\nand a check of every cited location against the workspace.",
       "hidden": false,
       "name": "explore",
       "params": [
@@ -2213,6 +2213,17 @@
           ],
           "required": false,
           "type": "int"
+        },
+        {
+          "default": "'medium'",
+          "help": "quick, medium or thorough: halves, keeps or doubles --max-turns. Read only when CHIMERA_EXPLORER_CONTRACT is on.",
+          "kind": "option",
+          "name": "thoroughness",
+          "opts": [
+            "--thoroughness"
+          ],
+          "required": false,
+          "type": "str"
         }
       ],
       "path": "explore"
