@@ -260,10 +260,28 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
     assert_frozen()
     ensure_reference()
     work = _work_dir()
-    # No solve of this bench is in flight when a driver starts (the runner checks), so a scratch
-    # dir left by a killed block is garbage.
-    for leftover in work.glob("dflt-*"):
+    # No solve of this bench is in flight when a driver starts (the runner checks), so whatever a
+    # killed block left is garbage, except what it spent. A block killed from outside (the WSL VM
+    # crashed at 07:39 on 2026-09-26) never ran its SIGTERM handler, so its solves' call logs are
+    # read here, before their scratch dirs go.
+    harvested = 0
+    for leftover in sorted(work.glob("dflt-*")):
+        log, inst_file = leftover / "calls.jsonl", leftover / "instance.json"
+        arm = leftover.name.split("-")[1] if leftover.name.count("-") >= 2 else ""
+        if log.exists() and inst_file.exists() and arm in ARMS:
+            calls = [json.loads(ln) for ln in log.read_text(encoding="utf-8").splitlines() if ln.strip()]
+            iid = json.loads(inst_file.read_text(encoding="utf-8"))["instance_id"]
+            with KILLED.open("a", encoding="utf-8", newline="\n") as fh:
+                fh.write(json.dumps({"instance_id": iid, "arm": arm, "killed": "found at driver start",
+                                     "calls": calls}) + "\n")
+            harvested += 1
         _rm(leftover, work)
+    # Disk stays bounded (2026-09-26: the host disk filled): workspaces and templates a killed block
+    # left behind go too. Each is a whole django checkout.
+    for leftover in [*work.glob("*__django__django-*"), *(work / "templates").glob("*")]:
+        _rm(leftover, work)
+    if harvested:
+        print(f"recorded the calls of {harvested} solves a killed block left behind", flush=True)
     signal.signal(signal.SIGTERM, _on_block_end)
     block_start = time.monotonic()
     done = {(r["instance_id"], r["arm"]) for r in load_jsonl(out)}
