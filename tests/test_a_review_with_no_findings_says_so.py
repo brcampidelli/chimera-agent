@@ -49,6 +49,22 @@ def test_an_unreadable_reply_is_an_incomplete_review_not_a_clean_one(tmp_path: P
     assert report.usage.failed_calls == 1
 
 
+def test_a_regex_quoted_in_a_finding_does_not_void_the_review(tmp_path: Path) -> None:
+    """`\\Z` is not a JSON escape, and a reviewer quoting a regex writes it anyway. Measured in
+    `bench/review_seeded` run 1: one such backslash made a reply with two correct findings unreadable,
+    and the whole review came back incomplete."""
+    reply = (
+        '{"findings": [{"file": "calc.py", "line": 11, "priority": "P1", "title": "divides by n - 1",'
+        ' "evidence": "pattern needs \\Z, and \\d+ never matches", "confidence": 0.9}],'
+        ' "residual_risks": [], "untested_paths": []}'
+    )
+
+    report = review(collect(repo_with_change(tmp_path)), FakeBackend(reply), REVIEWER, KeepAll())
+
+    assert report.status == "findings"
+    assert report.findings[0].evidence == "pattern needs \\Z, and \\d+ never matches"
+
+
 def test_a_failed_call_is_an_incomplete_review(tmp_path: Path) -> None:
     class Down(FakeBackend):
         def complete(self, messages: list[Any], **kw: Any) -> Any:

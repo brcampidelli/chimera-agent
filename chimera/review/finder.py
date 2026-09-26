@@ -68,6 +68,12 @@ def finder_request(rendered_diff: str) -> str:
     return "Review this change.\n\n" + fence(rendered_diff)
 
 
+#: A backslash that does not start a JSON escape. A reviewer quoting a regex writes ``\Z`` or ``\d``
+#: inside a string, which JSON forbids; one of them made `bench/review_seeded` run 1 lose a reply
+#: holding two correct findings, and the review read as incomplete.
+_STRAY_BACKSLASH = re.compile(r'\\(?!["\\/bfnrtu])')
+
+
 def extract_json(text: str) -> Any:
     """The JSON value in a model's reply, despite a fence or a sentence around it; None if none."""
     body = text.strip()
@@ -78,10 +84,11 @@ def extract_json(text: str) -> Any:
         if 0 <= start < end:
             candidates.append(body[start : end + 1])
     for candidate in candidates:
-        try:
-            return json.loads(candidate)
-        except ValueError:
-            continue
+        for attempt in (candidate, _STRAY_BACKSLASH.sub(r"\\\\", candidate)):
+            try:
+                return json.loads(attempt)
+            except ValueError:
+                continue
     return None
 
 
