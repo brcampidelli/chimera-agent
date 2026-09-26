@@ -2,9 +2,8 @@
 
 Study 25 S13. The extraction is one more model call per turn, and a model call can be slow, refuse,
 or return nothing parseable. The answer is the product; memory is extra. So the turn records and
-returns its answer whatever the extractor does, the background thread returns at once, and the
-whole thing is off unless ``CHIMERA_MEMORY_EXTRACT`` turns it on — on every surface, the Code turn
-included.
+returns its answer whatever the extractor does, and the background thread returns at once. On every
+surface, the Code turn included, ``CHIMERA_MEMORY_EXTRACT`` decides whether it runs at all.
 """
 
 from __future__ import annotations
@@ -126,8 +125,8 @@ def test_an_empty_answer_or_message_is_not_extracted(tmp_path: Path) -> None:
 
 
 def test_without_an_extractor_the_session_is_what_it_was() -> None:
+    """The library default. The surfaces that answer the owner pass one; the bots and benches do not."""
     assert ChatSession(_Agent()).extractor is None
-    assert Settings().memory_extract is False
 
 
 # ------------------------------------------------------------------------------ the Code turn
