@@ -248,6 +248,12 @@ class PlaywrightDriver:
     def page_text(self) -> str:
         return str(self._page.inner_text("body"))  # visible text; fallback + basis for find
 
+    @property
+    def url(self) -> str:
+        """The loaded page's address, after redirects — what a browser handover names (study 25,
+        S11). Not in the `BrowserDriver` protocol: the handover reads it when a driver has it."""
+        return str(self._page.url)
+
     def screenshot(self, path: str) -> None:
         self._page.screenshot(path=path, full_page=True)  # a real full-page PNG of the current page
 

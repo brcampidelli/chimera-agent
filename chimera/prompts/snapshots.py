@@ -68,10 +68,25 @@ def assembled_examples() -> dict[str, str]:
             ToolRegistry(),
             AgentConfig(inject_skill_context=False, prefix_nonce="", system_prompt=WORKER_SYSTEM),
         )
+        from chimera.tools.browser import BrowserTool
+
+        # The browser situation module (study 25, S11): the flag on and the browser registered,
+        # with a project and an owner, so the snapshot shows where the module sits between them.
+        browsing = ToolRegistry()
+        browsing.register(BrowserTool())
+        browser = Agent(
+            backend,
+            browsing,
+            AgentConfig(
+                inject_skill_context=False, prefix_nonce="", project_root=root, instructions=owner,
+                browser_situation=True,
+            ),
+        )
         texts = {
             "assembled.loop_bare": bare.compose_system_prompt(EXAMPLE_TASK),
             "assembled.loop_project_owner_todo": full.compose_system_prompt(EXAMPLE_TASK),
             "assembled.hierarchy_worker": worker.compose_system_prompt(EXAMPLE_TASK),
+            "assembled.loop_browser_situation": browser.compose_system_prompt(EXAMPLE_TASK),
         }
         # The temporary directory's name is not part of the prompt anyone reviews.
         return {name: text.replace(str(root), "<project>") for name, text in texts.items()}
