@@ -222,3 +222,28 @@ Let `N` be the slice size, `c` the pilot's mean computed cost per arm-A solve, `
 - Every candidate is still gold-validated before the main run, and before any model call on it.
 - The slice is frozen from the full gold report (`h45_gold`), which covers the head again. If a head item's two gold verdicts disagree, that is reported as grader flakiness, and the item is dropped from the main run.
 - No model call has been made.
+
+## Amendment 2 — 2026-09-25, after the first pilot's solves and before its grade was read: a network wall, and the pilot re-run behind it
+
+**What the first pilot showed.** This was read in the solves' own shell commands; no grade had been seen.
+- In 1 of the 10 solves (`django__django-15695`), the agent curl'd django's `stable/4.1.x` and `main` copies of `django/db/migrations/operations/models.py` from `raw.githubusercontent.com`. That is the file its fix lives in, taken from after `base_commit`. It then queried GitHub's commit search for the fix.
+- The pattern registered above (`github\.com/django`) does not match `githubusercontent.com/django`, so the registered scan would have missed it.
+- 9 of the 10 solves also reached for PyPI to install django's test dependencies.
+
+A solve that read the future fix measures copying, not the arm.
+
+The closed SWE-bench phase (`bench/swe_bench`) ran with the network up and the same shell, so its published numbers carry an unmeasured share of the same risk. That is reported, not re-run.
+
+**Change 1 — the network wall is enforced.**
+- Every process of a solve (the agent and every command it runs) gets `http_proxy`, `https_proxy` and `all_proxy` (both cases) set to a closed local port. `no_proxy` is set to `openrouter.ai,localhost,127.0.0.1`, so the model endpoint is the one host reachable over HTTP(S).
+- **Probed before the pilot** (`run.py probe`, one short model call). From a solve's environment, four ways out must fail: a curl to `raw.githubusercontent.com`, `pip download`, `git ls-remote` against github.com, and Python's `urllib` against pypi.org. A model call on the pinned route must succeed. The result is saved to `results/wall_probe.json`. If the wall does not hold, the arm stops.
+- **What it cannot stop:** a command that unsets the proxy variables or passes `--noproxy`. Such commands are counted per arm (`wall_bypass_tries`).
+- **The leak scan is widened** (`report.py`, `DJANGO_FETCH`): github.com and githubusercontent.com paths under `django`, `repo:django`, djangoproject.com, PyPI django, and git clone/fetch/ls-remote of django. Every item where any arm ran such a command is listed, and a sensitivity reading without those items is reported beside the primary.
+
+**Change 2 — TMPDIR is per solve.** An explicit `/tmp/...` path is still shared between solves running at the same time. That is a limitation, and the transcripts are where it would show.
+
+**Change 3 — the pilot re-runs, fresh, on the same 10 items, behind the wall.**
+- The first pilot (`results/pilot0_solves.jsonl`, US$ 0.10) is kept as a record and graded. It is used for nothing: not the gate, not the sizing, not the floor.
+- Its grade was being computed when this amendment was committed, and had not been read.
+
+**What does not change:** arms and their texts, model, route, step budget, slice rule, sizing rule, metrics, decision rules and budget. The first pilot's spend counts against the cap.

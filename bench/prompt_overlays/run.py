@@ -67,7 +67,7 @@ def solve_cost(row: dict[str, Any]) -> float:
 def spent() -> float:
     """Everything paid for, retried halts included."""
     return sum(solve_cost(r) + solve_cost({"calls": r.get("retry_calls") or []})
-               for path in (PILOT, MAIN) for r in load_jsonl(path))
+               for path in (RESULTS / "pilot0_solves.jsonl", PILOT, MAIN) for r in load_jsonl(path))
 
 
 # ---------------------------------------------------------------- slice
@@ -97,16 +97,69 @@ def build_slice(gold_report: Path, head: int = 0) -> None:
 
 
 # ---------------------------------------------------------------- solving
+#: Amendment 2, the network wall. Every process of a solve (the agent and every command it runs)
+#: sends HTTP(S) through a proxy that does not exist, except to the model endpoint. The first pilot
+#: showed why: one solve in ten curl'd django's stable/4.1.x and main branches from GitHub — the
+#: fixed file — and searched GitHub's commits for the fix.
+DEAD_PROXY = "http://127.0.0.1:9"
+MODEL_HOSTS = "openrouter.ai,localhost,127.0.0.1"
+_PROXY_VARS = ("http_proxy", "https_proxy", "all_proxy", "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY")
+
+
 def _child_env(home: Path) -> dict[str, str]:
     """The solve's environment. The venv is left off PATH and HOME is per solve, so a `pip install`
-    the agent runs cannot change the interpreter the harness runs on or leak into another solve."""
+    the agent runs cannot change the interpreter the harness runs on or leak into another solve.
+    TMPDIR is per solve too (Amendment 2); only an explicit `/tmp/...` path is still shared."""
     env = {k: v for k, v in os.environ.items() if k not in ("VIRTUAL_ENV", "CHIMERA_TEMPERATURE",
                                                              "CHIMERA_FALLBACK_MODELS", "CHIMERA_PROVIDER_ORDER")}
     venv_bin = str(Path(sys.executable).parent)
     env["PATH"] = ":".join(p for p in env.get("PATH", "").split(":") if p and p != venv_bin)
     env["HOME"] = str(home)
+    tmp = home.parent / "tmp"
+    tmp.mkdir(exist_ok=True)
+    env["TMPDIR"] = str(tmp)
     env["PYTHONUNBUFFERED"] = "1"
+    for var in _PROXY_VARS:
+        env[var] = DEAD_PROXY
+    env["no_proxy"] = env["NO_PROXY"] = MODEL_HOSTS
     return env
+
+
+def probe_wall() -> None:
+    """PROTOCOL §1, the probe that tries: from a solve's environment, three ways out must fail and
+    one model call must succeed. Costs one short model call."""
+    work = Path(os.environ["H45_WORK"])
+    scratch = Path(tempfile.mkdtemp(prefix="h45-probe-", dir=str(work)))
+    home = scratch / "home"
+    home.mkdir()
+    env = _child_env(home)
+    tries = {
+        "curl_github": "curl -sS -m 15 -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/django/django/main/README.rst",
+        "pip_download": f"python3 -m pip download --no-deps -q -d {scratch} asgiref",
+        "git_ls_remote": "timeout 20 git ls-remote https://github.com/django/django HEAD",
+        "python_urllib": "python3 -c \"import urllib.request;print(urllib.request.urlopen('https://pypi.org/simple/django/',timeout=15).status)\"",
+    }
+    out: dict[str, Any] = {}
+    for name, cmd in tries.items():
+        r = subprocess.run(["bash", "-c", cmd], env=env, capture_output=True, text=True, timeout=120, check=False)
+        blocked = r.returncode != 0 or "200" not in (r.stdout or "")
+        out[name] = {"blocked": blocked, "rc": r.returncode, "tail": ((r.stdout or "") + (r.stderr or ""))[-160:]}
+        print(f"{name:<14} blocked={blocked} rc={r.returncode}")
+    code = (
+        f"import sys; sys.path.insert(0, {str(HERE)!r}); from solve_one import Recorder; r = Recorder(None);"
+        "res = r.complete([{'role': 'user', 'content': 'Reply with the word OK.'}], "
+        "model='openrouter/deepseek/deepseek-v4-flash-0731', temperature=0.2, max_tokens=400);"
+        "print('MODEL', repr((res.content or '')[:40]), r.calls[0]['provider'])"
+    )
+    model = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True,
+                           timeout=180, check=False)
+    ok = model.returncode == 0 and "MODEL" in model.stdout
+    out["model_call"] = {"ok": ok, "tail": (model.stdout + model.stderr)[-300:]}
+    print(f"model_call     ok={ok} {model.stdout.strip()[-120:]}")
+    out["wall_holds"] = ok and all(v["blocked"] for k, v in out.items() if k != "model_call" and isinstance(v, dict))
+    (RESULTS / "wall_probe.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8", newline="\n")
+    print("WALL HOLDS" if out["wall_holds"] else "WALL DOES NOT HOLD")
+    subprocess.run(["rm", "-rf", str(scratch)], check=False)
 
 
 def run_solve(inst: dict[str, Any], arm: str) -> dict[str, Any]:
@@ -318,7 +371,11 @@ if __name__ == "__main__":
     sub.add_parser("report")
     sub.add_parser("pilotreport")
     sub.add_parser("dry")
+    sub.add_parser("probe")
     args = ap.parse_args()
+    if args.cmd == "probe":
+        probe_wall()
+        sys.exit(0)
     if args.cmd == "pilotreport":
         from report import arm_table, grades
 

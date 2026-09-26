@@ -21,8 +21,13 @@ SEED = 25
 
 #: A shell command that reaches the network (PROTOCOL §1: the wall this bench cannot enforce).
 NET = re.compile(r"\b(curl|wget|pip3? install|pip3? download|uv pip|git (clone|fetch|pull)|https?://)", re.I)
-#: ...and one that could fetch django's own source, the leak that would matter.
-DJANGO_FETCH = re.compile(r"(github\.com/django|pip3? (install|download)[^\n]*\bdjango\b|git clone[^\n]*django)", re.I)
+#: ...and one that could fetch django's own source, the leak that would matter. Widened by Amendment 2
+#: after the first pilot's `raw.githubusercontent.com/django/...` fetch, which the first version missed.
+DJANGO_FETCH = re.compile(
+    r"(github(usercontent)?\.com/django|repo:django|djangoproject\.com|pypi[^\s]*django"
+    r"|pip3? (install|download)[^\n]*\bdjango\b|git (clone|fetch|ls-remote)[^\n]*django)", re.I)
+#: A command that tries to step around the proxy wall of Amendment 2.
+WALL_BYPASS = re.compile(r"(--noproxy|no_proxy=|unset [^\n]*proxy|env -u [^\n]*proxy|proxy=\"?\"?(\s|$))", re.I)
 
 
 def grades(phase: str, arm: str) -> dict[str, set[str]] | None:
@@ -152,6 +157,7 @@ def arm_table(rows: list[dict[str, Any]], g: dict[str, set[str]] | None) -> dict
         "providers": sorted({c.get("provider") or "?" for r in rows for c in r.get("calls") or []}),
         "net_commands": sum(1 for r in rows if any(NET.search(s) for s in r.get("shell") or [])),
         "django_fetch": sum(1 for r in rows if any(DJANGO_FETCH.search(s) for s in r.get("shell") or [])),
+        "wall_bypass_tries": sum(1 for r in rows if any(WALL_BYPASS.search(s) for s in r.get("shell") or [])),
     }
 
 
@@ -222,6 +228,14 @@ def report() -> None:
     out["H4_timeouts_graded"] = compare("A", "B", by, g, timeout_is_halt=False)
     out["H5"] = compare("A", "C", by, g)
     out["H5_timeouts_graded"] = compare("A", "C", by, g, timeout_is_halt=False)
+    # Amendment 2: items where any arm ran a command that could fetch django's source leave a
+    # sensitivity reading (reported beside the primary, never instead of it).
+    leaks = sorted({r["instance_id"] for r in main if any(DJANGO_FETCH.search(s) for s in r.get("shell") or [])})
+    out["leak_items"] = leaks
+    if leaks:
+        clean = {iid: arms for iid, arms in by.items() if iid not in leaks}
+        out["H4_without_leak_items"] = compare("A", "B", clean, g)
+        out["H5_without_leak_items"] = compare("A", "C", clean, g)
     h4 = out["H4"]
     if h4.get("n"):
         lo = h4["newcombe95"][0]
@@ -260,8 +274,16 @@ def report() -> None:
     temps = {(r["arm"], c.get("temperature"), c.get("top_p")) for r in main for c in r.get("calls") or []}
     out["checks"]["sampling_sent"] = sorted(map(str, temps))
     out["pilot"] = arm_table(pilot, gp) if pilot else None
+    # The first pilot, run before the network wall (Amendment 2): kept as a record, used for nothing.
+    pilot0 = load_jsonl(RESULTS / "pilot0_solves.jsonl")
+    g0 = sorted(GRADES.glob("pilot0.*.json"))
+    if pilot0:
+        rep0 = json.loads(g0[-1].read_text(encoding="utf-8")) if g0 else {}
+        out["pilot0_before_wall"] = arm_table(pilot0, {k: set(rep0.get(k, [])) for k in (
+            "resolved_ids", "unresolved_ids", "error_ids", "empty_patch_ids", "completed_ids",
+            "submitted_ids")} if rep0 else None)
     out["usd_all"] = round(sum(solve_cost(r) + solve_cost({"calls": r.get("retry_calls") or []})
-                               for r in main + pilot), 4)
+                               for r in main + pilot + pilot0), 4)
     (RESULTS / "summary.json").write_text(json.dumps(out, indent=2) + "\n", encoding="utf-8",
                                                    newline="\n")
     print(json.dumps(out, indent=2))
