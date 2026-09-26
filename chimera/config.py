@@ -940,6 +940,20 @@ class Settings(BaseSettings):
     # the model and does not apply to another, and the receipt says so (`calibrated: false`).
     decision_backend: str = Field(default="local_logprob", validation_alias="CHIMERA_DECISION_BACKEND")
     decision_model: str = Field(default="", validation_alias="CHIMERA_DECISION_MODEL")
+    # --- A structured answer the route filed as reasoning. Some routes return a reasoning model's
+    # whole reply as reasoning, with `content` empty and `finish_reason` "stop" (`deepseek-r1` on
+    # Novita, 37-43% of calls in `bench/review_judge/RESULTS-h11.md`, 13/26 in
+    # `bench/answer_in_reasoning`); the gateway flags it (`CompletionResult.answer_in_reasoning`)
+    # and never makes the reasoning the answer. On, a caller that asked for JSON reads an object of
+    # its own schema from the END of the reasoning, and its receipt says `answer_from: reasoning`;
+    # today that caller is the hosted decision backend. Off (the default), it re-asks once as it
+    # always did, and a reading that still came back that way says `answer_from: reasoning_unread`.
+    # Off because a recovered reading has not been measured against a re-asked one on the same
+    # items: a map fitted on one path is not known to fit the other. The agent loop never reads
+    # prose from reasoning, whatever this says. ---
+    answer_from_reasoning: bool = Field(
+        default=False, validation_alias="CHIMERA_ANSWER_FROM_REASONING"
+    )
 
     # --- The REVIEW band (`chimera/governance/band.py`): off | on. With it on, and only under
     # `observe` or `enforce`, a tool call the lexical rules did not match is put to the decision

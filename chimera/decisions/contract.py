@@ -190,6 +190,12 @@ class Reading:
     alias ``typesafe/jev-1.13``, ``qwen3:4b@Q4_K_M`` behind the tag ``qwen3:4b``. Empty when the
     route does not say (every gateway in study 21 hid it). A map is fitted on one build; the Decider
     refuses to apply it to another."""
+    answer_from: str = ""
+    """Empty when the answer came as the reply's text, the ordinary path. ``reasoning``: the route
+    filed the reply as reasoning and the backend read its JSON from the end of it (see
+    ``CHIMERA_ANSWER_FROM_REASONING``). ``reasoning_unread``: the last reply was filed that way and
+    nothing was read from it, so an empty reading is the route's doing, not a model that said
+    nothing."""
 
 
 @runtime_checkable
@@ -242,6 +248,10 @@ class Answer:
     log_id: str = ""
     """The id of this answer's line in the decision log, when the Decider keeps one — what an
     outcome later names to label it. Empty without a log, or when the line could not be written."""
+    answer_from: str = ""
+    """Where the backend read the answer, when not from the reply's text (see
+    :attr:`Reading.answer_from`). On the receipt only when set, so whoever reads the log, or refits
+    a map on it, can tell such a row apart; nothing filters it out on its own."""
 
     @property
     def answered(self) -> bool:
@@ -299,6 +309,8 @@ class Answer:
             out["cached"] = True
         if self.log_id:
             out["log_id"] = self.log_id
+        if self.answer_from:
+            out["answer_from"] = self.answer_from
         if self.halt:
             out["halt"] = self.halt
         return out
@@ -411,7 +423,7 @@ class Decider:
             calibrated=usable is not None and raw_p is not None, map=found.id if found is not None else None,
             mass=reading.mass, seconds=seconds, usd=reading.usd, halt=halt, raw=reading.raw,
             logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
-            cached=cached is not None,
+            cached=cached is not None, answer_from=reading.answer_from,
         )
         if self.log is not None:
             # Every answer, halts included: a halt is a fact about availability the report counts.

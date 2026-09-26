@@ -1,0 +1,32 @@
+{
+ "calls": 20,
+ "answered_calls": 20,
+ "halts": 0,
+ "usd": 0.04956,
+ "batch": {
+  "n": 20,
+  "flagged": 9,
+  "flagged_ci95": [
+   0.258,
+   0.658
+  ],
+  "empty_not_flagged": 0,
+  "recovered_of_flagged": 6,
+  "providers": [
+   "Novita"
+  ],
+  "finish_reasons": [
+   "stop"
+  ],
+  "reasoning_content_present": 20,
+  "psf_reasoning_equals": 20
+ },
+ "amendment1": {
+  "flagged": 9,
+  "end_rule_recovered": 6,
+  "object_anywhere": 9,
+  "object_anywhere_not_at_end": 3,
+  "of_those_prose_restates_verdict": 1,
+  "no_brace_at_all": 0
+ }
+}

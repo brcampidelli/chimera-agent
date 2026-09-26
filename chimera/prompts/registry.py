@@ -190,7 +190,9 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="asked once when the closing reply is empty; the failure is measured (6/10 at max_steps in "
             "bench/unattended_claims), the sentence's effect is not"),
     _i("loop.empty_close_note", "chimera.core.agent:_empty_close_note", "turn", _LOOP,
-       note="the harness's own words when the closing reply is empty twice; never a claim of success"),
+       note="the harness's own words when the closing reply is empty twice; never a claim of "
+            "success; one more sentence when the route filed the model's text as reasoning, which "
+            "is never shown as the answer"),
     _i("loop.unanswered_call_stub", "chimera.core.agent:Agent.run", "turn", _LOOP),
     _i("loop.tool_raised", "chimera.tools.base:tool_raised", "turn", _LOOP,
        note="the observation for a tool that raised; a taint source's is fenced behind "
