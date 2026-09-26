@@ -1,0 +1,161 @@
+{
+  "must_fail": {
+    "curl_github": {
+      "blocked": true,
+      "rc": 7,
+      "tail": "000curl: (7) Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server\n"
+    },
+    "git_ls_remote": {
+      "blocked": true,
+      "rc": 128,
+      "tail": "fatal: unable to access 'https://github.com/django/django/': Failed to connect to 127.0.0.1 port 9 after 0 ms: Couldn't connect to server\n"
+    },
+    "python_urllib": {
+      "blocked": true,
+      "rc": 1,
+      "tail": "^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/usr/lib/python3.12/urllib/request.py\", line 1347, in do_open\n    raise URLError(err)\nurllib.error.URLError: <urlopen error [Errno 111] Connection refused>\n"
+    },
+    "django_ref": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/dflt-cache/django-ref/django': No such file or directory\nls: cannot access '/home/brcamp/h45-cache/django-ref/django': No such file or directory\n"
+    },
+    "gold_logs": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/h45-grade/gold/logs': No such file or directory\nls: cannot access '/home/brcamp/dflt-grade': No such file or directory\n"
+    },
+    "hf_cache": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/.cache/huggingface': No such file or directory\n"
+    },
+    "other_template": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/home/brcamp/dflt-h45-work/templates': No such file or directory\n"
+    },
+    "windows_drive": {
+      "blocked": true,
+      "rc": 2,
+      "tail": "ls: cannot access '/mnt/c/Users': No such file or directory\n"
+    },
+    "docker": {
+      "blocked": true,
+      "rc": 7,
+      "tail": "curl: (7) Failed to connect to localhost port 80 after 0 ms: Couldn't connect to server\n"
+    }
+  },
+  "must_hold": {
+    "home_listing": {
+      "ok": true,
+      "stdout": ".local\ndflt-h45-work\nP__django__django-16100\ndflt-P-vh6fbpkd",
+      "stderr": ""
+    },
+    "django_copies": {
+      "ok": true,
+      "stdout": "/home/brcamp/dflt-h45-work/P__django__django-16100/django/db/models/base.py",
+      "stderr": ""
+    },
+    "processes": {
+      "ok": true,
+      "stdout": "3",
+      "stderr": "your 131072x1 screen size is bogus. expect trouble\n"
+    },
+    "identity": {
+      "ok": true,
+      "stdout": "brcamp\n0\n0",
+      "stderr": ""
+    },
+    "venv": {
+      "ok": true,
+      "stdout": "imports ok",
+      "stderr": "cost map fetch attempt 2/3 failed (ConnectError fetching https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json: [Errno 111] Connection refused); retrying in 4.9s\n"
+    }
+  },
+  "arms": {
+    "A": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 278,
+        "completion": 63,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 2.802e-05,
+        "reasoning": 17,
+        "gen_id": "gen-1790410609-GVhkuSRUF5YAtzY9tRTv",
+        "seconds": 1.15
+      },
+      "tail": ""
+    },
+    "D": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 293,
+        "completion": 52,
+        "cache_read": 0,
+        "provider": "DeepInfra",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 6.286e-05,
+        "reasoning": 12,
+        "gen_id": "gen-1790410614-HIupRSEii6tGkmf4I2sp",
+        "seconds": 0.85
+      },
+      "tail": ""
+    },
+    "G": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 48,
+        "completion": 19,
+        "cache_read": 0,
+        "provider": "OpenAI",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 1.43e-05,
+        "reasoning": 0,
+        "gen_id": "gen-1790410619-8UVFIjPiCAOG71vWq6vq",
+        "seconds": 1.15
+      },
+      "tail": ""
+    },
+    "Q": {
+      "tool_call_parsed": true,
+      "on_pin": true,
+      "rec": {
+        "prompt": 273,
+        "completion": 115,
+        "cache_read": 0,
+        "provider": "Alibaba",
+        "finish": "tool_calls",
+        "temperature": 0.2,
+        "tools_offered": true,
+        "tool_calls": 1,
+        "empty": false,
+        "billed": 2.314e-05,
+        "reasoning": 87,
+        "gen_id": "gen-1790410624-cAjo1R45ijA0KFF3Vjwy",
+        "seconds": 2.36
+      },
+      "tail": ""
+    }
+  },
+  "wall_holds": true,
+  "arms_ok": true,
+  "usd": 0.00012832
+}

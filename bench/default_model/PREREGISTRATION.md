@@ -256,3 +256,9 @@ Nothing a solve sees changes, and no data is discarded: the cutoff only decides 
 **Amendment 3, the probe's first reading (04:01).** Every disk and network check held. All four pinned calls failed with a DNS error: on WSL `/etc/resolv.conf` links into `/mnt/wsl`, which the `/mnt` cover hid.
 
 The fix is in `sandbox.sh`, before the restart. The resolver file is bound back read-only, and the staging moved to a private tmpfs on `/dev/shm`, which is covered again afterwards. The probe is re-run, and nothing started in between.
+
+**Amendment 3, the probe's second reading (04:17), and the restart.** Every check held, and each arm returned a parsed tool call from its pin (`results/probe_sandbox.json`).
+
+Between the two readings the WSL VM crashed. `getpwuid` failed with EIO, then `CreateInstance/E_UNEXPECTED`, after hours at a load average near 40 from this bench and H4/H5 together. It came back empty (uptime 0 min), and on the idle machine the probe passed in 32 s.
+
+To keep the shared machine up, the restarted main run starts at most **12 solves at a time**, not 16. That changes nothing a solve sees. The pre-amendment grading report for D (`dflt_main_D`, of discarded solves) moved to `results/grades_discarded_before_amendment3/`.
