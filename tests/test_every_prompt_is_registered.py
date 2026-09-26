@@ -117,14 +117,15 @@ def test_no_snapshot_is_left_without_a_prompt() -> None:
 
 def test_the_assembled_loop_prompt_keeps_its_order() -> None:
     """The order is what the plan changes, so it is asserted in words as well as in bytes: the base
-    comes first, then the project's conventions, then the owner, then the task-list sentence."""
+    comes first, then the task-list sentence, then the project's conventions, then the owner, who is
+    read last (plan §5.1, rule 4)."""
     from chimera.core.agent import DEFAULT_SYSTEM_PROMPT, TODO_PROMPT
 
     text = render_all()["assembled.loop_project_owner_todo"]
     positions = [
         text.index(DEFAULT_SYSTEM_PROMPT),
+        text.index(TODO_PROMPT),
         text.index("Project instructions"),
         text.index("Instructions from the person who runs you"),
-        text.index(TODO_PROMPT),
     ]
     assert positions == sorted(positions)

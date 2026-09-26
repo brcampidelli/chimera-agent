@@ -726,6 +726,22 @@ class Agent:
         card_block = "" if self.config.turn_context else self._card_context(task)
         if card_block:
             system_prompt = f"{system_prompt}\n\n{card_block}"
+        # Only when the session actually granted the tool: a sentence telling a model to use
+        # something it was not given is a sentence that invites a call to nothing.
+        #
+        # It is here because the schema alone does not work, and that is measured rather than
+        # assumed. Same task, same models, one sentence of difference: bare, `todo_write` was called
+        # 0 times by either of two models; nudged, glm-5.3 called it 4 times with a correct
+        # progression. deepseek-v4-flash called it 0 times in 4 nudged runs, so on that model this
+        # buys nothing. The flag's comment in `chimera/config.py` names adoption as the number to
+        # watch; the four runs are here. Without this line the tool is 657 characters of schema and
+        # no behaviour at all.
+        #
+        # Before the project and the owner, not after them. It used to be the last block, which put
+        # tool text after the owner's and broke the one precedence rule every situation shares: the
+        # owner is read last (study 25, plan §5.1 rule 4). The four nudged runs above had it last.
+        if _find_tool(self.tools, "todo_write") is not None:
+            system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         # After the skills, so the project's own conventions outrank a generic skill card that
         # happens to have been retrieved — a repository that says "never use bare except" should
         # win over one. Not last any more: see the owner's instructions below.
@@ -740,18 +756,6 @@ class Agent:
         # silently.
         if self.config.instructions:
             system_prompt = f"{system_prompt}\n\n{self.config.instructions}"
-        # Last of all, and only when the session actually granted the tool: a sentence telling a
-        # model to use something it was not given is a sentence that invites a call to nothing.
-        #
-        # It is here because the schema alone does not work, and that is measured rather than
-        # assumed. Same task, same models, one sentence of difference: bare, `todo_write` was called
-        # 0 times by either of two models; nudged, glm-5.3 called it 4 times with a correct
-        # progression. deepseek-v4-flash called it 0 times in 4 nudged runs, so on that model this
-        # buys nothing, and deepseek-v4-flash is the shipped default model. The flag's comment in
-        # `chimera/config.py` names adoption as the number to watch; the four runs are here. Without
-        # this line the tool is 657 characters of schema and no behaviour at all.
-        if _find_tool(self.tools, "todo_write") is not None:
-            system_prompt = f"{system_prompt}\n\n{TODO_PROMPT}"
         return system_prompt
 
     def compose_turn_context(self, task: str, notes: str | None = None) -> str:
