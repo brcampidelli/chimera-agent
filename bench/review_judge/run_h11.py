@@ -219,6 +219,15 @@ def _selftest() -> None:
                                    "parse": "json"}
     assert answer_in_reasoning("draft {\"verdict\": \"refuted\"} final " + tabbed) == tabbed
     assert quote_in_diff(parse_three(tabbed)["quote"], '@@ -1 +1 @@\n+\t\t\tawait x("a");') is True
+    # Amendment 3: the lenient read. The case the main run met: a final answer with an invalid escape.
+    bad_escape = ('draft {"reason": "d", "verdict": "reject"}\n\nfinal:\n{\n  "reason": "if (x[0] != \'\\0\')",'
+                  '\n  "verdict": "approve"\n}')
+    assert answer_in_reasoning(bad_escape) == '{"reason": "d", "verdict": "reject"}'  # strict: the draft
+    lenient = answer_in_reasoning_lenient(bad_escape)
+    assert lenient.startswith('{\n  "reason": "if') and lenient.endswith('"approve"\n}'), lenient
+    assert answer_in_reasoning_lenient(tail) == answer_in_reasoning(tail)  # valid final: same answer
+    assert answer_in_reasoning_lenient('the form is {"reason": "<x>", "verdict": "approve" | "reject"}') == ""
+    assert answer_in_reasoning_lenient("no answer at all") == ""
 
 
 # --- the items -----------------------------------------------------------------------------------
@@ -278,6 +287,32 @@ def answer_in_reasoning(reasoning: str) -> str:
             return reasoning[pos:end]
         pos = reasoning.rfind("{", 0, pos)
     return ""
+
+
+_CLOSING_VERDICT = re.compile(
+    r'"verdict"\s*:\s*"(approve|reject|confirmed|plausible|refuted)"\s*\}', re.I)
+_OPENING = re.compile(r'\{\s*"')
+
+
+def answer_in_reasoning_lenient(reasoning: str) -> str:
+    """Amendment 3 — `answer_in_reasoning`, made as lenient as the content path it stands in for.
+
+    Used only by the read (`read_h11_three.py`), over the reasoning tail each row stored, so the
+    driver's behaviour is the same in every block. The strict version skips a final answer that is not
+    valid JSON — the first one seen had an invalid escape, `'\\0'`, inside its reason — although arm
+    A's published parser, which reads by pattern, would have read the same text had it arrived as
+    `content`. Here the answer is whichever ends LATER: the last valid object with a `verdict`, or the
+    last `"verdict": "<word>"}` closing an object, taken from the `{"` that opens it. A restatement of
+    the requested format (`"approve" | "reject"}`) does not close on a single word and is never taken.
+    """
+    strict = answer_in_reasoning(reasoning)
+    strict_end = reasoning.rfind(strict) + len(strict) if strict else -1
+    matches = list(_CLOSING_VERDICT.finditer(reasoning))
+    closing = matches[-1] if matches else None
+    if closing is None or closing.end() <= strict_end:
+        return strict
+    starts = [m.start() for m in _OPENING.finditer(reasoning, 0, closing.start())]
+    return reasoning[starts[-1] : closing.end()] if starts else strict
 
 
 _RAW = threading.local()

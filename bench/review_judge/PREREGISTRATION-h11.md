@@ -294,3 +294,31 @@ item after 2300 s.
 **Observed and not acted on.** In the second pilot T answered confirmed 16, plausible 2, refuted 2. The
 second pilot's rows (`results/h11/pilot/`) feed the cost projection only; they are in-sample and never
 enter the read.
+
+## Amendment 3 — 2026-09-25, during the main run's first block, before any comparison was computed
+
+**What happened.** Around item 154, one arm-A call came back with empty `content`. Its reasoning ended
+in a final answer the model wrote as `{"reason": "… if (thread_name[0] != '\0') …", "verdict": "approve"}`.
+The `'\0'` is not a valid JSON escape, so Amendment 1's recovery, which takes only valid JSON, found
+nothing and the call was recorded `unparsed`. Arm A's published parser reads by pattern, so the same
+text arriving as `content` would have been read as `approve`. The recovery path was stricter than the
+content path it stands in for, and that could remove items unevenly between arms (T quotes code,
+which carries backslashes).
+
+**The change is at read time, not in the driver.** The driver keeps running one harness in every
+block. `read_h11_three.py` re-reads **every** call whose `content` came back empty
+(`answer_from` = `reasoning` or `none`) from the reasoning tail the row stored, with
+`run_h11.answer_in_reasoning_lenient`: the model's last answer is whichever ends later — the last
+valid JSON object with a `verdict`, or the last `"verdict": "<word>"}` closing an object, taken from the
+`{"` that opens it. A restatement of the requested format (`"approve" | "reject"}`) does not close on a
+single word and is never taken. The arm's own parser then reads it: `run_judge.ask` for A and A2,
+`parse_three` for T. **The decision uses the re-read verdicts.** The as-run verdicts are printed beside
+them, with every verdict the re-read moved.
+
+**Checked before committing.** On the 183 rows then on disk, the re-read moved exactly one verdict — the
+call above, `unparsed` → `approve` — and reproduced every other recovered answer.
+
+**What had been seen when this was written.** The driver's progress lines, which print each item's
+label and each arm's verdict, and the per-arm verdict totals of the first 52 rows (A approve 50/52,
+T confirmed 47/52), read to project cost. No label-wise count, no pairing, no precision or recall had
+been computed, and this change does not depend on any.

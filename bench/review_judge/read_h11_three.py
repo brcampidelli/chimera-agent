@@ -147,6 +147,50 @@ def t_state(call: dict[str, Any]) -> str | None:
     return call["verdict"] if call["verdict"] in STATES else None
 
 
+def rederive(rows: list[dict[str, Any]]) -> Counter[tuple[str, str, str]]:
+    """Amendment 3: re-read every call whose `content` came back empty, from its stored reasoning tail.
+
+    The lenient recovery (`run_h11.answer_in_reasoning_lenient`) takes the model's last answer even
+    when it is not valid JSON, as the content path would have; the arm's OWN parser then reads it —
+    `run_judge.ask` for A and A2, `parse_three` for T. Applied to every row alike, at read time, so
+    the driver ran one harness in every block. The as-run verdict stays in `verdict_as_run`.
+    """
+    import run_h11 as rh
+    import run_judge as rj
+
+    class _Stub:
+        def __init__(self, text: str) -> None:
+            self.text = text
+
+        def complete(self, _messages: Any, **_kwargs: Any) -> Any:
+            return type("Reply", (), {"content": self.text})()
+
+    blank = rj.Item(row_id=0, repo="", pr=0, base="", head="", path="", from_line=0, to_line=0, note="",
+                    label=0, source_model="", language="")
+    patches: dict[str, str] | None = None
+    changed: Counter[tuple[str, str, str]] = Counter()
+    for row in rows:
+        for arm, call in row["arms"].items():
+            call["verdict_as_run"] = call["verdict"]
+            if call.get("answer_from") not in ("reasoning", "none") or not call.get("reasoning_tail"):
+                continue
+            text = rh.answer_in_reasoning_lenient(call["reasoning_tail"])
+            if arm in ("A", "A2"):
+                verdict = rj.ask(_Stub(text), blank, rh.MODEL, "cautious")[0]
+            else:
+                got = rh.parse_three(text)
+                verdict = got["state"]
+                if verdict != call["verdict"]:
+                    if patches is None:
+                        patches = {rh.item_id(i): i.patch for i in rh.out_of_sample()}
+                    call["quote"], call["parse"] = got["quote"], got["parse"]
+                    call["quote_in_diff"] = rh.quote_in_diff(got["quote"], patches.get(row["id"], ""))
+            if verdict != call["verdict"]:
+                changed[(arm, call["verdict"], verdict)] += 1
+                call["verdict"] = verdict
+    return changed
+
+
 # --- guards --------------------------------------------------------------------------------------
 
 
@@ -435,6 +479,13 @@ def main() -> None:
     if not guard_rows(rows, manifest):
         sys.exit("GUARD FAILED — the rows are not the registered items; nothing is read")
     print("  GUARDS PASSED")
+
+    changed = rederive(rows)
+    print("\n== 1b. Amendment 3 — empty-content calls re-read from their stored reasoning tail")
+    print(f"  verdicts that moved (arm, as run → re-read): {dict(changed) if changed else 'none'}")
+    for arm in ("A", "T", "A2"):
+        as_run = Counter(r["arms"][arm]["verdict_as_run"] for r in rows if arm in r["arms"])
+        print(f"  {arm:<3} as run {dict(sorted(as_run.items()))}")
 
     ans = answered(rows)
     ctrl = control(rows)
