@@ -173,6 +173,17 @@ CATALOG: tuple[CatalogEntry, ...] = (
         notes="replaces gpt-5.5-mini, withdrawn on 2026-08-18",
     ),
     CatalogEntry(
+        "openrouter/openai/gpt-6-luna", "mid", "OpenAI",
+        0.10, 0.50, tools=True, context_k=1050,
+        notes="the small end of the GPT-6 line, released 2026-09-22; the default reviewer of\n"
+        "        `chimera review` since `bench/review_reviewer` (2026-09-26): 39 of 40 seeded\n"
+        "        reviews showed the defect and none came back incomplete, at US$ 0.0010 a review,\n"
+        "        the default model's own cost. Priced off OpenAI's standard route, which OpenRouter\n"
+        "        billed exactly in that bench's probe; OpenAI also serves a flex tier at half and a\n"
+        "        fast one at double. It takes no temperature, so it samples. The row is here so a\n"
+        "        review's cost is known from a cold start",
+    ),
+    CatalogEntry(
         "openrouter/qwen/qwen3-coder", "mid", "Qwen (Alibaba)",
         0.30, 1.00, tools=True, context_k=262,
         notes="code-leaning mid",

@@ -63,7 +63,9 @@ def test_the_json_form_is_one_object_in_the_declared_schema(
     assert set(only) == FINDING_KEYS
     assert (only["id"], only["priority"], only["file"], only["line"]) == ("F1", "P1", "calc.py", 11)
     assert set(only["verdict"]) == {"state", "label", "reason", "stage"}
-    assert ReviewReport.model_validate(data).to_json() == json.dumps(data, indent=2)
+    # Compared as values, not text: pydantic writes a small cost as 0.00004 and `json.dumps` as
+    # 4e-05. The text matched only while the default reviewer's price kept a review above US$ 1e-4.
+    assert json.loads(ReviewReport.model_validate(data).to_json()) == data
 
 
 def test_a_field_the_schema_does_not_declare_is_refused(
