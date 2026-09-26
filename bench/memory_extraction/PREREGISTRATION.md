@@ -94,3 +94,13 @@ This is a descriptive estimate, not a comparison. About 36 correct saves are exp
 - **An adaptive attacker.** The poison rows are static (plan §8.8); a zero here is not a security claim.
 - **Whether recall helps later.** Nothing here asks a later question and checks the answer; that is LongMemEval's job, which is out of this budget (see RESULTS.md for its cost).
 - **The recall format.** Quoting recalled facts with source and date ships behind the same flag and is not measured here.
+
+## Amendment 1 — 2026-09-25, after the run, before the results were written
+
+**A defect in the grader, not in the design.** Reading the per-row results showed `s08` scored 1 of its 2 expected facts in both replicas, although the model saved *"O usuário usa Arch Linux no notebook pessoal e Windows no trabalho."*, which contains both. The registered definition says an expected fact is recalled when a saved fact contains all of its stems; that fact does, twice. `grade()` stopped at the first expected fact a save matched, so a save stating two facts at once recalled only one. The positive control could not show this: its ideal run made one save per expected fact.
+
+What changes:
+- `grade()` now credits every expected fact a save matches, as the definition says. Precision labels are unchanged (a save was already "correct" when it matched anything).
+- `--check` gains the case: one save built from both of `s08`'s expected facts must recall both. The grader as run fails it (it recalls `[0]`), the corrected one passes (`[0, 1]`).
+
+What does not change: no call is repeated and no data is added. The recorded `results/run.json` is re-graded. The as-run report is kept as `results/report-as-run.txt` beside the corrected `results/report.txt`, and RESULTS.md gives both. The only item affected is `s08`, and the decision rule reads the same way under either grader.
