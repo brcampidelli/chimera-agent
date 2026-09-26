@@ -158,6 +158,63 @@ def _served_windows() -> dict[str, int]:
     return served
 
 
+def _route_limits(slug: str) -> list[tuple[int | None, bool]]:
+    """``(max completion tokens, lists tools)`` for every route OpenRouter lists for ``slug``."""
+    import json
+    import urllib.request
+
+    tail = slug.removeprefix("openrouter/")
+    req = urllib.request.Request(
+        f"https://openrouter.ai/api/v1/models/{tail}/endpoints",
+        headers={"User-Agent": "chimera-tests"},
+    )
+    with urllib.request.urlopen(req, timeout=30) as response:
+        routes = json.loads(response.read())["data"].get("endpoints") or []
+    return [
+        (r.get("max_completion_tokens"), "tools" in (r.get("supported_parameters") or []))
+        for r in routes
+    ]
+
+
+def test_the_ceiling_does_not_pin_a_catalogue_model_to_one_route(live_slugs: set[str]) -> None:
+    """OpenRouter reads `max_tokens` as a route filter, and the gateway sends its ceiling as one.
+
+    Measured on 2026-09-26: at the 32,000 ceiling every tool-free call to the preset weak rung
+    went to the ONE of its four routes that lists more than 16,384 output tokens, and half of them
+    came back 429 from that provider's shared pool with nothing to fall back to. When no route
+    qualifies the filter is dropped (tool calls were served), so what does harm is a pool of
+    several narrowed to exactly one. `CatalogEntry.max_output` lowers the ceiling for a row whose
+    routes serve less; this reddens when a row needs one and has none, or has one that no longer
+    leaves more than a single route. Checked for tool-free calls and, separately, for tool calls,
+    whose pool is only the routes that list tools.
+    """
+    import urllib.error
+
+    from chimera.config import Settings
+    from chimera.providers.catalog import CATALOG
+
+    ceiling = Settings().completion_ceiling
+    if ceiling <= 0:
+        pytest.skip("no ceiling is sent, so nothing is filtered")
+    pinned: list[str] = []
+    for entry in CATALOG:
+        if not entry.slug.startswith("openrouter/") or entry.slug not in live_slugs:
+            continue
+        try:
+            routes = _route_limits(entry.slug)
+        except (urllib.error.URLError, OSError, ValueError) as exc:
+            pytest.skip(f"the endpoint listing did not answer for {entry.slug} ({exc})")
+        asked = min(ceiling, entry.max_output) if entry.max_output else ceiling
+        for label, pool in (
+            ("tool-free", [limit for limit, _ in routes]),
+            ("tools", [limit for limit, tools in routes if tools]),
+        ):
+            fits = [limit for limit in pool if limit is None or limit >= asked]
+            if len(pool) > 1 and len(fits) == 1:
+                pinned.append(f"{entry.slug} ({label}): {asked} fits 1 of the routes {pool}")
+    assert not pinned, f"the ceiling pins these to a single route: {pinned}"
+
+
 def test_no_catalogue_window_promises_more_than_the_provider_serves(live_slugs: set[str]) -> None:
     """`context_length` and `top_provider.context_length` are different numbers, and the second wins.
 

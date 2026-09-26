@@ -60,6 +60,23 @@ class CatalogEntry:
     measurement exists, :class:`chimera.core.context_budget.ContextBudget` spends at most this much.
     It is a floor that was tested, never a guess: a row without a bench behind it stays None."""
 
+    max_output: int | None = None
+    """The largest completion, in tokens, that EVERY route OpenRouter lists for this slug serves.
+    None = not recorded, which is right for a row whose routes all serve the default ceiling.
+
+    Read by the gateway, which asks for no more than this when the caller set no budget
+    (:meth:`chimera.providers.gateway.LLMGateway._bounded`), because OpenRouter treats
+    ``max_tokens`` as a route filter. Measured on 2026-09-26 for the weak rung of three presets,
+    `mistral-small-3.2`, whose routes list 16,384 / 16,384 / 26,214 / 32,768: at the 32,000
+    ceiling 6 of 6 tool-free calls went to the one route listing 32,768 (Parasail, which lists no
+    tools), and 3 of the 6 came back 429 from that provider's shared pool with no fallback,
+    because the filter had left no other route; at 16,384 or with no ``max_tokens``, 8 of 8 went
+    to Venice and none failed. When no route qualifies, the filter is dropped rather than failing
+    the call: 8 of 8 tool calls at 32,000 were served, by Venice. The ceiling was set to stop
+    runaways, not to pick a provider, and this is what keeps it to the first job. The live check
+    in `tests/test_catalog_is_live.py` reddens when the ceiling pins a row to one route again;
+    the probe and its rows are in `bench/route_ceiling/`."""
+
 
 
 def price_is_known(entry: CatalogEntry, live_input_per_m: float, *, tolerance: float = 0.5) -> bool:
@@ -105,6 +122,9 @@ CATALOG: tuple[CatalogEntry, ...] = (
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",
         0.075, 0.20, tools=True, context_k=128,
+        # Its routes list 16,384 (DeepInfra, Venice), 26,214 (Mistral) and 32,768 (Parasail, no
+        # tools) on 2026-09-26; at the 32k ceiling every tool-free call went to Parasail alone.
+        max_output=16_384,
         notes="the local-lift goldilocks model; cheap paid weak with usable tools. The window read\n        256k here until 2026-09-03; the provider serves 131k",
     ),
     CatalogEntry(
@@ -316,6 +336,14 @@ PROVIDERS_BY_NAME: dict[str, ProviderInfo] = {
 def provider_names() -> list[str]:
     """The accepted ``--provider`` values, in the order they are offered."""
     return list(PROVIDERS_BY_NAME)
+
+
+def max_output_for(slug: str) -> int | None:
+    """The row's :attr:`CatalogEntry.max_output` for this exact slug, or None when none is recorded.
+
+    Exact match only: a slug the catalogue does not carry says nothing about its routes, and a
+    near-match (another size of the same family) routes to other providers."""
+    return next((e.max_output for e in CATALOG if e.slug == slug), None)
 
 
 def entries(tier: Tier | None = None, vendor: str | None = None) -> list[CatalogEntry]:
