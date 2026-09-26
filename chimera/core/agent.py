@@ -53,6 +53,7 @@ PARALLEL_READ_TOOLS = frozenset(
 PARALLEL_READ_WORKERS = 4
 
 if TYPE_CHECKING:
+    from chimera.core.summarise import Summariser
     from chimera.skills.registry import SkillRegistry
 
 _log = get_logger("core.agent")
@@ -508,8 +509,9 @@ class Agent:
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
         # Built once rather than per compaction, and None unless asked for: `compact()` treats
-        # None as "use the structural note", which is the behaviour every caller has today.
-        self._summarise = None
+        # None as "use the structural note", which is the behaviour every caller has today. The
+        # run's meters are bound where it is called, in `run`, because they belong to one run.
+        self._summarise: Summariser | None = None
         if self.config.summarise_compaction:
             from chimera.core.summarise import rule_summariser
 
@@ -920,7 +922,7 @@ class Agent:
                     messages,
                     keep_recent=self.config.keep_recent,
                     state=self.run_state,
-                    summarise=self._summarise,
+                    summarise=self._metered_summariser(usage, spend),
                 )
                 if compacted:
                     record.compacted = True
@@ -1085,6 +1087,21 @@ class Agent:
         return self._result(answer, self.config.max_steps, "max_steps", messages,
                             tool_calls_made, tool_names, usage, final.model, steplog=steplog,
                             task=task)
+
+    def _metered_summariser(
+        self, usage: _UsageTally, spend: SpendBudget | None
+    ) -> Callable[[list[Any]], str] | None:
+        """This run's compaction summariser, charging its call to the run, or None when off.
+
+        Charged the way the tool router's call is charged (`ToolRouter.pick`), so it lands in the
+        run's own line: the result's tokens and ``usd``, the partial spend a failed run carries,
+        and the spend ceiling. Not a line of its own: the call is made inside the run, between two
+        of its steps, and a turn is one row in the usage log whatever it called on the way.
+        """
+        summarise = self._summarise
+        if summarise is None:
+            return None
+        return lambda older: summarise(older, usage=usage, spend=spend)
 
     def _close(
         self,
