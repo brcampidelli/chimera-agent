@@ -106,6 +106,15 @@ def _provider(steplog: Any) -> str:
     return StepLog(steps=list(getattr(steplog, "steps", ()) or ())).provider
 
 
+def _system_sha(agent_result: Any) -> str:
+    """The fingerprint the worker's own step log recorded — read, never recomputed.
+
+    Recomputing it here from a prompt string would be a second place for the receipt and the trace
+    line to disagree about which instructions ran; the step log is what the trace was written from.
+    """
+    return str(getattr(getattr(agent_result, "steplog", None), "system_sha", "") or "")
+
+
 def _side_effects(steplog: Any) -> list[str]:
     """Which out-of-checkout side-effect tools this attempt actually called, in first-call order.
 
@@ -355,6 +364,11 @@ class Attempt:
     failure_class: str = ""
     #: The exact field or line the detector fired on, so the receipt says WHY and not only what.
     failure_evidence: str = ""
+    #: The fingerprint of the system message this attempt's worker ran with
+    #: (:func:`chimera.prompts.fingerprint`), or "" when the worker reported none. Per attempt
+    #: because one attempt is one agent run, which composes its system message afresh: a behaviour
+    #: change between two attempts, or two runs, can then be traced to a change in the instructions.
+    system_sha: str = ""
 
 
 @dataclass
@@ -1245,6 +1259,7 @@ class AutonomousAgent:
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
             attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
+            attempt.system_sha = _system_sha(agent_result)
             # What the attempt DID, read off the same result as the id above and for the same
             # reason: the worker is what knows, and re-deriving it here would be a second place for
             # the two to disagree.
@@ -1539,6 +1554,8 @@ class AutonomousAgent:
         )
         parcial.model = str(getattr(agent_result, "model", "") or "")
         parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
+        # A cut-short attempt still sent its instructions, and was paid for under them.
+        parcial.system_sha = _system_sha(agent_result)
         parcial.evidence = "none"
         if snapshot is not None and self.guard is not None:
             # Measured, not assumed, and the same call the verified path makes. `diff_productive:

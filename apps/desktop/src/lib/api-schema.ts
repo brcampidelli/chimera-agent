@@ -3316,6 +3316,11 @@ export interface components {
             side_effects: string[];
             /** Success */
             success: boolean;
+            /**
+             * System Sha
+             * @default
+             */
+            system_sha: string;
             /** Verified */
             verified: boolean;
             /** Verify Output */
