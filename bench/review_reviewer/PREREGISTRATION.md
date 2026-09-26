@@ -117,3 +117,19 @@ Conditions on reading it:
 - **Determinism.** Four byte-identical T = 0 requests on one pinned route have produced four different replies (`bench/cache_confound`). L's route does not accept a temperature at all, so it samples.
 - **Natural defects, other languages, larger diffs, other days.** S15's limits, unchanged.
 - **Premium configurations.** The top rung of `premium` (claude-opus-5) is not an arm. If a candidate wins, the ranked list is consulted in every cost mode, so premium stops reviewing with opus by default on a measurement that did not include opus; `CHIMERA_REVIEW_MODEL` names it back.
+
+## Amendment 1 — 2026-09-26, after the probe and the pilot, before the main run
+
+**Probe** (`results/probe.txt`). All four routes answered. OpenRouter billed exactly tokens × the registered price on every route (ratio 1.000), so L was served at OpenAI's standard tier (0.10 / 0.50), not flex or fast.
+
+**Pilot** (`results/pilot1-discarded.json`, US$ 0.014). Its outcomes are discarded, as registered; the main run repeats those three items.
+- **D, L and Q work through the product's path.** Nine finder replies were read by eye. Every one is JSON the product reads; Q wraps its reply in a ```json fence, which `extract_json` already handles. Each located finding quotes the diff and states a consequence. No reply was cut at the ceiling.
+- **M never reached a model.** Every M call came back `404 No endpoints found`. OpenRouter's routing funnel says why: the product asks for its 32,000-token completion ceiling (`CHIMERA_COMPLETION_CEILING`), and DeepInfra and Venice serve at most 16,384. They are removed at "Filter by Context Length", before the pin is applied. Mistral's own EU route is removed as a regional surcharge. **Parasail** (bf16, up to 32,768) is the only route that accepts the product's request, so it is the route the product reaches. The pin was wrong, not the model.
+- **Cost per review in the pilot:** D US$ 0.0013, L US$ 0.0019, Q US$ 0.0016. × 60 reviews that is 0.08, 0.11 and 0.10, each inside its guard.
+
+**Changes.**
+1. **M is pinned to Parasail at 0.09 / 0.30** (the endpoints listing of 2026-09-26). Its guard stays US$ 0.10.
+2. `run.py --pilot` takes `--arms`, so the pilot can be repeated for M alone before the main run. M's second pilot is also discarded. It must show a readable reply, or M is dropped before the main run and reported as not measured.
+3. **k = 2 for every arm**, per the registered projection rule: every projection fits its guard.
+
+Nothing else changes: the arms, the metrics, the selection rule and the guards are as registered.

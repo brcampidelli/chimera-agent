@@ -68,7 +68,10 @@ ARMS: dict[str, Arm] = {
     "D": Arm(AUTHOR, "DeepInfra", (0.06, 0.18), 0.15),
     "L": Arm("openrouter/openai/gpt-6-luna", "OpenAI", (0.10, 0.50), 0.75),
     "Q": Arm("openrouter/qwen/qwen3.7-flash", "Alibaba", (0.03, 0.13), 0.25),
-    "M": Arm("openrouter/mistralai/mistral-small-3.2-24b-instruct", "DeepInfra", (0.075, 0.20),
+    # Amendment 1: DeepInfra serves at most 16,384 completion tokens and the product asks for its
+    # 32,000-token ceiling, so OpenRouter removes that route before pinning is applied. Parasail
+    # is the one route that accepts the product's request, and so the one the product reaches.
+    "M": Arm("openrouter/mistralai/mistral-small-3.2-24b-instruct", "Parasail", (0.09, 0.30),
              0.10),
 }
 ORDER = ("D", "L", "Q", "M")  # within an item, replica 1 of every arm, then replica 2
@@ -254,7 +257,10 @@ def probe() -> None:
 # --- the paid run ------------------------------------------------------------------------------
 
 
-def run(folder: Path, out: Path, workers: int, replicas: int, limit: int | None) -> None:
+def run(
+    folder: Path, out: Path, workers: int, replicas: int, limit: int | None,
+    arms: tuple[str, ...] = ORDER,
+) -> None:
     from chimera.providers.gateway import LLMGateway
 
     got = _hashes(folder)
@@ -275,7 +281,7 @@ def run(folder: Path, out: Path, workers: int, replicas: int, limit: int | None)
                                "runs": {a: [] for a in ARMS}}
         with tempfile.TemporaryDirectory(prefix="rv-") as tmp:
             for rep in range(replicas):
-                for arm in ORDER:
+                for arm in arms:
                     with lock:
                         halted = stopped.get(arm)
                     if halted:
@@ -568,13 +574,15 @@ def main() -> None:
     ap.add_argument("--out", type=Path)
     ap.add_argument("--workers", type=int, default=5)
     ap.add_argument("--replicas", type=int, default=2)
+    ap.add_argument("--arms", default="".join(ORDER), help="pilot only: a subset, e.g. M")
     args = ap.parse_args()
     if args.check:
         check(args.check)
     elif args.probe:
         probe()
     elif args.pilot:
-        run(args.pilot, args.out or HERE / "results" / "pilot.json", args.workers, 1, PILOT_ITEMS)
+        run(args.pilot, args.out or HERE / "results" / "pilot.json", args.workers, 1, PILOT_ITEMS,
+            tuple(a for a in ORDER if a in args.arms))
     elif args.run:
         run(args.run, args.out or HERE / "results" / "run.json", args.workers, args.replicas, None)
     elif args.report:
