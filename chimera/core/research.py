@@ -270,6 +270,8 @@ class ResearchResult:
     tool_calls: int = 0
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    #: Prompt tokens the provider served from its cache; a cost read without it compares unknowns.
+    cache_read_tokens: int = 0
     usd: float | None = None
     stopped_reason: str = ""
     error: str = ""
@@ -349,6 +351,7 @@ class WebResearcher:
             tool_calls=result.tool_calls_made,
             prompt_tokens=result.prompt_tokens,
             completion_tokens=result.completion_tokens,
+            cache_read_tokens=result.cache_read_tokens,
             usd=result.usd,
             stopped_reason=result.stopped_reason,
         )
