@@ -68,6 +68,9 @@ THEMES: tuple[Theme, ...] = (
             # Searching a repository by what the code DOES rather than by the string it contains.
             # `chimera/rag/` had been in the tree since 0.44.0 with no entrance; `find` is it.
             "find",
+            # A code review of a change by a model of another family than its author (study 25,
+            # S15). Experimental, and it says so in its own help.
+            "review",
             "workflow",
             "drift",
             "scenarios",

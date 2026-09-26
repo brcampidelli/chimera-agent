@@ -6015,6 +6015,9 @@ app.add_typer(decisions_app, name="decisions")
 from chimera.cli.decide_cmd import decide as _decide  # noqa: E402
 
 app.command("decide")(_decide)
+from chimera.cli.review_cmd import review as _review  # noqa: E402
+
+app.command("review")(_review)
 
 
 # --- cron subcommands ---------------------------------------------------------

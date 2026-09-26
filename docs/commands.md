@@ -62,6 +62,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
 | [`project`](#project) | Run a project start-to-finish against a Spec (drift = acceptance authority). |
 | [`redteam`](#redteam) | Red-team the injection defenses: attack success rate with vs without them. |
+| [`review`](#review) | [experimental] Review a change: findings first, P0 to P3, from a model of another family. |
 | [`rubric-grade`](#rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
 | [`run`](#run) | Run a single-shot Tier-1 completion (no fusion). Requires a provider key. |
 | [`sandbox-bench`](#sandbox-bench) | State-based bench: grade the final workspace state + count harmful side effects. |
@@ -953,6 +954,35 @@ once a run is tainted (defense-in-depth coverage), not model susceptibility.
 ```bash
 chimera redteam
 ```
+
+## review
+
+[experimental] Review a change: findings first, P0 to P3, from a model of another family.
+
+A finder reports every defect it sees with a confidence; a separate verifier drops a finding
+only when the diff does not show the code it describes or contradicts it. Each finding carries
+file:line, the evidence and the consequence. When nothing survives, the review says "no
+findings" and lists the residual risks and untested paths; a review that could not finish says
+"incomplete" instead. Untracked files are not reviewed.
+
+```bash
+chimera review [REVISION_RANGE]
+```
+
+| Argument | |
+| --- | --- |
+| `REVISION_RANGE` | A revision range, such as main..HEAD. Omit it to review the working tree. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--base` | Review the working tree against its merge base with this ref (default: main). |  |
+| `--repo` | The repository to review. | `'.'` |
+| `--json` | Print only the report, as JSON (schema chimera.review/1). |  |
+| `--reviewer-model` | Review with this model (default: CHIMERA_REVIEW_MODEL, else another family's). | `''` |
+| `--author-model` | The model that wrote the change (default: CHIMERA_DEFAULT_MODEL). | `''` |
+| `--no-verify` | Show every located finding, without the second-stage check. |  |
+| `--show-dropped` | Also list the findings the checks dropped, with the reason. |  |
+| `--context` | Lines of context around each change. | `10` |
 
 ## rubric-grade
 
