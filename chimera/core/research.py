@@ -192,7 +192,9 @@ def _failed(observation: str) -> bool:
     if head.lstrip().startswith("error:"):
         return True
     match = _STATUS.search(head)
-    return bool(match) and int(match.group(1) or match.group(2)) >= 400
+    if match is None:
+        return False
+    return int(match.group(1) or match.group(2)) >= 400
 
 
 class SourceLog:
