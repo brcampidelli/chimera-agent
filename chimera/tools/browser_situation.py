@@ -46,8 +46,10 @@ _log = get_logger("tools.browser_situation")
 #: The L1 browser module (study 25, S11). Every rule carries its reason, because a model that knows
 #: why a rule exists applies it to the case the rule did not name.
 #:
-#: Unmeasured as a whole when written: `bench/browser_situation` is the harm check registered for it
-#: (success and tokens on 24 browsing tasks, flag off against on). The last three rules are backed in
+#: Its benefit is unmeasured. Its harm was checked (`bench/browser_situation`, 24 browsing tasks, k=2):
+#: 44/48 on against 45/48 off, b − c = 1, no stop, no refused form, and a prompt cost below the pages'
+#: own spread. The "not both" rule did not reduce the read-then-read_text sequence it names (3 on, 1
+#: off) — too few to say more, and a reason not to claim it works. The last three rules are backed in
 #: the harness by this module and by governance (`chimera.governance.confirmations`), so the sentence
 #: is a courtesy to the model, never the only thing between a page and the person's accounts.
 BROWSER_SITUATION_PROMPT = (

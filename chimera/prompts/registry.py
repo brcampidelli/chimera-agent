@@ -326,8 +326,8 @@ SECTIONS: tuple[PromptSection, ...] = (
     # ---- the browser situation (study 25, S11; off unless CHIMERA_BROWSER_SITUATION) ------------
     _c("browser.situation", "chimera.tools.browser_situation:BROWSER_SITUATION_PROMPT", "situation",
        ("S11",), "unmeasured",
-       note="added only with the flag and the browser in the registry; harm check in "
-            "bench/browser_situation"),
+       note="added only with the flag and the browser in the registry; bench/browser_situation "
+            "found no harm (44/48 vs 45/48) and could not measure a benefit"),
     _c("browser.handover_nudge", "chimera.core.agent:_HANDOVER_NUDGE", "turn", ("S11",), "unmeasured",
        note="the closing turn after the browser hands a page to the person"),
     _i("browser.handover_observation", "chimera.tools.browser_situation:Wall.observation", "tool",
