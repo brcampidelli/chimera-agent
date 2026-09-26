@@ -28,8 +28,10 @@ from __future__ import annotations
 import json
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.redact import redact
 from chimera.memory.consolidate import group_similar
@@ -38,6 +40,9 @@ from chimera.memory.manager import MemoryManager
 from chimera.memory.models import MemoryItem
 from chimera.memory.tokens import informative, tokens
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from chimera.orchestration.metering import MeteredBackend
 
 _log = get_logger("memory.extract")
 
@@ -178,6 +183,11 @@ class Extraction:
     rejected: list[tuple[str, str]] = field(default_factory=list)
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    #: What the call cost at the answering model's list rate, or None when that price is unknown or
+    #: nothing metered it. Filled by :class:`MemoryExtractor`, which is what meters the call.
+    usd: float | None = None
+    #: The model that answered, as the meter saw it.
+    model: str = ""
     error: str = ""
 
 
@@ -390,14 +400,29 @@ class MemoryExtractor:
     ``backend`` is built on the extraction's own thread when not given, so constructing a gateway
     is not a cost the turn pays either. ``background=False`` runs inline, for tests and the bench;
     errors are swallowed there too, because that is the property under test.
+
+    **What the call costs is recorded, the way the other calls made for a run are.** The call goes
+    through a :class:`chimera.orchestration.metering.MeteredBackend`, one per extraction, which
+    prices it at the model that answered. With ``usage_home`` set, that spend is appended to the
+    usage log the Cost screen reads, under ``usage_id``: the conversation it was made for, and
+    marked :data:`chimera.api.usage.MEMORY_KIND` so it is added to the conversation's spend without
+    being counted as a turn of its own. A reply that could not be parsed was still paid for, so it
+    is recorded too; a call that never returned cost nothing and is not.
+
+    ``usage_id`` may be a callable, read when the spend is written, for a surface whose conversation
+    id changes under it (a terminal thread that ``/new`` replaces).
     """
 
     def __init__(self, memory: MemoryManager, backend: SupportsComplete | None = None, *,
-                 model: str | None = None, background: bool = True) -> None:
+                 model: str | None = None, background: bool = True,
+                 usage_home: Path | None = None,
+                 usage_id: str | Callable[[], str] = "") -> None:
         self.memory = memory
         self.backend = backend
         self.model = model
         self.background = background
+        self.usage_home = usage_home
+        self.usage_id = usage_id
         #: The last finished extraction, for a caller that wants to show or test what happened.
         self.last: Extraction | None = None
 
@@ -414,17 +439,43 @@ class MemoryExtractor:
         ).start()
 
     def _safely(self, user_message: str, answer: str, tainted: bool) -> None:
+        # Imported here, not at the top: memory stays importable without the orchestration package.
+        from chimera.orchestration.metering import MeteredBackend as _Meter
+
+        meter: MeteredBackend | None = None
         try:
             if self.backend is None:
                 from chimera.providers import LLMGateway
 
                 self.backend = LLMGateway()
-            done = extract(user_message, answer, memory=self.memory, backend=self.backend,
+            meter = _Meter(self.backend, label="memory")
+            done = extract(user_message, answer, memory=self.memory, backend=meter,
                            model=self.model, tainted=tainted)
         except Exception as exc:  # noqa: BLE001 — the answer is the product; memory is extra
             _log.warning("memory extraction skipped: %s", exc)
-            self.last = Extraction(error=f"{type(exc).__name__}: {exc}")
-            return
+            done = Extraction(error=f"{type(exc).__name__}: {exc}")
+        self._record_spend(meter, done)
         self.last = done
-        _log.debug("memory extraction: saved %d, skipped %d, refused %s", len(done.saved),
-                   len(done.skipped), [reason for reason, _ in done.rejected])
+        if not done.error:
+            _log.debug("memory extraction: saved %d, skipped %d, refused %s", len(done.saved),
+                       len(done.skipped), [reason for reason, _ in done.rejected])
+
+    def _record_spend(self, meter: MeteredBackend | None, done: Extraction) -> None:
+        """Put what the call cost on the extraction, and in the usage log when there is one."""
+        if meter is None or not meter.calls:
+            return
+        done.usd, done.model = meter.usd, meter.last_model
+        done.prompt_tokens, done.completion_tokens = meter.prompt_tokens, meter.completion_tokens
+        if self.usage_home is None:
+            return
+        try:
+            from chimera.api.usage import MEMORY_KIND, record_spend
+
+            usage_id = self.usage_id() if callable(self.usage_id) else self.usage_id
+            record_spend(
+                self.usage_home, session_id=usage_id or "memory-extract", model=done.model,
+                prompt_tokens=done.prompt_tokens, completion_tokens=done.completion_tokens,
+                usd=done.usd, route_kind=MEMORY_KIND,
+            )
+        except Exception as exc:  # noqa: BLE001 — a record that will not write costs no turn
+            _log.debug("memory extraction spend not recorded: %s", exc)

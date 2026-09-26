@@ -32,7 +32,8 @@ class UsageRecord(BaseModel):
     usd: float | None = None  # list-rate cost, or None when the model's price is unknown — never guessed
     tools: int = 0
     memory_facts: int = 0
-    route_kind: str | None = None  # "fusion" | "cascade" | None (single-model turn)
+    #: "fusion" | "cascade" | "hierarchy" | :data:`MEMORY_KIND` | None (single-model turn).
+    route_kind: str | None = None
     #: How many of this turn's tool calls a gate refused or that failed outright.
     #:
     #: The census counted `tools` — calls attempted — which is the same number whether the work
@@ -41,6 +42,13 @@ class UsageRecord(BaseModel):
     #: only interesting thing about it. Optional with a default, so records written before this
     #: field existed still load.
     declined: int = 0
+
+
+#: The ``route_kind`` of a row that prices a call made FOR a turn rather than a turn itself: the
+#: memory extraction after it (`chimera.memory.extract`). Filed under the turn's own session id,
+#: so the conversation's spend includes it, and not counted as a turn, because it is not one: with
+#: extraction on, every turn would otherwise read as two on the Cost screen.
+MEMORY_KIND = "memory"
 
 
 def append_usage(path: Path, record: UsageRecord) -> None:
@@ -271,9 +279,14 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     ``usd`` is summed from ONLY the records that carry a price; records with ``usd is None`` are
     counted as ``unpriced_turns`` and never added as 0 — so the total spend is honest about what it
     actually knows the cost of.
+
+    A :data:`MEMORY_KIND` row adds its tokens and price everywhere, and its unknown price to the
+    unpriced count, but it is not a turn and is not counted as one, in the totals or in any group.
+    An unknown extraction price can therefore turn a group's price into "unknown" on the screen,
+    which is the direction this file prefers to a total that is confidently too low.
     """
     totals = {
-        "turns": len(records),
+        "turns": sum(1 for r in records if r.route_kind != MEMORY_KIND),
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "cache_read_tokens": 0,
@@ -299,10 +312,16 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
             totals["usd"] += r.usd
 
         day = r.ts[:10]  # "YYYY-MM-DD" prefix of the ISO timestamp
-        _accumulate(by_day, day, "day", day, r)
-        _accumulate(by_model, r.model, "model", r.model, r)
-        _accumulate(by_session, r.session_id, "session_id", r.session_id, r)
+        turn = r.route_kind != MEMORY_KIND
+        _accumulate(by_day, day, "day", day, r, count=turn)
+        # Per model a row is a call that model answered, whatever it was for. Counting only turns
+        # here would leave the default model, when it answers nothing but extractions, a group of
+        # zero turns, which the Cost screen reads as a group whose price is unknown.
+        _accumulate(by_model, r.model, "model", r.model, r, count=True)
+        _accumulate(by_session, r.session_id, "session_id", r.session_id, r, count=turn)
 
+        if r.route_kind == MEMORY_KIND:
+            continue  # a call made for a turn: its route is the turn's, already counted
         kind = r.route_kind if r.route_kind in ("fusion", "cascade") else "single"
         route_mix[kind] += 1
 
@@ -326,9 +345,19 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
 
 
 def _accumulate(
-    bucket: dict[str, dict[str, Any]], key: str, key_field: str, key_value: str, r: UsageRecord
+    bucket: dict[str, dict[str, Any]],
+    key: str,
+    key_field: str,
+    key_value: str,
+    r: UsageRecord,
+    *,
+    count: bool = True,
 ) -> None:
-    """Fold one record into a group (by day / model / session), summing usd only when it is present."""
+    """Fold one record into a group (by day / model / session), summing usd only when it is present.
+
+    ``count`` says whether the record adds to the group's ``turns``; its tokens and price are added
+    either way.
+    """
     entry = bucket.get(key)
     if entry is None:
         entry = {
@@ -340,7 +369,8 @@ def _accumulate(
             "unpriced": 0,  # turns in this group whose price is unknown (usd is None)
         }
         bucket[key] = entry
-    entry["turns"] += 1
+    if count:
+        entry["turns"] += 1
     entry["prompt_tokens"] += r.prompt_tokens
     entry["completion_tokens"] += r.completion_tokens
     if r.usd is not None:

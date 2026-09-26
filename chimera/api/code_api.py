@@ -996,7 +996,7 @@ def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[s
 
 
 def _extract_after_turn(
-    message: str, answer: str, memory: Any, settings: Settings, *, tainted: bool
+    message: str, answer: str, memory: Any, settings: Settings, *, tainted: bool, session_id: str
 ) -> None:
     """Keep what the user stated about themselves in this turn (study 25 S13), off the turn's path.
 
@@ -1006,13 +1006,19 @@ def _extract_after_turn(
 
     ``message`` is what the user typed, not the prompt the turn was sent with: an attached document
     is somebody else's words, and a fact must trace to the user's own.
+
+    What the call costs goes to the usage log under this conversation's ``session_id``, beside the
+    turn's own row. It cannot go IN that row: the row is written before ``done``, and the call it
+    would have to wait for is the one this function moves off the turn's path.
     """
     if not getattr(settings, "memory_extract", False) or memory is None or not answer.strip():
         return
     try:
         from chimera.memory.extract import MemoryExtractor
 
-        MemoryExtractor(memory).after_turn(message, answer, tainted=tainted)
+        MemoryExtractor(
+            memory, usage_home=Path(settings.home), usage_id=session_id
+        ).after_turn(message, answer, tainted=tainted)
     except Exception as exc:  # noqa: BLE001 -- the turn is over and paid for; memory is extra
         _log.debug("memory extraction skipped: %s", exc)
 
@@ -1826,7 +1832,7 @@ def register_code_api(
                     if background is None and not author:
                         _extract_after_turn(
                             req.message, str(payload.get("answer") or ""), turn_memory, live(),
-                            tainted=bool(payload.get("tainted")),
+                            tainted=bool(payload.get("tainted")), session_id=session_id,
                         )
                     if background is not None:
                         works.finished(

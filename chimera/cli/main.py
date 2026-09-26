@@ -1908,7 +1908,8 @@ def chat(
             # nothing about which project's memory arrived, so a note from one codebase turned up
             # as context in a chat about another.
             project=project_key(workspace),
-            extractor=_memory_extractor(settings, mem),
+            # The thread's id when the spend is written: `/new` rebinds `active` below.
+            extractor=_memory_extractor(settings, mem, lambda: active),
             cite_facts=settings.memory_extract,
         ),
         store,
@@ -2109,7 +2110,7 @@ def assist(
         # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
         project=project_key(workspace),
-        extractor=_memory_extractor(settings, mem),
+        extractor=_memory_extractor(settings, mem, usage_session),
         cite_facts=settings.memory_extract,
     )
     skill_names = _learned_skill_labels(settings)
@@ -2426,7 +2427,9 @@ def tui(
             # nothing the scoped write produced, which is the defect underneath #401 and shows up
             # as memory that is simply never recalled.
             project=project_key(workspace),
-            extractor=_memory_extractor(settings, mem),
+            # Filed where the screen files its turns, which follows a `/reset`; read when the
+            # spend is written, by which time `screen` exists.
+            extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
             cite_facts=settings.memory_extract,
         ),
         store,
@@ -6896,18 +6899,23 @@ def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
     return build_graph([i.content for i in memory.store.all() if i.provenance == "clean"])
 
 
-def _memory_extractor(settings: Settings, memory: MemoryManager | None) -> MemoryExtractor | None:
+def _memory_extractor(
+    settings: Settings, memory: MemoryManager | None, usage_id: str | Callable[[], str]
+) -> MemoryExtractor | None:
     """The after-turn extractor for a terminal conversation, or None (study 25 S13).
 
     None unless ``CHIMERA_MEMORY_EXTRACT`` is on and there is a memory to write to. A terminal is a
     conversation with the owner, which is what makes the user's words theirs to keep; the messaging
     bots are not wired, because anyone who can reach the bot would be writing the owner's memory.
+
+    ``usage_id`` is what the turns of this conversation are filed under in the usage log, so the
+    extraction's cost lands beside them. A callable where ``/new`` can replace the thread.
     """
     if memory is None or not settings.memory_extract:
         return None
     from chimera.memory.extract import MemoryExtractor
 
-    return MemoryExtractor(memory)
+    return MemoryExtractor(memory, usage_home=Path(settings.home), usage_id=usage_id)
 
 
 @memory_app.command("add")
