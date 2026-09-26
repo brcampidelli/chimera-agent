@@ -306,8 +306,9 @@ class AgentConfig:
     tool_router: Any | None = None
     # Context budget. None (the default) keeps the historical behaviour: the message list only grows
     # and an overflow is terminal. A fraction spends that share of the model's advertised window on
-    # the prompt, compacting once the prompt crosses `trigger` of it. Off by default because
-    # compaction discards messages, and a caller that has not asked for that should not get it.
+    # the prompt, capped at the context the catalogue MEASURED the model to read well where it did
+    # (`CatalogEntry.useful_k`), compacting once the prompt crosses `trigger` of it. Off by default
+    # because compaction discards messages, and a caller that has not asked for it should not get it.
     context_budget: float | None = None
     # Replace the dropped span with a model-written summary of what still BINDS, instead of the
     # structural note. Off pending `bench/compaction`, and the reason is the note's own docstring:

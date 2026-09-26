@@ -95,6 +95,24 @@ def window_tokens(model: str) -> int:
     return remembered or FALLBACK_CONTEXT_TOKENS
 
 
+def useful_tokens(model: str) -> int | None:
+    """What the catalogue MEASURED this model to still read well, in tokens, or None.
+
+    Only the hand-checked catalogue answers: the live index publishes windows, which are what a
+    provider accepts, and nothing about how well the model reads near the end of one. A model with
+    no measurement keeps the window-fraction budget it always had.
+    """
+    from chimera.providers.catalog import CATALOG
+
+    slug = (model or "").strip()
+    if not slug:
+        return None
+    for entry in CATALOG:
+        if entry.slug == slug or slug.endswith(entry.slug.split("/")[-1]):
+            return entry.useful_k * 1000 if entry.useful_k else None
+    return None
+
+
 def estimate_tokens(messages: list[MessageLike]) -> int:
     """Cheap size estimate for a message list, used only before a real count exists.
 
@@ -195,15 +213,22 @@ class ContextBudget:
     window: int
     fraction: float = DEFAULT_BUDGET_FRACTION
     trigger: float = DEFAULT_TRIGGER
+    #: Context the model was measured to still read well (`CatalogEntry.useful_k`), or None.
+    useful: int | None = None
 
     @classmethod
     def for_model(cls, model: str, **kwargs: Any) -> ContextBudget:
+        kwargs.setdefault("useful", useful_tokens(model))
         return cls(window=window_tokens(model), **kwargs)
 
     @property
     def budget(self) -> int:
-        """Tokens we are willing to spend on the prompt."""
-        return int(self.window * self.fraction)
+        """Tokens we are willing to spend on the prompt: the share of the window, capped at what the
+        model was measured to still read well when that was measured. A fraction of an advertised
+        million-token window put the trigger past anything a conversation reaches, so compaction
+        never ran; the cap is what makes the budget about the model rather than the listing."""
+        share = int(self.window * self.fraction)
+        return min(share, self.useful) if self.useful else share
 
     @property
     def threshold(self) -> int:

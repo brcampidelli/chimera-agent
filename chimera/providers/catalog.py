@@ -51,6 +51,14 @@ class CatalogEntry:
     now names every price it has been seen at; the live check accepts any of them, and still
     reddens on a price the row has never seen. A receipt is priced from the live index; the row
     is the fallback."""
+    useful_k: int | None = None
+    """Context this model was MEASURED to still use well, thousands of tokens; None = never measured.
+
+    The advertised window says how much a provider accepts, not how much the model reads well, and
+    a context budget sized from it never fired: the Code screen compacted at 0.6 × 0.8 of 1,048k,
+    against a largest-ever-observed prompt of 64k (0 compactions in 137 traced runs). Where a
+    measurement exists, :class:`chimera.core.context_budget.ContextBudget` spends at most this much.
+    It is a floor that was tested, never a guess: a row without a bench behind it stays None."""
 
 
 
@@ -113,6 +121,10 @@ CATALOG: tuple[CatalogEntry, ...] = (
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash-0731", "mid", "DeepSeek",
         0.022, 0.32, tools=True, context_k=1048, also_seen=((0.04, 0.08), (0.065, 0.18)),
+        # bench/useful_context (2026-09-25): 90 paired agent transcripts, a rule stated at the start
+        # and a needle at 10/50/90% depth — 90/90 at 4k, 87/90 at 128k, every rung within −10 pp
+        # of 4k. 128 is the top of the ladder that was run, so it is a lower bound.
+        useful_k=128,
         notes="the product default and the fusion judge since 2026-09-03. Same vendor as the chat-v3.1 it replaced, at a fraction of 0.25/0.95 with eight times the window. Wrote a file on the first ask in a live probe, in 72s. Price read off the index on 2026-09-12 (0.04/0.08); on 2026-09-03 it read 0.065/0.18 — OpenRouter quotes whichever route it prefers that day, so a receipt should be priced from the live index and this row is the fallback (#421). On 2026-09-25 the live check on main turned red: the index quotes 0.022 in / 0.32 out, input cheaper and output four times dearer, so a turn that writes a lot now costs more, not less; both earlier figures stay in also_seen",
     ),
     CatalogEntry(
