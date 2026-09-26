@@ -18,7 +18,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from chimera.core.agent import Agent, AgentConfig
+from chimera.core.agent import Agent, AgentConfig, enclosing_run, partial_spend
+from chimera.orchestration.budget import SpendBudget
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
@@ -99,6 +100,13 @@ class ExplorerResult:
     evidence: list[Evidence] = field(default_factory=list)
     turns: int = 0
     tool_calls: int = 0
+    #: What the exploration's own run spent, as its `AgentResult` reported it: ``usd`` None when a
+    #: call had no price. Kept because the run is somebody's bill, and dropping it made every
+    #: exploration free on the receipt of the turn that asked for it.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    usd: float | None = 0.0
+    model: str = ""
 
     @property
     def block(self) -> str:
@@ -141,7 +149,10 @@ class ContextExplorer:
         self.model = model
         self.max_turns = max_turns
 
-    def explore(self, query: str) -> ExplorerResult:
+    def explore(self, query: str, *, spend: SpendBudget | None = None) -> ExplorerResult:
+        """Locate code for ``query``. ``spend`` is a ceiling this run draws on and charges, the
+        caller's own when the exploration is part of something with one (a turn); a run that
+        reaches it stops with what it found so far."""
         agent = Agent(
             self.backend,
             read_only_registry(self.workspace),
@@ -152,11 +163,14 @@ class ContextExplorer:
                 system_prompt=EXPLORER_SYSTEM,
             ),
         )
-        result = agent.run(_TASK.format(query=query))  # the transcript stays here, not returned
+        # The transcript stays here, not returned; what the run cost goes with the evidence.
+        result = agent.run(_TASK.format(query=query), spend=spend)
         evidence = parse_evidence(result.answer)
         _log.debug("explorer found %d location(s) in %d turn(s)", len(evidence), result.steps)
         return ExplorerResult(
-            query=query, evidence=evidence, turns=result.steps, tool_calls=result.tool_calls_made
+            query=query, evidence=evidence, turns=result.steps, tool_calls=result.tool_calls_made,
+            prompt_tokens=result.prompt_tokens, completion_tokens=result.completion_tokens,
+            usd=result.usd, model=result.model,
         )
 
 
@@ -194,4 +208,18 @@ class ExploreRepositoryTool(Tool):
         query = str(kwargs.get("query", "")).strip()
         if not query:
             return "error: query is required"
-        return self._explorer.explore(query).as_context()
+        # The run this tool was called from, when there is one: the exploration draws on its
+        # ceiling call by call, and what it spent goes on its bill. Read before exploring, because
+        # the exploration opens a run of its own on this thread.
+        outer = enclosing_run()
+        try:
+            found = self._explorer.explore(query, spend=outer.spend if outer else None)
+        except Exception as exc:
+            # A run that died after paying is still paid for; the loop turns the raise into a
+            # tool error, as it did before.
+            if outer is not None:
+                outer.add_nested(partial_spend(exc))
+            raise
+        if outer is not None:
+            outer.add_nested(found)
+        return found.as_context()

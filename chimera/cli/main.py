@@ -5234,19 +5234,46 @@ def explore(
     if not get_settings().can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
+    from uuid import uuid4
+
+    from chimera.api.usage import record_spend
+    from chimera.core.agent import partial_spend
+
     explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
+    # One row in the usage log per exploration, under its own id: it is a run of its own, and the
+    # Cost screen could not see it. Written on the way out whatever happened, like a failed turn's.
+    usage_id = f"explore:{uuid4().hex[:12]}"
     try:
         result = explorer.explore(query)
-    except MissingCredentialsError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
+    except Exception as exc:
+        spent = partial_spend(exc)
+        if spent is not None and (spent.prompt_tokens or spent.completion_tokens):
+            record_spend(
+                get_settings().home, session_id=usage_id, model=spent.model,
+                prompt_tokens=spent.prompt_tokens, completion_tokens=spent.completion_tokens,
+                usd=spent.usd,
+            )
+        if isinstance(exc, MissingCredentialsError):
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from exc
+        raise
+    record_spend(
+        get_settings().home, session_id=usage_id, model=result.model,
+        prompt_tokens=result.prompt_tokens, completion_tokens=result.completion_tokens,
+        usd=result.usd, tools=result.tool_calls,
+    )
+    # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
+    cost = "cost unknown (a call had no price)" if result.usd is None else f"${result.usd:.4f}"
     if not result.evidence:
-        console.print("[dim]no relevant locations found[/dim]")
+        console.print(f"[dim]no relevant locations found · {cost}[/dim]")
         return
     for ev in result.evidence:
         loc = f"[cyan]{ev.path}[/cyan]" + (f":[yellow]{ev.lines}[/yellow]" if ev.lines else "")
         console.print(f"  {loc}" + (f" [dim]— {ev.note}[/dim]" if ev.note else ""))
-    console.print(f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
+    console.print(
+        f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), "
+        f"{result.tool_calls} tool call(s) · {cost}[/dim]"
+    )
 
 
 @app.command()
