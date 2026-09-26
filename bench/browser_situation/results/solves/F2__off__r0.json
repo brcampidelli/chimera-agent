@@ -1,0 +1,50 @@
+{
+ "task": "F2",
+ "arm": "off",
+ "replica": 0,
+ "error": "",
+ "ruler": {
+  "site_manifest": "4675357a02453a3f",
+  "tasks": "211b19ba656994cc",
+  "browser_tool": "7c526d791f0401f6",
+  "chimera": "/tmp/s11-m2/chimera",
+  "commit": ""
+ },
+ "provider_pin": "DeepInfra",
+ "cap_usd": 0.0007800300000000001,
+ "answer": "BU5690Q",
+ "success": true,
+ "stopped_reason": "final",
+ "handover": false,
+ "steps": 4,
+ "tool_calls": 3,
+ "prompt_tokens": 10878,
+ "completion_tokens": 228,
+ "cache_read_tokens": 7680,
+ "usd": 0.000312,
+ "providers": [
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra",
+  "DeepInfra"
+ ],
+ "system_sha": "cf2990376b4d",
+ "module_in_prompt": false,
+ "browser_calls": [
+  "navigate",
+  "click",
+  "read_text"
+ ],
+ "observation_chars": 5938,
+ "seconds": 16.7,
+ "requested_paths": [
+  "/forum/thread-4412.html",
+  "/go/forum/reply-c119"
+ ],
+ "behaviour": {
+  "second_look": 0,
+  "read_after_action": 0,
+  "same_path_twice": 0,
+  "navigations": 1
+ }
+}
