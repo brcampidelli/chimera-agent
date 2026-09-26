@@ -33,7 +33,7 @@ from chimera.governance.ledger import (
 )
 from chimera.governance.policy import Decision
 from chimera.governance.sanitize import sanitize_untrusted
-from chimera.tools.base import Tool, is_untrusted_output, refusal
+from chimera.tools.base import Refusal, Tool, is_untrusted_output, refusal
 from chimera.tools.registry import ToolRegistry
 
 ApproveFn = Callable[[SequenceAssessment], bool]
@@ -48,6 +48,15 @@ FENCE_CLOSE = "<<end-external-data>>"
 
 _FENCE_PLACEHOLDER = "⟦fence⟧"  # visible, so a neutralized marker is auditable, never silently dropped
 
+#: The one line outside the fence when a taint-source tool failed. It begins with ``error:`` because
+#: that is what every reader of an observation checks (the loop, the breaker, the trace, the
+#: registry's span). The tool's own message goes inside the fence whole, ``error:`` and all, because
+#: it can quote the remote side: an HTTP error body, an MCP server's failure text, a page excerpt.
+FENCED_FAILURE_NOTE = (
+    "error: the tool reported a failure. Its message follows as data, because a failure can quote "
+    "what the remote side sent."
+)
+
 
 def fence(content: str) -> str:
     """Wrap untrusted content in the data-fence markers.
@@ -59,6 +68,32 @@ def fence(content: str) -> str:
     """
     safe = content.replace(FENCE_CLOSE, _FENCE_PLACEHOLDER).replace(FENCE_OPEN, _FENCE_PLACEHOLDER)
     return f"{FENCE_OPEN}\n{safe}\n{FENCE_CLOSE}"
+
+
+def fence_observation(result: str) -> str:
+    """A taint-source tool's result as the model reads it: fenced, and still a failure if it failed.
+
+    Fencing the whole result hid the tool's own failures. The loop decides whether a call ran from
+    the observation's first characters, and a fenced one begins with the fence, so a refusal and an
+    ``error:`` both counted as calls that ran: the screen drew a tick, the receipt counted them, and
+    the loop breaker never heard the same failure repeat. The two failures are kept apart here
+    because they are different kinds of text:
+
+    - A refusal built by :func:`~chimera.tools.base.refusal` is returned as it is. It was written by
+      our code before the tool ran, so it holds nothing the call fetched. It is recognised by its
+      type and never by its mark: a page that begins with ⛔ is a page, and stays fenced.
+    - An ``error:`` result stays fenced whole, behind :data:`FENCED_FAILURE_NOTE`. Every byte the
+      tool returned is inside the fence; the only bytes outside are that constant.
+
+    Chat-template and control tokens are defanged before fencing (M15-A3), so untrusted content
+    can't spoof a system or user turn, or a tool call, to break out of the fence.
+    """
+    if isinstance(result, Refusal):
+        return result
+    fenced = fence(sanitize_untrusted(result))
+    if result.startswith("error:"):
+        return f"{FENCED_FAILURE_NOTE}\n{fenced}"
+    return fenced
 
 
 def _idempotency_key(name: str, args: Mapping[str, Any]) -> str:
@@ -268,9 +303,9 @@ class LedgeredTool(Tool):
         # an address the run was shown, and so is the one in a sent message's own confirmation.
         self.ledger.note_seen(result)
         if self._is_fetch() and result.strip():
-            # M15-A3: defang chat-template/control tokens BEFORE fencing, so untrusted content
-            # can't spoof a system/user turn or a tool call to break out of the data fence.
-            return fence(sanitize_untrusted(result))
+            # The ledger above saw the raw result whatever it was, a refusal and an error included,
+            # so taint is recorded as it always was. Only what the model reads is decided here.
+            return fence_observation(result)
         return result
 
     def _why_not_approved(self) -> str:
