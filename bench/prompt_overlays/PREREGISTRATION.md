@@ -212,3 +212,13 @@ Let `N` be the slice size, `c` the pilot's mean computed cost per arm-A solve, `
 - **Correct fixes the agent could verify.** Django's test dependencies are not installed in the agent's environment, so the agent can rarely run the suite. This is the same in every arm, and the same as in the closed phase.
 - **An enforced network wall.** See the wall above; it is scanned, not enforced.
 - **An effect-size positive control.** None was affordable. The grader's controls are the gold validation (every slice item resolves with its reference patch) and the empty patch (never resolved). No published number exists for this model on this instrument (§2aa), so arm A's replay on the pilot items is the only reproduction check.
+
+## Amendment 1 — 2026-09-25, before any paid call: the pilot does not wait for the whole pool's gold run
+
+**What changed.** Gold validation of the 209 candidates is running at 20–45 s per instance: the machine is shared with other arms' type checks and browsers (load average 25 on 12 cores). The harness works in id order, and the pilot's items come first in sha256 order, so most of them would be validated last. The pilot therefore starts once **its own items** are validated, by a separate gold run over the head of the registered order (`run_id h45_gold_head`, the first 16 candidates in sha256 order).
+
+**What does not change.**
+- The pilot's items are still the first 10 gold-resolved candidates in sha256 order. Which items those are depends only on that order and on the gold status of the items ahead of them, not on the rest of the pool.
+- Every candidate is still gold-validated before the main run, and before any model call on it.
+- The slice is frozen from the full gold report (`h45_gold`), which covers the head again. If a head item's two gold verdicts disagree, that is reported as grader flakiness, and the item is dropped from the main run.
+- No model call has been made.

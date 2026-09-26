@@ -33,6 +33,7 @@ sys.path.insert(0, str(HERE))
 RESULTS = Path(os.environ.get("H45_RESULTS") or (HERE / "results"))
 POOL = RESULTS / "pool_django.jsonl"
 SLICE = RESULTS / "slice.jsonl"
+PILOT_ITEMS = RESULTS / "pilot_items.jsonl"
 PILOT = RESULTS / "pilot_solves.jsonl"
 MAIN = RESULTS / "main_solves.jsonl"
 GRADES = RESULTS / "grades"
@@ -70,17 +71,29 @@ def spent() -> float:
 
 
 # ---------------------------------------------------------------- slice
-def build_slice(gold_report: Path) -> None:
+def build_slice(gold_report: Path, head: int = 0) -> None:
+    """The slice from a gold report. With ``head`` (Amendment 1), only the first ``head`` candidates
+    in the registered order are read, and the pilot's items are written instead of the slice."""
     report = json.loads(gold_report.read_text(encoding="utf-8"))
     resolved = set(report.get("resolved_ids", []))
     pool = load_jsonl(POOL)
     cand = [r for r in pool if r["difficulty"] in STRATA]
+    if head:
+        cand = cand[:head]
     kept = [r for r in cand if r["instance_id"] in resolved]
     dropped = [r["instance_id"] for r in cand if r["instance_id"] not in resolved]
-    with SLICE.open("w", encoding="utf-8", newline="\n") as fh:
-        for r in kept:
+    out, rows = (PILOT_ITEMS, kept[:PILOT_N]) if head else (SLICE, kept)
+    if head and len(rows) < PILOT_N:
+        raise SystemExit(f"only {len(rows)} of the first {head} candidates resolved; widen the head run")
+    with out.open("w", encoding="utf-8", newline="\n") as fh:
+        for r in rows:
             fh.write(json.dumps(r, ensure_ascii=False) + "\n")
     print(f"candidates {len(cand)}  gold-resolved {len(kept)}  dropped {len(dropped)}: {dropped}")
+    print(f"wrote {out} ({len(rows)} rows)")
+    if not head and PILOT_ITEMS.exists():
+        pilot_ids = [r["instance_id"] for r in load_jsonl(PILOT_ITEMS)]
+        same = pilot_ids == [r["instance_id"] for r in kept[:PILOT_N]]
+        print(f"pilot items are the slice's first {PILOT_N}: {same}")
 
 
 # ---------------------------------------------------------------- solving
@@ -231,7 +244,7 @@ def run_items(items: list[tuple[int, dict[str, Any], list[str]]], out: Path, wor
 
 
 def pilot(workers: int) -> None:
-    items = [(i, inst, ["A"]) for i, inst in enumerate(load_jsonl(SLICE)[:PILOT_N])]
+    items = [(i, inst, ["A"]) for i, inst in enumerate(load_jsonl(PILOT_ITEMS)[:PILOT_N])]
     run_items(items, PILOT, workers)
 
 
@@ -293,6 +306,7 @@ if __name__ == "__main__":
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("slice")
     s.add_argument("gold", type=Path)
+    s.add_argument("--head", type=int, default=0)
     p = sub.add_parser("pilot")
     p.add_argument("--workers", type=int, default=10)
     m = sub.add_parser("main")
@@ -312,7 +326,7 @@ if __name__ == "__main__":
     elif args.cmd == "dry":
         dry()
     elif args.cmd == "slice":
-        build_slice(args.gold)
+        build_slice(args.gold, args.head)
     elif args.cmd == "pilot":
         pilot(args.workers)
     elif args.cmd == "main":
