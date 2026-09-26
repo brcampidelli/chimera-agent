@@ -972,8 +972,21 @@ class Agent:
                     nudge = _ASSUME_NUDGE if asked else _ACTION_NUDGE
                     messages.append({"role": "user", "content": nudge})
                     continue
-                messages.append({"role": "assistant", "content": result.content})
-                return self._result(result.content, step, "final", messages, tool_calls_made,
+                answer = result.content
+                if not (answer or "").strip():
+                    # A turn can also end on its own with no tool call AND no text: the model
+                    # reasoned its answer and wrote none of it. `bench/web_research` saw it on this
+                    # ending; #619 closed the same hole at the step limit and the loop breaker. Ask
+                    # once without tools, then say so rather than hand back a blank answer.
+                    _log.info("the final reply was empty; asking once more")
+                    result = self._step([*messages, {"role": "user", "content": _EMPTY_CLOSE_NUDGE}],
+                                        spend=spend, tools=None, on_token=on_token, usage=usage,
+                                        model=run_model)
+                    answer = result.content
+                    if not (answer or "").strip():
+                        answer = _empty_close_note(tool_names)
+                messages.append({"role": "assistant", "content": answer})
+                return self._result(answer, step, "final", messages, tool_calls_made,
                                     tool_names, usage, result.model,
                                     route_meta=result.route_meta, steplog=steplog, task=task)
 
