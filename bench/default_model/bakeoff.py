@@ -52,6 +52,8 @@ KILLED = RESULTS / "killed_solves.jsonl"
 #: what it cost; never graded into a comparison.
 DISCARDED = (RESULTS / "discarded_main_before_amendment3.jsonl",
              RESULTS / "discarded_killed_before_amendment3.jsonl")
+#: Amendment 5: rate-limited halts moved out of the primary file before their re-run; spend kept.
+RATELIMITED = RESULTS / "ratelimited_solves.jsonl"
 STRATA = ("<15 min fix", "15 min - 1 hour")
 
 PILOT_N = 8
@@ -72,6 +74,17 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def rate_limited(row: dict[str, Any]) -> bool:
+    """Amendment 5: a halt the provider caused by rate limiting (the gateway's CredentialRejectedError
+    for RATE_LIMIT). It is the route's reliability, not the model's, and it is re-run after the pass."""
+    return "rate-limited" in str(row.get("halted") or "")
+
+
+def counts_as_halt(row: dict[str, Any]) -> bool:
+    """What the per-arm halt rule counts (Amendment 5): timeouts and every other error, not rate limits."""
+    return bool(row.get("halted")) and not rate_limited(row)
+
+
 def solve_usd(row: dict[str, Any], *, calls_key: str = "calls") -> float:
     """What a solve cost: the bill where every call reported one, else the computed price, and the
     larger of the two when both exist (the budget guard is conservative on purpose)."""
@@ -83,10 +96,25 @@ def solve_usd(row: dict[str, Any], *, calls_key: str = "calls") -> float:
     return computed
 
 
+def unique_rows(path: Path) -> list[dict[str, Any]]:
+    """The rows of a spend file, each solve once. The four solves stopped by hand for the vhdx
+    compaction were recorded by the stop and again by the next driver's harvest of their call logs;
+    a solve is its first call's generation id."""
+    seen: set[tuple[str, str, str]] = set()
+    out = []
+    for r in load_jsonl(path):
+        key = (r["instance_id"], r["arm"], str((r.get("calls") or [{}])[0].get("gen_id")))
+        if key in seen and key[2] != "None":
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
+
+
 def spent() -> float:
     total = 0.0
-    for path in (PILOT, MAIN, KILLED, *DISCARDED):
-        for r in load_jsonl(path):
+    for path in (PILOT, MAIN, KILLED, RATELIMITED, *DISCARDED):
+        for r in unique_rows(path):
             total += solve_usd(r) + solve_usd(r, calls_key="retry_calls")
     for name in ("probe.json", "probe_sandbox.json", "probe_sandbox_a4.json"):
         probe = RESULTS / name
@@ -299,7 +327,7 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
         if r["arm"] in tally:
             t = tally[r["arm"]]
             t[0] += 1
-            t[1] += int(bool(r.get("halted")))
+            t[1] += int(counts_as_halt(r))
             if t[0] >= 20 and t[1] / t[0] > 0.10:
                 halted_arms.add(r["arm"])
     if halted_arms:
@@ -350,7 +378,7 @@ def run_items(items: list[tuple[int, dict[str, Any]]], arms: list[str], out: Pat
                 state["usd"] += row["usd"] + solve_usd(row, calls_key="retry_calls")
                 t = tally[arm]
                 t[0] += 1
-                t[1] += int(bool(row.get("halted")))
+                t[1] += int(counts_as_halt(row))
                 if t[0] >= 20 and t[1] / t[0] > 0.10 and arm not in halted_arms:
                     halted_arms.add(arm)
                     print(f"  STOP RULE: arm {arm} halted on {t[1]}/{t[0]} solves; no more {arm} solves",
@@ -573,6 +601,26 @@ def probe_sandbox(arms: list[str]) -> None:
     _rm(scratch, work)
 
 
+def requeue_ratelimited() -> None:
+    """Amendment 5: after the main pass, move every rate-limited halt out of the primary file (into
+    RATELIMITED, spend kept), so the next `main` run solves that (item, arm) again, fresh. Refuses to
+    run while a driver is alive: the file is rewritten, and a driver appends to it."""
+    alive = subprocess.run(["pgrep", "-f", "default_model/bakeoff.py main"], capture_output=True, text=True)
+    if alive.stdout.strip():
+        raise SystemExit("a main driver is alive; refusing to rewrite the solves file")
+    rows = load_jsonl(MAIN)
+    moved = [r for r in rows if rate_limited(r)]
+    kept = [r for r in rows if not rate_limited(r)]
+    nl = "\n"
+    with RATELIMITED.open("a", encoding="utf-8", newline=nl) as fh:
+        for r in moved:
+            fh.write(json.dumps(r, ensure_ascii=False) + nl)
+    tmp = MAIN.with_suffix(".jsonl.tmp")
+    tmp.write_text("".join(json.dumps(r, ensure_ascii=False) + nl for r in kept), encoding="utf-8", newline=nl)
+    tmp.replace(MAIN)
+    print(f"moved {len(moved)} rate-limited halts to {RATELIMITED.name}; {len(kept)} rows stay", flush=True)
+
+
 # ---------------------------------------------------------------- sizing
 def size() -> None:
     """The registered sizing rule (PREREGISTRATION.md, "Sizing"), read off the pilot's solves."""
@@ -648,6 +696,7 @@ if __name__ == "__main__":
     p.add_argument("--workers", type=int, default=16)
     sub.add_parser("size")
     sub.add_parser("dry")
+    sub.add_parser("requeue-ratelimited")
     m = sub.add_parser("main")
     m.add_argument("--n", type=int, required=True)
     m.add_argument("--arms", default=",".join(ORDER))
@@ -669,6 +718,8 @@ if __name__ == "__main__":
         size()
     elif args.cmd == "dry":
         dry()
+    elif args.cmd == "requeue-ratelimited":
+        requeue_ratelimited()
     elif args.cmd == "main":
         arms = [a for a in args.arms.split(",") if a]
         if "A" not in arms or any(a not in ARMS for a in arms):

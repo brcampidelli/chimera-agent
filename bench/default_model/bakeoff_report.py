@@ -28,10 +28,14 @@ from bakeoff import (  # noqa: E402
     KILLED,
     MAIN,
     PILOT,
+    RATELIMITED,
     RESULTS,
     SLICE,
+    counts_as_halt,
     load_jsonl,
+    rate_limited,
     solve_usd,
+    unique_rows,
 )
 from bakeoff_arms import ARMS, ORDER, cost  # noqa: E402
 from disk_scan import classify  # noqa: E402
@@ -185,7 +189,7 @@ def eligibility(arm: str, rows: list[dict[str, Any]]) -> dict[str, Any]:
     mine = [r for r in rows if r["arm"] == arm]
     stopped, halts = False, 0
     for i, r in enumerate(mine, 1):
-        halts += bool(r.get("halted"))
+        halts += counts_as_halt(r)
         if i >= 20 and halts / i > 0.10:
             stopped = True
     calls = [c for r in mine for c in r.get("calls") or []]
@@ -292,11 +296,13 @@ def report(phase: str = "main") -> dict[str, Any]:
                                  if (c.get("provider") or "").lower() != ARMS[a].provider.lower())
                           for a in arms_present},
     }
-    out["usd_killed_at_block_end"] = round(sum(solve_usd(r) for r in load_jsonl(KILLED)), 4)
+    out["ratelimited_halts_rerun"] = dict(Counter(r["arm"] for r in load_jsonl(RATELIMITED)))
+    out["ratelimited_halts_left"] = dict(Counter(r["arm"] for r in rows if rate_limited(r)))
+    out["usd_killed_at_block_end"] = round(sum(solve_usd(r) for r in unique_rows(KILLED)), 4)
     out["usd_discarded_before_amendment3"] = round(sum(solve_usd(r) + solve_usd(r, calls_key="retry_calls")
                                                        for p in DISCARDED for r in load_jsonl(p)), 4)
     out["usd_all"] = round(sum(solve_usd(r) + solve_usd(r, calls_key="retry_calls")
-                               for path in (PILOT, MAIN, KILLED, *DISCARDED) for r in load_jsonl(path)), 4)
+                               for path in (PILOT, MAIN, KILLED, RATELIMITED, *DISCARDED) for r in unique_rows(path)), 4)
     # Amendment 3: the local-disk scan, on this phase and on the discarded run it was found in.
     out["disk_scan"] = {name: disk_scan(name) for name in
                         (f"{phase}_solves", "discarded_main_before_amendment3")

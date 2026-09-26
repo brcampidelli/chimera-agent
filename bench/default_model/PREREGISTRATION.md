@@ -311,3 +311,23 @@ Must hold:
 - each arm returned a parsed tool call from its pin.
 
 Under the rule above, the 250 rows stand, and the run resumes from its file.
+
+## Amendment 5 — 2026-09-26, during the main run, before any main-run resolve rate is read: rate-limit halts
+
+**What the halts are.** Of the 13 halts on file:
+- 3 are D's 1800 s clock;
+- 10 are the gateway's `CredentialRejectedError` for `RATE_LIMIT`: Q 7, A 3, D and G none.
+
+The key is shared with the H4/H5 run, which calls A's exact endpoint all day. A rate-limited call puts the key into cooldown, and with one key and no fallback, the gateway raises on the spot. The driver's single immediate retry fell into the same window every time.
+
+That is the route's reliability, not the model's. Left as it is, the per-arm halt rule (more than 10% after 20 solves) would stop Q for a reason that has nothing to do with Q.
+
+**Changes, fixed now:**
+1. **The halt rule counts timeouts and every error except rate limiting** (`counts_as_halt`). Rate-limit halts are reported per arm, as their own count.
+2. **After the main pass, every rate-limit halt is solved once more, fresh** (`bakeoff.py requeue-ratelimited`, then `main` again).
+   - The halted row moves to `results/ratelimited_solves.jsonl`, with its spend, and the new solve takes its place.
+   - A rate limit strikes at call time, unrelated to the task, but a long solve makes more calls. Leaving these out would drop the long solves unevenly across arms.
+   - If the re-run halts again, it stays a halt and leaves the pairing (PROTOCOL §2).
+3. **Spend accounting.** The four solves stopped by hand for the vhdx compaction were recorded twice: by the stop, and again by the next driver's harvest of their call logs. `unique_rows` counts each once, keyed on its first call's generation id. Spend so far is US$ 5.21.
+
+**A finding for the product, not for this decision.** One 429 on a one-key pool ends a `chimera solve` run at once. The run gets no backoff and no wait for the 60 s cooldown the pool itself sets. It is reported to the coordinator.
