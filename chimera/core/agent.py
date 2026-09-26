@@ -150,18 +150,28 @@ _EMPTY_CLOSE_NUDGE = (
 )
 
 
-def _empty_close_note(tool_names: list[str]) -> str:
+def _empty_close_note(tool_names: list[str], *, filed_as_reasoning: bool = False) -> str:
     """What the run says when the model gave no closing text even when asked twice.
 
     Empty reads as "it produced nothing", which is a different claim: the tools below did run. This
-    says only what the harness knows — never that anything worked."""
+    says only what the harness knows — never that anything worked.
+
+    ``filed_as_reasoning``: one of the two replies was a route filing the model's text as reasoning
+    (`CompletionResult.answer_in_reasoning`; `deepseek-r1` on Novita did it on 37–43% of calls in
+    `bench/review_judge/RESULTS-h11.md`). The note says so, and nothing more: the reasoning is a
+    thought trace and can end on a draft, so it is never handed back as the answer."""
     counts: dict[str, int] = {}
     for name in tool_names:
         counts[name] = counts.get(name, 0) + 1
     ran = ", ".join(f"{name} ×{n}" if n > 1 else name for name, n in counts.items()) or "none"
+    filed = (
+        "The route filed the model's text as reasoning, and reasoning is not shown as an answer. "
+        if filed_as_reasoning else ""
+    )
     return (
         "(No final answer: the model returned an empty reply twice when asked to close the run. "
-        f"Tools called: {ran}. Whatever they changed is in the workspace, not in this message.)"
+        f"{filed}Tools called: {ran}. Whatever they changed is in the workspace, not in this "
+        "message.)"
     )
 
 
@@ -1031,12 +1041,16 @@ class Agent:
                     # ending; #619 closed the same hole at the step limit and the loop breaker. Ask
                     # once without tools, then say so rather than hand back a blank answer.
                     _log.info("the final reply was empty; asking once more")
+                    filed = result.answer_in_reasoning
                     result = self._step([*messages, {"role": "user", "content": _EMPTY_CLOSE_NUDGE}],
                                         spend=spend, tools=None, on_token=on_token, usage=usage,
                                         model=run_model)
                     answer = result.content
                     if not (answer or "").strip():
-                        answer = _empty_close_note(tool_names)
+                        # Never `result.reasoning`, even when the route filed the text there.
+                        answer = _empty_close_note(
+                            tool_names, filed_as_reasoning=filed or result.answer_in_reasoning
+                        )
                 messages.append({"role": "assistant", "content": answer})
                 return self._result(answer, step, "final", messages, tool_calls_made,
                                     tool_names, usage, result.model,
@@ -1198,11 +1212,14 @@ class Agent:
         if (final.content or "").strip():
             return final, final.content
         _log.info("the closing reply was empty; asking once more")
+        filed = final.answer_in_reasoning
         final = self._step([*messages, {"role": "user", "content": f"{nudge}\n\n{_EMPTY_CLOSE_NUDGE}"}],
                            spend=spend, tools=None, on_token=on_token, usage=usage, model=model)
         if (final.content or "").strip():
             return final, final.content
-        return final, _empty_close_note(tool_names)
+        # Never `final.reasoning`, even when the route filed the text there (see the note).
+        filed = filed or final.answer_in_reasoning
+        return final, _empty_close_note(tool_names, filed_as_reasoning=filed)
 
     def _step(
         self,

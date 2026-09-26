@@ -161,6 +161,33 @@ class CompletionResult(BaseModel):
     for an empty-argument failure, or for "describing a plan instead of acting", when the sentence
     was severed mid-word."""
 
+    reasoning: str = Field(default="", repr=False, exclude=True)
+    """The model's reasoning, as the route returned it beside the answer. Never the answer.
+
+    litellm names it ``reasoning_content`` on the message and on each streamed delta; OpenRouter
+    sends ``reasoning`` and litellm renames it (see :func:`_reasoning_of`). Kept for
+    :attr:`answer_in_reasoning` and for the callers that read a structured answer back out of it on
+    purpose. Off ``repr`` and out of ``model_dump``: it is the model's thought trace, and a log line,
+    a receipt or a response body that serialises a result must not carry it by accident."""
+
+    answer_in_reasoning: bool = False
+    """The reply had no text and no tool call, stopped with ``stop``, and carried reasoning: the
+    route filed the model's whole output as reasoning.
+
+    Measured on 2026-09-25 (`bench/review_judge/RESULTS-h11.md`, S5): ``deepseek-r1`` pinned to
+    Novita did this on 353 of 814 calls of one prompt and 305 of 814 of another. The model never
+    closed its reasoning, and the provider put the final answer, the JSON the prompt asked for, at
+    the end of ``reasoning_content`` with ``content`` empty. The gateway read ``content`` only, so
+    every caller got an empty answer with ``stop`` and no error.
+
+    The answer is **not** moved into ``content``. Reasoning is a thought trace: returned as the
+    answer it would be shown to the person, and it can end on a draft. A caller that expects a
+    structured answer may read an object of its own schema from the end of :attr:`reasoning`
+    (:func:`chimera.providers.thinking.answer_at_end_of_reasoning`) and says so on its receipt; a
+    caller that expects prose treats the reply as empty, as before, and can now say why. False on a
+    reply with text, on a tool call, on ``length`` (that is :attr:`truncated`) and on an empty
+    reply that carried no reasoning either."""
+
     logprobs: list[dict[str, Any]] | None = Field(default=None, repr=False)
     """The token log-probabilities the route returned, one entry per generated token, as plain
     dicts: ``{"token": str, "logprob": float, "top_logprobs": [{"token", "logprob"}, …]}``.
@@ -852,6 +879,7 @@ class LLMGateway:
         if keys:
             call_kwargs["api_key"] = keys[0]
         content: list[str] = []
+        reasoning: list[str] = []
         tool_acc: dict[int, dict[str, Any]] = {}
         usage: dict[str, int | None] = {}
         finish_reason = ""
@@ -885,7 +913,9 @@ class LLMGateway:
                 # learned — see `CompletionResult.generation_id`.
                 if not generation_id:
                     generation_id = str(getattr(chunk, "id", "") or "")
-                razao = self._consume_chunk(chunk, content, tool_acc, usage, think, on_delta)
+                razao = self._consume_chunk(
+                    chunk, content, tool_acc, usage, think, on_delta, reasoning=reasoning
+                )
                 if razao:
                     finish_reason = razao
         except Exception as exc:
@@ -912,10 +942,17 @@ class LLMGateway:
                 content.append(tail)
                 if on_delta is not None:
                     on_delta(tail)
+        text, thought = "".join(content), "".join(reasoning)
+        tool_calls = _finalize_stream_tool_calls(tool_acc)
+        # The same rule as the batch path, over the whole stream: the reasoning deltas were never
+        # shown (`on_delta` gets content only), so a stream that carried nothing else ends empty.
+        filed = _answer_filed_as_reasoning(text, thought, finish_reason, tool_calls)
+        if filed:
+            _warn_answer_in_reasoning(resolved, provider, generation_id, len(thought))
         return CompletionResult(
-            content="".join(content),
+            content=text,
             model=resolved,
-            tool_calls=_finalize_stream_tool_calls(tool_acc),
+            tool_calls=tool_calls,
             prompt_tokens=usage.get("prompt_tokens"),
             completion_tokens=usage.get("completion_tokens"),
             cache_read_tokens=usage.get("cache_read_tokens"),
@@ -924,6 +961,8 @@ class LLMGateway:
             truncated=finish_reason == "length",
             provider=provider,
             generation_id=generation_id,
+            reasoning=thought,
+            answer_in_reasoning=filed,
         )
 
     @staticmethod
@@ -945,8 +984,18 @@ class LLMGateway:
         usage: dict[str, Any],
         think: ThinkFilter | None,
         on_delta: Callable[[str], None] | None,
+        *,
+        reasoning: list[str] | None = None,
     ) -> str:
-        """Fold one streamed chunk into the accumulating result; return its stop reason, if any."""
+        """Fold one streamed chunk into the accumulating result; return its stop reason, if any.
+
+        ``reasoning`` collects the chunk's reasoning delta beside the content, never into it and
+        never through ``on_delta``: it is kept only so the end of the stream can tell an answer the
+        route filed as reasoning from a reply that was empty (:func:`_answer_filed_as_reasoning`)."""
+        if reasoning is not None:
+            thought = _delta_reasoning(chunk)
+            if thought:
+                reasoning.append(thought)
         text = _delta_text(chunk)
         if text:
             # Filtered BEFORE it is accumulated, not only before it is displayed. The reasoning
@@ -989,6 +1038,7 @@ class LLMGateway:
     @staticmethod
     def _normalize(response: Any, model: str) -> CompletionResult:
         content = ""
+        reasoning = ""
         tool_calls: list[ToolCall] | None = None
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
@@ -1000,8 +1050,14 @@ class LLMGateway:
             # how one of them quietly stops handling code fences.
             content = strip_think(message.content or "")
             tool_calls = LLMGateway._parse_tool_calls(message)
+            reasoning = _reasoning_of(message)
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
+        provider = str(getattr(response, "provider", "") or "")
+        generation_id = str(getattr(response, "id", "") or "")
+        filed = _answer_filed_as_reasoning(content, reasoning, finish_reason, tool_calls)
+        if filed:
+            _warn_answer_in_reasoning(model, provider, generation_id, len(reasoning))
         cache_read_tokens: int | None = None
         cache_write_tokens: int | None = None
         usage = getattr(response, "usage", None)
@@ -1024,8 +1080,10 @@ class LLMGateway:
             cache_write_tokens=cache_write_tokens,
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
-            provider=str(getattr(response, "provider", "") or ""),
-            generation_id=str(getattr(response, "id", "") or ""),
+            provider=provider,
+            generation_id=generation_id,
+            reasoning=reasoning,
+            answer_in_reasoning=filed,
             logprobs=logprobs,
         )
 
@@ -1120,6 +1178,62 @@ def _delta_text(chunk: Any) -> str:
         return str(delta.content or "")
     except (AttributeError, IndexError, TypeError):
         return ""
+
+
+def _reasoning_of(part: Any) -> str:
+    """The reasoning a batch message or a streamed delta carries, or "".
+
+    One reader for both shapes. litellm 1.99 names the field ``reasoning_content`` on each:
+    OpenRouter sends ``reasoning``, and litellm renames it on the way in (`_extract_reasoning_content`
+    for a message; the OpenRouter stream handler copies it onto every delta). A batch message also
+    keeps the raw ``reasoning`` under ``provider_specific_fields``, which is read when the renamed
+    field is absent. Only a string counts: an odd shape reads as no reasoning, never as some."""
+    value = getattr(part, "reasoning_content", None)
+    if isinstance(value, str) and value:
+        return value
+    fields = getattr(part, "provider_specific_fields", None)
+    if isinstance(fields, dict):
+        raw = fields.get("reasoning")
+        if isinstance(raw, str):
+            return raw
+    return ""
+
+
+def _delta_reasoning(chunk: Any) -> str:
+    """The reasoning piece of one streamed chunk, defensively (empty on any shape)."""
+    try:
+        return _reasoning_of(chunk.choices[0].delta)
+    except (AttributeError, IndexError, TypeError):
+        return ""
+
+
+def _answer_filed_as_reasoning(
+    content: str, reasoning: str, finish_reason: str, tool_calls: list[ToolCall] | None
+) -> bool:
+    """Whether a reply is the route filing the model's output as reasoning (see
+    :attr:`CompletionResult.answer_in_reasoning`).
+
+    All four parts are needed. ``stop`` separates it from a reply cut at the ceiling, whose
+    reasoning spent the budget and holds no finished answer; the reasoning separates it from a
+    reply that was simply empty; text or a tool call means the model did answer."""
+    return (
+        not content.strip()
+        and not tool_calls
+        and finish_reason == "stop"
+        and bool(reasoning.strip())
+    )
+
+
+def _warn_answer_in_reasoning(model: str, provider: str, generation_id: str, chars: int) -> None:
+    """One line per occurrence, naming the route. The reasoning itself is never logged."""
+    _log.warning(
+        "model %s (provider %s, generation %s) stopped with no answer text and %d characters of "
+        "reasoning: the route filed the answer as reasoning, and it is not read as the answer",
+        model,
+        provider or "not reported",
+        generation_id or "not reported",
+        chars,
+    )
 
 
 def _delta_tool_calls(chunk: Any, acc: dict[int, dict[str, Any]]) -> None:

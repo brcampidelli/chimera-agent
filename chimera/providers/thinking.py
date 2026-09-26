@@ -25,7 +25,9 @@ answer is a bug.
 
 from __future__ import annotations
 
+import json
 import re
+from collections.abc import Collection
 
 #: `<think>`, `</thinking>`, and a fence. One pattern so the scanner makes a single pass.
 _TOKEN = re.compile(r"```|</?think(?:ing)?\s*>", re.IGNORECASE)
@@ -136,3 +138,47 @@ def strip_think(text: str) -> str:
     """
     f = ThinkFilter()
     return f.feed(text) + f.flush()
+
+
+#: How far back from the end of a reasoning field an answer object may start. A structured answer
+#: is a line or two; the bound keeps the backward scan linear on a reasoning that ran to 40k tokens.
+ANSWER_WINDOW_CHARS = 8_000
+
+
+def answer_at_end_of_reasoning(reasoning: str, keys: Collection[str]) -> str:
+    """The JSON object a reasoning field ENDS with, as written, if it carries every one of ``keys``;
+    else "".
+
+    For the route that files a whole reply as reasoning
+    (:attr:`~chimera.providers.gateway.CompletionResult.answer_in_reasoning`), and only for a caller
+    that asked for a structured answer and says on its receipt that it read it from here. The
+    opposite of this module's rule for tags on purpose: there the reasoning sits inside ``content``
+    and an unclosed tag may be prose, so the text is released; here the route itself labelled the
+    text as reasoning, so nothing leaves it except an object of the caller's own schema.
+
+    **The object must be the last thing written**, apart from whitespace and a closing code fence.
+    An object followed by more reasoning is a draft the model went on thinking about, and is never
+    taken. That rule costs nothing measured: in the reasoning tails `bench/review_judge` stored for
+    its 765 recovered answers (H11, 2026-09-25), 714 objects were followed by nothing and 51 by a
+    fence only, and this reader takes the same text that run took on all 765; on the three where the
+    run found no valid object (a final with an invalid escape among them), neither does this one. A
+    restatement of the requested format (``"approve" | "reject"``) is not valid JSON and is never
+    taken either.
+    Control characters inside strings are accepted (``strict=False``): a quoted line of code with a
+    literal tab is still the model's answer (H11, amendment 2).
+    """
+    text = reasoning.rstrip().removesuffix("```").rstrip()
+    if not text.endswith("}"):
+        return ""
+    decoder = json.JSONDecoder(strict=False)
+    floor = max(0, len(text) - ANSWER_WINDOW_CHARS)
+    pos = text.rfind("{", floor)
+    while pos != -1:
+        try:
+            obj, stop = decoder.raw_decode(text, pos)
+        except json.JSONDecodeError:
+            obj, stop = None, -1
+        if stop == len(text) and isinstance(obj, dict) and all(k in obj for k in keys):
+            return text[pos:]
+        pos = text.rfind("{", floor, pos)
+    return ""
