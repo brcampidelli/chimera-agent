@@ -4542,6 +4542,15 @@ def solve(
 
         region = WriteRegion(write_region.split(","), ws) if write_region else None
         registry = default_registry(ws, write_region=region)
+        # The web research sub-agent (study 25, S12), when switched on. Before the allowlist, so
+        # the lists reach it by name like a built-in; it draws its web tools from the FINAL
+        # registry, resolved late, for the reason the subagent below gives.
+        if settings.research_agent:
+            from chimera.core.research import ResearchWebTool
+
+            registry.register(
+                ResearchWebTool(gateway, lambda: registry, model=roles.models.explore or model)
+            )
         # Per-session grant first (issue #4): scope the native tools before the meta-tools
         # (explorer/subagents) are added, so subagents inherit the same allowlist.
         from chimera.governance import AuditLog
@@ -4557,7 +4566,8 @@ def solve(
             # A narrow localisation question does not need the editor's model.
             registry.register(
                 ExploreRepositoryTool(
-                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps
+                    gateway, ws, model=roles.models.explore or model, max_turns=max_steps,
+                    contract=settings.explorer_contract,
                 )
             )
         if subagents:
@@ -5231,11 +5241,18 @@ def explore(
     workspace: str = typer.Option(".", "--workspace", "-w", help="Repository root to explore."),
     model: str = typer.Option(None, "--model", "-m", help="Model for the explorer (a cheap one is fine)."),
     max_turns: int = typer.Option(8, "--max-turns", help="Max exploration turns."),
+    thoroughness: str = typer.Option(
+        "medium", "--thoroughness",
+        help="quick, medium or thorough: halves, keeps or doubles --max-turns. "
+        "Read only when CHIMERA_EXPLORER_CONTRACT is on.",
+    ),
 ) -> None:
     """Locate relevant code via the isolated Context Explorer subagent (FastContext-style).
 
     Returns only a compact file:line evidence block — the exploration turns never touch your
     context. A cheap model is usually the right call here; localization is a narrow task.
+    With CHIMERA_EXPLORER_CONTRACT on, it returns findings with a location each, a gaps section,
+    and a check of every cited location against the workspace.
     """
     from chimera.core import ContextExplorer
     from chimera.providers import LLMGateway, MissingCredentialsError
@@ -5245,10 +5262,15 @@ def explore(
         raise typer.Exit(code=1)
     explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
     try:
-        result = explorer.explore(query)
+        result = explorer.explore(query, thoroughness.strip().lower())
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
+    if result.check is not None:
+        # Plain text: the report and the receipt both carry square brackets rich would eat.
+        console.print(result.as_context(), markup=False, highlight=False)
+        console.print(f"[dim]{result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
+        return
     if not result.evidence:
         console.print("[dim]no relevant locations found[/dim]")
         return

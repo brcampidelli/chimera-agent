@@ -391,6 +391,17 @@ class Settings(BaseSettings):
     # answered by the configured decision backend. OFF by default for the reason `edit_batch` is: a
     # schema in every prompt of every step. Nothing is gated on its answers — they go to the agent.
     decide_tool: bool = Field(default=False, validation_alias="CHIMERA_DECIDE_TOOL")
+    # --- The explorer's contract (study 25, S12; chimera/core/explorer.py). On, the explorer is
+    # asked for a thoroughness level, reports findings with a path:line each and a gaps section, and
+    # its cited locations are checked against the workspace. OFF by default: today's explorer text
+    # stays byte for byte, and the new one has no measurement of its own yet.
+    explorer_contract: bool = Field(default=False, validation_alias="CHIMERA_EXPLORER_CONTRACT")
+    # --- The web research sub-agent (study 25, S12; chimera/core/research.py). On, the Code screen
+    # and `chimera solve` gain a `research_web` tool: a sub-agent with read-only web tools whose
+    # answer carries a receipt saying which cited URLs it actually saw. OFF by default: it is a new
+    # tool schema in every prompt and a new model bill per call, earned only by its bench
+    # (bench/web_research).
+    research_agent: bool = Field(default=False, validation_alias="CHIMERA_RESEARCH_AGENT")
     # --- Where an approval question goes when there is nobody at a console.
     #
     # This is what makes the three-state gate reachable on the surfaces that need it most. A cron

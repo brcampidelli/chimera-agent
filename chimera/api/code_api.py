@@ -533,6 +533,20 @@ def assemble_registry(
         write_region=build_write_region(seams.write_region, ws),
         host_exec_confirm=None if ungated else resolve_host_exec_confirm(settings),
     )
+    # The web research sub-agent (study 25, S12), when the owner switched it on. Registered BEFORE
+    # the lists below, unlike the explorer, so every one of them reaches it by name the way they
+    # reach a built-in: a request's own allowlist that does not name it narrows it away too. Its web
+    # tools are drawn from this registry late (`lambda: registry` sees the final, wrapped value, as
+    # `SubAgentTool` documents), so a denied fetch tool is denied to it and its fetches pass the
+    # kernel and the taint ledger wrapped around everything below.
+    if settings.research_agent:
+        from chimera.core.research import ResearchWebTool
+
+        registry.register(
+            ResearchWebTool(
+                gateway, lambda: registry, model=resolve_role_plan(seams, settings).models.explore
+            )
+        )
     # The owner's approver — the object the taint ledger and, since #495, the policy kernel are
     # handed below — reaches the FILE tools too, on the surface that has a person: a path outside
     # the project folder becomes a question on the screen instead of a refusal. Only when a screen
@@ -633,7 +647,10 @@ def assemble_registry(
         # than the search, so the main loop never pays for the hunt.
         explore_model = resolve_role_plan(seams, settings).models.explore
         registry.register(
-            ExploreRepositoryTool(gateway, ws, model=explore_model, max_turns=steps)
+            ExploreRepositoryTool(
+                gateway, ws, model=explore_model, max_turns=steps,
+                contract=settings.explorer_contract,
+            )
         )
     # Tools the caller brings for THIS turn — the talking model's handles on the conversation's
     # background works — registered here, before the kernel and the ledger wrap the registry, so

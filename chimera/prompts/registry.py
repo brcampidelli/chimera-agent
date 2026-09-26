@@ -108,6 +108,32 @@ def _restored_labels() -> str:
     return "\n".join(f"{key}:{label}" for key, label in sorted(_RESTORED.items()))
 
 
+def _explorer_contract_task() -> str:
+    from chimera.core.explorer import _CONTRACT_TEMPLATE, THOROUGHNESS, thoroughness_steps
+
+    return "\n\n---\n\n".join(
+        _CONTRACT_TEMPLATE.format(
+            level=level, steps=thoroughness_steps(level, 8), query="<the caller's query>"
+        )
+        for level in THOROUGHNESS
+    )
+
+
+def _research_task() -> str:
+    from chimera.core.explorer import THOROUGHNESS, thoroughness_steps
+    from chimera.core.research import _TASK_TEMPLATE, DEFAULT_RESEARCH_STEPS, SEARCH_BUDGET_NOTE
+
+    return "\n\n---\n\n".join(
+        _TASK_TEMPLATE.format(
+            level=level,
+            budget=SEARCH_BUDGET_NOTE[level],
+            steps=thoroughness_steps(level, DEFAULT_RESEARCH_STEPS),
+            question="<the caller's question>",
+        )
+        for level in THOROUGHNESS
+    )
+
+
 def _fence_example() -> str:
     from chimera.governance.ledger_tool import fence
 
@@ -278,6 +304,23 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("explorer.system", "chimera.core.explorer:EXPLORER_SYSTEM", "situation", ("S12",),
        "unmeasured"),
     _i("explorer.task", "chimera.core.explorer:ContextExplorer.explore", "turn", ("S12",)),
+    _c("explorer.contract", "chimera.core.explorer:EXPLORER_CONTRACT_SYSTEM", "situation", ("S12",),
+       "unmeasured",
+       note="replaces explorer.system under CHIMERA_EXPLORER_CONTRACT, off by default"),
+    _c("explorer.contract_task", "chimera.core.explorer:_CONTRACT_TEMPLATE", "turn", ("S12",),
+       "unmeasured", render=_explorer_contract_task,
+       note="one rendering per thoroughness level, at the default ceiling of 8 steps"),
+    _i("explorer.location_receipt", "chimera.core.explorer:LocationCheck.receipt", "tool", ("S12",),
+       note="the harness's words after a contract report; never the explorer's"),
+    _c("research.system", "chimera.core.research:RESEARCH_SYSTEM", "situation", ("S12",),
+       "unmeasured",
+       note="behind CHIMERA_RESEARCH_AGENT, off. bench/web_research was uninformative (the plain "
+            "loop sat at the ceiling, 66/72) and the module cost 4.9x the tokens"),
+    _c("research.task", "chimera.core.research:_TASK_TEMPLATE", "turn", ("S12",), "unmeasured",
+       render=_research_task, note="one rendering per thoroughness level, at the default 12 steps"),
+    _i("research.tool_description", "chimera.core.research:ResearchWebTool", "tool", ("S12",)),
+    _i("research.source_receipt", "chimera.core.research:CitationCheck.receipt", "tool", ("S12",),
+       note="the harness's citation check, appended to the answer; the prompt only asks"),
     _i("brief.recipe", "chimera.orchestration.brief:brief_task", "turn", ("S5", "S10")),
     _c("spec.draft", "chimera.orchestration.draft:_SYSTEM", "call", ("S14",), "unmeasured"),
     # ---- fusion --------------------------------------------------------------------------------

@@ -88,6 +88,9 @@ _IDENTIFIERS = frozenset({
     "pattern",
     "prompt",
     "query",
+    # `research_web`: the question it was sent to answer — the same kind of text as `task` and
+    # `query`, naming what was acted on; the pages it read come back in the fenced result.
+    "question",
     "ref",
     "render",
     "replace_all",
@@ -100,6 +103,8 @@ _IDENTIFIERS = frozenset({
     "size",
     "subject",
     "task",
+    # `research_web`: quick / medium / thorough — a mode word, no body.
+    "thoroughness",
     "timeout",
     "to",
     "tools",
