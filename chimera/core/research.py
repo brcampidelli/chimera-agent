@@ -25,10 +25,11 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import unquote, urlsplit
 
-from chimera.core.agent import Agent, AgentConfig, ToolActivity
+from chimera.core.agent import Agent, AgentConfig, ToolActivity, run_nested
 from chimera.core.explorer import THOROUGHNESS, thoroughness_steps
 from chimera.governance.ledger_tool import FENCE_OPEN, fence
 from chimera.governance.sanitize import sanitize_untrusted
+from chimera.orchestration.budget import SpendBudget
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool, is_refusal
@@ -277,6 +278,8 @@ class ResearchResult:
     usd: float | None = None
     stopped_reason: str = ""
     error: str = ""
+    #: The model that answered the research run, for the bill it goes on.
+    model: str = ""
 
     def as_context(self) -> str:
         """The answer and its receipt, which is all the main agent receives."""
@@ -314,12 +317,18 @@ class WebResearcher:
         source = self._source() if callable(self._source) else self._source
         return web_research_registry(source)
 
-    def research(self, question: str, thoroughness: str = "medium") -> ResearchResult:
+    def research(
+        self, question: str, thoroughness: str = "medium", *, spend: SpendBudget | None = None
+    ) -> ResearchResult:
+        """Research ``question``. ``spend`` is a ceiling the run draws on and charges, the caller's
+        own when the research is part of something with one (a turn)."""
         level = thoroughness if thoroughness in THOROUGHNESS else "medium"
         tools = self._tools()
         if not len(tools):
+            # Refused before any call: a known nothing, never the unknown that `usd=None` reads as.
             return ResearchResult(
-                question, level, error="no web tool is available to research with in this session"
+                question, level, error="no web tool is available to research with in this session",
+                usd=0.0,
             )
         steps = thoroughness_steps(level, self.max_turns)
         log = SourceLog()
@@ -338,7 +347,7 @@ class WebResearcher:
         task = _TASK_TEMPLATE.format(
             level=level, budget=SEARCH_BUDGET_NOTE[level], steps=steps, question=question
         )
-        result = agent.run(task, on_tool=log.record)  # the transcript stays here
+        result = agent.run(task, on_tool=log.record, spend=spend)  # the transcript stays here
         check = check_citations(result.answer, log)
         _log.debug(
             "research (%s): %d cited, %d unverified, %d tool result(s), %d failed",
@@ -356,6 +365,7 @@ class WebResearcher:
             cache_read_tokens=result.cache_read_tokens,
             usd=result.usd,
             stopped_reason=result.stopped_reason,
+            model=result.model,
         )
 
 
@@ -398,13 +408,22 @@ class ResearchWebTool(Tool):
         max_turns: int = DEFAULT_RESEARCH_STEPS,
     ) -> None:
         self._researcher = WebResearcher(backend, source, model=model, max_turns=max_turns)
+        #: What the last research spent. Inside a run it is on that run's bill already; this is how
+        #: a caller that ran the tool on its own reads it, having no bill to look at.
+        self.last_spend: ResearchResult | None = None
 
     def run(self, **kwargs: Any) -> str:
         question = str(kwargs.get("question", "")).strip()
         if not question:
             return "error: question is required"
         level = str(kwargs.get("thoroughness") or "medium").strip().lower()
-        return self._researcher.research(question, level).as_context()
+        # On the ceiling and the bill of the run this tool was called from, when there is one.
+        found = run_nested(
+            "the web researcher",
+            lambda spend: self._researcher.research(question, level, spend=spend),
+        )
+        self.last_spend = found
+        return found.as_context()
 
 
 __all__ = [

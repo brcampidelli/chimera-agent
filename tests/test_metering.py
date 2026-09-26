@@ -83,6 +83,55 @@ def test_it_prices_the_model_that_ANSWERED_not_the_one_requested() -> None:
     assert meter.usd is not None and meter.usd > 0  # priced off the answering model
 
 
+class _Fused:
+    """Answers the way `FusionEngine.complete` does: as "fusion", with its stages in route_meta."""
+
+    def __init__(self, stages: list[dict[str, Any]]) -> None:
+        self.stages = stages
+
+    def complete(self, messages: list[Any], **kwargs: Any) -> CompletionResult:
+        return CompletionResult(
+            content="ok", model="fusion",
+            prompt_tokens=sum(s["prompt_tokens"] for s in self.stages),
+            completion_tokens=sum(s["completion_tokens"] for s in self.stages),
+            route_meta={"kind": "fusion", "stages": self.stages},
+        )
+
+
+PRICED = "openrouter/deepseek/deepseek-chat-v3.1"
+
+
+def test_a_fused_answer_is_priced_by_its_stages() -> None:
+    """"fusion" is a label no price resolves, so a meter wrapping the Fuse button read every call
+    as unknown. The stages name the models that ran; the spend ceiling already prices by them."""
+    from chimera.orchestration.receipts import price_delegation
+
+    stages = [
+        {"stage": "panel", "model": PRICED, "prompt_tokens": 1000, "completion_tokens": 100},
+        {"stage": "judge", "model": PRICED, "prompt_tokens": 3000, "completion_tokens": 50},
+    ]
+    meter = MeteredBackend(_Fused(stages))
+    meter.complete([{"role": "user", "content": "x"}])
+
+    panel, judge = price_delegation(PRICED, 1000, 100), price_delegation(PRICED, 3000, 50)
+    assert panel and judge
+    expected = panel + judge
+    assert meter.usd == round(expected, 6)
+    assert meter.last_model == "fusion"
+
+
+def test_a_fused_answer_with_one_unpriced_stage_is_unknown() -> None:
+    stages = [
+        {"stage": "panel", "model": PRICED, "prompt_tokens": 1000, "completion_tokens": 100},
+        {"stage": "judge", "model": "vendor/model-nobody-has-priced", "prompt_tokens": 10,
+         "completion_tokens": 10},
+    ]
+    meter = MeteredBackend(_Fused(stages))
+    meter.complete([{"role": "user", "content": "x"}])
+
+    assert meter.usd is None
+
+
 def test_the_result_object_passes_through_untouched() -> None:
     """A wrapper that normalised or re-wrapped the result would be a second place for behaviour to
     diverge — and the reason this class exists is that a second place already did."""

@@ -32,7 +32,8 @@ class UsageRecord(BaseModel):
     usd: float | None = None  # list-rate cost, or None when the model's price is unknown — never guessed
     tools: int = 0
     memory_facts: int = 0
-    #: "fusion" | "cascade" | "hierarchy" | :data:`MEMORY_KIND` | None (single-model turn).
+    #: "fusion" | "cascade" | "hierarchy" | :data:`MEMORY_KIND` | :data:`TIDY_KIND` | None
+    #: (single-model turn).
     route_kind: str | None = None
     #: How many of this turn's tool calls a gate refused or that failed outright.
     #:
@@ -49,6 +50,16 @@ class UsageRecord(BaseModel):
 #: so the conversation's spend includes it, and not counted as a turn, because it is not one: with
 #: extraction on, every turn would otherwise read as two on the Cost screen.
 MEMORY_KIND = "memory"
+
+#: The ``route_kind`` of a row that prices "Tidy memory"'s merge when it runs after a terminal
+#: conversation rather than inside a turn (`chimera chat`, `chimera assist`; on the Code screen the
+#: merge is inside the turn and on the turn's own row). Filed under that conversation's id and not
+#: counted as a turn, for the reason :data:`MEMORY_KIND` is not. A kind of its own, so the
+#: extraction's rows and the tidy's can still be told apart.
+TIDY_KIND = "memory_tidy"
+
+#: The route kinds of rows that price a call made FOR a conversation, not a turn of it.
+NOT_A_TURN: frozenset[str] = frozenset({MEMORY_KIND, TIDY_KIND})
 
 
 def append_usage(path: Path, record: UsageRecord) -> None:
@@ -280,13 +291,14 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
     counted as ``unpriced_turns`` and never added as 0 — so the total spend is honest about what it
     actually knows the cost of.
 
-    A :data:`MEMORY_KIND` row adds its tokens and price everywhere, and its unknown price to the
-    unpriced count, but it is not a turn and is not counted as one, in the totals or in any group.
-    An unknown extraction price can therefore turn a group's price into "unknown" on the screen,
-    which is the direction this file prefers to a total that is confidently too low.
+    A :data:`MEMORY_KIND` or :data:`TIDY_KIND` row (:data:`NOT_A_TURN`) adds its tokens and price
+    everywhere, and its unknown price to the unpriced count, but it is not a turn and is not
+    counted as one, in the totals or in any group. An unknown extraction price can therefore turn a
+    group's price into "unknown" on the screen, which is the direction this file prefers to a total
+    that is confidently too low.
     """
     totals = {
-        "turns": sum(1 for r in records if r.route_kind != MEMORY_KIND),
+        "turns": sum(1 for r in records if r.route_kind not in NOT_A_TURN),
         "prompt_tokens": 0,
         "completion_tokens": 0,
         "cache_read_tokens": 0,
@@ -312,7 +324,7 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
             totals["usd"] += r.usd
 
         day = r.ts[:10]  # "YYYY-MM-DD" prefix of the ISO timestamp
-        turn = r.route_kind != MEMORY_KIND
+        turn = r.route_kind not in NOT_A_TURN
         _accumulate(by_day, day, "day", day, r, count=turn)
         # Per model a row is a call that model answered, whatever it was for. Counting only turns
         # here would leave the default model, when it answers nothing but extractions, a group of
@@ -320,7 +332,7 @@ def summarize_usage(records: list[UsageRecord]) -> dict[str, Any]:
         _accumulate(by_model, r.model, "model", r.model, r, count=True)
         _accumulate(by_session, r.session_id, "session_id", r.session_id, r, count=turn)
 
-        if r.route_kind == MEMORY_KIND:
+        if r.route_kind in NOT_A_TURN:
             continue  # a call made for a turn: its route is the turn's, already counted
         kind = r.route_kind if r.route_kind in ("fusion", "cascade") else "single"
         route_mix[kind] += 1

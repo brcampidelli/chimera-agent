@@ -24,7 +24,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from chimera.core.agent import Agent, AgentConfig
+from chimera.core.agent import Agent, AgentConfig, run_nested
+from chimera.orchestration.budget import SpendBudget
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
@@ -245,6 +246,13 @@ class ExplorerResult:
     #: Empty and None otherwise, so a caller of the older explorer sees nothing new.
     report: str = ""
     check: LocationCheck | None = None
+    #: What the exploration's own run spent, as its `AgentResult` reported it: ``usd`` None when a
+    #: call had no price. Kept because the run is somebody's bill, and dropping it made every
+    #: exploration free on the receipt of the turn that asked for it.
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    usd: float | None = 0.0
+    model: str = ""
 
     @property
     def block(self) -> str:
@@ -299,9 +307,14 @@ class ContextExplorer:
         #: None reads ``CHIMERA_EXPLORER_CONTRACT`` once, here, so one explorer keeps one contract.
         self.contract = _contract_default() if contract is None else contract
 
-    def explore(self, query: str, thoroughness: str = "medium") -> ExplorerResult:
+    def explore(
+        self, query: str, thoroughness: str = "medium", *, spend: SpendBudget | None = None
+    ) -> ExplorerResult:
+        """Locate code for ``query``. ``spend`` is a ceiling this run draws on and charges, the
+        caller's own when the exploration is part of something with one (a turn); a run that
+        reaches it stops with what it found so far."""
         if not self.contract:
-            return self._explore_plain(query)
+            return self._explore_plain(query, spend=spend)
         level = thoroughness if thoroughness in THOROUGHNESS else "medium"
         steps = thoroughness_steps(level, self.max_turns)
         agent = Agent(
@@ -314,7 +327,9 @@ class ContextExplorer:
                 system_prompt=EXPLORER_CONTRACT_SYSTEM,
             ),
         )
-        result = agent.run(_CONTRACT_TEMPLATE.format(level=level, steps=steps, query=query))
+        result = agent.run(
+            _CONTRACT_TEMPLATE.format(level=level, steps=steps, query=query), spend=spend
+        )
         report = _report_body(result.answer)
         check = check_locations(report, self.workspace)
         _log.debug(
@@ -328,9 +343,13 @@ class ContextExplorer:
             tool_calls=result.tool_calls_made,
             report=report,
             check=check,
+            prompt_tokens=result.prompt_tokens,
+            completion_tokens=result.completion_tokens,
+            usd=result.usd,
+            model=result.model,
         )
 
-    def _explore_plain(self, query: str) -> ExplorerResult:
+    def _explore_plain(self, query: str, *, spend: SpendBudget | None) -> ExplorerResult:
         agent = Agent(
             self.backend,
             read_only_registry(self.workspace),
@@ -341,11 +360,14 @@ class ContextExplorer:
                 system_prompt=EXPLORER_SYSTEM,
             ),
         )
-        result = agent.run(_TASK.format(query=query))  # the transcript stays here, not returned
+        # The transcript stays here, not returned; what the run cost goes with the evidence.
+        result = agent.run(_TASK.format(query=query), spend=spend)
         evidence = parse_evidence(result.answer)
         _log.debug("explorer found %d location(s) in %d turn(s)", len(evidence), result.steps)
         return ExplorerResult(
-            query=query, evidence=evidence, turns=result.steps, tool_calls=result.tool_calls_made
+            query=query, evidence=evidence, turns=result.steps, tool_calls=result.tool_calls_made,
+            prompt_tokens=result.prompt_tokens, completion_tokens=result.completion_tokens,
+            usd=result.usd, model=result.model,
         )
 
 
@@ -393,6 +415,9 @@ class ExploreRepositoryTool(Tool):
         self._explorer = ContextExplorer(
             backend, workspace, model=model, max_turns=max_turns, contract=contract
         )
+        #: What the last exploration spent. Inside a run it is on that run's bill already; this is
+        #: how a caller that ran the tool on its own reads it, having no bill to look at.
+        self.last_spend: ExplorerResult | None = None
         if self._explorer.contract:
             # Per instance, so the class attribute (today's schema) is never mutated.
             self.parameters = {
@@ -409,4 +434,9 @@ class ExploreRepositoryTool(Tool):
         if not query:
             return "error: query is required"
         level = str(kwargs.get("thoroughness") or "medium").strip().lower()
-        return self._explorer.explore(query, level).as_context()
+        # On the ceiling and the bill of the run this tool was called from, when there is one.
+        found = run_nested(
+            "the explorer", lambda spend: self._explorer.explore(query, level, spend=spend)
+        )
+        self.last_spend = found
+        return found.as_context()

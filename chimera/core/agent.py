@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
@@ -53,6 +53,7 @@ PARALLEL_READ_TOOLS = frozenset(
 PARALLEL_READ_WORKERS = 4
 
 if TYPE_CHECKING:
+    from chimera.core.summarise import Summariser
     from chimera.skills.registry import SkillRegistry
     from chimera.tools.browser_situation import Wall
 
@@ -495,6 +496,117 @@ class _UsageTally:
         if cost.unpriced is not None and self.unpriced is None:
             self.unpriced = cost.unpriced
 
+    def add_nested(self, spent: NestedSpend) -> None:
+        """Fold in what a run nested inside this one spent, already priced by its own tally.
+
+        Its ``usd`` is None when one of its calls had no price, and that stays unknown here: a
+        nested total dropped as zero is the undercount this tally exists to refuse.
+        """
+        self.prompt += spent.prompt_tokens or 0
+        self.completion += spent.completion_tokens or 0
+        self.cache_read += getattr(spent, "cache_read_tokens", 0) or 0
+        self.cache_write += getattr(spent, "cache_write_tokens", 0) or 0
+        if spent.usd is not None:
+            self.usd += spent.usd
+        elif self.unpriced is None:
+            self.unpriced = spent.model or "(a nested run)"
+
+
+class NestedSpend(Protocol):
+    """What a run nested inside another spent: an :class:`AgentResult`, or the
+    :class:`PartialSpend` a failed one carries out on its exception."""
+
+    @property
+    def prompt_tokens(self) -> int: ...
+
+    @property
+    def completion_tokens(self) -> int: ...
+
+    @property
+    def usd(self) -> float | None: ...
+
+    @property
+    def model(self) -> str: ...
+
+
+@dataclass(frozen=True)
+class OpenRun:
+    """A run in progress on this thread, as a tool running inside it can see it.
+
+    A tool that runs a model of its own (the repository explorer runs a whole `Agent`) spends money
+    the loop never sees: the loop meters the calls it makes, and the tool's are made inside one
+    tool call. Such a tool hands ``spend`` to its own run, so the ceiling is checked before each of
+    its calls as before each of the loop's, then adds what that run spent with :meth:`add_nested`,
+    so the run's tokens, ``usd`` and receipt carry it.
+    """
+
+    usage: _UsageTally
+    spend: SpendBudget | None
+
+    def add_nested(self, spent: NestedSpend | None) -> None:
+        """Add a nested run's tokens and price to this run's tally. The ceiling is not charged
+        here: a nested run given ``spend`` already charged it, call by call."""
+        if spent is not None:
+            self.usage.add_nested(spent)
+
+
+#: The runs open on each thread, innermost last. Per thread because a run shares its thread with
+#: every tool it calls one at a time, and one Agent can serve runs on several threads at once. The
+#: read-only batch that runs on worker threads (`PARALLEL_READ_TOOLS`) holds no tool that runs a
+#: model, so it has nothing to charge.
+_OPEN_RUNS = threading.local()
+
+
+def _open_runs() -> list[OpenRun]:
+    runs: list[OpenRun] | None = getattr(_OPEN_RUNS, "runs", None)
+    if runs is None:
+        runs = []
+        _OPEN_RUNS.runs = runs
+    return runs
+
+
+def enclosing_run() -> OpenRun | None:
+    """The innermost :class:`Agent` run in progress on this thread, or None outside any."""
+    runs: list[OpenRun] | None = getattr(_OPEN_RUNS, "runs", None)
+    return runs[-1] if runs else None
+
+
+_Spent = TypeVar("_Spent", bound=NestedSpend)
+
+
+def run_nested(label: str, nested: Callable[[SpendBudget | None], _Spent]) -> _Spent:
+    """Run a tool's own run of a model on the bill of the run that called the tool.
+
+    ``nested`` is handed the enclosing run's ceiling (None outside any run) and returns what it
+    spent, which is added to that run with :meth:`OpenRun.add_nested`. One that raises after paying
+    adds its :class:`PartialSpend` and the raise goes on, for the loop to turn into a tool error as
+    it always has. Outside any run there is no bill to put it on, so what it spent is logged, and
+    the tool keeps the returned value for its caller to read.
+
+    One helper for every tool that delegates (the explorer, the sub-agent, the web researcher),
+    so none of them can charge the ceiling and forget the tally, or the other way round.
+    """
+    outer = enclosing_run()
+    try:
+        spent = nested(outer.spend if outer is not None else None)
+    except Exception as exc:
+        partial = partial_spend(exc)
+        if outer is not None:
+            outer.add_nested(partial)
+        elif partial is not None:
+            _log.info("%s failed outside any run after spending %s", label, _priced(partial))
+        raise
+    if outer is not None:
+        outer.add_nested(spent)
+    else:
+        _log.info("%s ran outside any run and spent %s", label, _priced(spent))
+    return spent
+
+
+def _priced(spent: NestedSpend) -> str:
+    price = "an unknown amount" if spent.usd is None else f"${spent.usd:.4f}"
+    return f"{price} ({spent.prompt_tokens} prompt + {spent.completion_tokens} completion tokens)"
+
 
 @dataclass
 class AgentResult:
@@ -555,8 +667,9 @@ class Agent:
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
         # Built once rather than per compaction, and None unless asked for: `compact()` treats
-        # None as "use the structural note", which is the behaviour every caller has today.
-        self._summarise = None
+        # None as "use the structural note", which is the behaviour every caller has today. The
+        # run's meters are bound where it is called, in `run`, because they belong to one run.
+        self._summarise: Summariser | None = None
         if self.config.summarise_compaction:
             from chimera.core.summarise import rule_summariser
 
@@ -773,6 +886,47 @@ class Agent:
         ``turn_notes`` is :attr:`AgentConfig.turn_notes` for this run only, for a caller that keeps
         one agent across turns (``ChatSession`` under real history). Setting the config instead
         would leave one turn's recalled facts on the agent for the next. None reads the config."""
+        usage = _UsageTally()
+        # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
+        # scheduler dispatching jobs), and a cap that carried across them would refuse the second
+        # task because the first one used its allowance.
+        #
+        # Unless the CALLER owns one. `AutonomousAgent` calls this once per ATTEMPT, so a budget
+        # built here gave a three-attempt run three separate ceilings: measured, a run asking for
+        # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
+        # calls passes its own, and every attempt then draws on the same money.
+        if spend is None and self.config.max_usd:
+            spend = SpendBudget(self.config.max_usd)
+        # Open on this thread for as long as the loop runs, so a tool that runs a model of its own
+        # can charge THIS run instead of nothing (`enclosing_run`). Closed in `finally`: a run that
+        # raised must not stay open and collect a later tool's spend.
+        runs = _open_runs()
+        runs.append(OpenRun(usage, spend))
+        try:
+            return self._run(
+                task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
+                on_edit=on_edit, on_todo=on_todo, history=history, images=images,
+                should_stop=should_stop, turn_notes=turn_notes,
+            )
+        finally:
+            runs.pop()
+
+    def _run(
+        self,
+        task: str,
+        *,
+        usage: _UsageTally,
+        spend: SpendBudget | None,
+        on_token: Callable[[str], None] | None,
+        on_tool: Callable[[ToolActivity], None] | None,
+        on_edit: Callable[[str, str], None] | None,
+        on_todo: Callable[[list[dict[str, str]]], None] | None,
+        history: list[MessageLike] | None,
+        images: list[str] | None,
+        should_stop: Callable[[], bool] | None,
+        turn_notes: str | None,
+    ) -> AgentResult:
+        """The loop of :meth:`run`, on the meters that opened it."""
         # Attached per call rather than at construction: the sink belongs to this invocation, and a
         # second turn with no sink must not keep announcing into the first turn's queue.
         # Bound here rather than at construction, and per call: the sink belongs to THIS
@@ -828,17 +982,6 @@ class Agent:
         tool_schema = self.tools.to_openai_schema(compact=self.config.compact_schemas) or None
         tool_calls_made = 0
         tool_names: list[str] = []
-        usage = _UsageTally()
-        # Per RUN, not per Agent: the same Agent object serves several runs (a conversation, a
-        # scheduler dispatching jobs), and a cap that carried across them would refuse the second
-        # task because the first one used its allowance.
-        #
-        # Unless the CALLER owns one. `AutonomousAgent` calls this once per ATTEMPT, so a budget
-        # built here gave a three-attempt run three separate ceilings: measured, a run asking for
-        # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
-        # calls passes its own, and every attempt then draws on the same money.
-        if spend is None and self.config.max_usd:
-            spend = SpendBudget(self.config.max_usd)
         steplog = StepLog()
         # Which instructions this run was given, as twelve hex characters in its trace. The
         # prompt registry snapshots every piece; this is what ties a run back to a version of them
@@ -982,7 +1125,7 @@ class Agent:
                     messages,
                     keep_recent=self.config.keep_recent,
                     state=self.run_state,
-                    summarise=self._summarise,
+                    summarise=self._metered_summariser(usage, spend),
                 )
                 if compacted:
                     record.compacted = True
@@ -1190,6 +1333,21 @@ class Agent:
         return self._result(answer, self.config.max_steps, "max_steps", messages,
                             tool_calls_made, tool_names, usage, final.model, steplog=steplog,
                             task=task)
+
+    def _metered_summariser(
+        self, usage: _UsageTally, spend: SpendBudget | None
+    ) -> Callable[[list[Any]], str] | None:
+        """This run's compaction summariser, charging its call to the run, or None when off.
+
+        Charged the way the tool router's call is charged (`ToolRouter.pick`), so it lands in the
+        run's own line: the result's tokens and ``usd``, the partial spend a failed run carries,
+        and the spend ceiling. Not a line of its own: the call is made inside the run, between two
+        of its steps, and a turn is one row in the usage log whatever it called on the way.
+        """
+        summarise = self._summarise
+        if summarise is None:
+            return None
+        return lambda older: summarise(older, usage=usage, spend=spend)
 
     def _close(
         self,

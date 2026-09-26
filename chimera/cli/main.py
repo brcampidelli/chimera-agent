@@ -48,6 +48,7 @@ if TYPE_CHECKING:
     from chimera.kanban import KanbanBoard
     from chimera.memory import EmbedFn, MemoryGraph, MemoryManager
     from chimera.memory.extract import MemoryExtractor
+    from chimera.orchestration.metering import MeteredBackend
     from chimera.pet import Pet, PetStore
     from chimera.providers import SupportsComplete
     from chimera.scheduler import CronStore
@@ -1939,14 +1940,14 @@ def chat(
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if not message:
             continue
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if head == "/help":
             _print_help(commands)
@@ -1997,7 +1998,7 @@ def chat(
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, active)
             break
         if outcome != "ok":
             continue
@@ -2144,7 +2145,7 @@ def assist(
             message = console.input("[bold green]you ›[/bold green] ").strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if not message:
@@ -2152,7 +2153,7 @@ def assist(
         head, argument = render.split_command(message)
         if head in ("/exit", "/quit", "/q"):
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if head == "/help":
@@ -2219,7 +2220,7 @@ def assist(
         report, outcome = _run_turn(session, message)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
-            _maybe_autoconsolidate(mem, settings)
+            _maybe_autoconsolidate(mem, settings, usage_session)
             _session_receipt()
             break
         if outcome != "ok":
@@ -5275,24 +5276,53 @@ def explore(
     if not get_settings().can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
         raise typer.Exit(code=1)
+    from uuid import uuid4
+
+    from chimera.api.usage import record_spend
+    from chimera.core.agent import partial_spend
+
     explorer = ContextExplorer(LLMGateway(), Path(workspace), model=model, max_turns=max_turns)
+    # One row in the usage log per exploration, under its own id: it is a run of its own, and the
+    # Cost screen could not see it. Written on the way out whatever happened, like a failed turn's.
+    usage_id = f"explore:{uuid4().hex[:12]}"
     try:
         result = explorer.explore(query, thoroughness.strip().lower())
-    except MissingCredentialsError as exc:
-        console.print(f"[red]{exc}[/red]")
-        raise typer.Exit(code=1) from exc
+    except Exception as exc:
+        spent = partial_spend(exc)
+        if spent is not None and (spent.prompt_tokens or spent.completion_tokens):
+            record_spend(
+                get_settings().home, session_id=usage_id, model=spent.model,
+                prompt_tokens=spent.prompt_tokens, completion_tokens=spent.completion_tokens,
+                usd=spent.usd,
+            )
+        if isinstance(exc, MissingCredentialsError):
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=1) from exc
+        raise
+    record_spend(
+        get_settings().home, session_id=usage_id, model=result.model,
+        prompt_tokens=result.prompt_tokens, completion_tokens=result.completion_tokens,
+        usd=result.usd, tools=result.tool_calls,
+    )
+    # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
+    cost = "cost unknown (a call had no price)" if result.usd is None else f"${result.usd:.4f}"
     if result.check is not None:
         # Plain text: the report and the receipt both carry square brackets rich would eat.
         console.print(result.as_context(), markup=False, highlight=False)
-        console.print(f"[dim]{result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
+        console.print(
+            f"[dim]{result.turns} turn(s), {result.tool_calls} tool call(s) · {cost}[/dim]"
+        )
         return
     if not result.evidence:
-        console.print("[dim]no relevant locations found[/dim]")
+        console.print(f"[dim]no relevant locations found · {cost}[/dim]")
         return
     for ev in result.evidence:
         loc = f"[cyan]{ev.path}[/cyan]" + (f":[yellow]{ev.lines}[/yellow]" if ev.lines else "")
         console.print(f"  {loc}" + (f" [dim]— {ev.note}[/dim]" if ev.note else ""))
-    console.print(f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), {result.tool_calls} tool call(s)[/dim]")
+    console.print(
+        f"[dim]{len(result.evidence)} location(s) in {result.turns} turn(s), "
+        f"{result.tool_calls} tool call(s) · {cost}[/dim]"
+    )
 
 
 @app.command()
@@ -6907,22 +6937,55 @@ def _emit_skill_nudges(session: object, known_skills: list[str], already: set[st
             )
 
 
-def _maybe_autoconsolidate(memory: MemoryManager | None, settings: Settings) -> None:
-    """On session end, consolidate memory if it outgrew the budget (opt-in)."""
+def _maybe_autoconsolidate(
+    memory: MemoryManager | None, settings: Settings, usage_id: str = ""
+) -> None:
+    """On session end, consolidate memory if it outgrew the budget (opt-in).
+
+    The merges are model calls, metered and written to the usage log under ``usage_id``, the
+    conversation that just ended, as :data:`chimera.api.usage.TIDY_KIND`: added to its spend and
+    not counted as a turn of it. A merge that failed part-way still bills the merges it paid for.
+    """
     if memory is None or not settings.auto_consolidate:
         return
+    from chimera.orchestration.metering import MeteredBackend as _Meter
+
+    meter: MeteredBackend | None = None
     try:
         from chimera.memory.consolidate import model_summarizer
         from chimera.providers import LLMGateway
 
-        removed = memory.autoconsolidate(
-            model_summarizer(LLMGateway()), max_items=settings.memory_budget
-        )
+        meter = _Meter(LLMGateway(), label="tidy")
+        removed = memory.autoconsolidate(model_summarizer(meter), max_items=settings.memory_budget)
     except Exception as exc:  # noqa: BLE001 — best-effort cleanup, never break exit
+        _record_tidy_spend(settings, meter, usage_id)
         console.print(f"[dim]auto-consolidate skipped: {exc}[/dim]")
         return
+    _record_tidy_spend(settings, meter, usage_id)
     if removed:
         console.print(f"[dim]🧹 consolidated {removed} redundant memory item(s)[/dim]")
+
+
+def _record_tidy_spend(settings: Settings, meter: MeteredBackend | None, usage_id: str) -> None:
+    """Write what the tidy's merges cost, when it made any (see `_maybe_autoconsolidate`)."""
+    from chimera.api.usage import TIDY_KIND
+
+    _record_merge_spend(settings, meter, usage_id or "memory-tidy", route_kind=TIDY_KIND)
+
+
+def _record_merge_spend(
+    settings: Settings, meter: MeteredBackend | None, usage_id: str, *, route_kind: str | None
+) -> None:
+    """One usage row for the memory merges ``meter`` saw, or none when it saw no call returned."""
+    if meter is None or not meter.calls:
+        return
+    from chimera.api.usage import record_spend
+
+    record_spend(
+        settings.home, session_id=usage_id, model=meter.last_model,
+        prompt_tokens=meter.prompt_tokens, completion_tokens=meter.completion_tokens,
+        usd=meter.usd, route_kind=route_kind,
+    )
 
 
 def _recall_graph(memory: MemoryManager | None) -> MemoryGraph | None:
@@ -7036,20 +7099,33 @@ def memory_consolidate(
     ),
 ) -> None:
     """Merge clusters of similar memories into one LLM-summarised fact (opt-in write)."""
+    from uuid import uuid4
+
     from chimera.memory.consolidate import model_summarizer
+    from chimera.orchestration.metering import MeteredBackend as _Meter
     from chimera.providers import LLMGateway, MissingCredentialsError
 
     if not get_settings().can_answer():
         console.print("[red]no provider API key configured, and no local model[/red] — set one to summarise")
         raise typer.Exit(1)
+    # Each merge is a model call, metered here and written as one row of this command's own: it
+    # belongs to no conversation, and the Cost screen could not see it. Written on the way out
+    # whatever happened, so a run that failed part-way bills the merges it paid for.
+    meter = _Meter(LLMGateway(), label="consolidate")
+    usage_id = f"consolidate:{uuid4().hex[:12]}"
     try:
-        removed = _memory_manager().consolidate(
-            model_summarizer(LLMGateway()), threshold=threshold
-        )
+        removed = _memory_manager().consolidate(model_summarizer(meter), threshold=threshold)
     except MissingCredentialsError as exc:
+        _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(1) from exc
-    console.print(f"consolidated: merged away {removed} redundant memory item(s)")
+    except Exception:
+        _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
+        raise
+    _record_merge_spend(get_settings(), meter, usage_id, route_kind=None)
+    # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
+    cost = "cost unknown (a merge had no price)" if meter.usd is None else f"${meter.usd:.4f}"
+    console.print(f"consolidated: merged away {removed} redundant memory item(s) · {cost}")
 
 
 @memory_app.command("graph")

@@ -105,9 +105,12 @@ const CONTEXT_BUDGET = 0.6;
  *  Measured before being sent (`bench/compaction`, 2026-09-15, 30 paired conversations on the
  *  shipped model): a convention stated in turn one survived compaction in **6/30** conversations
  *  with the note alone and **25/30** with the summary beside it — 19 pairs moved one way, none the
- *  other, exact McNemar p = 4e-6. One model call per compaction, on the turn's own model; the
- *  conversations that paid it cost no more in dollars than the ones that did not. Sent per turn,
- *  like the budget, for the same reason. */
+ *  other, exact McNemar p = 4e-6. One model call per compaction, on the turn's own model. The
+ *  bench reported that the conversations that paid it cost no more in dollars (US$ 0.0381 against
+ *  0.0456), but it summed `result.usd`, which left the 30 summariser calls out. Corrected
+ *  2026-09-26 in `bench/compaction/RESULTS.md`: bounded, not re-measured, at ≤ 0.0440 against
+ *  0.0456, so the conclusion survives and the printed number does not. Sent per turn, like the
+ *  budget, for the same reason. */
 const SUMMARISE_COMPACTION = true;
 
 /** How many tool-calling steps one turn may take.

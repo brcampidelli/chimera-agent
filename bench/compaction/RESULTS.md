@@ -128,6 +128,21 @@ session had a pseudo-terminal, so `CHIMERA_HOST_EXEC=ask` prompted on 21 attempt
 and refused each after its 120 s timeout, exactly as the headless run refused them at once; the
 seconds column carries that and the dollars do not.
 
+> **Correction, 2026-09-26: the dollars above were taken with the wrong ruler.** `run.py` summed
+> `result.usd` per turn, and the summariser's own call was never in it: it went to the backend
+> beside the loop's `_step`, so neither `AgentResult` nor the usage log saw it. The summariser now
+> charges the run it compacts (`chimera/core/summarise.py`, branch
+> `fix/plan-gate-and-summary-on-the-bill`). The treatment arm made **30 summariser calls**, one per
+> compaction, and none of them is in its US$ 0.0381.
+>
+> Not re-measured; bounded. At the model's list price (US$ 0.022/M in, 0.32/M out), with every
+> call's input at the summariser's 12,000-character cap, 4 characters per token and 400 output
+> tokens a call, the 30 cost at most **US$ 0.0059**, which puts the treatment arm at **≤ 0.0440
+> against 0.0456**. Read against the 30 summaries this file's results record, even at 2 characters
+> per token the bound is US$ 0.0053 (≤ 0.0434). **The conclusion survives**: overturning it needs
+> more than US$ 0.0075 across the 30 calls, over US$ 0.00025 each. The number printed above does
+> not: it measured the arm without its most distinctive call.
+
 ## The fabrication count, and what it found instead
 
 All thirty treatment summaries were read against the span they compress (the registration asked for

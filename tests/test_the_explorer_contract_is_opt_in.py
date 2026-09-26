@@ -116,7 +116,11 @@ def test_thoroughness_sets_the_step_ceiling(
             ceilings.append(config.max_steps)
 
         def run(self, task: str, **kwargs: Any) -> Any:
-            return type("R", (), {"answer": "", "steps": 0, "tool_calls_made": 0})()
+            # Shaped like an `AgentResult`, what it spent included: the explorer carries that out.
+            return type("R", (), {
+                "answer": "", "steps": 0, "tool_calls_made": 0, "prompt_tokens": 0,
+                "completion_tokens": 0, "usd": 0.0, "model": "",
+            })()
 
     monkeypatch.setattr(explorer_module, "Agent", _Agent)
     explorer = ContextExplorer(_Recorder(""), tmp_path, max_turns=8, contract=True)
