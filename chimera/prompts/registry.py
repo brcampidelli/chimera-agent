@@ -303,10 +303,11 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("governance.hosted_advisory", "chimera.decisions.hosted:ADVISORY", "call", ("S9",), "measured",
        "bench/jev_decisions"),
     _i("governance.hosted_system", "chimera.decisions.hosted:HostedVerbalizedBackend.system_text",
-       "call", ("S9",),
-       note="asks for one word (JUDGE_TEXT) and then for JSON (ADVISORY). Left as is on purpose: "
-       "the instrument is pinned to the bench that measured it, so resolving the two is a measured "
-       "arm (plan §7 S9), not an edit"),
+       "call", ("S9",), "measured",
+       "bench/jev_decisions/RESULTS-one-schema.md (arm V′: unparsed 0/110 vs 0/110, ΔAUROC −0.015 "
+       "[−0.046, +0.009], non-inferior at 0.05)",
+       note="sends the question's framing without its one-word reply line, so JSON (ADVISORY) is "
+       "the only output instruction; the change was a measured arm (plan §7 S9 b), not an edit"),
     _i("governance.local_system", "chimera.decisions.local:LocalLogprobBackend.system_text", "call",
        ("S9",), "measured", "bench/jevbench_local (0.619)"),
     _c("governance.quarantine", "chimera.governance.quarantine:_QUARANTINE_SYSTEM", "call",
