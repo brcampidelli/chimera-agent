@@ -231,9 +231,9 @@ def test_a_failure_after_the_row_was_written_does_not_bill_the_plan_twice(
     the same handler a dying run does, and must not write the planning call a second time."""
 
     def _breaks(*_a: Any, **_k: Any) -> Any:
-        raise RuntimeError("the memory write fell over")
+        raise RuntimeError("the receipt would not store")
 
-    monkeypatch.setattr("chimera.api.code_api._remember_and_tidy", _breaks)
+    monkeypatch.setattr("chimera.core.code_session.CodeSession.remember_receipt", _breaks)
 
     text = _turn(tmp_path, monkeypatch, approve=True)
 

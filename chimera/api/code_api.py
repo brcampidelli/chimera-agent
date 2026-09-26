@@ -946,19 +946,20 @@ def _log_usage(payload: dict[str, Any], session_id: str, settings: Settings) -> 
         _log.debug("usage logging skipped: %s", exc)
 
 
-def _with_plan_call(payload: dict[str, Any], meter: MeteredBackend | None) -> dict[str, Any]:
-    """``payload`` with the plan gate's call added to what the turn spent (:mod:`plan_gate`).
+def _with_metered_call(payload: dict[str, Any], meter: MeteredBackend | None) -> dict[str, Any]:
+    """``payload`` with what ``meter`` saw added to what the turn spent.
 
-    The planning call is made on the turn's thread, before the loop and before the turn's row is
-    written, so it goes IN that row rather than beside it: a gated turn is still one turn on the
-    Cost screen, and the receipt under the answer says what the whole turn cost. Tokens are
-    added; the price follows :func:`~chimera.orchestration.metering.add_usd`, so an unknown price
-    on either side makes the turn's unknown instead of reading as a low total. A row that names no
-    model gets the one that answered the plan, because a row with dollars and no model is the
-    blank line the Cost screen once showed.
+    For the calls a turn makes outside its loop: the plan gate's (:mod:`plan_gate`) and the merge
+    "Tidy memory" asks for (:func:`_remember_and_tidy`). Both are made on the turn's thread before
+    the turn's row is written, so they go IN that row rather than beside it: the turn is still one
+    turn on the Cost screen, and the receipt under the answer says what the whole turn cost. Tokens
+    are added; the price follows :func:`~chimera.orchestration.metering.add_usd`, so an unknown
+    price on either side makes the turn's unknown instead of reading as a low total. A row that
+    names no model gets the one that answered, because a row with dollars and no model is the blank
+    line the Cost screen once showed.
 
-    A meter that recorded no call leaves the payload alone: a planning call that raised cost
-    nothing, and adding its zero would change nothing but the look of the row.
+    A meter that recorded no call leaves the payload alone: a call that raised cost nothing, and
+    adding its zero would change nothing but the look of the row.
     """
     if meter is None or not meter.calls:
         return payload
@@ -973,7 +974,9 @@ def _with_plan_call(payload: dict[str, Any], meter: MeteredBackend | None) -> di
     return out
 
 
-def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[str | None, int]:
+def _remember_and_tidy(
+    message: str, memory: Any, settings: Settings, *, backend: Any = None
+) -> tuple[str | None, int]:
     """Honour an explicit "remember that…" from the user's own message, then tidy if asked.
 
     Two Settings toggles fired nothing from the app before this. "Remember from chat" was real and
@@ -989,6 +992,10 @@ def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[s
     feature routes and lives on the streaming turn, like every other call that can cost money.
 
     Best-effort throughout: neither toggle may take a turn down. The answer is the product.
+
+    ``backend`` is what the tidy's merge asks, a fresh gateway when None. The Code turn passes a
+    :class:`~chimera.orchestration.metering.MeteredBackend` over its own gateway, because the merge
+    is a model call the turn pays for and nothing else was recording it.
     """
     if not getattr(settings, "remember_from_chat", False) or memory is None:
         return None, 0
@@ -1010,12 +1017,13 @@ def _remember_and_tidy(message: str, memory: Any, settings: Settings) -> tuple[s
         return fact, 0
     try:
         from chimera.memory.consolidate import model_summarizer
-        from chimera.providers import LLMGateway
 
+        if backend is None:
+            from chimera.providers import LLMGateway
+
+            backend = LLMGateway()
         removed = int(
-            memory.autoconsolidate(
-                model_summarizer(LLMGateway()), max_items=settings.memory_budget
-            )
+            memory.autoconsolidate(model_summarizer(backend), max_items=settings.memory_budget)
         )
     except Exception as exc:  # noqa: BLE001 -- see the docstring
         _log.debug("auto-consolidate skipped: %s", exc)
@@ -1689,9 +1697,16 @@ def register_code_api(
             emit("todo", {"items": items, "claimed": True})
 
         def work() -> None:
+            from chimera.orchestration.metering import MeteredBackend as _Meter
+
             # What the plan gate's call cost, when the turn has one. Out here so the `except` below
             # can still add it to a turn that died after the plan was paid for.
             plan_meter: MeteredBackend | None = None
+            # What "Tidy memory"'s merge costs, when a "remember that…" makes one. On the turn's
+            # own gateway, taken here before a fused turn swaps the agent's backend for the engine:
+            # the merge used a fresh gateway and still does not go through fusion.
+            turn_backend = getattr(agent, "backend", None)
+            tidy_meter = None if turn_backend is None else _Meter(turn_backend, label="tidy")
             try:
                 # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
                 #
@@ -1727,17 +1742,22 @@ def register_code_api(
                     # worker's turn, a turn whose workspace had no test command. Distinct from a
                     # verdict of "none", which means we looked and there was nothing to run.
                     verdict: dict[str, Any] | None = None
-                    # Before the row, the receipt and `done` are written from it, so all three
-                    # carry the planning call: every way out of a gated turn passes here. Then
-                    # cleared, so a failure later in this function cannot bill it a second time.
-                    payload = _with_plan_call(payload, plan_meter)
-                    plan_meter = None
-                    _log_usage(payload, session_id, live())
                     # Here rather than in either branch: both go through this function, and an
                     # external agent's turn is still a turn the user typed "remember that…" into.
-                    saved, tidied = _remember_and_tidy(req.message, turn_memory, live())
+                    # Before the row, not after it as it once was: the tidy's merge is a model call
+                    # this turn pays for, and a row already written cannot carry it.
+                    saved, tidied = _remember_and_tidy(
+                        req.message, turn_memory, live(), backend=tidy_meter
+                    )
+                    # Before the row, the receipt and `done` are written from it, so all three
+                    # carry the planning call and the merge: every way out of a turn passes here.
+                    # The plan's meter is then cleared, so a failure later in this function cannot
+                    # bill it a second time through the `except` below.
+                    payload = _with_metered_call(_with_metered_call(payload, plan_meter), tidy_meter)
+                    plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
+                    _log_usage(payload, session_id, live())
                     if edited:
                         from chimera.api.app import resolve_verify, verifier_source
                         from chimera.core.verify import CommandVerifier
@@ -2026,7 +2046,7 @@ def register_code_api(
                 # followed by a run that died is still a plan somebody paid for. The loop's part
                 # is a known zero when it never reached a model, so the sum stays known.
                 spent = partial_spend(exc)
-                failed = _with_plan_call(
+                failed = _with_metered_call(
                     {
                         "model": spent.model if spent is not None else "",
                         "prompt_tokens": spent.prompt_tokens if spent is not None else 0,
