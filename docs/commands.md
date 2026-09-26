@@ -559,6 +559,8 @@ Locate relevant code via the isolated Context Explorer subagent (FastContext-sty
 
 Returns only a compact file:line evidence block — the exploration turns never touch your
 context. A cheap model is usually the right call here; localization is a narrow task.
+With CHIMERA_EXPLORER_CONTRACT on, it returns findings with a location each, a gaps section,
+and a check of every cited location against the workspace.
 
 ```bash
 chimera explore QUERY
@@ -573,6 +575,7 @@ chimera explore QUERY
 | `--workspace`, `-w` | Repository root to explore. | `'.'` |
 | `--model`, `-m` | Model for the explorer (a cheap one is fine). |  |
 | `--max-turns` | Max exploration turns. | `8` |
+| `--thoroughness` | quick, medium or thorough: halves, keeps or doubles --max-turns. Read only when CHIMERA_EXPLORER_CONTRACT is on. | `'medium'` |
 
 ## features
 
