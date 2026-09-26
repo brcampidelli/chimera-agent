@@ -29,6 +29,7 @@ the date, the system and shell, the working directory, the state of git.
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import subprocess
@@ -106,6 +107,18 @@ def environment_facts(cwd: Path | None, *, now: datetime | None = None, git: boo
 def facts_block(facts: list[str]) -> str:
     """Recalled facts under :data:`FACTS_HEADER`, or "" when there are none."""
     return FACTS_HEADER + "\n" + "\n".join(f"- {f}" for f in facts) if facts else ""
+
+
+def cited_fact(content: str, *, source: str, saved: float | None) -> str:
+    """One recalled fact, quoted, with where it came from and when it was written.
+
+    Study 25 S13: memory is recall, not proof of the present, and the model can only weigh a fact
+    by its age and origin if it is shown them. Quoted through JSON rather than with bare marks, so
+    a stored fact that contains a quotation mark cannot close the quote and read as the harness's
+    own words. A fact written before dates were recorded says so, and is never given today's date.
+    """
+    when = datetime.fromtimestamp(saved).strftime("%Y-%m-%d") if saved else "date not recorded"
+    return f"{json.dumps(content, ensure_ascii=False)} (source: {source or 'unknown'}, saved {when})"
 
 
 def turn_context(*parts: str) -> str:

@@ -742,6 +742,11 @@ class Settings(BaseSettings):
     # where the desktop chat never wrote memory. Only explicit requests are captured — never automatic
     # extraction, which would pollute the store.
     remember_from_chat: bool = Field(default=False, validation_alias="CHIMERA_CHAT_MEMORY")
+    # Study 25 S13: after a chat or Code turn, one model call proposes facts the user STATED about
+    # themselves, and the harness keeps only those it can trace to the user's own words
+    # (`chimera.memory.extract`). The same switch quotes recalled facts with their source and date.
+    # Off by default: it writes memory nobody asked for by name, and it costs one call per turn.
+    memory_extract: bool = Field(default=False, validation_alias="CHIMERA_MEMORY_EXTRACT")
 
     # Send a chat's earlier turns as the model's own messages, tool calls included, with the
     # profile and recalled facts in the turn context, instead of one flattened user message

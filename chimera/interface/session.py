@@ -9,6 +9,7 @@ command, the TUI, and the messaging gateway all reuse it unchanged.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
@@ -21,6 +22,8 @@ from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
 
 _log = get_logger("interface.session")
+
+_log = logging.getLogger("chimera.interface.session")
 
 #: What is known about untrusted content in one stored turn.
 #:
@@ -80,6 +83,12 @@ class SupportsRelated(Protocol):
     """Graph memory: recall facts linked to entities mentioned in the query."""
 
     def related_facts(self, query: str, k: int = 5) -> list[str]: ...
+
+
+class SupportsAfterTurn(Protocol):
+    """Memory extraction after a finished turn (:class:`chimera.memory.extract.MemoryExtractor`)."""
+
+    def after_turn(self, user_message: str, answer: str, *, tainted: bool = ...) -> None: ...
 
 
 @dataclass
@@ -414,6 +423,13 @@ class ChatSession:
     #: messaging gateway, ``/v1/chat/completions`` and every bench, none of which has a screen. An
     #: announcer with nothing bound announces to nobody, which is exactly what those want.
     approval_sink: Any = None
+    #: Study 25 S13, behind ``CHIMERA_MEMORY_EXTRACT``: handed each finished turn, to keep what the
+    #: user stated about themselves. ``None`` by default, which is byte-identical to before: this
+    #: class also serves the messaging gateway, ``/v1/chat/completions`` and every bench.
+    extractor: SupportsAfterTurn | None = None
+    #: Quote recalled facts with their source and date, in the turn-context header's words. Off by
+    #: default, for the same reason as ``extractor``; the terminal surfaces tie both to one setting.
+    cite_facts: bool = False
     #: Send the earlier turns as the model's own messages, and the profile and recalled facts in the
     #: turn context, instead of flattening all of it into one user message.
     #:
@@ -450,19 +466,18 @@ class ChatSession:
             messages = _turn_messages(result, message)
         else:
             result = self.agent.run(self._compose(message))
-        self._record(
-            message,
-            result.answer,
-            turn_provenance(
-                list(result.tool_names), None, already_tainted=self._thread_tainted()
-            ),
+        provenance = turn_provenance(
+            list(result.tool_names), None, already_tainted=self._thread_tainted()
         )
+        self._record(message, result.answer, provenance)
         self._keep_messages(message, messages)
         # `remember_from_chat` used to mean two different things depending on which method you
         # called: `send_verbose` honoured it and `send` did not. So every surface built on `send`
         # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
-        # true in the config and false in the product.
+        # true in the config and false in the product. The extraction below is called from both
+        # for the same reason.
         self._maybe_remember(message)
+        self._maybe_extract(message, result.answer, provenance)
         return result.answer
 
     def send_verbose(
@@ -509,6 +524,7 @@ class ChatSession:
         self._record(message, result.answer, provenance)
         self._keep_messages(message, messages)
         saved = self._maybe_remember(message)
+        self._maybe_extract(message, result.answer, provenance)
         return TurnReport(
             answer=result.answer,
             declined=declined,
@@ -553,6 +569,22 @@ class ChatSession:
             return None
         write(fact, source="chat")  # deduped; clean provenance (the user asked for it directly)
         return fact
+
+    def _maybe_extract(self, message: str, answer: str, provenance: str) -> None:
+        """Hand the finished turn to the extractor, after the explicit "remember that…" above.
+
+        After it, so a fact the user asked for by name is already stored and the extraction reads
+        it as a duplicate rather than writing it twice. A turn whose provenance is not known to be
+        clean is passed as tainted, the reading ``read_provenance`` gives it everywhere else. The
+        extractor runs off this thread and swallows its own errors; the guard here covers the one
+        call that hands the turn over, because nothing about memory may cost the answer.
+        """
+        if self.extractor is None:
+            return
+        try:
+            self.extractor.after_turn(message, answer, tainted=provenance != CLEAN)
+        except Exception as exc:  # noqa: BLE001 — the answer is already recorded; memory is extra
+            _log.warning("memory extraction could not start: %s", exc)
 
     def _thread_tainted(self) -> bool:
         """Has untrusted content already entered this conversation?
@@ -678,6 +710,7 @@ class ChatSession:
             gate=self.gate,
             k=self.memory_k,
             project=self.project,
+            cite=self.cite_facts,
         )
 
     def _compose(self, message: str) -> str:
@@ -689,13 +722,38 @@ class ChatSession:
         parts: list[str] = []
         if self.profile:  # persistent persona preamble — cross-session personalization
             parts.append(self.profile)
-        if facts:
+        if facts and self.cite_facts:
+            # The turn context's header, which says what a quoted fact is: recall, possibly stale.
+            from chimera.prompts.context import facts_block
+
+            parts.append(facts_block(facts))
+        elif facts:
             parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
         window = recent_turns(self.turns, self.max_history)
         if window:
             parts.append(_replay(window))
         parts.append(f"User: {message}")
         return "\n\n".join(parts)
+
+
+def _recalled(item: Any, cite: bool) -> str:
+    """A recalled record as the prompt shows it: bare text, or quoted with source and date."""
+    if not cite:
+        return str(item.content)
+    from chimera.prompts.context import cited_fact
+
+    return cited_fact(
+        str(item.content),
+        source=str(getattr(item, "source", "") or ""),
+        saved=getattr(item, "created_at", None),
+    )
+
+
+def _linked(text: str) -> str:
+    """A graph-linked fact, quoted: the graph hands back text, not the record it came from."""
+    import json
+
+    return f"{json.dumps(text, ensure_ascii=False)} (source: linked by entity, date not recorded)"
 
 
 #: Sentinel for "the caller said nothing about a gate", which is not the same as "no gate".
@@ -719,6 +777,7 @@ def recall_facts(
     k: int = 3,
     search: Any = None,
     project: str | None = EVERY_PROJECT,
+    cite: bool = False,
 ) -> tuple[list[str], str | None]:
     """Long-term facts relevant to ``message``: gated keyword/semantic hits + graph-linked facts.
 
@@ -731,10 +790,19 @@ def recall_facts(
     folder open is not a project; a surface that has one passes it.
 
     ``gate`` defaults to a real :class:`MemoryGate`. Pass ``None`` to opt out explicitly.
+
+    ``cite`` (study 25 S13, behind ``CHIMERA_MEMORY_EXTRACT``) quotes each fact and names its source
+    and the date it was written (:func:`chimera.prompts.context.cited_fact`). Off, the facts are the
+    bare text they have always been. A graph-linked fact is a string with no record behind it here,
+    so it is quoted and says that its source is the entity link.
     """
     if gate is _GATE_UNSET:
         gate = MemoryGate()
     facts: list[str] = []
+    #: The stored texts behind ``facts``. With ``cite`` on, a rendered line no longer equals the text
+    #: a graph link hands back, so the dedup below compares against these instead. Off, the dedup is
+    #: the one it always was.
+    seen: set[str] = set()
     layers: list[str] = []
     if memory is not None:
         captured: dict[str, str] = {}
@@ -763,7 +831,7 @@ def recall_facts(
             # verified. Dropping the label here (taking .content raw) was a taint leak — a poisoned
             # memory could re-enter the next turn's prompt looking clean.
             facts = [
-                item.content
+                _recalled(item, cite)
                 + (
                     " [unverified: learned from untrusted content]"
                     if getattr(item, "provenance", "clean") == "tainted"
@@ -771,6 +839,7 @@ def recall_facts(
                 )
                 for item in items
             ]
+            seen.update(item.content for item in items)
             if "layer" in captured:
                 layers.append(captured["layer"])
     if graph is not None:
@@ -781,8 +850,10 @@ def recall_facts(
             # Entity-linked facts skip the keyword-similarity gate (they intentionally may not
             # overlap the query), but they must STILL pass the injection check — a graph-reachable
             # tainted memory could otherwise inject override text the gate exists to block.
-            if related not in facts and (gate is None or gate.is_clean(related)):
-                facts.append(related)
+            duplicate = related in facts or (cite and related in seen)
+            if not duplicate and (gate is None or gate.is_clean(related)):
+                facts.append(_linked(related) if cite else related)
+                seen.add(related)
                 graph_added += 1
         if graph_added:
             layers.append("graph")

@@ -214,6 +214,8 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="recalled facts, labelled as recall that the present overrides; chat sends it under "
             "CHIMERA_CHAT_REAL_HISTORY"),
     _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
+    _i("context.cited_fact", "chimera.prompts.context:cited_fact", "volatile", ("S2", "S3"),
+       note="a recalled fact quoted with its source and date; only under CHIMERA_MEMORY_EXTRACT"),
     # ---- compaction and memory -----------------------------------------------------------------
     _i("compaction.structural_note", "chimera.core.context_budget:compact", "volatile", ("S13",),
        "measured", "bench/compaction: fired 0 times in 137 real runs"),
@@ -221,6 +223,12 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("compaction.summariser", "chimera.core.summarise:SYSTEM", "call", ("S13", "S2"), "measured",
        "bench/compaction: 25/30 vs 6/30 (+63 pp, p=3.8e-6)"),
     _i("memory.consolidate", "chimera.memory.consolidate:model_summarizer", "call", ("S13",)),
+    _c("memory.extract", "chimera.memory.extract:EXTRACT_MEMORY_SYSTEM", "call",
+       ("S2", "S3", "S13"), "measured",
+       "bench/memory_extraction: 31/31 saves correct, poison 0/16, recall 33/36; the harness "
+       "refused no wrong save and cost 2 correct ones",
+       note="after a turn, off by default (CHIMERA_MEMORY_EXTRACT); the harness re-checks every "
+            "proposal against the user's own words"),
     _i("memory.persona_preamble", "chimera.memory.manager:MemoryManager.profile", "volatile",
        ("S3", "S10")),
     # ---- the tool router (off by default; #537 measured it worse) ------------------------------
