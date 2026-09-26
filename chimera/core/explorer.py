@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from chimera.core.agent import Agent, AgentConfig, enclosing_run, partial_spend
+from chimera.core.agent import Agent, AgentConfig, run_nested
 from chimera.orchestration.budget import SpendBudget
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
@@ -415,6 +415,9 @@ class ExploreRepositoryTool(Tool):
         self._explorer = ContextExplorer(
             backend, workspace, model=model, max_turns=max_turns, contract=contract
         )
+        #: What the last exploration spent. Inside a run it is on that run's bill already; this is
+        #: how a caller that ran the tool on its own reads it, having no bill to look at.
+        self.last_spend: ExplorerResult | None = None
         if self._explorer.contract:
             # Per instance, so the class attribute (today's schema) is never mutated.
             self.parameters = {
@@ -431,18 +434,9 @@ class ExploreRepositoryTool(Tool):
         if not query:
             return "error: query is required"
         level = str(kwargs.get("thoroughness") or "medium").strip().lower()
-        # The run this tool was called from, when there is one: the exploration draws on its
-        # ceiling call by call, and what it spent goes on its bill. Read before exploring, because
-        # the exploration opens a run of its own on this thread.
-        outer = enclosing_run()
-        try:
-            found = self._explorer.explore(query, level, spend=outer.spend if outer else None)
-        except Exception as exc:
-            # A run that died after paying is still paid for; the loop turns the raise into a
-            # tool error, as it did before.
-            if outer is not None:
-                outer.add_nested(partial_spend(exc))
-            raise
-        if outer is not None:
-            outer.add_nested(found)
+        # On the ceiling and the bill of the run this tool was called from, when there is one.
+        found = run_nested(
+            "the explorer", lambda spend: self._explorer.explore(query, level, spend=spend)
+        )
+        self.last_spend = found
         return found.as_context()

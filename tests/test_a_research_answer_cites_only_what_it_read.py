@@ -178,7 +178,7 @@ def test_thoroughness_sets_the_research_step_ceiling(monkeypatch: pytest.MonkeyP
             return type("R", (), {
                 "answer": "", "steps": 0, "tool_calls_made": 0, "prompt_tokens": 0,
                 "completion_tokens": 0, "cache_read_tokens": 0, "usd": 0.0,
-                "stopped_reason": "final",
+                "stopped_reason": "final", "model": "",
             })()
 
     monkeypatch.setattr(research_module, "Agent", _Agent)

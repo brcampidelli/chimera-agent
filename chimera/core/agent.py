@@ -19,7 +19,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
@@ -569,6 +569,43 @@ def enclosing_run() -> OpenRun | None:
     """The innermost :class:`Agent` run in progress on this thread, or None outside any."""
     runs: list[OpenRun] | None = getattr(_OPEN_RUNS, "runs", None)
     return runs[-1] if runs else None
+
+
+_Spent = TypeVar("_Spent", bound=NestedSpend)
+
+
+def run_nested(label: str, nested: Callable[[SpendBudget | None], _Spent]) -> _Spent:
+    """Run a tool's own run of a model on the bill of the run that called the tool.
+
+    ``nested`` is handed the enclosing run's ceiling (None outside any run) and returns what it
+    spent, which is added to that run with :meth:`OpenRun.add_nested`. One that raises after paying
+    adds its :class:`PartialSpend` and the raise goes on, for the loop to turn into a tool error as
+    it always has. Outside any run there is no bill to put it on, so what it spent is logged, and
+    the tool keeps the returned value for its caller to read.
+
+    One helper for every tool that delegates (the explorer, the sub-agent, the web researcher),
+    so none of them can charge the ceiling and forget the tally, or the other way round.
+    """
+    outer = enclosing_run()
+    try:
+        spent = nested(outer.spend if outer is not None else None)
+    except Exception as exc:
+        partial = partial_spend(exc)
+        if outer is not None:
+            outer.add_nested(partial)
+        elif partial is not None:
+            _log.info("%s failed outside any run after spending %s", label, _priced(partial))
+        raise
+    if outer is not None:
+        outer.add_nested(spent)
+    else:
+        _log.info("%s ran outside any run and spent %s", label, _priced(spent))
+    return spent
+
+
+def _priced(spent: NestedSpend) -> str:
+    price = "an unknown amount" if spent.usd is None else f"${spent.usd:.4f}"
+    return f"{price} ({spent.prompt_tokens} prompt + {spent.completion_tokens} completion tokens)"
 
 
 @dataclass

@@ -169,6 +169,18 @@ class _Boom:
         raise RuntimeError("the provider fell over")
 
 
+def test_standing_alone_the_tool_keeps_what_it_spent(tmp_path: Path) -> None:
+    """No run to bill: the tool keeps the exploration's cost for the caller that ran it."""
+    tool = ExploreRepositoryTool(_Model(["answer"]), tmp_path, max_turns=3)
+
+    out = tool.run(query="the parser")
+
+    assert out.startswith("Relevant code locations")
+    spent = tool.last_spend
+    assert spent is not None
+    assert (spent.prompt_tokens, spent.usd) == (2000, pytest.approx(EXPLORE_COST))
+
+
 def test_an_unpriced_explorer_makes_the_turns_price_unknown(tmp_path: Path) -> None:
     backend = _Model(["answer"], explore_model="test/no-price-anywhere")
 

@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from chimera.core.agent import Agent, AgentConfig
+from chimera.core.agent import Agent, AgentConfig, AgentResult, run_nested
 from chimera.providers.gateway import SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
@@ -73,6 +73,9 @@ class SubAgentTool(Tool):
         self._allowed_names = set(allowed) if allowed is not None else None
         self._model = model
         self._max_turns = max_turns
+        #: What the last delegation's run spent. Inside a run it is on that run's bill already;
+        #: this is how a caller that ran the tool on its own reads it.
+        self.last_spend: AgentResult | None = None
 
     def _current(self) -> ToolRegistry:
         return self._source() if callable(self._source) else self._source
@@ -113,6 +116,10 @@ class SubAgentTool(Tool):
                 system_prompt=SUBAGENT_SYSTEM,
             ),
         )
-        result = agent.run(task)  # transcript stays here; only the answer is returned
+        # The transcript stays here; only the answer is returned. What the run spent goes on the
+        # bill of the run that delegated, on its ceiling (`run_nested`), and is kept for a caller
+        # that ran this tool on its own.
+        result = run_nested("the sub-agent", lambda spend: agent.run(task, spend=spend))
+        self.last_spend = result
         _log.debug("subagent finished in %d step(s), %d tool call(s)", result.steps, result.tool_calls_made)
         return result.answer
