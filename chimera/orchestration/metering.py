@@ -26,7 +26,7 @@ from __future__ import annotations
 import threading
 from typing import TYPE_CHECKING, Any
 
-from chimera.orchestration.receipts import price_delegation
+from chimera.orchestration.receipts import _stages_of, price_completion, price_delegation
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -112,6 +112,13 @@ class MeteredBackend:
         # invent a number for a call that never happened.
         model = str(getattr(result, "model", "") or requested_model or "")
         usd = price_delegation(model, prompt, completion) if model else None
+        if _stages_of(result):
+            # A fused answer is labelled "fusion", which no price resolves, so every call a meter
+            # saw through the Fuse button read as unknown. Its stages carry their own models and
+            # tokens, and `SpendBudget.record_result` and the loop's tally already price by them;
+            # this is the meter catching up, all-or-nothing as ever.
+            cost = price_completion(result)
+            usd = None if cost.unpriced is not None else cost.usd
         with self._lock:
             self.calls += 1
             self.prompt_tokens += prompt

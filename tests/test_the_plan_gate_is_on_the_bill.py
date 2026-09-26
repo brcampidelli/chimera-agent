@@ -52,12 +52,14 @@ class _Gateway:
     """The turn's `LLMGateway`, built once per turn, so what it does is set on the class.
 
     The planning call is told apart by its system prompt. ``plan`` is the planner's reply and
-    ``plan_model`` who answers it; ``plan_boom`` and ``turn_boom`` make that call raise, the way
-    a provider does.
+    ``plan_model`` who answers it; ``plan_stages`` makes it answer as a fused turn does, as
+    "fusion" with its stages; ``plan_boom`` and ``turn_boom`` make a call raise, the way a
+    provider does.
     """
 
     plan = "1. read a.py\n2. edit a.py"
     plan_model = PLAN_MODEL
+    plan_stages: list[dict[str, Any]] | None = None
     plan_boom = False
     turn_boom = False
     calls: list[str] = []
@@ -72,6 +74,11 @@ class _Gateway:
             _Gateway.calls.append("plan")
             if _Gateway.plan_boom:
                 raise RuntimeError("the provider fell over")
+            if _Gateway.plan_stages is not None:
+                return CompletionResult(content=_Gateway.plan, model="fusion",
+                                        prompt_tokens=1000, completion_tokens=100,
+                                        route_meta={"kind": "fusion",
+                                                    "stages": _Gateway.plan_stages})
             return CompletionResult(content=_Gateway.plan, model=_Gateway.plan_model,
                                     prompt_tokens=1000, completion_tokens=100)
         _Gateway.calls.append("turn")
@@ -84,7 +91,7 @@ class _Gateway:
 @pytest.fixture
 def gateway(monkeypatch: pytest.MonkeyPatch) -> type[_Gateway]:
     for name, value in (("plan", "1. read a.py\n2. edit a.py"), ("plan_model", PLAN_MODEL),
-                        ("plan_boom", False), ("turn_boom", False)):
+                        ("plan_stages", None), ("plan_boom", False), ("turn_boom", False)):
         monkeypatch.setattr(_Gateway, name, value)
     monkeypatch.setattr(_Gateway, "calls", [])
     return _Gateway
@@ -186,6 +193,22 @@ def test_an_unpriced_plan_makes_the_turns_price_unknown(
     [row] = _rows(tmp_path)
     assert row.usd is None, "an unpriced call must never read as a low total"
     assert row.prompt_tokens == 11_000
+
+
+def test_a_fused_plan_is_priced_by_the_models_that_ran(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, gateway: type[_Gateway]
+) -> None:
+    """With Fuse on, the plan is asked of the fusion engine, which answers as "fusion": a label,
+    not a model. Its stages name the models that ran, and those have prices."""
+    gateway.plan_stages = [
+        {"stage": "panel", "model": PLAN_MODEL, "prompt_tokens": 600, "completion_tokens": 60},
+        {"stage": "judge", "model": PLAN_MODEL, "prompt_tokens": 400, "completion_tokens": 40},
+    ]
+
+    _turn(tmp_path, monkeypatch, approve=True)
+
+    [row] = _rows(tmp_path)
+    assert row.usd == pytest.approx(PLAN_COST + TURN_COST)
 
 
 def test_a_run_that_died_after_an_approved_plan_still_bills_the_plan(
