@@ -308,7 +308,9 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("explorer.location_receipt", "chimera.core.explorer:LocationCheck.receipt", "tool", ("S12",),
        note="the harness's words after a contract report; never the explorer's"),
     _c("research.system", "chimera.core.research:RESEARCH_SYSTEM", "situation", ("S12",),
-       "unmeasured", note="behind CHIMERA_RESEARCH_AGENT, off by default; bench/web_research"),
+       "unmeasured",
+       note="behind CHIMERA_RESEARCH_AGENT, off. bench/web_research was uninformative (the plain "
+            "loop sat at the ceiling, 66/72) and the module cost 4.9x the tokens"),
     _c("research.task", "chimera.core.research:_TASK_TEMPLATE", "turn", ("S12",), "unmeasured",
        render=_research_task, note="one rendering per thoroughness level, at the default 12 steps"),
     _i("research.tool_description", "chimera.core.research:ResearchWebTool", "tool", ("S12",)),
