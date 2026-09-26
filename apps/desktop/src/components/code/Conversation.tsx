@@ -446,6 +446,11 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {done.cache_read_tokens != null ? (
         <Badge>{t("code.chat.cache", { n: num(done.cache_read_tokens) })}</Badge>
       ) : null}
+      {/* Which instructions this turn ran under, as the trace names them. When two turns behave
+          differently, this is what says whether the prompt changed between them. */}
+      {done.system_sha && !done.external ? (
+        <Badge>{t("code.chat.prompt", { sha: done.system_sha })}</Badge>
+      ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
           Both are the receipt's half of the bargain the posture note describes. */}
       {done.auto_approved?.length ? (

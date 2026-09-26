@@ -772,6 +772,11 @@
             "title": "Success",
             "type": "boolean"
           },
+          "system_sha": {
+            "default": "",
+            "title": "System Sha",
+            "type": "string"
+          },
           "verified": {
             "title": "Verified",
             "type": "boolean"

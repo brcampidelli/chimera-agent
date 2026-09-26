@@ -1940,6 +1940,12 @@ def register_code_api(
                         # let the stored receipt learn it when the conversation is reopened
                         # (`chimera.providers.generation`; the record exists ~10 s after the call).
                         "generation_ids": result.steplog.generation_ids,
+                        # Which instructions produced this turn: the fingerprint of the system
+                        # message, read off the same step log the trace line was written from, so
+                        # the receipt and the trace cannot name two different prompts. The turn
+                        # context is not in it — it changes every turn, and a hash of it would
+                        # differ between two turns given the same instructions (study 25, wave 0).
+                        "system_sha": result.steplog.system_sha,
                         "route_meta": result.route_meta,
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.

@@ -188,3 +188,37 @@ describe("the bill", () => {
     expect(DICTS[code]["code.chat.billed"]).toContain("{usd}");
   });
 });
+
+/**
+ * Which instructions produced the turn. The trace has named them since #606; the receipt a person
+ * reads did not, so "did the prompt change between these two turns?" meant opening `traces.jsonl`.
+ * The value is drawn as given — the badge's job is to let two receipts be compared by eye.
+ */
+describe("the prompt fingerprint", () => {
+  it("names the fingerprint the turn ran under", () => {
+    renderWithProviders(
+      <TurnReceipt
+        done={{ ...BASE, system_sha: "0123456789ab" }}
+        t={(k, p) => (p?.sha ? `${k} ${p.sha}` : k)}
+      />,
+    );
+
+    expect(screen.getByText("code.chat.prompt 0123456789ab")).toBeInTheDocument();
+  });
+
+  it("stays quiet on a receipt older than the field", () => {
+    receipt({});
+
+    expect(screen.queryByText("code.chat.prompt")).not.toBeInTheDocument();
+  });
+
+  it("does not name one on an external turn — its prompt was never ours", () => {
+    receipt({ external: "claude-code", system_sha: "0123456789ab" });
+
+    expect(screen.queryByText("code.chat.prompt")).not.toBeInTheDocument();
+  });
+
+  it.each(LANGS.map((l) => l.code))("%s has the string", (code) => {
+    expect(DICTS[code]["code.chat.prompt"]).toContain("{sha}");
+  });
+});

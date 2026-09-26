@@ -127,6 +127,11 @@ class AttemptReceipt(BaseModel):
     #: is not ``unknown``: that is a classification whose detectors all declined.
     failure_class: str = ""
     failure_evidence: str = ""
+    #: Which instructions this attempt ran under: the twelve-hex fingerprint of its system message,
+    #: as the worker's step log recorded it and the trace line carries it. Empty for an attempt that
+    #: reported none, and for every receipt written before this field existed — "not recorded", not
+    #: "no prompt". Two attempts with different values were not given the same instructions.
+    system_sha: str = ""
 
 
 class RunReceipt(BaseModel):
@@ -318,6 +323,7 @@ def build_receipt(
             verified_fingerprint=str(getattr(a, "verified_fingerprint", "") or ""),
             failure_class=str(getattr(a, "failure_class", "") or ""),
             failure_evidence=str(getattr(a, "failure_evidence", "") or "")[:500],
+            system_sha=str(getattr(a, "system_sha", "") or ""),
         )
         for a in result.attempts
     ]
