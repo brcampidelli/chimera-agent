@@ -1,0 +1,9 @@
+{
+  "gold_report": "/mnt/c/Users/brcam/AppData/Local/Temp/chimera-default/bench/default_model/results/gold_h45.json",
+  "gold_report_sha256": "b70189f53a533ad1c35ca8202bc70e6c074c10c4c2a9ce5462d2b94935fc293f",
+  "candidates": 209,
+  "gold_resolved": 208,
+  "dropped": [
+    "django__django-10097"
+  ]
+}
