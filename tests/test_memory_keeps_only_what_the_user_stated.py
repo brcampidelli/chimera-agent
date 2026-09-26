@@ -40,6 +40,11 @@ class _Model:
         return _Reply(self.reply)
 
 
+#: Built rather than written out, as the other secret tests do, so the file holds nothing a secret
+#: scanner reads as a credential; `redact` still recognises the shape at run time.
+_TOKEN = "ghp_" + "B" * 36
+
+
 def _memory(tmp_path: Path) -> MemoryManager:
     return MemoryManager(MemoryStore(tmp_path / "memory.json"), clock=lambda: 1_758_000_000.0)
 
@@ -100,9 +105,8 @@ def test_an_instruction_is_refused_and_the_same_preference_as_a_fact_is_kept(
 @pytest.mark.parametrize(
     ("message", "fact", "evidence"),
     [
-        ("My GitHub token is ghp_abcdefghijklmnopqrstuvwxyz0123456789, can you list my repos?",
-         "The user's GitHub token is ghp_abcdefghijklmnopqrstuvwxyz0123456789.",
-         "My GitHub token is ghp_abcdefghijklmnopqrstuvwxyz0123456789"),
+        (f"My GitHub token is {_TOKEN}, can you list my repos?",
+         f"The user's GitHub token is {_TOKEN}.", f"My GitHub token is {_TOKEN}"),
         ("My bank PIN is 4821, remind me later", "The user's bank PIN is 4821.",
          "My bank PIN is 4821"),
         ("minha senha do wifi é abacaxi123", "A senha do wifi do usuário é abacaxi123.",
@@ -114,8 +118,23 @@ def test_a_secret_is_refused(tmp_path: Path, message: str, fact: str, evidence: 
 
     done = extract(message, "Noted.", memory=memory, backend=_Model(_add(fact, evidence)))
 
-    assert done.rejected == [("secret", fact)]
+    # Refused, and not kept in the record either: the text judged a secret is the secret.
+    assert done.rejected == [("secret", "")]
+    assert fact not in repr(done)
     assert memory.store.all() == []
+
+
+def test_a_candidate_skipped_as_a_secret_is_not_kept_in_the_record(tmp_path: Path) -> None:
+    """The bench measured the model skipping a secret by quoting it: "My bank PIN is 4821."."""
+    memory = _memory(tmp_path)
+    model = _Model({"op": "skip", "reason": "secret", "candidate": "My bank PIN is 4821."},
+                   {"op": "skip", "reason": "temporary", "candidate": "The user is at the bank."})
+
+    done = extract("My bank PIN is 4821, I'm at the bank now", "Okay.", memory=memory,
+                   backend=model)
+
+    assert done.skipped == [("secret", ""), ("temporary", "The user is at the bank.")]
+    assert "4821" not in repr(done)
 
 
 def test_a_password_manager_is_not_a_password(tmp_path: Path) -> None:

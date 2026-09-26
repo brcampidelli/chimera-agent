@@ -339,20 +339,34 @@ def extract(user_message: str, answer: str, *, memory: MemoryManager,
     reply = _ask(backend, user_message, answer, near, model)
     result.prompt_tokens = int(getattr(reply, "prompt_tokens", 0) or 0)
     result.completion_tokens = int(getattr(reply, "completion_tokens", 0) or 0)
-    result.proposed = parse_operations(str(getattr(reply, "content", "") or ""))
     own = users_own_words(user_message)
     provenance = "tainted" if tainted else "clean"
-    for op in result.proposed:
+    for op in parse_operations(str(getattr(reply, "content", "") or "")):
         if op.op == "skip":
             reason = op.reason if op.reason in SKIP_REASONS else "unspecified"
+            op = _forget_if_secret(op, reason)
+            result.proposed.append(op)
             result.skipped.append((reason, op.fact))
             continue
         why = refusal(op, own=own, answer=answer, near=near)
+        op = _forget_if_secret(op, why)
+        result.proposed.append(op)
         if why is not None:
             result.rejected.append((why, op.fact))
             continue
         _write(memory, op, near, provenance, result)
     return result
+
+
+def _forget_if_secret(op: Operation, reason: str | None) -> Operation:
+    """The operation without its text when that text was judged a secret.
+
+    A candidate skipped or refused as a secret IS the secret (measured: the model skips with "My
+    bank PIN is 4821."), and this record is what a caller may log or show on a screen.
+    """
+    if reason != "secret":
+        return op
+    return Operation(op=op.op, target=op.target, reason=op.reason)
 
 
 def _write(memory: MemoryManager, op: Operation, near: dict[str, MemoryItem],
