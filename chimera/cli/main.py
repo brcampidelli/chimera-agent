@@ -1281,7 +1281,9 @@ def _replayed_provenance(session: Any) -> list[str]:
     clean; this is the same window, read for the same reason one line further out. Read BEFORE the
     turn runs, because ``send_verbose`` appends the new exchange and would shift the window by one.
     """
-    return [turn.provenance for turn in session.turns[-session.max_history :] if turn.restored]
+    from chimera.interface.session import recent_turns
+
+    return [turn.provenance for turn in recent_turns(session.turns, session.max_history) if turn.restored]
 
 
 def _render_turn(

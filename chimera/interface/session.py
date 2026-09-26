@@ -169,6 +169,15 @@ _RESTORED = {
 }
 
 
+def recent_turns(turns: list[ChatTurn], size: int) -> list[ChatTurn]:
+    """The last ``size`` turns: the window a prompt replays.
+
+    ``turns[-size:]`` is the obvious spelling and it is wrong at 0: ``turns[-0:]`` is the whole list,
+    so a session asked to replay no history replayed all of it — every turn, growing without bound.
+    """
+    return turns[-size:] if size > 0 else []
+
+
 def _replay(turns: list[ChatTurn]) -> str:
     """Render the recent turns for the prompt, saying which of them the model did not just say.
 
@@ -503,8 +512,9 @@ class ChatSession:
             parts.append(self.profile)
         if facts:
             parts.append("Relevant facts from memory:\n" + "\n".join(f"- {f}" for f in facts))
-        if self.turns:
-            parts.append(_replay(self.turns[-self.max_history :]))
+        window = recent_turns(self.turns, self.max_history)
+        if window:
+            parts.append(_replay(window))
         parts.append(f"User: {message}")
         return "\n\n".join(parts)
 
