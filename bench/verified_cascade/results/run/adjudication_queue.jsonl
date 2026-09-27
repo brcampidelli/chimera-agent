@@ -1,0 +1,58 @@
+{"target": "NCR:pt:external-agents:7:0|d1", "question": "Como o Chimera responde aos pedidos de permissão de um agente externo?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCP:ncp:pt:external-agents:03|d1", "question": "Quais variáveis de ambiente um adaptador custom, como o do Codex, recebe do Chimera?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "ANS:en:architecture:10:0|d2", "question": "What does the flywheel call a run where the verifier passed but the workspace diff is empty, and what happens to it?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "ANS:en:architecture:10:0|d3", "question": "What does the flywheel call a run where the verifier passed but the workspace diff is empty, and what happens to it?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "NCR:en:readme:14:0|d2", "question": "In the how-it-works flow, what does Chimera do when checking its own work fails?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:readme:14:0|d3", "question": "In the how-it-works flow, what does Chimera do when checking its own work fails?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:readme:6:0|d1", "question": "How many skill cards does the curated library ship, and how many were written from the project's own incidents?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "ANS:en:security:2:0|d3", "question": "What does the cross-agent monitor catch after a parallel batch that a single-worker monitor would miss?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "NCR:pt:architecture:11:0|d2", "question": "Na autonomia de projeto, como um passo fica marcado para parar e esperar aprovação humana, e que tipo de passo costuma ser assim?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:architecture:11:0|d3", "question": "Na autonomia de projeto, como um passo fica marcado para parar e esperar aprovação humana, e que tipo de passo costuma ser assim?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "ANS:en:architecture:4:0|d3", "question": "When the agent notices a recurring task and proposes a cron for it, is that cron active right away?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "NCP:ncp:pt:readme:04|d1", "question": "Dá para apoiar o Chimera com uma doação mensal recorrente?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:en:benchmarks:4:0|d2", "question": "In SWE-bench, which tests must the patch make pass and which must stay green?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:en:security:2:0|d1", "question": "What does the cross-agent monitor catch after a parallel batch that a single-worker monitor would miss?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:security:2:0|d2", "question": "What does the cross-agent monitor catch after a parallel batch that a single-worker monitor would miss?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:readme:11:0|d2", "question": "O que é o mínimo para o Chimera já funcionar logo depois de instalar?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:usage:12:0|d2", "question": "What did skillcard-bench measure for reasoning cards on the hard short-answer suite compared with no cards?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:recipes:13:1|d1", "question": "Que extra eu instalo para renderizar os gráficos Vega-Lite como PNG ou SVG estático?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:recipes:13:1|d2", "question": "Que extra eu instalo para renderizar os gráficos Vega-Lite como PNG ou SVG estático?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:recipes:8:0|d1", "question": "For a known page template, how can I pull fields out without paying for a model call?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCP:ncp:en:external-agents:03|d1", "question": "Which environment variables are passed through to a custom adapter started with provider_command?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:usage:11:1|d2", "question": "Por que eu não deveria colocar modelos gratuitos do OpenRouter no painel de fusão?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:readme:10:1|d2", "question": "What example solve task does the quickstart suggest trying, and with which verifier?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCP:ncp:pt:external-agents:02|d2", "question": "Depois de quanto tempo sem resposta um turno de agente externo é cancelado?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "ANS:en:recipes:8:1|d1", "question": "If a long crawl gets interrupted partway through, what happens on the next run?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "NCP:ncp:pt:fusion-receipts:02|d1", "question": "Com que frequência a tabela de preços usada nos recibos é atualizada?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:en:readme:8:0|d2", "question": "How does Chimera's structured web extraction limit what a hidden instruction in a page can do?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:en:extending:2:0|d2", "question": "To add a model-backed skill, which class do I subclass and what should its run method return?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:usage:13:0|d2", "question": "Como eu ligo a compactação dos schemas de tool enviados ao modelo?", "votes": {"g1": "declined", "g2": "correct"}}
+{"target": "NCR:pt:usage:5:1|d1", "question": "O assist guarda a conversa para eu retomar depois que saio?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:usage:4:0|d2", "question": "How do I remove a saved chat thread?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:en:usage:14:0|d1", "question": "What counts as a successful verification in solve?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCP:ncp:pt:readme:01|d2", "question": "Quanto espaço em disco ocupa a instalação completa com `chimera-agent[full]`?", "votes": {"g1": "declined", "g2": "correct"}}
+{"target": "NCR:pt:readme:13:0|d1", "question": "Qual é um exemplo de comando para importar um dos skill cards curados?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:usage:29:0|d1", "question": "Como eu vejo os logs de roteamento e de quando a fusão é acionada?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:deploy:7:1|d1", "question": "Como eu gero o token que o app de desktop vai usar para falar com a instância remota?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:deploy:7:1|d2", "question": "Como eu gero o token que o app de desktop vai usar para falar com a instância remota?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:pt:usage:21:1|d1", "question": "Onde fica indexado o histórico dos turnos de código da tela Code, e com qual ferramenta o agente consulta isso?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCP:ncp:en:external-agents:02|d1", "question": "How long does Chimera wait for an external agent to finish one turn before timing it out?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCP:ncp:pt:security:03|d1", "question": "Posso rodar o `chimera memory-poison` contra a minha própria base de memória em vez do corpus embutido?", "votes": {"g1": "declined", "g2": "correct"}}
+{"target": "NCP:ncp:pt:security:03|d2", "question": "Posso rodar o `chimera memory-poison` contra a minha própria base de memória em vez do corpus embutido?", "votes": {"g1": "declined", "g2": "correct"}}
+{"target": "NCR:pt:deploy:7:0|d2", "question": "A partir de qual versão o app de desktop consegue apontar para um Chimera que eu mantenho num VPS, em vez do que ele inicia localmente?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCR:en:readme:6:0|f1", "question": "How many skill cards does the curated library ship, and how many were written from the project's own incidents?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:readme:13:1|f1", "question": "Me dá um exemplo de como instalar dois extras juntos com pip?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:benchmarks:5:0|f1", "question": "Por que 8 passos de tool-calling não bastaram na primeira execução do SWE-bench?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "NCP:ncp:pt:extending:04|f1", "question": "O Chimera consegue se conectar a um servidor MCP remoto por HTTP/SSE, ou só por stdio?", "votes": {"g1": "declined", "g2": "correct"}}
+{"target": "NCR:pt:security:1:0|f1", "question": "Como reforço o sandbox em container com gVisor?", "votes": {"g1": "wrong", "g2": "correct"}}
+{"target": "ANS:en:architecture:10:0|f1", "question": "What does the flywheel call a run where the verifier passed but the workspace diff is empty, and what happens to it?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "ANS:en:security:2:0|f1", "question": "What does the cross-agent monitor catch after a parallel batch that a single-worker monitor would miss?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "ANS:en:architecture:4:0|f1", "question": "When the agent notices a recurring task and proposes a cron for it, is that cron active right away?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "NCR:en:recipes:8:2|f1", "question": "Does Chimera depend on an external scraping service for most pages?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:en:usage:12:0|f1", "question": "What did skillcard-bench measure for reasoning cards on the hard short-answer suite compared with no cards?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "ANS:en:external-agents:2:1|f1", "question": "Does Chimera accept the ACP terminal capability when driving an external agent?", "votes": {"g1": "correct", "g2": "incomplete"}}
+{"target": "NCR:pt:recipes:13:1|f1", "question": "Que extra eu instalo para renderizar os gráficos Vega-Lite como PNG ou SVG estático?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:usage:11:1|f1", "question": "Por que eu não deveria colocar modelos gratuitos do OpenRouter no painel de fusão?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:fusion-receipts:1:0|f1", "question": "Como vejo o custo detalhado por conselheiro de uma execução de fusão?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:readme:13:0|f1", "question": "Qual é um exemplo de comando para importar um dos skill cards curados?", "votes": {"g1": "correct", "g2": "wrong"}}
+{"target": "NCR:pt:usage:23:0|f1", "question": "Como faço o quadro de tarefas virar cards a partir de tarefas que o agente repete?", "votes": {"g1": "wrong", "g2": "correct"}}

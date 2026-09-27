@@ -1,0 +1,112 @@
+{
+ "s0": {
+  "fuse_reason": {
+   "length": 400
+  },
+  "number_check": {
+   "v_gold_fired": 0,
+   "v_num": 29,
+   "v_num_fired": 29
+  },
+  "passed": true,
+  "wall_violations": []
+ },
+ "s1": {
+  "admission_stop": false,
+  "graders": {
+   "g1": {
+    "agreement": 0.9739776951672863,
+    "n": 269,
+    "passed": true,
+    "recall_wrong": 0.9629629629629629,
+    "wrong_on_gold": 0.0
+   },
+   "g2": {
+    "agreement": 1.0,
+    "n": 269,
+    "passed": true,
+    "recall_wrong": 1.0,
+    "wrong_on_gold": 0.0
+   }
+  },
+  "instrument": {
+   "jev": {
+    "accept_gold": 1.0,
+    "accept_unsupported": 0.011661807580174927,
+    "halts": 0,
+    "n_gold": 144,
+    "n_unsupported": 686,
+    "passed": true
+   },
+   "local": {
+    "accept_gold": 1.0,
+    "accept_unsupported": 0.22157434402332363,
+    "halts": 0,
+    "n_gold": 144,
+    "n_unsupported": 686,
+    "passed": true
+   }
+  },
+  "jev_replay_flips": {
+   "flips": 0,
+   "n": 100
+  },
+  "note": "",
+  "passed": true
+ },
+ "s2": {
+  "admission_stop": false,
+  "halts": 0,
+  "local_mass_ok": 1.0,
+  "mean_cost": {
+   "draft_luna": 0.00016051250000000006,
+   "draft_sol": 0.0031330999999999998,
+   "grade": 0.000930775092936803,
+   "jev": 7.49174565517243e-05
+  },
+  "mechanics_ok": true,
+  "n_main": 400,
+  "nonempty": {
+   "luna": 1.0,
+   "sol": 1.0
+  },
+  "off_pin": 0,
+  "passed": true,
+  "readable": {
+   "jev": 1.0,
+   "local": 1.0
+  },
+  "unreadable": 0
+ },
+ "s3": {
+  "W": 33,
+  "adjudicated": 18,
+  "admission_stop": false,
+  "graded": 400,
+  "passed": true,
+  "pending": 0
+ },
+ "s4": {
+  "admission_stop": false,
+  "escalations_from_d1": {
+   "jev": 42,
+   "local": 18
+  },
+  "passed": true
+ },
+ "s5": {
+  "admission_stop": false,
+  "local_replay_flips": {
+   "flips": 0,
+   "n": 100
+  },
+  "passed": true
+ },
+ "s6": {
+  "admission_stop": false,
+  "f1_coverage": 400,
+  "n": 400,
+  "passed": true,
+  "spent": 4.893
+ }
+}

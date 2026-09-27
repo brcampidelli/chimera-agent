@@ -146,7 +146,11 @@ def verdict(x: str, prim: dict[str, Any], help_: dict[str, Any], gates: dict[str
     off = sum(v["off_pin"] for v in mech["by_kind"].values())
     c4 = bool(inst.get("passed")) and halts <= 0.05 and (calls == 0 or off / calls <= 0.01)
     opt_in = c1 and c2 and c3 and c4
-    default = opt_in and ratio <= 3.0 and (help_["handoff_rate"] or 1.0) <= 0.05 and help_["correct_newcombe"][0] >= -0.05
+    # `is not None`, as c3 reads it: `or 1.0` turned the best possible rate, 0.0, into 1.0 and failed
+    # the default on it (found reading the first real report, 2026-09-27; Amendment 3).
+    rate = help_["handoff_rate"]
+    default = (opt_in and ratio <= 3.0 and rate is not None and rate <= 0.05
+               and help_["correct_newcombe"][0] >= -0.05)
     return {"fewer_wrong": c1, "cost_ok": c2, "handoffs_ok": c3, "eligible": c4, "opt_in": opt_in, "default": default}
 
 

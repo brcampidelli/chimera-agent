@@ -504,3 +504,19 @@ That session belongs to the family that wrote the items (Amendment 0). The risk 
 - No item is changed or dropped. The item set stays frozen at manifest `d1b4bba0…`.
 
 **Not changed:** arms, thresholds, metrics, gates and the adoption rule.
+
+## Amendment 3 — 2026-09-27, after the run: the report misread a hand-off rate of zero
+
+The first full report printed `default: False` for both B and D. The §8 rule as registered reads "hand-offs on answerable items ≤ 5%", but `report.verdict` wrote it as `(handoff_rate or 1.0) <= 0.05`. `or` takes 0.0 as a missing value, so the best possible rate, zero hand-offs on 141 answerable items, failed the condition.
+
+**The fix and its test:**
+- The code now reads the rate the way `c3` already did (`rate is not None and rate <= 0.05`).
+- `tests/test_the_cascade_verdict_reads_zero_handoffs_as_zero.py` covers three cases: a zero rate can make the default, a missing rate cannot, and the cost ceiling still holds B back.
+- Sabotage check: putting `or 1.0` back turns the test red.
+
+**Nothing registered changed.** The rule, the thresholds and the data are the same. Only the reading of zero was wrong.
+
+| | before the fix | after |
+|---|---|---|
+| B | opt-in, not default | opt-in, not default (cost 3.74× > 3×) |
+| D | opt-in, not default | **opt-in and default** (cost 1.87×, 0 hand-offs on answerable items, useful answers non-inferior) |
