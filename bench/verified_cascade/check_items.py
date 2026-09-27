@@ -218,8 +218,8 @@ def full() -> list[str]:
             errs.append(f"V {v['vid']}: the number check does not fire on a V-num triple")
         if v["kind"] == "gold" and fires:
             errs.append(f"V {v['vid']}: the number check fires on a V-gold triple")
-        want = {"gold": "supported", "decline": "declined"}.get(v["kind"], "unsupported")
-        if v["label"] != want:
+        want_label = {"gold": "supported", "decline": "declined"}.get(v["kind"], "unsupported")
+        if v["label"] != want_label:
             errs.append(f"V {v['vid']}: label {v['label']} for kind {v['kind']}")
         if v["kind"] == "fabricated" and it["gold"] in v["excerpt_ids"]:
             errs.append(f"V {v['vid']}: V-fabricated shows the gold chunk")

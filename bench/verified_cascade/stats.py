@@ -19,7 +19,7 @@ def mcnemar_exact(b: int, c: int) -> float:
     if n == 0:
         return 1.0
     k = min(b, c)
-    return min(1.0, 2 * sum(comb(n, i) for i in range(k + 1)) / 2**n)
+    return min(1.0, float(2 * sum(comb(n, i) for i in range(k + 1))) / float(2**n))
 
 
 def holm(pvalues: dict[str, float]) -> dict[str, float]:

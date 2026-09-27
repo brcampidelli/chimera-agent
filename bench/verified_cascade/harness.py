@@ -211,7 +211,7 @@ def is_rate_limit(message: str) -> bool:
 
 
 def run_call(log: CallLog, ledger: Ledger, key: str, kind: str, meta: dict[str, Any],
-             fn: Callable[[], dict[str, Any]], *, requeue: list[Callable[[], None]] | None = None) -> dict[str, Any]:
+             fn: Callable[[], dict[str, Any]], *, requeue: list[Callable[[], object]] | None = None) -> dict[str, Any]:
     """One logged call: skipped when done, admitted against the budget, re-run once fresh on error
     (PROTOCOL §2). A second failure is a halt; a rate-limit failure is re-queued once, apart."""
     existing = log.get(key)

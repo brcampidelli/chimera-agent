@@ -38,6 +38,7 @@ import re
 import sys
 from collections import Counter
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT = Path(__file__).resolve().parent / "results"
@@ -121,8 +122,8 @@ def chunk(body: str) -> list[str]:
     return ["\n\n".join(c) for c in chunks]
 
 
-def pool() -> tuple[list[dict], dict[str, str]]:
-    rows: list[dict] = []
+def pool() -> tuple[list[dict[str, Any]], dict[str, str]]:
+    rows: list[dict[str, Any]] = []
     sources: dict[str, str] = {}
     for lang, base in (("en", ROOT / "docs"), ("pt", ROOT / "docs" / "i18n" / "pt")):
         for doc in DOCS:
@@ -143,7 +144,7 @@ def pool() -> tuple[list[dict], dict[str, str]]:
     return rows, sources
 
 
-def tfidf(rows: list[dict]) -> list[dict[str, float]]:
+def tfidf(rows: list[dict[str, Any]]) -> list[dict[str, float]]:
     toks = [Counter(w.lower() for w in WORD.findall(r["text"]) if len(w) > 2) for r in rows]
     df = Counter(t for c in toks for t in c)
     n = len(rows)
@@ -161,7 +162,7 @@ def cos(a: dict[str, float], b: dict[str, float]) -> float:
     return sum(x * b.get(t, 0.0) for t, x in a.items())
 
 
-def eligible(row: dict) -> bool:
+def eligible(row: dict[str, Any]) -> bool:
     parity = 0 if row["lang"] == "en" else 1
     return (
         row["section"] % 2 == parity and row["words"] >= GOLD_MIN_WORDS
@@ -169,16 +170,16 @@ def eligible(row: dict) -> bool:
     )
 
 
-def build() -> dict:
+def build() -> dict[str, Any]:
     rows, sources = pool()
-    items: list[dict] = []
+    items: list[dict[str, Any]] = []
     for lang in ("en", "pt"):
         lang_rows = [r for r in rows if r["lang"] == lang]
         vecs = tfidf(lang_rows)
         index = {r["id"]: i for i, r in enumerate(lang_rows)}
         cands = sorted((r for r in lang_rows if eligible(r)), key=lambda r: sha(r["id"]))
         per_doc: Counter[str] = Counter()
-        gold: list[dict] = []
+        gold: list[dict[str, Any]] = []
         for r in cands:
             if per_doc[r["doc"]] >= MAX_GOLD_PER_DOC:
                 continue
@@ -207,7 +208,7 @@ def build() -> dict:
     return {"rows": rows, "sources": sources, "items": items}
 
 
-def write(result: dict) -> dict[str, str]:
+def write(result: dict[str, Any]) -> dict[str, str]:
     OUT.mkdir(exist_ok=True)
     files = {
         "excerpts.jsonl": "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in result["rows"]),
@@ -219,7 +220,7 @@ def write(result: dict) -> dict[str, str]:
     return {name: sha(text) for name, text in files.items()}
 
 
-def summary(result: dict, digests: dict[str, str]) -> str:
+def summary(result: dict[str, Any], digests: dict[str, str]) -> str:
     rows, items = result["rows"], result["items"]
     lines = []
     for lang in ("en", "pt"):

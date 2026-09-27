@@ -80,7 +80,7 @@ class Harness:
         self.v_by_id = {v["vid"]: v for v in self.vslice}
         self.gates_path = out / "gates.json"
         self.gates: dict[str, Any] = json.loads(self.gates_path.read_text(encoding="utf-8")) if self.gates_path.exists() else {}
-        self.requeue: list[Callable[[], None]] = []
+        self.requeue: list[Callable[[], object]] = []
 
     # -- plumbing ------------------------------------------------------------------------------
     def save_gate(self, stage: str, passed: bool, **details: Any) -> None:
@@ -406,7 +406,7 @@ def grader_gate(h: Harness, grader: str) -> dict[str, Any]:
             gold_wrong += got == "wrong"
     res = {"n": n, "agreement": agree / n if n else None, "recall_wrong": recall / n_wrong if n_wrong else None,
            "wrong_on_gold": gold_wrong / n_gold if n_gold else None}
-    res["passed"] = bool(n) and res["agreement"] >= 0.90 and (res["recall_wrong"] or 0.0) >= 0.85 and (res["wrong_on_gold"] or 0.0) <= 0.05
+    res["passed"] = bool(n) and (res["agreement"] or 0.0) >= 0.90 and (res["recall_wrong"] or 0.0) >= 0.85 and (res["wrong_on_gold"] or 0.0) <= 0.05
     return res
 
 

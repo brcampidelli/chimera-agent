@@ -74,7 +74,8 @@ class LiveBackends:
         kwargs: dict[str, Any] = {"model": model, "max_tokens": spec["max_tokens"], "extra_body": spec["extra_body"]}
         if temperature is not None:
             kwargs["temperature"] = temperature
-        result = self.gateway.complete(messages, **kwargs)
+        payload: list[Any] = list(messages)
+        result = self.gateway.complete(payload, **kwargs)
         cost = price_completion(result)
         billed = getattr(result, "usd", None)
         return {
