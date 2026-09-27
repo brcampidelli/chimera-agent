@@ -6,6 +6,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.63.0] - 2026-09-27
+### Added
+
+- **Answers grounded in your documents are checked against them, on by default.** When a message asks a question about attached documents, and the answer is written from them with no tool call in the turn, a System One verifier reads question, sources and answer.
+  - **What happens next:**
+    - If the answer is supported with confidence ≥ 0.8, it ships.
+    - Otherwise it escalates to a stronger model (`gpt-6-sol`), which is verified again.
+    - If that also fails, you get "the sources provided don't cover this" in your language, instead of an unsupported answer.
+  - **Measured** in `bench/verified_cascade` on 400 grounded questions, with `gpt-6-luna` drafting: wrong answers shipped went from **33 to 21** (Holm p = 0.002, 11 fixed and 0 broken), at **1.87×** the cost with the local verifier, and with no answerable question handed off.
+  - **Not applied** to tasks on documents (summarize, critique, translate, rewrite), to tool-using turns or to `solve`. A deterministic classifier routes tasks past the check.
+  - **Where to see it:** a badge on the answer (verified, sources don't cover it, lexical only, verifier unavailable, not checked), with the withheld text one click away, and the receipt's `grounded` block records every step.
+  - **Controls:** `CHIMERA_VERIFIED_ANSWERS`, `CHIMERA_VERIFIED_ANSWERS_THRESHOLD` and `CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL`.
+  - **In the terminal,** `chat` and `assist` gain `/attach <file>`. (#656)
+
+- **Choose the System One decision model in Settings and in the terminal.** A new "System One" card offers three backends: Local (qwen3:4b, free), Hosted judge, or OpenRouter System One.
+  - **Model list:** it comes live from OpenRouter's `output_modalities=decisions` index, with price, context and a calibrated or uncalibrated badge.
+  - **Selectable today:** `typesafe/jev-1.13` and `jaredpalmer/kev-4b`.
+  - **Refused, with the reason:** the moving alias `~typesafe/jev-latest`, and `respan/span-01*`, whose behavior-scoring contract has not been measured.
+  - **Terminal:** `chimera decisions models` and `chimera decisions use <backend> [model]`.
+  - **Fallback:** the verified-answers check uses this choice. The local verifier falls back to Jev when an OpenRouter key exists, and to the lexical check otherwise. (#653)
+
+### Benchmarks
+
+- **`bench/verified_cascade`** — pre-registered, US$ 4.89 spent.
+
+  | arm | wrong answers shipped (of 400) | result | cost |
+  |---|---:|---|---:|
+  | Decision-gated cascade, Jev verifier | 21 | significant against luna alone | 3.74× |
+  | Decision-gated cascade, local verifier | 21 | significant; tied with Jev, so the local one is preferred | 1.87× |
+  | Today's lexical gate | 22 | null | 10.8× |
+  | `gpt-6-sol` alone | 20 | null | 19.4× |
+
+  The run needed three amendments: a grader swapped after failing its gate, 42 disagreements adjudicated, and a report bug that read zero hand-offs as missing. (#654, #655)
+
 ## [0.62.3] - 2026-09-27
 ### Fixed
 
