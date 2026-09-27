@@ -1,5 +1,5 @@
 ---
-source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
+source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -656,6 +656,17 @@ bramkowy filtr leksykalny wypadł tak samo jak brak bramki.
   `qwen3:4b` przełącza się na `typesafe/jev-1.13`, gdy ustawiony jest klucz OpenRouter, a w
   przeciwnym razie na stary filtr leksykalny; backend wybrany przez ciebie nie ma zastępstwa.
   Paragon podaje weryfikator, który zadziałał, i te pominięte.
+- **Tylko pytania.** Sprawdzana jest wiadomość, która pyta o informację zawartą w dokumentach.
+  Taka, która prosi o pracę z nimi — streszczenie, krytykę, tłumaczenie, przepisanie, wyciągnięcie
+  danych, napisanie czegoś na ich podstawie, ocenę — przechodzi bez sprawdzania i bez notatki o
+  źródłach; tak samo to, czego klasyfikator nie jest pewien, i każdy język poza portugalskim i
+  angielskim (`chimera/fusion/grounded_question.py`; reguły oraz precyzja/czułość w
+  `bench/grounded_question_classifier/`). Jak często prawdziwe zadanie wciąż zostałoby odrzucone,
+  jeszcze nie zmierzono.
+- **Odmowa jest w twoim języku:** tym z tożsamości agenta, a jeśli go nie ma, w języku pytania,
+  a w ostateczności po angielsku.
+- **Zmierzone z `gpt-6-luna` piszącym szkic.** Inny model też jest sprawdzany, ale jego wynik nie
+  był mierzony; paragon podaje autora szkicu.
 - **Gdzie nie działa.** Tura, która użyła toola (router przed pętlą agenta pogorszył wszystkich
   wykonawców w benchu B4), edycja kodu i `solve`, fakty przywołane z pamięci (przychodzą w każdej
   turze, niezależnie od tego, czy pytanie ich dotyczy) oraz dokumenty dłuższe niż największy zestaw,

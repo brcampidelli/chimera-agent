@@ -977,6 +977,9 @@ class Settings(BaseSettings):
     # shipped 25 wrong, at 0.8 21, at 0.9 21. Tool-using steps are never gated — bench B4 measured a
     # router making every executor worse. With the local backend and no Ollama, the verifier falls
     # back to Jev when an OpenRouter key is set, else to the lexical gate, and the receipt says which.
+    # Only QUESTIONS about the sources are checked (`chimera/fusion/grounded_question.py`): a task done
+    # with them (summarize, translate, judge) passes straight through. Measured with gpt-6-luna
+    # drafting; another drafter is checked the same way and its result is unmeasured.
     verified_answers: bool = Field(default=True, validation_alias="CHIMERA_VERIFIED_ANSWERS")
     verified_answers_threshold: float = Field(
         default=0.8, ge=0.0, le=1.0, validation_alias="CHIMERA_VERIFIED_ANSWERS_THRESHOLD"

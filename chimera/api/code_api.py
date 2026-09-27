@@ -1566,18 +1566,19 @@ def register_code_api(
         # A turn with attached documents is checked against them when it answers without a tool
         # (`chimera/fusion/verified.py`, study 26). Not an external agent's turn: its loop is not
         # ours, and whether it called a tool is not something this side can see.
-        from chimera.fusion.verified import GROUNDED_NOTE, GroundedTurn
+        from chimera.fusion.verified import GroundedTurn, grounded_note
 
         grounded_turn = (
             GroundedTurn.make(doc_texts, req.message, ["attachments"])
             if doc_texts and live().verified_answers and not (req.provider or "").strip()
             else None
         )
-        if grounded_turn is not None:
-            # The measured drafter was told this rule; the model is told the rule it is checked by,
-            # so a question the documents do not cover is answered "they do not cover it" by the
-            # model itself rather than declined after the fact.
-            note = (note + "\n\n" if note else "") + GROUNDED_NOTE
+        # The measured drafter was told this rule; the model is told the rule it is checked by, so a
+        # question the documents do not cover is answered "they do not cover it" by the model itself
+        # rather than declined after the fact. Only for a QUESTION: a task (summarize, translate…)
+        # passes straight through, with no check and no note.
+        if grounded_note(grounded_turn):
+            note = (note + "\n\n" if note else "") + grounded_note(grounded_turn)
 
         def _check_grounded(turn: GroundedTurn | None, result: Any) -> tuple[str, dict[str, Any] | None, float]:
             """The finished turn's answer, checked against its documents when it is the measured
@@ -1591,7 +1592,7 @@ def register_code_api(
 
             return check_answer(
                 build, turn, str(result.answer or ""), tool_names=list(result.tool_names),
-                stopped_reason=str(result.stopped_reason or ""),
+                stopped_reason=str(result.stopped_reason or ""), drafter_model=str(result.model or ""),
             )
 
         # Background jobs that ended since a turn last looked. Handed to the model here — true for

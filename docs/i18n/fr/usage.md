@@ -1,5 +1,5 @@
 ---
-source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
+source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
 ---
 
 # Chimera — Guide d'utilisation
@@ -676,6 +676,17 @@ local ; l'ancien gate lexical faisait jeu égal avec l'absence de gate.
   sans `qwen3:4b`, il se replie sur `typesafe/jev-1.13` si une clé OpenRouter est définie, sinon sur
   l'ancien gate lexical ; un backend que vous avez choisi vous-même n'a pas de repli. Le reçu nomme le
   vérificateur qui a tourné et ceux qui ont été sautés.
+- **Seulement les questions.** Un message qui demande une information contenue dans les documents
+  est vérifié. Un message qui demande un travail sur eux — résumer, critiquer, traduire, réécrire,
+  extraire, écrire à partir de lui, le juger — passe directement, sans vérification et sans la note
+  d'ancrage ; de même pour ce dont le classifieur n'est pas sûr et pour toute langue autre que le
+  portugais et l'anglais (`chimera/fusion/grounded_question.py` ; règles et précision/rappel dans
+  `bench/grounded_question_classifier/`). La fréquence à laquelle une vraie tâche serait encore
+  refusée n'est pas encore mesurée.
+- **Le refus parle votre langue :** celle de l'identité de l'agent, sinon celle de la question,
+  sinon l'anglais.
+- **Mesuré avec `gpt-6-luna` comme rédacteur.** Un autre modèle est aussi vérifié, mais son résultat
+  n'est pas mesuré ; le reçu nomme le rédacteur.
 - **Où cela ne s'applique pas.** Un tour qui a utilisé un outil (un routeur devant la boucle de
   l'agent a dégradé tous les exécutants dans le bench B4), l'édition de code et `solve`, les faits
   rappelés de la mémoire (ils arrivent à chaque tour, que la question les concerne ou non) et les

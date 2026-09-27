@@ -1,5 +1,5 @@
 ---
-source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
+source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
 ---
 
 # Chimera — Guida all'uso
@@ -672,6 +672,17 @@ locale; il vecchio gate lessicale valeva quanto nessun gate.
   o senza `qwen3:4b`, ripiega su `typesafe/jev-1.13` se è impostata una chiave OpenRouter, altrimenti
   sul vecchio gate lessicale; un backend scelto da te non ha ripiego. La ricevuta nomina il
   verificatore che ha girato e quelli saltati.
+- **Solo domande.** Un messaggio che chiede un'informazione contenuta nei documenti viene
+  verificato. Uno che chiede un lavoro su di essi — riassumere, criticare, tradurre, riscrivere,
+  estrarre, scrivere a partire da esso, valutarlo — passa direttamente, senza verifica e senza la
+  nota di ancoraggio; lo stesso vale per ciò di cui il classificatore non è sicuro e per ogni lingua
+  che non sia portoghese o inglese (`chimera/fusion/grounded_question.py`; regole e
+  precisione/richiamo in `bench/grounded_question_classifier/`). Quanto spesso un vero compito
+  verrebbe ancora rifiutato non è ancora misurato.
+- **Il rifiuto parla la tua lingua:** quella dell'identità dell'agente, altrimenti quella della
+  domanda, altrimenti l'inglese.
+- **Misurato con `gpt-6-luna` come redattore.** Anche un altro modello viene verificato, ma il suo
+  risultato non è misurato; la ricevuta nomina il redattore.
 - **Dove non si applica.** Un turno che ha usato una tool (un router davanti al loop dell'agente ha
   peggiorato tutti gli esecutori nel bench B4), la modifica del codice e `solve`, i fatti richiamati
   dalla memoria (arrivano a ogni turno, che la domanda li riguardi o no) e documenti più lunghi del

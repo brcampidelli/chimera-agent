@@ -581,10 +581,11 @@ class ChatSession:
         turn_message = f"{message}\n\n{blocks}"
         if self.grounded_answers is None:
             return None, turn_message, ""
-        from chimera.fusion.verified import GROUNDED_NOTE, GroundedTurn
+        from chimera.fusion.verified import GroundedTurn, grounded_note
 
         turn = GroundedTurn.make([text for _, text in texts], message, ["attachments"])
-        return turn, turn_message, (GROUNDED_NOTE if turn is not None else "")
+        # The note only for a question the check will read; a task passes straight through.
+        return turn, turn_message, grounded_note(turn)
 
     def _check_grounded(self, turn: Any, result: AgentResult) -> tuple[str, dict[str, Any] | None, float]:
         """The answer to ship, the receipt block and the extra spend (see ``check_answer``)."""
@@ -594,7 +595,7 @@ class ChatSession:
 
         return check_answer(
             self.grounded_answers, turn, result.answer, tool_names=list(result.tool_names),
-            stopped_reason=result.stopped_reason,
+            stopped_reason=result.stopped_reason, drafter_model=result.model,
         )
 
     def _maybe_remember(self, message: str) -> str | None:

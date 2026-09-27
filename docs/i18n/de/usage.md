@@ -1,5 +1,5 @@
 ---
-source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
+source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -738,6 +738,17 @@ lokalen Prüfer; das alte lexikalische Gate war so gut wie gar keins.
   ohne `qwen3:4b` weicht es auf `typesafe/jev-1.13` aus, wenn ein OpenRouter-Schlüssel gesetzt ist,
   sonst auf das alte lexikalische Gate; ein selbst gewähltes Backend hat keinen Ausweichweg. Der
   Beleg nennt den Prüfer, der lief, und jeden übersprungenen.
+- **Nur Fragen.** Eine Nachricht, die nach Information in den Dokumenten fragt, wird geprüft. Eine,
+  die Arbeit damit verlangt — zusammenfassen, kritisieren, übersetzen, umschreiben, extrahieren,
+  daraus schreiben, es beurteilen —, geht direkt durch, ungeprüft und ohne den Verankerungshinweis;
+  ebenso alles, worüber der Klassifikator unsicher ist, und jede Sprache außer Portugiesisch und
+  Englisch (`chimera/fusion/grounded_question.py`; Regeln und Precision/Recall in
+  `bench/grounded_question_classifier/`). Wie oft eine echte Aufgabe dennoch abgelehnt würde, ist
+  noch nicht gemessen.
+- **Die Ablehnung spricht Ihre Sprache:** die in der Identität des Agenten, sonst die der Frage,
+  sonst Englisch.
+- **Gemessen mit `gpt-6-luna` als Verfasser.** Ein anderes Modell wird ebenfalls geprüft, sein
+  Ergebnis ist aber nicht gemessen; der Beleg nennt den Verfasser.
 - **Wo es nicht gilt.** Ein Durchgang, der ein Tool benutzt hat (ein Router vor der Agentenschleife
   machte in Bench B4 jeden Ausführer schlechter), Code-Änderungen und `solve`, abgerufene
   Gedächtnisfakten (sie kommen in jedem Durchgang, ob die Frage sie betrifft oder nicht) und

@@ -209,6 +209,9 @@ describe("Settings — the System One card", () => {
     expect(toggle).toHaveAttribute("aria-checked", "true"); // a server without the field is on the default
     expect(region).toHaveTextContent("a third fewer wrong answers (33 → 21, none made worse)");
     expect(region).toHaveTextContent("about 1.9× the cost with the local verifier");
+    expect(region).toHaveTextContent("with gpt-6-luna drafting");
+    expect(region).toHaveTextContent("Other drafting models are unmeasured.");
+    expect(region).toHaveTextContent("tasks (summarize, translate, rewrite…) pass straight through");
     expect(region).toHaveTextContent(
       "If the local model isn't running: Jev (typesafe/jev-1.13) when an OpenRouter key is set, otherwise the old lexical check.",
     );

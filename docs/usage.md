@@ -627,6 +627,16 @@ no gate at all.
   no `qwen3:4b`, it falls back to `typesafe/jev-1.13` when an OpenRouter key is set, else to the old
   lexical check; a backend you chose yourself has no fallback. The receipt names the verifier that
   ran and any it skipped.
+- **Only questions.** A message that asks for information in the documents is checked. One that
+  asks for work with them — summarize, critique, translate, rewrite, extract, write from it, judge
+  it — passes straight through, unchecked and without the grounding note; so does anything the
+  classifier is unsure of, and any language but Portuguese and English (`chimera/fusion/grounded_question.py`,
+  rules and precision/recall in `bench/grounded_question_classifier/`). How often a real task would
+  still be declined is not measured yet.
+- **The decline speaks your language:** the one set in your agent's identity, else the question's,
+  else English.
+- **Measured with `gpt-6-luna` drafting.** Another model still gets the check, but its result is
+  unmeasured; the receipt names the drafter.
 - **Where it does not apply.** A turn that used a tool (a router in front of the agent loop made
   every executor worse in bench B4), code edits and `solve`, recalled memory facts (they arrive on
   every turn whether the question is about them or not), and documents longer than the largest set

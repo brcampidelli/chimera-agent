@@ -1,0 +1,120 @@
+{"id": "en-q-01", "lang": "en", "label": "question", "text": "What does the document say about pricing?"}
+{"id": "en-q-02", "lang": "en", "label": "question", "text": "How many workers does the pool run by default?"}
+{"id": "en-q-03", "lang": "en", "label": "question", "text": "Which flag turns the sandbox off?"}
+{"id": "en-q-04", "lang": "en", "label": "question", "text": "When does the contract expire?"}
+{"id": "en-q-05", "lang": "en", "label": "question", "text": "Who signed the agreement on behalf of the supplier?"}
+{"id": "en-q-06", "lang": "en", "label": "question", "text": "Is there a limit on the number of refunds per month?"}
+{"id": "en-q-07", "lang": "en", "label": "question", "text": "Does the policy cover remote employees?"}
+{"id": "en-q-08", "lang": "en", "label": "question", "text": "Where is the config file stored"}
+{"id": "en-q-09", "lang": "en", "label": "question", "text": "why does the release get blocked when the tests are skipped?"}
+{"id": "en-q-10", "lang": "en", "label": "question", "text": "Can you tell me what the doc says about the retention period?"}
+{"id": "en-q-11", "lang": "en", "label": "question", "text": "Could you tell me who the point of contact is?"}
+{"id": "en-q-12", "lang": "en", "label": "question", "text": "Tell me the default timeout."}
+{"id": "en-q-13", "lang": "en", "label": "question", "text": "what's the minimum Python version?"}
+{"id": "en-q-14", "lang": "en", "label": "question", "text": "According to the attached file, what is the penalty for late delivery?"}
+{"id": "en-q-15", "lang": "en", "label": "question", "text": "Is the API key sent in a header or in the query string?"}
+{"id": "en-q-16", "lang": "en", "label": "question", "text": "How do I enable semantic memory?"}
+{"id": "en-q-17", "lang": "en", "label": "question", "text": "Are weekends included in the SLA?"}
+{"id": "en-q-18", "lang": "en", "label": "question", "text": "Do the attached notes mention the Berlin office?"}
+{"id": "en-q-19", "lang": "en", "label": "question", "text": "I want to know what the report says about Q3 revenue."}
+{"id": "en-q-20", "lang": "en", "label": "question", "text": "Quick question: how long is the trial?"}
+{"id": "en-q-21", "lang": "en", "label": "question", "text": "What port does the server listen on by default?"}
+{"id": "en-q-22", "lang": "en", "label": "question", "text": "Which regions are supported?"}
+{"id": "en-q-23", "lang": "en", "label": "question", "text": "Does it say anything about data deletion?"}
+{"id": "en-q-24", "lang": "en", "label": "question", "text": "What happens if the payment fails twice?"}
+{"id": "en-q-25", "lang": "en", "label": "question", "text": "How much does the premium plan cost per month?"}
+{"id": "en-q-26", "lang": "en", "label": "question", "text": "Find the section that defines 'business day' and tell me what it says."}
+{"id": "en-q-27", "lang": "en", "label": "question", "text": "What is the maximum file size for an upload?"}
+{"id": "en-q-28", "lang": "en", "label": "question", "text": "who is responsible for backups according to this runbook?"}
+{"id": "en-q-29", "lang": "en", "label": "question", "text": "Is two-factor authentication mandatory?"}
+{"id": "en-q-30", "lang": "en", "label": "question", "text": "What does section 4.2 require from vendors?"}
+{"id": "en-t-01", "lang": "en", "label": "task", "text": "Summarize this document."}
+{"id": "en-t-02", "lang": "en", "label": "task", "text": "Please translate the attached file into Spanish."}
+{"id": "en-t-03", "lang": "en", "label": "task", "text": "Critique the argument in section 2."}
+{"id": "en-t-04", "lang": "en", "label": "task", "text": "Rewrite the intro so it is friendlier."}
+{"id": "en-t-05", "lang": "en", "label": "task", "text": "Improve the wording of this README."}
+{"id": "en-t-06", "lang": "en", "label": "task", "text": "Extract all the dates into a table."}
+{"id": "en-t-07", "lang": "en", "label": "task", "text": "Write a tweet announcing this release based on the notes."}
+{"id": "en-t-08", "lang": "en", "label": "task", "text": "Can you summarize it in three bullet points?"}
+{"id": "en-t-09", "lang": "en", "label": "task", "text": "Could you proofread this?"}
+{"id": "en-t-10", "lang": "en", "label": "task", "text": "What does it say about pricing? Also summarize it."}
+{"id": "en-t-11", "lang": "en", "label": "task", "text": "Explain section 3."}
+{"id": "en-t-12", "lang": "en", "label": "task", "text": "Turn these meeting notes into a list of action items."}
+{"id": "en-t-13", "lang": "en", "label": "task", "text": "Convert the table to CSV."}
+{"id": "en-t-14", "lang": "en", "label": "task", "text": "Draft an email to the client using the points in this doc."}
+{"id": "en-t-15", "lang": "en", "label": "task", "text": "Is this well written?"}
+{"id": "en-t-16", "lang": "en", "label": "task", "text": "What do you think of this proposal?"}
+{"id": "en-t-17", "lang": "en", "label": "task", "text": "Are there any mistakes in this contract?"}
+{"id": "en-t-18", "lang": "en", "label": "task", "text": "Make it shorter."}
+{"id": "en-t-19", "lang": "en", "label": "task", "text": "Fix the typos."}
+{"id": "en-t-20", "lang": "en", "label": "task", "text": "Compare this proposal with our current plan and recommend one."}
+{"id": "en-t-21", "lang": "en", "label": "task", "text": "Here is the spec, implement the parser."}
+{"id": "en-t-22", "lang": "en", "label": "task", "text": "Review this PR description"}
+{"id": "en-t-23", "lang": "en", "label": "task", "text": "How can I improve this essay?"}
+{"id": "en-t-24", "lang": "en", "label": "task", "text": "Give me a one-paragraph summary."}
+{"id": "en-t-25", "lang": "en", "label": "task", "text": "Generate test cases from this spec."}
+{"id": "en-t-26", "lang": "en", "label": "task", "text": "Could you simplify the language for a 10-year-old?"}
+{"id": "en-t-27", "lang": "en", "label": "task", "text": "Outline a presentation from this report."}
+{"id": "en-t-28", "lang": "en", "label": "task", "text": "Analyze the risks in this plan."}
+{"id": "en-t-29", "lang": "en", "label": "task", "text": "Paraphrase the second paragraph."}
+{"id": "en-t-30", "lang": "en", "label": "task", "text": "Should we sign this?"}
+{"id": "pt-q-01", "lang": "pt", "label": "question", "text": "O que o documento diz sobre preços?"}
+{"id": "pt-q-02", "lang": "pt", "label": "question", "text": "Quantos workers o pool roda por padrão?"}
+{"id": "pt-q-03", "lang": "pt", "label": "question", "text": "Qual flag desliga o sandbox?"}
+{"id": "pt-q-04", "lang": "pt", "label": "question", "text": "Quando vence o contrato?"}
+{"id": "pt-q-05", "lang": "pt", "label": "question", "text": "Quem assinou o acordo pelo fornecedor?"}
+{"id": "pt-q-06", "lang": "pt", "label": "question", "text": "Existe limite de reembolsos por mês?"}
+{"id": "pt-q-07", "lang": "pt", "label": "question", "text": "A política cobre funcionários remotos?"}
+{"id": "pt-q-08", "lang": "pt", "label": "question", "text": "onde fica o arquivo de configuração"}
+{"id": "pt-q-09", "lang": "pt", "label": "question", "text": "Por que o release é bloqueado quando os testes são pulados?"}
+{"id": "pt-q-10", "lang": "pt", "label": "question", "text": "Você pode me dizer o que o doc fala de retenção de dados?"}
+{"id": "pt-q-11", "lang": "pt", "label": "question", "text": "Poderia me dizer quem é o responsável pelo contato?"}
+{"id": "pt-q-12", "lang": "pt", "label": "question", "text": "Me diga o timeout padrão."}
+{"id": "pt-q-13", "lang": "pt", "label": "question", "text": "qual a versão mínima do Python?"}
+{"id": "pt-q-14", "lang": "pt", "label": "question", "text": "Segundo o arquivo anexado, qual é a multa por atraso na entrega?"}
+{"id": "pt-q-15", "lang": "pt", "label": "question", "text": "A chave da API vai no header ou na query string?"}
+{"id": "pt-q-16", "lang": "pt", "label": "question", "text": "Como eu ligo a memória semântica?"}
+{"id": "pt-q-17", "lang": "pt", "label": "question", "text": "Fins de semana entram no SLA?"}
+{"id": "pt-q-18", "lang": "pt", "label": "question", "text": "As notas anexadas mencionam o escritório de Berlim?"}
+{"id": "pt-q-19", "lang": "pt", "label": "question", "text": "Quero saber o que o relatório diz sobre a receita do terceiro trimestre."}
+{"id": "pt-q-20", "lang": "pt", "label": "question", "text": "Pergunta rápida: quanto tempo dura o teste grátis?"}
+{"id": "pt-q-21", "lang": "pt", "label": "question", "text": "Em qual porta o servidor escuta por padrão?"}
+{"id": "pt-q-22", "lang": "pt", "label": "question", "text": "Quais regiões são suportadas?"}
+{"id": "pt-q-23", "lang": "pt", "label": "question", "text": "Ele fala alguma coisa sobre exclusão de dados?"}
+{"id": "pt-q-24", "lang": "pt", "label": "question", "text": "O que acontece se o pagamento falhar duas vezes?"}
+{"id": "pt-q-25", "lang": "pt", "label": "question", "text": "Quanto custa o plano premium por mês?"}
+{"id": "pt-q-26", "lang": "pt", "label": "question", "text": "Encontre a seção que define 'dia útil' e me diga o que ela fala."}
+{"id": "pt-q-27", "lang": "pt", "label": "question", "text": "Qual o tamanho máximo de arquivo para upload?"}
+{"id": "pt-q-28", "lang": "pt", "label": "question", "text": "quem é responsável pelos backups segundo esse runbook?"}
+{"id": "pt-q-29", "lang": "pt", "label": "question", "text": "A autenticação em dois fatores é obrigatória?"}
+{"id": "pt-q-30", "lang": "pt", "label": "question", "text": "O que a seção 4.2 exige dos fornecedores?"}
+{"id": "pt-t-01", "lang": "pt", "label": "task", "text": "Resuma este documento."}
+{"id": "pt-t-02", "lang": "pt", "label": "task", "text": "Por favor, traduza o arquivo anexado para o inglês."}
+{"id": "pt-t-03", "lang": "pt", "label": "task", "text": "Critique o argumento da seção 2."}
+{"id": "pt-t-04", "lang": "pt", "label": "task", "text": "Reescreva a introdução de um jeito mais amigável."}
+{"id": "pt-t-05", "lang": "pt", "label": "task", "text": "Melhore o texto deste README."}
+{"id": "pt-t-06", "lang": "pt", "label": "task", "text": "Extraia todas as datas para uma tabela."}
+{"id": "pt-t-07", "lang": "pt", "label": "task", "text": "Escreva um post anunciando esta versão com base nas notas."}
+{"id": "pt-t-08", "lang": "pt", "label": "task", "text": "Você pode resumir em três tópicos?"}
+{"id": "pt-t-09", "lang": "pt", "label": "task", "text": "Poderia revisar este texto?"}
+{"id": "pt-t-10", "lang": "pt", "label": "task", "text": "Resuma e me diga se há erros."}
+{"id": "pt-t-11", "lang": "pt", "label": "task", "text": "Explique a seção 3."}
+{"id": "pt-t-12", "lang": "pt", "label": "task", "text": "Transforme essas notas de reunião em uma lista de tarefas."}
+{"id": "pt-t-13", "lang": "pt", "label": "task", "text": "Converta a tabela para CSV."}
+{"id": "pt-t-14", "lang": "pt", "label": "task", "text": "Redija um e-mail para o cliente usando os pontos deste doc."}
+{"id": "pt-t-15", "lang": "pt", "label": "task", "text": "Está bem escrito?"}
+{"id": "pt-t-16", "lang": "pt", "label": "task", "text": "O que você acha dessa proposta?"}
+{"id": "pt-t-17", "lang": "pt", "label": "task", "text": "Tem algum erro neste contrato?"}
+{"id": "pt-t-18", "lang": "pt", "label": "task", "text": "Deixe mais curto."}
+{"id": "pt-t-19", "lang": "pt", "label": "task", "text": "Corrija os erros de digitação."}
+{"id": "pt-t-20", "lang": "pt", "label": "task", "text": "Compare esta proposta com o nosso plano atual e recomende uma."}
+{"id": "pt-t-21", "lang": "pt", "label": "task", "text": "Aqui está a especificação, implemente o parser."}
+{"id": "pt-t-22", "lang": "pt", "label": "task", "text": "Revise a descrição deste PR"}
+{"id": "pt-t-23", "lang": "pt", "label": "task", "text": "Como posso melhorar esta redação?"}
+{"id": "pt-t-24", "lang": "pt", "label": "task", "text": "Me dá um resumo em um parágrafo."}
+{"id": "pt-t-25", "lang": "pt", "label": "task", "text": "Gere casos de teste a partir desta especificação."}
+{"id": "pt-t-26", "lang": "pt", "label": "task", "text": "Consegue simplificar a linguagem para uma criança de 10 anos?"}
+{"id": "pt-t-27", "lang": "pt", "label": "task", "text": "Monte o roteiro de uma apresentação a partir deste relatório."}
+{"id": "pt-t-28", "lang": "pt", "label": "task", "text": "Analise os riscos deste plano."}
+{"id": "pt-t-29", "lang": "pt", "label": "task", "text": "Parafraseie o segundo parágrafo."}
+{"id": "pt-t-30", "lang": "pt", "label": "task", "text": "Devemos assinar isso?"}

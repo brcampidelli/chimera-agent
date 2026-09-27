@@ -1185,7 +1185,8 @@ export interface CodeTurnDone {
  *  withheld text a declined answer keeps. */
 export interface GroundedCheck {
   outcome: "supported" | "escalated" | "declined" | "unverified" | "lexical" | "not_applied";
-  /** Only on `not_applied`: `tool_calls` | `not_final` | `sources_too_long`. */
+  /** Only on `not_applied`: `task` (the message asks for work, not information) | `tool_calls` |
+   *  `not_final` | `sources_too_long`. */
   reason?: string;
   verifier?: {
     backend?: string;
@@ -1205,6 +1206,11 @@ export interface GroundedCheck {
   usd_extra?: number;
   /** Answers read as unsupported and not shipped, kept so the person can still read them. */
   withheld?: string[];
+  /** The model that drafted the answer. Study 26 measured gpt-6-luna; any other is unmeasured. */
+  drafter_model?: string | null;
+  drafter_measured?: boolean;
+  /** The locale the shipped decline was written in (the owner's language, else the question's). */
+  decline_language?: string;
 }
 
 /** The verdict on what a turn WROTE, emitted only when the turn edited something.

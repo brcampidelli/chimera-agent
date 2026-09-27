@@ -1,0 +1,24 @@
+slice  class       n precision  recall
+all    question   40     0.805   0.825
+all    task       40     0.821   0.800
+pt     question   20     0.800   0.800
+pt     task       20     0.800   0.800
+en     question   20     0.810   0.850
+en     task       20     0.842   0.800
+
+15 misread of 80:
+  h-pt-q-02 label=question read=task     preciso do valor da multa
+  h-pt-q-04 label=question read=task     quando vence a fatura
+  h-pt-q-15 label=question read=task     Consta no aditivo alguma data de reajuste
+  h-pt-q-19 label=question read=task     me lembra qual a porta padrão do servidor, que eu não achei no README
+  h-pt-t-05 label=task     read=question Esse contrato é bom pra mim?
+  h-pt-t-16 label=task     read=question O que eu deveria negociar nesse contrato de aluguel?
+  h-pt-t-17 label=task     read=question Você poderia melhorar a introdução do paper?
+  h-pt-t-19 label=task     read=question Quais são os riscos desse contrato pra mim como locatário?
+  h-en-q-02 label=question read=task     gimme the deadline
+  h-en-q-04 label=question read=task     invoice total?
+  h-en-q-15 label=question read=task     Due date on this invoice pls
+  h-en-t-02 label=task     read=question any chance you could shorten this?
+  h-en-t-04 label=task     read=question Is this a good deal?
+  h-en-t-18 label=task     read=question Does this clause seem fair to you?
+  h-en-t-20 label=task     read=question What are the weak points in the methodology?

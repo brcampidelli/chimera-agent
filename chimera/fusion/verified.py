@@ -13,7 +13,12 @@ outcome **ships the decline** ("the sources provided don't cover this"), 16 hand
 sources the product handed the model (attached documents, recalled memory facts, retrieved chunks),
 drafted in a step that made **no tool call**. The sources travel to the verifier as the state's
 ``excerpts``, exactly as the bench sent them: **no sources, no gate** (:meth:`GroundedTurn.make`
-returns ``None``). A tool-using step is never gated: `bench/tool_router` (B4) measured a router in
+returns ``None``). And only a QUESTION for information the sources should hold: a message asking
+for work with them — summarize, critique, translate, judge — passes straight through, unchecked and
+without the grounding note (`chimera/fusion/grounded_question.py`; unsure reads as a task, because a
+false decline on legitimate work is the worse error). The bench's drafter was ``gpt-6-luna``; the
+product checks the user's chosen model the same way, and the receipt names it (``drafter_model``)
+because any other drafter's result is unmeasured. A tool-using step is never gated: `bench/tool_router` (B4) measured a router in
 front of the agent loop making every executor worse, and nothing in study 26 speaks for tool turns.
 
 **The policy, step for step as `bench/verified_cascade/harness.py::verified` replays it:**
@@ -55,11 +60,14 @@ _log = get_logger("fusion.verified")
 DECISION = "verified_answers.grounded_answer"
 #: The registered threshold (§4.1), applied to the raw number: no map exists for this decision.
 DEFAULT_THRESHOLD = 0.8
+#: The model the bench drafted with (§4.1, "luna", the default model): the result is for this drafter.
+MEASURED_DRAFTER = "openrouter/openai/gpt-6-luna"
 #: The model the bench escalated to (§4.1, arm B/D's frontier rung).
 MEASURED_ESCALATION_MODEL = "openrouter/openai/gpt-6-sol"
 #: The verifier the local backend falls back to when the owner has a key and no local model runs.
 FALLBACK_SYSTEM_ONE = "typesafe/jev-1.13"
-#: Shipped when the sources do not cover the question and no drafted decline is available to ship.
+#: Shipped when the sources do not cover the question and no drafted decline is available to ship —
+#: the English row; a surface ships it in the owner's language (`chimera/fusion/decline_language.py`).
 DECLINE_TEXT = "The sources provided don't cover this."
 #: How long a failed/successful local probe is trusted, so a stopped Ollama costs one probe, not one
 #: per turn, and a restarted one is noticed within the minute.
@@ -246,6 +254,7 @@ class VerifiedAnswer:
 #: Why a turn with sources was not gated, in words for the terminal (the desktop has its own copy
 #: in ten languages, keyed on the same reason words).
 NOT_APPLIED_REASONS = {
+    "task": "the message asks for work with the documents, not for information in them",
     "tool_calls": "the turn used tools, and the check was measured only on answers written without them",
     "not_final": "the turn stopped before a final answer",
     "sources_too_long": "the documents are longer than anything the check was measured on",
@@ -300,8 +309,11 @@ class GroundedVerifier:
             return slot, read, skipped
         return None, None, skipped
 
-    def verify(self, turn: GroundedTurn, draft: str, *, escalate: Escalate | None) -> VerifiedAnswer:
+    def verify(
+        self, turn: GroundedTurn, draft: str, *, escalate: Escalate | None, decline: str = DECLINE_TEXT,
+    ) -> VerifiedAnswer:
         t0 = time.perf_counter()
+        self._decline_text = decline
         slot, first, skipped = self._first_read(turn, draft)
         if slot is None or first is None:  # unreachable: the chain is non-empty and its last slot answers
             raise RuntimeError("the verifier chain produced no reading")
@@ -363,10 +375,9 @@ class GroundedVerifier:
             result.withheld.append(redraft.text)
         return self._decline(result)
 
-    @staticmethod
-    def _decline(result: VerifiedAnswer) -> VerifiedAnswer:
+    def _decline(self, result: VerifiedAnswer) -> VerifiedAnswer:
         if result.text in result.withheld:
-            result.text = DECLINE_TEXT
+            result.text = getattr(self, "_decline_text", DECLINE_TEXT)
         result.outcome, result.decline_shipped = "declined", True
         return result
 
@@ -505,6 +516,19 @@ GROUNDED_NOTE = (
 )
 
 
+def asks_the_sources(turn: GroundedTurn) -> bool:
+    """Whether the turn's message is a question for information the sources should hold: the only
+    shape the gate was measured on (`chimera/fusion/grounded_question.py`; unsure reads as a task)."""
+    from chimera.fusion.grounded_question import is_question
+
+    return is_question(turn.question)
+
+
+def grounded_note(turn: GroundedTurn | None) -> str:
+    """The turn note for a turn the gate will check; ``""`` for a task, which passes straight through."""
+    return GROUNDED_NOTE if turn is not None and asks_the_sources(turn) else ""
+
+
 def draft_messages(turn: GroundedTurn) -> list[dict[str, str]]:
     body = "\n\n".join(f"[{i}] {text}" for i, text in enumerate(turn.excerpts, 1))
     return [
@@ -522,9 +546,14 @@ def not_applied(reason: str, **extra: Any) -> dict[str, Any]:
 class GroundedAnswers:
     """The verifier plus its escalation rung, and the rule for which turns it applies to."""
 
-    def __init__(self, verifier: GroundedVerifier, redraft: Callable[[GroundedTurn], Redraft]) -> None:
+    def __init__(
+        self, verifier: GroundedVerifier, redraft: Callable[[GroundedTurn], Redraft], *,
+        owner_language: str = "",
+    ) -> None:
         self.verifier = verifier
         self.redraft = redraft
+        #: agent.json's ``language``: what the shipped decline is written in (study 25, L0).
+        self.owner_language = owner_language
 
     @staticmethod
     def applies(turn: GroundedTurn | None, *, tool_names: Sequence[str], stopped_reason: str) -> str:
@@ -537,6 +566,10 @@ class GroundedAnswers:
         """
         if turn is None:
             return "no_sources"
+        if not asks_the_sources(turn):
+            # A task done WITH the documents (summarize, critique, translate): its right answer is
+            # not a fact in them, and the verifier would read a good one as unsupported.
+            return "task"
         if tool_names:
             return "tool_calls"
         if stopped_reason != "final":
@@ -547,6 +580,7 @@ class GroundedAnswers:
 
     def check(
         self, turn: GroundedTurn | None, draft: str, *, tool_names: Sequence[str], stopped_reason: str,
+        drafter_model: str = "",
     ) -> tuple[str, dict[str, Any] | None]:
         """``(answer to ship, receipt block)``. The block is ``None`` for a turn with no sources."""
         reason = self.applies(turn, tool_names=tool_names, stopped_reason=stopped_reason)
@@ -554,8 +588,18 @@ class GroundedAnswers:
             return draft, None
         if reason:
             return draft, not_applied(reason, sources=list(turn.sources))
-        result = self.verifier.verify(turn, draft, escalate=lambda: self.redraft(turn))
-        return result.text, result.receipt()
+        from chimera.fusion.decline_language import DECLINES, decline_language
+
+        lang = decline_language(self.owner_language, turn.question)
+        result = self.verifier.verify(turn, draft, escalate=lambda: self.redraft(turn), decline=DECLINES[lang])
+        block = result.receipt()
+        # Study 26 measured gpt-6-luna drafting; another drafter's result is unmeasured, and the
+        # receipt names the drafter so a reader can tell which case this turn was.
+        block["drafter_model"] = drafter_model or None
+        block["drafter_measured"] = bool(drafter_model) and drafter_model.split("/")[-1] == MEASURED_DRAFTER.split("/")[-1]
+        if result.decline_shipped:
+            block["decline_language"] = lang
+        return result.text, block
 
 
 def build_grounded_answers(settings: Any, gateway: Any) -> GroundedAnswers | None:
@@ -564,10 +608,16 @@ def build_grounded_answers(settings: Any, gateway: Any) -> GroundedAnswers | Non
     if verifier is None:
         return None
     model = escalation_model(settings)
+    from pathlib import Path
+
+    from chimera.core.instructions import load as load_identity
+
+    owner_language = load_identity(Path(settings.home)).language
     # 4,000 output tokens, as the bench gave Sol: a reasoning route spends part of a small budget
     # thinking and returns nothing (`bench/jev_decisions/RESULTS.md` §10).
     return GroundedAnswers(
-        verifier, lambda turn: redraft_with(gateway, draft_messages(turn), model, max_tokens=4000)
+        verifier, lambda turn: redraft_with(gateway, draft_messages(turn), model, max_tokens=4000),
+        owner_language=owner_language,
     )
 
 
@@ -578,6 +628,7 @@ def check_answer(
     *,
     tool_names: Sequence[str],
     stopped_reason: str,
+    drafter_model: str = "",
 ) -> tuple[str, dict[str, Any] | None, float]:
     """What a surface calls after its turn: ``(answer to ship, receipt block, extra usd)``.
 
@@ -591,13 +642,15 @@ def check_answer(
         checker = build()
         if checker is None:
             return draft, None, 0.0
-        answer, block = checker.check(turn, draft, tool_names=tool_names, stopped_reason=stopped_reason)
+        answer, block = checker.check(
+            turn, draft, tool_names=tool_names, stopped_reason=stopped_reason, drafter_model=drafter_model,
+        )
     except Exception as exc:  # noqa: BLE001 — the answer is already paid for and must not be lost
         _log.warning("verified answers: the check failed: %s", exc)
         block = {
             "outcome": "unverified", "verifier": {}, "halt": f"{type(exc).__name__}: {str(exc)[:200]}",
             "escalated": False, "decline_shipped": False, "usd_extra": 0.0, "sources": list(turn.sources),
-            "withheld": [],
+            "withheld": [], "drafter_model": drafter_model or None,
         }
         return draft, block, 0.0
     extra = float(block.get("usd_extra") or 0.0) if block else 0.0

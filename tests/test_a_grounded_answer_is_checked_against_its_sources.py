@@ -335,7 +335,7 @@ def test_a_turn_outside_the_measured_shape_is_not_gated_and_says_why(
     tools: list[str], stopped: str, excerpts: list[str], reason: str,
 ) -> None:
     slot = FakeSlot({})
-    turn = GroundedTurn.make(excerpts, "q?", ["attachments"])
+    turn = GroundedTurn.make(excerpts, "How many workers does the pool run?", ["attachments"])
     answer, block = _answers(slot).check(turn, DRAFT, tool_names=tools, stopped_reason=stopped)
 
     assert (answer, block) == (DRAFT, {"outcome": "not_applied", "reason": reason, "sources": ["attachments"]})
@@ -546,3 +546,136 @@ def test_the_terminal_prints_the_badge_under_the_reply() -> None:
     assert "the sources provided don't cover this" in render.grounded_line(declined)
     assert render.grounded_line(skipped).startswith("[dim]") and "used tools" in render.grounded_line(skipped)
     assert render.grounded_line(TurnReport(answer="x")) == ""
+
+
+# --- only a QUESTION about the sources is gated; a task passes straight through -------------------
+
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Resuma e me diga se há erros.",
+        "What does it say about pricing? Also summarize it.",
+        "Explique a seção 3.",
+        "Você pode resumir em três tópicos?",
+        "Is this a good deal for me?",
+        "Traduza para o inglês",
+        "¿Cuál es el precio?",  # a language the classifier does not read: unsure, so a task
+        "Cuál es el precio del plan premium?",  # the same without the ¿, which shares accents with PT
+    ],
+)
+def test_a_task_with_documents_is_not_checked_and_gets_no_note(message: str) -> None:
+    slot = FakeSlot({})
+    turn = GroundedTurn.make(EXCERPTS, message, ["attachments"])
+
+    answer, block = _answers(slot).check(turn, DRAFT, tool_names=[], stopped_reason="final")
+
+    assert (answer, block) == (DRAFT, {"outcome": "not_applied", "reason": "task", "sources": ["attachments"]})
+    assert slot.asked == []
+    assert verified.grounded_note(turn) == ""
+
+
+@pytest.mark.parametrize(
+    "message",
+    ["Você pode me dizer o que o doc fala de retenção?", "What does the document say about pricing?",
+     "Quantos workers o pool roda por padrão?", "Tell me the default timeout."],
+)
+def test_a_question_about_the_documents_is_checked_and_told_the_rule(message: str) -> None:
+    slot = FakeSlot({DRAFT: sup(0.9)})
+    turn = GroundedTurn.make(EXCERPTS, message, ["attachments"])
+
+    _, block = _answers(slot).check(turn, DRAFT, tool_names=[], stopped_reason="final")
+
+    assert block is not None and block["outcome"] == "supported"
+    assert verified.grounded_note(turn) == verified.GROUNDED_NOTE
+
+
+def test_a_chat_task_with_a_document_reaches_the_model_without_the_note_and_is_not_checked() -> None:
+    slot = FakeSlot({})
+    agent = _Agent("Resumo: o pool roda 4 workers.")
+    session = ChatSession(agent, gate=None, grounded_answers=lambda: _answers(slot))
+
+    report = session.send_verbose("Resuma este documento.", documents=[("pool.md", EXCERPTS[0])])
+
+    assert report.answer == "Resumo: o pool roda 4 workers."
+    assert report.grounded == {"outcome": "not_applied", "reason": "task", "sources": ["attachments"]}
+    assert "Attached document `pool.md`" in agent.tasks[0]  # the document still reaches the model
+    assert verified.GROUNDED_NOTE not in agent.tasks[0]
+    assert slot.asked == []
+
+
+def test_the_classifier_reads_both_labelled_sets_without_calling_a_task_a_question() -> None:
+    from bench.grounded_question_classifier.evaluate import load
+    from chimera.fusion.grounded_question import is_question
+
+    for name in ("messages", "heldout"):
+        rows = load(name)
+        false_questions = [r["id"] for r in rows if r["label"] == "task" and is_question(r["text"])]
+        assert false_questions == [], (name, false_questions)
+    assert len(load("messages")) == 120 and len(load("heldout")) == 80
+
+
+# --- the decline is written in the owner's language --------------------------------------------------
+
+@pytest.mark.parametrize(
+    ("owner", "question", "lang"),
+    [
+        ("Português (Brasil)", "What is the SLA?", "pt"),  # the owner's language wins over the question's
+        ("Portuguese", "", "pt"),
+        ("pt-BR", "", "pt"),
+        ("English", "Qual é o SLA?", "en"),
+        ("日本語", "", "ja"),
+        ("Deutsch", "", "de"),
+        ("", "Qual é o prazo de entrega do contrato?", "pt"),  # no owner language: the question's
+        ("", "What is the delivery deadline?", "en"),
+        ("", "¿Cuál es el plazo de entrega del contrato?", "es"),
+        ("", "Какой срок?", "ru"),
+        ("Klingon", "", "en"),  # neither tells: English
+        ("", "??", "en"),
+    ],
+)
+def test_the_decline_language_follows_the_owner_then_the_question_then_english(owner: str, question: str, lang: str) -> None:
+    from chimera.fusion.decline_language import decline_language
+
+    assert decline_language(owner, question) == lang
+
+
+def test_every_desktop_locale_has_a_decline() -> None:
+    from chimera.fusion.decline_language import DECLINES
+
+    assert set(DECLINES) == {"en", "pt", "es", "fr", "de", "it", "pl", "ru", "zh", "ja"}
+    assert DECLINES["en"] == DECLINE_TEXT
+    assert DECLINES["pt"] == "As fontes fornecidas não cobrem isso."
+
+
+def test_the_shipped_decline_is_in_the_owner_language_and_the_receipt_says_so() -> None:
+    slot = FakeSlot({DRAFT: Read("unsupported", 0.1), STRONG: Read("unsupported", 0.2)})
+    checker = GroundedAnswers(GroundedVerifier([slot]), lambda turn: escalate_to()(), owner_language="Português (Brasil)")
+
+    answer, block = checker.check(TURN, DRAFT, tool_names=[], stopped_reason="final", drafter_model="m")
+
+    assert answer == "As fontes fornecidas não cobrem isso."
+    assert block is not None and block["decline_language"] == "pt"
+
+
+def test_the_owner_language_is_read_from_the_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from chimera.core.instructions import AgentIdentity, save
+
+    settings = _settings(tmp_path, monkeypatch)
+    save(Path(settings.home), AgentIdentity(language="Português (Brasil)"))
+
+    checker = verified.build_grounded_answers(settings, gateway=None)
+
+    assert checker is not None and checker.owner_language == "Português (Brasil)"
+
+
+# --- the drafter is on the receipt, and only gpt-6-luna is the measured one --------------------------
+
+def test_the_receipt_names_the_drafter_and_whether_it_is_the_measured_one() -> None:
+    slot = FakeSlot({DRAFT: sup(0.9)})
+    _, luna = _answers(slot).check(TURN, DRAFT, tool_names=[], stopped_reason="final",
+                                   drafter_model="openrouter/openai/gpt-6-luna")
+    _, other = _answers(slot).check(TURN, DRAFT, tool_names=[], stopped_reason="final",
+                                    drafter_model="openrouter/deepseek/deepseek-v4-flash-0731")
+
+    assert luna is not None and (luna["drafter_model"], luna["drafter_measured"]) == ("openrouter/openai/gpt-6-luna", True)
+    assert other is not None and other["drafter_measured"] is False

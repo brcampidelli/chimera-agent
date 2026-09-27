@@ -1,5 +1,5 @@
 ---
-source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
+source_sha256: 5a1067e079062981a7b19d7b7ee7f2c92f2e432694eca4242c69b71a190d6a0f
 ---
 
 # Chimera — Guia de Uso
@@ -666,6 +666,17 @@ léxico empatou com nenhum gate.
   `qwen3:4b`, ele recorre a `typesafe/jev-1.13` quando há chave do OpenRouter, senão ao antigo
   gate léxico; um backend que você mesmo escolheu não tem recurso. O recibo diz qual verificador
   rodou e qual foi pulado.
+- **Só perguntas.** Uma mensagem que pede informação que está nos documentos é conferida. Uma que
+  pede um trabalho com eles — resumir, criticar, traduzir, reescrever, extrair, escrever a partir
+  dele, avaliá-lo — passa direto, sem verificação e sem a nota de ancoragem; o mesmo vale para o que
+  o classificador não tiver certeza e para qualquer idioma que não seja português ou inglês
+  (`chimera/fusion/grounded_question.py`; regras e precisão/recall em
+  `bench/grounded_question_classifier/`). Com que frequência uma tarefa real ainda seria recusada
+  ainda não foi medido.
+- **A recusa sai no seu idioma:** o definido na identidade do agente, senão o da pergunta, senão
+  inglês.
+- **Medido com o `gpt-6-luna` redigindo.** Outro modelo também passa pela verificação, mas o
+  resultado dele não foi medido; o recibo diz qual modelo redigiu.
 - **Onde não se aplica.** Turno que usou tool (um roteador na frente do loop do agente piorou todos
   os executores no bench B4), edição de código e `solve`, fatos lembrados da memória (chegam em todo
   turno, seja a pergunta sobre eles ou não) e documentos maiores que o maior conjunto que o bench leu

@@ -1,0 +1,80 @@
+{"id": "h-pt-q-01", "lang": "pt", "label": "question", "text": "Qual é o valor da multa por rescisão antecipada no contrato?"}
+{"id": "h-pt-q-02", "lang": "pt", "label": "question", "text": "preciso do valor da multa"}
+{"id": "h-pt-q-03", "lang": "pt", "label": "question", "text": "Você sabe me dizer quem assinou o contrato pela contratada?"}
+{"id": "h-pt-q-04", "lang": "pt", "label": "question", "text": "quando vence a fatura"}
+{"id": "h-pt-q-05", "lang": "pt", "label": "question", "text": "Tem cláusula de fidelidade?"}
+{"id": "h-pt-q-06", "lang": "pt", "label": "question", "text": "O README fala qual versão do Python é necessária?"}
+{"id": "h-pt-q-07", "lang": "pt", "label": "question", "text": "quantos dias de ferias a politica da empresa da no primeiro ano"}
+{"id": "h-pt-q-08", "lang": "pt", "label": "question", "text": "Gostaria de saber qual CNPJ aparece na nota fiscal."}
+{"id": "h-pt-q-09", "lang": "pt", "label": "question", "text": "Prazo de entrega do projeto?"}
+{"id": "h-pt-q-10", "lang": "pt", "label": "question", "text": "qual o total de despesas de março que aparece na planilha"}
+{"id": "h-pt-q-11", "lang": "pt", "label": "question", "text": "Qual é o foro eleito pra resolver disputas?"}
+{"id": "h-pt-q-12", "lang": "pt", "label": "question", "text": "Como faço pra instalar o pacote segundo o README?"}
+{"id": "h-pt-q-13", "lang": "pt", "label": "question", "text": "O artigo usou quantos participantes no experimento?"}
+{"id": "h-pt-q-14", "lang": "pt", "label": "question", "text": "a politica de home office permite trabalhar de outro estado?"}
+{"id": "h-pt-q-15", "lang": "pt", "label": "question", "text": "Consta no aditivo alguma data de reajuste"}
+{"id": "h-pt-q-16", "lang": "pt", "label": "question", "text": "Quem é o responsável técnico citado no laudo"}
+{"id": "h-pt-q-17", "lang": "pt", "label": "question", "text": "Dá pra ver no documento qual é a taxa de juros de mora?"}
+{"id": "h-pt-q-18", "lang": "pt", "label": "question", "text": "poderia me informar o número do pedido de compra que está na invoice?"}
+{"id": "h-pt-q-19", "lang": "pt", "label": "question", "text": "me lembra qual a porta padrão do servidor, que eu não achei no README"}
+{"id": "h-pt-q-20", "lang": "pt", "label": "question", "text": "isso aqui é contrato por prazo determinado ou indeterminado?"}
+{"id": "h-pt-t-01", "lang": "pt", "label": "task", "text": "Resume esse contrato em 5 tópicos."}
+{"id": "h-pt-t-02", "lang": "pt", "label": "task", "text": "resumir o doc pfv"}
+{"id": "h-pt-t-03", "lang": "pt", "label": "task", "text": "dá pra resumir?"}
+{"id": "h-pt-t-04", "lang": "pt", "label": "task", "text": "Traduz a política de reembolso pro inglês"}
+{"id": "h-pt-t-05", "lang": "pt", "label": "task", "text": "Esse contrato é bom pra mim?"}
+{"id": "h-pt-t-06", "lang": "pt", "label": "task", "text": "Devo aceitar essa proposta de emprego?"}
+{"id": "h-pt-t-07", "lang": "pt", "label": "task", "text": "Revise o artigo e aponte erros de concordância."}
+{"id": "h-pt-t-08", "lang": "pt", "label": "task", "text": "Monta uma tabela com os itens da nota fiscal, quantidade e valor unitário."}
+{"id": "h-pt-t-09", "lang": "pt", "label": "task", "text": "Qual é o prazo de pagamento e o que você acha dele?"}
+{"id": "h-pt-t-10", "lang": "pt", "label": "task", "text": "Me explica a cláusula 7 como se eu tivesse 10 anos"}
+{"id": "h-pt-t-11", "lang": "pt", "label": "task", "text": "Escreve um e-mail pro fornecedor contestando a cobrança duplicada da fatura"}
+{"id": "h-pt-t-12", "lang": "pt", "label": "task", "text": "compara as duas propostas e me diz qual vale mais a pena"}
+{"id": "h-pt-t-13", "lang": "pt", "label": "task", "text": "Tem algum erro de cálculo na planilha?"}
+{"id": "h-pt-t-14", "lang": "pt", "label": "task", "text": "Reescreva a seção de instalação do README de forma mais clara."}
+{"id": "h-pt-t-15", "lang": "pt", "label": "task", "text": "extrai todas as datas do contrato numa lista"}
+{"id": "h-pt-t-16", "lang": "pt", "label": "task", "text": "O que eu deveria negociar nesse contrato de aluguel?"}
+{"id": "h-pt-t-17", "lang": "pt", "label": "task", "text": "Você poderia melhorar a introdução do paper?"}
+{"id": "h-pt-t-18", "lang": "pt", "label": "task", "text": "formata as referências do artigo no padrão ABNT"}
+{"id": "h-pt-t-19", "lang": "pt", "label": "task", "text": "Quais são os riscos desse contrato pra mim como locatário?"}
+{"id": "h-pt-t-20", "lang": "pt", "label": "task", "text": "Faz um checklist de onboarding a partir da politica de RH"}
+{"id": "h-en-q-01", "lang": "en", "label": "question", "text": "What is the termination notice period in the contract?"}
+{"id": "h-en-q-02", "lang": "en", "label": "question", "text": "gimme the deadline"}
+{"id": "h-en-q-03", "lang": "en", "label": "question", "text": "Can you tell me who the landlord is?"}
+{"id": "h-en-q-04", "lang": "en", "label": "question", "text": "invoice total?"}
+{"id": "h-en-q-05", "lang": "en", "label": "question", "text": "Does the policy cover dental?"}
+{"id": "h-en-q-06", "lang": "en", "label": "question", "text": "I'd like to know which license the README says the project uses."}
+{"id": "h-en-q-07", "lang": "en", "label": "question", "text": "how many PTO days do new hires get"}
+{"id": "h-en-q-08", "lang": "en", "label": "question", "text": "When does the lease start"}
+{"id": "h-en-q-09", "lang": "en", "label": "question", "text": "What's the sample size in the paper?"}
+{"id": "h-en-q-10", "lang": "en", "label": "question", "text": "Is there a non-compete clause?"}
+{"id": "h-en-q-11", "lang": "en", "label": "question", "text": "which node version does it need"}
+{"id": "h-en-q-12", "lang": "en", "label": "question", "text": "Where is the company's registered office according to the agreement?"}
+{"id": "h-en-q-13", "lang": "en", "label": "question", "text": "how do i reset the config per the docs"}
+{"id": "h-en-q-14", "lang": "en", "label": "question", "text": "Could you let me know what the late payment fee is?"}
+{"id": "h-en-q-15", "lang": "en", "label": "question", "text": "Due date on this invoice pls"}
+{"id": "h-en-q-16", "lang": "en", "label": "question", "text": "Does it say anything about working remotely from abroad?"}
+{"id": "h-en-q-17", "lang": "en", "label": "question", "text": "Who approved the expense report?"}
+{"id": "h-en-q-18", "lang": "en", "label": "question", "text": "Can you find the interest rate mentioned in section 4?"}
+{"id": "h-en-q-19", "lang": "en", "label": "question", "text": "what does SLA stand for in this doc"}
+{"id": "h-en-q-20", "lang": "en", "label": "question", "text": "Any chance you know what the warranty period is?"}
+{"id": "h-en-t-01", "lang": "en", "label": "task", "text": "Summarize this contract."}
+{"id": "h-en-t-02", "lang": "en", "label": "task", "text": "any chance you could shorten this?"}
+{"id": "h-en-t-03", "lang": "en", "label": "task", "text": "Translate the HR policy into Spanish."}
+{"id": "h-en-t-04", "lang": "en", "label": "task", "text": "Is this a good deal?"}
+{"id": "h-en-t-05", "lang": "en", "label": "task", "text": "Should I sign this NDA?"}
+{"id": "h-en-t-06", "lang": "en", "label": "task", "text": "Proofread the abstract."}
+{"id": "h-en-t-07", "lang": "en", "label": "task", "text": "turn the line items into a table"}
+{"id": "h-en-t-08", "lang": "en", "label": "task", "text": "What's the renewal date, and can you draft a reminder email for it?"}
+{"id": "h-en-t-09", "lang": "en", "label": "task", "text": "Explain section 3 of the paper to me in plain English."}
+{"id": "h-en-t-10", "lang": "en", "label": "task", "text": "Write a cover letter based on this job description."}
+{"id": "h-en-t-11", "lang": "en", "label": "task", "text": "Compare the two quotes and tell me which vendor to go with."}
+{"id": "h-en-t-12", "lang": "en", "label": "task", "text": "Are there any errors in the formulas?"}
+{"id": "h-en-t-13", "lang": "en", "label": "task", "text": "Rewrite the README intro so it's less jargony"}
+{"id": "h-en-t-14", "lang": "en", "label": "task", "text": "pull all the payment milestones out into a bulleted list"}
+{"id": "h-en-t-15", "lang": "en", "label": "task", "text": "What should I push back on in this offer letter?"}
+{"id": "h-en-t-16", "lang": "en", "label": "task", "text": "Can you make this sound more professional?"}
+{"id": "h-en-t-17", "lang": "en", "label": "task", "text": "list the pros and cons of the new remote work policy"}
+{"id": "h-en-t-18", "lang": "en", "label": "task", "text": "Does this clause seem fair to you?"}
+{"id": "h-en-t-19", "lang": "en", "label": "task", "text": "fix the typos"}
+{"id": "h-en-t-20", "lang": "en", "label": "task", "text": "What are the weak points in the methodology?"}

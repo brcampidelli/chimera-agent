@@ -7,6 +7,7 @@ import type { TFunc } from "@/lib/i18n";
 /** Why a turn with documents was not checked — literal keys, one per reason word the server sends,
  *  so the i18n reachability test can see each of them. */
 const NOT_APPLIED: Record<string, string> = {
+  task: "code.chat.grounded.notApplied.task",
   tool_calls: "code.chat.grounded.notApplied.toolCalls",
   not_final: "code.chat.grounded.notApplied.notFinal",
   sources_too_long: "code.chat.grounded.notApplied.tooLong",
@@ -25,6 +26,8 @@ function detail(g: GroundedCheck): string {
   if (g.escalated && g.escalated_model) parts.push(`→ ${g.escalated_model}`);
   if (g.halt) parts.push(g.halt);
   if (g.usd_extra) parts.push(`+$${g.usd_extra.toFixed(4)}`);
+  // The measured result is for gpt-6-luna drafting; the tooltip says when this drafter is another.
+  if (g.drafter_model) parts.push(`drafter ${g.drafter_model}${g.drafter_measured ? "" : " (unmeasured)"}`);
   return parts.join(" · ");
 }
 

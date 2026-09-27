@@ -33,9 +33,13 @@ function receipt(grounded: GroundedCheck | null | undefined) {
 
 describe("the grounded-answer badge", () => {
   it("says verified, with who verified it and how sure, on a supported answer", () => {
-    receipt({ outcome: "supported", verifier: LOCAL, label: "supported", p: 0.93 });
+    receipt({
+      outcome: "supported", verifier: LOCAL, label: "supported", p: 0.93,
+      drafter_model: "openrouter/deepseek/deepseek-v4-flash-0731", drafter_measured: false,
+    });
 
     const badge = screen.getByText("code.chat.grounded.verified");
+    expect(badge).toHaveAttribute("title", expect.stringContaining("deepseek-v4-flash-0731 (unmeasured)"));
     expect(badge).toHaveAttribute("title", expect.stringContaining("qwen3:4b@Q4_K_M"));
     expect(badge).toHaveAttribute("title", expect.stringContaining("supported p=0.93"));
   });
@@ -94,6 +98,16 @@ describe("the grounded-answer badge", () => {
     );
   });
 
+  it("says a task with documents was passed straight through, not checked", () => {
+    receipt({ outcome: "not_applied", reason: "task" });
+
+    expect(screen.queryByText("code.chat.grounded.verified")).not.toBeInTheDocument();
+    expect(screen.getByText("code.chat.grounded.notApplied")).toHaveAttribute(
+      "title",
+      "code.chat.grounded.notApplied.task",
+    );
+  });
+
   it("draws nothing for a turn that attached nothing", () => {
     receipt(null);
 
@@ -102,7 +116,7 @@ describe("the grounded-answer badge", () => {
 
   it("has every badge string in every language", () => {
     const keys = Object.keys(DICTS.en).filter((k) => k.startsWith("code.chat.grounded."));
-    expect(keys.length).toBe(10);
+    expect(keys.length).toBe(11);
     for (const dict of Object.values(DICTS)) {
       for (const key of keys) expect((dict as Record<string, string>)[key]).toBeTruthy();
     }
