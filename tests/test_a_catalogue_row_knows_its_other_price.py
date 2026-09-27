@@ -34,3 +34,18 @@ def test_the_three_flipping_rows_carry_their_history() -> None:
     assert price_is_known(by["openrouter/z-ai/glm-5.3-flash"], 0.075)
     assert price_is_known(by["openrouter/deepseek/deepseek-chat-v3.1"], 0.55)
     assert price_is_known(by["openrouter/deepseek/deepseek-v4-flash-0731"], 0.065)
+
+
+def test_a_floating_listing_accepts_a_cheaper_route_and_still_refuses_a_dearer_one() -> None:
+    row = _row(input_per_m=1.40, listing_floats=True)
+    assert price_is_known(row, 0.238)  # the floor that reddened main on 2026-09-27
+    assert price_is_known(row, 1.40)
+    assert not price_is_known(row, 2.20)  # dearer than the band: a receipt would under-report
+    assert not price_is_known(_row(input_per_m=1.40), 0.238)  # a fixed row still fails
+
+
+def test_glm_5_3_is_the_row_whose_listing_floats() -> None:
+    by = {e.slug: e for e in CATALOG}
+    assert by["openrouter/z-ai/glm-5.3"].listing_floats
+    assert price_is_known(by["openrouter/z-ai/glm-5.3"], 0.238)
+    assert sum(e.listing_floats for e in CATALOG) == 1  # opt-in per row, never a blanket waiver
