@@ -50,6 +50,7 @@ import type {
   TaskCard,
   Tools,
   Decisions,
+  SystemOneModels,
   UsageSummary,
   VersionInfo,
 } from "@/lib/types";
@@ -253,6 +254,10 @@ export const answerApproval = (id: string, approved: boolean) =>
  *  it. Separate from `answerApproval`: approving says "may it run", not "was it dangerous". */
 /** The Decisions screen's read model: declared points, a report per instrument, the latest answers. */
 export const getDecisions = (limit = 50) => json<Decisions>(`/api/decisions?limit=${limit}`);
+/** The System One models OpenRouter lists — whether Chimera's client can talk to each, whether a map
+ *  calibrates it — and the pair this server is on. Saved through `patchConfig`, which refuses a pair
+ *  the backend cannot honour. */
+export const getDecisionModels = () => json<SystemOneModels>("/api/decisions/models");
 export const labelDecision = (decisionId: string, event: boolean) =>
   json<{ ok: boolean }>(`/api/decisions/${encodeURIComponent(decisionId)}/label`, {
     method: "POST",

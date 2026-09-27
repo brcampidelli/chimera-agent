@@ -1106,6 +1106,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/decisions/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Decision Models Route
+         * @description The System One models OpenRouter lists, each with whether Chimera's client can talk to it
+         *     and whether a calibration map exists for it — and the backend/model this server is on. The
+         *     choice is saved through `PATCH /api/config`, which refuses a pair the factory cannot honour.
+         *     Offline, the list is the backend's default alone, flagged `stale`.
+         */
+        get: operations["decision_models_route_api_decisions_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/decisions/{decision_id}/label": {
         parameters: {
             query?: never;
@@ -4164,6 +4187,7 @@ export interface components {
             bridge?: components["schemas"]["BridgeCfgOut"];
             browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
+            decisions?: components["schemas"]["DecisionsCfgOut"];
             experimental?: components["schemas"]["ExperimentalCfgOut"];
             fusion?: components["schemas"]["FusionCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
@@ -4732,6 +4756,23 @@ export interface components {
             surfaces: string[];
             /** Threshold */
             threshold?: number | null;
+        };
+        /**
+         * DecisionsCfgOut
+         * @description Which backend answers a typed decision and which model (``chimera/config.py``). An empty model
+         *     is the backend's measured default; a server without the block is on the shipped default.
+         */
+        DecisionsCfgOut: {
+            /**
+             * Backend
+             * @default local_logprob
+             */
+            backend: string;
+            /**
+             * Model
+             * @default
+             */
+            model: string;
         };
         /**
          * DecisionsOut
@@ -7183,6 +7224,74 @@ export interface components {
              */
             task_id: string;
         };
+        /**
+         * SystemOneModelOut
+         * @description One model OpenRouter lists with ``output_modalities: decisions`` (``chimera/decisions/system_one.py``).
+         */
+        SystemOneModelOut: {
+            /**
+             * Alias
+             * @default false
+             */
+            alias: boolean;
+            /**
+             * Calibrated
+             * @default false
+             */
+            calibrated: boolean;
+            /** Context */
+            context?: number | null;
+            /** Contract */
+            contract: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Input Per M */
+            input_per_m?: number | null;
+            /** Name */
+            name: string;
+            /** Questions */
+            questions: string[];
+            /**
+             * Refusal
+             * @default
+             */
+            refusal: string;
+            /** Selectable */
+            selectable: boolean;
+            /** Slug */
+            slug: string;
+        };
+        /** SystemOneModelsOut */
+        SystemOneModelsOut: {
+            /** Backend */
+            backend: string;
+            /** Backends */
+            backends: string[];
+            /** Default Model */
+            default_model: string;
+            /** Model */
+            model: string;
+            /** Models */
+            models: components["schemas"]["SystemOneModelOut"][];
+            /**
+             * Openrouter Key Set
+             * @default false
+             */
+            openrouter_key_set: boolean;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+            /**
+             * Stale
+             * @default false
+             */
+            stale: boolean;
+        };
         /** TaskCardOut */
         TaskCardOut: {
             /** Action */
@@ -9417,6 +9526,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decision_models_route_api_decisions_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SystemOneModelsOut"];
                 };
             };
         };

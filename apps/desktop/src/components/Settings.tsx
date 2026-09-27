@@ -29,6 +29,7 @@ import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
 import { Decisions } from "@/components/Decisions";
 import { Usage } from "@/components/Usage";
+import { SystemOneCard } from "@/components/SystemOneCard";
 import { VoiceCard } from "@/components/VoiceCard";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
@@ -1497,6 +1498,15 @@ export function Settings() {
                     />
                   </Row>
                 </Card>
+
+                {/* Which instrument answers a typed decision. A server without the `decisions` block
+              is on the shipped default, local — the same thing the card shows for it. */}
+                <SystemOneCard
+                  backend={c.decisions?.backend ?? "local_logprob"}
+                  model={c.decisions?.model ?? ""}
+                  applies={c.applies?.CHIMERA_DECISION_BACKEND}
+                  onSave={save}
+                />
 
                 {/* The desktop bridge (`chimera/api/desktop_bridge.py`): whether Claude, through
               `chimera mcp desktop`, may operate this running app. Both off by default. The second

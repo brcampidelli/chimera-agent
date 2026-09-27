@@ -2350,6 +2350,9 @@
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
+          "decisions": {
+            "$ref": "#/components/schemas/DecisionsCfgOut"
+          },
           "experimental": {
             "$ref": "#/components/schemas/ExperimentalCfgOut"
           },
@@ -3694,6 +3697,23 @@
           "bench"
         ],
         "title": "DecisionSpecOut",
+        "type": "object"
+      },
+      "DecisionsCfgOut": {
+        "description": "Which backend answers a typed decision and which model (``chimera/config.py``). An empty model\nis the backend's measured default; a server without the block is on the shipped default.",
+        "properties": {
+          "backend": {
+            "default": "local_logprob",
+            "title": "Backend",
+            "type": "string"
+          },
+          "model": {
+            "default": "",
+            "title": "Model",
+            "type": "string"
+          }
+        },
+        "title": "DecisionsCfgOut",
         "type": "object"
       },
       "DecisionsOut": {
@@ -9050,6 +9070,139 @@
         "title": "SubtaskOut",
         "type": "object"
       },
+      "SystemOneModelOut": {
+        "description": "One model OpenRouter lists with ``output_modalities: decisions`` (``chimera/decisions/system_one.py``).",
+        "properties": {
+          "alias": {
+            "default": false,
+            "title": "Alias",
+            "type": "boolean"
+          },
+          "calibrated": {
+            "default": false,
+            "title": "Calibrated",
+            "type": "boolean"
+          },
+          "context": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
+          "contract": {
+            "title": "Contract",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "input_per_m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Per M"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "questions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Questions",
+            "type": "array"
+          },
+          "refusal": {
+            "default": "",
+            "title": "Refusal",
+            "type": "string"
+          },
+          "selectable": {
+            "title": "Selectable",
+            "type": "boolean"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "contract",
+          "questions",
+          "selectable"
+        ],
+        "title": "SystemOneModelOut",
+        "type": "object"
+      },
+      "SystemOneModelsOut": {
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "backends": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Backends",
+            "type": "array"
+          },
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "models": {
+            "items": {
+              "$ref": "#/components/schemas/SystemOneModelOut"
+            },
+            "title": "Models",
+            "type": "array"
+          },
+          "openrouter_key_set": {
+            "default": false,
+            "title": "Openrouter Key Set",
+            "type": "boolean"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "stale": {
+            "default": false,
+            "title": "Stale",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "backend",
+          "model",
+          "default_model",
+          "backends",
+          "models"
+        ],
+        "title": "SystemOneModelsOut",
+        "type": "object"
+      },
       "TaskCardOut": {
         "properties": {
           "action": {
@@ -12266,6 +12419,25 @@
           }
         },
         "summary": "Decisions Route"
+      }
+    },
+    "/api/decisions/models": {
+      "get": {
+        "description": "The System One models OpenRouter lists, each with whether Chimera's client can talk to it\nand whether a calibration map exists for it \u2014 and the backend/model this server is on. The\nchoice is saved through `PATCH /api/config`, which refuses a pair the factory cannot honour.\nOffline, the list is the backend's default alone, flagged `stale`.",
+        "operationId": "decision_models_route_api_decisions_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemOneModelsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Decision Models Route"
       }
     },
     "/api/decisions/{decision_id}/label": {

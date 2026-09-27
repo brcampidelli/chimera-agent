@@ -112,6 +112,7 @@ from chimera.api.schemas import (
     SearchOut,
     SessionDetailOut,
     SessionMetaOut,
+    SystemOneModelsOut,
     ToolsOut,
     UpdatedOut,
     UsageSummaryOut,
@@ -1425,6 +1426,31 @@ def build_api_app(
         ]
         return {"review_at": review_at, "allow_below": allow_below, "specs": specs, "groups": groups, "recent": recent}
 
+    @app.get("/api/decisions/models", dependencies=[guard], response_model=SystemOneModelsOut)
+    def decision_models_route() -> dict[str, Any]:
+        """The System One models OpenRouter lists, each with whether Chimera's client can talk to it
+        and whether a calibration map exists for it — and the backend/model this server is on. The
+        choice is saved through `PATCH /api/config`, which refuses a pair the factory cannot honour.
+        Offline, the list is the backend's default alone, flagged `stale`."""
+        from chimera.decisions.calibration import CalibrationMaps
+        from chimera.decisions.factory import (
+            BACKENDS,
+            default_model_for,
+            maps_path,
+            openrouter_key_set,
+        )
+        from chimera.decisions.system_one import list_models
+
+        current = live_settings()
+        backend = (current.decision_backend or "local_logprob").strip()
+        listing = list_models(CalibrationMaps.shipped().merged(CalibrationMaps.load(maps_path(current))))
+        return {
+            "backend": backend, "model": (current.decision_model or "").strip(),
+            "default_model": default_model_for(current, backend), "backends": list(BACKENDS),
+            "models": [m.to_dict() for m in listing.models], "stale": listing.stale, "reason": listing.reason,
+            "openrouter_key_set": openrouter_key_set(current),
+        }
+
     _decide_state: dict[str, Any] = {}
 
     @app.post("/api/decide", dependencies=[guard], response_model=DecideOut)
@@ -1439,8 +1465,13 @@ def build_api_app(
         from chimera.decisions.interface import RequestError
         from chimera.decisions.interface import decide as ask
 
-        if "decider" not in _decide_state:
-            _decide_state["decider"] = build_decider(live_settings())
+        # Rebuilt when the pair changes: kept forever, a choice saved in Settings would answer here
+        # only after a relaunch, while the screen says it applies now.
+        current = live_settings()
+        pair = (current.decision_backend, current.decision_model)
+        if _decide_state.get("pair") != pair:
+            _decide_state["decider"] = build_decider(current)
+            _decide_state["pair"] = pair
         try:
             return ask(_decide_state["decider"], req.model_dump())
         except RequestError as exc:

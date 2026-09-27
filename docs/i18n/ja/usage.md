@@ -1,5 +1,5 @@
 ---
-source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
+source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
 ---
 
 # Chimera — 利用ガイド
@@ -614,6 +614,22 @@ uv run chimera meta "an agent that triages GitHub issues and routes them to team
 uv run chimera guard "rm -rf /"                       # BLOCK
 uv run chimera guard "list the files in this folder"  # ALLOW
 ```
+
+### `decisions` — 型付き判断に答えるモデル
+型付き判断（はい/いいえ、選択、スコア）には 3 つのバックエンドのいずれかが答えます：
+`local_logprob`（Ollama 経由の小型モデル、既定、無料）、`hosted_verbalized`（フュージョンの判定役）、
+`openrouter_decisions`（OpenRouter 上の System One モデル）。既定のインストールでは何も自動では問い合わせません。
+ガバナンスの REVIEW 帯か `decide` ツールを有効にしたとき、または `chimera decide` を呼んだときに答えます。
+
+```bash
+uv run chimera decisions models                                   # OpenRouter の一覧、* = 使用中
+uv run chimera decisions use openrouter_decisions typesafe/jev-1.13
+uv run chimera decisions use local_logprob                        # 既定に戻す
+```
+
+同じ選択はデスクトップアプリの設定にある **System One** カードでもできます。選べるのは Jev の契約
+（はい/いいえ、選択、スコア）を話すモデルだけで、振る舞いスコアリングのモデルや移動するエイリアスは
+一覧に出ますが選べません。キャリブレーションマップのないモデルは確信度をそのまま読みます。
 
 ### `bench` — 継続的進化ベンチマーク
 

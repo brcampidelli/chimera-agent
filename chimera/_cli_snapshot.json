@@ -1465,6 +1465,14 @@
         },
         {
           "deprecated": false,
+          "help": "The System One models OpenRouter lists, which one is active, and which carry a calibration map.",
+          "hidden": false,
+          "name": "models",
+          "params": [],
+          "path": "decisions models"
+        },
+        {
+          "deprecated": false,
           "help": "Fit this deployment's own map on its labelled answers \u2014 pooled with the shipped rows while it\nhas fewer than 20 labels of a class. Prints before writing; writes only with --write.",
           "hidden": false,
           "name": "refit",
@@ -1489,10 +1497,40 @@
           "name": "report",
           "params": [],
           "path": "decisions report"
+        },
+        {
+          "deprecated": false,
+          "help": "Choose the backend (and model) that answers typed decisions \u2014 written to ``.env`` in this folder,\nthe same pair and the same check as the desktop's System One card.",
+          "hidden": false,
+          "name": "use",
+          "params": [
+            {
+              "help": "local_logprob | hosted_verbalized | openrouter_decisions",
+              "kind": "argument",
+              "name": "backend",
+              "opts": [
+                "backend"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "default": "''",
+              "help": "Empty = the backend's measured default. For openrouter_decisions, a listed slug.",
+              "kind": "argument",
+              "name": "model",
+              "opts": [
+                "model"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "decisions use"
         }
       ],
       "deprecated": false,
-      "help": "The decision log: what the typed decisions answered, labels, a report and a refit.",
+      "help": "Typed decisions: which model answers them, the log of what they answered, labels, a report and a refit.",
       "hidden": false,
       "name": "decisions",
       "params": [],

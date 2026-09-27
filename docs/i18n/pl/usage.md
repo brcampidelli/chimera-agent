@@ -1,5 +1,5 @@
 ---
-source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
+source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -623,6 +623,22 @@ Pokazuje decyzję jądra zaufania (allow / warn / review / block) dla działania
 uv run chimera guard "rm -rf /"                       # BLOCK
 uv run chimera guard "list the files in this folder"  # ALLOW
 ```
+
+### `decisions` — który model odpowiada na decyzję typowaną
+Na decyzję typowaną (tak/nie, wybór, ocena) odpowiada jeden z trzech backendów: `local_logprob` (mały
+model przez Ollama, domyślny, darmowy), `hosted_verbalized` (sędzia fuzji) albo
+`openrouter_decisions` (model System One na OpenRouter). W domyślnej instalacji nic nie pyta go samo:
+odpowiada, gdy włączysz pasmo REVIEW governance albo tool `decide`, lub wywołasz `chimera decide`.
+
+```bash
+uv run chimera decisions models                                   # co listuje OpenRouter; * = aktywny
+uv run chimera decisions use openrouter_decisions typesafe/jev-1.13
+uv run chimera decisions use local_logprob                        # powrót do domyślnego
+```
+
+Ten sam wybór to karta **System One** w Ustawieniach aplikacji desktopowej. Wybrać można tylko modele
+mówiące kontraktem Jev (tak/nie, wybór, ocena); model oceniający zachowania albo ruchomy alias jest
+na liście i zostaje odrzucony. Model bez mapy kalibracji odczytuje pewność surowo.
 
 ### `bench` — benchmark ciągłej ewolucji
 

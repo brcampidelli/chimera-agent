@@ -593,6 +593,23 @@ uv run chimera guard "rm -rf /"                       # BLOCK
 uv run chimera guard "list the files in this folder"  # ALLOW
 ```
 
+### `decisions` — which model answers a typed decision
+A typed decision (a yes/no, a choice, a score) is answered by one of three backends: `local_logprob`
+(a small model through Ollama, the default, free), `hosted_verbalized` (the fusion judge) or
+`openrouter_decisions` (a System One model on OpenRouter). On a default install nothing asks one on
+its own: it answers when you turn on the governance REVIEW band or the `decide` tool, or call
+`chimera decide`.
+
+```bash
+uv run chimera decisions models                                   # what OpenRouter lists; * = active
+uv run chimera decisions use openrouter_decisions typesafe/jev-1.13
+uv run chimera decisions use local_logprob                        # back to the default
+```
+
+The same choice is the **System One** card in the desktop's Settings. Only models that speak the
+Jev contract (yes/no, choice, score) can be chosen; a behaviour-scoring model or a moving alias is
+listed and refused. A model without a calibration map reads its confidence raw.
+
 ### `bench` — continuous-evolution benchmark
 
 Measures whether performance *holds* over a chain of tasks (the anti-degradation

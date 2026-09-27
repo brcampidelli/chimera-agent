@@ -193,34 +193,45 @@ def openrouter_models(*, timeout_s: float = DEFAULT_TIMEOUT_S) -> tuple[tuple[Mo
 
 
 def _fetch_openrouter(timeout_s: float) -> tuple[tuple[ModelOption, ...], Reason]:
+    entries, reason = fetch_openrouter_index(timeout_s=timeout_s)
+    if reason:
+        return (), reason
+    options = [option for entry in entries if (option := _openrouter_option(entry)) is not None]
+    return tuple(options), ""
+
+
+def fetch_openrouter_index(
+    *, timeout_s: float = DEFAULT_TIMEOUT_S, params: dict[str, str] | None = None
+) -> tuple[list[dict[str, Any]], Reason]:
+    """The raw entries of OpenRouter's public index, or ``([], reason)``. Never raises, never cached.
+
+    Raw because a second reader needs fields :class:`ModelOption` does not keep — the System One
+    listing (:mod:`chimera.decisions.system_one`) reads ``architecture.output_modalities`` and the
+    description — and one fetcher means one place that decides what a failed fetch looks like.
+    ``params`` is passed through as the query string (``output_modalities=decisions``).
+    """
     try:
         import httpx
     except ImportError:  # pragma: no cover — httpx is a hard dependency
-        return (), "unreachable"
+        return [], "unreachable"
 
     try:
-        response = httpx.get(OPENROUTER_MODELS_URL, timeout=timeout_s)
+        response = httpx.get(OPENROUTER_MODELS_URL, params=params, timeout=timeout_s)
     except Exception as exc:  # noqa: BLE001 — no network is a normal state, not a 500
         _log.debug("openrouter model index unreachable: %s", exc)
-        return (), "unreachable"
+        return [], "unreachable"
     if response.status_code >= 400:
         _log.debug("openrouter model index answered %s", response.status_code)
-        return (), "http_error"
+        return [], "http_error"
 
     try:
         payload = response.json()
         entries = payload["data"]
     except Exception:  # noqa: BLE001 — a 200 from a captive portal is not the index
-        return (), "unreadable"
+        return [], "unreadable"
     if not isinstance(entries, list):
-        return (), "unreadable"
-
-    options = [
-        option
-        for entry in entries
-        if isinstance(entry, dict) and (option := _openrouter_option(entry)) is not None
-    ]
-    return tuple(options), ""
+        return [], "unreadable"
+    return [entry for entry in entries if isinstance(entry, dict)], ""
 
 
 def _catalog_options(providers: list[str]) -> list[ModelOption]:

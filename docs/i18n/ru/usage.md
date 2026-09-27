@@ -1,5 +1,5 @@
 ---
-source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
+source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
 ---
 
 # Chimera — руководство по использованию
@@ -613,6 +613,23 @@ uv run chimera meta "an agent that triages GitHub issues and routes them to team
 uv run chimera guard "rm -rf /"                       # BLOCK
 uv run chimera guard "list the files in this folder"  # ALLOW
 ```
+
+### `decisions` — какая модель отвечает на типизированное решение
+На типизированное решение (да/нет, выбор, оценка) отвечает один из трёх бэкендов: `local_logprob`
+(небольшая модель через Ollama, по умолчанию, бесплатно), `hosted_verbalized` (судья фьюжна) или
+`openrouter_decisions` (модель System One на OpenRouter). В установке по умолчанию ничто не
+спрашивает её само: она отвечает, когда вы включаете полосу REVIEW в governance или tool `decide`,
+либо вызываете `chimera decide`.
+
+```bash
+uv run chimera decisions models                                   # что перечисляет OpenRouter; * = активная
+uv run chimera decisions use openrouter_decisions typesafe/jev-1.13
+uv run chimera decisions use local_logprob                        # вернуться к умолчанию
+```
+
+Тот же выбор — карточка **System One** в Настройках десктоп-приложения. Выбрать можно только модели,
+говорящие по контракту Jev (да/нет, выбор, оценка); модель оценки поведения или плавающий алиас
+показывается в списке и отклоняется. Модель без карты калибровки читает свою уверенность как есть.
 
 ### `bench` — замер непрерывной эволюции
 

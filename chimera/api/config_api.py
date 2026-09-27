@@ -134,6 +134,11 @@ _EDITABLE_SETTINGS = {
     # so a client can never widen its own access.
     "CHIMERA_DESKTOP_BRIDGE",
     "CHIMERA_DESKTOP_BRIDGE_FULL",
+    # The System One card: which backend answers a typed decision, and which model. Written as a
+    # pair and checked as one (`_check_decision_choice`) — each is valid alone and wrong together
+    # often enough (a Jev slug handed to Ollama) that the value, not only the key, is refused.
+    "CHIMERA_DECISION_BACKEND",
+    "CHIMERA_DECISION_MODEL",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -185,6 +190,11 @@ APPLIES_WHEN: dict[str, str] = {
     # a Code turn builds both afresh, so there it is the next turn. The research agent and the
     # explorer's contract are read only on the Code turn, per turn, so they are absent: next call.
     "CHIMERA_BROWSER_SITUATION": NEXT_CONVERSATION,
+    # The governance band builds its decider once per assembly (`governance/band.py::build_band`), so
+    # a chat already running keeps the instrument it started with; the next one reads the new pair.
+    # `POST /api/decide` and the `decide` tool rebuild on the next call.
+    "CHIMERA_DECISION_BACKEND": NEXT_CONVERSATION,
+    "CHIMERA_DECISION_MODEL": NEXT_CONVERSATION,
     # These start something at boot — a daemon thread and a set of MCP subprocesses. Re-reading the
     # value would not undo that, so the honest answer is the relaunch, not a re-read.
     "CHIMERA_APP_CRON": NEXT_LAUNCH,
@@ -379,6 +389,11 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "research_agent": settings.research_agent,
             "explorer_contract": settings.explorer_contract,
         },
+        # Which backend answers a typed decision, and which model; empty = the backend's default.
+        "decisions": {
+            "backend": (settings.decision_backend or "local_logprob").strip(),
+            "model": (settings.decision_model or "").strip(),
+        },
         # Whether Claude may operate this app, and whether it may also answer approvals and edit
         # settings. Applied live: saving either one writes or removes the discovery file at once.
         "bridge": {
@@ -539,6 +554,24 @@ def _write_env_var(path: Path, key: str, value: str) -> None:
     tmp.replace(path)
 
 
+def _check_decision_choice(updates: dict[str, str]) -> None:
+    """Refuse a decision backend/model pair the factory cannot honour, before anything is written.
+
+    The pair is checked as it will stand AFTER the save: a patch that names only one of the two is
+    read against the other's current value, because that is the pair ``build_backend`` will receive.
+    The listing is fetched only when a model is named — an empty model is every backend's measured
+    default and needs no index.
+    """
+    if not {"CHIMERA_DECISION_BACKEND", "CHIMERA_DECISION_MODEL"} & set(updates):
+        return
+    from chimera.decisions.system_one import SystemOneListing, check_choice, list_models
+
+    current = get_settings()
+    backend = str(updates.get("CHIMERA_DECISION_BACKEND", current.decision_backend or "local_logprob"))
+    model = str(updates.get("CHIMERA_DECISION_MODEL", current.decision_model or ""))
+    check_choice(backend, model, list_models() if model.strip() else SystemOneListing(models=()))
+
+
 def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> dict[str, Any]:
     """Persist ``updates`` (env-var -> value) to ``.env`` after allowlisting the keys.
 
@@ -554,6 +587,7 @@ def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> di
     for key, value in updates.items():
         if any(c in str(value) for c in "\r\n"):
             raise ValueError(f"value for {key} may not contain a newline")
+    _check_decision_choice(updates)
     path = env_path or Path(".env")
     for key, value in updates.items():
         _write_env_var(path, key, str(value))

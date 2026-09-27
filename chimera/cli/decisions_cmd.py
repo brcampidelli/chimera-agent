@@ -1,4 +1,5 @@
-"""``chimera decisions`` — read the decision log, label an answer, report, refit (study 22, phase 2).
+"""``chimera decisions`` — choose the System One model, read the decision log, label an answer, report,
+refit (study 22, phase 2).
 
 The log is ``<home>/decisions/decisions.jsonl`` (`chimera/decisions/log.py`): every answer a decider
 gave, with its raw number. A label says what was true — for ``governance.danger``, whether the
@@ -17,7 +18,7 @@ from rich.console import Console
 from rich.table import Table
 
 decisions_app = typer.Typer(
-    help="The decision log: what the typed decisions answered, labels, a report and a refit.",
+    help="Typed decisions: which model answers them, the log of what they answered, labels, a report and a refit.",
     no_args_is_help=True,
 )
 console = Console()
@@ -169,3 +170,64 @@ def do_refit(
         own.add(m)
     own.save(path)
     console.print(f"[green]wrote {len(fitted)} map(s)[/green] to {path}")
+
+
+@decisions_app.command("models")
+def show_models() -> None:
+    """The System One models OpenRouter lists, which one is active, and which carry a calibration map."""
+    from chimera.config import get_settings
+    from chimera.decisions.calibration import CalibrationMaps
+    from chimera.decisions.factory import default_model_for, maps_path
+    from chimera.decisions.system_one import BACKEND, list_models
+
+    settings = get_settings()
+    backend = (settings.decision_backend or "local_logprob").strip()
+    model = (settings.decision_model or "").strip()
+    listing = list_models(CalibrationMaps.shipped().merged(CalibrationMaps.load(maps_path(settings))))
+    active = (model or default_model_for(settings, backend)) if backend == BACKEND else ""
+    table = Table(title="System One models (OpenRouter, output: decisions)")
+    for column in ("", "model", "$/1M in", "context", "questions", "calibrated", "choosable"):
+        table.add_column(column)
+    for m in listing.models:
+        price = "—" if m.input_per_m is None else ("free" if m.input_per_m == 0 else f"{m.input_per_m:g}")
+        table.add_row(
+            "*" if m.slug == active else "", m.slug, price, "—" if m.context is None else str(m.context),
+            ", ".join(m.questions) or "—", "yes" if m.calibrated else "no",
+            "yes" if m.selectable else f"no ({m.refusal.replace('_', ' ')})",
+        )
+    console.print(table)
+    if listing.stale:
+        console.print(f"[yellow]OpenRouter's index was not reached ({listing.reason}); showing the default only[/yellow]")
+    console.print(f"active: [bold]{backend}[/bold] / {model or default_model_for(settings, backend) + ' (default)'}")
+    console.print(
+        "[dim]uncalibrated = no map for that model yet: its confidence is read raw. "
+        "Choose with: chimera decisions use <backend> [model][/dim]"
+    )
+
+
+@decisions_app.command("use")
+def use(
+    backend: str = typer.Argument(..., help="local_logprob | hosted_verbalized | openrouter_decisions"),
+    model: str = typer.Argument("", help="Empty = the backend's measured default. For openrouter_decisions, a listed slug."),
+) -> None:
+    """Choose the backend (and model) that answers typed decisions — written to ``.env`` in this folder,
+    the same pair and the same check as the desktop's System One card."""
+    from chimera.api.config_api import patch_config
+    from chimera.config import get_settings
+    from chimera.decisions.factory import default_model_for, openrouter_key_set
+
+    try:
+        # Both keys, always: naming a backend without a model means its default, and leaving the old
+        # model in place would hand, say, a Jev slug to Ollama.
+        patch_config(
+            {"CHIMERA_DECISION_BACKEND": backend.strip(), "CHIMERA_DECISION_MODEL": model.strip()},
+            env_path=Path.cwd() / ".env",
+        )
+    except ValueError as exc:
+        console.print(f"[red]refused:[/red] {exc}")
+        raise typer.Exit(code=1) from exc
+    settings = get_settings()
+    shown = model.strip() or f"{default_model_for(settings, backend.strip())} (default)"
+    console.print(f"[green]Set[/green] decisions: {backend.strip()} / {shown}")
+    if backend.strip() == "openrouter_decisions" and not openrouter_key_set(settings):
+        console.print("[yellow]no OpenRouter key is set — every decision will halt until one is[/yellow]")

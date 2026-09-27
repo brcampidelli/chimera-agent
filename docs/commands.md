@@ -28,7 +28,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
 | [`decide`](#decide) | Ask typed questions — yes/no, a choice, a score — and get probabilities back. |
-| [`decisions`](#decisions) | The decision log: what the typed decisions answered, labels, a report and a refit. |
+| [`decisions`](#decisions) | Typed decisions: which model answers them, the log of what they answered, labels, a report and a refit. |
 | [`delegations`](#delegations) | Measured vs counterfactual across delegations — what the hierarchy actually saved. |
 | [`deliver`](#deliver) | Deliverable Mode: produce a polished, self-contained artifact. Requires a key. |
 | [`doctor`](#doctor) | Check the environment and configuration. With --fix, repair safe setup issues. |
@@ -458,7 +458,7 @@ chimera decide
 
 ## decisions
 
-The decision log: what the typed decisions answered, labels, a report and a refit.
+Typed decisions: which model answers them, the log of what they answered, labels, a report and a refit.
 
 ```bash
 chimera decisions

@@ -585,6 +585,14 @@ class BridgeCfgOut(BaseModel):
     full: bool = False
 
 
+class DecisionsCfgOut(BaseModel):
+    """Which backend answers a typed decision and which model (``chimera/config.py``). An empty model
+    is the backend's measured default; a server without the block is on the shipped default."""
+
+    backend: str = "local_logprob"
+    model: str = ""
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -594,6 +602,7 @@ class ConfigOut(BaseModel):
     browser: BrowserCfgOut = Field(default_factory=BrowserCfgOut)
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
+    decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
@@ -1704,6 +1713,40 @@ class DecisionsOut(BaseModel):
     specs: list[DecisionSpecOut]
     groups: list[DecisionGroupOut]
     recent: list[DecisionRowOut]
+
+
+class SystemOneModelOut(BaseModel):
+    """One model OpenRouter lists with ``output_modalities: decisions`` (``chimera/decisions/system_one.py``)."""
+
+    slug: str
+    name: str
+    input_per_m: float | None = None
+    """USD per 1M input tokens; null when the index quotes none — never read as free."""
+    context: int | None = None
+    description: str = ""
+    contract: str
+    """``jev`` (Noul, Choice, Score — what Chimera's client sends), ``behavior`` or ``unknown``."""
+    questions: list[str]
+    alias: bool = False
+    selectable: bool
+    refusal: str = ""
+    """Why it cannot be chosen, as a word: ``alias`` | ``behavior_contract`` | ``unknown_contract``."""
+    calibrated: bool = False
+    """A calibration map exists for this slug; without one its confidence reads raw."""
+
+
+class SystemOneModelsOut(BaseModel):
+    backend: str
+    model: str
+    """As configured; empty = the backend's default, which ``default_model`` names."""
+    default_model: str
+    backends: list[str]
+    models: list[SystemOneModelOut]
+    stale: bool = False
+    """True when the index was not reached and ``models`` is the shipped default alone."""
+    reason: str = ""
+    openrouter_key_set: bool = False
+    """Whether an OpenRouter key is configured — the System One backend halts every call without one."""
 
 
 class DecisionLabelOut(BaseModel):

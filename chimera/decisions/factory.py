@@ -27,6 +27,32 @@ def maps_path(settings: Any) -> Path:
     return Path(settings.home) / "decisions" / "maps.json"
 
 
+def _openrouter_key(settings: Any) -> str:
+    # The settings read the key the way the gateway does (`.env`, then the environment); the backend
+    # never prints it and never stores it anywhere but the request header.
+    return str(getattr(settings, "openrouter_api_key", None) or os.environ.get("OPENROUTER_API_KEY", ""))
+
+
+def openrouter_key_set(settings: Any) -> bool:
+    """Whether the Decisions backend has a key to send — a yes/no, never the key."""
+    return bool(_openrouter_key(settings))
+
+
+def default_model_for(settings: Any, backend: str) -> str:
+    """The model ``build_backend`` uses for ``backend`` when none is set — what an empty setting means."""
+    if backend == "local_logprob":
+        from chimera.decisions.local import DEFAULT_MODEL
+
+        return DEFAULT_MODEL
+    if backend == "hosted_verbalized":
+        return str(settings.fusion_judge)
+    if backend == "openrouter_decisions":
+        from chimera.decisions.openrouter import DEFAULT_MODEL as VENDOR_MODEL
+
+        return VENDOR_MODEL
+    raise ValueError(f"unknown decision backend {backend!r}; one of {', '.join(BACKENDS)}")
+
+
 def build_backend(settings: Any, *, gateway: Any | None = None) -> DecisionBackend:
     """The backend the settings name, with its measured default model when none is set."""
     name = (settings.decision_backend or "local_logprob").strip()
@@ -52,8 +78,7 @@ def build_backend(settings: Any, *, gateway: Any | None = None) -> DecisionBacke
 
         # The settings read the key the way the gateway does (`.env`, then the environment); the
         # backend never prints it and never stores it anywhere but the request header.
-        key = getattr(settings, "openrouter_api_key", None) or os.environ.get("OPENROUTER_API_KEY", "")
-        return OpenRouterDecisionsBackend(key, model or VENDOR_MODEL)
+        return OpenRouterDecisionsBackend(_openrouter_key(settings), model or VENDOR_MODEL)
     raise ValueError(f"unknown decision backend {name!r}; one of {', '.join(BACKENDS)}")
 
 

@@ -119,6 +119,9 @@ export type SandboxState = Schemas["SandboxStateOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];
 export type Tools = Schemas["ToolsOut"];
 export type Decisions = Schemas["DecisionsOut"];
+/** The System One models OpenRouter lists, with the backend/model this server answers decisions with. */
+export type SystemOneModels = Schemas["SystemOneModelsOut"];
+export type SystemOneModel = Schemas["SystemOneModelOut"];
 export type Maturity = Schemas["MaturityOut"];
 export type MaturitySurface = Schemas["MaturitySurfaceOut"];
 export type Benchmarks = Schemas["BenchmarksOut"];

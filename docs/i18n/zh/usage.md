@@ -1,5 +1,5 @@
 ---
-source_sha256: 51204191938970d932cfa23c8a1b15ce45647f8fe7335793a525d5fa3a078bf0
+source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
 ---
 
 # Chimera —— 使用指南
@@ -558,6 +558,21 @@ uv run chimera meta "an agent that triages GitHub issues and routes them to team
 uv run chimera guard "rm -rf /"                       # BLOCK
 uv run chimera guard "list the files in this folder"  # ALLOW
 ```
+
+### `decisions` —— 由哪个模型回答类型化决策
+类型化决策（是/否、选择、评分）由三个后端之一回答：`local_logprob`（通过 Ollama 的小模型，默认，免费）、
+`hosted_verbalized`（融合的评审模型）或 `openrouter_decisions`（OpenRouter 上的 System One 模型）。
+默认安装下没有任何东西会自行调用它：只有在你开启治理的 REVIEW 带或 `decide` 工具，或调用
+`chimera decide` 时，它才会回答。
+
+```bash
+uv run chimera decisions models                                   # OpenRouter 的列表；* = 当前使用
+uv run chimera decisions use openrouter_decisions typesafe/jev-1.13
+uv run chimera decisions use local_logprob                        # 回到默认
+```
+
+同样的选择就是桌面应用设置中的 **System One** 卡片。只有使用 Jev 契约（是/否、选择、评分）的模型可以被选中；
+行为评分模型或移动别名会列出但被拒绝。没有校准映射的模型按原始值读取置信度。
 
 ### `bench` —— 持续演进基准测试
 
