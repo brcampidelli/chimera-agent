@@ -6,6 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.62.2] - 2026-09-26
+### Added
+
+- **`chimera mcp desktop`: Claude can operate the running desktop app.** It is a stdio MCP server that bridges to the app's own local API, and every call runs in the original handler. It is set up in two steps:
+  1. Turn on **Settings → Claude → "Allow Claude to operate this app"**.
+  2. Register the server with `claude mcp add chimera-desktop -- chimera mcp desktop`.
+  - **Operate** gives 22 area tools over the whole app, with approvals read-only. Each tool takes a closed list of actions from one route table, so a client can never name an arbitrary URL. The owner's posture is injected server-side, and any attempt to widen it is refused.
+  - **Full control**, a second switch, adds approving or denying pending items, and editing settings, identity and agents. With it off, those tools are not listed and the app refuses them with 403.
+  - **Credentials are out whatever the switches say.** No tool reads or writes a key or token value, and every response is scrubbed.
+  - Both switches are off by default and take effect live. The discovery file holds a per-session token and is deleted when the switch goes off or the app quits.
+  - A workspace inside or above the app's data folder is refused, so the operate level cannot approve by writing an answer file. (#648)
+
 ## [0.62.1] - 2026-09-26
 ### Fixed
 
