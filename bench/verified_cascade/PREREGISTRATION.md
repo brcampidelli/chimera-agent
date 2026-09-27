@@ -1,6 +1,6 @@
 # Pre-registration — a decision-gated cascade for grounded answers ("Jev-verified cascade")
 
-**Registered 2026-09-26, before any paid call and before any model call.** No model has seen an item of this bench, and nothing in this file was read off a model's output. The only thing that has run is `build_items.py`, which is stdlib-only and offline, and `power.py`, which is arithmetic. The spend is not yet approved: this file proposes a cap of **US$ 5.00** (§10) and the owner decides it. This file follows `bench/PROTOCOL.md`; the rules it satisfies are cited by number, and §14 maps them.
+**Registered 2026-09-26, before any paid call and before any model call.** No model has seen an item of this bench, and nothing in this file was read off a model's output. The only thing that has run is `build_items.py`, which is stdlib-only and offline, and `power.py`, which is arithmetic. The spend cap was set by the owner on 2026-09-27 at **US$ 20.00**, admission stopping at US$ 18.00 (§10, Amendment 0); the first version of this file proposed US$ 5.00. This file follows `bench/PROTOCOL.md`; the rules it satisfies are cited by number, and §14 maps them.
 
 ## 0. What is being tested, and why now
 
@@ -323,12 +323,12 @@ Items run in sha256(item id) order, fixed at the freeze. Every stage's calls are
 | **core: S1–S5** | | | **~2.5–3.6** |
 | S6: L's extra escalations + C's remaining items | ~US$ 0.013 each | up to about 350 | up to ~4.5 |
 
-**The proposed cap is US$ 5.00**, with admission stopping at **US$ 4.50** of billed-or-computed spend. The core fits the US$ 3–5 range the owner was given. **Full coverage of L and C does not fit:** every item with a Sol draft would take the total to about US$ 6–8. So L and C are reported on the items the remaining budget covers, from the head of the frozen order. The owner may raise the cap to about US$ 8 for full coverage; that is a decision for the owner, taken before S1, not one this file makes.
+**The cap is US$ 20.00** (the owner's decision of 2026-09-27, Amendment 0), with admission stopping at **US$ 18.00** of billed-or-computed spend. The first version of this file proposed US$ 5.00, under which L and C could only be covered from the head of the frozen order. **At US$ 20, L and C get full coverage of every item:** `f1` exists on every item, so every arm is paired on the full n (about 400) and F2 (§8) is read at the same n as F1. The estimated total with full coverage is about US$ 7–9 (core ~2.5–3.6, plus `f1`, its two verifier reads and its grading on the remaining ~300 items, ~4.5–5.5); the gap to the admission stop absorbs a 2× miss on the unmeasured output and reasoning tokens (§10's main uncertainty). If the pilot's measured costs project the full design above US$ 18, the sizing rule below applies.
 
 **Sizing, fixed now (after S2).** With mean costs per call measured in the pilot (the larger of billed and computed), and the pilot's escalation rates e_B, e_D, e_L:
-- **Steps S3–S5 are projected over all items.** If the projection plus spend-so-far exceeds US$ 4.50, `n` is cut from the tail of the frozen order until it fits.
+- **Steps S3–S5 are projected over all items.** If the projection plus spend-so-far exceeds US$ 18.00, `n` is cut from the tail of the frozen order until it fits.
 - **If the cut leaves n < 300**, there is no main run: at the rates assumed in §6, n < 300 loses most of its power. It is reported as unaffordable at this cap, and the owner decides.
-- **S6** then spends what remains, L's escalations first, then C.
+- **S6** then spends what remains, L's escalations first, then C; at the US$ 20 cap this is expected to reach every item (full coverage, Amendment 0).
 
 ## 11. Floors, replicates and controls
 
@@ -411,4 +411,46 @@ Items run in sha256(item id) order, fixed at the freeze. Every stage's calls are
 
 ## Amendments
 
-*None yet. Amendment 0 is reserved for the item freeze (§3.3): the authored `items.jsonl`, the V slice, their sha256s and the freeze report, committed before S1.*
+### Amendment 0 — the owner's decisions and the item freeze (2026-09-27, before any paid or model call)
+
+Committed before any spend. Nothing below was read off a model's output: no model has been called.
+
+**A. The owner's decisions.**
+1. **Item author.** The questions, reference answers, key facts and premise questions were written by Claude (Anthropic): one Claude Opus 5.5 session that fixed the rules and the checks, and four sub-sessions of the same model family that each wrote one quarter (ANS EN, ANS PT, NCP EN, NCP PT) against the lint below, with no model output of any arm in view. **So no Anthropic model is an arm, a verifier or a grader, and the design already excludes them:** the drafters are OpenAI (`gpt-6-luna`, `gpt-6-sol`), the verifiers typesafe (`jev-1.13`) and Qwen (`qwen3:4b`, local), the graders DeepSeek (`deepseek-v4-flash-0731`) and Mistral (`mistral-small-3.2-24b-instruct`), and the swap grader Google (`gemini-3.8-flash`). The `premium` ladder's `claude-opus-5` rung (§4, "Why Sol") is not used anywhere. The report names the author (§15).
+2. **Budget: cap US$ 20.00, admission stops at US$ 18.00.** §10 and the header are updated in place. With it, **arms L and C get full coverage of every item** (`f1` on all items), so F2 is read at the full n, not on a head of the frozen order.
+3. **Adoption thresholds kept as proposed** (§8): opt-in when cost ≤ 5× A and ANS hand-offs ≤ 15%; default when cost ≤ 3× A, ANS hand-offs ≤ 5% and correct answers on ANS non-inferior at −5 pp.
+4. **Open items keep this file's defaults.** Luna's `declined` path → **hand-off** as primary, "reply that the sources don't cover it" (ship the decline) as the registered secondary variant. Second grader `mistral-small-3.2-24b-instruct` with the `gemini-3.8-flash` swap rule (§5.3). The decision criteria stay the brief's paraphrase as written in §4.1; **the cookbook's literal text can replace them only before S1, and only by amendment.**
+5. **Run plan.** The paid run is not run now. It will be driven later from the Chimera desktop app through its MCP server (`chimera mcp desktop`, shipped in 0.62.2/0.62.3); the harness (`run.py`) is equally runnable from a terminal. See the README.
+
+**B. The freeze.** `python bench/verified_cascade/build_items.py freeze` (stdlib, offline, deterministic; `freeze --check` rebuilds and compares) read the authored files and wrote `items.jsonl`, `verifier_slice.jsonl`, `freeze_report.txt` and `manifest.json`. `python bench/verified_cascade/check_items.py` validates all of it (counts per family and language, key facts in gold and reference and absent from every NCR excerpt, NCP tempting terms absent from the excerpts, the number check's self-test, no duplicate or near-duplicate question, a source on every item, and every file against the manifest) and prints `OK`.
+
+| | EN | PT | total |
+|---|---:|---:|---:|
+| ANS | 69 | 75 | 144 |
+| NCR | 69 | 75 | 144 |
+| NCP | 56 | 56 | 112 |
+| **items** | 194 | 206 | **400** (256 distinct questions) |
+
+- **Drops: none.** Check 2 needed no spare-neighbour replacement (every key fact was chosen, under the lint, to be absent from all four NCR excerpts); checks 1, 3 and 4 dropped nothing.
+- Excerpt words, median: ANS 632, NCR 644, NCP 556; question words, median: 15, 15, 13.
+- **The V slice: 1,230 triples** — gold 144, num 29, offtopic 257, extra 144, fabricated 144, tempt 112, decline 400. The number check fires on 29/29 V-num and on 0/144 V-gold.
+
+**Manifest** (`results/manifest.json`, **sha256 `d1b4bba0176d37b6ed535ec8d4f1297864a05412004bcfdb42d648b273eee59a`**), which pins:
+
+| file | sha256 |
+|---|---|
+| `questions_ans.jsonl` (authored) | `bef7146e11ca5304a4cec69aa6d502e6682b19a8493f3dac974525c5bfe6b75d` |
+| `questions_ncp.jsonl` (authored) | `14433329785020c334167f9d54a1df5cc07fd5ee3a4bcc2240e049f88f18ca69` |
+| `items.jsonl` | `61de7593e69ac702e2d9e067b618b4ea067bb9b1d9e4469018f37472ff4c962a` |
+| `verifier_slice.jsonl` | `71342a638dc4703deed313276bd0290799ddc7bbff6258eeb8d4c028d459ec2b` |
+| `freeze_report.txt` | `4313198e7e93f3761855be004a96465d274e88f38f29984355d2483db7543ada` |
+| `excerpts.jsonl`, `skeleton.jsonl`, `sources.json` | unchanged from §3.2 |
+
+**C. Clarifications the freeze and the harness had to make, fixed here before any call.**
+1. **NCP excerpts** are the 4 chunks nearest the question text by the builder's TF-IDF (fitted on the language's pool), **same document first** — the rule ANS and NCR use (§3.2), so the three families share one retrieval.
+2. **V-num is smaller than planned: 29 triples.** Following §3.4 literally, only a *numeric key fact* is mutated, and most key facts the lint accepted are flags, variables and names rather than numbers. Not widened after the fact. The grader preflight takes 40 per construction type where available: **all 7 types** (gold, num, offtopic, extra, fabricated, tempt, decline), so 6 × 40 + 29 = **269 triples** instead of the 240 §5.3 named, and "recall on the wrong constructions" is computed over **all five** unsupported types (§5.3 said four; §3.4 defines five).
+3. **V labels mapped to grading labels:** supported → correct, unsupported → wrong; **declined → declined on an ANS item and → correct on an NCR or NCP item**, where a decline is the correct behaviour (§5.1).
+4. **The number check matches digit runs as runs**: a run in the answer passes only if the same maximal run occurs in the excerpts or the question (so `280` does not pass on `2800`).
+5. **Cost.** The gateway returns tokens but not OpenRouter's billed figure for chat calls; the harness records the catalogue-computed price (`price_completion`) and, where the route returns a billed cost (the Decisions API does), the billed one, and admission counts the larger. A per-generation billed lookup is not added, because it is another call per call.
+6. **A graded draft on which the number check fires is labelled wrong without a grader call** (§5.2: "first and final").
+7. **V-extra** is built as §3.4 says (the reference plus the first sentence of another file's reference, same language), not from a template set.

@@ -1,0 +1,31 @@
+{
+ "amendment": 0,
+ "counts": {
+  "ANS:en": 69,
+  "ANS:pt": 75,
+  "NCP:en": 56,
+  "NCP:pt": 56,
+  "NCR:en": 69,
+  "NCR:pt": 75
+ },
+ "dropped": {},
+ "files": {
+  "excerpts.jsonl": "e620fa3c6fc3642aae4e51b1821eccc386d7b8598b3f5fe42e29120ed213ff64",
+  "freeze_report.txt": "4313198e7e93f3761855be004a96465d274e88f38f29984355d2483db7543ada",
+  "items.jsonl": "61de7593e69ac702e2d9e067b618b4ea067bb9b1d9e4469018f37472ff4c962a",
+  "questions_ans.jsonl": "bef7146e11ca5304a4cec69aa6d502e6682b19a8493f3dac974525c5bfe6b75d",
+  "questions_ncp.jsonl": "14433329785020c334167f9d54a1df5cc07fd5ee3a4bcc2240e049f88f18ca69",
+  "skeleton.jsonl": "e6fda693826f15c3abbf37714d7175a14dcabd90b8976984a0a8704b512fc6aa",
+  "sources.json": "66a2cb3ff676977d439ba54d4d8ec036a6f81b0b6795e25676dfeabdbf1c1f00",
+  "verifier_slice.jsonl": "71342a638dc4703deed313276bd0290799ddc7bbff6258eeb8d4c028d459ec2b"
+ },
+ "v_counts": {
+  "decline": 400,
+  "extra": 144,
+  "fabricated": 144,
+  "gold": 144,
+  "num": 29,
+  "offtopic": 257,
+  "tempt": 112
+ }
+}

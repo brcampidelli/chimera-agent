@@ -24,6 +24,8 @@ they must pass are in PREREGISTRATION.md §3.3 and are checked when the item fil
 
     python bench/verified_cascade/build_items.py          # writes results/, prints the summary
     python bench/verified_cascade/build_items.py --check  # rebuilds and compares the sha256s
+    python bench/verified_cascade/build_items.py freeze   # Amendment 0: items, V slice, manifest
+    python bench/verified_cascade/build_items.py freeze --check
 """
 
 from __future__ import annotations
@@ -240,8 +242,14 @@ def summary(result: dict, digests: dict[str, str]) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    ap.add_argument("action", nargs="?", choices=("build", "freeze"), default="build")
     ap.add_argument("--check", action="store_true", help="rebuild and compare against results/")
     args = ap.parse_args()
+    if args.action == "freeze":
+        sys.path.insert(0, str(ROOT))
+        from bench.verified_cascade.freeze import freeze
+
+        return freeze(check=args.check)
     result = build()
     if args.check:
         want = {n: sha((OUT / n).read_bytes().decode("utf-8")) for n in ("excerpts.jsonl", "skeleton.jsonl", "sources.json")}

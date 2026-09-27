@@ -1,0 +1,12 @@
+freeze report (Amendment 0)
+
+ANS: en 69, pt 75, dropped {}
+NCR: en 69, pt 75, dropped {}
+NCP: en 56, pt 56, dropped {}
+items 400; distinct questions 256
+ANS excerpt words median 632 (min 162, max 2100); question words median 15
+NCR excerpt words median 644 (min 241, max 1815); question words median 15
+NCP excerpt words median 556 (min 327, max 1570); question words median 13
+V slice 1230 triples: gold 69+75, num 10+19, offtopic 124+133, extra 69+75, fabricated 69+75, tempt 56+56, decline 194+206
+number check self-test: fires on 29/29 V-num, 0 V-gold
+
