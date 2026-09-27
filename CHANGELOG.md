@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.63.1] - 2026-09-27
+### Fixed
+
+- **The desktop agent can start long commands in the background, read them and stop them, inside `run_shell`'s fences.** A bench stage driven through the MCP bridge was cut at 120 s. The existing `run_shell(background=true)`, `job_status` and `job_cancel` now close the gaps:
+  - **Limits:** at most 3 concurrent jobs (`CHIMERA_JOBS_MAX_RUNNING`) and 6 hours per job (`CHIMERA_JOBS_MAX_RUNTIME`). An overrun job has its whole process tree killed.
+  - **Exit recording:** the exit code and end time are recorded the moment the process ends.
+  - **Bounded reads:** output is read by head and tail.
+  - **Isolation:** each workspace sees and stops only its own jobs.
+  - **Orphans:** an orphaned job reads `lost`, never `running`.
+  - **App exit:** closing the app ends its jobs. On Windows they run in a kill-on-close Job Object.
+  - **POSIX sandbox:** bwrap and Seatbelt now wrap the job, instead of refusing it.
+  - **Same fences as the foreground:** the same approval card, the same workspace jail, the same scrubbed environment and the same taint marking.
+  - **Timeout hint:** a timeout now points to `background=true`.
+  - **Where to see it:** a "Background jobs" panel on the Code screen and a new MCP bridge area, `desktop_shell_jobs` (list, read, stop). (#658)
+
 ## [0.63.0] - 2026-09-27
 ### Added
 
