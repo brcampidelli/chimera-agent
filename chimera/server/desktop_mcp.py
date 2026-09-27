@@ -70,7 +70,7 @@ def urllib_call(
 
 
 def _read_discovery() -> dict[str, Any] | None:
-    from chimera.api.desktop_bridge import read_discovery
+    from chimera.api.bridge_discovery import read_discovery
 
     return read_discovery()
 
