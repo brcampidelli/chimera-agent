@@ -5493,8 +5493,8 @@
         "title": "InjectionReportOut",
         "type": "object"
       },
-      "JobOut": {
-        "description": "One background job \u2014 a `run_shell(background=true)` the agent started and did not wait for.\n\n``state`` is ``running`` | ``finished`` | ``cancelled`` | ``lost``. ``lost`` is honest about a\nprocess this backend did not start (the app restarted): its pid is gone and its exit code was\nnever seen, so \"finished\" would be a number nobody observed. ``reported`` says whether a turn\nhas already been told it ended.",
+      "JobLogOut": {
+        "description": "One job with a bounded slice of its log (``GET /api/jobs/{id}``).",
         "properties": {
           "command": {
             "title": "Command",
@@ -5515,6 +5515,117 @@
             ],
             "title": "Exit Code"
           },
+          "extra": {
+            "additionalProperties": true,
+            "title": "Extra",
+            "type": "object"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "gap": {
+            "default": false,
+            "title": "Gap",
+            "type": "boolean"
+          },
+          "head": {
+            "default": "",
+            "title": "Head",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "log_size": {
+            "default": 0,
+            "title": "Log Size",
+            "type": "integer"
+          },
+          "max_runtime": {
+            "default": 0.0,
+            "title": "Max Runtime",
+            "type": "number"
+          },
+          "owner": {
+            "default": "",
+            "title": "Owner",
+            "type": "string"
+          },
+          "pid": {
+            "title": "Pid",
+            "type": "integer"
+          },
+          "reported": {
+            "default": false,
+            "title": "Reported",
+            "type": "boolean"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "tail": {
+            "default": "",
+            "title": "Tail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "command",
+          "cwd",
+          "pid",
+          "started_at",
+          "log",
+          "state"
+        ],
+        "title": "JobLogOut",
+        "type": "object"
+      },
+      "JobOut": {
+        "description": "One background job \u2014 a `run_shell(background=true)` the agent started and did not wait for.\n\n``state`` is ``running`` | ``finished`` | ``cancelled`` | ``timed_out`` | ``lost``.\n``timed_out`` means it reached ``max_runtime`` and was killed with everything it started.\n``lost`` is honest about a process nobody is watching any more (the app that started it\nrestarted): its exit code was never seen, so \"finished\" would be a number nobody observed.\n``reported`` says whether a turn has already been told it ended.",
+        "properties": {
+          "command": {
+            "title": "Command",
+            "type": "string"
+          },
+          "cwd": {
+            "title": "Cwd",
+            "type": "string"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          },
+          "extra": {
+            "additionalProperties": true,
+            "title": "Extra",
+            "type": "object"
+          },
           "finished_at": {
             "anyOf": [
               {
@@ -5532,6 +5643,16 @@
           },
           "log": {
             "title": "Log",
+            "type": "string"
+          },
+          "max_runtime": {
+            "default": 0.0,
+            "title": "Max Runtime",
+            "type": "number"
+          },
+          "owner": {
+            "default": "",
+            "title": "Owner",
             "type": "string"
           },
           "pid": {
@@ -13307,6 +13428,66 @@
           }
         },
         "summary": "Jobs Endpoint"
+      }
+    },
+    "/api/jobs/{job_id}": {
+      "get": {
+        "description": "One background job with a bounded slice of its log: the first ``head_lines`` and the last\n``tail_lines`` lines (capped at 200 and 500), read from the two ends of the file \u2014 a job\nthat printed a gigabyte is answered from a few kilobytes. 404 for a job this home never had.",
+        "operationId": "job_endpoint_api_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "head_lines",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "title": "Head Lines",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tail_lines",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "title": "Tail Lines",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobLogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Endpoint"
       }
     },
     "/api/jobs/{job_id}/cancel": {

@@ -93,6 +93,10 @@ _AREA_TITLES: dict[str, str] = {
     "files": "Files in a workspace. Credential files (.env, keys) and the app's own data folder are out of reach.",
     "git": "Git in a workspace.",
     "planning": "Planner preview, requirements and typed decisions.",
+    "shell_jobs": (
+        "Background shell jobs the app's agent started with run_shell(background=true): they "
+        "outlive the turn. List them, read one's log (bounded), stop one."
+    ),
     "insights": "Spend, worth, benchmarks, health.",
     "app": "How the app is set up. Credentials are reported only as set/unset.",
     "approve": "FULL CONTROL: answer approvals and gated steps on the owner's behalf.",

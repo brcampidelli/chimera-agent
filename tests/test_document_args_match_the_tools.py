@@ -48,6 +48,9 @@ _IDENTIFIERS = frozenset({
     # `read_file`: which window of the file — two integers, no body.
     "start_line",
     "max_lines",
+    # `job_status`: how many lines of a job's log, from each end — two integers, no body.
+    "head_lines",
+    "tail_lines",
     # `mcp_call`/`mcp_describe`: which server tool. The identity of the action — an audit line
     # reading "called <120 chars>" would record that something happened and nothing about what.
     "tool",

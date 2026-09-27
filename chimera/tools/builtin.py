@@ -134,10 +134,16 @@ def default_registry(
     from chimera.core.jobs import jobs_for
     from chimera.tools.jobs import JobCancelTool, JobStatusTool
 
+    # The limits are the deployment's (`CHIMERA_JOBS_MAX_RUNNING`, `CHIMERA_JOBS_MAX_RUNTIME`), read
+    # each time a registry is built so a changed setting applies from the next turn. The two job
+    # tools see only jobs started inside THIS workspace (the jail `run_shell` applies to its cwd),
+    # and `job_status` carries the shell tool's own output marker: it returns the shell's output.
     jobs = jobs_for(settings.home)
-    registry.register(RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs))
-    registry.register(JobStatusTool(jobs))
-    registry.register(JobCancelTool(jobs))
+    jobs.configure(max_running=settings.jobs_max_running, max_runtime=settings.jobs_max_runtime)
+    shell = RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs)
+    registry.register(shell)
+    registry.register(JobStatusTool(jobs, shell.workspace, output_like=shell))
+    registry.register(JobCancelTool(jobs, shell.workspace))
     # The conversation history — every coding turn that finished, kept after the session's own
     # trimming forgot it. Read-only, scoped to THIS workspace by the same key memory is scoped by,
     # and in the default registry for the reason the task list is: a session the operator scoped

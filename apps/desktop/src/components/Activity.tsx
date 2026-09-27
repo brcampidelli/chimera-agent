@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Check, X, Wrench, Cpu, Brain, CircleDollarSign } from "lucide-react";
 import { Fusion } from "@/components/Fusion";
+import { JobsPanel } from "@/components/JobsPanel";
 import { MachinePanel } from "@/components/MachinePanel";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -117,6 +118,11 @@ export function Activity() {
       {/* The routing breakdown for this same turn. Renders nothing unless the turn used fusion or
           the cascade, so it never leaves an empty box behind. */}
       <Fusion report={report} />
+
+      {/* The commands the agent left running in the background. They outlive the turn, and the
+          turn's Stop does not reach them, so this is where they are seen and stopped. Renders
+          nothing while there are none. */}
+      <JobsPanel />
 
       {/* What the machine is spending, beside what the agent is doing — the two questions someone
           watching a long run actually alternates between. Every reading is nullable and an absent

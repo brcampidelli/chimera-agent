@@ -18,6 +18,8 @@ import type {
   GitStatus,
   RouteMeta,
   Resources,
+  BackgroundJob,
+  BackgroundJobs,
   CompletionAcceptance,
   DiagnosticsResult,
   InlineCompletion,
@@ -380,6 +382,12 @@ export const getCompletionStats = () => json<CompletionAcceptance>("/api/complet
 // be taken is absent, never zero. 0% VRAM on an AMD card would be believed, and would be wrong
 // about hardware the user is looking at.
 export const getResources = () => json<Resources>("/api/resources");
+// The agent's background shell jobs (`run_shell` with `background: true`). They outlive the turn
+// that started them, so the list does not depend on any conversation being open; stopping one kills
+// the command and everything it started.
+export const listJobs = () => json<BackgroundJobs>("/api/jobs");
+export const stopJob = (jobId: string) =>
+  json<BackgroundJob>(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: "POST" });
 
 // --- Git (status / diff / commit / scoped revert for the Code screen's git panel) ---
 // All gate on `is_git_repo` server-side: a non-repo (or git-missing) folder returns the honest

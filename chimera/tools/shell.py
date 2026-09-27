@@ -33,7 +33,14 @@ class RunShellTool(Tool):
         "type": "object",
         "properties": {
             "command": {"type": "string", "description": "The shell command to run."},
-            "timeout": {"type": "integer", "description": "Timeout in seconds (default 60)."},
+            "timeout": {
+                "type": "integer",
+                "description": (
+                    "Timeout in seconds (default 60). A command that may take longer than a few "
+                    "minutes (a benchmark, a long build or test run) should be started with "
+                    "background=true instead of a long timeout."
+                ),
+            },
             "cwd": {
                 "type": "string",
                 "description": "Working directory, relative to the workspace (default: workspace root).",
@@ -78,6 +85,7 @@ class RunShellTool(Tool):
         """The `background: true` path, reached only AFTER every gate the foreground path passes:
         the kernel and the taint ledger saw this exact call one wrapper out, and the host-exec
         confirm above said yes. What differs is only that nobody waits."""
+        from chimera.core.jobs import JobLimitError
         from chimera.sandbox import LocalSandbox
         from chimera.sandbox.local import _child_env
 
@@ -86,21 +94,34 @@ class RunShellTool(Tool):
                 "error: background jobs are not available here — this registry has no job store. "
                 "Run the command in the foreground."
             )
-        if self._sandbox_is_isolated(sandbox) or not isinstance(sandbox, LocalSandbox):
+        # The local family only: the host, or a kernel sandbox (bubblewrap, Seatbelt) that is the
+        # same process wrapped in an argv — `_command_argv` below applies that wrapper to the job
+        # exactly as `run` applies it to a foreground command. A container is another thing: it runs
+        # a command to completion inside itself, and there is no detached form of that here.
+        if not isinstance(sandbox, LocalSandbox):
             return (
-                "error: background jobs run on the host sandbox only — an isolated sandbox runs a "
-                "command to completion inside its container and has no detached form. Run it in "
-                "the foreground, or set CHIMERA_SANDBOX=local."
+                "error: background jobs run on the host sandbox only — an isolated container runs a "
+                "command to completion inside itself and has no detached form. Run it in the "
+                "foreground, or set CHIMERA_SANDBOX=local."
             )
         argv, use_shell = sandbox._command_argv(command, cwd)
         try:
             job = self._jobs.start(command, cwd=cwd, env=_child_env(), argv=argv, shell=use_shell)
+        except JobLimitError as exc:
+            running = "; ".join(f"{j.id}: {j.command[:80]}" for j in exc.running)
+            return (
+                f"error: {len(exc.running)} background jobs are already running, the most this app "
+                f"runs at once ({exc.limit}; CHIMERA_JOBS_MAX_RUNNING). Not started. Wait for one to "
+                f"finish (job_status) or stop one (job_cancel). Running: {running}"
+            )
         except OSError as exc:
             return f"error: could not start the background job: {exc}"
+        limit = f" It is stopped after {job.max_runtime:.0f}s at most." if job.max_runtime else ""
         return (
             f"job {job.id} started in the background (pid {job.pid}); it keeps running after this "
-            f"turn and is NOT stopped by cancelling the turn. Output: {job.log}. Check it with "
-            f"job_status(job_id={job.id!r}); stop it with job_cancel(job_id={job.id!r}). "
+            f"turn and is NOT stopped by cancelling the turn.{limit} Check it with "
+            f"job_status(job_id={job.id!r}) — it shows the state, the exit code and the last lines "
+            f"of output; stop it with job_cancel(job_id={job.id!r}). "
             "Do not report the work as done until job_status says it finished."
         )
 
@@ -133,6 +154,12 @@ class RunShellTool(Tool):
             return self._start_job(command, cwd, sandbox)
         result = sandbox.run(command, timeout=timeout, cwd=cwd)
         if result.timed_out:
+            if self._jobs is not None and isinstance(sandbox, LocalSandbox):
+                return (
+                    f"error: command timed out after {timeout}s and was stopped. If it needs longer, "
+                    "run it again with background=true: it keeps running after this turn, and "
+                    "job_status shows how it is going."
+                )
             return f"error: command timed out after {timeout}s"
         out = result.output
         if len(out) > _MAX_OUTPUT_CHARS:

@@ -103,7 +103,7 @@ const en: Dict = {
   "tools.desc.run_shell":
     "Run a shell command in the workspace directory and return its output. Use with care: this can modify the system.",
   "tools.desc.job_status":
-    "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled or lost — and the tail of its output. Without a job_id, lists every job.",
+    "What a background job started by run_shell(background=true) is doing: running, finished (with its exit code), cancelled, timed_out or lost — its start and end times, and the last lines of its output (tail_lines, default 40; head_lines for the first ones). Without a job_id, lists this workspace's jobs.",
   "tools.desc.job_cancel":
     "Stop a background job started by run_shell(background=true): kills the command and everything it started. A job that already ended is reported as it is.",
   "tools.desc.recall_history":
@@ -712,6 +712,17 @@ const en: Dict = {
   "machine.vramDetail": "{used} of {total} GB of VRAM",
   "machine.process": "Chimera itself: {mb} MB",
   "machine.unavailable": "unavailable",
+  "jobs.title": "Background jobs",
+  "jobs.state.running": "running",
+  "jobs.state.finished": "finished",
+  "jobs.state.cancelled": "stopped",
+  "jobs.state.timed_out": "hit the time limit",
+  "jobs.state.lost": "lost",
+  "jobs.exit": "exit {code}",
+  "jobs.started": "started {time}",
+  "jobs.stop": "Stop",
+  "jobs.stopLabel": "Stop job {id}",
+  "jobs.output": "Output",
   "code.provider.label": "Worker",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Not installed here — run {hint}",
@@ -1647,7 +1658,7 @@ const pt: Dict = {
   "tools.desc.run_shell":
     "Roda um comando de shell no diretório do workspace e devolve a saída. Use com cuidado: isto pode modificar o sistema.",
   "tools.desc.job_status":
-    "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado ou perdido — e o fim da saída dele. Sem job_id, lista todos os jobs.",
+    "O que um job em segundo plano iniciado por run_shell(background=true) está fazendo: rodando, terminado (com o código de saída), cancelado, timed_out (estourou o tempo máximo) ou perdido — as horas de início e fim, e as últimas linhas da saída (tail_lines, padrão 40; head_lines para as primeiras). Sem job_id, lista os jobs deste workspace.",
   "tools.desc.job_cancel":
     "Para um job em segundo plano iniciado por run_shell(background=true): mata o comando e tudo que ele iniciou. Um job que já terminou é reportado como está.",
   "tools.desc.recall_history":
@@ -2260,6 +2271,17 @@ const pt: Dict = {
   "machine.vramDetail": "{used} de {total} GB de VRAM",
   "machine.process": "O próprio Chimera: {mb} MB",
   "machine.unavailable": "indisponível",
+  "jobs.title": "Jobs em segundo plano",
+  "jobs.state.running": "rodando",
+  "jobs.state.finished": "terminado",
+  "jobs.state.cancelled": "parado",
+  "jobs.state.timed_out": "estourou o tempo",
+  "jobs.state.lost": "perdido",
+  "jobs.exit": "saída {code}",
+  "jobs.started": "iniciado às {time}",
+  "jobs.stop": "Parar",
+  "jobs.stopLabel": "Parar o job {id}",
+  "jobs.output": "Saída",
   "code.provider.label": "Quem executa",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Não instalado aqui — rode {hint}",
@@ -3240,7 +3262,7 @@ const es: Dict = {
   "tools.desc.run_shell":
     "Ejecuta un comando de shell en el directorio del workspace y devuelve su salida. Úsalo con cuidado: esto puede modificar el sistema.",
   "tools.desc.job_status":
-    "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado o perdido — y el final de su salida. Sin job_id, lista todos los trabajos.",
+    "Qué hace un trabajo en segundo plano iniciado por run_shell(background=true): en ejecución, terminado (con su código de salida), cancelado, timed_out (superó el tiempo máximo) o perdido — sus horas de inicio y fin, y las últimas líneas de su salida (tail_lines, 40 por defecto; head_lines para las primeras). Sin job_id, lista los trabajos de este espacio de trabajo.",
   "tools.desc.job_cancel":
     "Detiene un trabajo en segundo plano iniciado por run_shell(background=true): mata el comando y todo lo que inició. Un trabajo que ya terminó se informa tal como está.",
   "tools.desc.recall_history":
@@ -3820,6 +3842,17 @@ const es: Dict = {
   "machine.vramDetail": "{used} de {total} GB de VRAM",
   "machine.process": "Chimera en sí: {mb} MB",
   "machine.unavailable": "no disponible",
+  "jobs.title": "Trabajos en segundo plano",
+  "jobs.state.running": "en ejecución",
+  "jobs.state.finished": "terminado",
+  "jobs.state.cancelled": "detenido",
+  "jobs.state.timed_out": "superó el tiempo",
+  "jobs.state.lost": "perdido",
+  "jobs.exit": "salida {code}",
+  "jobs.started": "iniciado a las {time}",
+  "jobs.stop": "Detener",
+  "jobs.stopLabel": "Detener el trabajo {id}",
+  "jobs.output": "Salida",
   "code.provider.label": "Quién ejecuta",
   "code.provider.native": "Chimera",
   "code.provider.missing": "No instalado aquí: ejecuta {hint}",
@@ -4807,7 +4840,7 @@ const fr: Dict = {
   "tools.desc.run_shell":
     "Exécute une commande shell dans le répertoire du workspace et renvoie sa sortie. À utiliser avec prudence : cela peut modifier le système.",
   "tools.desc.job_status":
-    "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée ou perdue — et la fin de sa sortie. Sans job_id, liste toutes les tâches.",
+    "Ce que fait une tâche de fond lancée par run_shell(background=true) : en cours, terminée (avec son code de sortie), annulée, timed_out (durée maximale atteinte) ou perdue — ses heures de début et de fin, et les dernières lignes de sa sortie (tail_lines, 40 par défaut ; head_lines pour les premières). Sans job_id, liste les tâches de cet espace de travail.",
   "tools.desc.job_cancel":
     "Arrête une tâche de fond lancée par run_shell(background=true) : tue la commande et tout ce qu'elle a lancé. Une tâche déjà terminée est rapportée telle quelle.",
   "tools.desc.recall_history":
@@ -5390,6 +5423,17 @@ const fr: Dict = {
   "machine.vramDetail": "{used} sur {total} Go de VRAM",
   "machine.process": "Chimera lui-même : {mb} Mo",
   "machine.unavailable": "indisponible",
+  "jobs.title": "Tâches de fond",
+  "jobs.state.running": "en cours",
+  "jobs.state.finished": "terminée",
+  "jobs.state.cancelled": "arrêtée",
+  "jobs.state.timed_out": "délai dépassé",
+  "jobs.state.lost": "perdue",
+  "jobs.exit": "sortie {code}",
+  "jobs.started": "lancée à {time}",
+  "jobs.stop": "Arrêter",
+  "jobs.stopLabel": "Arrêter la tâche {id}",
+  "jobs.output": "Sortie",
   "code.provider.label": "Qui exécute",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Pas installé ici — exécutez {hint}",
@@ -6384,7 +6428,7 @@ const de: Dict = {
   "tools.desc.run_shell":
     "Führt einen Shell-Befehl im Workspace-Verzeichnis aus und gibt dessen Ausgabe zurück. Mit Vorsicht verwenden: das kann das System verändern.",
   "tools.desc.job_status":
-    "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen oder verloren — und das Ende seiner Ausgabe. Ohne job_id werden alle Jobs aufgelistet.",
+    "Was ein mit run_shell(background=true) gestarteter Hintergrundjob tut: läuft, beendet (mit Exit-Code), abgebrochen, timed_out (Höchstlaufzeit erreicht) oder verloren — Start- und Endzeit sowie die letzten Zeilen seiner Ausgabe (tail_lines, Standard 40; head_lines für die ersten). Ohne job_id werden die Jobs dieses Arbeitsbereichs aufgelistet.",
   "tools.desc.job_cancel":
     "Stoppt einen mit run_shell(background=true) gestarteten Hintergrundjob: beendet den Befehl und alles, was er gestartet hat. Ein bereits beendeter Job wird so gemeldet, wie er ist.",
   "tools.desc.recall_history":
@@ -6967,6 +7011,17 @@ const de: Dict = {
   "machine.vramDetail": "{used} von {total} GB VRAM",
   "machine.process": "Chimera selbst: {mb} MB",
   "machine.unavailable": "nicht verfügbar",
+  "jobs.title": "Hintergrundjobs",
+  "jobs.state.running": "läuft",
+  "jobs.state.finished": "beendet",
+  "jobs.state.cancelled": "gestoppt",
+  "jobs.state.timed_out": "Zeitlimit erreicht",
+  "jobs.state.lost": "verloren",
+  "jobs.exit": "Exit {code}",
+  "jobs.started": "gestartet um {time}",
+  "jobs.stop": "Stoppen",
+  "jobs.stopLabel": "Job {id} stoppen",
+  "jobs.output": "Ausgabe",
   "code.provider.label": "Wer arbeitet",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Hier nicht installiert — {hint} ausführen",
@@ -7952,7 +8007,7 @@ const zh: Dict = {
   "tools.desc.run_shell":
     "在工作区目录中运行一条 shell 命令并返回其输出。谨慎使用：它可以修改系统。",
   "tools.desc.job_status":
-    "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消或已丢失——以及其输出的末尾。不带 job_id 时列出所有任务。",
+    "由 run_shell(background=true) 启动的后台任务在做什么：运行中、已完成（含退出码）、已取消、timed_out（达到最长运行时间）或已丢失——开始和结束时间，以及输出的最后几行（tail_lines，默认 40；head_lines 取开头几行）。不带 job_id 时列出此工作区的任务。",
   "tools.desc.job_cancel":
     "停止由 run_shell(background=true) 启动的后台任务：终止该命令及其启动的一切。已结束的任务按原样报告。",
   "tools.desc.recall_history":
@@ -8503,6 +8558,17 @@ const zh: Dict = {
   "machine.vramDetail": "{total} GB 显存中已用 {used} GB",
   "machine.process": "Chimera 自身：{mb} MB",
   "machine.unavailable": "不可用",
+  "jobs.title": "后台任务",
+  "jobs.state.running": "运行中",
+  "jobs.state.finished": "已完成",
+  "jobs.state.cancelled": "已停止",
+  "jobs.state.timed_out": "已超时",
+  "jobs.state.lost": "已丢失",
+  "jobs.exit": "退出码 {code}",
+  "jobs.started": "开始于 {time}",
+  "jobs.stop": "停止",
+  "jobs.stopLabel": "停止任务 {id}",
+  "jobs.output": "输出",
   "code.provider.label": "由谁执行",
   "code.provider.native": "Chimera",
   "code.provider.missing": "此处未安装 — 请运行 {hint}",
@@ -9457,7 +9523,7 @@ const ja: Dict = {
   "tools.desc.run_shell":
     "ワークスペースのディレクトリで shell コマンドを実行し、その出力を返します。注意して使ってください: これはシステムを変更できます。",
   "tools.desc.job_status":
-    "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、または喪失 — と出力の末尾。job_id を省くと全ジョブを一覧します。",
+    "run_shell(background=true) で開始したバックグラウンドジョブの状態：実行中、終了（終了コード付き）、キャンセル済み、timed_out（最大実行時間に到達）、または喪失 — 開始・終了時刻と、出力の最後の数行（tail_lines、既定 40。先頭は head_lines）。job_id を省くとこのワークスペースのジョブを一覧します。",
   "tools.desc.job_cancel":
     "run_shell(background=true) で開始したバックグラウンドジョブを停止します：コマンドとそれが起動したすべてを終了します。すでに終わったジョブはそのまま報告します。",
   "tools.desc.recall_history":
@@ -10031,6 +10097,17 @@ const ja: Dict = {
   "machine.vramDetail": "VRAM {total} GB 中 {used} GB",
   "machine.process": "Chimera 自身: {mb} MB",
   "machine.unavailable": "取得できません",
+  "jobs.title": "バックグラウンドジョブ",
+  "jobs.state.running": "実行中",
+  "jobs.state.finished": "終了",
+  "jobs.state.cancelled": "停止済み",
+  "jobs.state.timed_out": "時間切れ",
+  "jobs.state.lost": "喪失",
+  "jobs.exit": "終了コード {code}",
+  "jobs.started": "{time} に開始",
+  "jobs.stop": "停止",
+  "jobs.stopLabel": "ジョブ {id} を停止",
+  "jobs.output": "出力",
   "code.provider.label": "実行するのは",
   "code.provider.native": "Chimera",
   "code.provider.missing": "ここには未インストールです — {hint} を実行してください",
@@ -10973,7 +11050,7 @@ const it: Dict = {
   "tools.desc.run_shell":
     "Esegue un comando di shell nella directory del workspace e ne restituisce l'output. Usalo con cautela: questo può modificare il sistema.",
   "tools.desc.job_status":
-    "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato o perso — e la coda del suo output. Senza job_id, elenca tutti i job.",
+    "Cosa sta facendo un job in background avviato da run_shell(background=true): in esecuzione, terminato (con il codice di uscita), annullato, timed_out (raggiunto il tempo massimo) o perso — gli orari di inizio e fine, e le ultime righe del suo output (tail_lines, predefinito 40; head_lines per le prime). Senza job_id, elenca i job di questo spazio di lavoro.",
   "tools.desc.job_cancel":
     "Ferma un job in background avviato da run_shell(background=true): uccide il comando e tutto ciò che ha avviato. Un job già terminato viene riportato così com'è.",
   "tools.desc.recall_history":
@@ -11594,6 +11671,17 @@ const it: Dict = {
   "machine.vramDetail": "{used} di {total} GB di VRAM",
   "machine.process": "Chimera stesso: {mb} MB",
   "machine.unavailable": "non disponibile",
+  "jobs.title": "Job in background",
+  "jobs.state.running": "in esecuzione",
+  "jobs.state.finished": "terminato",
+  "jobs.state.cancelled": "fermato",
+  "jobs.state.timed_out": "tempo scaduto",
+  "jobs.state.lost": "perso",
+  "jobs.exit": "uscita {code}",
+  "jobs.started": "avviato alle {time}",
+  "jobs.stop": "Ferma",
+  "jobs.stopLabel": "Ferma il job {id}",
+  "jobs.output": "Output",
   "code.provider.label": "Chi esegue",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Non installato qui — esegui {hint}",
@@ -12542,7 +12630,7 @@ const pl: Dict = {
   "tools.desc.run_shell":
     "Uruchamia polecenie powłoki w katalogu workspace i zwraca jego wyjście. Używaj ostrożnie: to może zmienić system.",
   "tools.desc.job_status":
-    "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane lub utracone — oraz końcówka jego wyjścia. Bez job_id wypisuje wszystkie zadania.",
+    "Co robi zadanie w tle uruchomione przez run_shell(background=true): działa, zakończone (z kodem wyjścia), anulowane, timed_out (osiągnęło maksymalny czas) lub utracone — godziny rozpoczęcia i zakończenia oraz ostatnie wiersze jego wyjścia (tail_lines, domyślnie 40; head_lines dla pierwszych). Bez job_id wypisuje zadania tego obszaru roboczego.",
   "tools.desc.job_cancel":
     "Zatrzymuje zadanie w tle uruchomione przez run_shell(background=true): zabija polecenie i wszystko, co uruchomiło. Zadanie już zakończone jest raportowane takie, jakie jest.",
   "tools.desc.recall_history":
@@ -13159,6 +13247,17 @@ const pl: Dict = {
   "machine.vramDetail": "{used} z {total} GB VRAM",
   "machine.process": "Sama Chimera: {mb} MB",
   "machine.unavailable": "niedostępne",
+  "jobs.title": "Zadania w tle",
+  "jobs.state.running": "działa",
+  "jobs.state.finished": "zakończone",
+  "jobs.state.cancelled": "zatrzymane",
+  "jobs.state.timed_out": "przekroczony czas",
+  "jobs.state.lost": "utracone",
+  "jobs.exit": "kod {code}",
+  "jobs.started": "uruchomione o {time}",
+  "jobs.stop": "Zatrzymaj",
+  "jobs.stopLabel": "Zatrzymaj zadanie {id}",
+  "jobs.output": "Wyjście",
   "code.provider.label": "Kto wykonuje",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Nie zainstalowano tutaj — uruchom {hint}",
@@ -14104,7 +14203,7 @@ const ru: Dict = {
   "tools.desc.run_shell":
     "Выполняет команду оболочки в каталоге рабочей папки и возвращает её вывод. Пользуйтесь осторожно: это может изменить систему.",
   "tools.desc.job_status":
-    "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена или потеряна — и конец её вывода. Без job_id выводит все задачи.",
+    "Что делает фоновая задача, запущенная через run_shell(background=true): выполняется, завершена (с кодом выхода), отменена, timed_out (достигнуто максимальное время) или потеряна — время начала и окончания и последние строки её вывода (tail_lines, по умолчанию 40; head_lines — первые строки). Без job_id выводит задачи этого рабочего пространства.",
   "tools.desc.job_cancel":
     "Останавливает фоновую задачу, запущенную через run_shell(background=true): убивает команду и всё, что она запустила. Уже завершённая задача сообщается как есть.",
   "tools.desc.recall_history":
@@ -14724,6 +14823,17 @@ const ru: Dict = {
   "machine.vramDetail": "{used} из {total} ГБ видеопамяти",
   "machine.process": "Сама Chimera: {mb} МБ",
   "machine.unavailable": "недоступно",
+  "jobs.title": "Фоновые задачи",
+  "jobs.state.running": "выполняется",
+  "jobs.state.finished": "завершена",
+  "jobs.state.cancelled": "остановлена",
+  "jobs.state.timed_out": "превышено время",
+  "jobs.state.lost": "потеряна",
+  "jobs.exit": "код {code}",
+  "jobs.started": "запущена в {time}",
+  "jobs.stop": "Остановить",
+  "jobs.stopLabel": "Остановить задачу {id}",
+  "jobs.output": "Вывод",
   "code.provider.label": "Кто выполняет",
   "code.provider.native": "Chimera",
   "code.provider.missing": "Здесь не установлено — выполните {hint}",

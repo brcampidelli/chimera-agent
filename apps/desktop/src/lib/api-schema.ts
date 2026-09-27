@@ -1576,6 +1576,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/{job_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Job Endpoint
+         * @description One background job with a bounded slice of its log: the first ``head_lines`` and the last
+         *     ``tail_lines`` lines (capped at 200 and 500), read from the two ends of the file — a job
+         *     that printed a gigabyte is answered from a few kilobytes. 404 for a job this home never had.
+         */
+        get: operations["job_endpoint_api_jobs__job_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/{job_id}/cancel": {
         parameters: {
             query?: never;
@@ -5655,13 +5677,77 @@ export interface components {
             undefended_block_rate: number;
         };
         /**
+         * JobLogOut
+         * @description One job with a bounded slice of its log (``GET /api/jobs/{id}``).
+         */
+        JobLogOut: {
+            /** Command */
+            command: string;
+            /** Cwd */
+            cwd: string;
+            /** Exit Code */
+            exit_code?: number | null;
+            /** Extra */
+            extra?: {
+                [key: string]: unknown;
+            };
+            /** Finished At */
+            finished_at?: number | null;
+            /**
+             * Gap
+             * @default false
+             */
+            gap: boolean;
+            /**
+             * Head
+             * @default
+             */
+            head: string;
+            /** Id */
+            id: string;
+            /** Log */
+            log: string;
+            /**
+             * Log Size
+             * @default 0
+             */
+            log_size: number;
+            /**
+             * Max Runtime
+             * @default 0
+             */
+            max_runtime: number;
+            /**
+             * Owner
+             * @default
+             */
+            owner: string;
+            /** Pid */
+            pid: number;
+            /**
+             * Reported
+             * @default false
+             */
+            reported: boolean;
+            /** Started At */
+            started_at: number;
+            /** State */
+            state: string;
+            /**
+             * Tail
+             * @default
+             */
+            tail: string;
+        };
+        /**
          * JobOut
          * @description One background job — a `run_shell(background=true)` the agent started and did not wait for.
          *
-         *     ``state`` is ``running`` | ``finished`` | ``cancelled`` | ``lost``. ``lost`` is honest about a
-         *     process this backend did not start (the app restarted): its pid is gone and its exit code was
-         *     never seen, so "finished" would be a number nobody observed. ``reported`` says whether a turn
-         *     has already been told it ended.
+         *     ``state`` is ``running`` | ``finished`` | ``cancelled`` | ``timed_out`` | ``lost``.
+         *     ``timed_out`` means it reached ``max_runtime`` and was killed with everything it started.
+         *     ``lost`` is honest about a process nobody is watching any more (the app that started it
+         *     restarted): its exit code was never seen, so "finished" would be a number nobody observed.
+         *     ``reported`` says whether a turn has already been told it ended.
          */
         JobOut: {
             /** Command */
@@ -5670,12 +5756,26 @@ export interface components {
             cwd: string;
             /** Exit Code */
             exit_code?: number | null;
+            /** Extra */
+            extra?: {
+                [key: string]: unknown;
+            };
             /** Finished At */
             finished_at?: number | null;
             /** Id */
             id: string;
             /** Log */
             log: string;
+            /**
+             * Max Runtime
+             * @default 0
+             */
+            max_runtime: number;
+            /**
+             * Owner
+             * @default
+             */
+            owner: string;
             /** Pid */
             pid: number;
             /**
@@ -10238,6 +10338,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobsOut"];
+                };
+            };
+        };
+    };
+    job_endpoint_api_jobs__job_id__get: {
+        parameters: {
+            query?: {
+                head_lines?: number;
+                tail_lines?: number;
+            };
+            header?: never;
+            path: {
+                job_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobLogOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

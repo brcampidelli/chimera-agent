@@ -47,6 +47,7 @@ OPERATE_TOOLS = {
     "desktop_files",
     "desktop_git",
     "desktop_planning",
+    "desktop_shell_jobs",
     "desktop_insights",
     "desktop_app",
 }

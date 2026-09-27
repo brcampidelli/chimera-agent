@@ -258,6 +258,16 @@ ROUTES: dict[str, BridgeRoute] = {
     "planning.plan": _r("POST", "/api/plan", "Planner preview. body: {task}"),
     "planning.requirements": _r("POST", "/api/requirements", "Extract requirements. body: {task}"),
     "planning.decide": _r("POST", "/api/decide", "Typed questions over a state. body: {...}"),
+    # --- background shell jobs: run_shell(background=true), outliving the turn that started them ---
+    "shell_jobs.list": _r("GET", "/api/jobs", "Every job, newest first, with the end of its log."),
+    "shell_jobs.read": _r(
+        "GET",
+        "/api/jobs/{job_id}",
+        "One job and a bounded slice of its log. params: {job_id, tail_lines?, head_lines?}",
+    ),
+    "shell_jobs.stop": _r(
+        "POST", "/api/jobs/{job_id}/cancel", "Kill a job and everything it started. params: {job_id}"
+    ),
     # --- cost, quality, health ---
     "insights.usage": _r("GET", "/api/usage", "Spend and tokens, by day, model and session."),
     "insights.worth": _r(
@@ -266,8 +276,6 @@ ROUTES: dict[str, BridgeRoute] = {
     "insights.benchmarks": _r("GET", "/api/benchmarks", "Benchmark results."),
     "insights.maturity": _r("GET", "/api/maturity", "Maturity report."),
     "insights.resources": _r("GET", "/api/resources", "Machine resources."),
-    "insights.jobs": _r("GET", "/api/jobs", "Background jobs."),
-    "insights.cancel_job": _r("POST", "/api/jobs/{job_id}/cancel", "Cancel. params: {job_id}"),
     "insights.doctor": _r("GET", "/api/doctor", "Health checks."),
     # --- how the app is set up (credentials masked out by `scrub`) ---
     "app.config": _r("GET", "/api/config", "Settings, with every credential reduced to set/unset."),

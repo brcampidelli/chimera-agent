@@ -8,9 +8,10 @@ with the command string unchanged, one wrapper out — started detached with its
 
 What is pinned: the job runs after the tool returned; its output is on disk; `job_status` reads the
 state and the tail; `job_cancel` kills the tree; a job that ended is handed to exactly one later
-turn; the API lists and cancels; a registry without a home refuses the parameter; an isolated
-sandbox refuses it; and a record whose process this backend did not start is `lost`, not
-`finished`.
+turn; the API lists and cancels; a registry without a home refuses the parameter; a container
+refuses it while a kernel sandbox wraps it; and a record whose process nobody watches any more is
+`lost`, not `finished`. The limits, the jail, the governance and the bounded reads are pinned in
+`test_background_jobs_stay_inside_the_fences_run_shell_has.py`.
 """
 
 from __future__ import annotations
@@ -135,20 +136,43 @@ def test_without_a_job_store_the_parameter_is_refused_with_a_sentence(tmp_path: 
     assert "foreground" in out
 
 
-def test_an_isolated_sandbox_refuses_a_background_job(tmp_path: Path) -> None:
-    class _Isolated(LocalSandbox):
-        @staticmethod
-        def is_isolated() -> bool:
-            return True
+def test_a_container_sandbox_refuses_a_background_job(tmp_path: Path) -> None:
+    from chimera.sandbox.docker import DockerSandbox
 
     ws = tmp_path / "ws"
     ws.mkdir()
-    tool = RunShellTool(ws, _Isolated(), confirm=None, jobs=JobRegistry(tmp_path / "home"))
+    tool = RunShellTool(ws, DockerSandbox(), confirm=None, jobs=JobRegistry(tmp_path / "home"))
     out = tool.run(command="echo hi", background=True)
     assert out.startswith("error: background jobs run on the host sandbox only")
     assert not (tmp_path / "home" / "jobs").exists() or not list(
         (tmp_path / "home" / "jobs").glob("*.json")
     )
+
+
+def test_a_kernel_sandbox_runs_the_job_inside_its_own_wrapper(tmp_path: Path) -> None:
+    """bubblewrap and Seatbelt are an argv around the same process (`OsSandbox._command_argv`): the
+    job must get that wrapper, exactly as a foreground command does — refusing them meant no Linux
+    or macOS machine with the default `CHIMERA_SANDBOX=auto` could start a job at all."""
+    wrapped: list[str] = []
+
+    class _Kernel(LocalSandbox):
+        @staticmethod
+        def is_isolated() -> bool:
+            return True
+
+        def _command_argv(self, command: str, cwd: Path | None) -> tuple[list[str] | str, bool]:
+            wrapped.append(command)
+            return ([PY, "-c", "print('inside the wrapper')"], False)
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    jobs = JobRegistry(tmp_path / "home")
+    out = RunShellTool(ws, _Kernel(), confirm=None, jobs=jobs).run(command="echo hi", background=True)
+    assert out.startswith("job "), out
+    job_id = out.split()[1]
+    _wait(lambda: jobs.get(job_id).state == "finished")  # type: ignore[union-attr]
+    assert wrapped == ["echo hi"]
+    assert "inside the wrapper" in jobs.tail(job_id)
 
 
 def test_the_host_exec_gate_is_consulted_before_a_job_starts(tmp_path: Path) -> None:
@@ -276,7 +300,7 @@ def test_the_api_lists_and_cancels_and_the_next_turn_is_told(
     prompt = seen_prompts[-1]
     assert "Background jobs that finished since your last turn" in prompt
     assert f"job {short_id} finished (exit 0)" in prompt and f"job {long_id} cancelled" in prompt
-    assert "read the log with read_file" in prompt
+    assert "job_status(job_id=...)" in prompt and "read_file" not in prompt
     assert "Background jobs" not in seen_systems[-1], "the note is back in the cached system message"
 
     client.post("/api/code/turn", json={"message": "de novo"})

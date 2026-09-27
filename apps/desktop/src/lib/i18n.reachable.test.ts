@@ -39,6 +39,9 @@ const DYNAMIC = [
   "crew.approach.",
   "crew.status.",
   "fusion.role.",
+  // `` t(`jobs.state.${job.state}`) `` — the background-jobs panel names a job's state from the
+  // token `/api/jobs` sends (`running`, `finished`, `cancelled`, `timed_out`, `lost`).
+  "jobs.state.",
   // `` t(`onboarding.local.runtime.${o.runtime}`) `` — the first-run screen names the local
   // runtime a found model belongs to, from the token `/api/models/local` sends (`ollama`,
   // `lm_studio`), so the client never keeps its own list of runtimes.

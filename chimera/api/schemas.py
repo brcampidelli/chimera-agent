@@ -771,10 +771,11 @@ class LocalRuntimesOut(BaseModel):
 class JobOut(BaseModel):
     """One background job — a `run_shell(background=true)` the agent started and did not wait for.
 
-    ``state`` is ``running`` | ``finished`` | ``cancelled`` | ``lost``. ``lost`` is honest about a
-    process this backend did not start (the app restarted): its pid is gone and its exit code was
-    never seen, so "finished" would be a number nobody observed. ``reported`` says whether a turn
-    has already been told it ended.
+    ``state`` is ``running`` | ``finished`` | ``cancelled`` | ``timed_out`` | ``lost``.
+    ``timed_out`` means it reached ``max_runtime`` and was killed with everything it started.
+    ``lost`` is honest about a process nobody is watching any more (the app that started it
+    restarted): its exit code was never seen, so "finished" would be a number nobody observed.
+    ``reported`` says whether a turn has already been told it ended.
     """
 
     id: str
@@ -787,8 +788,25 @@ class JobOut(BaseModel):
     exit_code: int | None = None
     finished_at: float | None = None
     reported: bool = False
+    #: The process that started it (``<pid>-<random>``); "" on records older than owners.
+    owner: str = ""
+    #: The runtime cap it was started under, in seconds (0 = none).
+    max_runtime: float = 0.0
+    #: Facts about how it ended: ``ended_by`` (``app_exit``), ``pid_alive_when_lost``.
+    extra: dict[str, Any] = Field(default_factory=dict)
     #: The last part of the log, for a screen that shows a job without opening its file.
     tail: str = ""
+
+
+class JobLogOut(JobOut):
+    """One job with a bounded slice of its log (``GET /api/jobs/{id}``)."""
+
+    #: The first lines asked for; "" when none were.
+    head: str = ""
+    #: The log's size in bytes.
+    log_size: int = 0
+    #: True when lines between ``head`` and ``tail`` were not read.
+    gap: bool = False
 
 
 class JobsOut(BaseModel):

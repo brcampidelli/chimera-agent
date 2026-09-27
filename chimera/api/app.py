@@ -87,6 +87,7 @@ from chimera.api.schemas import (
     HitlOut,
     HitlRequest,
     InjectionReportOut,
+    JobLogOut,
     JobOut,
     JobsOut,
     LocalRuntimesOut,
@@ -857,6 +858,27 @@ def build_api_app(
         if job is None:
             raise HTTPException(status_code=404, detail="no such job")
         return {**job.to_dict(), "tail": registry.tail(job.id, 1_000)}
+
+    @app.get("/api/jobs/{job_id}", dependencies=[guard], response_model=JobLogOut)
+    def job_endpoint(job_id: str, head_lines: int = 0, tail_lines: int = 200) -> dict[str, Any]:
+        """One background job with a bounded slice of its log: the first ``head_lines`` and the last
+        ``tail_lines`` lines (capped at 200 and 500), read from the two ends of the file — a job
+        that printed a gigabyte is answered from a few kilobytes. 404 for a job this home never had.
+        """
+        from chimera.core.jobs import jobs_for
+
+        registry = jobs_for(live_settings().home)
+        job = registry.get(job_id)
+        part = registry.read_log(job_id, head_lines=head_lines, tail_lines=tail_lines)
+        if job is None or part is None:
+            raise HTTPException(status_code=404, detail="no such job")
+        return {
+            **job.to_dict(),
+            "tail": part.tail,
+            "head": part.head,
+            "log_size": part.size,
+            "gap": part.gap,
+        }
 
     @app.get("/api/models/local", dependencies=[guard], response_model=LocalRuntimesOut)
     def local_runtimes_endpoint() -> dict[str, Any]:

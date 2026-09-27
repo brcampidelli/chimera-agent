@@ -1599,18 +1599,20 @@ def register_code_api(
         # this turn, absent from the stored transcript, like the image note above — so "the
         # download finished, exit 0" reaches the person through the agent instead of through
         # nobody. Each job is reported once (`finished_unreported` marks it), and the model is told
-        # to read the log rather than guess at what the job produced.
+        # to read the output rather than guess at what the job produced. Through `job_status`, not
+        # `read_file`: the log lives in the app's data folder, outside the workspace, so a read_file
+        # of it is a jail question on the screen for something the job tool reads freely.
         finished = jobs_for(live().home).finished_unreported()
         if finished:
             lines = [
                 f"- job {j.id} {j.state}"
                 + (f" (exit {j.exit_code})" if j.exit_code is not None else "")
-                + f": {j.command[:160]} — log: {j.log}"
+                + f": {j.command[:160]}"
                 for j in finished
             ]
             note = (note + "\n\n" if note else "") + (
-                "Background jobs that finished since your last turn (read the log with read_file "
-                "before saying what they produced):\n" + "\n".join(lines)
+                "Background jobs that finished since your last turn (read their output with "
+                "job_status(job_id=...) before saying what they produced):\n" + "\n".join(lines)
             )
 
         # What this conversation's background works are up to, for the model that is talking —
