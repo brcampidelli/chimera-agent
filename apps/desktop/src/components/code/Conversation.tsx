@@ -59,6 +59,7 @@ import {
 } from "@/components/code/Attachments";
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
+import { GroundedBadge } from "@/components/code/GroundedBadge";
 import { BrowserView } from "@/components/code/BrowserView";
 import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
@@ -410,6 +411,9 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
     <div className="flex flex-wrap items-center gap-1.5">
       {/* First, ahead of every measurement, because it is what decides how to read them. */}
       {stopped ? <Badge tone="warn">{t(stopped)}</Badge> : null}
+      {/* Next, because it qualifies the answer itself: checked against the attached documents,
+          declined because they do not cover it, or unchecked — and never one looking like another. */}
+      <GroundedBadge grounded={done.grounded} t={t} />
       {/* Who did the work, first — it is the fact that reframes every badge after it. */}
       {done.external ? (
         <Badge tone="warn">

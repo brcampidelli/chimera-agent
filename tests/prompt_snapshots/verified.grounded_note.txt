@@ -1,0 +1,1 @@
+The user attached documents to this message. If the question is about them, answer using only what they say: every fact, number, name, flag or setting you state must appear in them. If they do not contain the answer, say that the provided documents do not cover it, and add no facts or guesses. Your answer will be checked against them.

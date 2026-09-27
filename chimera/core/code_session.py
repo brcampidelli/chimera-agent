@@ -215,6 +215,19 @@ class CodeSession:
         body = [m for m in result.transcript if _as_dict(m).get("role") != "system"]
         self.messages = trim_to_a_safe_boundary(body, self.max_messages)
 
+    def replace_last_answer(self, text: str) -> bool:
+        """Put ``text`` where the last turn's final answer is — what shipped, when a check after the
+        run replaced the draft (`chimera/fusion/verified.py`). Only the final assistant message, and
+        only one with no tool calls: an answer is never spliced into the middle of a tool exchange.
+        Returns whether anything was replaced."""
+        if not self.messages:
+            return False
+        last = _as_dict(self.messages[-1])
+        if last.get("role") != "assistant" or last.get("tool_calls"):
+            return False
+        self.messages[-1] = {**last, "content": text}
+        return True
+
     def clear(self) -> None:
         self.messages = []
 

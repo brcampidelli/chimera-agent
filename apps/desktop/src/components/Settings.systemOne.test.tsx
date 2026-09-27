@@ -128,7 +128,7 @@ describe("Settings — the System One card", () => {
 
     expect(within(region).getByRole("radio", { name: /^Local/ })).toBeChecked();
     expect(within(region).getByRole("radio", { name: /^OpenRouter System One/ })).not.toBeChecked();
-    expect(region).toHaveTextContent("On a default install nothing asks one on its own");
+    expect(region).toHaveTextContent("On a default install it is asked on its own in one place");
     expect(within(region).queryByLabelText("Model")).toBeNull();
     expect(getDecisionModels).not.toHaveBeenCalled();
   });
@@ -199,6 +199,42 @@ describe("Settings — the System One card", () => {
       CHIMERA_DECISION_BACKEND: "openrouter_decisions",
       CHIMERA_DECISION_MODEL: "jaredpalmer/kev-4b",
     });
+  });
+
+  it("shows the answer check on by default, with what it measured and what runs without Ollama", async () => {
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    const toggle = within(region).getByRole("switch", { name: "Verify answers grounded in sources" });
+    expect(toggle).toHaveAttribute("aria-checked", "true"); // a server without the field is on the default
+    expect(region).toHaveTextContent("a third fewer wrong answers (33 → 21, none made worse)");
+    expect(region).toHaveTextContent("about 1.9× the cost with the local verifier");
+    expect(region).toHaveTextContent(
+      "If the local model isn't running: Jev (typesafe/jev-1.13) when an OpenRouter key is set, otherwise the old lexical check.",
+    );
+  });
+
+  it("turns the answer check off through the setting", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    await user.click(within(region).getByRole("switch", { name: "Verify answers grounded in sources" }));
+    await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());
+    expect(vi.mocked(patchConfig).mock.calls[0][0]).toEqual({ CHIMERA_VERIFIED_ANSWERS: "false" });
+  });
+
+  it("draws the answer check off when the server reports it off", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({ decisions: { backend: "local_logprob", model: "", verified_answers: false } }) as never,
+    );
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    expect(within(region).getByRole("switch", { name: "Verify answers grounded in sources" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
   });
 
   it("says when the list is the offline default and when no key is set", async () => {

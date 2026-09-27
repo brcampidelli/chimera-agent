@@ -1,5 +1,5 @@
 ---
-source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
+source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
 ---
 
 # Chimera — Guia de Uso
@@ -135,7 +135,7 @@ passos de chamada de tool dentro de uma mensagem; `--model`/`-m` sobrescreve o s
 
 Comandos: `/help` · `/new` (thread nova — a atual continua em disco) · `/reset` (o mesmo que
 `/new`) · `/model <slug>` (sem argumento volta ao padrão) · `/solve <tarefa>` (entrega ao loop
-verificado) · `/exit` (também `/quit`, `/q`).
+verificado) · `/attach <arquivo>` (um documento para a próxima mensagem; a resposta é conferida contra ele) · `/exit` (também `/quit`, `/q`).
 
 **Ele é governado, e pergunta a você.** `chat` e `assist` montam a mesma pilha que o caminho
 da API monta: um ledger de taint a quem se conta a sua própria mensagem, a cerca
@@ -215,7 +215,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 Comandos: `/help` · `/task <pedido difícil>` (fusão a plena potência, um tiro só) ·
 `/solve <tarefa>` (entrega ao loop verificado) · `/profile <tipo>: <fato>` (lembrar algo sobre
 você — tipos: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/reset` (limpa
-o contexto da conversa; nada é apagado) · `/exit` (também `/quit`, `/q`).
+o contexto da conversa; nada é apagado) · `/attach <arquivo>` (um documento para a próxima mensagem; a resposta é conferida contra ele) · `/exit` (também `/quit`, `/q`).
 
 Governado exatamente como o `chat` — o mesmo registry, o mesmo aprovador que pergunta, as
 mesmas linhas de recusa, governança e custo, a mesma linha em `usage.jsonl`, os mesmos
@@ -636,9 +636,9 @@ uv run chimera guard "list the files in this folder"  # ALLOW
 ### `decisions` — qual modelo responde uma decisão tipada
 Uma decisão tipada (sim/não, uma escolha, uma nota) é respondida por um de três backends:
 `local_logprob` (um modelo pequeno pelo Ollama, o padrão, grátis), `hosted_verbalized` (o juiz da
-fusão) ou `openrouter_decisions` (um modelo System One no OpenRouter). Numa instalação padrão nada
-pergunta sozinho: ele responde quando você liga a faixa REVIEW da governança ou a tool `decide`, ou
-chama `chimera decide`.
+fusão) ou `openrouter_decisions` (um modelo System One no OpenRouter). Numa instalação padrão ele é
+perguntado sozinho num lugar só — as respostas verificadas, abaixo — e fora isso quando você liga a
+faixa REVIEW da governança ou a tool `decide`, ou chama `chimera decide`.
 
 ```bash
 uv run chimera decisions models                                   # o que o OpenRouter lista; * = ativo
@@ -650,6 +650,32 @@ A mesma escolha é o cartão **System One** nas Configurações do app desktop. 
 modelos que falam o contrato do Jev (sim/não, escolha, nota); um modelo de pontuação de
 comportamento ou um alias móvel aparece na lista e é recusado. Um modelo sem mapa de calibração lê a
 confiança crua.
+
+#### Respostas verificadas
+Uma resposta escrita a partir de documentos que você anexou (o clipe na tela Code, `/attach` no
+`chat` e no `assist`), num turno que não chamou **nenhuma tool**, é lida por esse backend antes de
+sair: ela é *sustentada* pelos documentos, *não sustentada* ou uma *recusa*? Sustentada com
+confiança de 0,8 ou mais sai como está. Uma recusa sai como está. O resto vai para um modelo forte
+com os documentos e a pergunta, é lido de novo e sai se passar; se não passar, o que sai é "as fontes
+fornecidas não cobrem isto", e a resposta retida fica no recibo. Medido no estudo 26
+(`bench/verified_cascade/RESULTS.md`, 400 perguntas pareadas): respostas erradas entregues caíram de
+33 para 21 — 11 corrigidas, 0 pioradas — a 1,87× o custo com o verificador local; o antigo gate
+léxico empatou com nenhum gate.
+
+- **Qual verificador.** O backend escolhido acima. Com o local (o padrão) e sem Ollama ou sem
+  `qwen3:4b`, ele recorre a `typesafe/jev-1.13` quando há chave do OpenRouter, senão ao antigo
+  gate léxico; um backend que você mesmo escolheu não tem recurso. O recibo diz qual verificador
+  rodou e qual foi pulado.
+- **Onde não se aplica.** Turno que usou tool (um roteador na frente do loop do agente piorou todos
+  os executores no bench B4), edição de código e `solve`, fatos lembrados da memória (chegam em todo
+  turno, seja a pergunta sobre eles ou não) e documentos maiores que o maior conjunto que o bench leu
+  (14.000 caracteres). O recibo diz qual desses deixou o turno de fora.
+- **Se o verificador falhar,** a resposta sai marcada como *não verificada*, com o motivo — nunca
+  retida e nunca mostrada como verificada.
+- **O modelo da escalada** é `openrouter/openai/gpt-6-sol`, o medido, quando uma chave do OpenRouter
+  o alcança; senão o topo da escada de tiers. `CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL` o substitui.
+- **Desligar:** `CHIMERA_VERIFIED_ANSWERS=false`, ou o interruptor no cartão System One.
+  `CHIMERA_VERIFIED_ANSWERS_THRESHOLD` (0,8, o valor registrado) move a régua.
 
 ### `bench` — benchmark de evolução contínua
 

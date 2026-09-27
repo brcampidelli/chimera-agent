@@ -261,9 +261,16 @@ def test_the_config_reports_the_pair_and_a_server_without_it_reads_as_the_defaul
         CHIMERA_HOME=str(tmp_path), CHIMERA_DECISION_BACKEND="openrouter_decisions",
         CHIMERA_DECISION_MODEL="jaredpalmer/kev-4b",
     )
-    assert read_config(on)["decisions"] == {"backend": "openrouter_decisions", "model": "jaredpalmer/kev-4b"}
+    # The grounded-answer switch travels in the same block (study 26): the card that picks the
+    # instrument is the card that says what it checks.
+    assert read_config(on)["decisions"] == {
+        "backend": "openrouter_decisions", "model": "jaredpalmer/kev-4b",
+        "verified_answers": True, "verified_answers_threshold": 0.8,
+    }
     assert "decisions" in ConfigOut.model_fields
-    assert DecisionsCfgOut().model_dump() == {"backend": "local_logprob", "model": ""}
+    assert DecisionsCfgOut().model_dump() == {
+        "backend": "local_logprob", "model": "", "verified_answers": True, "verified_answers_threshold": 0.8,
+    }
 
 
 def test_a_valid_pair_is_written_and_read_back(index: _Index, own_keys: Path) -> None:

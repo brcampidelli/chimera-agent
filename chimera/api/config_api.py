@@ -139,6 +139,10 @@ _EDITABLE_SETTINGS = {
     # often enough (a Jev slug handed to Ollama) that the value, not only the key, is refused.
     "CHIMERA_DECISION_BACKEND",
     "CHIMERA_DECISION_MODEL",
+    # Whether a grounded answer is checked by that backend (`chimera/fusion/verified.py`). Read per
+    # turn, so it applies from the next question. The threshold stays in `.env`: 0.8 is the
+    # registered number, and a slider would invite moving it without a measurement.
+    "CHIMERA_VERIFIED_ANSWERS",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -393,6 +397,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "decisions": {
             "backend": (settings.decision_backend or "local_logprob").strip(),
             "model": (settings.decision_model or "").strip(),
+            # Grounded answers checked by it (study 26); on unless the owner turned it off.
+            "verified_answers": bool(settings.verified_answers),
+            "verified_answers_threshold": float(settings.verified_answers_threshold),
         },
         # Whether Claude may operate this app, and whether it may also answer approvals and edit
         # settings. Applied live: saving either one writes or removes the discovery file at once.

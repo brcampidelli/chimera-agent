@@ -10,7 +10,7 @@ command, the TUI, and the messaging gateway all reuse it unchanged.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol, cast
 
@@ -332,6 +332,10 @@ class TurnReport:
     #: or empty when it wrote none. The desktop draws this list live; the terminal registered the
     #: tool (on by default) and drew nothing, so the model kept a checklist nobody at a terminal saw.
     todos: list[tuple[str, str]] = field(default_factory=list)
+    #: The check of this turn's answer against its attached documents
+    #: (:meth:`chimera.fusion.verified.VerifiedAnswer.receipt`), a ``not_applied`` block with the
+    #: reason, or ``None`` for a turn that attached nothing.
+    grounded: dict[str, Any] | None = None
 
 
 
@@ -443,6 +447,11 @@ class ChatSession:
     #: here. On, it still flattens for an agent that cannot take ``history`` and ``turn_notes`` or
     #: has no turn context, because the facts would otherwise have nowhere to go.
     real_history: bool = False
+    #: Builds the grounded-answer check (`chimera/fusion/verified.py`, study 26) for a turn that
+    #: carries documents. Called only for such a turn, so a turn without any pays nothing. ``None``
+    #: by default, byte-identical to before: the messaging gateway, ``/v1/chat/completions`` and the
+    #: benches attach nothing and are not gated.
+    grounded_answers: Callable[[], Any] | None = None
     turns: list[ChatTurn] = field(default_factory=list)
 
     def _begin_turn(self, message: str) -> None:
@@ -486,12 +495,18 @@ class ChatSession:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        documents: Sequence[tuple[str, str]] = (),
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
-        is reused for both the prompt and the report's fact count (no double search)."""
+        is reused for both the prompt and the report's fact count (no double search).
+
+        ``documents`` are ``(name, text)`` pairs attached to THIS message, folded into it the way
+        the coding turn folds them. With :attr:`grounded_answers` set, the answer is checked against
+        them before it is recorded (`chimera/fusion/verified.py`)."""
         self._begin_turn(message)
         facts, layer = self._recall(message)
+        grounded_turn, turn_message, note = self._ground(message, documents)
         declined: list[DeclinedTool] = []
         observed: list[ToolActivity] = []
 
@@ -512,21 +527,28 @@ class ChatSession:
 
         messages: list[dict[str, Any]] | None = None
         if self._real_history_ready():
-            result = self._run_with_history(message, facts, on_token=on_token, on_tool=watch)
-            messages = _turn_messages(result, message)
+            result = self._run_with_history(
+                turn_message, facts, on_token=on_token, on_tool=watch, note=note
+            )
+            messages = _turn_messages(result, turn_message)
         else:
             result = self.agent.run(
-                self._assemble(message, facts), on_token=on_token, on_tool=watch
+                self._assemble(turn_message, facts, note=note), on_token=on_token, on_tool=watch
             )
+        answer, grounded, extra_usd = self._check_grounded(grounded_turn, result)
+        if messages and answer != result.answer and messages[-1].get("role") == "assistant":
+            # The record holds what shipped: the next turn's history is not built on a withheld draft.
+            messages[-1] = {**messages[-1], "content": answer}
         provenance = turn_provenance(
             list(result.tool_names), observed, already_tainted=self._thread_tainted()
         )
-        self._record(message, result.answer, provenance)
-        self._keep_messages(message, messages)
+        self._record(turn_message, answer, provenance)
+        self._keep_messages(turn_message, messages)
         saved = self._maybe_remember(message)
-        self._maybe_extract(message, result.answer, provenance)
+        self._maybe_extract(message, answer, provenance)
         return TurnReport(
-            answer=result.answer,
+            answer=answer,
+            grounded=grounded,
             declined=declined,
             todos=last_todo_list(observed),
             memory_saved=saved,
@@ -535,7 +557,7 @@ class ChatSession:
             completion_tokens=result.completion_tokens,
             cache_read_tokens=result.cache_read_tokens,
             cache_write_tokens=result.cache_write_tokens,
-            usd=result.usd,
+            usd=None if result.usd is None else round(result.usd + extra_usd, 6),
             tool_names=list(result.tool_names),
             memory_facts_used=len(facts),
             memory_layer=layer,
@@ -543,6 +565,36 @@ class ChatSession:
             steps=result.steps,
             stopped_reason=result.stopped_reason,
             route_meta=result.route_meta,
+        )
+
+    def _ground(self, message: str, documents: Sequence[tuple[str, str]]) -> tuple[Any, str, str]:
+        """``(grounded turn | None, the message the model reads, the turn note)``.
+
+        The documents are folded into the message as the coding turn folds them, whether or not
+        the check is on: attaching a file is asking the model to read it. The check, and the note
+        that tells the model the rule it is checked by, only when :attr:`grounded_answers` is set.
+        """
+        texts = [(name, text) for name, text in documents if text and text.strip()]
+        if not texts:
+            return None, message, ""
+        blocks = "\n\n".join(f"Attached document `{name}`:\n{text}" for name, text in texts)
+        turn_message = f"{message}\n\n{blocks}"
+        if self.grounded_answers is None:
+            return None, turn_message, ""
+        from chimera.fusion.verified import GROUNDED_NOTE, GroundedTurn
+
+        turn = GroundedTurn.make([text for _, text in texts], message, ["attachments"])
+        return turn, turn_message, (GROUNDED_NOTE if turn is not None else "")
+
+    def _check_grounded(self, turn: Any, result: AgentResult) -> tuple[str, dict[str, Any] | None, float]:
+        """The answer to ship, the receipt block and the extra spend (see ``check_answer``)."""
+        if turn is None or self.grounded_answers is None:
+            return result.answer, None, 0.0
+        from chimera.fusion.verified import check_answer
+
+        return check_answer(
+            self.grounded_answers, turn, result.answer, tool_names=list(result.tool_names),
+            stopped_reason=result.stopped_reason,
         )
 
     def _maybe_remember(self, message: str) -> str | None:
@@ -644,7 +696,7 @@ class ChatSession:
             out.extend(dict(m) for m in (turn.messages or _as_messages(turn)))
         return out
 
-    def _turn_notes(self, facts: list[str]) -> str:
+    def _turn_notes(self, facts: list[str], note: str = "") -> str:
         """The profile and the recalled facts, for the turn context rather than the history.
 
         The same two things :meth:`_assemble` puts at the head of its block, in the same order. Here
@@ -653,7 +705,7 @@ class ChatSession:
         """
         from chimera.prompts.context import facts_block
 
-        return "\n\n".join(part for part in (self.profile, facts_block(facts)) if part)
+        return "\n\n".join(part for part in (self.profile, facts_block(facts), note) if part)
 
     def _run_with_history(
         self,
@@ -662,18 +714,19 @@ class ChatSession:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        note: str = "",
     ) -> AgentResult:
         run = cast(SupportsHistoryRun, self.agent).run
         if on_token is None and on_tool is None:
             # `send` has never passed callbacks, and an agent that takes history is not thereby
             # promised to take them as well.
-            return run(message, history=self._history(), turn_notes=self._turn_notes(facts))
+            return run(message, history=self._history(), turn_notes=self._turn_notes(facts, note))
         return run(
             message,
             on_token=on_token,
             on_tool=on_tool,
             history=self._history(),
-            turn_notes=self._turn_notes(facts),
+            turn_notes=self._turn_notes(facts, note),
         )
 
     def reset(self) -> None:
@@ -717,11 +770,13 @@ class ChatSession:
         facts, _layer = self._recall(message)
         return self._assemble(message, facts)
 
-    def _assemble(self, message: str, facts: list[str]) -> str:
+    def _assemble(self, message: str, facts: list[str], note: str = "") -> str:
         """Build the turn's prompt from the profile preamble, recalled facts, recent turns, message."""
         parts: list[str] = []
         if self.profile:  # persistent persona preamble — cross-session personalization
             parts.append(self.profile)
+        if note:  # a rule true of this turn only (the grounded-answer note); never recorded
+            parts.append(note)
         if facts and self.cite_facts:
             # The turn context's header, which says what a quoted fact is: recall, possibly stale.
             from chimera.prompts.context import facts_block

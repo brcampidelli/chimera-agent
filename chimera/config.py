@@ -965,6 +965,27 @@ class Settings(BaseSettings):
     # the model and does not apply to another, and the receipt says so (`calibrated: false`).
     decision_backend: str = Field(default="local_logprob", validation_alias="CHIMERA_DECISION_BACKEND")
     decision_model: str = Field(default="", validation_alias="CHIMERA_DECISION_MODEL")
+    # --- Verified answers (`chimera/fusion/verified.py`): a turn's final answer written from sources
+    # the product handed the model (attachments, recalled memory, retrieved chunks), in a step with no
+    # tool call, is read by the System One backend above as "supported / unsupported / declined" and
+    # shipped only when supported at p >= the threshold; otherwise the strong model answers, is read
+    # again, and the decline ships if that fails too. ON by default because study 26 measured it
+    # (`bench/verified_cascade/RESULTS.md`, 400 paired items): wrong answers shipped 33 → 21, 11 fixed
+    # and 0 broken (Holm p = 0.002), at 1.87× the cost with the local verifier, 0 hand-offs on
+    # answerable items; the lexical gate it replaces matched no gate at 10.8× the cost. The threshold
+    # is the registered 0.8 on the raw number (no map exists for this decision): at 0.5 the local arm
+    # shipped 25 wrong, at 0.8 21, at 0.9 21. Tool-using steps are never gated — bench B4 measured a
+    # router making every executor worse. With the local backend and no Ollama, the verifier falls
+    # back to Jev when an OpenRouter key is set, else to the lexical gate, and the receipt says which.
+    verified_answers: bool = Field(default=True, validation_alias="CHIMERA_VERIFIED_ANSWERS")
+    verified_answers_threshold: float = Field(
+        default=0.8, ge=0.0, le=1.0, validation_alias="CHIMERA_VERIFIED_ANSWERS_THRESHOLD"
+    )
+    # Empty: the measured escalation model (`gpt-6-sol`) when an OpenRouter key reaches it, else the
+    # tier ladder's top for the cost mode (`verified.escalation_model`).
+    verified_answers_escalate_model: str = Field(
+        default="", validation_alias="CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL"
+    )
     # --- A structured answer the route filed as reasoning. Some routes return a reasoning model's
     # whole reply as reasoning, with `content` empty and `finish_reason` "stop" (`deepseek-r1` on
     # Novita, 37-43% of calls in `bench/review_judge/RESULTS-h11.md`, 13/26 in

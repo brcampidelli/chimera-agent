@@ -1,5 +1,5 @@
 ---
-source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
+source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
 ---
 
 # Chimera — Nutzungsleitfaden
@@ -142,7 +142,7 @@ zum Routing weiter unten.
 
 Befehle: `/help` · `/new` (frischer Thread — der aktuelle bleibt auf der Platte)
 · `/reset` (wie `/new`) · `/model <slug>` (ohne Argument zurück zum Standard) ·
-`/solve <Aufgabe>` (an die verifizierte Schleife übergeben) · `/exit` (auch
+`/solve <Aufgabe>` (an die verifizierte Schleife übergeben) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch
 `/quit`, `/q`).
 
 **Es ist kontrolliert, und es fragt dich.** `chat` und `assist` bauen denselben
@@ -238,7 +238,7 @@ Befehle: `/help` · `/task <harte Frage>` (volle Leistung per Fusion, ein Schuss
 · `/solve <Aufgabe>` (an die verifizierte Schleife übergeben) ·
 `/profile <Art>: <Fakt>` (sich etwas über dich merken — Arten: `preference`,
 `project`, `context`, `name`) · `/model <slug>` · `/reset` (den Gesprächskontext
-leeren; nichts wird gelöscht) · `/exit` (auch `/quit`, `/q`).
+leeren; nichts wird gelöscht) · `/attach <Datei>` (ein Dokument für Ihre nächste Nachricht; die Antwort wird daran geprüft) · `/exit` (auch `/quit`, `/q`).
 
 Genauso kontrolliert wie `chat` — dieselbe Registry, dieselbe fragende Freigabe,
 dieselben Ablehnungs-, Governance- und Kostenzeilen, dieselbe
@@ -707,8 +707,9 @@ uv run chimera guard "list the files in this folder"  # ALLOW
 Eine typisierte Entscheidung (ja/nein, eine Auswahl, eine Bewertung) beantwortet eines von drei
 Backends: `local_logprob` (ein kleines Modell über Ollama, der Standard, kostenlos),
 `hosted_verbalized` (der Fusion-Richter) oder `openrouter_decisions` (ein System-One-Modell auf
-OpenRouter). Bei einer Standardinstallation fragt nichts von selbst: Es antwortet, wenn Sie das
-REVIEW-Band der Governance oder das Tool `decide` einschalten oder `chimera decide` aufrufen.
+OpenRouter). Bei einer Standardinstallation wird es an genau einer Stelle von selbst gefragt — bei
+den verifizierten Antworten, unten — und sonst, wenn Sie das REVIEW-Band der Governance oder das
+Tool `decide` einschalten oder `chimera decide` aufrufen.
 
 ```bash
 uv run chimera decisions models                                   # was OpenRouter listet; * = aktiv
@@ -720,6 +721,35 @@ Dieselbe Wahl ist die Karte **System One** in den Einstellungen der Desktop-App.
 Modelle, die den Jev-Vertrag sprechen (ja/nein, Auswahl, Bewertung); ein Verhaltens-Scoring-Modell
 oder ein wandernder Alias wird gelistet und abgelehnt. Ein Modell ohne Kalibrierungskarte liest seine
 Konfidenz roh.
+
+#### Verifizierte Antworten
+Eine Antwort, die aus angehängten Dokumenten geschrieben wurde (die Büroklammer im Code-Bildschirm,
+`/attach` in `chat` und `assist`), in einem Durchgang ohne **jeden Tool-Aufruf**, liest dieses
+Backend, bevor sie ausgeliefert wird: Ist sie von den Dokumenten *gestützt*, *nicht gestützt* oder
+eine *Ablehnung*? Gestützt mit einer Konfidenz von 0,8 oder mehr geht sie unverändert hinaus. Eine
+Ablehnung geht unverändert hinaus. Alles andere geht mit den Dokumenten und der Frage an ein starkes
+Modell, wird erneut gelesen und geht hinaus, wenn es besteht; sonst geht „die bereitgestellten
+Quellen decken das nicht ab" hinaus, und die zurückgehaltene Antwort bleibt im Beleg. Gemessen in
+Studie 26 (`bench/verified_cascade/RESULTS.md`, 400 gepaarte Fragen): ausgelieferte falsche
+Antworten sanken von 33 auf 21 — 11 korrigiert, 0 verschlechtert — bei 1,87× den Kosten mit dem
+lokalen Prüfer; das alte lexikalische Gate war so gut wie gar keins.
+
+- **Welcher Prüfer.** Das oben gewählte Backend. Mit dem lokalen (dem Standard) und ohne Ollama oder
+  ohne `qwen3:4b` weicht es auf `typesafe/jev-1.13` aus, wenn ein OpenRouter-Schlüssel gesetzt ist,
+  sonst auf das alte lexikalische Gate; ein selbst gewähltes Backend hat keinen Ausweichweg. Der
+  Beleg nennt den Prüfer, der lief, und jeden übersprungenen.
+- **Wo es nicht gilt.** Ein Durchgang, der ein Tool benutzt hat (ein Router vor der Agentenschleife
+  machte in Bench B4 jeden Ausführer schlechter), Code-Änderungen und `solve`, abgerufene
+  Gedächtnisfakten (sie kommen in jedem Durchgang, ob die Frage sie betrifft oder nicht) und
+  Dokumente, die länger sind als der größte Satz, den der Bench las (14.000 Zeichen). Der Beleg sagt,
+  was davon einen Durchgang ausgeschlossen hat.
+- **Wenn der Prüfer ausfällt,** geht die Antwort als *nicht verifiziert* markiert hinaus, mit dem
+  Grund — nie zurückgehalten und nie als verifiziert gezeigt.
+- **Das Eskalationsmodell** ist `openrouter/openai/gpt-6-sol`, das gemessene, wenn ein
+  OpenRouter-Schlüssel es erreicht, sonst die Spitze der Tier-Leiter;
+  `CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL` überschreibt es.
+- **Aus:** `CHIMERA_VERIFIED_ANSWERS=false` oder der Schalter auf der System-One-Karte.
+  `CHIMERA_VERIFIED_ANSWERS_THRESHOLD` (0,8, der registrierte Wert) verschiebt die Schwelle.
 
 ### `bench` — Benchmark für kontinuierliche Evolution
 

@@ -1,5 +1,5 @@
 ---
-source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
+source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
 ---
 
 # Chimera —— 使用指南
@@ -127,7 +127,7 @@ uv run chimera chat --model MODEL --workspace DIR --max-steps 8
 
 命令：`/help` · `/new`（新线程——当前这条仍留在磁盘上） · `/reset`（等同于 `/new`） ·
 `/model <slug>`（不带参数则回到默认） · `/solve <任务>`（交给带验证的循环） ·
-`/exit`（也可用 `/quit`、`/q`）。
+`/attach <文件>`（为下一条消息附上一份文档；回答会对照它检查） · `/exit`（也可用 `/quit`、`/q`）。
 
 **它是受管控的，而且会问你。** `chat` 和 `assist` 会搭起与 API 路径相同的那一套：一个被告知
 你自己那条消息的污点台账、包住不可信工具输出的 `<<external-data>>` 围栏、信任内核、
@@ -190,7 +190,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 命令：`/help` · `/task <难题>`（全功率融合，一次成型） · `/solve <任务>`（交给带验证的循环） ·
 `/profile <种类>: <事实>`（记住关于你的一件事——种类：`preference`、`project`、`context`、
 `name`） · `/model <slug>` · `/reset`（清空对话上下文；不会删除任何东西） ·
-`/exit`（也可用 `/quit`、`/q`）。
+`/attach <文件>`（为下一条消息附上一份文档；回答会对照它检查） · `/exit`（也可用 `/quit`、`/q`）。
 
 管控方式与 `chat` 完全一致——同一套注册表、同一个会发问的审批器、同样的拒绝行、治理行与成本
 行、同样的 `usage.jsonl` 记录、同样的 MCP 服务器、同样一只贯穿整次运行的 `--max-usd` 计量器，
@@ -562,8 +562,8 @@ uv run chimera guard "list the files in this folder"  # ALLOW
 ### `decisions` —— 由哪个模型回答类型化决策
 类型化决策（是/否、选择、评分）由三个后端之一回答：`local_logprob`（通过 Ollama 的小模型，默认，免费）、
 `hosted_verbalized`（融合的评审模型）或 `openrouter_decisions`（OpenRouter 上的 System One 模型）。
-默认安装下没有任何东西会自行调用它：只有在你开启治理的 REVIEW 带或 `decide` 工具，或调用
-`chimera decide` 时，它才会回答。
+默认安装下只有一处会自行调用它——下面的"经过验证的回答"；除此之外，只有在你开启治理的 REVIEW 带或
+`decide` 工具，或调用 `chimera decide` 时，它才会回答。
 
 ```bash
 uv run chimera decisions models                                   # OpenRouter 的列表；* = 当前使用
@@ -573,6 +573,24 @@ uv run chimera decisions use local_logprob                        # 回到默认
 
 同样的选择就是桌面应用设置中的 **System One** 卡片。只有使用 Jev 契约（是/否、选择、评分）的模型可以被选中；
 行为评分模型或移动别名会列出但被拒绝。没有校准映射的模型按原始值读取置信度。
+
+#### 经过验证的回答
+根据你附上的文档写出的回答（Code 界面的回形针，`chat` 和 `assist` 里的 `/attach`），只要该轮**没有调用任何工具**，
+就会在发出前由这个后端读一遍：它是被文档*支持*、*不支持*，还是*婉拒*？置信度 0.8 及以上的"支持"原样发出。
+婉拒原样发出。其余的连同文档和问题交给一个强模型，再读一遍，通过就发出；不通过则发出"所提供的来源不涵盖这一点"，
+被扣下的回答保留在回执里。研究 26（`bench/verified_cascade/RESULTS.md`，400 道配对问题）的测量：发出的错误回答
+从 33 降到 21——修正 11 个，变差 0 个——使用本地验证器时成本为 1.87 倍；旧的词法门与不设门无异。
+
+- **用哪个验证器。** 上面选定的后端。选本地（默认）而没有 Ollama 或没有 `qwen3:4b` 时，若配置了 OpenRouter 密钥
+  就改用 `typesafe/jev-1.13`，否则改用旧的词法门；你自己选定的后端没有后备。回执会写明实际运行的验证器和被跳过的。
+- **不适用的情况。** 用了工具的轮次（基准 B4 中，放在智能体循环前面的路由器让每个执行模型都变差了）、代码编辑和
+  `solve`、从记忆中召回的事实（无论问题是否与之相关，每一轮都会带上），以及比基准读过的最大集合（14,000 个字符）
+  更长的文档。回执会说明是哪一条让该轮不在范围内。
+- **验证器失败时，** 回答会带着原因标为*未验证*发出——既不会被扣下，也不会显示为已验证。
+- **升级用的模型**：若 OpenRouter 密钥可达，就是测量时用的 `openrouter/openai/gpt-6-sol`，否则是层级阶梯的顶层；
+  可用 `CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL` 覆盖。
+- **关闭：** `CHIMERA_VERIFIED_ANSWERS=false`，或 System One 卡片上的开关。
+  `CHIMERA_VERIFIED_ANSWERS_THRESHOLD`（登记值 0.8）用来调整门槛。
 
 ### `bench` —— 持续演进基准测试
 

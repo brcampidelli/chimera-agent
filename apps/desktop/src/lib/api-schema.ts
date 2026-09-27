@@ -4773,6 +4773,16 @@ export interface components {
              * @default
              */
             model: string;
+            /**
+             * Verified Answers
+             * @default true
+             */
+            verified_answers: boolean;
+            /**
+             * Verified Answers Threshold
+             * @default 0.8
+             */
+            verified_answers_threshold: number;
         };
         /**
          * DecisionsOut

@@ -472,6 +472,11 @@ ALLOWED: dict[str, str] = {
     # `tests/test_decide_speaks_the_decisions_shape.py` (the request our own OpenRouter client sends is
     # accepted, and the response it reads comes back as the same reading) and the 1 000-item local run
     # in `bench/decide_interface/RESULTS.md`.
+    "chimera/fusion/verified.py": (
+        "verified answers for grounded turns (study 26, bench/verified_cascade): the local verifier cut wrong "
+        "answers shipped 33 -> 21 of 400, 11 fixed / 0 broken, Holm p = 0.002, at 1.87x the cost; the Jev "
+        "arm the same at 3.74x. Scoped to answers drafted from provided sources with no tool call"
+    ),
     "chimera/cli/decide_cmd.py": "the open interface's CLI (study 22 phase 4) — asked on purpose, gates nothing",
     "chimera/api/app.py": "POST /api/decide (study 22 phase 4) — asked on purpose, gates nothing",
     "chimera/tools/decide.py": (

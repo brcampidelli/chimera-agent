@@ -52,7 +52,14 @@ def _sum_usage(results: list[CompletionResult], field_name: str) -> int | None:
 
 
 def default_gate(result: CompletionResult) -> bool:
-    """Free acceptance gate: non-empty and not an refusal/apology opener."""
+    """Free acceptance gate: non-empty and not an refusal/apology opener.
+
+    Not the gate for grounded answers. Study 26 measured it level with no gate on answers drafted
+    from sources (−0.8 pp of wrong answers against no gate, p = 0.61, at 10.8× the cost), and inside the
+    agent loop it never sees such an answer anyway: every agent call carries tools and goes straight
+    to MID, and this gate is handed a completion with no sources to check it against. Grounded
+    answers are checked at the turn boundary instead, where the sources are known
+    (`chimera/fusion/verified.py`); this function remains that check's last fallback."""
     text = (result.content or "").strip()
     if not text:
         return False

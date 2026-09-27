@@ -1174,6 +1174,37 @@ export interface CodeTurnDone {
   /** Writes the agent asked us to make and the write region refused. A refusal nobody sees is
    *  indistinguishable from a write that silently did not happen. */
   refused_writes?: string[];
+  /** The check of this answer against the documents attached to the message
+   *  (`chimera/fusion/verified.py`, study 26), a `not_applied` block saying why a turn with
+   *  documents was not checked, or absent/null for a turn that attached none. Its own key: `verified`
+   *  on the stored receipt already means the workspace's test command. */
+  grounded?: GroundedCheck | null;
+}
+
+/** What the grounded-answer check did. `outcome` decides the badge; the rest is its tooltip and the
+ *  withheld text a declined answer keeps. */
+export interface GroundedCheck {
+  outcome: "supported" | "escalated" | "declined" | "unverified" | "lexical" | "not_applied";
+  /** Only on `not_applied`: `tool_calls` | `not_final` | `sources_too_long`. */
+  reason?: string;
+  verifier?: {
+    backend?: string;
+    model?: string;
+    resolved_model?: string;
+    /** The verifiers skipped before this one ran, and why — the local model down, say. */
+    fell_back_from?: { backend: string; model: string; reason: string }[];
+  };
+  label?: string | null;
+  p?: number | null;
+  threshold?: number;
+  escalated?: boolean;
+  escalated_model?: string | null;
+  decline_shipped?: boolean;
+  halt?: string | null;
+  /** What the verifier and the escalation added to this turn's cost, already inside `usd`. */
+  usd_extra?: number;
+  /** Answers read as unsupported and not shipped, kept so the person can still read them. */
+  withheld?: string[];
 }
 
 /** The verdict on what a turn WROTE, emitted only when the turn edited something.

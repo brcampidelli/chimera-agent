@@ -591,6 +591,10 @@ class DecisionsCfgOut(BaseModel):
 
     backend: str = "local_logprob"
     model: str = ""
+    verified_answers: bool = True
+    """Whether an answer drafted from attached sources with no tool call is checked by this backend
+    before it ships (``chimera/fusion/verified.py``, study 26)."""
+    verified_answers_threshold: float = 0.8
 
 
 class ConfigOut(BaseModel):

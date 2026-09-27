@@ -1520,6 +1520,9 @@ def register_code_api(
         images: list[str] = []
         dropped_images: list[str] = []
         doc_blocks: list[str] = []
+        # The documents' own texts, as the sources a grounded answer is checked against
+        # (`chimera/fusion/verified.py`): the verifier reads exactly what the model was handed.
+        doc_texts: list[str] = []
         for ident in req.attachments:
             found = load_attachment(settings.home, ident)
             if found is None:
@@ -1538,6 +1541,7 @@ def register_code_api(
                 text = _save(settings.home, found.name, found.path.read_bytes()).text
                 if text:
                     doc_blocks.append(f"Attached document `{found.name}`:\n{text}")
+                    doc_texts.append(text)
 
         message = req.message
         if doc_blocks:
@@ -1558,6 +1562,37 @@ def register_code_api(
             if dropped_images
             else ""
         )
+
+        # A turn with attached documents is checked against them when it answers without a tool
+        # (`chimera/fusion/verified.py`, study 26). Not an external agent's turn: its loop is not
+        # ours, and whether it called a tool is not something this side can see.
+        from chimera.fusion.verified import GROUNDED_NOTE, GroundedTurn
+
+        grounded_turn = (
+            GroundedTurn.make(doc_texts, req.message, ["attachments"])
+            if doc_texts and live().verified_answers and not (req.provider or "").strip()
+            else None
+        )
+        if grounded_turn is not None:
+            # The measured drafter was told this rule; the model is told the rule it is checked by,
+            # so a question the documents do not cover is answered "they do not cover it" by the
+            # model itself rather than declined after the fact.
+            note = (note + "\n\n" if note else "") + GROUNDED_NOTE
+
+        def _check_grounded(turn: GroundedTurn | None, result: Any) -> tuple[str, dict[str, Any] | None, float]:
+            """The finished turn's answer, checked against its documents when it is the measured
+            shape; the draft unchanged otherwise. Never raises."""
+            from chimera.fusion.verified import build_grounded_answers, check_answer
+
+            def build() -> Any:
+                from chimera.providers import LLMGateway
+
+                return build_grounded_answers(live(), LLMGateway())
+
+            return check_answer(
+                build, turn, str(result.answer or ""), tool_names=list(result.tool_names),
+                stopped_reason=str(result.stopped_reason or ""),
+            )
 
         # Background jobs that ended since a turn last looked. Handed to the model here — true for
         # this turn, absent from the stored transcript, like the image note above — so "the
@@ -2031,17 +2066,29 @@ def register_code_api(
                     )
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
+                    # Inside the lock and before the save: a declined or escalated answer replaces
+                    # the draft in the stored conversation too, so a reopened conversation shows
+                    # what shipped, and the next turn's history is not built on a withheld answer.
+                    answer, grounded, grounded_usd = _check_grounded(grounded_turn, result)
+                    if answer != result.answer:
+                        session.replace_last_answer(answer)
                     store_for.save(session)
                 _verify_and_finish(
                     {
-                        "answer": result.answer,
+                        "answer": answer,
+                        # The check against the attached documents (`chimera/fusion/verified.py`),
+                        # or None for a turn with none. Its own key: `verified` on this receipt
+                        # already means the workspace's test command.
+                        "grounded": grounded,
                         "steps": result.steps,
                         "stopped_reason": result.stopped_reason,
                         "tool_names": list(result.tool_names),
                         "model": result.model,
                         "prompt_tokens": result.prompt_tokens,
                         "completion_tokens": result.completion_tokens,
-                        "usd": result.usd,
+                        # The verifier's and the escalation's calls are this turn's spend too;
+                        # an unpriced turn stays unpriced rather than becoming only their cost.
+                        "usd": None if result.usd is None else round(result.usd + grounded_usd, 6),
                         # The number that says whether raising max_steps is safe. Reported because
                         # a ceiling the user can raise without seeing its cost is a trap.
                         "context_peak_tokens": result.steplog.context_peak_tokens,

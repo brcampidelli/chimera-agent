@@ -1,5 +1,5 @@
 ---
-source_sha256: 17f3d34f0596c12639aa8e3505e14f9b5e6db68b605faca2d3be047084dec894
+source_sha256: 404eaaf01520200f0332bde98fcf450ab51128945453efe63d4b4ff7848319dc
 ---
 
 # Chimera — Przewodnik użytkowania
@@ -135,7 +135,7 @@ nadpisuje slug modelu — ale przeczytaj niżej uwagę o routingu.
 
 Komendy: `/help` · `/new` (świeży wątek — bieżący zostaje na dysku) · `/reset` (to samo co
 `/new`) · `/model <slug>` (bez argumentu wraca do domyślnego) · `/solve <zadanie>` (przekazuje to
-pętli z weryfikacją) · `/exit` (także `/quit`, `/q`).
+pętli z weryfikacją) · `/attach <plik>` (dokument do następnej wiadomości; odpowiedź jest z nim sprawdzana) · `/exit` (także `/quit`, `/q`).
 
 **Jest zarządzany i pyta ciebie.** `chat` i `assist` budują ten sam stos co ścieżka API:
 ledger skażenia, któremu podaje się twoją własną wiadomość, ogrodzenie `<<external-data>>`
@@ -213,7 +213,7 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 Komendy: `/help` · `/task <trudna prośba>` (pełna moc przez fuzję, jeden strzał) ·
 `/solve <zadanie>` (przekazuje to pętli z weryfikacją) · `/profile <rodzaj>: <fakt>` (zapamiętaj
 coś o tobie — rodzaje: `preference`, `project`, `context`, `name`) · `/model <slug>` · `/reset`
-(czyści kontekst konwersacji; nic nie jest kasowane) · `/exit` (także `/quit`, `/q`).
+(czyści kontekst konwersacji; nic nie jest kasowane) · `/attach <plik>` (dokument do następnej wiadomości; odpowiedź jest z nim sprawdzana) · `/exit` (także `/quit`, `/q`).
 
 Zarządzany dokładnie tak jak `chat` — ten sam rejestr, ten sam pytający zatwierdzający, te
 same linie odmowy, zarządzania i kosztu, ten sam wiersz w `usage.jsonl`, te same serwery MCP,
@@ -627,8 +627,9 @@ uv run chimera guard "list the files in this folder"  # ALLOW
 ### `decisions` — który model odpowiada na decyzję typowaną
 Na decyzję typowaną (tak/nie, wybór, ocena) odpowiada jeden z trzech backendów: `local_logprob` (mały
 model przez Ollama, domyślny, darmowy), `hosted_verbalized` (sędzia fuzji) albo
-`openrouter_decisions` (model System One na OpenRouter). W domyślnej instalacji nic nie pyta go samo:
-odpowiada, gdy włączysz pasmo REVIEW governance albo tool `decide`, lub wywołasz `chimera decide`.
+`openrouter_decisions` (model System One na OpenRouter). W domyślnej instalacji pyta go samo tylko jedno
+miejsce — zweryfikowane odpowiedzi, niżej — a poza tym odpowiada, gdy włączysz pasmo REVIEW
+governance albo tool `decide`, lub wywołasz `chimera decide`.
 
 ```bash
 uv run chimera decisions models                                   # co listuje OpenRouter; * = aktywny
@@ -639,6 +640,33 @@ uv run chimera decisions use local_logprob                        # powrót do d
 Ten sam wybór to karta **System One** w Ustawieniach aplikacji desktopowej. Wybrać można tylko modele
 mówiące kontraktem Jev (tak/nie, wybór, ocena); model oceniający zachowania albo ruchomy alias jest
 na liście i zostaje odrzucony. Model bez mapy kalibracji odczytuje pewność surowo.
+
+#### Zweryfikowane odpowiedzi
+Odpowiedź napisaną na podstawie dołączonych dokumentów (spinacz na ekranie Code, `/attach` w `chat`
+i `assist`), w turze, która nie wywołała **żadnego toola**, ten backend czyta przed wysłaniem: czy
+jest *poparta* dokumentami, *niepoparta*, czy jest *odmową*? Poparta z pewnością 0,8 lub wyższą
+wychodzi bez zmian. Odmowa wychodzi bez zmian. Reszta trafia do silnego modelu z dokumentami i
+pytaniem, jest czytana ponownie i wychodzi, jeśli przejdzie; jeśli nie, wychodzi „dostarczone źródła
+tego nie obejmują", a wstrzymana odpowiedź zostaje na paragonie. Zmierzone w badaniu 26
+(`bench/verified_cascade/RESULTS.md`, 400 sparowanych pytań): wysłanych błędnych odpowiedzi było 21
+zamiast 33 — 11 poprawionych, 0 pogorszonych — przy 1,87× kosztu z lokalnym weryfikatorem; stary
+bramkowy filtr leksykalny wypadł tak samo jak brak bramki.
+
+- **Który weryfikator.** Backend wybrany wyżej. Z lokalnym (domyślnym) i bez Ollamy lub bez
+  `qwen3:4b` przełącza się na `typesafe/jev-1.13`, gdy ustawiony jest klucz OpenRouter, a w
+  przeciwnym razie na stary filtr leksykalny; backend wybrany przez ciebie nie ma zastępstwa.
+  Paragon podaje weryfikator, który zadziałał, i te pominięte.
+- **Gdzie nie działa.** Tura, która użyła toola (router przed pętlą agenta pogorszył wszystkich
+  wykonawców w benchu B4), edycja kodu i `solve`, fakty przywołane z pamięci (przychodzą w każdej
+  turze, niezależnie od tego, czy pytanie ich dotyczy) oraz dokumenty dłuższe niż największy zestaw,
+  jaki przeczytał bench (14 000 znaków). Paragon mówi, co wykluczyło turę.
+- **Gdy weryfikator zawiedzie,** odpowiedź wychodzi oznaczona jako *niezweryfikowana*, z powodem —
+  nigdy wstrzymana i nigdy pokazana jako zweryfikowana.
+- **Model eskalacji** to `openrouter/openai/gpt-6-sol`, ten zmierzony, gdy sięga do niego klucz
+  OpenRouter; w przeciwnym razie szczyt drabiny tierów. `CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL` go
+  zastępuje.
+- **Wyłączenie:** `CHIMERA_VERIFIED_ANSWERS=false` albo przełącznik na karcie System One.
+  `CHIMERA_VERIFIED_ANSWERS_THRESHOLD` (0,8, wartość zarejestrowana) przesuwa próg.
 
 ### `bench` — benchmark ciągłej ewolucji
 

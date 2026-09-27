@@ -4,12 +4,14 @@ import { Loader2 } from "lucide-react";
 
 import { ErrorState } from "@/components/ui/async";
 import { Badge } from "@/components/ui/panel";
+import { Switch } from "@/components/ui/switch";
 import { getDecisionModels } from "@/lib/api";
 import { useT, type TFunc } from "@/lib/i18n";
 import type { SystemOneModel } from "@/lib/types";
 
 const BACKEND_KEY = "CHIMERA_DECISION_BACKEND";
 const MODEL_KEY = "CHIMERA_DECISION_MODEL";
+const VERIFY_KEY = "CHIMERA_VERIFIED_ANSWERS";
 const OPENROUTER = "openrouter_decisions";
 
 const BACKENDS = ["local_logprob", "hosted_verbalized", OPENROUTER] as const;
@@ -35,11 +37,15 @@ function isBackend(value: string): value is Backend {
 export function SystemOneCard({
   backend,
   model,
+  verifiedAnswers = true,
   applies,
   onSave,
 }: {
   backend: string;
   model: string;
+  /** Whether a grounded answer is checked by this backend (`CHIMERA_VERIFIED_ANSWERS`, default on).
+   *  A server without the field is on the shipped default, which is on. */
+  verifiedAnswers?: boolean;
   applies?: string;
   onSave: (updates: Record<string, string>) => void;
 }) {
@@ -83,8 +89,35 @@ export function SystemOneCard({
           )}
         </fieldset>
         {current === OPENROUTER && <ModelPicker model={model} onSave={onSave} />}
+        <VerifyRow on={verifiedAnswers} onSave={onSave} />
       </div>
     </section>
+  );
+}
+
+/**
+ * The one place this instrument is asked on its own on a default install: answers written from
+ * attached documents (`chimera/fusion/verified.py`). The measured result and the fallback are said
+ * here because they are what someone deciding whether to turn it off needs — what it buys, what it
+ * costs, and what runs when the local model does not.
+ */
+function VerifyRow({ on, onSave }: { on: boolean; onSave: (updates: Record<string, string>) => void }) {
+  const t = useT();
+  const label = t("settings.systemOne.verify");
+  return (
+    <div className="space-y-1 px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm font-medium">{label}</span>
+        <Switch
+          checked={on}
+          label={label}
+          onChange={(next) => onSave({ [VERIFY_KEY]: next ? "true" : "false" })}
+        />
+      </div>
+      <div className="text-xs text-muted-foreground">{t("settings.systemOne.verifyHint")}</div>
+      <div className="text-xs text-muted-foreground">{t("settings.systemOne.verifyMeasured")}</div>
+      <div className="text-xs text-muted-foreground">{t("settings.systemOne.verifyFallback")}</div>
+    </div>
   );
 }
 

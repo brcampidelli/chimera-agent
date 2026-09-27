@@ -1247,7 +1247,9 @@ def _sandbox_banner() -> None:
         )
 
 
-def _run_turn(session: Any, message: str) -> tuple[Any, str]:
+def _run_turn(
+    session: Any, message: str, documents: list[tuple[str, str]] | None = None
+) -> tuple[Any, str]:
     """Run one REPL turn and print whatever went wrong. Returns ``(report | None, outcome)``.
 
     ``outcome`` is ``"ok"`` (``report`` is a :class:`~chimera.interface.session.TurnReport`),
@@ -1261,6 +1263,10 @@ def _run_turn(session: Any, message: str) -> tuple[Any, str]:
 
     try:
         with console.status("[dim]thinking…[/dim]"):
+            # Passed only when there are documents: a session written against the older signature
+            # (a test double, a published `SupportsRun` surface) is never handed a keyword it lacks.
+            if documents:
+                return session.send_verbose(message, documents=documents), "ok"
             return session.send_verbose(message), "ok"
     except MissingCredentialsError as exc:
         console.print(f"[red]{escape(str(exc))}[/red]")
@@ -1316,6 +1322,11 @@ def _render_turn(
     from chimera.interface import render
 
     console.print(render.reply_line(report.answer))
+    grounded = render.grounded_line(report)
+    if grounded:
+        # Right under the reply it qualifies: "verified", "the sources don't cover this", or that
+        # the verifier could not run and the answer is unchecked.
+        console.print(grounded)
     for line in render.refusal_lines(report):
         console.print(line)
     for line in render.todo_lines(report):
@@ -1403,8 +1414,57 @@ def _chat_commands() -> list[Any]:
         SlashCommand(
             "/solve", "<task>", "hand it to the verified loop: plan, verify, revert on failure"
         ),
+        SlashCommand("/attach", "<file>", _ATTACH_HELP),
         SlashCommand("/exit", "", "quit (also /quit, /q)"),
     ]
+
+
+_ATTACH_HELP = "attach a document to your next message; the answer is checked against it"
+
+
+def _attach_document(argument: str, settings: Settings, pending: list[tuple[str, str]]) -> None:
+    """Read a document for the next message, the way the desktop's paperclip reads one.
+
+    Through the same extraction (`chimera/api/attachments.py`: plain text read directly, anything
+    else through the converter, the text sanitized and fenced as data), so the terminal and the app
+    hand the model the same bytes for the same file, and the grounded-answer check reads them.
+    """
+    from chimera.api.attachments import AUDIO_SUFFIXES, IMAGE_SUFFIXES, save
+
+    raw = argument.strip().strip('"').strip("'")
+    if not raw:
+        console.print("[dim]usage: /attach <file> — the next message is answered from it[/dim]")
+        return
+    path = Path(raw).expanduser()
+    if not path.is_file():
+        console.print(f"[red]no such file:[/red] {escape(str(path))}")
+        return
+    if path.suffix.lower() in IMAGE_SUFFIXES | AUDIO_SUFFIXES:
+        console.print("[yellow]only documents can be attached here; images and audio are the app's[/yellow]")
+        return
+    try:
+        found = save(settings.home, path.name, path.read_bytes())
+    except (OSError, ValueError) as exc:
+        console.print(f"[red]could not attach:[/red] {escape(str(exc))}")
+        return
+    if not found.text:
+        console.print(f"[yellow]{escape(found.note or 'nothing readable in that file')}[/yellow]")
+        return
+    pending.append((path.name, found.text))
+    console.print(
+        f"[dim]attached {escape(path.name)} ({len(found.text):,} chars) to your next message.[/dim]"
+    )
+
+
+def _grounded_answers_for(settings: Settings, gateway: Any) -> Any:
+    """The grounded-answer check a terminal session builds when a turn carries a document."""
+
+    def build() -> Any:
+        from chimera.fusion.verified import build_grounded_answers
+
+        return build_grounded_answers(settings, gateway)
+
+    return build
 
 
 def _assist_commands() -> list[Any]:
@@ -1420,6 +1480,7 @@ def _assist_commands() -> list[Any]:
         SlashCommand("/profile", "<kind>: <fact>", "remember a fact about you"),
         SlashCommand("/model", "<slug>", "switch model (no argument = back to default)"),
         SlashCommand("/reset", "", "clear the conversation context (nothing is deleted)"),
+        SlashCommand("/attach", "<file>", _ATTACH_HELP),
         SlashCommand("/exit", "", "quit (also /quit, /q)"),
     ]
 
@@ -1915,6 +1976,9 @@ def chat(
             # The thread's id when the spend is written: `/new` rebinds `active` below.
             extractor=_memory_extractor(settings, mem, lambda: active),
             cite_facts=settings.memory_extract,
+            # A message with `/attach`ed documents is checked against them (study 26); built on
+            # such a turn only. The plain gateway: the escalation names its own model.
+            grounded_answers=_grounded_answers_for(settings, gateway),
         ),
         store,
     )
@@ -1935,6 +1999,7 @@ def chat(
         console.print(f"[dim]session {active} — saved as you go, under {store_label}.[/dim]")
     nudged: set[str] = set()  # preferences already suggested this session
     skill_nudged: set[str] = set()  # recurring tasks already suggested as skills
+    pending_docs: list[tuple[str, str]] = []  # `/attach`ed for the next message only
     while True:
         try:
             message = console.input("[bold green]you ›[/bold green] ").strip()
@@ -1963,6 +2028,9 @@ def chat(
             continue
         if head == "/model":
             _switch_model(session, agent, argument or None, routed=routed, plain=gateway)
+            continue
+        if head == "/attach":
+            _attach_document(argument, settings, pending_docs)
             continue
         if head == "/solve":
             # Never automatic, and the one command here that can change files. `_run_solve_command`
@@ -1994,7 +2062,8 @@ def chat(
         # Read BEFORE the turn: `send_verbose` appends the new exchange, which would shift the
         # window this reads by one and drop the oldest restored turn out of the count.
         restored = _replayed_provenance(session)
-        report, outcome = _run_turn(session, message)
+        docs, pending_docs = pending_docs, []
+        report, outcome = _run_turn(session, message, docs)
         if outcome == "stop":
             _persist_turn(manager, active)  # whatever the thread already had, before leaving
             console.print("[dim]bye[/dim]")
@@ -2117,6 +2186,7 @@ def assist(
         project=project_key(workspace),
         extractor=_memory_extractor(settings, mem, usage_session),
         cite_facts=settings.memory_extract,
+        grounded_answers=_grounded_answers_for(settings, gateway),
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2140,6 +2210,7 @@ def assist(
         console.print(f"[dim]spend ceiling: ${budget.max_usd:.4f} for this whole run.[/dim]")
     nudged: set[str] = set()
     skill_nudged: set[str] = set()
+    pending_docs: list[tuple[str, str]] = []  # `/attach`ed for the next message only
     while True:
         try:
             message = console.input("[bold green]you ›[/bold green] ").strip()
@@ -2210,6 +2281,9 @@ def assist(
         if head == "/model":
             _switch_model(session, agent, argument or None, routed=routed, plain=gateway)
             continue
+        if head == "/attach":
+            _attach_document(argument, settings, pending_docs)
+            continue
         if _handle_unknown_command(head, commands):
             continue
         if budget is not None and budget.blocked():
@@ -2217,7 +2291,8 @@ def assist(
             continue
         hand.begin_turn(message)  # the ledger learns whose words this turn is; see `chat`
         restored = _replayed_provenance(session)
-        report, outcome = _run_turn(session, message)
+        docs, pending_docs = pending_docs, []
+        report, outcome = _run_turn(session, message, docs)
         if outcome == "stop":
             console.print("[dim]bye[/dim]")
             _maybe_autoconsolidate(mem, settings, usage_session)

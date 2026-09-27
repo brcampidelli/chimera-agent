@@ -128,7 +128,8 @@ routing below.
 
 Commands: `/help` · `/new` (fresh thread — the current one stays on disk) · `/reset` (same as
 `/new`) · `/model <slug>` (no argument goes back to the default) · `/solve <task>` (hand it to the
-verified loop) · `/exit` (also `/quit`, `/q`).
+verified loop) · `/attach <file>` (a document for your next message; the answer is checked against
+it — see [Verified answers](#verified-answers)) · `/exit` (also `/quit`, `/q`).
 
 **It is governed, and it asks you.** `chat` and `assist` build the same stack the API path builds: a
 taint ledger told your own message, the `<<external-data>>` fence around untrusted tool output, the
@@ -202,7 +203,8 @@ uv run chimera assist --model MODEL --workspace DIR --max-steps 8
 Commands: `/help` · `/task <hard ask>` (full-power fusion, one shot) · `/solve <task>` (hand it to
 the verified loop) · `/profile <kind>: <fact>` (remember something about you — kinds: `preference`,
 `project`, `context`, `name`) · `/model <slug>` · `/reset` (clear the conversation context; nothing
-is deleted) · `/exit` (also `/quit`, `/q`).
+is deleted) · `/attach <file>` (a document for your next message; the answer is checked against
+it) · `/exit` (also `/quit`, `/q`).
 
 Governed exactly as `chat` is — same registry, same prompting approver, same refusal, governance and
 cost lines, same `usage.jsonl` row, same MCP servers, same `--max-usd` meter over the whole run, and
@@ -596,9 +598,9 @@ uv run chimera guard "list the files in this folder"  # ALLOW
 ### `decisions` — which model answers a typed decision
 A typed decision (a yes/no, a choice, a score) is answered by one of three backends: `local_logprob`
 (a small model through Ollama, the default, free), `hosted_verbalized` (the fusion judge) or
-`openrouter_decisions` (a System One model on OpenRouter). On a default install nothing asks one on
-its own: it answers when you turn on the governance REVIEW band or the `decide` tool, or call
-`chimera decide`.
+`openrouter_decisions` (a System One model on OpenRouter). On a default install it is asked on its
+own in one place — [verified answers](#verified-answers) — and otherwise when you turn on the
+governance REVIEW band or the `decide` tool, or call `chimera decide`.
 
 ```bash
 uv run chimera decisions models                                   # what OpenRouter lists; * = active
@@ -609,6 +611,32 @@ uv run chimera decisions use local_logprob                        # back to the 
 The same choice is the **System One** card in the desktop's Settings. Only models that speak the
 Jev contract (yes/no, choice, score) can be chosen; a behaviour-scoring model or a moving alias is
 listed and refused. A model without a calibration map reads its confidence raw.
+
+#### Verified answers
+An answer written from documents you attached (the paperclip on the Code screen, `/attach` in `chat`
+and `assist`), in a turn that called **no tool**, is read by that backend before it ships: is it
+*supported* by the documents, *unsupported*, or a *decline*? Supported at a confidence of 0.8 or more
+ships as it is. A decline ships as it is. Anything else goes to a strong model with the documents and
+the question, is read again, and ships if it passes; if it does not, what ships is "the sources
+provided don't cover this", and the withheld answer stays on the receipt. Measured in study 26
+(`bench/verified_cascade/RESULTS.md`, 400 paired questions): wrong answers shipped went from 33 to
+21 — 11 fixed, 0 made worse — at 1.87× the cost with the local verifier; the old lexical gate matched
+no gate at all.
+
+- **Which verifier.** The backend chosen above. With the local one (the default) and no Ollama or
+  no `qwen3:4b`, it falls back to `typesafe/jev-1.13` when an OpenRouter key is set, else to the old
+  lexical check; a backend you chose yourself has no fallback. The receipt names the verifier that
+  ran and any it skipped.
+- **Where it does not apply.** A turn that used a tool (a router in front of the agent loop made
+  every executor worse in bench B4), code edits and `solve`, recalled memory facts (they arrive on
+  every turn whether the question is about them or not), and documents longer than the largest set
+  the bench read (14,000 characters). The receipt says which of these kept a turn out.
+- **If the verifier fails,** the answer ships marked *unverified*, with the reason — never withheld
+  and never shown as verified.
+- **The escalation model** is `openrouter/openai/gpt-6-sol`, the one measured, when an OpenRouter
+  key reaches it, else the tier ladder's top; `CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL` overrides it.
+- **Off:** `CHIMERA_VERIFIED_ANSWERS=false`, or the switch on the System One card.
+  `CHIMERA_VERIFIED_ANSWERS_THRESHOLD` (0.8, the registered value) moves the bar.
 
 ### `bench` — continuous-evolution benchmark
 

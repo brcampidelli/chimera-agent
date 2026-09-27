@@ -3711,6 +3711,16 @@
             "default": "",
             "title": "Model",
             "type": "string"
+          },
+          "verified_answers": {
+            "default": true,
+            "title": "Verified Answers",
+            "type": "boolean"
+          },
+          "verified_answers_threshold": {
+            "default": 0.8,
+            "title": "Verified Answers Threshold",
+            "type": "number"
           }
         },
         "title": "DecisionsCfgOut",

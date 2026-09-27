@@ -370,6 +370,16 @@ SECTIONS: tuple[PromptSection, ...] = (
             "bytes, not these"),
     _i("review.verifier_request", "chimera.review.verifier:verifier_request", "turn", ("S15",),
        note="one finding and its diff window, fenced"),
+    # ---- verified answers: a grounded answer checked against its sources (study 26) -------------
+    _c("verified.question", "chimera.fusion.verified:INSTRUCTIONS", "call", ("S2", "S3", "S5"), "measured",
+       "bench/verified_cascade (local arm: wrong shipped 33 → 21 of 400, 11 fixed / 0 broken)",
+       note="the Choice's framing, byte for byte the bench's; its criteria travel with it"),
+    _c("verified.escalation_system", "chimera.fusion.verified:DRAFT_SYSTEM", "call", ("S2", "S3", "S5"),
+       "measured", "bench/verified_cascade (the drafting prompt the escalation rung, gpt-6-sol, answered under)"),
+    _c("verified.grounded_note", "chimera.fusion.verified:GROUNDED_NOTE", "turn", ("S2", "S3", "S5"),
+       "unmeasured",
+       note="added to a turn with attached documents; the measured drafter's rule, scoped to questions "
+       "about them — the sentence itself was not a bench arm"),
     # ---- governance and typed decisions --------------------------------------------------------
     _c("governance.judge", "chimera.decisions.governance:JUDGE_TEXT", "call", ("S9",), "measured",
        "bench/governance_judge (9/9, 0/10); bench/perturbation_floor (framing: 8–9 of 14 to ALLOW)"),

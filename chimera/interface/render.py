@@ -163,6 +163,30 @@ def cut_short_line(report: TurnReport) -> str:
     return f"[yellow]⚠ {note}[/yellow] [dim]({escape(reason)})[/dim]"
 
 
+_GROUNDED_TONE = {"supported": "green", "escalated": "green", "declined": "yellow", "lexical": "yellow"}
+
+
+def grounded_line(report: TurnReport) -> str:
+    """The badge of a turn whose answer was checked against its attached documents, or ``""``.
+
+    The same outcome the desktop draws under the answer: verified, the sources do not cover it,
+    a lexical check only, or the verifier unavailable. A turn that attached nothing prints nothing;
+    a turn that attached documents and was not checked says why, dim, so "no badge" never reads as
+    "checked and fine".
+    """
+    from chimera.fusion.verified import badge
+
+    block = getattr(report, "grounded", None)
+    text = badge(block)
+    if not text or not block:
+        return ""
+    outcome = str(block.get("outcome") or "")
+    if outcome == "not_applied":
+        return f"[dim]{escape(text)}[/dim]"
+    tone = _GROUNDED_TONE.get(outcome, "red")
+    return f"[{tone}]{escape(text)}[/{tone}]"
+
+
 def approval_stats_line(stats: Mapping[str, Any]) -> str:
     """How the questions this deployment has asked actually ended — the answer rate and the wait.
 

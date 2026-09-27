@@ -1504,6 +1504,7 @@ export function Settings() {
                 <SystemOneCard
                   backend={c.decisions?.backend ?? "local_logprob"}
                   model={c.decisions?.model ?? ""}
+                  verifiedAnswers={c.decisions?.verified_answers ?? true}
                   applies={c.applies?.CHIMERA_DECISION_BACKEND}
                   onSave={save}
                 />
