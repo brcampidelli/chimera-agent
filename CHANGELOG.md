@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.62.3] - 2026-09-27
+### Fixed
+
+- **`chimera mcp desktop` now runs with the `mcp` extra alone.** In 0.62.2 it failed on its first tool listing with `No module named 'fastapi'`, because it read the discovery file through a module that imports the web stack. The discovery helpers moved to a module that needs only the standard library, and a test drives the bridge with the web stack forbidden. (#651)
+
 ## [0.62.2] - 2026-09-26
 ### Added
 
