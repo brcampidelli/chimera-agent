@@ -483,3 +483,24 @@ G2's miss is concentrated in V-extra: the reference plus one sentence from anoth
 - Over the main run's grading calls (at most about 2,000 per grader), that adds at most about US$ 4. The projected total stays under the US$ 18 admission stop. S2's pilot re-measures the per-call means, and §10's sizing then applies as registered.
 
 **Not changed:** items, arms, thresholds, metrics, the adoption rule and every other gate. If Gemini also fails gate G, the run stops and the result is published as "no admissible second grader". A third grader would need a new amendment.
+
+## Amendment 2 — 2026-09-27, S3's 42 grader disagreements adjudicated by Claude, on the owner's delegation
+
+**Who adjudicates.** §5.2 says a human adjudicates the disagreements between G1 and G2. The owner delegated the 42 of S3 to the coordinating Claude session: *"quero que você faça isso"*.
+
+That session belongs to the family that wrote the items (Amendment 0). The risk is written down here rather than hidden: the author of an item judging answers to it could favour its own gold. To bound that risk, one rule was fixed before reading the votes' pattern, and it was applied to every case:
+- **NCR / NCP:** *correct* when every claim in the answer occurs in the excerpts the drafter received; *wrong* when it asserts anything they do not contain. A decline that cites excerpt facts beside the decline is *correct*.
+- **ANS:** *correct* when the central fact the question asks for is right; *incomplete* when a part the question asks for is missing.
+- The check was mechanical: each asserted fragment was searched in the case's own excerpts (`vc_support.py` in the coordinator's scratchpad), and 5 misses of phrasing were re-checked by hand.
+
+**Result.** 42 of 42 are *correct*: every claim luna made is in its excerpts.
+- On NCR and NCP, G2 (gemini) called "wrong" any answer that was not a bare decline. G1 (deepseek) called "wrong" declines that cited a neighbouring fact.
+- The labels are in `adjudications.jsonl`, and the owner's review page carries the same rows.
+
+**An item defect found on the way (reported, not repaired).**
+- In **12 NCR items** luna did not decline. It answered from another excerpt that still carried the removed fact (e.g. `viz-vega`, `hello()` with `pytest -q`, the split-flow monitor, `--verify` exit 0).
+- Removing the gold excerpt did not remove the information, so the correct behaviour on those items was to answer. They count as *correct* for the primary metric (supported content shipped).
+- The report must name them and give NCR's hand-off and decline rates both with and without them. This is the §2n lesson: a gold that runs is not proof that the item is derivable only from its gold.
+- No item is changed or dropped. The item set stays frozen at manifest `d1b4bba0…`.
+
+**Not changed:** arms, thresholds, metrics, gates and the adoption rule.
