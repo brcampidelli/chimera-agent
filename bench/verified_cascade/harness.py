@@ -30,7 +30,7 @@ LOCAL = "qwen3:4b"
 G1 = "openrouter/deepseek/deepseek-v4-flash-0731"
 G2 = "openrouter/mistralai/mistral-small-3.2-24b-instruct"
 G2_SWAP = "openrouter/google/gemini-3.8-flash"
-PINS = {LUNA: "OpenAI", SOL: "OpenAI", G1: "DeepInfra", G2: "DeepInfra"}
+PINS = {LUNA: "OpenAI", SOL: "OpenAI", G1: "DeepInfra", G2: "DeepInfra", G2_SWAP: "Google AI Studio"}
 MAX_TOKENS = {LUNA: 4000, SOL: 4000, G1: 2000, G2: 1000, G2_SWAP: 1000}
 #: Per-call estimates used for admission until the pilot has measured a mean (§10).
 ESTIMATE_USD = {"draft_luna": 0.0005, "draft_sol": 0.013, "jev": 0.00006, "local": 0.0, "grade": 0.0003}

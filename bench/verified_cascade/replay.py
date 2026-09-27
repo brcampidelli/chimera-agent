@@ -13,7 +13,7 @@ from typing import Any
 from bench.verified_cascade.common import RESULTS, number_check_fires, read_jsonl
 from bench.verified_cascade.harness import (
     G1,
-    G2,
+    G2_SWAP,
     LUNA,
     SOL,
     THRESHOLD,
@@ -25,7 +25,8 @@ from bench.verified_cascade.harness import (
     verified,
 )
 
-GRADERS = {"g1": G1, "g2": G2}
+# Amendment 1 (2026-09-27): G2 (mistral-small) failed gate G in S1; the registered swap took its seat.
+GRADERS = {"g1": G1, "g2": G2_SWAP}
 DRAFT_MODEL = {"d1": LUNA, "d2": LUNA, "d3": LUNA, "f1": SOL, "f2": SOL}
 SHORT = {LUNA: "luna", SOL: "sol"}
 

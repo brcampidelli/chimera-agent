@@ -454,3 +454,32 @@ Committed before any spend. Nothing below was read off a model's output: no mode
 5. **Cost.** The gateway returns tokens but not OpenRouter's billed figure for chat calls; the harness records the catalogue-computed price (`price_completion`) and, where the route returns a billed cost (the Decisions API does), the billed one, and admission counts the larger. A per-generation billed lookup is not added, because it is another call per call.
 6. **A graded draft on which the number check fires is labelled wrong without a grader call** (§5.2: "first and final").
 7. **V-extra** is built as §3.4 says (the reference plus the first sentence of another file's reference, same language), not from a template set.
+
+## Amendment 1 — 2026-09-27, S1 gate G: the second grader swapped as §5.3 registers
+
+**What the gate read** (`gates.json`, S1, after 269 grading calls per grader on the labelled slice):
+
+| | agreement | recall on wrong | wrong on V-gold | gate |
+|---|---:|---:|---:|---|
+| G1 `deepseek-v4-flash-0731` | 97.4% | 96.3% | 0% | passed |
+| G2 `mistral-small-3.2-24b-instruct` | 86.6% | 83.0% | 0% | **failed** (needs ≥90% and ≥85%) |
+
+G2's miss is concentrated in V-extra: the reference plus one sentence from another file's reference. G2 called 26 of 40 of those "correct". It also left 3 unreadable labels on V-fabricated. Both verifiers passed their instrument gate:
+- Jev accepts 1.2% of the 686 unsupported constructions and 100% of V-gold, with 0 flips on 100 replayed reads.
+- The local verifier accepts 22.2% of the unsupported constructions and 100% of V-gold.
+
+**The change, as §5.3 registers it:**
+- G2 is replaced by `openrouter/google/gemini-3.8-flash`, pinned to the `Google AI Studio` route (`harness.PINS`).
+- `replay.GRADERS["g2"]` now names it. The grader id stays `g2`, so the report's columns keep their names.
+
+**Data handling:**
+- Mistral's 269 grading rows are moved out of `calls.jsonl` into `discarded_g2_mistral_amendment1.jsonl`, next to it in the run directory.
+- Otherwise the ledger's resume key (`grade|g2|<target>`) would have served Mistral's labels as Gemini's.
+- The US$ 0.0412 they cost stays in the reported total spend. The admission stop (US$ 18.00) is unchanged, because 18.00 + 0.04 is still well under the US$ 20 cap.
+- The verifier reads (Jev, local) and G1's grades are kept, and S1 is re-run so that only the new G2 is called.
+
+**Cost re-estimate.**
+- Gemini on this route is listed at 0.375–0.75 per M in and 1.875–3.75 per M out, depending on the tier the route serves. That is about US$ 0.001–0.002 per grading call, against the 0.0003 assumed for Mistral.
+- Over the main run's grading calls (at most about 2,000 per grader), that adds at most about US$ 4. The projected total stays under the US$ 18 admission stop. S2's pilot re-measures the per-call means, and §10's sizing then applies as registered.
+
+**Not changed:** items, arms, thresholds, metrics, the adoption rule and every other gate. If Gemini also fails gate G, the run stops and the result is published as "no admissible second grader". A third grader would need a new amendment.
