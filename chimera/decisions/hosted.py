@@ -103,7 +103,7 @@ class HostedVerbalizedBackend:
         # docs/decisions-redaction.md for what each surface sends.
         state = redact(state)
 
-        usd = 0.0
+        usd: float | None = 0.0
         text = ""
         resolved = ""
         answer_from = ""
@@ -116,7 +116,12 @@ class HostedVerbalizedBackend:
                 model=self.model, temperature=self.temperature, max_tokens=self.max_tokens,
             )
             cost = price_completion(result)
-            if not cost.unpriced:
+            # An unpriced call makes the answer's cost UNKNOWN (None), not free: a daily ceiling that
+            # counted it as 0.0 would show green while the real spend climbed, which is the lie
+            # `SpendBudget` exists to refuse. Once unknown it stays unknown across the re-ask.
+            if cost.unpriced:
+                usd = None
+            elif usd is not None:
                 usd += cost.usd
             text = result.content or ""
             resolved = str(getattr(result, "model", "") or "")

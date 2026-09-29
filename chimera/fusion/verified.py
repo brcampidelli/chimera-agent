@@ -464,12 +464,13 @@ def _jev_decider(settings: Any) -> Decider:
     from chimera.decisions.calibration import CalibrationMaps
     from chimera.decisions.contract import DecisionCache
     from chimera.decisions.factory import _openrouter_key, maps_path
+    from chimera.decisions.gate import gated
     from chimera.decisions.log import DecisionLog
     from chimera.decisions.openrouter import OpenRouterDecisionsBackend
 
     maps = CalibrationMaps.shipped().merged(CalibrationMaps.load(maps_path(settings)))
     return Decider(
-        OpenRouterDecisionsBackend(_openrouter_key(settings), FALLBACK_SYSTEM_ONE), maps,
+        gated(OpenRouterDecisionsBackend(_openrouter_key(settings), FALLBACK_SYSTEM_ONE), settings), maps,
         cache=DecisionCache(), log=DecisionLog.for_home(Path(settings.home)),
     )
 

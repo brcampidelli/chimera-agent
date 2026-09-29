@@ -974,6 +974,14 @@ class Settings(BaseSettings):
     # the model and does not apply to another, and the receipt says so (`calibrated: false`).
     decision_backend: str = Field(default="local_logprob", validation_alias="CHIMERA_DECISION_BACKEND")
     decision_model: str = Field(default="", validation_alias="CHIMERA_DECISION_MODEL")
+    # The gate in front of HOSTED decision asks (`chimera/decisions/gate.py`). Unset = no gate: each is
+    # a budget the owner chooses. Requests and tokens per minute make an ask WAIT at 80% of the budget
+    # in flight; the daily USD ceiling, summed from the decision log, refuses. A refusal is a halt
+    # that names the gate on the receipt, never an answer. A local model is not gated: it spends
+    # electricity, and a dollar ceiling is not about electricity.
+    decision_rpm: int | None = Field(default=None, validation_alias="CHIMERA_DECISION_RPM")
+    decision_tpm: int | None = Field(default=None, validation_alias="CHIMERA_DECISION_TPM")
+    decision_daily_usd: float | None = Field(default=None, validation_alias="CHIMERA_DECISION_DAILY_USD")
     # --- Verified answers (`chimera/fusion/verified.py`): a turn's final answer written from sources
     # the product handed the model (attachments, recalled memory, retrieved chunks), in a step with no
     # tool call, is read by the System One backend above as "supported / unsupported / declined" and
