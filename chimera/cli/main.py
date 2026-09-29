@@ -1135,6 +1135,7 @@ def agent(
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
     from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
@@ -1166,6 +1167,8 @@ def agent(
                 warn_usd=DEFAULT_SPEND_WARN_USD,
                 loop_correction=True,
                 auto_continue=True,
+                context_budget=DEFAULT_BUDGET_FRACTION,
+                unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
             ),
         )
         result = runner.run(task)
@@ -1875,6 +1878,7 @@ def chat(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession, render
@@ -1957,6 +1961,8 @@ def chat(
             warn_usd=DEFAULT_SPEND_WARN_USD,
             loop_correction=True,
             auto_continue=True,
+            context_budget=DEFAULT_BUDGET_FRACTION,
+            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
         ),
     )
     mem = None if no_memory else _memory_manager()
@@ -2142,6 +2148,7 @@ def assist(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
@@ -2192,6 +2199,8 @@ def assist(
             warn_usd=DEFAULT_SPEND_WARN_USD,
             loop_correction=True,
             auto_continue=True,
+            context_budget=DEFAULT_BUDGET_FRACTION,
+            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
         ),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
@@ -2387,6 +2396,7 @@ def tui(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession
@@ -2512,6 +2522,8 @@ def tui(
             warn_usd=DEFAULT_SPEND_WARN_USD,
             loop_correction=True,
             auto_continue=True,
+            context_budget=DEFAULT_BUDGET_FRACTION,
+            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
         ),
     )
     mem = None if no_memory else _memory_manager()

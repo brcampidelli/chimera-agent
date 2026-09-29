@@ -87,6 +87,7 @@ describe("a turn that stopped early", () => {
     ["max_steps", "code.chat.stopped.maxSteps"],
     ["tool_loop", "code.chat.stopped.toolLoop"],
     ["budget", "code.chat.stopped.budget"],
+    ["context_stuck", "code.chat.stopped.contextStuck"],
     ["cancelled", "code.chat.stopped.cancelled"],
   ])("still says so for %s", (reason, key) => {
     receipt({ stopped_reason: reason });
