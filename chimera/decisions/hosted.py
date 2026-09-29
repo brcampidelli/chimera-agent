@@ -94,8 +94,14 @@ class HostedVerbalizedBackend:
 
     def ask(self, state: str, question: Question) -> Reading:
         question = as_choice(question)
+        from chimera.core.redact import redact
         from chimera.orchestration.receipts import price_completion
         from chimera.providers.thinking import answer_at_end_of_reasoning
+
+        # What leaves the machine has been through the net that keeps secrets out of the trace: a
+        # credential in the state is a credential in someone else's request log. See
+        # docs/decisions-redaction.md for what each surface sends.
+        state = redact(state)
 
         usd = 0.0
         text = ""

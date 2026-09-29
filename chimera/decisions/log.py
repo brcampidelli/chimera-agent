@@ -32,6 +32,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from chimera.core.redact import redact
+
 _log = logging.getLogger(__name__)
 
 FILE = "decisions.jsonl"
@@ -74,7 +76,10 @@ class DecisionLog:
         entry_id = uuid.uuid4().hex[:12]
         line: dict[str, Any] = {
             "kind": "answer", "id": entry_id, "at": round(time.time(), 3), **receipt,
-            "state": state[:STATE_CHARS], "state_hash": state_hash(state),
+            # Redacted first and capped second: capped first, a token straddling the cut would be
+            # left as a fragment no pattern recognises. The hash is of the original, and a hash is
+            # not a way back to the text.
+            "state": redact(state)[:STATE_CHARS], "state_hash": state_hash(state),
         }
         # The receipt rounds `raw_p` to four places and only when calibrated; the refit needs it
         # always, and UNROUNDED — six places moved the refitted slope in the sixth decimal, and a refit

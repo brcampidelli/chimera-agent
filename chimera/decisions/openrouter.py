@@ -73,6 +73,11 @@ class OpenRouterDecisionsBackend:
         return {"model": self.model, "state": state, "questions": {key: self.question_body(question)}}
 
     def ask(self, state: str, question: Question) -> Reading:
+        # What leaves the machine has been through the net that keeps secrets out of the trace (see
+        # docs/decisions-redaction.md for what each surface sends).
+        from chimera.core.redact import redact
+
+        state = redact(state)
         response = self._client.post(self.url, json=self.body(state, question), headers=self._headers, timeout=self.timeout_s)
         response.raise_for_status()
         return self.read(response.json(), question)
