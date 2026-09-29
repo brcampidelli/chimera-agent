@@ -3467,6 +3467,46 @@
         "title": "DecideQuestionIn",
         "type": "object"
       },
+      "DecisionAlertOut": {
+        "description": "A drift alarm computed from the log alone (``chimera/decisions/drift.py``). It annotates and\ngates nothing; ``detail`` carries the numbers the screen words it from.",
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "decision",
+          "backend",
+          "model",
+          "prompt_hash",
+          "detail"
+        ],
+        "title": "DecisionAlertOut",
+        "type": "object"
+      },
       "DecisionGroupOut": {
         "description": "One instrument \u2014 decision, backend, model, wording, build \u2014 and what its log holds.",
         "properties": {
@@ -3811,6 +3851,14 @@
       "DecisionsOut": {
         "description": "The Decisions screen: the declared decision points, what each instrument's log holds, and the\nlatest answers with their labels (study 22, phase 4).",
         "properties": {
+          "alerts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DecisionAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
           "allow_below": {
             "title": "Allow Below",
             "type": "number"

@@ -4700,6 +4700,27 @@ export interface components {
             type: "noul" | "choice" | "score";
         };
         /**
+         * DecisionAlertOut
+         * @description A drift alarm computed from the log alone (``chimera/decisions/drift.py``). It annotates and
+         *     gates nothing; ``detail`` carries the numbers the screen words it from.
+         */
+        DecisionAlertOut: {
+            /** Backend */
+            backend: string;
+            /** Decision */
+            decision: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+            /** Kind */
+            kind: string;
+            /** Model */
+            model: string;
+            /** Prompt Hash */
+            prompt_hash: string;
+        };
+        /**
          * DecisionGroupOut
          * @description One instrument — decision, backend, model, wording, build — and what its log holds.
          */
@@ -4850,6 +4871,11 @@ export interface components {
          *     latest answers with their labels (study 22, phase 4).
          */
         DecisionsOut: {
+            /**
+             * Alerts
+             * @default []
+             */
+            alerts: components["schemas"]["DecisionAlertOut"][];
             /** Allow Below */
             allow_below: number;
             /** Groups */

@@ -127,6 +127,13 @@ def show_report() -> None:
             fr = f"{g.false_refusal[0]}/{g.false_refusal[1]}" if g.false_refusal else "—"
             console.print(f"  at review_at: catch {catch} · false refusal {fr} · "
                           f"Brier {_fmt(g.brier)} · ECE {_fmt(g.ece)} (in-sample)")
+    from chimera.decisions.drift import alerts, describe
+
+    found = alerts(rows, review_at=review_at, allow_below=allow_below)
+    if found:
+        console.print("[bold]drift alerts[/bold] [dim](annotations from the log alone; nothing is gated by them)[/dim]")
+        for alert in found:
+            console.print(f"  [yellow]{alert.kind}[/yellow]  {describe(alert)}")
 
 
 @decisions_app.command("refit")

@@ -65,6 +65,7 @@ export function Decisions({ embedded = false }: { embedded?: boolean } = {}) {
           ))
         )}
       </Panel>
+      <AlertsPanel alerts={data.alerts ?? []} t={t} />
       {data.groups.length === 0 ? (
         <Panel>
           <EmptyState text={t("decisions.empty")} />
@@ -74,6 +75,47 @@ export function Decisions({ embedded = false }: { embedded?: boolean } = {}) {
       )}
       <RecentPanel rows={data.recent} t={t} />
     </Screen>
+  );
+}
+
+type Alert = NonNullable<DecisionsData["alerts"]>[number];
+
+/**
+ * The drift alarms — computed from the log alone, and gating nothing. Rendered only when there is
+ * something to say: a panel of "no alarms" on every visit is a panel nobody reads by the third day.
+ * The wording is written out per kind rather than composed from the kind, so the dead-key gate can
+ * see every key it uses.
+ */
+function AlertsPanel({ alerts, t }: { alerts: Alert[]; t: TFunc }) {
+  if (alerts.length === 0) return null;
+  const words = (a: Alert) => {
+    const d = a.detail as Record<string, unknown>;
+    if (a.kind === "model_changed") {
+      const builds = ((d.builds ?? []) as { build: string }[]).map((b) => b.build).join(" → ");
+      return t("decisions.alert.modelChanged", { decision: a.decision, builds });
+    }
+    if (a.kind === "answer_drift") {
+      return t("decisions.alert.answerDrift", {
+        decision: a.decision, recent: String(d.recent ?? ""), reference: String(d.reference ?? ""), psi: String(d.psi ?? ""),
+      });
+    }
+    return t("decisions.alert.nearThreshold", {
+      decision: a.decision, near: String(d.near ?? ""), of: String(d.of ?? ""), eps: String(d.eps ?? ""),
+      cut: String(d.cut ?? ""), value: String(d.value ?? ""),
+    });
+  };
+  return (
+    <Panel title={t("decisions.alerts.title")}>
+      <p className="mb-2 text-xs text-muted-foreground">{t("decisions.alerts.note")}</p>
+      <ul className="space-y-1.5" role="status">
+        {alerts.map((a, i) => (
+          <li key={`${a.kind}/${a.decision}/${a.prompt_hash}/${i}`} className="flex items-start gap-2 text-xs">
+            <Badge tone="warn">{a.kind}</Badge>
+            <span>{words(a)}</span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
   );
 }
 

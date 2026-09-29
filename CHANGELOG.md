@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **Drift alarms on the Decisions screen and in `chimera decisions report`, computed from the log alone.**
+  - **What they say:** the serving build behind one instrument changed (`model_changed`, and the
+    calibration map is keyed on the build); the last 50 raw answers moved away from the rest
+    (`answer_drift`: a population-stability index of at least 0.2 **and** a chi-square test under
+    0.01, both required); and 25% or more of the recent calibrated answers sit within 0.03 of a cut
+    of the band (`near_threshold`, a region that flaps).
+  - **What they do not do:** gate anything. They annotate. A refit that follows one can now be
+    justified by the log instead of a hunch.
+  - **How:** `chimera/decisions/drift.py`, pure Python (no scipy in this project; the chi-square
+    survival function is the incomplete gamma, checked against published table values). The screen
+    shows the panel only when there is something to say, in ten languages.
+  - Study 27, phase 3, first slice. The rest of the phase (the spend and rate gate, the decisions
+    read model, the redaction page) follows as separate changes.
 - **A run can now warn without stopping.** The loop's limits were silent until they were a stop; there is a third thing now, a `notice`.
   - **What it says:** `tool_loop_warn` when the same call has repeated three times (the breaker used to compute this level and drop it), `steps_low` two steps before the step limit, and `compacted` when the conversation was compacted to keep going.
   - **Where it shows:** the desktop turn stream gets a `notice` frame, drawn as one warning line per code under the task list, in all ten languages. The terminal REPL prints the same warnings live.

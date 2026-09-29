@@ -1446,7 +1446,13 @@ def build_api_app(
              "threshold": s.threshold, "surfaces": list(s.surfaces), "description": s.description}
             for s in REGISTRY.values()
         ]
-        return {"review_at": review_at, "allow_below": allow_below, "specs": specs, "groups": groups, "recent": recent}
+        from chimera.decisions.drift import alerts as drift_alerts
+
+        return {
+            "review_at": review_at, "allow_below": allow_below, "specs": specs, "groups": groups,
+            "recent": recent,
+            "alerts": [a.as_dict() for a in drift_alerts(rows, review_at=review_at, allow_below=allow_below)],
+        }
 
     @app.get("/api/decisions/models", dependencies=[guard], response_model=SystemOneModelsOut)
     def decision_models_route() -> dict[str, Any]:

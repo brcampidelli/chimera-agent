@@ -1746,6 +1746,18 @@ class DecisionRowOut(BaseModel):
     source: str | None = None
 
 
+class DecisionAlertOut(BaseModel):
+    """A drift alarm computed from the log alone (``chimera/decisions/drift.py``). It annotates and
+    gates nothing; ``detail`` carries the numbers the screen words it from."""
+
+    kind: str
+    decision: str
+    backend: str
+    model: str
+    prompt_hash: str
+    detail: dict[str, Any]
+
+
 class DecisionsOut(BaseModel):
     """The Decisions screen: the declared decision points, what each instrument's log holds, and the
     latest answers with their labels (study 22, phase 4)."""
@@ -1755,6 +1767,7 @@ class DecisionsOut(BaseModel):
     specs: list[DecisionSpecOut]
     groups: list[DecisionGroupOut]
     recent: list[DecisionRowOut]
+    alerts: list[DecisionAlertOut] = []
 
 
 class SystemOneModelOut(BaseModel):
