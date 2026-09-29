@@ -105,6 +105,9 @@ class RunShellTool(Tool):
                 "foreground, or set CHIMERA_SANDBOX=local."
             )
         argv, use_shell = sandbox._command_argv(command, cwd)
+        # Said BEFORE the start, while the count is still the one the person would want to know: a
+        # third job running is fine, and the tenth is worth a sentence, but neither is a refusal.
+        over = self._jobs.over_advisory_limit()
         try:
             job = self._jobs.start(command, cwd=cwd, env=_child_env(), argv=argv, shell=use_shell)
         except JobLimitError as exc:
@@ -117,6 +120,11 @@ class RunShellTool(Tool):
         except OSError as exc:
             return f"error: could not start the background job: {exc}"
         limit = f" It is stopped after {job.max_runtime:.0f}s at most." if job.max_runtime else ""
+        if over is not None:
+            limit += (
+                f" Note: {over[0]} other background jobs were already running (more than the usual "
+                f"{over[1]}); that is a suggestion, not a limit, and it started anyway."
+            )
         return (
             f"job {job.id} started in the background (pid {job.pid}); it keeps running after this "
             f"turn and is NOT stopped by cancelling the turn.{limit} Check it with "

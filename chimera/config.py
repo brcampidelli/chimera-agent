@@ -680,12 +680,13 @@ class Settings(BaseSettings):
     host_exec: str = Field(default="ask", validation_alias="CHIMERA_HOST_EXEC")
     # Background shell jobs (`run_shell` with `background: true`, `chimera/core/jobs.py`): how many
     # may run at once, and how long one may run before it is killed with everything it started and
-    # recorded as `timed_out`. Generous by default — the case they exist for is a benchmark stage
-    # that takes tens of minutes — and bounded, because a job outlives the turn that started it and
-    # nobody may be watching. A value below 1 means the default, not "off": turning the tool off is
-    # `CHIMERA_TOOL_DENYLIST=run_shell`.
-    jobs_max_running: int = Field(default=3, validation_alias="CHIMERA_JOBS_MAX_RUNNING")
-    jobs_max_runtime: int = Field(default=21600, validation_alias="CHIMERA_JOBS_MAX_RUNTIME")
+    # recorded as `timed_out`. UNSET, both are advice (3 at once, 6 hours) said in the start message
+    # and never enforced: the owner decided on 2026-09-27 that a refused or killed job reads as the
+    # agent giving up on something it was handed on purpose. SET, each is a hard limit, because a job
+    # outlives the turn that started it and an owner who wants a bound can name one. A value below 1
+    # means the default, not "off": turning the tool off is `CHIMERA_TOOL_DENYLIST=run_shell`.
+    jobs_max_running: int | None = Field(default=None, validation_alias="CHIMERA_JOBS_MAX_RUNNING")
+    jobs_max_runtime: int | None = Field(default=None, validation_alias="CHIMERA_JOBS_MAX_RUNTIME")
 
     # The deployment's own posture — how far the agent may reach, and when it stops to ask. Both
     # empty by default, and that emptiness is load-bearing: "" means "this deployment states no

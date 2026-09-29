@@ -140,6 +140,12 @@ class JobRegistry:
         self.root = Path(home) / "jobs"
         self.max_running = max_running
         self.max_runtime = max_runtime
+        #: A limit is hard (it refuses, or kills) only when somebody set it. The two defaults above
+        #: are advisory: said in the start message, never enforced. A registry built directly, with
+        #: numbers, is a caller that meant them, so it is hard: `configure_from_settings` is the one
+        #: door that can make it advisory.
+        self.hard_running = True
+        self.hard_runtime = True
         self._procs: dict[str, subprocess.Popen[bytes]] = {}
         self._contained: dict[str, Any] = {}
         self._lock = threading.Lock()
@@ -154,6 +160,26 @@ class JobRegistry:
         if max_runtime is not None:
             self.max_runtime = max_runtime if max_runtime >= 1 else DEFAULT_MAX_RUNTIME
 
+    def configure_from_settings(self, max_running: int | None, max_runtime: int | None) -> None:
+        """Apply ``CHIMERA_JOBS_MAX_RUNNING`` / ``CHIMERA_JOBS_MAX_RUNTIME``: a value the owner set is
+        a hard limit, and an unset one leaves the default as a piece of advice.
+
+        The owner decided on 2026-09-27 that "3 at once and 6 hours" stop being reasons for the agent
+        to stop: a job that is refused, or killed at hour six, reads as the agent giving up on a task
+        somebody handed it on purpose. A value below 1 is still "the default", as in `configure`.
+        """
+        self.hard_running = max_running is not None and max_running >= 1
+        self.hard_runtime = max_runtime is not None and max_runtime >= 1
+        self.max_running = max_running if self.hard_running and max_running else DEFAULT_MAX_RUNNING
+        self.max_runtime = max_runtime if self.hard_runtime and max_runtime else DEFAULT_MAX_RUNTIME
+
+    def over_advisory_limit(self) -> tuple[int, int] | None:
+        """``(running, limit)`` when the next job would go past a limit nobody set, else None."""
+        if self.hard_running:
+            return None
+        running = sum(1 for j in self.all() if j.state == "running")
+        return (running, self.max_running) if running >= self.max_running else None
+
     # --- starting ---------------------------------------------------------------------------
 
     def start(self, command: str, *, cwd: Path, env: dict[str, str], argv: list[str] | str,
@@ -165,7 +191,7 @@ class JobRegistry:
 
         with self._start_lock:
             running = [j for j in self.all() if j.state == "running"]
-            if len(running) >= self.max_running:
+            if self.hard_running and len(running) >= self.max_running:
                 raise JobLimitError(running, self.max_running)
             self.root.mkdir(parents=True, exist_ok=True)
             job_id = uuid.uuid4().hex[:12]
@@ -188,7 +214,7 @@ class JobRegistry:
             job = Job(
                 id=job_id, command=command, cwd=str(cwd), pid=proc.pid,
                 started_at=time.time(), log=str(log_path), owner=_PROCESS_TOKEN,
-                max_runtime=float(self.max_runtime),
+                max_runtime=float(self.max_runtime) if self.hard_runtime else 0.0,
             )
             with self._lock:
                 self._procs[job_id] = proc
@@ -198,7 +224,8 @@ class JobRegistry:
                 self._beat(job_id)
         _Reaped.track(self, job_id)
         threading.Thread(
-            target=self._watch, args=(job_id, proc, float(self.max_runtime)),
+            target=self._watch,
+            args=(job_id, proc, float(self.max_runtime) if self.hard_runtime else 0.0),
             name=f"job-{job_id}", daemon=True,
         ).start()
         _log.info("job %s started (pid %s): %s", job_id, proc.pid, command[:120])
