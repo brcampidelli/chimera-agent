@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import math
 import threading
 import time
 from collections.abc import Callable
@@ -379,11 +380,15 @@ class AgentConfig:
     # once the spend reaches it — checked BEFORE the call, so the money is never spent to discover
     # it was over budget.
     #
-    # A call whose model has no known price also stops the run, by the owner's decision: a ceiling
-    # that skips what it cannot price shows green while the real spend climbs. Local models are
-    # priced at zero rather than unknown, so `ollama/` runs are unaffected. See
+    # With a ceiling set, a call whose model has no known price also stops the run, by the owner's
+    # decision: a ceiling that skips what it cannot price shows green while the real spend climbs.
+    # Without one the same call is only a warning (`price_unknown`). Local models are priced at zero
+    # rather than unknown, so `ollama/` runs are unaffected. See
     # chimera.orchestration.budget.SpendBudget.
     max_usd: float | None = None
+    #: Dollars at which the run SAYS what it has spent, once, without stopping (`spend_warn`). The
+    #: ceiling above is the only thing that stops a run for money; this is the default way to know.
+    warn_usd: float | None = None
     #: Turns kept verbatim at the tail when compacting — where the current sub-task lives.
     keep_recent: int = 6
     # The workspace whose AGENTS.md the run should follow. None = read no project instructions,
@@ -916,8 +921,8 @@ class Agent:
         # built here gave a three-attempt run three separate ceilings: measured, a run asking for
         # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
         # calls passes its own, and every attempt then draws on the same money.
-        if spend is None and self.config.max_usd:
-            spend = SpendBudget(self.config.max_usd)
+        if spend is None and (self.config.max_usd or self.config.warn_usd):
+            spend = SpendBudget(self.config.max_usd or math.inf, warn_usd=self.config.warn_usd)
         # Open on this thread for as long as the loop runs, so a tool that runs a model of its own
         # can charge THIS run instead of nothing (`enclosing_run`). Closed in `finally`: a run that
         # raised must not stay open and collect a later tool's spend.
@@ -1068,6 +1073,9 @@ class Agent:
                         step_tools = narrow(tool_schema, picked)
                 result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend,
                                     model=run_model)
+                if spend is not None:
+                    for code, text, data in spend.take_notices():
+                        _notice(on_notice, code, text, **data)
                 router = self.config.tool_router
                 if hinted is not None and router is not None:
                     calls = getattr(result, "tool_calls", None) or []

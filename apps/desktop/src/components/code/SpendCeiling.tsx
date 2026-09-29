@@ -5,21 +5,16 @@ import { AlertTriangle } from "lucide-react";
 import { getDoctor } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 
-/** The ceiling a turn starts with, in dollars.
+/** The ceiling a turn starts with, in dollars: none.
  *
- *  It used to start at nothing, which was defensible while a turn could only take 8 tool-calling
- *  steps. It is not defensible now: the step ceiling this screen sends is 40, and this app is
- *  installed by people who did not write it and will not read the settings before their first
- *  message. An accident that used to cost a few cents can now cost five times that, silently.
+ *  It started at US$1 from the day the step ceiling went to 40, so that a first message could not
+ *  cost whatever a loop felt like. The owner decided on 2026-09-27 that spending is a warning and
+ *  not a reason to stop: the server now says what the turn has spent when it reaches US$1
+ *  (`spend_warn`, `DEFAULT_SPEND_WARN_USD`), and a ceiling exists only when the person types one.
  *
- *  Armed and VISIBLE rather than enforced somewhere in the backend, because a limit nobody can see
- *  is a limit nobody can raise. The number sits in the box; clearing the box disarms it.
- *
- *  A dollar is roughly 75x the cost of a measured ordinary turn on this install ($0.002–$0.013)
- *  and about 10x a heavy one at the new step ceiling. It is meant to be reached only by something
- *  that has gone wrong — a loop the detector did not catch, a model far more expensive than the
- *  default — and never by work someone actually wanted. */
-export const DEFAULT_SPEND_CEILING = 1;
+ *  A typed ceiling is still a real stop, checked before each call, and the box below is where it is
+ *  typed. Nothing else about how a ceiling behaves changed. */
+export const DEFAULT_SPEND_CEILING: number | null = null;
 
 /**
  * A dollar ceiling for this turn, and the honest answer about whether one can work here.
@@ -54,7 +49,7 @@ export function SpendCeiling({
   // without re-rendering left the box permanently accusing itself of being empty. One source of
   // truth, and a controlled `value` would also erase the character as you type it: "0" arms
   // nothing, the input would re-render empty, and the box would fight the keyboard.
-  const [text, setText] = useState(String(DEFAULT_SPEND_CEILING));
+  const [text, setText] = useState(DEFAULT_SPEND_CEILING === null ? "" : String(DEFAULT_SPEND_CEILING));
   const armed = parse(text);
   // Typed something, armed nothing. Said out loud rather than swallowed: someone who types $0
   // believes they capped this turn at nothing, and the server reads this field for truthiness — so

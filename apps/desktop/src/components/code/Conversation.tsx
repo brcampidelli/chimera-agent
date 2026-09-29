@@ -792,7 +792,7 @@ export function Conversation({
           ...e,
           notices: [
             ...(e.notices ?? []).filter((x) => x.code !== code),
-            { code, text: String(data.text ?? "") },
+            { code, text: String(data.text ?? ""), data },
           ],
         }));
         break;
@@ -844,10 +844,8 @@ export function Conversation({
    *  behaviour every earlier build had). Session-local like `provider` rather than persisted: a
    *  standing spend limit is a different promise from "cap this piece of work", and a ceiling that
    *  quietly stayed on from last week would stop a turn for a reason nobody remembers choosing. */
-  // Starts ARMED. See DEFAULT_SPEND_CEILING: the step ceiling this screen sends went from the
-  // library's 8 to 40, and an app other people install should not let a first message cost whatever
-  // a loop feels like. The box shows the number and clearing it disarms — a limit nobody can see is
-  // a limit nobody can raise.
+  // Starts with NO ceiling. See DEFAULT_SPEND_CEILING: spending is a warning by default now (the
+  // server says so at US$1), and a ceiling that stops a turn exists only when it is typed here.
   const [maxUsd, setMaxUsd] = useState<number | null>(DEFAULT_SPEND_CEILING);
   const [attached, setAttached] = useState<Attachment[]>([]);
   // Same upload path the paperclip uses — see `useAttachmentUpload`. The button keeps its own

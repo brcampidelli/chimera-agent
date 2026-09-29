@@ -5,6 +5,8 @@ import { useT } from "@/lib/i18n";
 export interface NoticeEntry {
   code: string;
   text: string;
+  /** What the frame carried besides the words (an amount, a model), for the codes that show one. */
+  data?: Record<string, unknown>;
 }
 
 /**
@@ -25,7 +27,11 @@ export function NoticeList({ items }: { items?: NoticeEntry[] }) {
         ? t("code.notice.compacted")
         : n.code === "tool_loop_warn"
           ? t("code.notice.toolLoopWarn")
-          : n.text;
+          : n.code === "price_unknown"
+            ? t("code.notice.priceUnknown", { model: String(n.data?.model ?? "") })
+            : n.code === "spend_warn"
+              ? t("code.notice.spendWarn", { usd: Number(n.data?.usd ?? 0).toFixed(2) })
+              : n.text;
   return (
     <ul className="space-y-0.5" role="status">
       {items.map((n) => (

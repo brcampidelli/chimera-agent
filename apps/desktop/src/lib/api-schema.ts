@@ -3285,6 +3285,8 @@ export interface components {
             summarise_compaction: boolean;
             /** Tasks */
             tasks: components["schemas"]["AgentTaskIn"][];
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -4145,6 +4147,8 @@ export interface components {
             summarise_compaction: boolean;
             /** Thinking */
             thinking?: boolean | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -4361,6 +4365,8 @@ export interface components {
              * @description Shell command run in each worker's own worktree; exit 0 merges it. Without one, every worker that did not crash merges — and workers that touched the same file all lose to the conflict rule.
              */
             verify?: string | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workers */
             workers: components["schemas"]["CrewWorkerIn"][];
             /** Workspace */
@@ -5989,6 +5995,8 @@ export interface components {
             task: string;
             /** Verify */
             verify?: string | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -7081,6 +7089,8 @@ export interface components {
             thread_id?: string | null;
             /** Verify */
             verify?: string | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */

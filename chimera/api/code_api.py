@@ -93,6 +93,11 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 _log = get_logger("api.code")
 
+#: What a coding turn spends before it says so. A dollar is roughly 75x an ordinary turn on the
+#: measured install and only a run that went wrong reaches it, which is the point of a warning
+#: instead of a ceiling: it costs the person nothing until the moment it is useful.
+DEFAULT_SPEND_WARN_USD = 1.0
+
 #: Hard ceiling on a requested step count. Not a judgement about how many steps a task needs — it
 #: is the difference between a long run and a runaway one, and the client asking is a UI field.
 MAX_RUN_STEPS = 100
@@ -171,6 +176,14 @@ class CodeSeams(BaseModel):
     spend $3. Stated here because the field name does not say it, and it is not divided by the
     attempt count on the way in — that would invent arithmetic nobody asked for and make the same
     number mean different money on the two endpoints."""
+
+    warn_usd: float | None = Field(default=None, gt=0)
+    """Dollars at which the turn SAYS what it has spent, once, and goes on. None = the server's
+    default (:data:`DEFAULT_SPEND_WARN_USD`).
+
+    This is what the desktop's armed US$1 ceiling became: a warning, not a stop. A stop for money
+    exists only when the person types ``max_usd``. Named separately so that "I want to hear about it
+    at $5" and "refuse the call that would cross $5" are two different sentences on the wire."""
 
     repo_map: bool = False
     """Prepend a bounded structural digest of the repository, ranked by importance, so the agent can
@@ -1309,6 +1322,7 @@ def register_code_api(
                 # the same number — the one surface where the cap means what its name says without
                 # a footnote about attempts.
                 max_usd=req.max_usd,
+                warn_usd=req.warn_usd if req.warn_usd is not None else DEFAULT_SPEND_WARN_USD,
                 project_root=ws,
                 # Read per turn, so editing the identity applies to the next question rather than
                 # to the next launch.

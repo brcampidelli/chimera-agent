@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **What it does not do:** change how any run ends. This is the channel only: the same run ends the same way with or without a listener, and a listener that raises is ignored. An agent written before the channel is never handed the keyword.
 - **Two new question-lint rules.** `duplicate_criteria` (error) refuses a question whose options share one criterion, since nothing in the rubric tells them apart. `negated_true` (warning) flags a yes/no question whose "true" criterion is itself a negation, the double negative that breaks P(X) + P(not X) = 1.
 
+### Changed
+
+- **A missing price and money spent are now warnings, not stops, until the person types a ceiling.**
+  - **Before:** the desktop armed a US$1 ceiling on every turn, and a model with no known price
+    stopped the run on its first call. Both read as the agent giving up for no reason the person
+    chose.
+  - **Now:** the desktop sends no ceiling. A turn that has spent US$1 says so once (`spend_warn`,
+    `warn_usd`, default US$1 on the coding route), and a call on an unpriced model says that its
+    spend is not being counted (`price_unknown`) and goes on.
+  - **What did not change:** a ceiling someone typed is still a hard stop, checked before each call,
+    and with a ceiling set an unpriced call still stops the run: a cap that skips what it cannot
+    price shows green while the real spend climbs.
+  - **Tests rewritten, with the reason:** `SpendCeiling.test.tsx`, `Conversation.wave0.test.tsx`
+    and `Code.spend.test.tsx` asserted that a ceiling was armed by default. That premise is the decision that changed.
+
 ### Fixed
 
 - **The local decider no longer judges a truncated state.** Ollama keeps only half of its context window for the prompt and cuts the rest with no error. The default window here was 4,096 tokens, so the local System One model read at most ~2,050 tokens (about 11,000 characters of prose), while the verified-answers check sends attached sources of up to 14,000 characters. Every call now asks for a 16,384-token window (8,192 tokens of prompt), and a prompt that still fills it is a halt: the answer ships unverified, never judged on text the model did not see. Measured before the change on this backend (`bench/jevbench_local`): 231 of 231 answers identical with the larger window.

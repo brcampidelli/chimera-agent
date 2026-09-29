@@ -496,6 +496,18 @@
             "title": "Tasks",
             "type": "array"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -2212,6 +2224,18 @@
             ],
             "title": "Thinking"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -2733,6 +2757,18 @@
             ],
             "description": "Shell command run in each worker's own worktree; exit 0 merges it. Without one, every worker that did not crash merges \u2014 and workers that touched the same file all lose to the conflict rule.",
             "title": "Verify"
+          },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
           },
           "workers": {
             "items": {
@@ -6156,6 +6192,18 @@
             ],
             "title": "Verify"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -8656,6 +8704,18 @@
               }
             ],
             "title": "Verify"
+          },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
           },
           "workspace": {
             "anyOf": [

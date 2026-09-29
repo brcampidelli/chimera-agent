@@ -22,6 +22,22 @@ describe("the turn's warnings", () => {
     expect(screen.queryByText("server wording that must not win")).not.toBeInTheDocument();
   });
 
+  it("names the model whose price is unknown and the amount already spent", () => {
+    renderWithProviders(
+      <NoticeList
+        items={[
+          { code: "price_unknown", text: "", data: { model: "vendor/brand-new" } },
+          { code: "spend_warn", text: "", data: { usd: 1.0234, warn_usd: 1 } },
+        ]}
+      />,
+    );
+
+    expect(
+      screen.getByText("The price of vendor/brand-new is unknown, so this turn's spend is not counted"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("This turn has spent US$ 1.02 so far")).toBeInTheDocument();
+  });
+
   it("still tells a warning this build does not know, with the server's words", () => {
     renderWithProviders(<NoticeList items={[{ code: "from_the_future", text: "something new" }]} />);
 
@@ -34,9 +50,15 @@ describe("the turn's warnings", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("has the three known warnings in every language the app offers", () => {
+  it("has the known warnings in every language the app offers", () => {
     for (const lang of LANGS) {
-      for (const key of ["code.notice.stepsLow", "code.notice.compacted", "code.notice.toolLoopWarn"]) {
+      for (const key of [
+        "code.notice.stepsLow",
+        "code.notice.compacted",
+        "code.notice.toolLoopWarn",
+        "code.notice.priceUnknown",
+        "code.notice.spendWarn",
+      ]) {
         expect(DICTS[lang.code][key], `${lang.code} is missing ${key}`).toBeTruthy();
       }
     }

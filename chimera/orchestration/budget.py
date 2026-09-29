@@ -14,6 +14,7 @@ propagates into receipts so estimated numbers never masquerade as measured.
 
 from __future__ import annotations
 
+import math
 import threading
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -46,10 +47,18 @@ class SpendBudget:
     is a project where the two disagree, and the disagreement surfaces at 3 a.m. on the machine that
     trades money.
 
-    **An unpriced call stops the run.** That is the owner's decision, and it is the only one that
-    does not lie: a ceiling that skips what it cannot price still shows green while the real spend
-    climbs, and it climbs fastest on exactly the models nobody bothered to price. The stop names the
-    model so the fix is one line of :func:`~chimera.fusion.receipts.set_price` away.
+    **An unpriced call stops a run that has a CEILING, and only warns one that does not.** A ceiling
+    that skips what it cannot price still shows green while the real spend climbs, and it climbs
+    fastest on exactly the models nobody bothered to price; so when the owner set a number, an
+    unpriced call stops the run and names the model, one line of
+    :func:`~chimera.fusion.receipts.set_price` away. Without a ceiling there is nothing to skip:
+    the same call is a warning (``price_unknown``, see :meth:`take_notices`) and the run goes on.
+    The owner decided on 2026-09-27 that a missing price, by itself, is a notice and not a stop; the
+    ceiling they typed themselves is the one thing that keeps its refusal.
+
+    **A ceiling is optional now.** ``max_usd`` defaults to infinity, and ``warn_usd`` says when to
+    speak instead of when to stop. The desktop used to arm a US$1 ceiling on every turn; that is now
+    a warning at US$1, and a ceiling exists only when the person types one.
 
     A **local** model is priced at zero rather than treated as unknown, because it is not unknown —
     an Ollama run spends electricity, and a dollar cap is not about electricity. That distinction is
@@ -57,12 +66,56 @@ class SpendBudget:
     gets it, not just this class.
     """
 
-    def __init__(self, max_usd: float) -> None:
+    def __init__(self, max_usd: float = math.inf, *, warn_usd: float | None = None) -> None:
         if max_usd <= 0:
             raise ValueError("max_usd must be positive")
+        if warn_usd is not None and warn_usd <= 0:
+            raise ValueError("warn_usd must be positive")
         self.max_usd = max_usd
+        self.warn_usd = warn_usd
         self._spent = 0.0
         self._unpriced_model: str | None = None
+        #: The warnings already sent. Each is said once: a line repeated on every step is a line
+        #: nobody reads by the third one.
+        self._told: set[str] = set()
+
+    @property
+    def capped(self) -> bool:
+        """True when the person set a ceiling. Only then can a call be refused for money."""
+        return self.max_usd != math.inf
+
+    def take_notices(self) -> list[tuple[str, str, dict[str, Any]]]:
+        """The warnings that became true since the last call, each once: ``(code, text, data)``.
+
+        ``price_unknown`` — a call was made on a model with no price and there is no ceiling to
+        protect, so the run goes on and says that its spend is not being counted. ``spend_warn`` —
+        the run has spent ``warn_usd``. Neither stops anything; a run with a ceiling is stopped by
+        :meth:`blocked` as before.
+        """
+        out: list[tuple[str, str, dict[str, Any]]] = []
+        if (
+            self._unpriced_model is not None
+            and not self.capped
+            and "price_unknown" not in self._told
+        ):
+            self._told.add("price_unknown")
+            out.append((
+                "price_unknown",
+                f"the price of {self._unpriced_model} is unknown, so this turn's spend is not counted",
+                {"model": self._unpriced_model},
+            ))
+        if (
+            self.warn_usd is not None
+            and self._spent >= self.warn_usd
+            and "spend_warn" not in self._told
+        ):
+            self._told.add("spend_warn")
+            out.append((
+                "spend_warn",
+                f"this turn has spent ${self._spent:.2f}",
+                {"usd": round(self._spent, 4), "warn_usd": self.warn_usd},
+            ))
+        return out
 
     @property
     def spent(self) -> float:
@@ -84,12 +137,12 @@ class SpendBudget:
 
         Checked BEFORE the call, so the money is never spent to discover it was over budget.
         """
-        if self._unpriced_model is not None:
+        if self._unpriced_model is not None and self.capped:
             return (
                 f"the price of {self._unpriced_model} is unknown, so the spend so far cannot be "
                 "known either; set a price for it or run without a budget"
             )
-        if self._spent >= self.max_usd:
+        if self.capped and self._spent >= self.max_usd:
             return f"spend cap reached: ${self._spent:.4f} of ${self.max_usd:.4f}"
         return None
 

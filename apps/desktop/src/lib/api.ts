@@ -1271,7 +1271,7 @@ export interface CodeTurnHandlers {
   onTool?: (e: CodeToolEvent) => void;
   onEdit?: (path: string, patch: string) => void;
   onTodo?: (items: { task: string; status: string }[]) => void;
-  onNotice?: (n: { code: string; text: string }) => void;
+  onNotice?: (n: { code: string; text: string; data?: Record<string, unknown> }) => void;
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
   onBrowser?: (f: CodeBrowserFrame) => void;
@@ -1477,7 +1477,11 @@ function applyCodeTurnFrame(
   else if (event === "todo")
     h.onTodo?.((payload.items ?? []) as { task: string; status: string }[]);
   else if (event === "notice")
-    h.onNotice?.({ code: String(payload.code ?? ""), text: String(payload.text ?? "") });
+    h.onNotice?.({
+      code: String(payload.code ?? ""),
+      text: String(payload.text ?? ""),
+      data: payload,
+    });
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "approval") h.onApproval?.(payload as unknown as CodeApprovalEvent);
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
