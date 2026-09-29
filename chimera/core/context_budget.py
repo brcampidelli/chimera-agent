@@ -46,6 +46,13 @@ DEFAULT_TRIGGER = 0.8
 #: summarising them is what makes an agent forget what it is doing right now.
 DEFAULT_KEEP_RECENT = 6
 
+#: What a surface with a person waiting treats as readable for a model nobody measured. A model with
+#: a 1M window and no measurement used to get a budget of 0.6 of that, past anything a conversation
+#: reaches, so it never compacted and slid into whatever its real quality cliff is. 64k is the
+#: conservative end of what has been measured (`bench/useful_context`), and only a ceiling: a model
+#: with a smaller window, or a measurement, keeps the smaller number.
+UNMEASURED_USEFUL_TOKENS = 64_000
+
 #: Fallback window when the model is not in the catalog. Deliberately modest: under-estimating costs
 #: an unnecessary compaction, over-estimating costs a dead run.
 FALLBACK_CONTEXT_TOKENS = 128_000
@@ -217,8 +224,15 @@ class ContextBudget:
     useful: int | None = None
 
     @classmethod
-    def for_model(cls, model: str, **kwargs: Any) -> ContextBudget:
-        kwargs.setdefault("useful", useful_tokens(model))
+    def for_model(
+        cls, model: str, *, unmeasured_cap: int | None = None, **kwargs: Any
+    ) -> ContextBudget:
+        """The budget for ``model``. ``unmeasured_cap`` is the ceiling for a model the catalogue has
+        no measurement for (None keeps the window share it always had); a measured model ignores it.
+        An explicit ``useful=`` wins over both, including ``useful=None`` for "no cap at all"."""
+        if "useful" not in kwargs:
+            measured = useful_tokens(model)
+            kwargs["useful"] = measured if measured is not None else unmeasured_cap
         return cls(window=window_tokens(model), **kwargs)
 
     @property

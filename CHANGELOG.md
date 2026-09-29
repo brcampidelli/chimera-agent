@@ -49,6 +49,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     typed, or a full context. It no longer announces "2 steps left" when it is going on anyway.
   - **What did not change:** the library default. `auto_continue` is off, so `max_steps` is a wall
     for every bench, and the desktop's own toggle still exists and now has nothing left to do.
+- **A conversation that outgrows its model compacts and goes on, and a model nobody measured is
+  capped at 64k.**
+  - **Before:** the compaction budget was 0.6 of the advertised window, so a model with a million
+    tokens and no measurement never compacted before whatever its real quality cliff is. The terminal
+    commands never set a budget at all, so an overflow there ended the run, and the desktop had no
+    badge for a run that could not be compacted any further (`context_stuck`).
+  - **Now, where a person is waiting:** the coding route and `chimera agent`, `chat`, `assist` and
+    `tui` compact by default (0.6, or the fraction a client names), at the context the catalogue
+    measured for the model (`useful_k`) and at 64k for a model it did not
+    (`AgentConfig.unmeasured_context_tokens`). The cap is only a ceiling: a smaller window keeps its
+    smaller number. The desktop says `context_stuck` in ten languages.
+  - **What did not change:** the library default. Both are off in `AgentConfig()`, so every bench
+    keeps the window-share budget it was measured with. The 64k is a precaution and not a
+    measurement; the bench that would replace it (`bench/useful_context`, larger models) is
+    pre-registered and waiting on a budget.
 - **The background-job limits (3 at once, 6 hours) are advice until the owner sets them.**
   - **Before:** a fourth job was refused, and a job still running at hour six was killed with
     everything it started. Both read as the agent giving up on something it was handed on purpose.

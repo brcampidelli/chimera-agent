@@ -392,6 +392,10 @@ class AgentConfig:
     # (`CatalogEntry.useful_k`), compacting once the prompt crosses `trigger` of it. Off by default
     # because compaction discards messages, and a caller that has not asked for it should not get it.
     context_budget: float | None = None
+    #: Ceiling on the compaction budget for a model the catalogue has no `useful_k` for. None keeps
+    #: the window share, which is what every bench was measured with; a surface with a person waiting
+    #: passes `UNMEASURED_USEFUL_TOKENS` so a model nobody measured compacts before its cliff.
+    unmeasured_context_tokens: int | None = None
     # Replace the dropped span with a model-written summary of what still BINDS, instead of the
     # structural note. Off pending `bench/compaction`, and the reason is the note's own docstring:
     # a summary is believed in a way a note is not, so a bad one is worse than an honest count.
@@ -698,7 +702,11 @@ class Agent:
         self.tools = tools
         self.config = config or AgentConfig()
         self._budget = (
-            ContextBudget.for_model(self.config.model or "", fraction=self.config.context_budget)
+            ContextBudget.for_model(
+                self.config.model or "",
+                fraction=self.config.context_budget,
+                unmeasured_cap=self.config.unmeasured_context_tokens,
+            )
             if self.config.context_budget
             else None
         )

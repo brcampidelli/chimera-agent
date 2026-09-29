@@ -394,6 +394,7 @@ const STOP_REASONS: Record<string, string> = {
   tool_loop: "code.chat.stopped.toolLoop",
   budget: "code.chat.stopped.budget",
   spend: "code.chat.stopped.spend",
+  context_stuck: "code.chat.stopped.contextStuck",
   cancelled: "code.chat.stopped.cancelled",
 };
 

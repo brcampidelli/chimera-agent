@@ -79,6 +79,7 @@ from chimera.api.schemas import (
 from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
+from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
@@ -1313,7 +1314,12 @@ def register_code_api(
                 turn_notes=turn_notes,
                 thinking=thinking,
                 max_steps=steps,
-                context_budget=req.context_budget,
+                # On by default here: a turn that outgrows its model's window should compact and
+                # go on, not stop. A client that names a fraction still gets exactly that one.
+                context_budget=(
+                    req.context_budget if req.context_budget is not None else DEFAULT_BUDGET_FRACTION
+                ),
+                unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
                 summarise_compaction=req.summarise_compaction,
                 # A conversational turn is exactly one loop, so the ceiling and the turn's bill are
                 # the same number — the one surface where the cap means what its name says without
