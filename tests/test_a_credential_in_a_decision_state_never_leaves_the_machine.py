@@ -8,6 +8,7 @@ sits. The net is `chimera.core.redact`, the one that already keeps secrets out o
 
 from __future__ import annotations
 
+import contextlib
 import json
 from pathlib import Path
 from typing import Any
@@ -99,10 +100,8 @@ def test_the_openrouter_request_body_never_carries_the_secrets() -> None:
     client = httpx.Client(transport=httpx.MockTransport(handler))
     backend = OpenRouterDecisionsBackend("sk-or-test", "typesafe/jev-1.13", client=client)
 
-    try:
+    with contextlib.suppress(ValueError):  # the reading of the canned reply is not what this is about
         backend.ask(dirty(), QUESTION)
-    except ValueError:
-        pass  # the reading of the canned reply is not what this test is about
 
     wire = json.dumps(bodies)
     assert bodies and ENV_SECRET not in wire and TOKEN not in wire and "zzz" not in wire
