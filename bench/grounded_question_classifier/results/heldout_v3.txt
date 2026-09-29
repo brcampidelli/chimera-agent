@@ -1,0 +1,13 @@
+slice  class       n precision  recall
+all    question   40     1.000   0.900
+all    task       40     0.909   1.000
+pt     question   20     1.000   0.950
+pt     task       20     0.952   1.000
+en     question   20     1.000   0.850
+en     task       20     0.870   1.000
+
+4 misread of 80:
+  h-pt-q-02 label=question read=task     preciso do valor da multa
+  h-en-q-02 label=question read=task     gimme the deadline
+  h-en-q-04 label=question read=task     invoice total?
+  h-en-q-15 label=question read=task     Due date on this invoice pls

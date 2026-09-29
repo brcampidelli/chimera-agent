@@ -6531,6 +6531,33 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
     console.print(f"[green]disabled[/green] {job_id}")
 
 
+@cron_app.command("kill")
+def cron_kill(job_id: str = typer.Argument(..., help="The job id to stop.")) -> None:
+    """Stop a job's running (or next) dispatch — one run, not the schedule.
+
+    `disable` takes the job off the clock; `kill` answers the other question: the job is running
+    RIGHT NOW and must stop. The daemon's worker polls the flag between steps, the dispatch it
+    stops deletes it, and the run ends `cancelled` — which counts as neither a failure nor a
+    success, so a kill cannot ride the failure counter into the brake.
+    """
+    import time
+
+    from chimera.scheduler import Scheduler
+
+    store = _cron_store()
+    if job_id not in store:
+        console.print(f"[yellow]no job with id {job_id}[/yellow]")
+        raise typer.Exit(code=1)
+    stopped = Scheduler(store).kill(job_id, now=time.time())
+    if stopped:
+        console.print(f"[green]kill requested[/green] {job_id} — the running dispatch will stop")
+    else:
+        console.print(
+            f"[yellow]not stopped[/yellow] {job_id} — the job is disabled, so nothing is running"
+        )
+        raise typer.Exit(code=1)
+
+
 @cron_app.command("fire")
 def cron_fire(
     event: str = typer.Argument(..., help="The event name to fire (as given to `cron add --event`)."),
