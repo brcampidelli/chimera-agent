@@ -33,7 +33,9 @@ export function NoticeList({ items }: { items?: NoticeEntry[] }) {
               ? t("code.notice.spendWarn", { usd: Number(n.data?.usd ?? 0).toFixed(2) })
               : n.code === "steps_extended"
                 ? t("code.notice.stepsExtended", { steps: String(n.data?.steps ?? "") })
-                : n.text;
+                : n.code === "tainted_write"
+                  ? t("code.notice.taintedWrite", { tool: String(n.data?.tool ?? "") })
+                  : n.text;
   return (
     <ul className="space-y-0.5" role="status">
       {items.map((n) => (

@@ -48,6 +48,16 @@ describe("the turn's warnings", () => {
     expect(screen.getByText("24 steps done, and it is still working")).toBeInTheDocument();
   });
 
+  it("names the tool that wrote after untrusted input", () => {
+    renderWithProviders(
+      <NoticeList items={[{ code: "tainted_write", text: "", data: { tool: "edit_file" } }]} />,
+    );
+
+    expect(
+      screen.getByText("edit_file ran after this turn read untrusted content — check what it wrote"),
+    ).toBeInTheDocument();
+  });
+
   it("still tells a warning this build does not know, with the server's words", () => {
     renderWithProviders(<NoticeList items={[{ code: "from_the_future", text: "something new" }]} />);
 
@@ -69,6 +79,7 @@ describe("the turn's warnings", () => {
         "code.notice.priceUnknown",
         "code.notice.spendWarn",
         "code.notice.stepsExtended",
+        "code.notice.taintedWrite",
       ]) {
         expect(DICTS[lang.code][key], `${lang.code} is missing ${key}`).toBeTruthy();
       }

@@ -478,6 +478,22 @@ def _intersect_allow(request: list[str] | None, deployment: list[str] | None) ->
     return sorted(set(request) & set(deployment))
 
 
+class NoticeAnnouncer:
+    """Carries a warning from a tool to the turn's stream, bound after the registry exists.
+
+    The same late binding as :class:`ApprovalAnnouncer`: the registry is built before the turn's
+    `emit` is, so the tool holds this and the turn points ``emit`` at the stream afterwards. A
+    warning sent before that reaches nobody, which is the safe direction: it never blocks anything.
+    """
+
+    def __init__(self) -> None:
+        self.emit: Callable[[str, str, dict[str, Any]], None] | None = None
+
+    def __call__(self, code: str, text: str, data: dict[str, Any]) -> None:
+        if self.emit is not None:
+            self.emit(code, text, data)
+
+
 def assemble_registry(
     seams: CodeSeams,
     ws: Path,
@@ -492,6 +508,7 @@ def assemble_registry(
     frame_sink: Any = None,
     extra_tools: Sequence[Tool] | None = None,
     run_id: str | None = None,
+    notice_sink: Any = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -780,6 +797,11 @@ def assemble_registry(
         # 24, M2). Without a sink this is `POST /api/runs` and friends: nobody to ask, so the send
         # goes ahead and the audit records it — the owner's decision, never a block.
         ask_unseen_recipients=approval_sink is not None,
+        # A person is watching this turn (a sink to show a card to is the same fact): a write inside
+        # the workspace after untrusted input is a warning on their screen, not a card. Everything
+        # that reaches a shell, the network or a path outside the workspace still asks.
+        warn_workspace_writes=approval_sink is not None,
+        notify=notice_sink,
     ), ledger
 
 
@@ -1266,6 +1288,7 @@ def register_code_api(
         frame_sink: Any = None,
         extra_tools: Sequence[Tool] | None = None,
         run_id: str | None = None,
+        notice_sink: Any = None,
     ) -> tuple[Agent, Any]:
         """The agent for this turn, and the ledger watching it.
 
@@ -1285,6 +1308,7 @@ def register_code_api(
             instruction=req.message,
             extra_tools=extra_tools,
             run_id=run_id,
+            notice_sink=notice_sink,
         )
         # Recalled facts and the turn's notes go in the TURN CONTEXT, not the system prompt (study
         # 25, wave 2). They used to be appended to the system prompt so that `absorb`, which drops
@@ -1663,13 +1687,15 @@ def register_code_api(
         approval_sink = ApprovalAnnouncer()
         # Same late binding for the browser's frames: built here, bound to `emit` below.
         frame_sink = FrameAnnouncer()
+        # And for a warning a tool raises (a write after untrusted input): bound to `emit` below.
+        notice_sink = NoticeAnnouncer()
         # The turn's id is minted here, before the agent, because the registry's approver writes it
         # on every question it asks (`pending.FACTS`): a record line that names its run can be
         # joined to the run's trace and receipt; one that does not is a sentence in a file.
         turn_id = background.turn_id if background is not None else uuid.uuid4().hex
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
-            extra_tools=extra_tools or None, run_id=turn_id,
+            extra_tools=extra_tools or None, run_id=turn_id, notice_sink=notice_sink,
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
@@ -1802,6 +1828,8 @@ def register_code_api(
         def on_notice(code: str, text: str, data: dict[str, Any]) -> None:
             """A warning that does not stop the turn. Its own frame, so it replays like the rest."""
             emit("notice", {"code": code, "text": text, **data})
+
+        notice_sink.emit = on_notice
 
         def work() -> None:
             from chimera.orchestration.metering import MeteredBackend as _Meter

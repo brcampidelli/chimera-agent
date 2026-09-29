@@ -15,6 +15,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **After untrusted input, a write inside the workspace is a warning, not a card.**
+  - **Before:** once a run had read anything external, every `write_file`, `edit_file`,
+    `apply_patch` and `edit_batch` asked for approval for the rest of the run. `bench/injection`
+    measured what that costs when nobody can answer: it refused every piece of legitimate work that
+    began by reading something external.
+  - **Now, on the coding route** (a screen is there to show a card to): those four tools go ahead,
+    the turn says so (`tainted_write`, naming the tool, the path and where the taint came from), and
+    the audit keeps a `taint_write_warned` line. **Still a card:** anything that reaches a shell,
+    a send over the network, a path outside the workspace, and the per-action check on what a write
+    contains (a write of what the page said into a script or a config that something else will
+    run).
+  - **What did not change:** every other surface, every bench and the library default. The warning
+    is opt-in (`LedgeredTool(warn_workspace_writes=...)`), so the narrowing that `bench/injection`
+    and the authorization bench were measured with is the one they still run.
 - **A missing price and money spent are now warnings, not stops, until the person types a ceiling.**
   - **Before:** the desktop armed a US$1 ceiling on every turn, and a model with no known price
     stopped the run on its first call. Both read as the agent giving up for no reason the person

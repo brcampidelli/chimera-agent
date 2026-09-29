@@ -129,6 +129,12 @@ DANGEROUS_WHEN_TAINTED = frozenset(
 )
 
 
+#: The tools that write inside the workspace. Their own jail keeps a write in it, so what narrowing
+#: adds for them is a card on every edit after the run read anything external. The owner decided on
+#: 2026-09-27 that this is a warning: a card is for untrusted content reaching a shell, a write
+#: outside the workspace, or a send over the network (all of which stay gated below).
+WORKSPACE_WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch"})
+
 _RECIPIENT_KEYS = ("to", "recipient", "recipients", "cc", "bcc", "email")
 
 
@@ -181,8 +187,17 @@ class LedgeredTool(Tool):
         narrow_on_taint: bool = False,
         free_browser_reads: bool = True,
         ask_unseen_recipient: bool = False,
+        warn_workspace_writes: bool = False,
+        notify: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.inner = inner
+        # A write inside the workspace after untrusted input is a WARNING, not a card, where the
+        # surface says a person is watching (`warn_workspace_writes`). Off by default: every bench
+        # and every unattended surface keeps the narrowing it was measured with. What still asks is
+        # everything that reaches a shell, the network, or a path outside the workspace, and the
+        # per-action check below (a tainted reference, a self-modifying write) is untouched.
+        self.warn_workspace_writes = warn_workspace_writes
+        self.notify = notify
         self.ledger = ledger
         # Study 24, M2 (`bench/recipient_provenance`: 7/7 fabrications caught, 0/9 false flags): a
         # send to an email address the run was never shown is a card — but only where somebody can
@@ -223,12 +238,30 @@ class LedgeredTool(Tool):
         #    tainted (needs approval), even without a direct tainted reference.
         #    `for_narrowing` is the one place the ledger's `authority` mode can answer differently
         #    (a fetch the user named does not count there); under the default it is the same bit.
-        if (
+        narrowing = (
             self.narrow_on_taint
             and self.name in DANGEROUS_WHEN_TAINTED
             and not (self.free_browser_reads and browser_reads_loaded_page(self.name, kwargs))
             and self.ledger.run_tainted(for_narrowing=True)
-        ):
+        )
+        if narrowing and self.warn_workspace_writes and self.name in WORKSPACE_WRITE_TOOLS:
+            # The write goes ahead and the person is told. The per-action check in step 1 still runs.
+            sources = self.ledger.taint_sources(for_narrowing=True)
+            target = _first(kwargs, _PATH_KEYS)
+            where = f" from {'; '.join(sources[:3])}" if sources else ""
+            if self.audit is not None:
+                self.audit.record(
+                    "taint_write_warned",
+                    {"tool": self.name, "path": _excerpt(target, 300), "sources": sources},
+                )
+            if self.notify is not None:
+                self.notify(
+                    "tainted_write",
+                    f"{self.name} ran after this turn read untrusted content{where}",
+                    {"tool": self.name, "path": _excerpt(target, 300), "sources": sources[:3]},
+                )
+            narrowing = False
+        if narrowing:
             # The question a person answers needs three things the old one lacked: what will run,
             # where the taint came from, and who asked for that read. `sources` follows the same
             # authority rule as the gate itself, so it names exactly the reads that armed it.
@@ -425,6 +458,8 @@ def ledger_registry(
     audit: AuditLog | None = None,
     narrow_on_taint: bool = False,
     ask_unseen_recipients: bool = False,
+    warn_workspace_writes: bool = False,
+    notify: Callable[[str, str, dict[str, Any]], None] | None = None,
 ) -> ToolRegistry:
     """Return a new registry with every tool wrapped in a :class:`LedgeredTool`.
 
@@ -433,6 +468,9 @@ def ledger_registry(
 
     ``ask_unseen_recipients`` is the surface saying a person can answer a card here (study 24,
     M2). False by default, so every surface that does not say so keeps sending and only records.
+
+    ``warn_workspace_writes`` is the surface saying a person is watching: a write inside the
+    workspace after untrusted input goes ahead and ``notify`` is told, instead of asking a card.
     """
     wrapped = ToolRegistry()
     for tool in registry.tools():
@@ -440,6 +478,7 @@ def ledger_registry(
             LedgeredTool(
                 tool, ledger, approve=approve, audit=audit, narrow_on_taint=narrow_on_taint,
                 ask_unseen_recipient=ask_unseen_recipients,
+                warn_workspace_writes=warn_workspace_writes, notify=notify,
             )
         )
     return wrapped
