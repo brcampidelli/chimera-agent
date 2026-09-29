@@ -201,6 +201,15 @@ def _looks_like_unexecuted_plan(text: str) -> bool:
     )
 
 
+#: What the model is told the first time a tool starts repeating, when `loop_correction` is on. It
+#: names the repetition and asks for a different action; it does not tell the model to stop, because
+#: the point of this level is to give the run a chance before the net catches it.
+_LOOP_CORRECTION = (
+    "You are repeating yourself ({what}). Change approach: use different arguments or a different "
+    "tool, or, if you are blocked, say what is blocking you and give your best answer so far."
+)
+
+
 def _notice(
     on_notice: Callable[[str, str, dict[str, Any]], None] | None, code: str, text: str, **data: Any
 ) -> None:
@@ -317,6 +326,12 @@ class AgentConfig:
     # repeats / ping-pong / no-progress polling) instead of grinding to max_steps. Conservative
     # thresholds, so a genuine multi-step run is untouched.
     detect_tool_loops: bool = True
+    #: Warn, ask the model to change approach, and only then break. Off it is the breaker every
+    #: bench was measured with (warn at 3, break at 5). On, the first warning per tool also adds a
+    #: note asking for a different approach, and the breaker moves out to a net that catches a run
+    #: that is truly spinning (10 identical, 8 unchanged, 6 ping-pong cycles). A surface where a
+    #: person is waiting turns this on; a bench does not, so its baseline does not move.
+    loop_correction: bool = False
     # Study 24, M6: when the breaker trips, hand the rest of the run to this (stronger) model instead
     # of asking for a final answer. Off by default (None): the stored runs show the breaker ending 6.4%
     # of solves at a mean score of 0.416 against 0.681, a gap that mixes task difficulty with the cost
@@ -1017,7 +1032,10 @@ class Agent:
 
         steplog.system_sha = fingerprint(system_prompt)
         nudged = False
-        loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
+        loop_detector = self._new_loop_detector() if self.config.detect_tool_loops else None
+        #: Tools already warned about this run, and the correction waiting for the end of the step.
+        warned_loops: set[str] = set()
+        loop_nudge: str | None = None
         # The model this run's steps go to. Set once, when the breaker trips and an escalation model
         # is configured; per RUN, so the Agent's own config is never mutated for the runs after it.
         run_model: str | None = None
@@ -1283,11 +1301,15 @@ class Agent:
                         break
                 if loop_detector is not None:
                     verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
-                    if verdict.level == "warn":
+                    if verdict.level == "warn" and call.name not in warned_loops:
+                        # Once per tool: the third repeat and the fourth are the same fact.
+                        warned_loops.add(call.name)
                         _notice(
                             on_notice, "tool_loop_warn",
                             verdict.reason or f"{call.name} is repeating", tool=call.name,
                         )
+                        if self.config.loop_correction:
+                            loop_nudge = _LOOP_CORRECTION.format(what=verdict.reason or call.name)
                     if verdict.tripped:
                         tripped = verdict.reason
                         # A batch that ran together has already run: its remaining observations
@@ -1313,6 +1335,12 @@ class Agent:
                         "tool_call_id": call.id,
                         "content": f"error: not run — {stopper}.",
                     })
+            if loop_nudge is not None:
+                if tripped is None:
+                    # After every tool reply of the step, never between them: an assistant message
+                    # that announced tool calls needs all of its answers before anything else.
+                    messages.append({"role": "user", "content": loop_nudge})
+                loop_nudge = None
             if handover is not None:
                 # No further step and no retry: the page will ask the same thing again. One closing
                 # call, like every other stop, and the answer opens with the harness's own line, so
@@ -1342,7 +1370,7 @@ class Agent:
                 _log.info("tool-loop breaker tripped (%s): escalating to %s", tripped, run_model)
                 if self.config.snapshot_on_tool_loop is not None:
                     _snapshot_workspace(self.config.project_root, self.config.snapshot_on_tool_loop)
-                loop_detector = ToolLoopDetector()
+                loop_detector = self._new_loop_detector()
                 continue
             if tripped is not None:
                 # Physically spinning: stop burning budget. Ask once, no tools, for a final answer
@@ -1419,6 +1447,14 @@ class Agent:
         # Never `final.reasoning`, even when the route filed the text there (see the note).
         filed = filed or final.answer_in_reasoning
         return final, _empty_close_note(tool_names, filed_as_reasoning=filed)
+
+    def _new_loop_detector(self) -> ToolLoopDetector:
+        """The breaker this run uses: the measured one, or the wider net when correcting first."""
+        if self.config.loop_correction:
+            return ToolLoopDetector(
+                window=16, repeat_break=10, pingpong_cycles_break=6, stall_break=8
+            )
+        return ToolLoopDetector()
 
     def _step(
         self,

@@ -26,6 +26,12 @@ from chimera.telemetry import get_logger
 _log = get_logger("orchestration.budget")
 
 
+#: What a turn spends before it says so, when nobody set a number. A dollar is roughly 75x an
+#: ordinary turn on the measured install and only a run that went wrong reaches it, which is the point
+#: of a warning instead of a ceiling: it costs the person nothing until the moment it is useful.
+DEFAULT_SPEND_WARN_USD = 1.0
+
+
 class BudgetExceeded(RuntimeError):
     """Raised (hard mode) when a call would exceed the delegation's token budget."""
 

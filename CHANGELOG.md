@@ -27,6 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     price shows green while the real spend climbs.
   - **Tests rewritten, with the reason:** `SpendCeiling.test.tsx`, `Conversation.wave0.test.tsx`
     and `Code.spend.test.tsx` asserted that a ceiling was armed by default. That premise is the decision that changed.
+- **A repeating run is asked to change approach before it is cut.**
+  - **Before:** the loop breaker warned at three identical calls and cut the run at four or five,
+    and the warning was never shown to anyone.
+  - **Now, where a person is waiting** (the desktop and MCP coding route, `chimera chat`, `assist`,
+    `tui` and `agent`): the first warning per tool adds a note asking the model to use different
+    arguments or a different tool, or to say what is blocking it, and the breaker moves out to a
+    net: ten identical calls, eight unchanged answers, six ping-pong cycles. A run that ignores the
+    note is still stopped.
+  - **What did not change:** the library default. `AgentConfig.loop_correction` is off, so every
+    bench keeps the breaker it was measured with. The same commit turns the US$1 spend warning on
+    for the terminal surfaces.
 
 ### Fixed
 

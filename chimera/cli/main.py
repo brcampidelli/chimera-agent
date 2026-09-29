@@ -1135,6 +1135,7 @@ def agent(
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
+    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
@@ -1160,6 +1161,10 @@ def agent(
                 model=model, max_steps=max_steps, project_root=Path(workspace),
                 instructions=owner_identity(get_settings().home),
                 turn_context=True,
+                # A person is waiting: warn at US$1 and ask a repeating run to change approach
+                # before the breaker cuts it (see AgentConfig.loop_correction).
+                warn_usd=DEFAULT_SPEND_WARN_USD,
+                loop_correction=True,
             ),
         )
         result = runner.run(task)
@@ -1873,6 +1878,7 @@ def chat(
     from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
+    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway
 
     settings = get_settings()
@@ -1945,6 +1951,10 @@ def chat(
             # depending on which window you opened.
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
+            # A person is waiting: warn at US$1 and ask a repeating run to change approach
+            # before the breaker cuts it (see AgentConfig.loop_correction).
+            warn_usd=DEFAULT_SPEND_WARN_USD,
+            loop_correction=True,
         ),
     )
     mem = None if no_memory else _memory_manager()
@@ -2135,6 +2145,7 @@ def assist(
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
+    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway
 
     settings = get_settings()
@@ -2174,6 +2185,10 @@ def assist(
             project_root=Path(workspace),
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
+            # A person is waiting: warn at US$1 and ask a repeating run to change approach
+            # before the breaker cuts it (see AgentConfig.loop_correction).
+            warn_usd=DEFAULT_SPEND_WARN_USD,
+            loop_correction=True,
         ),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
@@ -2373,6 +2388,7 @@ def tui(
     from chimera.core.instructions import render as render_identity
     from chimera.interface import ChatSession
     from chimera.memory.models import project_key
+    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway
     from chimera.sandbox.confirm import declare_no_human_here
 
@@ -2488,6 +2504,10 @@ def tui(
             # like a stranger's.
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
+            # A person is waiting: warn at US$1 and ask a repeating run to change approach
+            # before the breaker cuts it (see AgentConfig.loop_correction).
+            warn_usd=DEFAULT_SPEND_WARN_USD,
+            loop_correction=True,
         ),
     )
     mem = None if no_memory else _memory_manager()

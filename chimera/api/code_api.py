@@ -81,6 +81,7 @@ from chimera.api.sse import SSE_RESPONSE
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
+from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.browser import FrameAnnouncer
@@ -93,10 +94,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
 _log = get_logger("api.code")
 
-#: What a coding turn spends before it says so. A dollar is roughly 75x an ordinary turn on the
-#: measured install and only a run that went wrong reaches it, which is the point of a warning
-#: instead of a ceiling: it costs the person nothing until the moment it is useful.
-DEFAULT_SPEND_WARN_USD = 1.0
 
 #: Hard ceiling on a requested step count. Not a judgement about how many steps a task needs — it
 #: is the difference between a long run and a runaway one, and the client asking is a UI field.
@@ -1323,6 +1320,9 @@ def register_code_api(
                 # a footnote about attempts.
                 max_usd=req.max_usd,
                 warn_usd=req.warn_usd if req.warn_usd is not None else DEFAULT_SPEND_WARN_USD,
+                # A person is waiting on this turn: warn and ask for a different approach before the
+                # breaker cuts a run, and keep the cut as a net only.
+                loop_correction=True,
                 project_root=ws,
                 # Read per turn, so editing the identity applies to the next question rather than
                 # to the next launch.
