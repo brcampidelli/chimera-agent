@@ -13,6 +13,9 @@ class SandboxResult:
     stdout: str = ""
     stderr: str = ""
     timed_out: bool = False
+    #: The id of the background job this command became when it outlived its timeout, or "". Set
+    #: only by a sandbox that was asked to keep it going (`on_timeout`), and never with `timed_out`.
+    adopted: str = ""
 
     @property
     def output(self) -> str:

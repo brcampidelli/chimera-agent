@@ -160,7 +160,24 @@ class RunShellTool(Tool):
             return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         if bool(kwargs.get("background", False)):
             return self._start_job(command, cwd, sandbox)
-        result = sandbox.run(command, timeout=timeout, cwd=cwd)
+        if self._jobs is not None and isinstance(sandbox, LocalSandbox):
+            jobs = self._jobs
+
+            def adopt(proc: Any) -> str | None:
+                job = jobs.adopt(proc, command, cwd=cwd)
+                return job.id if job is not None else None
+
+            result = sandbox.run(command, timeout=timeout, cwd=cwd, on_timeout=adopt)
+        else:
+            result = sandbox.run(command, timeout=timeout, cwd=cwd)
+        if result.adopted:
+            return (
+                f"job {result.adopted} is still running after {timeout}s and was NOT stopped: it "
+                f"continues in the background and keeps running after this turn. Its output appears "
+                f"when it finishes; check it with job_status(job_id={result.adopted!r}), stop it with "
+                f"job_cancel(job_id={result.adopted!r}). Do not report the work as done until "
+                "job_status says it finished."
+            )
         if result.timed_out:
             if self._jobs is not None and isinstance(sandbox, LocalSandbox):
                 return (

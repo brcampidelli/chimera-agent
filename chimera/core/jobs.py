@@ -231,7 +231,70 @@ class JobRegistry:
         _log.info("job %s started (pid %s): %s", job_id, proc.pid, command[:120])
         return job
 
-    def _watch(self, job_id: str, proc: subprocess.Popen[bytes], max_runtime: float) -> None:
+    def adopt(self, proc: subprocess.Popen[bytes], command: str, *, cwd: Path) -> Job | None:
+        """Take over a FOREGROUND command that outlived its timeout, instead of killing it.
+
+        The owner decided on 2026-09-27 that the shell timeout stops being a reason to stop: a
+        command killed at sixty seconds is a benchmark stage killed at sixty seconds. The process is
+        already running with its output on pipes this process reads, so the log is written when it
+        ends (`communicate` picks up where the timed-out call left off, including what it had
+        already read), and the job is otherwise an ordinary one: it is watched, it can be cancelled,
+        and the next turn is told when it finishes. Returns None when a limit the owner SET forbids
+        one more job, and the caller kills the command as it did before.
+        """
+        from chimera.proc.decode import console_text
+        from chimera.proc.winjob import contain
+
+        with self._start_lock:
+            running = [j for j in self.all() if j.state == "running"]
+            if self.hard_running and len(running) >= self.max_running:
+                return None
+            self.root.mkdir(parents=True, exist_ok=True)
+            job_id = uuid.uuid4().hex[:12]
+            log_path = self.root / f"{job_id}.log"
+            log_path.write_bytes(b"")
+            contained = contain(proc.pid)
+            job = Job(
+                id=job_id, command=command, cwd=str(cwd), pid=proc.pid,
+                started_at=time.time(), log=str(log_path), owner=_PROCESS_TOKEN,
+                max_runtime=float(self.max_runtime) if self.hard_runtime else 0.0,
+                extra={"adopted": True},
+            )
+            with self._lock:
+                self._procs[job_id] = proc
+                if contained is not None:
+                    self._contained[job_id] = contained
+                self._write(job)
+                self._beat(job_id)
+        drained = threading.Event()
+
+        def drain() -> None:
+            try:
+                raw_out, raw_err = proc.communicate()
+                text = console_text(raw_out) + console_text(raw_err)
+            except Exception as exc:  # noqa: BLE001 - a log that cannot be written is not a crash
+                text = f"[the output could not be collected: {exc}]"
+            with suppress(OSError):
+                log_path.write_text(text, encoding="utf-8")
+            drained.set()
+
+        threading.Thread(target=drain, name=f"job-drain-{job_id}", daemon=True).start()
+        _Reaped.track(self, job_id)
+        threading.Thread(
+            target=self._watch,
+            args=(job_id, proc, float(self.max_runtime) if self.hard_runtime else 0.0, drained),
+            name=f"job-{job_id}", daemon=True,
+        ).start()
+        _log.info("job %s adopted (pid %s): %s", job_id, proc.pid, command[:120])
+        return job
+
+    def _watch(
+        self,
+        job_id: str,
+        proc: subprocess.Popen[bytes],
+        max_runtime: float,
+        drained: threading.Event | None = None,
+    ) -> None:
         """Wait for the process, beating the heartbeat, and write how it ended. At the deadline,
         kill the tree and write ``timed_out``. The only writer of a natural ending."""
         deadline = time.monotonic() + max_runtime if max_runtime > 0 else None
@@ -256,6 +319,10 @@ class JobRegistry:
                 self._beat(job_id)
         with suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=10)
+        if drained is not None:
+            # An adopted command's log is written when its pipes close: the state is not final until
+            # the output a reader will look for is on disk.
+            drained.wait(timeout=30)
         with self._lock:
             contained = self._contained.pop(job_id, None)
             if contained is not None:

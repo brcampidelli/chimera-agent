@@ -87,6 +87,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     runtime kills the tree and records `timed_out`.
   - **What did not change:** a registry built directly with numbers (a bench, a test) is a caller
     that meant them, so it stays hard.
+- **A shell command that outlives its timeout keeps running as a job instead of being killed.**
+  - **Before:** `run_shell` killed the command and its whole process tree when its timeout passed
+    (60 seconds unless the model asked for more) and answered "timed out". A benchmark stage that
+    takes tens of minutes died at the timeout the model happened to choose.
+  - **Now:** where there is a job store and the host sandbox, the still-running command is adopted
+    as a background job. The answer says it is still running and was not stopped, and names
+    `job_status` and `job_cancel`. It can be cancelled like any job, its output is read from the log
+    (written when it ends), and the next turn is told when it finishes.
+  - **What did not change:** a `run_shell` with no job store, or on a container sandbox, still kills
+    at the timeout, and so does one whose adoption a limit the owner set (`CHIMERA_JOBS_MAX_RUNNING`)
+    forbids. The output of a still-running adopted command is not streamed: `background=true` from
+    the start is still the way to watch one.
 
 ### Fixed
 
