@@ -29,8 +29,11 @@ only means one answer goes unchecked, which is where every answer was before thi
 and recall (README there). ``messages.jsonl`` (120) was written by this function's author before the
 function; ``heldout.jsonl`` (80) by a separate session that never saw it. The first version read the
 held-out set at 0.805 precision on "question"; the judgement and politeness rules above were widened
-after reading its misses, so the held-out set is no longer held out. Neither set measures how often
-a real task gets declined — that needs a paid run of the gate on tasks, and it has not been made.
+after reading its misses, so the held-out set is no longer held out. ``fresh.jsonl`` (160), written by
+another model family, read 5 of 80 tasks as questions (inconclusive); four were Portuguese advice,
+appraisal and "será que" frames whose English twins passed, and the rules were widened as classes
+on them, so it is in-sample now too. How often a misread task is then declined was measured in
+`bench/grounded_task_declines`: 1 real attempt withheld in 60 tasks forced through the check.
 """
 
 from __future__ import annotations
@@ -46,6 +49,7 @@ _TASK_STEMS_EN = (
     "make ", "fix", "correct", "proofread", "edit", "format", "reformat", "shorten", "condens",
     "expand", "simplif", "compar", "analy", "evaluat", "assess", "outlin", "produc", "build",
     "restructur", "implement", "explain", "polish", "recommend", "suggest", "give me a",
+    "justify", "justifi",
     "prepare", "organi", "sort", "tabulat", "check ", "grade", "score", "rate ", "refactor",
 )
 _TASK_STEMS_PT = (
@@ -56,6 +60,7 @@ _TASK_STEMS_PT = (
     "explic", "poli", "recomend", "suger", "sugir", "me dá um", "me da um", "me de um", "prepar",
     "organiz", "orden", "tabel", "verifiqu", "verific", "monte", "montar", "elabor", "deix",
     "list", "classifiq", "classific", "refator", "ajust", "adapt", "dá um", "da um", "dê um",
+    "justifiq", "justific",
 )
 #: Asking for a judgement or advice: an opinion, not a fact the sources hold.
 _JUDGEMENT = (
@@ -76,16 +81,24 @@ _JUDGEMENT = (
     # appraisal: strengths, weaknesses, risks, gaps
     "weak point", "weakness", "strength", "strong point", "risks", "risk of", "pontos fracos",
     "pontos fortes", "ponto fraco", "ponto forte", "riscos", "lacunas", "gaps in", "flaws", "falhas",
+    "ajuda a decidir", "ajude a decidir", "help me decide", "decidir se", "decide whether",
+    "adequad", "apropriad", "appropriate", "suitable", "risky", "arriscad",
 )
 _POLITE_EN = (
     "please ", "can you ", "could you ", "would you ", "will you ", "pls ", "kindly ",
     "any chance you could ", "any chance you can ", "is it possible to ", "would it be possible to ",
 )
 _POLITE_PT = (
-    "por favor ", "por favor, ", "você pode ", "voce pode ", "vc pode ", "pode ", "poderia ",
+    "será que ", "sera que ", "por favor ", "por favor, ", "você pode ", "voce pode ",
+    "vc pode ", "pode ", "poderia ",
     "consegue ", "você consegue ", "voce consegue ", "dá pra ", "da pra ", "tem como ",
     "você poderia ", "voce poderia ", "vc poderia ", "daria pra ", "daria para ", "dá para ",
     "seria possível ", "seria possivel ",
+)
+#: A second-person conditional asks for the assistant's own view ("o que você mudaria", "você faria").
+#: Not the courtesy modals, which frame a plain question ("você poderia me dizer…", "saberia dizer…").
+_YOUR_VIEW = re.compile(
+    r"\b(?:você|voce|vc)\s+(?!(?:poderia|conseguiria|gostaria|saberia|teria)m?\b)\w+ria(?:m)?\b"
 )
 #: "…you could <verb>", "…você poderia <verb>" anywhere in a clause: the verb after it is the request.
 _FRAME = re.compile(
@@ -168,7 +181,7 @@ def _asks_for_work(clause: str, lang: str) -> bool:
     stems = _TASK_STEMS_PT if lang == "pt" else _TASK_STEMS_EN
     head = _strip_polite(clause, polite)
     # "me ajude a resumir", "help me summarize" — the work verb one step in.
-    head = re.sub(r"^(?:me ajude a |ajude-me a |help me (?:to )?|i need you to |i want you to |quero que você |preciso que você )", "", head)
+    head = re.sub(r"^(?:me ajud[ae] a |ajude-me a |help me (?:to )?|i need you to |i want you to |quero que você |preciso que você )", "", head)
     head = re.sub(r"^(?:me |also |também |tambem |then |depois |agora |now |just |só |so )+", "", head)
     if any(head.startswith(s) for s in stems):
         return True
@@ -184,7 +197,7 @@ def is_question(message: str) -> bool:
     lang = language(text)
     if lang not in ("pt", "en") or not text:
         return False
-    if any(j in text for j in _JUDGEMENT):
+    if any(j in text for j in _JUDGEMENT) or _YOUR_VIEW.search(text):
         return False
     clauses = [c.strip(" ,:-") for c in _CLAUSE.split(text) if c and c.strip(" ,:-")]
     if any(_asks_for_work(c, lang) for c in clauses):

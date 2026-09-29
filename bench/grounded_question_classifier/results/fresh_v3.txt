@@ -1,0 +1,22 @@
+slice  class       n precision  recall
+all    question   80     1.000   0.838
+all    task       80     0.860   1.000
+pt     question   40     1.000   0.875
+pt     task       40     0.889   1.000
+en     question   40     1.000   0.800
+en     task       40     0.833   1.000
+
+13 misread of 160:
+  f-pt-q-02 label=question read=task     Me passa o CNPJ da contratada que aparece no acordo.
+  f-pt-q-04 label=question read=task     prazo?
+  f-pt-q-12 label=question read=task     Informe a tensão nominal especificada no manual do equipamento.
+  f-pt-q-30 label=question read=task     Por favor, localize o valor da multa por atraso no contrato.
+  f-pt-q-40 label=question read=task     Diz aí qual é o consumo de energia informado na etiqueta.
+  f-en-q-04 label=question read=task     deadline?
+  f-en-q-07 label=question read=task     I need to know what daily dosage the doctor recorded on the prescription.
+  f-en-q-12 label=question read=task     State the rated voltage specified in the equipment manual.
+  f-en-q-15 label=question read=task     Would you tell me the name of the school shown on the transcript?
+  f-en-q-17 label=question read=task     Give me the deadline for submitting the bid.
+  f-en-q-22 label=question read=task     Could you check whether the insurance policy covers flood damage?
+  f-en-q-28 label=question read=task     Please give me the full address of the branch shown in the letter.
+  f-en-q-30 label=question read=task     Find the late-payment penalty in the contract.

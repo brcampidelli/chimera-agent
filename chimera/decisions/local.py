@@ -56,6 +56,21 @@ DEFAULT_TIMEOUT_S = 30.0
 NUM_PREDICT = 24
 TOP_LOGPROBS = 10
 
+#: The context window every call asks for. Ollama's default is set per machine (4,096 here on
+#: 2026-09-29) and it keeps only HALF of num_ctx for the prompt, cutting the rest SILENTLY: a
+#: 30,314-token prompt came back as prompt_eval_count 2,050 under the default and 8,194 under 16,384.
+#: Prose runs ~5.5 characters a token, so the default read at most ~11,000 characters, under the
+#: verified-answers cap of 14,000; 16,384 reads up to 8,192 tokens. Every bench of this backend
+#: already sent it (jevbench_local A_ctx, spot_noul, stop_gate).
+NUM_CTX = 16384
+PROMPT_BUDGET = NUM_CTX // 2  # what Ollama actually reads of a prompt (measured, see above)
+
+
+class ContextOverflow(RuntimeError):
+    """The state filled the context window: whatever the model answered was about a truncated state.
+    Raised, so the Decider records a halt — never a reading of text the model did not see."""
+
+
 
 def _ambiguous_prefix(token: str, options: tuple[str, ...] | list[str]) -> bool:
     """Whether the label token is a non-empty prefix of MORE THAN ONE option (after the same
@@ -104,7 +119,7 @@ class LocalLogprobBackend:
     def body(self, state: str, question: Choice) -> dict[str, Any]:
         return {
             "model": self.model, "think": False, "stream": False, "logprobs": True, "top_logprobs": TOP_LOGPROBS,
-            "format": self.schema(question), "options": {"temperature": 0, "num_predict": NUM_PREDICT},
+            "format": self.schema(question), "options": {"temperature": 0, "num_predict": NUM_PREDICT, "num_ctx": NUM_CTX},
             "messages": [
                 {"role": "system", "content": self.system_text(question)},
                 {"role": "user", "content": state + self.user_suffix(question)},
@@ -134,7 +149,14 @@ class LocalLogprobBackend:
         question = as_choice(question)
         response = self._client.post(f"{self.base_url}/api/chat", json=self.body(state, question), timeout=self._budget())
         response.raise_for_status()
-        return self.read(response.json(), question, resolved_model=self.resolved_model())
+        data = response.json()
+        used = int(data.get("prompt_eval_count") or 0)
+        if used >= PROMPT_BUDGET:
+            raise ContextOverflow(
+                f"the state filled the {PROMPT_BUDGET}-token prompt budget of a {NUM_CTX} context "
+                f"({used} tokens read)"
+            )
+        return self.read(data, question, resolved_model=self.resolved_model())
 
     def read(self, data: dict[str, Any], question: Choice, *, resolved_model: str = "") -> Reading:
         """The reading off one response body — separable so the bench and the tests share it."""

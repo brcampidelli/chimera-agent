@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - **Two new question-lint rules.** `duplicate_criteria` (error) refuses a question whose options share one criterion, since nothing in the rubric tells them apart. `negated_true` (warning) flags a yes/no question whose "true" criterion is itself a negation, the double negative that breaks P(X) + P(not X) = 1.
 
+### Fixed
+
+- **The local decider no longer judges a truncated state.** Ollama keeps only half of its context window for the prompt and cuts the rest with no error. The default window here was 4,096 tokens, so the local System One model read at most ~2,050 tokens (about 11,000 characters of prose), while the verified-answers check sends attached sources of up to 14,000 characters. Every call now asks for a 16,384-token window (8,192 tokens of prompt), and a prompt that still fills it is a halt: the answer ships unverified, never judged on text the model did not see. Measured before the change on this backend (`bench/jevbench_local`): 231 of 231 answers identical with the larger window.
+- **`chimera decide` exits 1 when a question fails.** It exited 0 even when the backend was down or the state overflowed, so a CI step or a script could not tell "answered" from "failed". Now: 0 every question answered; 1 at least one failed, after the JSON is printed (or every JSONL line written) in full; 2 usage, or a question the linter refuses.
+
 ### Changed
 
 - **Compaction on the default model now starts at the context it was measured to read.**
@@ -19,6 +24,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     carries `useful_k = 255`, a lower bound, so the budget is 255k and compaction lands at 204,000
     tokens.
   - **Cost of the run:** US$ 4.67.
+
+### Fixed
+
+- **`apply_patch` no longer writes a stray conflict marker into a file.**
+  - **What went wrong:** a hunk with a second `=======` line put that line into the replacement
+    text. The marker landed in the source file, and the tool still answered "applied". This was
+    seen live, with the desktop agent editing through the app.
+  - **Now:** a hunk whose SEARCH or REPLACE holds a marker line is refused, the file is left
+    untouched, and the error points to `edit_file` for a file that really contains such a line.
+
+- **Portuguese advice and appraisal requests on attached documents are no longer checked as if
+  they were questions.**
+  - **What went wrong:** on a fresh set written by another model family, the grounded-question
+    classifier read 5 of 80 tasks as questions. Four were Portuguese, and their English twins passed.
+    Examples: "Será que dá pra reescrever…", "O que você mudaria…", "Me ajuda a decidir…",
+    "parece adequada… Justifique".
+  - **The fix:** these frames now read as tasks, and courtesy questions ("você poderia me dizer…")
+    are still questions.
+  - **The stake is small.** Forced through the check, 60 tasks lost one real attempt
+    (`bench/grounded_task_declines`).
 
 ## [0.63.1] - 2026-09-27
 ### Fixed
@@ -34,7 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **Same fences as the foreground:** the same approval card, the same workspace jail, the same scrubbed environment and the same taint marking.
   - **Timeout hint:** a timeout now points to `background=true`.
   - **Where to see it:** a "Background jobs" panel on the Code screen and a new MCP bridge area, `desktop_shell_jobs` (list, read, stop). (#658)
-
 ## [0.63.0] - 2026-09-27
 ### Added
 

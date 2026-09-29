@@ -1219,6 +1219,25 @@
         },
         {
           "deprecated": false,
+          "help": "Stop a job's running (or next) dispatch \u2014 one run, not the schedule.\n\n`disable` takes the job off the clock; `kill` answers the other question: the job is running\nRIGHT NOW and must stop. The daemon's worker polls the flag between steps, the dispatch it\nstops deletes it, and the run ends `cancelled` \u2014 which counts as neither a failure nor a\nsuccess, so a kill cannot ride the failure counter into the brake.",
+          "hidden": false,
+          "name": "kill",
+          "params": [
+            {
+              "help": "The job id to stop.",
+              "kind": "argument",
+              "name": "job_id",
+              "opts": [
+                "job_id"
+              ],
+              "required": true,
+              "type": "str"
+            }
+          ],
+          "path": "cron kill"
+        },
+        {
+          "deprecated": false,
           "help": "Propose crons from recurring tasks and create the ones you confirm.\n\nEach proposal is shown for explicit confirmation (the human-in-the-loop approval\nthat keeps automation creation under control); confirmed jobs are validated and\ncreated enabled. ``--yes`` confirms all (use deliberately).",
           "hidden": false,
           "name": "learn",
@@ -1295,7 +1314,7 @@
     },
     {
       "deprecated": false,
-      "help": "Ask typed questions \u2014 yes/no, a choice, a score \u2014 and get probabilities back.\n\nEvery question is read on its own, decision-first; a question the linter rejects is refused before\nany call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a\nprobability of being right. A number is calibrated only where a map exists for exactly this question.\n\nMeasured on a ruler we did not build (`bench/jevbench_local`, the 231 public JevBench items): the\ndefault local backend answers 0.619 of them right (Jev 1.13: 0.866), 0.324 on the hard tier, with a\nraw top-label ECE of 0.218. Options that share a first token cannot be read locally: name them so\ntheir first words differ.",
+      "help": "Ask typed questions \u2014 yes/no, a choice, a score \u2014 and get probabilities back.\n\nEvery question is read on its own, decision-first; a question the linter rejects is refused before\nany call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a\nprobability of being right. A number is calibrated only where a map exists for exactly this question.\n\nExit codes: 0 every question answered; 1 at least one question failed (a halt: the backend was down\nor the state overflowed) \u2014 the output is still printed in full first; 2 usage, or a question the\nlinter refuses before any call.\n\nMeasured on a ruler we did not build (`bench/jevbench_local`, the 231 public JevBench items): the\ndefault local backend answers 0.619 of them right (Jev 1.13: 0.866), 0.324 on the hard tier, with a\nraw top-label ECE of 0.218. Options that share a first token cannot be read locally: name them so\ntheir first words differ.",
       "hidden": false,
       "name": "decide",
       "params": [

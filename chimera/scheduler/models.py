@@ -3,14 +3,30 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+
+def kill_flag_path(home: Path, job_id: str) -> Path:
+    """Where ``cron kill`` leaves its stop request for one job.
+
+    A file, not shared memory: the daemon and the CLI are different processes on a VPS (or two
+    containers on a host), and a file is the one channel both already trust for state — the same
+    reason the heartbeat is a file. Written by the CLI, polled by the worker between steps,
+    deleted by the dispatch it actually stops, so a flag can never outlive the run it was meant
+    for and silence the one after it. Lives on the data model because both the engine (writer)
+    and the job runner (reader) need it, and this module is the one neither has to apologise for
+    importing.
+    """
+    return Path(home) / "scheduler" / f"kill.{job_id}.flag"
+
 Trigger = Literal["cron", "event", "webhook"]
+
 CreatedBy = Literal["human", "agent"]
 
-DispatchStatus = Literal["ok", "error", "timeout", "budget", "rejected"]
+DispatchStatus = Literal["ok", "error", "timeout", "budget", "rejected", "cancelled"]
 """How a dispatch ended.
 
 ``rejected`` is the one that is not an error: the job RAN, produced work, and its own verify
@@ -33,6 +49,16 @@ class JobOutcome:
 
     answer: str
     ok: bool = True
+    cancelled: bool = False
+    """The dispatch was stopped by the operator (``chimera cron kill``), not by its gate.
+
+    A third fact beside ``ok``: a killed run is not evidence the job is broken, so it must not
+    ride ``consecutive_failures`` into the brake — the same reasoning that stops a user
+    cancellation from distilling an anti-pattern card. Nor is it a clean ``ok``: the work is a
+    partial answer that was never verified, so it is not delivered anywhere as if it were one.
+    The receipt in ``runs.jsonl`` carries ``ending="cancelled"``; this flag is how the dispatch
+    layer knows to stay out of both the failure count and the delivery sink.
+    """
 """What happened on the last dispatch — which is not the same question as whether one happened.
 
 ``last_run`` records the ATTEMPT: the scheduler sets it outside the try/except on purpose, so a job

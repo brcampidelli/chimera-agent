@@ -33,6 +33,8 @@ python -m bench.grounded_question_classifier.evaluate --check         # exit 1 i
 | held-out, v2 | task | 0.952 | 1.000 | 0.870 | 1.000 | 0.909 | 1.000 |
 | **fresh, v2 (out of sample, other model family)** | question | 0.897 | 0.875 | 0.970 | 0.800 | **0.931** | 0.838 |
 | fresh, v2 | task | 0.878 | 0.900 | 0.830 | 0.975 | 0.852 | 0.938 |
+| fresh, v3 (**in sample**: rules widened on its misses) | question | 1.000 | 0.875 | 1.000 | 0.800 | 1.000 | 0.838 |
+| fresh, v3 | task | 0.889 | 1.000 | 0.833 | 1.000 | 0.860 | 1.000 |
 | messages, v2 (same author) | question | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
 | messages, v2 | task | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
 
@@ -48,6 +50,12 @@ deadline"), the safe direction. A fresh, unseen set is what would say whether v2
 workspace, pre-registered before the run. 5 of 80 tasks were read as questions (6.3%, Wilson
 [2.7%, 13.8%]), which is **inconclusive** under the pre-registered 10% rule. Four of the five are
 Portuguese polite, advice or appraisal frames whose English twins pass.
+
+**v3 (2026-09-27).** The five fresh-set misses were fixed as classes: "será que" before a polite frame,
+a second-person conditional ("o que você mudaria", courtesy modals like "poderia" excluded),
+help deciding, `justifique`/`justify`, and appraisal words (`adequad`, `appropriate`, `risky`). The fresh
+set now reads 0 of 80 tasks as questions **in sample**, and `messages` and `heldout` read exactly as
+under v2 (`results/*_v3.txt`). Whether v3 generalizes needs another unseen set.
 
 ## What this cannot show
 

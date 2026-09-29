@@ -1,0 +1,9 @@
+slice  class       n precision  recall
+all    question   60     1.000   1.000
+all    task       60     1.000   1.000
+pt     question   30     1.000   1.000
+pt     task       30     1.000   1.000
+en     question   30     1.000   1.000
+en     task       30     1.000   1.000
+
+0 misread of 120:
