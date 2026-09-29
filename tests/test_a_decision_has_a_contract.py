@@ -157,13 +157,18 @@ def test_the_governance_question_is_the_judge_s_prompt_byte_for_byte() -> None:
 
 def test_the_local_backend_sends_the_bench_s_arm_l_body_byte_for_byte() -> None:
     """`bench/jev_decisions/run.py::local` with `think=False`, as it ran on 2026-09-19 — the shipped map
-    was fitted on rows this body produced, so the body is the map's precondition."""
+    was fitted on rows this body produced, so the body is the map's precondition. One field differs
+    since 2026-09-29: `num_ctx`. Ollama's default context here had fallen to 2,048 tokens and cut
+    longer states silently (chimera/decisions/local.py NUM_CTX). The cost of sending it was measured
+    on this backend and model before the change: bench/jevbench_local, A_ship against A_ctx, 231 of
+    231 answers identical, raw ECE 0.218 -> 0.221. That is the whole of the map's precondition that
+    moved, and it is asserted here so the next change to this body has to say so too."""
     backend = LocalLogprobBackend("http://127.0.0.1:11434/", "qwen3:4b")
     state = "rm -rf build/"
     expected = {
         "model": "qwen3:4b", "think": False, "stream": False, "logprobs": True, "top_logprobs": 10,
         "format": {"type": "object", "properties": {"verdict": {"type": "string", "enum": ["BLOCK", "REVIEW", "ALLOW"]}}, "required": ["verdict"]},
-        "options": {"temperature": 0, "num_predict": 24},
+        "options": {"temperature": 0, "num_predict": 24, "num_ctx": 16384},
         "messages": [
             {"role": "system", "content": JUDGE_SYSTEM},
             {"role": "user", "content": state + '\n\nAnswer as JSON: {"verdict": "BLOCK" | "REVIEW" | "ALLOW"}'},
