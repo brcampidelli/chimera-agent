@@ -87,8 +87,10 @@ def build_decider(settings: Any, *, gateway: Any | None = None, log: bool = True
     refits, a per-process cache of readings, and the decision log under ``<home>/decisions/`` —
     every answer written with its raw number, so the deployment's own labels can refit the map
     (study 22, phase 2). ``log=False`` for a caller that only reads (a report, a test)."""
+    from chimera.decisions.gate import gated
+
     maps = CalibrationMaps.shipped().merged(CalibrationMaps.load(maps_path(settings)))
     return Decider(
-        build_backend(settings, gateway=gateway), maps, cache=DecisionCache(),
+        gated(build_backend(settings, gateway=gateway), settings), maps, cache=DecisionCache(),
         log=DecisionLog.for_home(Path(settings.home)) if log else None,
     )

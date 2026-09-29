@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **Where it shows:** the desktop turn stream gets a `notice` frame, drawn as one warning line per code under the task list, in all ten languages. The terminal REPL prints the same warnings live.
   - **What it does not do:** change how any run ends. This is the channel only: the same run ends the same way with or without a listener, and a listener that raises is ignored. An agent written before the channel is never handed the keyword.
 - **Two new question-lint rules.** `duplicate_criteria` (error) refuses a question whose options share one criterion, since nothing in the rubric tells them apart. `negated_true` (warning) flags a yes/no question whose "true" criterion is itself a negation, the double negative that breaks P(X) + P(not X) = 1.
+- **A gate in front of every hosted decision ask: it waits while a budget is busy and refuses, naming the gate, when waiting will not help.**
+  - **What it does:** a sliding 60-second window of requests and tokens. At 80% of a configured
+    `CHIMERA_DECISION_RPM` or `CHIMERA_DECISION_TPM` the next ask waits for the oldest entry to age
+    out, up to 30 seconds, and past that it is refused instead of hanging a decision. A `429` with a
+    `Retry-After` holds the gate for that long. `CHIMERA_DECISION_DAILY_USD` is a ceiling over what
+    the decision log says today's hosted answers cost.
+  - **The refusal is designed:** a refused ask is a halt whose receipt (and log line) carries
+    `gate: "budget"` or `"rate"`, never an answer and never silence. What the REVIEW band does with
+    that is a separate change.
+  - **An unpriced answer is unknown, not free.** The hosted backend now reports `usd` as unknown when
+    the model has no price, where it used to report 0.0. With a daily ceiling set, an unknown makes
+    the day unknown and the gate refuses, for the reason `SpendBudget` gives: a ceiling that skips
+    what it cannot price shows green while the real spend climbs.
+  - **What it does not do:** it is off unless a limit is set, it never applies to the local backend
+    (which spends electricity, not dollars), and the ceiling is per home rather than per key (the log
+    does not record which key answered).
+  - Study 27, phase 3, second slice. `chimera/decisions/gate.py`.
 
 ### Changed
 

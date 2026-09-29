@@ -252,6 +252,10 @@ class Answer:
     """Where the backend read the answer, when not from the reply's text (see
     :attr:`Reading.answer_from`). On the receipt only when set, so whoever reads the log, or refits
     a map on it, can tell such a row apart; nothing filters it out on its own."""
+    gate: str = ""
+    """``"budget"`` or ``"rate"`` when the spend/rate gate (`chimera/decisions/gate.py`) refused the
+    ask, else empty. A halt with a gate on it is a different fact from a halt because the model was
+    down: the first says the meter was out, and whoever reads it decides what that means for them."""
 
     @property
     def answered(self) -> bool:
@@ -311,6 +315,8 @@ class Answer:
             out["log_id"] = self.log_id
         if self.answer_from:
             out["answer_from"] = self.answer_from
+        if self.gate:
+            out["gate"] = self.gate
         if self.halt:
             out["halt"] = self.halt
         return out
@@ -388,6 +394,7 @@ class Decider:
         digest = prompt_hash(self.backend.name, self.backend.model, self.backend.instrument(question))
         t0 = time.perf_counter()
         halt: str | None = None
+        gate = ""
         key: CacheKey = (self.backend.name, self.backend.model, digest, state)
         cached = self.cache.get(key) if self.cache is not None else None
         if cached is not None:
@@ -397,6 +404,10 @@ class Decider:
                 reading = self.backend.ask(state, question)
             except Exception as exc:  # noqa: BLE001 — a halt, recorded as one, never a verdict
                 halt = f"{type(exc).__name__}: {str(exc)[:200]}"
+                # A refusal by the spend/rate gate is a halt that says which meter was out.
+                from chimera.decisions.gate import GateRefused
+
+                gate = exc.reason if isinstance(exc, GateRefused) else ""
                 reading = Reading(choice=None, shares=None, p=None)
             else:
                 if self.cache is not None:
@@ -423,7 +434,7 @@ class Decider:
             calibrated=usable is not None and raw_p is not None, map=found.id if found is not None else None,
             mass=reading.mass, seconds=seconds, usd=reading.usd, halt=halt, raw=reading.raw,
             logprobs_came=reading.logprobs_came, resolved_model=reading.resolved_model, note=note,
-            cached=cached is not None, answer_from=reading.answer_from,
+            cached=cached is not None, answer_from=reading.answer_from, gate=gate,
         )
         if self.log is not None:
             # Every answer, halts included: a halt is a fact about availability the report counts.
