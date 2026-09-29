@@ -38,6 +38,16 @@ describe("the turn's warnings", () => {
     expect(screen.getByText("This turn has spent US$ 1.02 so far")).toBeInTheDocument();
   });
 
+  it("says how many steps a long turn has taken, and only the latest count", () => {
+    renderWithProviders(
+      <NoticeList
+        items={[{ code: "steps_extended", text: "", data: { steps: 24 } }]}
+      />,
+    );
+
+    expect(screen.getByText("24 steps done, and it is still working")).toBeInTheDocument();
+  });
+
   it("still tells a warning this build does not know, with the server's words", () => {
     renderWithProviders(<NoticeList items={[{ code: "from_the_future", text: "something new" }]} />);
 
@@ -58,6 +68,7 @@ describe("the turn's warnings", () => {
         "code.notice.toolLoopWarn",
         "code.notice.priceUnknown",
         "code.notice.spendWarn",
+        "code.notice.stepsExtended",
       ]) {
         expect(DICTS[lang.code][key], `${lang.code} is missing ${key}`).toBeTruthy();
       }

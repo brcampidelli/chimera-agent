@@ -31,7 +31,9 @@ export function NoticeList({ items }: { items?: NoticeEntry[] }) {
             ? t("code.notice.priceUnknown", { model: String(n.data?.model ?? "") })
             : n.code === "spend_warn"
               ? t("code.notice.spendWarn", { usd: Number(n.data?.usd ?? 0).toFixed(2) })
-              : n.text;
+              : n.code === "steps_extended"
+                ? t("code.notice.stepsExtended", { steps: String(n.data?.steps ?? "") })
+                : n.text;
   return (
     <ul className="space-y-0.5" role="status">
       {items.map((n) => (

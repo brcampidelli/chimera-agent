@@ -1323,6 +1323,9 @@ def register_code_api(
                 # A person is waiting on this turn: warn and ask for a different approach before the
                 # breaker cuts a run, and keep the cut as a net only.
                 loop_correction=True,
+                # No ceiling on steps: `max_steps` is a window, and the loop goes on until the run is done,
+                # cancelled, stuck, or over a ceiling the person typed.
+                auto_continue=True,
                 project_root=ws,
                 # Read per turn, so editing the identity applies to the next question rather than
                 # to the next launch.

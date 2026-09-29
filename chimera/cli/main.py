@@ -1165,6 +1165,7 @@ def agent(
                 # before the breaker cuts it (see AgentConfig.loop_correction).
                 warn_usd=DEFAULT_SPEND_WARN_USD,
                 loop_correction=True,
+                auto_continue=True,
             ),
         )
         result = runner.run(task)
@@ -1955,6 +1956,7 @@ def chat(
             # before the breaker cuts it (see AgentConfig.loop_correction).
             warn_usd=DEFAULT_SPEND_WARN_USD,
             loop_correction=True,
+            auto_continue=True,
         ),
     )
     mem = None if no_memory else _memory_manager()
@@ -2189,6 +2191,7 @@ def assist(
             # before the breaker cuts it (see AgentConfig.loop_correction).
             warn_usd=DEFAULT_SPEND_WARN_USD,
             loop_correction=True,
+            auto_continue=True,
         ),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
@@ -2508,6 +2511,7 @@ def tui(
             # before the breaker cuts it (see AgentConfig.loop_correction).
             warn_usd=DEFAULT_SPEND_WARN_USD,
             loop_correction=True,
+            auto_continue=True,
         ),
     )
     mem = None if no_memory else _memory_manager()

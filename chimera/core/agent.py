@@ -304,6 +304,13 @@ class AgentConfig:
 
     model: str | None = None
     max_steps: int = 8
+    #: Keep going when a window of `max_steps` steps is used up, with no total ceiling. Off it is the
+    #: loop every bench was measured with: `max_steps` is a wall and the run closes on it. On,
+    #: `max_steps` is the size of a window: at its end the run says so (`steps_extended`) and takes
+    #: another one, and only the loop breaker, a cancel, a spend ceiling the person set, or a full
+    #: context ends it. A surface where a person is waiting turns this on: a long task stopping at
+    #: an arbitrary number of steps and asking to be told to "continue" is the agent giving up.
+    auto_continue: bool = False
     temperature: float = field(default_factory=_default_temperature)
     #: ``False`` asks a reasoning model not to think before answering (the gateway says where
     #: that reaches the provider); ``None`` leaves the model as it is. Passed to the backend only
@@ -1049,8 +1056,24 @@ class Agent:
         #: the ceiling" and "start a new conversation" are opposite advice.
         contexto_travado: str | None = None
 
-        for step in range(1, self.config.max_steps + 1):
-            if self.config.max_steps > 4 and step == self.config.max_steps - 2:
+        step = 0
+        window_end = self.config.max_steps
+        while True:
+            step += 1
+            if step > window_end:
+                if not self.config.auto_continue:
+                    step -= 1
+                    break
+                window_end += self.config.max_steps
+                _notice(
+                    on_notice, "steps_extended",
+                    f"{step - 1} steps done, and it is still working", steps=step - 1,
+                )
+            if (
+                not self.config.auto_continue
+                and self.config.max_steps > 4
+                and step == window_end - 2
+            ):
                 _notice(on_notice, "steps_low", "2 steps left before this turn stops", steps_left=2)
             # Cooperative cancel, checked once per step. A model call in flight cannot be
             # interrupted, so a step boundary is the finest grain available — and it is much finer

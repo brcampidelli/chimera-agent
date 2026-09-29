@@ -38,6 +38,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **What did not change:** the library default. `AgentConfig.loop_correction` is off, so every
     bench keeps the breaker it was measured with. The same commit turns the US$1 spend warning on
     for the terminal surfaces.
+- **The step limit is a window, not a wall, where a person is waiting.**
+  - **Before:** a turn stopped at its step limit and closed with a partial answer; the desktop had an
+    opt-in "continue" toggle that sent the word "continue" up to three times, and no terminal
+    surface had anything.
+  - **Now** (the desktop and MCP coding route, `chimera chat`, `assist`, `tui` and `agent`):
+    `AgentConfig.auto_continue` makes `max_steps` the size of a window. At its end the run says so
+    (`steps_extended`, with the step count) and takes another one, with no total ceiling. What ends
+    the run is the work being done, a cancel, the loop breaker's net, a spend ceiling the person
+    typed, or a full context. It no longer announces "2 steps left" when it is going on anyway.
+  - **What did not change:** the library default. `auto_continue` is off, so `max_steps` is a wall
+    for every bench, and the desktop's own toggle still exists and now has nothing left to do.
 
 ### Fixed
 
