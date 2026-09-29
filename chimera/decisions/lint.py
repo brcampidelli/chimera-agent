@@ -24,6 +24,11 @@ tokenizer- or context-dependent and need a reader.
   then, so the question silently stops producing numbers.
 * **criteria_key** (error) — a criterion for an option the question does not have is rubric the
   model reads and no answer can pick.
+* **duplicate_criteria** (error) — two options with the same criterion (case, spacing and a final
+  period ignored): the rubric gives nothing to separate them, so the pick is noise. Study 27, phase 0.
+* **negated_true** (warn, Noul) — a ``true`` criterion that is itself a negation ("does not
+  mention…"): yes then means "not X", the double negative jev.nvim measured breaking
+  noul(X) + noul(not X) = 1. A warning because an error would refuse questions in use. Study 27.
 """
 
 from __future__ import annotations
@@ -42,6 +47,9 @@ POLAR_LABELS = frozenset({
 })
 _COMPOUND = re.compile(r"\b(?:and|or|e|ou)\b", re.IGNORECASE)
 _NEGATED = re.compile(r"\b(?:not|never|no|n't|não|nao|nunca)\b|n't\b", re.IGNORECASE)
+_NEGATED_START = re.compile(
+    r"^(?:does not|do not|doesn't|don't|is not|isn't|not|no|never|não|nao|nunca)\b", re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -66,6 +74,13 @@ def lint(question: Question) -> list[Finding]:
             found.append(Finding("error", "compound", f"{question.key}: {asked!r} joins two conditions — ask two Nouls"))
         if _NEGATED.search(asked):
             found.append(Finding("warn", "negated", f"{question.key}: {asked!r} is phrased in the negative"))
+        true_text = (question.criteria.get("true") or "").strip()
+        if _NEGATED_START.match(true_text):
+            found.append(Finding(
+                "warn", "negated_true",
+                f"{question.key}: its 'true' criterion {true_text!r} is a negation — yes would mean "
+                "'not X'; phrase the criterion affirmatively",
+            ))
     choice: Choice = as_choice(question)
     if not isinstance(question, Noul):
         polar = [o for o in choice.options if o.strip().casefold() in POLAR_LABELS]
@@ -95,6 +110,19 @@ def lint(question: Question) -> list[Finding]:
     stray = [k for k in choice.criteria if k not in choice.options]
     if stray:
         found.append(Finding("error", "criteria_key", f"{choice.key}: criteria for options it does not have: {stray}"))
+    seen_text: dict[str, str] = {}
+    for option in choice.options:
+        text = " ".join((choice.criteria.get(option) or "").split()).casefold().rstrip(".")
+        if not text:
+            continue
+        if text in seen_text:
+            found.append(Finding(
+                "error", "duplicate_criteria",
+                f"{choice.key}: {seen_text[text]!r} and {option!r} share one criterion — nothing in "
+                "the rubric tells them apart",
+            ))
+        else:
+            seen_text[text] = option
     return sorted(found, key=lambda f: f.severity != "error")
 
 

@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Added
+
+- **Two new question-lint rules.** `duplicate_criteria` (error) refuses a question whose options share one criterion, since nothing in the rubric tells them apart. `negated_true` (warning) flags a yes/no question whose "true" criterion is itself a negation, the double negative that breaks P(X) + P(not X) = 1.
+
 ### Changed
 
 - **Compaction on the default model now starts at the context it was measured to read.**
