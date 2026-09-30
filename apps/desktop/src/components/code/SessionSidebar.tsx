@@ -23,6 +23,7 @@ import {
   registerCodeProject,
   type CodeSessionMeta,
 } from "@/lib/api";
+import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
@@ -204,6 +205,7 @@ export function SessionSidebar({
         >
           <FolderPlus className="h-4 w-4" />
         </Button>
+        <HideRegionButton side="left" />
       </div>
       {adding ? (
         <form

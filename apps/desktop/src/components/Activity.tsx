@@ -3,6 +3,7 @@ import { Check, X, Wrench, Cpu, Brain, CircleDollarSign } from "lucide-react";
 import { Fusion } from "@/components/Fusion";
 import { JobsPanel } from "@/components/JobsPanel";
 import { MachinePanel } from "@/components/MachinePanel";
+import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useAgent } from "@/lib/agent-context";
@@ -47,6 +48,8 @@ export function Activity() {
           )}
         />
         <span className="text-sm font-medium">{t(`activity.${status}`)}</span>
+        {/* Hiding this panel hides nothing about the agent: the status bar keeps its state and Stop. */}
+        <HideRegionButton side="right" className="ml-auto" />
       </div>
 
       <Section title={t("activity.tools")}>

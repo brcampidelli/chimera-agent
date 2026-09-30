@@ -36,10 +36,12 @@ import {
   type RoleOverride,
 } from "@/components/code/RolesBar";
 import { SessionSidebar } from "@/components/code/SessionSidebar";
+import { EdgeTab, useRegionEnter } from "@/components/shell/RegionToggle";
 import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
+import { useLayout } from "@/lib/layout/context";
 import { cn } from "@/lib/utils";
 import { shellAllowed, setShellAllowed } from "@/lib/project-shell";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
@@ -309,6 +311,11 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
 
 export function Code() {
   const t = useT();
+  // The session list is the left region (dynamic screen, phase 1). The parent owns its enter
+  // animation because it stays mounted while the list comes and goes.
+  const { layout } = useLayout();
+  const showSessions = layout.regions.left.visible;
+  const sessionsEnter = useRegionEnter(showSessions, "left");
   const qc = useQueryClient();
   // Lazy initialiser, not `useState(readWorkspace())`: the latter reads storage on every render.
   const [workspace, setWorkspace] = useState(readWorkspace);
@@ -527,6 +534,8 @@ export function Code() {
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+        {showSessions ? (
+        <div className={cn("flex min-h-0 shrink-0", sessionsEnter.className)} onAnimationEnd={sessionsEnter.onAnimationEnd}>
         <SessionSidebar
           workspace={workspace}
           activeSession={sessionId}
@@ -547,6 +556,12 @@ export function Code() {
           }}
           onProject={switchProject}
         />
+        </div>
+        ) : (
+          // Hidden, the list leaves a tab on the edge it was on. A running turn stays findable from
+          // the status bar and, the moment the list is back, by its dot.
+          <EdgeTab side="left" />
+        )}
         {/* The conversation IS the screen. It used to be one of five panels in a 384px column, and
             the arithmetic did not work: the panels that could not shrink took every pixel and this
             was laid out at zero height. Git and the cost table now live on Work, where reviewing

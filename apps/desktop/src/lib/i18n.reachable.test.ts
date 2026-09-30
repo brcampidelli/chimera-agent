@@ -46,6 +46,10 @@ const DYNAMIC = [
   // what it lists from the layout model's own ids (`lib/layout/model.ts`), so the names cannot drift.
   "layout.panel.",
   "layout.region.",
+  // `` t(shown ? `layout.hide.${side}` : `layout.show.${side}`) `` — the palette words each region's
+  // command for what it will do now (`App.tsx`).
+  "layout.hide.",
+  "layout.show.",
   // `` t(`onboarding.local.runtime.${o.runtime}`) `` — the first-run screen names the local
   // runtime a found model belongs to, from the token `/api/models/local` sends (`ollama`,
   // `lm_studio`), so the client never keeps its own list of runtimes.

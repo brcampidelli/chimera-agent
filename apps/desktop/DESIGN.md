@@ -226,6 +226,12 @@ tray (`shell/HiddenTray.tsx`) lists it with "Show". It renders nothing while not
 same rule `PendingApprovals` follows about an indicator at zero, so "Restore default layout" lives
 in the command palette, where it is always reachable.
 
+**Phase 1: side regions.** The rail, the conversation list and the right panel hide from a button in
+their own header, from `⌘B` / `⌘⌥B` and from the palette. A hidden region leaves a tab on its edge
+(`shell/RegionToggle.tsx`), and hiding moves focus onto that tab. A region that comes back slides in
+from its edge at `duration-3`, only on coming back; its parent owns the animation, because the parent
+stays mounted and can tell "shown again" from "the screen just opened".
+
 **Dependencies, approved for later phases.** `react-resizable-panels` (phase 2: resizing with
 keyboard and ARIA) and `@dnd-kit` (phase 4: dragging between zones by keyboard, with announcements)
 join the four Radix packages, for the reason given above: each buys something harder than a hundred
@@ -269,6 +275,7 @@ question a person actually has, or a feature you want them to notice.
 | `⌘1`–`⌘5` | rail positions |
 | `⌘N` | new chat |
 | `⌘,` | settings |
+| `⌘B` / `⌘⌥B` | hide or show the left sidebar / the right panel (by the physical B key) |
 
 The palette is what makes a five-icon rail cost nothing in reach: the long tail lives there instead
 of on screen.

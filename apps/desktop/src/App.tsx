@@ -188,8 +188,13 @@ export default function App() {
   // carries — and the reason collapsing the rail cost nothing in reach.
   // And the layout's own commands. "Restore the default layout" is always here, even with nothing
   // hidden: the status bar shows nothing at zero, so this is where the way back lives meanwhile.
-  const { dispatch: layoutDispatch, hidden } = useLayout();
+  const { dispatch: layoutDispatch, hidden, layout } = useLayout();
   const anyHidden = hidden.length > 0;
+  const shown = {
+    left: layout.regions.left.visible,
+    right: layout.regions.right.visible,
+    rail: layout.regions.rail.visible,
+  };
   const commands: Command[] = useMemo(() => {
     const views: View[] = ["code", "edit", "work", "knowledge", "automation", "settings"];
     const go = views.map((v) => ({
@@ -198,7 +203,15 @@ export default function App() {
       group: t("palette.group.go"),
       run: () => navigate(v),
     }));
-    const layout: Command[] = [
+    // One command per side region, worded for what it will do now: "Hide…" while it is shown.
+    const toggles: Command[] = (["left", "right", "rail"] as const).map((side) => ({
+      id: `layout-toggle-${side}`,
+      label: t(shown[side] ? `layout.hide.${side}` : `layout.show.${side}`),
+      group: t("palette.group.layout"),
+      run: () => void layoutDispatch({ type: "set-region", region: side, visible: !shown[side] }),
+    }));
+    const layoutCommands: Command[] = [
+      ...toggles,
       ...(anyHidden
         ? [{ id: "layout-show-all", label: t("layout.hidden.showAll"), group: t("palette.group.layout"),
              run: () => void layoutDispatch({ type: "show-all" }) }]
@@ -206,8 +219,8 @@ export default function App() {
       { id: "layout-reset", label: t("layout.reset"), group: t("palette.group.layout"),
         run: () => void layoutDispatch({ type: "reset" }) },
     ];
-    return [...go, ...layout];
-  }, [t, navigate, layoutDispatch, anyHidden]);
+    return [...go, ...layoutCommands];
+  }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),
@@ -216,6 +229,8 @@ export default function App() {
     // where someone looks for it. A global shortcut that jumps you to a screen AND clears it is two
     // actions wearing one key.
     onNewChat: () => navigate("code"),
+    onToggleRegion: (side) =>
+      void layoutDispatch({ type: "set-region", region: side, visible: !shown[side] }),
     onNavigate: (i) => {
       // The same order as the rail, which is the only reason a number key is guessable at all.
       const order: View[] = ["code", "edit", "work", "knowledge", "automation"];

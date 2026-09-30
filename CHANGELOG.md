@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **The dynamic screen, phase 1: hide and show the left sidebar, the right panel and the screen rail.**
+  - **How:** a button in the conversation list's header and in the right panel's header, ⌘B / Ctrl+B for the
+    left and ⌘⌥B / Ctrl+Alt+B for the right (read by the physical key, so AltGr on a Brazilian keyboard still
+    works), and a command per region in the command palette, worded for what it will do now.
+  - **The way back is where the thing went:** a hidden region leaves a narrow tab on its edge, and hiding hands
+    focus to that tab so a keyboard user is not dropped on the page. The hidden-panels tray lists it too.
+  - **The agent's state does not go with the right panel:** the status bar keeps the state and Stop.
+  - **Motion:** a region that comes back slides in from its own edge (`duration-3`, transform and opacity only),
+    and only when it comes back, not every time a screen opens. Reduced motion collapses it to 1 ms.
+  - The choice is kept across launches, in the layout from phase 0. Six translation keys in all ten languages.
 - **The dynamic screen, phase 0: one layout model, a way back to anything hidden, and "Restore default layout".**
   - **What it is:** the first of eight phases of the plan the owner approved on 2026-09-29, a screen where
     anything can be minimised, maximised, closed, dragged, resized and brought back. This phase is the model

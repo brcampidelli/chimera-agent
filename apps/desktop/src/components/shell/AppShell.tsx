@@ -1,8 +1,10 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
 import { AgentStatusBar } from "@/components/shell/AgentStatusBar";
+import { EdgeTab, useRegionEnter } from "@/components/shell/RegionToggle";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
+import { useLayout } from "@/lib/layout/context";
 import { cn } from "@/lib/utils";
 
 /**
@@ -40,6 +42,11 @@ export function AppShell({
   onOpenUsage?: () => void;
 }) {
   const t = useT();
+  const { layout } = useLayout();
+  const showRail = layout.regions.rail.visible;
+  // The inspector is the right region wherever a screen has one; a screen without one shows no tab.
+  const showInspector = layout.regions.right.visible;
+  const inspectorEnter = useRegionEnter(showInspector, "right");
   const mainRef = useRef<HTMLElement>(null);
   const first = useRef(true);
 
@@ -76,7 +83,9 @@ export function AppShell({
       </a>
 
       <div className="flex min-h-0 flex-1">
-        {rail}
+        {/* Hidden, the rail leaves a tab on the edge. Every destination stays reachable meanwhile:
+            ⌘1–⌘5 and the command palette do not go through the rail. */}
+        {showRail ? rail : <EdgeTab side="rail" />}
 
         {context && (
           <div {...(ignite && { "data-ignite": "context" })} className="flex shrink-0">
@@ -101,11 +110,19 @@ export function AppShell({
           </div>
         </main>
 
-        {inspector && (
-          <div {...(ignite && { "data-ignite": "inspector" })} className="flex shrink-0">
-            {inspector}
-          </div>
-        )}
+        {inspector &&
+          (showInspector ? (
+            <div
+              {...(ignite && { "data-ignite": "inspector" })}
+              className={cn("flex shrink-0", inspectorEnter.className)}
+              onAnimationEnd={inspectorEnter.onAnimationEnd}
+            >
+              {inspector}
+            </div>
+          ) : (
+            // The agent's state does not go with it: the status bar below keeps showing it.
+            <EdgeTab side="right" />
+          ))}
       </div>
 
       {/* Announces the screen a keyboard or screen-reader user just landed on. Separate from the
