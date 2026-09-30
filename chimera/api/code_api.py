@@ -1770,9 +1770,12 @@ def register_code_api(
             )
             # Findable from outside until it ends. `live_since` is the sequence BEFORE the opening
             # frame, so asking the live stream for what came after it brings the turn back whole.
+            # The workspace is the one the conversation RECORDS, not the resolved folder: an empty
+            # request is the app's own project, and filing the running row under the resolved path
+            # moved it to another group in the sidebar the moment the turn ended (seen live).
             live_turns.start(
-                turn_id=turn_id, session_id=session_id, workspace=str(ws), message=req.message,
-                live_since=int(opening["session_seq"]) - 1,
+                turn_id=turn_id, session_id=session_id, workspace=session.workspace,
+                message=req.message, live_since=int(opening["session_seq"]) - 1,
             )
 
         # What the panel draws: the viewport as base64 JPEG, the page's address and title, and

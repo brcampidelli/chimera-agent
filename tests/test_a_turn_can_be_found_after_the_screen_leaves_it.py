@@ -135,6 +135,9 @@ def test_a_conversation_whose_first_turn_is_running_is_in_the_list_though_its_fi
         after = run.client.get("/api/code/sessions").json()
         assert [r["id"] for r in after] == [row["id"]] and not after[0]["running"]
         assert after[0]["turns"] == 1
+        # Filed under the same project before and after: seen live, the running row sat under the
+        # resolved folder and jumped to the default project the moment the turn ended.
+        assert after[0]["workspace"] == row["workspace"]
 
 
 def test_the_session_read_names_the_turn_to_follow_instead_of_looking_idle(
@@ -148,11 +151,11 @@ def test_the_session_read_names_the_turn_to_follow_instead_of_looking_idle(
         assert read["exchanges"] == []  # the file has nothing yet: this is the gap being closed
         assert read["running_turn"]["turn_id"] == turn["turn_id"]
         assert read["running_turn"]["transcript_saved"] is False
-        assert read["workspace"] == turn["workspace"] != ""
         run.finish()
 
         done = run.client.get(f"/api/code/sessions/{turn['session_id']}").json()
         assert done["running_turn"] is None and len(done["exchanges"]) == 1
+        assert done["workspace"] == read["workspace"]  # the same project while running and after
 
 
 def test_a_stored_conversation_nobody_is_working_in_says_nothing_is_running(
