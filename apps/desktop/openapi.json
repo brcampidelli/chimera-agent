@@ -1836,6 +1836,11 @@
             "title": "Id",
             "type": "string"
           },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1875,6 +1880,16 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "running_turn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunningTurnOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "workspace": {
             "title": "Workspace",
@@ -8797,6 +8812,50 @@
         "title": "RunRequest",
         "type": "object"
       },
+      "RunningTurnOut": {
+        "description": "A coding turn that is running now, as much of it as a screen needs to follow it.\n\nA conversation is stored when the agent finishes, so while a turn works the file has nothing of\nit. This is the pointer to it: which turn, what it was asked, and where on the conversation's\nlive stream its opening frame is, so a screen that comes back can replay the turn from the start.",
+        "properties": {
+          "live_since": {
+            "title": "Live Since",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "transcript_saved": {
+            "title": "Transcript Saved",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "session_id",
+          "workspace",
+          "message",
+          "started_at",
+          "live_since",
+          "transcript_saved"
+        ],
+        "title": "RunningTurnOut",
+        "type": "object"
+      },
       "SandboxCfgOut": {
         "properties": {
           "image": {
@@ -11143,7 +11202,7 @@
     },
     "/api/code/sessions": {
       "get": {
-        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.",
+        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.",
         "operationId": "list_code_sessions_api_code_sessions_get",
         "responses": {
           "200": {
@@ -11208,7 +11267,7 @@
         "summary": "Delete Code Session"
       },
       "get": {
-        "description": "A stored conversation as the exchanges a person had, ready to render.\n\nResuming used to show an empty screen while the agent silently carried the whole history \u2014\nthe worst of both, because the next question worked for reasons the user could not see.\n\nAn unknown id returns an empty conversation rather than a 404: the store treats a missing\nfile as the ordinary first-turn case, and a screen that errors on a session someone just\ndeleted in another window would be reporting a race as a fault.",
+        "description": "A stored conversation as the exchanges a person had, ready to render.\n\nResuming used to show an empty screen while the agent silently carried the whole history \u2014\nthe worst of both, because the next question worked for reasons the user could not see.\n\nAn unknown id returns an empty conversation rather than a 404: the store treats a missing\nfile as the ordinary first-turn case, and a screen that errors on a session someone just\ndeleted in another window would be reporting a race as a fault.\n\nA turn running in this conversation is named in ``running_turn``, and the file is read\nbetween two looks at it (`LiveTurns.read_consistently`): the agent saves the transcript\nwhen it finishes and the turn goes on verifying after that, so the file can already hold the\nexchange of a turn that is still running, and a screen has to know which of the two it got.",
         "operationId": "get_code_session_api_code_sessions__session_id__get",
         "parameters": [
           {
@@ -11733,6 +11792,29 @@
           }
         },
         "summary": "Code Turn"
+      }
+    },
+    "/api/code/turns/running": {
+      "get": {
+        "description": "The coding turns running now, oldest first.\n\nA turn keeps running when the screen that started it goes away, and until this existed\nnothing could say so: the conversation is stored when the agent finishes, so a session left\nmid-turn read as empty and was not in the list. Empty here means nothing is running, not\nthat the question failed; an error is an error.",
+        "operationId": "code_turns_running_api_code_turns_running_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunningTurnOut"
+                  },
+                  "title": "Response Code Turns Running Api Code Turns Running Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Code Turns Running"
       }
     },
     "/api/code/turns/{turn_id}": {

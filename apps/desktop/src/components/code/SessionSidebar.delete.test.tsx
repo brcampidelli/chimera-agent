@@ -12,6 +12,8 @@ vi.mock("@/lib/api", () => ({
   forkCodeSession: vi.fn(),
   getCodeSessionRaw: vi.fn(),
   listCodeSessions: vi.fn(),
+  // Asked by the sidebar every few seconds since it marks the conversations that are working.
+  listRunningTurns: vi.fn(async () => []),
 }));
 
 /**

@@ -656,6 +656,22 @@ export function Conversation({
   // The tools of the turn in flight, in a ref because `publish` is not a React state updater and
   // reading the previous value from a closure would drop every call after the first.
   const toolsRef = useRef<{ name: string; ok: boolean }[]>([]);
+  // The turn this screen found already running when it opened the conversation, and is watching
+  // through the conversation's live stream rather than a stream of its own. A ref beside the state
+  // because `applyLive` is a memoised callback and must read the current id, not the one it closed over.
+  const [following, setFollowing] = useState<string | null>(null);
+  const followingRef = useRef<string | null>(null);
+  // How the last followed turn ended: the turn's own closing frame, or the person pressing stop.
+  const followEndedBy = useRef<"frame" | "person">("person");
+  /** The followed turn ended, by finishing or by failing: the composer comes back. Only for the turn
+   *  that is being followed, so another turn's closing frame on the same stream leaves it alone. */
+  const endFollowing = useCallback((turnId: string) => {
+    if (followingRef.current !== turnId) return;
+    followEndedBy.current = "frame";
+    followingRef.current = null;
+    setFollowing(null);
+    setBusy(false);
+  }, []);
 
   // Load a resumed conversation's turns. Without this the agent silently carried the whole history
   // while the screen showed nothing — the worst combination, because the next question then worked
@@ -672,20 +688,31 @@ export function Conversation({
         // wiped. `done: null` here used to be the honest thing to write — nothing stored one — and
         // it stopped being honest the moment the server began storing them: it threw away the best
         // thing this app produces on every reopened conversation.
-        setExchanges(
-          session.exchanges.map((e) => ({
-            ...e,
-            // A guest's turn names its author on the receipt; the owner's own turns carry none.
-            author: e.done?.author || undefined,
-            done: (e.done ?? null) as Exchange["done"],
-            verified: (e.verified ?? undefined) as Exchange["verified"],
-            // Empty on a replay, for the reason `CodeExchangeOut` already gives about `edits`: the
-            // list was streamed and never entered the message list, so a reopened conversation can
-            // show the tool call that recorded it but not the list itself. An absent list reads as
-            // "none was kept", which is true, rather than as a claim about the work.
-            todos: [],
-          })),
-        );
+        const stored = session.exchanges.map((e) => ({
+          ...e,
+          // A guest's turn names its author on the receipt; the owner's own turns carry none.
+          author: e.done?.author || undefined,
+          done: (e.done ?? null) as Exchange["done"],
+          verified: (e.verified ?? undefined) as Exchange["verified"],
+          // Empty on a replay, for the reason `CodeExchangeOut` already gives about `edits`: the
+          // list was streamed and never entered the message list, so a reopened conversation can
+          // show the tool call that recorded it but not the list itself. An absent list reads as
+          // "none was kept", which is true, rather than as a claim about the work.
+          todos: [],
+        }));
+        // A turn is still running here. The stored file holds nothing of it until the agent
+        // finishes, so what was read is the conversation BEFORE it — except in the stretch after
+        // the agent has finished and the turn is still verifying, when the file already holds the
+        // exchange and the replay below would draw it a second time. The server says which.
+        const running = session.running_turn ?? null;
+        setExchanges(running?.transcript_saved ? stored.slice(0, -1) : stored);
+        if (running) {
+          // Everything after the sequence before its opening frame: the turn comes back whole.
+          liveSeq.current = running.live_since;
+          followingRef.current = running.turn_id;
+          setFollowing(running.turn_id);
+          setBusy(true);
+        }
         setReplayed(true);
       })
       .catch(() => {
@@ -804,20 +831,24 @@ export function Conversation({
       case "done": {
         const done = data as unknown as CodeTurnDone;
         patch((e) => ({ ...e, answer: done.answer || e.answer, done }));
+        endFollowing(id);
         break;
       }
       case "error":
         patch((e) => ({ ...e, failed: true, error: String(data.message ?? "") }));
+        endFollowing(id);
         break;
       default:
         break;
     }
-  }, [applyWork]);
+  }, [applyWork, endFollowing]);
 
   // The live stream is held open while someone could be on the other end — or while a work
   // could report: its state changes travel on the same stream, and a card it raises lands here.
+  // And while this screen is following a turn it found running, which is the same stream read by
+  // the one person it is for.
   useEffect(() => {
-    if (!sessionId || (shareCount === 0 && !worksActive)) return;
+    if (!sessionId || (shareCount === 0 && !worksActive && !following)) return;
     const controller = new AbortController();
     let alive = true;
     void (async () => {
@@ -833,7 +864,7 @@ export function Conversation({
       alive = false;
       controller.abort();
     };
-  }, [sessionId, shareCount, worksActive, applyLive]);
+  }, [sessionId, shareCount, worksActive, following, applyLive]);
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
@@ -891,6 +922,19 @@ export function Conversation({
   // any screen. There is a test that exists precisely to say the agent must stay visible when you
   // navigate away mid-turn.
   const { publish } = useAgent();
+  // The bar shows a turn this screen is only watching the way it shows one it started: working while
+  // it runs, done when it ends. Written here rather than in `applyLive`, which is built before
+  // `publish` exists, and keyed on the transition so a followed turn is announced once, not per frame.
+  const wasFollowing = useRef(false);
+  useEffect(() => {
+    if (following) {
+      publish({ status: "thinking", tools: [], report: null, busy: true, stop: abandon });
+    } else if (wasFollowing.current && followEndedBy.current === "frame") {
+      publish({ status: "done", busy: false, report: null });
+    }
+    wasFollowing.current = following !== null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [following]);
 
   /** Mutate the turn currently streaming — always the last one, which is the only one that moves. */
   const patchLast = useCallback((fn: (e: Exchange) => Exchange) => {
@@ -1280,6 +1324,11 @@ export function Conversation({
   function abandon() {
     abortRef.current?.abort();
     abortRef.current = null;
+    // A turn this screen was only watching: nothing of its own to abort, so stopping is to stop
+    // watching, with the same meaning it has for a turn it started. The turn goes on, on the server.
+    followEndedBy.current = "person";
+    followingRef.current = null;
+    setFollowing(null);
     // A stop the user pressed is a stop the user decided: whatever continuations were armed for
     // this task are cancelled with it, and the pending one is dropped rather than sent — otherwise
     // the button would stop the turn and the automation would immediately start another one.

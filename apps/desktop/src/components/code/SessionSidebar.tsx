@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Braces,
@@ -19,6 +19,7 @@ import {
   forkCodeSession,
   getCodeSessionRaw,
   listCodeSessions,
+  listRunningTurns,
   registerCodeProject,
   type CodeSessionMeta,
 } from "@/lib/api";
@@ -77,6 +78,26 @@ export function SessionSidebar({
   const t = useT();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
+  // Which conversations have a turn running, asked often because the answer is kept in memory on the
+  // server and is one small list. A turn keeps running when the screen that started it goes away, so
+  // this is the only way a person who moved to another conversation learns that one is still working.
+  const running = useQuery({
+    queryKey: ["code-turns-running"],
+    queryFn: listRunningTurns,
+    refetchInterval: 4000,
+  });
+  const runningIds = new Set((running.data ?? []).map((turn) => turn.session_id));
+  // When the set changes the list is stale: a task started in a new conversation has no file until
+  // the agent finishes, so it is not in the list yet, and one that ended has its final title and count.
+  const runningKey = [...runningIds].sort().join(",");
+  const lastRunningKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (running.data === undefined) return;
+    if (lastRunningKey.current !== null && lastRunningKey.current !== runningKey) {
+      void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+    }
+    lastRunningKey.current = runningKey;
+  }, [running.data, runningKey, qc]);
   // Server state since the list stopped being a property of this browser profile. `loadProjects`
   // carries the one-time migration of whatever this webview had stored, so a running install keeps
   // its projects instead of meeting an empty sidebar after an update.
@@ -313,6 +334,14 @@ export function SessionSidebar({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
+                    {runningIds.has(session.id) || session.running ? (
+                      <span
+                        role="status"
+                        aria-label={t("code.sessions.running")}
+                        title={t("code.sessions.running")}
+                        className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle"
+                      />
+                    ) : null}
                     {session.title || t("code.sessions.untitled")}
                   </button>
                   <button

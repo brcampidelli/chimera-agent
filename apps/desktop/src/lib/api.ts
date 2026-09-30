@@ -1650,7 +1650,28 @@ export interface CodeSessionMeta {
   workspace: string;
   turns: number;
   updated_at: number;
+  /** A turn of this conversation is running now. Absent from a server that predates the field. */
+  running?: boolean;
 }
+
+/** A coding turn that is running now, and where on the conversation's live stream it starts.
+ *
+ * The conversation is stored when the agent finishes, so while a turn works the file holds nothing
+ * of it: this is the pointer that lets a screen that left the conversation come back to it. */
+export interface RunningTurn {
+  turn_id: string;
+  session_id: string;
+  workspace: string;
+  message: string;
+  started_at: number;
+  /** Ask the conversation's live stream for frames after this and the turn comes back whole. */
+  live_since: number;
+  /** The stored conversation already holds this turn's exchange, so it must not be drawn twice. */
+  transcript_saved: boolean;
+}
+
+/** The coding turns running now, oldest first. Answered from memory, so it is cheap to ask often. */
+export const listRunningTurns = () => json<RunningTurn[]>("/api/code/turns/running");
 
 /** Past coding conversations, newest first, each carrying the project it belongs to.
  *
@@ -1704,6 +1725,9 @@ export const getCodeSession = (sessionId: string) =>
        *  says. */
       verified: Omit<CodeVerified, "revert_token"> | null;
     }[];
+    /** Set while a turn of this conversation is running: what to follow, instead of showing a
+     *  conversation that looks idle while it works. */
+    running_turn?: RunningTurn | null;
   }>(`/api/code/sessions/${encodeURIComponent(sessionId)}`);
 
 // --- sharing a conversation with a second person (item 3, 2026-09-17) -------------------------
