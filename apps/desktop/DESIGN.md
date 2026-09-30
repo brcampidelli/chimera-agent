@@ -199,6 +199,38 @@ The shell provides slots; a screen fills the ones it needs.
 A screen that opts out of the shell entirely is what made this app feel like a menu of features
 rather than one workspace. Opt out only with a reason.
 
+### Dynamic layout
+
+The owner approved, on 2026-09-29, a screen where anything can be minimised, maximised, closed,
+dragged, resized and brought back. It lands in phases; phase 0 is the model it all draws from:
+`lib/layout/model.ts` (one serialisable value and one pure `applyLayout`), `lib/layout/store.ts`
+(local storage, one key per screen, moving to the server in phase 6) and `lib/layout/context.tsx`.
+
+**Five things never disappear.** Each can shrink; none can go without a trace, because hiding it
+would leave the person not knowing what the agent is doing, or unable to stop it.
+
+| | May | What stays when it shrinks |
+|---|---|---|
+| Approval card | minimise | one line, and the approvals chip in the status bar; a new approval reopens it |
+| Stop | nothing | always in the composer and in the status bar |
+| Status bar | compact (a later phase) | the state and the way back to anything hidden |
+| Spend and limit warnings | minimise | a count on the turn |
+| A failed turn's error | minimise | the error line, without the detail |
+
+These are enforced in `applyLayout`, not in the buttons: a refused action returns the same object,
+and Stop and the status bar are not panels at all, so no action can reach them. Tested in
+`model.test.ts`, each rule sabotaged once and watched to fail.
+
+**Every hidden thing has a way back that needs no remembered shortcut.** The status bar's hidden
+tray (`shell/HiddenTray.tsx`) lists it with "Show". It renders nothing while nothing is hidden, the
+same rule `PendingApprovals` follows about an indicator at zero, so "Restore default layout" lives
+in the command palette, where it is always reachable.
+
+**Dependencies, approved for later phases.** `react-resizable-panels` (phase 2: resizing with
+keyboard and ARIA) and `@dnd-kit` (phase 4: dragging between zones by keyboard, with announcements)
+join the four Radix packages, for the reason given above: each buys something harder than a hundred
+lines, the accessible version of the thing. Neither is installed yet.
+
 ### Information architecture
 
 Five destinations, plus Settings pinned to the rail footer. Fifteen icons stopped being words and

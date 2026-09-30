@@ -42,6 +42,10 @@ const DYNAMIC = [
   // `` t(`jobs.state.${job.state}`) `` — the background-jobs panel names a job's state from the
   // token `/api/jobs` sends (`running`, `finished`, `cancelled`, `timed_out`, `lost`).
   "jobs.state.",
+  // `` t(`layout.region.${h.id}`) `` and `` t(`layout.panel.${h.id}`) `` — the hidden-panels tray names
+  // what it lists from the layout model's own ids (`lib/layout/model.ts`), so the names cannot drift.
+  "layout.panel.",
+  "layout.region.",
   // `` t(`onboarding.local.runtime.${o.runtime}`) `` — the first-run screen names the local
   // runtime a found model belongs to, from the token `/api/models/local` sends (`ollama`,
   // `lm_studio`), so the client never keeps its own list of runtimes.

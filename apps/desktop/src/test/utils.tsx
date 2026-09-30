@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n";
+import { LayoutProvider } from "@/lib/layout/context";
 import { RunSessionProvider } from "@/lib/run-session";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
@@ -29,7 +30,11 @@ export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptio
               screen turns a dozen unrelated test files red at once. Mirroring the app's providers
               here is what stops each of those files having to remember. */}
           <TooltipProvider>
-            <RunSessionProvider>{children}</RunSessionProvider>
+            {/* The layout (`main.tsx`): loud when absent, like the tooltip one — `useLayout` throws
+                outside it, so the status bar would break every suite that mounts it. */}
+            <LayoutProvider>
+              <RunSessionProvider>{children}</RunSessionProvider>
+            </LayoutProvider>
           </TooltipProvider>
         </I18nProvider>
       </QueryClientProvider>

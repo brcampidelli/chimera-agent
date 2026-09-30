@@ -1,6 +1,7 @@
 import { Square } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
+import { HiddenTray } from "@/components/shell/HiddenTray";
 import { PendingApprovals } from "@/components/shell/PendingApprovals";
 import { ServerBadge } from "@/components/ServerBadge";
 import { VersionBadge } from "@/components/VersionBadge";
@@ -114,6 +115,10 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
           agent is waiting on YOU, from whichever screen you happen to be on. Renders nothing at
           all while no question is parked — see PendingApprovals. */}
       <PendingApprovals />
+
+      {/* What the person hid from the screen, and the way back. Renders nothing while nothing is
+          hidden, for the reason PendingApprovals gives about an indicator at zero. */}
+      <HiddenTray />
 
       {(busy || run.running) && (
         <button

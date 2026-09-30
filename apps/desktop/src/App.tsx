@@ -20,6 +20,7 @@ import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { getDoctor } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useLayout } from "@/lib/layout/context";
 import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
@@ -185,15 +186,28 @@ export default function App() {
 
   // Every destination, plus every session by title. This is the long tail the rail no longer
   // carries — and the reason collapsing the rail cost nothing in reach.
+  // And the layout's own commands. "Restore the default layout" is always here, even with nothing
+  // hidden: the status bar shows nothing at zero, so this is where the way back lives meanwhile.
+  const { dispatch: layoutDispatch, hidden } = useLayout();
+  const anyHidden = hidden.length > 0;
   const commands: Command[] = useMemo(() => {
     const views: View[] = ["code", "edit", "work", "knowledge", "automation", "settings"];
-    return views.map((v) => ({
+    const go = views.map((v) => ({
       id: `go-${v}`,
       label: t(`nav.${v}`),
       group: t("palette.group.go"),
       run: () => navigate(v),
     }));
-  }, [t, navigate]);
+    const layout: Command[] = [
+      ...(anyHidden
+        ? [{ id: "layout-show-all", label: t("layout.hidden.showAll"), group: t("palette.group.layout"),
+             run: () => void layoutDispatch({ type: "show-all" }) }]
+        : []),
+      { id: "layout-reset", label: t("layout.reset"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "reset" }) },
+    ];
+    return [...go, ...layout];
+  }, [t, navigate, layoutDispatch, anyHidden]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),

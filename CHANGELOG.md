@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 ### Added
 
+- **The dynamic screen, phase 0: one layout model, a way back to anything hidden, and "Restore default layout".**
+  - **What it is:** the first of eight phases of the plan the owner approved on 2026-09-29, a screen where
+    anything can be minimised, maximised, closed, dragged, resized and brought back. This phase is the model
+    the others draw from, and changes nothing on screen by itself.
+  - **The model:** the Code screen's layout is one serialisable value (`lib/layout/model.ts`), changed only by
+    a pure `applyLayout(layout, action)`. That gives undo, "restore default" and tests that need no screen.
+    Closing keeps a panel's place, so reopening puts it back where it was. Focus mode remembers the layout it
+    replaced and returns to it exactly.
+  - **What never disappears:** the approval card, spend and limit warnings and a failed turn's error only
+    minimise; Stop and the status bar are not panels, so no action reaches them. The rules live in
+    `applyLayout`, not in the buttons, and a refused action returns the same object.
+  - **Stored locally** under `chimera.layout.v1.code`. A stored layout can never break the screen: anything
+    not recognised becomes the default, a panel a newer build adds takes its default place, and a storage
+    that throws costs the layout and nothing else.
+  - **Visible now:** a hidden-panels tray in the status bar that lists what is hidden with "Show", "Show all"
+    and "Restore default layout". It renders nothing while nothing is hidden, following the rule
+    `PendingApprovals` already set, so "Restore default layout" is also in the command palette.
+  - Twenty new translation keys, in all ten languages. `DESIGN.md` gains a "Dynamic layout" section.
 - **A credential in a decision's state no longer reaches a hosted backend or the decision log.**
   - **What was wrong:** nothing in `chimera/decisions/` used the redaction net. The decision log wrote
     the first 500 characters of the state raw, and both hosted backends sent the state whole. The

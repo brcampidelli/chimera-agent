@@ -5,6 +5,7 @@ import App from "@/App";
 import { I18nProvider } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider } from "@/components/ui/toast";
+import { LayoutProvider } from "@/lib/layout/context";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
 // After index.css: motion.css consumes the --dur-*/--ease-* tokens declared there, and its
@@ -36,7 +37,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             opens, moving along the rail shows the rest instantly instead of re-waiting. */}
         <TooltipProvider>
           <ToastProvider>
-            <App />
+            {/* The screen's layout (what is hidden, minimised, moved, how wide). Above App so the
+                command palette, which App builds, can restore it. */}
+            <LayoutProvider>
+              <App />
+            </LayoutProvider>
           </ToastProvider>
         </TooltipProvider>
       </I18nProvider>
