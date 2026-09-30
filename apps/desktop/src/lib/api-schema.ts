@@ -392,6 +392,11 @@ export interface paths {
          *     conversations are a flat pile you cannot file. Titles are the first thing the user asked,
          *     derived on read — never generated, so a row is never a paraphrase of the conversation it
          *     points at.
+         *
+         *     A conversation with a turn running is marked, and one whose first turn is still running is
+         *     listed although its file does not exist yet: the file is written when the agent finishes,
+         *     so without this a task started in a new conversation was invisible for exactly as long as it
+         *     took to do.
          */
         get: operations["list_code_sessions_api_code_sessions_get"];
         put?: never;
@@ -419,6 +424,11 @@ export interface paths {
          *     An unknown id returns an empty conversation rather than a 404: the store treats a missing
          *     file as the ordinary first-turn case, and a screen that errors on a session someone just
          *     deleted in another window would be reporting a race as a fault.
+         *
+         *     A turn running in this conversation is named in ``running_turn``, and the file is read
+         *     between two looks at it (`LiveTurns.read_consistently`): the agent saves the transcript
+         *     when it finishes and the turn goes on verifying after that, so the file can already hold the
+         *     exchange of a turn that is still running, and a screen has to know which of the two it got.
          */
         get: operations["get_code_session_api_code_sessions__session_id__get"];
         put?: never;
@@ -628,6 +638,31 @@ export interface paths {
         put?: never;
         /** Code Turn */
         post: operations["code_turn_api_code_turn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/turns/running": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Turns Running
+         * @description The coding turns running now, oldest first.
+         *
+         *     A turn keeps running when the screen that started it goes away, and until this existed
+         *     nothing could say so: the conversation is stored when the agent finishes, so a session left
+         *     mid-turn read as empty and was not in the list. Empty here means nothing is running, not
+         *     that the question failed; an error is an error.
+         */
+        get: operations["code_turns_running_api_code_turns_running_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4000,6 +4035,11 @@ export interface components {
         CodeSessionMetaOut: {
             /** Id */
             id: string;
+            /**
+             * Running
+             * @default false
+             */
+            running: boolean;
             /** Title */
             title: string;
             /** Turns */
@@ -4015,6 +4055,7 @@ export interface components {
             exchanges: components["schemas"]["CodeExchangeOut"][];
             /** Id */
             id: string;
+            running_turn?: components["schemas"]["RunningTurnOut"] | null;
             /** Workspace */
             workspace: string;
         };
@@ -7122,6 +7163,30 @@ export interface components {
             /** Write Region */
             write_region?: string[] | null;
         };
+        /**
+         * RunningTurnOut
+         * @description A coding turn that is running now, as much of it as a screen needs to follow it.
+         *
+         *     A conversation is stored when the agent finishes, so while a turn works the file has nothing of
+         *     it. This is the pointer to it: which turn, what it was asked, and where on the conversation's
+         *     live stream its opening frame is, so a screen that comes back can replay the turn from the start.
+         */
+        RunningTurnOut: {
+            /** Live Since */
+            live_since: number;
+            /** Message */
+            message: string;
+            /** Session Id */
+            session_id: string;
+            /** Started At */
+            started_at: number;
+            /** Transcript Saved */
+            transcript_saved: boolean;
+            /** Turn Id */
+            turn_id: string;
+            /** Workspace */
+            workspace: string;
+        };
         /** SandboxCfgOut */
         SandboxCfgOut: {
             /** Image */
@@ -8949,6 +9014,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_turns_running_api_code_turns_running_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunningTurnOut"][];
                 };
             };
         };

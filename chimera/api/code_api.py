@@ -70,6 +70,7 @@ from chimera.api.schemas import (
     CodeTurnFramesOut,
     DeletedCountOut,
     DictationOut,
+    RunningTurnOut,
     TranscriberWarmOut,
     TranscriptOut,
     VisionOut,
@@ -1263,6 +1264,11 @@ def register_code_api(
 
     shares = ShareStore(settings.home / SHARES_FILE)
     bus = SessionBus()
+    # The turns running right now, so a screen that left a conversation mid-turn can find its way
+    # back: the stored file holds nothing of a turn until the agent finishes.
+    from chimera.api.live_turns import LiveTurns
+
+    live_turns = LiveTurns()
     # The index of finished turns (`chimera.memory.history`), one per home, shared with the
     # `recall_history` tool every registry mounts. The session file is what a conversation is
     # RESUMED from and trims itself accordingly; this is what a person's question about a turn
@@ -1758,9 +1764,18 @@ def register_code_api(
         # viewer who did not send this message needs both to draw the row the answer will land
         # under; the session file only learns the author when the receipt is written at the end.
         if background is None:
-            bus.publish(
+            opening = bus.publish(
                 session_id, "turn_started", {"message": req.message, "author": author},
                 turn_id=turn_id, author=author,
+            )
+            # Findable from outside until it ends. `live_since` is the sequence BEFORE the opening
+            # frame, so asking the live stream for what came after it brings the turn back whole.
+            # The workspace is the one the conversation RECORDS, not the resolved folder: an empty
+            # request is the app's own project, and filing the running row under the resolved path
+            # moved it to another group in the sidebar the moment the turn ended (seen live).
+            live_turns.start(
+                turn_id=turn_id, session_id=session_id, workspace=session.workspace,
+                message=req.message, live_since=int(opening["session_seq"]) - 1,
             )
 
         # What the panel draws: the viewport as base64 JPEG, the page's address and title, and
@@ -1966,7 +1981,8 @@ def register_code_api(
                         receipt["author"] = author
                     session.remember_receipt(receipt)
                     try:
-                        store_for.save(session)
+                        with live_turns.writing(turn_id):
+                            store_for.save(session)
                     except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
                     # The turn joins the conversation history index — the record that outlives the
@@ -2104,7 +2120,8 @@ def register_code_api(
                         # sidebar would show an untitled, empty session for work that really happened.
                         session.messages.append({"role": "user", "content": message})
                         session.messages.append({"role": "assistant", "content": acp_result.answer})
-                        store_for.save(session)
+                        with live_turns.writing(turn_id):
+                            store_for.save(session)
                     _verify_and_finish(
                         done_payload(acp_result, provider=external, tainted=bool(ledger.run_tainted()))
                     )
@@ -2131,7 +2148,8 @@ def register_code_api(
                     answer, grounded, grounded_usd = _check_grounded(grounded_turn, result)
                     if answer != result.answer:
                         session.replace_last_answer(answer)
-                    store_for.save(session)
+                    with live_turns.writing(turn_id):
+                        store_for.save(session)
                 _verify_and_finish(
                     {
                         "answer": answer,
@@ -2239,6 +2257,8 @@ def register_code_api(
                 if background is not None:
                     works.fail(background.id, message_out)
             finally:
+                # Every way out of a turn, so a turn that died still stops being "running".
+                live_turns.finish(turn_id)
                 if loop is not None and queue is not None:
                     loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
@@ -2315,6 +2335,32 @@ def register_code_api(
             "workspace": work.workspace,
             "exchanges": attach_receipts(exchanges_from_messages(messages), receipts),
         }
+
+    def _running_out(turn: Any) -> dict[str, Any]:
+        return {
+            "turn_id": turn.turn_id,
+            "session_id": turn.session_id,
+            "workspace": turn.workspace,
+            "message": turn.message,
+            "started_at": turn.started_at,
+            "live_since": turn.live_since,
+            "transcript_saved": turn.transcript_saved,
+        }
+
+    # Declared BEFORE `/api/code/turns/{turn_id}`: the router matches in order, and `running` would
+    # otherwise be read as a turn id and answered with a 404.
+    @app.get(
+        "/api/code/turns/running", dependencies=[guard], response_model=list[RunningTurnOut]
+    )
+    def code_turns_running() -> list[dict[str, Any]]:
+        """The coding turns running now, oldest first.
+
+        A turn keeps running when the screen that started it goes away, and until this existed
+        nothing could say so: the conversation is stored when the agent finishes, so a session left
+        mid-turn read as empty and was not in the list. Empty here means nothing is running, not
+        that the question failed; an error is an error.
+        """
+        return [_running_out(t) for t in live_turns.running()]
 
     @app.get(
         "/api/code/turns/{turn_id}", dependencies=[guard], response_model=CodeTurnFramesOut
@@ -2497,8 +2543,32 @@ def register_code_api(
         conversations are a flat pile you cannot file. Titles are the first thing the user asked,
         derived on read — never generated, so a row is never a paraphrase of the conversation it
         points at.
+
+        A conversation with a turn running is marked, and one whose first turn is still running is
+        listed although its file does not exist yet: the file is written when the agent finishes,
+        so without this a task started in a new conversation was invisible for exactly as long as it
+        took to do.
         """
-        return store.list_meta()
+        from chimera.core.code_session import _title_of
+
+        rows = store.list_meta()
+        running = {t.session_id: t for t in live_turns.running()}
+        for row in rows:
+            row["running"] = row["id"] in running
+        stored = {row["id"] for row in rows}
+        unsaved = [
+            {
+                "id": t.session_id,
+                "title": _title_of(t.message),
+                "workspace": t.workspace,
+                "turns": 0,
+                "updated_at": t.started_at,
+                "running": True,
+            }
+            for sid, t in running.items()
+            if sid not in stored
+        ]
+        return sorted([*unsaved, *rows], key=lambda r: float(r["updated_at"]), reverse=True)
 
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:
@@ -2510,9 +2580,21 @@ def register_code_api(
         An unknown id returns an empty conversation rather than a 404: the store treats a missing
         file as the ordinary first-turn case, and a screen that errors on a session someone just
         deleted in another window would be reporting a race as a fault.
+
+        A turn running in this conversation is named in ``running_turn``, and the file is read
+        between two looks at it (`LiveTurns.read_consistently`): the agent saves the transcript
+        when it finishes and the turn goes on verifying after that, so the file can already hold the
+        exchange of a turn that is still running, and a screen has to know which of the two it got.
         """
-        view = _session_view(session_id)
-        return view if view is not None else {"id": session_id, "workspace": "", "exchanges": []}
+        view, turn = live_turns.read_consistently(session_id, lambda: _session_view(session_id))
+        out = view if view is not None else {"id": session_id, "workspace": "", "exchanges": []}
+        if turn is None:
+            return out
+        return {
+            **out,
+            "workspace": out["workspace"] or turn.workspace,
+            "running_turn": _running_out(turn),
+        }
 
     def _session_view(session_id: str) -> dict[str, Any] | None:
         """The stored conversation as exchanges, or None when there is no readable file.

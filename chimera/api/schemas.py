@@ -174,6 +174,8 @@ class CodeSessionMetaOut(BaseModel):
     workspace: str
     turns: int
     updated_at: float
+    #: A turn of this conversation is running now. Absent for a conversation nobody is working in.
+    running: bool = False
 
 
 class CodeProjectOut(BaseModel):
@@ -304,10 +306,33 @@ class WorkActionOut(BaseModel):
     reason: str = ""
 
 
+class RunningTurnOut(BaseModel):
+    """A coding turn that is running now, as much of it as a screen needs to follow it.
+
+    A conversation is stored when the agent finishes, so while a turn works the file has nothing of
+    it. This is the pointer to it: which turn, what it was asked, and where on the conversation's
+    live stream its opening frame is, so a screen that comes back can replay the turn from the start.
+    """
+
+    turn_id: str
+    session_id: str
+    workspace: str
+    message: str
+    started_at: float
+    #: Ask the conversation's live stream for frames after this and the turn comes back whole.
+    live_since: int
+    #: The stored conversation already holds this turn's exchange (the agent has finished and the
+    #: turn is verifying), so a screen that follows it must not draw that exchange twice.
+    transcript_saved: bool
+
+
 class CodeSessionOut(BaseModel):
     id: str
     workspace: str
     exchanges: list[CodeExchangeOut]
+    #: Set while a turn of this conversation is running. A screen follows it instead of showing a
+    #: conversation that looks idle while it is working.
+    running_turn: RunningTurnOut | None = None
 
 
 class CodeSessionRawOut(BaseModel):

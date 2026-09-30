@@ -25,6 +25,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     and "Restore default layout". It renders nothing while nothing is hidden, following the rule
     `PendingApprovals` already set, so "Restore default layout" is also in the command palette.
   - Twenty new translation keys, in all ten languages. `DESIGN.md` gains a "Dynamic layout" section.
+- **A coding turn that is still running can be found again: in the sidebar, and in a conversation reopened mid-turn.**
+  - **What was wrong (measured live, 2026-09-29):** a turn keeps running on the server when the screen
+    that started it goes away, and its frames are kept. But the conversation is stored when the agent
+    finishes, so for as long as the turn ran its session read back empty (`exchanges: []`) and was
+    missing from the list. Someone who moved to another conversation and came back saw an idle one,
+    with nothing to say that a task was working in it.
+  - **Now:** the server keeps an in-memory registry of the turns running. `GET /api/code/turns/running`
+    lists them; each row of the session list carries `running` (and a conversation whose first turn is
+    still running is listed although its file does not exist yet); the session read carries
+    `running_turn`. The sidebar marks the conversations that are working. A conversation reopened
+    mid-turn follows the turn through its live stream from its opening frame, shows it as working (a
+    message typed meanwhile waits behind it, as it does behind a turn the screen started), and comes
+    back when it ends.
+  - **The subtle part:** the agent's run saves the transcript and the turn goes on verifying after
+    that, so for a while the stored file holds the exchange of a turn that is still running. Each turn
+    counts its own transcript writes, and a session read is trusted only when the count did not move
+    under it; the screen then drops the stored copy and replays the turn, so the exchange is drawn once.
+  - **What did not change:** stopping a followed turn stops watching it, exactly what it means for a
+    turn the screen started; the turn goes on running on the server. Nothing here can stop a turn from
+    another screen.
+  - The registry is in memory on purpose: a turn is a thread of this process, so a restart ends every
+    turn and a record on disk would go on saying "running". One new translation key,
+    `code.sessions.running`, in all ten languages.
 - **A credential in a decision's state no longer reaches a hosted backend or the decision log.**
   - **What was wrong:** nothing in `chimera/decisions/` used the redaction net. The decision log wrote
     the first 500 characters of the state raw, and both hosted backends sent the state whole. The
