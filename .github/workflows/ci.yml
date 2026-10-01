@@ -394,10 +394,18 @@ jobs:
       # green. A gate named for a property it covers one third of is worse than no gate: it is a
       # green light for the two thirds nobody is checking.
       #
-      # All three are ADVISORY, for the reason pip-audit already gave: they fail on any CVE in any
+      # Python and npm are ADVISORY, for the reason pip-audit already gave: they fail on any CVE in any
       # transitive package, including ones with no fix released, which would make red the normal
       # state and teach everyone to ignore it. Dependabot moves versions; this makes what is known
       # visible in the run instead of discovered by a user.
+      #
+      # Rust is NOT, since 2026-09-30 (the owner's decision). It was advisory too, and on 2026-09-17
+      # it printed RUSTSEC-2026-0285 (rustls, in the updater's TLS path, fixed in 0.23.45) and exited
+      # 1 — inside a green job, where nobody looked for two weeks. "Visible in the run" turned out to
+      # mean visible to no one. The reason for advisory does not hold the same way here: cargo audit
+      # fails only on VULNERABILITIES, and its unmaintained/unsound notices (seven today: the unic-*
+      # crates, proc-macro-error, glib) are warnings that do not fail it. So red means a known
+      # vulnerability, and the answer is a version bump or a written `--ignore` with the reason.
       #
       # Advisory via `continue-on-error` ALONE, with no trailing `|| true`. Both together is one too
       # many: `continue-on-error` already keeps the job green, and the `|| true` on top additionally
@@ -472,10 +480,12 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri -> target
 
+      # BLOCKING (see the note above the three audits). The scanner's version is pinned for the reason
+      # gitleaks' is: a gate that can change its verdict on the day a new release ships is not one we
+      # chose. To accept a vulnerability with no fix, add `--ignore RUSTSEC-…` here with the reason.
       - name: Known vulnerabilities — Rust (the Tauri shell)
-        continue-on-error: true
         run: |
-          cargo install cargo-audit --locked
+          cargo install cargo-audit --locked --version 0.22.2
           cargo audit --file apps/desktop/src-tauri/Cargo.lock
 
   verdict:
