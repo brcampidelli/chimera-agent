@@ -162,6 +162,20 @@ class DeletedCountOut(BaseModel):
     deleted: int
 
 
+class UiLayoutOut(BaseModel):
+    """The desktop's stored screen layout, or null when none was stored (dynamic screen, phase 6).
+
+    Opaque to the server on purpose: the client owns the layout model and reads anything it does not
+    recognise as its default, so a shape checked here would be a second definition that drifts.
+    """
+
+    layout: dict[str, Any] | None
+
+
+class UiLayoutIn(BaseModel):
+    layout: dict[str, Any]
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
@@ -265,6 +279,13 @@ class CodeTurnFramesOut(BaseModel):
     #: The highest `seq` in `frames`, or the `since` that was asked for when there are none. A
     #: client stores this and asks again from it, which is what makes a second replay cheap.
     seq: int
+
+
+class CodeTurnStopOut(BaseModel):
+    """A stop that reached a running coding turn. The turn ends at its next step, not at once."""
+
+    turn_id: str
+    stopping: bool
 
 
 class WorkOut(BaseModel):
@@ -1640,6 +1661,14 @@ class HitlOut(BaseModel):
 
 class ApprovalOut(BaseModel):
     """One question waiting for a person, written by `pending.ask_durably` from an attended surface."""
+
+    #: Which turn asked, which conversation it belongs to, and in which folder: what a card needs to
+    #: say where it comes from, with several conversations working at once. Empty when unknown (a
+    #: surface that names no turn, or a turn already gone). ``work`` is a background work's title.
+    run_id: str = ""
+    session_id: str = ""
+    workspace: str = ""
+    work: str = ""
 
     id: str
     action: str  # `<tool>: <command | path | url>` — empty only on a question raised before 0.54

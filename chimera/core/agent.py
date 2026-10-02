@@ -248,6 +248,22 @@ def _default_browser_situation() -> bool:
     return get_settings().browser_situation
 
 
+def _default_model() -> str:
+    """The model a gateway run with no ``config.model`` calls: the gateway falls back to this setting.
+
+    Read by :func:`attended` so the context budget can be sized for that model. Sized for an empty
+    slug instead, a run on the default model got the 128k fallback window and the unmeasured cap,
+    and compacted at about 51k on a model measured to read 255k. ``""`` when the settings cannot be
+    read, which leaves the fallback the budget had before.
+    """
+    try:
+        from chimera.config import get_settings
+
+        return get_settings().default_model or ""
+    except Exception:  # noqa: BLE001 — sizing a context must not be what takes a run down
+        return ""
+
+
 #: The sentence that turns the task-list schema into a task list. See `Agent.run` for the
 #: measurement that decides it is not optional.
 TODO_PROMPT = (
@@ -396,6 +412,12 @@ class AgentConfig:
     #: the window share, which is what every bench was measured with; a surface with a person waiting
     #: passes `UNMEASURED_USEFUL_TOKENS` so a model nobody measured compacts before its cliff.
     unmeasured_context_tokens: int | None = None
+    #: The model the context budget is sized for while :attr:`model` is None. None sizes it for an
+    #: unknown model (the fallback window), which is what a library caller with its own backend
+    #: gets: "no model" means whatever that backend picks, and guessing high costs a dead run.
+    #: :func:`attended` sets it to the configured default, because every surface that calls it
+    #: runs on the gateway, where "no model" IS that default.
+    budget_model: str | None = None
     # Replace the dropped span with a model-written summary of what still BINDS, instead of the
     # structural note. Off pending `bench/compaction`, and the reason is the note's own docstring:
     # a summary is believed in a way a note is not, so a bad one is worse than an honest count.
@@ -435,6 +457,35 @@ class AgentConfig:
     #: a step log nothing ever persists is a measurement with no consumer, which is the failure this
     #: whole line of work exists to avoid. The CLI and the desktop API both set it.
     trace_path: Path | None = None
+
+
+def attended(config: AgentConfig) -> AgentConfig:
+    """``config`` as a surface where a person is waiting for the answer runs it.
+
+    Five settings that the library leaves off so every bench keeps its baseline: say what was spent
+    at US$1, ask a repeating run to change approach before the breaker, treat ``max_steps`` as a
+    window, and compact a conversation that outgrows its model instead of ending it.
+
+    One function rather than five keywords at each call site, because the keywords were copied to
+    the four terminal commands and not to the three that serve a chat platform. The Discord bot kept
+    the six-step wall and died on its first long thread, while the release notes said the limits
+    had become warnings. A surface that answers a person calls this; a cron job does not, because
+    nobody is there to read a warning.
+    """
+    from dataclasses import replace
+
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
+
+    return replace(
+        config,
+        warn_usd=DEFAULT_SPEND_WARN_USD,
+        loop_correction=True,
+        auto_continue=True,
+        context_budget=DEFAULT_BUDGET_FRACTION,
+        unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
+        budget_model=config.budget_model or _default_model() or None,
+    )
 
 
 @dataclass
@@ -701,15 +752,8 @@ class Agent:
         self.backend = backend
         self.tools = tools
         self.config = config or AgentConfig()
-        self._budget = (
-            ContextBudget.for_model(
-                self.config.model or "",
-                fraction=self.config.context_budget,
-                unmeasured_cap=self.config.unmeasured_context_tokens,
-            )
-            if self.config.context_budget
-            else None
-        )
+        self._budget_for: tuple[str, float, int | None] | None = None
+        self._budget_built: ContextBudget | None = None
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
@@ -736,6 +780,30 @@ class Agent:
         self.cards = cards
         # Per-thread state of the run in progress (see `run`, where the turn context is swapped).
         self._local = threading.local()
+
+    @property
+    def _budget(self) -> ContextBudget | None:
+        """The context budget for the model this run will call, or None when compaction is off.
+
+        Built on first use and rebuilt when the model changes, not fixed at construction. Fixed at
+        construction it had two defects that a person could not see:
+        - with no ``config.model`` (every terminal command run without ``--model``, and the
+          Discord bot), it was sized for an empty slug, so the measured context of the default
+          model was never read. Those surfaces now say which model that is
+          (:attr:`AgentConfig.budget_model`, set by :func:`attended`);
+        - ``/model`` in ``chimera chat`` swaps ``config.model`` and kept the old model's budget.
+        """
+        fraction = self.config.context_budget
+        if not fraction:
+            return None
+        model = self.config.model or self.config.budget_model or ""
+        key = (model, fraction, self.config.unmeasured_context_tokens)
+        if self._budget_for != key:
+            self._budget_built = ContextBudget.for_model(
+                model, fraction=fraction, unmeasured_cap=self.config.unmeasured_context_tokens
+            )
+            self._budget_for = key
+        return self._budget_built
 
     def compose_system_prompt(self, task: str) -> str:
         """The system message this agent sends for ``task``, in the order it is assembled.
@@ -1197,10 +1265,11 @@ class Agent:
             # just sent — the most accurate number available, and free. The next step's prompt is
             # this one plus whatever we are about to append, so acting here means acting one step
             # before the wall rather than at it.
+            budget = self._budget
             if (
-                self._budget is not None
+                budget is not None
                 and result.prompt_tokens
-                and self._budget.should_compact(result.prompt_tokens)
+                and budget.should_compact(result.prompt_tokens)
             ):
                 messages, compacted = compact(
                     messages,
@@ -1216,7 +1285,7 @@ class Agent:
                     )
                     _log.info(
                         "compacted at %d tokens (threshold %d of %d-token window)",
-                        result.prompt_tokens, self._budget.threshold, self._budget.window,
+                        result.prompt_tokens, budget.threshold, budget.window,
                     )
                 else:
                     # `compact`'s own docstring asks for this and nothing implemented it: "callers
@@ -1233,7 +1302,7 @@ class Agent:
                     _log.warning(
                         "context is stuck at %d tokens (threshold %d) and there is nothing left to "
                         "compact; answering with what the run has",
-                        result.prompt_tokens, self._budget.threshold,
+                        result.prompt_tokens, budget.threshold,
                     )
                     # The content of the call that just returned IS "what the run has": the
                     # assistant message is only appended further down, on the branch this break

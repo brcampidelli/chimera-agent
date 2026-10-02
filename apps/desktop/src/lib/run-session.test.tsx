@@ -199,3 +199,94 @@ describe("what is about to judge the run", () => {
     await waitFor(() => expect(screen.getByTestId("verify")).toHaveTextContent("-"));
   });
 });
+
+/**
+ * One run per project, runs in parallel across projects (the owner's decision of 2026-09-30).
+ *
+ * The session held one run for the whole app and refused a second anywhere, so a run in one project
+ * blocked every other project. Runs now take the server's lock per folder (a second run in the same
+ * folder would wait there anyway), so the session keeps one run PER PROJECT: a second one in the
+ * same project is still refused, one in another project starts.
+ */
+describe("the run session, with several projects", () => {
+  /** The live stream of each project's run, by workspace. */
+  let streams: Record<string, RunStreamHandlers> = {};
+
+  beforeEach(() => {
+    streams = {};
+    vi.mocked(streamRun).mockImplementation(async (req, handlers) => {
+      streams[req.workspace ?? ""] = handlers;
+    });
+  });
+
+  function Project({ ws }: { ws: string }) {
+    const run = useRunSession(ws);
+    return (
+      <div>
+        <button onClick={() => run.start({ task: `work in ${ws}`, workspace: ws, max_attempts: 3 })}>
+          start {ws}
+        </button>
+        <button onClick={run.stop}>stop {ws}</button>
+        <span data-testid={`state ${ws}`}>{run.running ? `running:${run.task}` : "idle"}</span>
+      </div>
+    );
+  }
+
+  function StatusBar() {
+    const run = useRunSession();
+    return <span data-testid="bar">{run.running ? `${run.task} +${run.alsoRunning}` : "idle"}</span>;
+  }
+
+  function Shell() {
+    return (
+      <RunSessionProvider>
+        <Project ws="/a" />
+        <Project ws="/b" />
+        <StatusBar />
+      </RunSessionProvider>
+    );
+  }
+
+  it("runs one in each project at once, and refuses a second in the same project", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+
+    await user.click(screen.getByText("start /a"));
+    await user.click(screen.getByText("start /b"));
+    await user.click(screen.getByText("start /a"));
+
+    expect(streamRun).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("state /a")).toHaveTextContent("running:work in /a");
+    expect(screen.getByTestId("state /b")).toHaveTextContent("running:work in /b");
+  });
+
+  it("stops only the run it was asked to stop", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+    await user.click(screen.getByText("start /a"));
+    await user.click(screen.getByText("start /b"));
+    streams["/a"].onRunId?.("run_a");
+    streams["/b"].onRunId?.("run_b");
+
+    // The OLDER one: the status bar names the latest, so stopping that one could not tell a Stop
+    // addressed to its own project from one addressed to whatever the bar shows.
+    await user.click(screen.getByText("stop /a"));
+
+    expect(cancelRun).toHaveBeenCalledWith("run_a");
+    expect(cancelRun).not.toHaveBeenCalledWith("run_b");
+  });
+
+  it("ends each run on its own frame, and the status bar follows the latest one still running", async () => {
+    const user = userEvent.setup();
+    render(<Shell />);
+    await user.click(screen.getByText("start /a"));
+    await user.click(screen.getByText("start /b"));
+    await waitFor(() => expect(screen.getByTestId("bar")).toHaveTextContent("work in /b +1"));
+
+    streams["/b"].onDone?.({ success: true, answer: "", attempts: 1, stopped_reason: "" } as never);
+
+    await waitFor(() => expect(screen.getByTestId("state /b")).toHaveTextContent("idle"));
+    expect(screen.getByTestId("state /a")).toHaveTextContent("running:work in /a");
+    expect(screen.getByTestId("bar")).toHaveTextContent("work in /a +0");
+  });
+});

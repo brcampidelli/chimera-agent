@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { deleteCodeProject, deleteCodeSession, listCodeSessions } from "@/lib/api";
+import { readLastSession, writeLastSession } from "@/lib/workspace";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
@@ -121,5 +122,36 @@ describe("SessionSidebar — deleting", () => {
       screen.getByRole("heading", { name: /2/ }),
       "the confirmation does not say how many conversations are at stake",
     ).toBeInTheDocument();
+  });
+
+  // The Code screen reopens the last conversation of each project (R16, 2026-09-30). One deleted
+  // from here must not be the one it reopens: an unknown id opens as an empty conversation under
+  // the deleted one's id, which reads as the conversation coming back with nothing in it.
+  it("forgets a deleted conversation as the one its project reopens", async () => {
+    writeLastSession("C:\\loja", "s1");
+    const user = userEvent.setup();
+    render();
+
+    await user.click(
+      await screen.findByRole("button", { name: /(Apagar|Delete) Corrigir o carrinho/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /^Apagar$|^Delete$/i }));
+
+    await waitFor(() => expect(readLastSession("C:\\loja")).toBeNull());
+  });
+
+  it("forgets it when the whole project goes, and leaves another project's alone", async () => {
+    writeLastSession("C:\\loja", "s2");
+    writeLastSession("C:\\blog", "s3");
+    const user = userEvent.setup();
+    render();
+
+    await user.click(
+      await screen.findByRole("button", { name: /(Apagar o projeto|Delete the project) loja/i }),
+    );
+    await user.click(screen.getByRole("button", { name: /^Apagar$|^Delete$/i }));
+
+    await waitFor(() => expect(readLastSession("C:\\loja")).toBeNull());
+    expect(readLastSession("C:\\blog")).toBe("s3");
   });
 });

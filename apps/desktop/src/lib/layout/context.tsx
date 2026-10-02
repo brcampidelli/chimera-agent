@@ -12,6 +12,9 @@ interface LayoutApi {
   dispatch: (action: LayoutAction) => boolean;
   /** Put back the layout before the last applied action. */
   undo: () => void;
+  /** Take a layout read from elsewhere (the server) as the current one, without making it a step to
+   *  undo: nobody did anything, the screen just learned what it already was. */
+  hydrate: (layout: Layout) => void;
   /** Mark the start of a new gesture, so the next resize is its own step to undo rather than the tail
    *  of the previous drag of the same region. */
   settle: () => void;
@@ -28,7 +31,17 @@ const LayoutContext = createContext<LayoutApi | null>(null);
  * Kept apart from `AgentProvider` on purpose: the agent's state changes on every streamed token, and
  * a panel moving must not redraw the transcript, nor a token redraw the panels.
  */
-export function LayoutProvider({ children, initial }: { children: ReactNode; initial?: Layout }) {
+export function LayoutProvider({
+  children,
+  initial,
+  persist = true,
+}: {
+  children: ReactNode;
+  initial?: Layout;
+  /** False for a window that draws one conversation: it reads the person's layout and writes none of
+   *  it, because the main window owns it and a change made elsewhere would land there unseen. */
+  persist?: boolean;
+}) {
   const [layout, setLayout] = useState<Layout>(() => initial ?? loadLayout());
   const past = useRef<Layout[]>([]);
   const [canUndo, setCanUndo] = useState(false);
@@ -38,8 +51,8 @@ export function LayoutProvider({ children, initial }: { children: ReactNode; ini
   const resizing = useRef<string | null>(null);
 
   useEffect(() => {
-    saveLayout(layout);
-  }, [layout]);
+    if (persist) saveLayout(layout);
+  }, [layout, persist]);
 
   const dispatch = useCallback((action: LayoutAction) => {
     const next = applyLayout(current.current, action);
@@ -66,9 +79,14 @@ export function LayoutProvider({ children, initial }: { children: ReactNode; ini
     resizing.current = null;
   }, []);
 
+  const hydrate = useCallback((next: Layout) => {
+    current.current = next;
+    setLayout(next);
+  }, []);
+
   const value = useMemo<LayoutApi>(
-    () => ({ layout, dispatch, undo, settle, canUndo, hidden: hiddenItems(layout) }),
-    [layout, dispatch, undo, settle, canUndo],
+    () => ({ layout, dispatch, undo, settle, hydrate, canUndo, hidden: hiddenItems(layout) }),
+    [layout, dispatch, undo, settle, hydrate, canUndo],
   );
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>;
 }

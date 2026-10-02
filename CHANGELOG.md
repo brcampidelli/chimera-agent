@@ -5,8 +5,76 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.64.1] - 2026-10-01
+### Fixed
+
+- **The chat bot gets what 0.64 said a person waiting gets.**
+  - **What was wrong:** 0.64.0 turned the limits into warnings, and that reached `chimera chat` and the desktop
+    app only. The Discord bot (`serve --discord`, and the same bot started from the app's Messaging switch) kept
+    the six-step wall, ended a long thread on a context overflow, and could not show a warning, because the
+    gateway called `send`, which takes no callbacks. A reply cut short by a limit read like a finished one.
+  - **Now:** the bot runs with the same five settings as the terminal (one function, `attended`, instead of
+    five keywords copied to four places and missed in three). Its replies carry the turn's warnings and the
+    reason a reply was cut short, one `⚠` line each, under the answer. The HTTP `/chat` reply stays the answer
+    alone, and the HTTP gateway keeps the step wall, because the webhook jobs run through it with nobody waiting.
+- **The terminal compacts at the context its model was measured to read.**
+  - **What was wrong:** run without `--model`, the context budget was sized for an empty model name. The
+    default model, measured to read 255k, compacted at about 51k, and `/model` kept the old model's budget.
+  - **Now:** the budget is sized for the model the run calls (the default when none is given) and follows a
+    switch.
+- **Warnings reach every terminal command, and a finished background job reaches every chat.**
+  - `--max-usd` wrapped the agent in a turn whose signature had no `on_notice`, so every warning of a
+    conversation with a ceiling was dropped. `chimera tui` and `chimera agent` never asked for them.
+  - A shell command that outlives its timeout becomes a job on every surface, and only the Code screen was told
+    when one ended. `chat`, `assist`, `tui` and the bot now hear it on the next turn, as the Code screen does.
+
+## [0.64.0] - 2026-10-01
 ### Added
 
+- **The dynamic screen, phase 7: any panel of the right panel opens in a window of its own.**
+  - **How:** "To a window of its own" in a panel's move menu. The panel leaves its dock while the window is
+    open and comes back however the window goes: its own "Bring back" button, the tray in the status bar
+    (which lists it as "in a window"), closing it, or the window vanishing without a word (checked every
+    second). Closing the main window closes them all, and the app quits as before.
+  - **The window is the same page**, asked by `/?float=<panel>` to draw one panel. The agent's state
+    reaches it over a `BroadcastChannel`; the panels that ask the server themselves need nothing.
+  - **Which panels float is not stored.** A relaunch finds every panel in its dock; undo, the default
+    layout and the server copy never meet a window.
+  - **Native side:** this runtime refused every new window until now. The main window now has one
+    handler, and it opens a window for exactly one address: this backend's origin, the root path and a
+    single `float` parameter naming a panel. Everything else is still refused. The new windows get no
+    IPC: the capability file names `main` alone, and a test fails if it ever grants more.
+- **The dynamic screen, phase 6: the layout is kept by the server too, and the editor's sidebar joins in.**
+  - **Why:** the layout lived only in the webview's storage, which a reinstall or a cleared WebView2 profile
+    wipes. The owner chose to keep it where the project list already lives.
+  - **Server:** `GET` and `PUT /api/ui/layout` keep it as one JSON object under `CHIMERA_HOME`
+    (`chimera/core/ui_layout.py`): an object only, at most 64 KB, replaced atomically. The server does not
+    check its shape; the client owns the model and reads anything it does not recognise as its default.
+  - **Client** (`lib/layout/sync.tsx`, mounted in `main.tsx`):
+    - the first time, the local layout goes up;
+    - after that the server's is applied at start (not as a step to undo) and each change is sent once after
+      a short pause;
+    - a change made before the server answered wins;
+    - a stored value of another version is no answer, so the local layout is kept and sent;
+    - with no server, the local copy keeps working.
+  - **The editor's sidebar** follows the left region like the conversation list: it hides from its own
+    button, leaves a tab on its edge and slides back in.
+- **Opening the desktop app again brings the open window forward.** A second launch hands over to the
+  running app instead of starting a second backend on the same data folder.
+- **The dynamic screen, phase 5: maximise any panel, focus mode, and layouts one command away.**
+  - **Maximise:** the file viewer and the tools, fusion, background-jobs and machine panels maximise from a
+    button in their header, or with ⌘⇧M / Ctrl+Shift+M on the panel that holds focus. Escape restores from
+    anywhere, unless an open menu or dialog already took it. A maximised viewer takes the whole row; closing
+    the file restores the layout, so the next file does not open maximised.
+  - **Focus mode:** a button in the status bar (and ⌘⇧F / Ctrl+Shift+F, and the palette) puts the rail and
+    both side regions away and shrinks the composer's settings to their line; the same button puts back
+    exactly what was there.
+  - **Layouts:** "review" (the file viewer as wide as it goes, the list away) and "monitor" (the right panel as
+    wide as it goes) in the command palette, plus "Save this layout as mine" and "Apply my layout".
+  - **⌘⇧A / Ctrl+Shift+A** goes to the approval waiting in the conversation, minimised or not.
+  - The shifted chords are read by the physical key and leave the unshifted ones alone: Ctrl+A still
+    selects, Ctrl+F still finds. Nine translation keys in all ten languages.
 - **The dynamic screen, phase 4: the right panel's sections move between the right panel, the left sidebar and a
   bottom dock.**
   - **What moves:** tools, tokens, memory, fusion, background jobs and this machine are each a panel
@@ -23,6 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     note, with the no-sandbox warning, is outside them and stays on screen.
   - A panel whose content has nothing to say (Fusion without a fused turn, no background jobs) hides its frame
     too. The machine panel keeps its old title. Eleven translation keys in all ten languages.
+- **Turns running at once warn about what they spend together.** Each turn already warned at its own
+  US$ 1; five running at once could spend five times that without a word. When two or more running turns
+  together cross a multiple of the warning amount, each says so. It is a warning, not a stop; a ceiling the
+  person typed is still that turn's own.
+- **A conversation can open in a window of its own, so two are worked at once.** "Open in a new window" in
+  the conversation's header draws that one conversation in its own window, in its own project, with its own
+  composer. The window reads the layout and writes none of it, offers no further window, and a second click
+  focuses it. Checked live in the desktop shell.
 - **The dynamic screen, phase 3: every card of the conversation minimises, closes and comes back.**
   - **What:** the tool list, the task list, warnings, the browser view, each file's changes, the verification
     verdict, the receipt, a failed turn's error and the approval card each carry three controls in their corner
@@ -59,6 +135,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **Motion:** a region that comes back slides in from its own edge (`duration-3`, transform and opacity only),
     and only when it comes back, not every time a screen opens. Reduced motion collapses it to 1 ms.
   - The choice is kept across launches, in the layout from phase 0. Six translation keys in all ten languages.
+- **Autonomous runs in parallel, one per project.** A run in one project no longer blocks starting a run, or
+  the verdict's fix, in another. A second run in the same project is still refused, and the status bar names
+  the latest run with a count of the others.
 - **The dynamic screen, phase 0: one layout model, a way back to anything hidden, and "Restore default layout".**
   - **What it is:** the first of eight phases of the plan the owner approved on 2026-09-29, a screen where
     anything can be minimised, maximised, closed, dragged, resized and brought back. This phase is the model
@@ -152,6 +231,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- **`glm-5.3-flash` now compacts at the context it was measured to read, 512k, instead of the 64k kept for
+  unmeasured models.**
+  - **The measurement:** `bench/useful_context` (`RESULTS_glm53flash.md`) ran 54 paired agent transcripts on the
+    Novita route. It read 54/54 at 4k and 53/54 at 512k, with every rung within the registered margin. 512k was
+    the top of the ladder, so the value is a lower bound.
+  - **What changes:** the catalogue row carries `useful_k = 512`. A surface that caps unmeasured models (the
+    coding route) now budgets this model at 512,000 tokens rather than 64,000, and compacts near 409,000.
+  - **Adopted in its own change,** as the pre-registration requires.
 - **A decision the spend/rate gate refused now raises an approval card instead of falling to the default.**
   - **Before:** a halt of any kind left the REVIEW band without a verdict and the kernel went on to
     its default, which is ALLOW. That is right for a model that was down (it said nothing about the
@@ -249,12 +336,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
     forbids. The output of a still-running adopted command is not streamed: `background=true` from
     the start is still the way to watch one.
 
-### Fixed
-
-- **The local decider no longer judges a truncated state.** Ollama keeps only half of its context window for the prompt and cuts the rest with no error. The default window here was 4,096 tokens, so the local System One model read at most ~2,050 tokens (about 11,000 characters of prose), while the verified-answers check sends attached sources of up to 14,000 characters. Every call now asks for a 16,384-token window (8,192 tokens of prompt), and a prompt that still fills it is a halt: the answer ships unverified, never judged on text the model did not see. Measured before the change on this backend (`bench/jevbench_local`): 231 of 231 answers identical with the larger window.
-- **`chimera decide` exits 1 when a question fails.** It exited 0 even when the backend was down or the state overflowed, so a CI step or a script could not tell "answered" from "failed". Now: 0 every question answered; 1 at least one failed, after the JSON is printed (or every JSONL line written) in full; 2 usage, or a question the linter refuses.
-
-### Changed
 
 - **Compaction on the default model now starts at the context it was measured to read.**
   - **Before:** `gpt-6-luna` had no measured useful context. The Code screen's budget was therefore
@@ -266,6 +347,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **Cost of the run:** US$ 4.67.
 
 ### Fixed
+
+- **Two catalogue rows caught up with what the provider serves.**
+  - **What was wrong:** the live check on main had been red since 2026-09-29. `deepseek-v4-flash-0731` was priced
+    0.022/0.32 while the index quotes 0.0045/1.28, and `llama-3.3-70b-instruct` promised a 131k window its provider
+    serves at 65,536. Both reach the user: the price prices a turn's receipt, and the window sets when a conversation
+    compacts.
+  - **What happens now:** both rows carry the live figures; the old price stays in `also_seen`.
+- **A conversation deleted while one of its turns runs stays deleted.**
+  - **What was wrong:** deleting a conversation (or a project's conversations) did not look at running turns.
+    The turn went on and, when it finished, saved the conversation again, so a conversation the person had
+    deleted came back.
+  - **What happens now:** deleting stops the turn with the same signal as Stop. That turn writes nothing more
+    of the conversation: no transcript, no receipt, no history index entry.
+- **An external agent in the middle of a turn is never closed to make room, nor for being idle.**
+  - **What was wrong:** the ACP registry keeps at most four external agents (Claude Code, Gemini) alive, and
+    closed the least recently used one when a fifth started, without asking whether it was mid-turn. The idle
+    sweep had the same blind spot for a turn longer than an hour.
+  - **What happens now:** a turn is busy while it prompts, and only idle agents are closed. When every agent
+    is busy, the registry goes over the limit for a while, and logs it, rather than killing work.
+- **Dependencies past their open advisories.** PyJWT 2.15.1 (15 advisories, one critical), urllib3 2.8.0 (three,
+  two high) and brace-expansion 2.1.7 in the desktop tree. One PyJWT advisory has no fix yet, and glib still
+  waits on a Tauri upgrade.
+- **`deepseek-v4-flash-0731` carries the higher of the two prices it is quoted at.** The route moved from 0.0045 to
+  0.0108 per million input tokens within a day; the row now reads 0.0108 so a fallback receipt never under-states
+  what a turn cost, and 0.0045 stays as a price it has been seen at.
+- **The desktop updater's TLS library is patched.**
+  - **What was wrong:** `rustls` 0.23.43, which the updater uses to download updates, had RUSTSEC-2026-0285
+    (TLS 1.3 handshake messages accepted across encryption level boundaries; medium). CI's Rust audit
+    reported it from 2026-09-17 but is advisory, so the job stayed green and nobody saw it.
+  - **What happens now:** `rustls` 0.23.45 and `rustls-webpki` 0.103.15 (the version it needs); nothing
+    else moved.
+- **The status bar no longer mixes conversations, and it lists every turn running elsewhere, each with its
+  own Stop.**
+  - **What was wrong:** the bar reads one agent state, and every conversation wrote into it for as long as
+    its handlers lived. Start a turn in A, switch to B and send, and when A finished it set "done, not busy",
+    so B's Stop vanished while B was still running.
+  - **Also wrong:** the other running turns were invisible from the bar. With three working, it described
+    one and offered one Stop.
+  - **What happens now:** a conversation publishes only while it is on screen, and hands the state back
+    once when it leaves. Beside the bar's own subject, a chip reads "+N running". Its menu lists every other
+    running coding turn (project · what was asked) from the server, each with a Stop that ends that turn on
+    the server. It renders nothing while nothing else runs.
+- **The Code screen comes back to the conversation you were in, per project.**
+  - **What was wrong:** leaving the Code screen and coming back, or switching project and back, landed on a
+    blank new conversation. The conversation was still in the list; the screen had forgotten it.
+  - **What happens now:** the last conversation of each project is remembered and reopened. New
+    conversation forgets it, and so does deleting it from the sidebar.
+- **A conversation holds at most four turns running or waiting.** A share link reaches the guest route over
+  the network, and nothing bounded how many turns a guest could pile onto one conversation, each a thread
+  waiting on its lock. A fifth is refused with 429 before anything is built or announced.
+- **A question waiting for a person says which project and conversation asked it.**
+  - **What was wrong:** the status bar's list of waiting questions showed every conversation's questions in
+    one dialog, and each said only what it would run and why. With two turns in two projects both asking to
+    run a command, the wrong one could be approved.
+  - **What happens now:** the question file records the turn that asked (`run_id`). `GET /api/approvals`
+    answers each question with that turn's conversation and folder, read from the running turns (or from a
+    background work's record). Each card in the list reads "From shop · Clean the build", or "From blog ·
+    background work “Resize images”". A question whose origin is unknown gets no line, never an invented
+    one.
+- **An undo offer and a finished job's news each stay with the conversation they came from.**
+  - **Undo offers:** they lived in one list capped at 8 for the whole app. After eight editing turns anywhere,
+    an older conversation's Undo button, and a finished background work's undo, answered "nothing to undo".
+    Each conversation now keeps its 20 most recent offers, and the app keeps 200 in all, oldest first out.
+    Each offer holds only the files its turn changed, not a copy of the whole folder.
+  - **Finished jobs:** "a background job finished" went to the next turn of ANY project. That turn marked it
+    reported and could not read its output, because the job tools are fenced to the turn's folder, so the
+    project that started the job never heard. A turn is now told only about jobs that ran inside its own
+    folder.
+- **Undo takes back what its own turn changed, and one conversation at a time edits a folder.**
+  - **What was wrong:** undo restored the whole folder to the snapshot taken before the turn. With two
+    conversations in one folder, undoing one also reverted the other's edits and anything the person had typed
+    since; outside a git repository it deleted the other's new files. Nothing kept two turns from editing the
+    same folder at once, either, so a snapshot, a verification or an undo could describe a mix of both.
+  - **What undo does now:** a turn records what it changed: the difference between the folder before it and
+    right after it, so edits made through the shell count too. Undo puts back only those files. A file that
+    changed again after the turn is left as it is, and the screen names it ("except N file(s) that changed
+    after this turn"). The rules against deleting inside a git repository or after a truncated snapshot still
+    apply.
+  - **What turns in one folder do now:** they take turns, background works included, as works already did
+    among themselves. A turn that waits is told why. Stop still reaches it while it waits, and it never
+    starts. Different folders still run at once.
+- **A long turn followed late comes back whole, and idle conversations stop holding frames.**
+  - **What was wrong:** each conversation kept its last 4000 live frames, and a coding turn streams a frame
+    per token. A screen that came back to a long turn got its tail: no opening frame to draw the row on,
+    and the answer without its start. Every conversation opened in the process also kept its frames until
+    the app closed.
+  - **What happens now:** a replay that asks for frames the buffer dropped gets, for each turn still in it,
+    the opening and the missing frames back from the run log, which records the session number of every
+    frame. Conversations nobody watches and nothing runs in for 30 minutes drop their frames (the numbering
+    goes on), and a deleted conversation's are dropped.
+- **A memory write no longer fails on Windows when the file is busy for longer than 0.2 s.** The antivirus or a
+  paused reader can hold a file open past the old retry window, and the write then failed, losing the memory
+  being saved. Retries now back off from 10 ms to 250 ms, about 3.8 s in all.
+- **Two turns on the same conversation both stay in it.**
+  - **What was wrong:** the coding route loaded the conversation before taking its lock and saved it inside
+    the lock. A second turn on the same conversation (the owner and a guest on a shared link, or two tabs)
+    waited for the first, then ran on the history it had loaded before the first finished, and its save
+    erased the first turn's exchange. The comment above the lock promised the protection the code did not
+    give.
+  - **What happens now:** every use of the lock reads the conversation again first. The turn's receipt,
+    written after a verification that can take minutes, goes on top of what is stored, never back over a
+    later turn with an older copy. A spoken work's note in its parent conversation does the same.
+  - **Saves are atomic:** a temporary file, then a rename. A reader that met half a file used to read the
+    conversation as unreadable, and `load` starts an unreadable conversation fresh.
+- **Stop ends a coding turn on the server, not only the screen's view of it.**
+  - **What was wrong:** the Stop button aborted the screen's request and nothing else. There was no route to
+    stop a coding turn, and the stop signal reached the agent loop only for background works. A turn the
+    person had stopped went on calling the model, editing files and spending until it ended by itself, while
+    the screen said it had stopped. Found reading the code while mapping how several conversations run at once.
+  - **What happens now:** `POST /api/code/turns/{turn_id}/stop` raises the turn's stop signal. Chimera's own
+    loop checks it once per step, so the step in progress finishes first. An external agent's prompt (Claude
+    Code, Gemini over ACP) is cancelled at once. A turn that is not running answers 404, never a stop that
+    reached nothing.
+  - **Where it applies:** the Stop button uses it for a turn the screen started and for one it was following
+    after coming back to the conversation.
+- **"Let the agent try to fix it" says why it cannot start.** With a run already working, the button handed
+  the fix to a session that refused it without a word, and the click did nothing. It is now disabled, with
+  a line saying why.
+- **External links open in the system browser in the desktop app.**
+  - **What was wrong:** the links that open a new window (the repository, the releases, the MCP and skill
+    catalogues) did nothing in the desktop app. The runtime refuses every new window unless told otherwise, and
+    it said nothing. The same links worked in the browser build.
+  - **What happens now:** the native side hands such a link to the operating system, and the page itself still
+    opens nothing.
+  - **What is refused:** only an `http` or `https` address with a host goes through. It must carry no
+    credentials and be off the app's own origin. `file:`, `javascript:`, `mailto:` and custom protocols are
+    refused, so a link cannot make the system run a program.
+  - **New dependency:** the `open` crate, 5.4.4. It is what Tauri's own opener plugin uses underneath, used
+    here from Rust only; the plugin would add webview commands this app does not grant.
+- **The local decider no longer judges a truncated state.** Ollama keeps only half of its context window for the prompt and cuts the rest with no error. The default window here was 4,096 tokens, so the local System One model read at most ~2,050 tokens (about 11,000 characters of prose), while the verified-answers check sends attached sources of up to 14,000 characters. Every call now asks for a 16,384-token window (8,192 tokens of prompt), and a prompt that still fills it is a halt: the answer ships unverified, never judged on text the model did not see. Measured before the change on this backend (`bench/jevbench_local`): 231 of 231 answers identical with the larger window.
+- **One Chimera Desktop server per data folder.**
+  - **What was wrong:** a second copy of the app (a second click on the icon, or `chimera app` in a terminal)
+    could serve the same data folder. Each server keeps in memory the turns it runs and the folders they
+    edit, so two of them each believed they were alone: the one-writer-per-folder rule held only inside
+    each, and Stop in one window could not reach a turn the other ran.
+  - **What happens now:** the server claims its data folder before building anything, with a lock the OS
+    drops when the process ends. A second server on the same folder says where the first one is and exits
+    with code 3.
+- **`chimera decide` exits 1 when a question fails.** It exited 0 even when the backend was down or the state overflowed, so a CI step or a script could not tell "answered" from "failed". Now: 0 every question answered; 1 at least one failed, after the JSON is printed (or every JSONL line written) in full; 2 usage, or a question the linter refuses.
+- **An autonomous run waits for its folder the way a coding turn does.**
+  - **What was wrong:** turns took one lock per folder; runs took none, so another window or client could
+    start a run beside a turn, or a second run, in the same folder.
+  - **What happens now:** turns and runs share one lock per folder. A run whose folder is busy says so on
+    its feed and waits; Stop still reaches it while it waits.
+
 
 - **`apply_patch` no longer writes a stray conflict marker into a file.**
   - **What went wrong:** a hunk with a second `=======` line put that line into the replacement

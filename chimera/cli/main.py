@@ -1135,8 +1135,7 @@ def agent(
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
-    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
-    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
+    from chimera.core.agent import attended
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
@@ -1158,20 +1157,18 @@ def agent(
             registry = govern_registry(registry, kernel)
         runner = Agent(
             backend, registry,
-            AgentConfig(
+            attended(AgentConfig(
                 model=model, max_steps=max_steps, project_root=Path(workspace),
                 instructions=owner_identity(get_settings().home),
                 turn_context=True,
-                # A person is waiting: warn at US$1 and ask a repeating run to change approach
-                # before the breaker cuts it (see AgentConfig.loop_correction).
-                warn_usd=DEFAULT_SPEND_WARN_USD,
-                loop_correction=True,
-                auto_continue=True,
-                context_budget=DEFAULT_BUDGET_FRACTION,
-                unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
-            ),
+            )),
         )
-        result = runner.run(task)
+        # Printed as they come, as `chat` does: the run was given its warnings and nobody heard them.
+        from chimera.interface import render
+
+        result = runner.run(
+            task, on_notice=lambda code, text, _data: console.print(render.notice_line(code, text))
+        )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -1878,12 +1875,12 @@ def chat(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
-    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+    from chimera.core.agent import attended
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import finished_note
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
-    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway
 
     settings = get_settings()
@@ -1947,7 +1944,7 @@ def chat(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(
+        attended(AgentConfig(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
@@ -1956,14 +1953,7 @@ def chat(
             # depending on which window you opened.
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
-            # A person is waiting: warn at US$1 and ask a repeating run to change approach
-            # before the breaker cuts it (see AgentConfig.loop_correction).
-            warn_usd=DEFAULT_SPEND_WARN_USD,
-            loop_correction=True,
-            auto_continue=True,
-            context_budget=DEFAULT_BUDGET_FRACTION,
-            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
-        ),
+        )),
     )
     mem = None if no_memory else _memory_manager()
 
@@ -2005,6 +1995,9 @@ def chat(
             # A message with `/attach`ed documents is checked against them (study 26); built on
             # such a turn only. The plain gateway: the escalation names its own model.
             grounded_answers=_grounded_answers_for(settings, gateway),
+            # A shell command that outlived its timeout kept running as a job; the next turn hears
+            # that it ended, as on the Code screen.
+            turn_note=lambda: finished_note(settings.home, Path(workspace)),
         ),
         store,
     )
@@ -2148,13 +2141,13 @@ def assist(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
-    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+    from chimera.core.agent import attended
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import finished_note
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
-    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway
 
     settings = get_settings()
@@ -2188,20 +2181,13 @@ def assist(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(
+        attended(AgentConfig(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
-            # A person is waiting: warn at US$1 and ask a repeating run to change approach
-            # before the breaker cuts it (see AgentConfig.loop_correction).
-            warn_usd=DEFAULT_SPEND_WARN_USD,
-            loop_correction=True,
-            auto_continue=True,
-            context_budget=DEFAULT_BUDGET_FRACTION,
-            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
-        ),
+        )),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
     mem = None if no_memory else _memory_manager()
@@ -2222,6 +2208,7 @@ def assist(
         extractor=_memory_extractor(settings, mem, usage_session),
         cite_facts=settings.memory_extract,
         grounded_answers=_grounded_answers_for(settings, gateway),
+        turn_note=lambda: finished_note(settings.home, Path(workspace)),
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2396,12 +2383,12 @@ def tui(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
-    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+    from chimera.core.agent import attended
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import finished_note
     from chimera.interface import ChatSession
     from chimera.memory.models import project_key
-    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
     from chimera.providers import LLMGateway
     from chimera.sandbox.confirm import declare_no_human_here
 
@@ -2506,7 +2493,7 @@ def tui(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(
+        attended(AgentConfig(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
@@ -2517,14 +2504,7 @@ def tui(
             # like a stranger's.
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
-            # A person is waiting: warn at US$1 and ask a repeating run to change approach
-            # before the breaker cuts it (see AgentConfig.loop_correction).
-            warn_usd=DEFAULT_SPEND_WARN_USD,
-            loop_correction=True,
-            auto_continue=True,
-            context_budget=DEFAULT_BUDGET_FRACTION,
-            unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
-        ),
+        )),
     )
     mem = None if no_memory else _memory_manager()
     budget = session_budget(max_usd)
@@ -2556,6 +2536,7 @@ def tui(
             # spend is written, by which time `screen` exists.
             extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
             cite_facts=settings.memory_extract,
+            turn_note=lambda: finished_note(settings.home, Path(workspace)),
         ),
         store,
     )
@@ -2689,6 +2670,10 @@ def serve(
             # capability here and not good enough to convey the project's conventions, which is
             # incoherent: `serve --workspace X` is the headless deployment from the README, and
             # its AGENTS.md was never read.
+            #
+            # Not `attended`, unlike the platform bot: the webhook handler sends its jobs through
+            # this same gateway, and a webhook run is unattended like a cron one. Without the step
+            # wall it would have no end that anybody is there to see.
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 instructions=owner_identity(settings.home),
@@ -2879,6 +2864,26 @@ def desktop_app(
 
     _kernel_observes_unless_told_otherwise()
     settings = get_settings()
+    # One server per data folder, claimed before anything is built. A server keeps in memory the
+    # turns it runs, the folder each edits, the undo offers and the live frames; a second one on the
+    # same folder believed it was alone, so the one-writer-per-folder lock held only inside each,
+    # and Stop in one window could not reach a turn the other ran. The OS drops the claim with the
+    # process, so a crash never leaves the folder locked (`chimera/core/instance.py`).
+    from chimera.core.instance import claim_home, running_url
+
+    claim = claim_home(Path(settings.home))
+    if claim is None:
+        where = running_url(Path(settings.home))
+        console.print(
+            "[yellow]Chimera Desktop is already running on this data folder"
+            + (f" at {where}" if where else "")
+            + ".[/yellow] Use that one, or give this one another CHIMERA_HOME."
+        )
+        if open_browser and where:
+            import webbrowser
+
+            webbrowser.open(where)
+        raise typer.Exit(code=3)
     if not settings.can_answer():
         # Unlike run/solve/fuse (which need a model to do their job and stay strict), the desktop app
         # can BOOT keyless: LLMGateway() below is lazy (no model call), and the UI opens a first-run
@@ -3153,6 +3158,7 @@ def desktop_app(
     url = f"http://{host}:{port}"
     if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
         Path(emit_port_file).write_text(url, encoding="utf-8")
+    claim.announce(url)
     # The desktop bridge learns its port only now. With "Allow Claude to operate this app" on, this
     # writes the discovery file `chimera mcp desktop` reads; off, it only clears a stale one. A
     # wildcard bind is reached on loopback — the bridge is for a client on THIS machine.
@@ -3175,6 +3181,7 @@ def desktop_app(
     finally:
         # First, so the token dies with the server even if a later step raises.
         desktop_bridge.close()
+        claim.release()
         if cron_stop is not None:
             cron_stop.set()  # stop the cron daemon thread on Ctrl+C / shutdown
         messaging.stop_all()  # close any running messaging adapters
@@ -3492,6 +3499,8 @@ def _serve_platform(
 ) -> None:
     """Serve the gateway over a platform adapter: one session per chat; the agent can send."""
     from chimera.core import Agent, AgentConfig
+    from chimera.core.agent import attended
+    from chimera.core.jobs import finished_note
     from chimera.integrations import SendMessageTool
     from chimera.interface import ChatSession
     from chimera.server import MessageGateway
@@ -3524,14 +3533,15 @@ def _serve_platform(
         registry.register(send_tool)
         runner = Agent(
             backend, registry,
-            AgentConfig(
+            # A person is waiting on the other end of the chat, as at the terminal: see `attended`.
+            attended(AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 # The same identity the app's own bot and the coding turn apply. Without it the
                 # bot `serve --discord` starts answered as a different agent from the one the
                 # owner configured, in whatever language the message happened to be in.
                 instructions=owner_identity(get_settings().home),
                 turn_context=True,
-            ),
+            )),
         )
         return ChatSession(
             runner,
@@ -3539,6 +3549,9 @@ def _serve_platform(
             graph=graph,
             # The path `serve --discord` runs, which is the production bot.
             real_history=get_settings().chat_real_history,
+            # A shell command that outlived its timeout kept running as a job; this is how the
+            # chat hears that it ended.
+            turn_note=lambda: finished_note(get_settings().home, workspace_path),
             # `None` under the shipped `CHIMERA_GOVERNANCE=off`, where no ledger is built at all.
             on_turn_start=(
                 None
@@ -3549,7 +3562,7 @@ def _serve_platform(
             ),
         )
 
-    gateway = MessageGateway(factory)
+    gateway = MessageGateway(factory, warnings_in_reply=True)
     console.print(
         f"[bold]Chimera on {adapter.platform}[/bold] "
         "[dim]— message the bot; each chat is its own session. Ctrl+C to stop.[/dim]"

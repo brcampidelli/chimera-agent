@@ -22,13 +22,15 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowLeftRight, ChevronDown, GripVertical, Minus, X } from "lucide-react";
 
+import { MaximizeButton } from "@/components/shell/Maximize";
 import { DOCK_PANELS, isDockPanel, panelTitleKey, type MovablePanel } from "@/components/shell/panels";
 import { focusRing } from "@/components/ui/focus";
 import { useOptionalToast } from "@/components/ui/toast";
 import { Tooltip } from "@/components/ui/tooltip";
+import { useFloat } from "@/lib/float/host";
 import { useT, type TFunc } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
-import { panelsIn, type Layout, type PanelId, type Zone } from "@/lib/layout/model";
+import { PANELS, panelsIn, type Layout, type PanelId, type Zone } from "@/lib/layout/model";
 import { cn } from "@/lib/utils";
 
 /**
@@ -119,7 +121,12 @@ export function Dock({ zone, className }: { zone: DockZone; className?: string }
   const t = useT();
   const { layout } = useLayout();
   const { active } = useDndContext();
-  const ids = panelsIn(layout, zone).filter(isDockPanel);
+  const { floating } = useFloat();
+  // The maximised panel is drawn over the main area instead (phase 5), and a floating one in its own
+  // window (phase 7): each is drawn once.
+  const ids = panelsIn(layout, zone)
+    .filter(isDockPanel)
+    .filter((id) => id !== layout.maximized && !floating.has(id));
   const { setNodeRef, isOver } = useDroppable({ id: `zone:${zone}` });
   if (ids.length === 0 && !active) return null;
 
@@ -208,6 +215,7 @@ function PanelFrame({ id, zone }: { id: MovablePanel; zone: DockZone }) {
           {name}
         </span>
         <MoveMenu id={id} zone={zone} name={name} />
+        {PANELS[id].maximizable ? <MaximizeButton panel={id} name={name} /> : null}
         <Tooltip label={t(minimized ? "layout.card.expand" : "layout.card.minimize", { name })}>
           <button
             type="button"
@@ -237,7 +245,9 @@ function PanelFrame({ id, zone }: { id: MovablePanel; zone: DockZone }) {
 /** The path that needs neither a pointer nor the drag keys: pick where the panel goes. */
 function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: string }) {
   const t = useT();
+  const toast = useOptionalToast();
   const { layout, dispatch } = useLayout();
+  const { canFloat, popOut } = useFloat();
   const item = cn(
     "flex cursor-default items-center rounded-md px-2 py-1 text-xs outline-hidden",
     "data-highlighted:bg-surface-hover",
@@ -260,6 +270,20 @@ function MoveMenu({ id, zone, name }: { id: MovablePanel; zone: DockZone; name: 
               {t(`layout.moveTo.${z}`)}
             </Menu.Item>
           ))}
+          {canFloat ? (
+            <>
+              <Menu.Separator className="my-1 h-px bg-hairline" />
+              <Menu.Item
+                className={item}
+                onSelect={() => {
+                  // A refused window leaves the panel where it was, and says so rather than doing nothing.
+                  if (!popOut(id)) toast(t("layout.float.refused", { name }), "bad");
+                }}
+              >
+                {t("layout.moveTo.window")}
+              </Menu.Item>
+            </>
+          ) : null}
         </Menu.Content>
       </Menu.Portal>
     </Menu.Root>

@@ -46,6 +46,9 @@ export interface AgentState {
   report: AgentReport | null;
   busy: boolean;
   stop: () => void;
+  /** The coding turn this state describes, when there is one. Lets the status bar tell the turn on
+   *  screen from the others running in other conversations, which it lists beside it. */
+  turnId?: string | null;
   /** Publish what this screen's agent is doing, so the shell can show it from anywhere.
    *
    *  The provider owns the state now rather than receiving it from App. It used to be fed by the
@@ -62,6 +65,7 @@ const IDLE: Omit<AgentState, "publish"> = {
   report: null,
   busy: false,
   stop: () => {},
+  turnId: null,
 };
 
 export function AgentProvider({

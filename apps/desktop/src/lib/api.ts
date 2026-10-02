@@ -1375,7 +1375,9 @@ export async function transcribe(audio: Blob, filename = "speech.webm", language
  *  server, so a second press cannot restore a snapshot the user has since typed on top of. */
 export async function revertCodeTurn(
   token: string,
-): Promise<{ ok: boolean; restored: number; left_new_files?: boolean }> {
+): Promise<{ ok: boolean; restored: number; left_new_files?: boolean; kept?: string[] }> {
+  // `kept`: files that changed again after this turn (another conversation, or the person) and were
+  // left as they are. Undo takes back only what its own turn changed.
   // `left_new_files`: the restore put the captured content back but did NOT remove files the turn
   // created. Inside a git repository that pass is skipped unconditionally — deliberately, after a
   // path bug once let a revert wipe a repo — which is most workspaces someone opens in this app.
@@ -1670,8 +1672,24 @@ export interface RunningTurn {
   transcript_saved: boolean;
 }
 
+/** The desktop's screen layout as the server keeps it (dynamic screen, phase 6). Opaque here: the
+ *  layout module parses it, and reads anything it does not recognise as its default. */
+export const getUiLayout = () => json<{ layout: Record<string, unknown> | null }>("/api/ui/layout");
+export const putUiLayout = (layout: object) =>
+  json<{ layout: Record<string, unknown> | null }>("/api/ui/layout", {
+    method: "PUT",
+    body: JSON.stringify({ layout }),
+  });
+
 /** The coding turns running now, oldest first. Answered from memory, so it is cheap to ask often. */
 export const listRunningTurns = () => json<RunningTurn[]>("/api/code/turns/running");
+
+/** Stop a running coding turn on the server. It ends at its next step; an external agent's prompt is
+ *  cancelled at once. A 404 means the turn was not running (it had already ended), not a failure. */
+export const stopCodeTurn = (turnId: string) =>
+  json<{ turn_id: string; stopping: boolean }>(`/api/code/turns/${encodeURIComponent(turnId)}/stop`, {
+    method: "POST",
+  });
 
 /** Past coding conversations, newest first, each carrying the project it belongs to.
  *

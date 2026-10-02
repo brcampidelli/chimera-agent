@@ -10,6 +10,7 @@ import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  AppWindow,
   ArrowDown,
   Copy,
   Download,
@@ -32,6 +33,7 @@ import {
   listShares,
   listWorks,
   revertCodeTurn,
+  stopCodeTurn,
   stopWork,
   streamCodeTurn,
   streamSessionLive,
@@ -82,9 +84,10 @@ import {
   type TranscriptExchange,
 } from "@/lib/transcript";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
-import { useAgent } from "@/lib/agent-context";
+import { useAgent, type AgentState } from "@/lib/agent-context";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
+import { writeLastSession } from "@/lib/workspace";
 
 /** Share of the model's window this screen spends on the prompt before compacting.
  *
@@ -169,7 +172,9 @@ interface Exchange {
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
-  undone?: "ok" | "partial" | "gone";
+  undone?: "ok" | "partial" | "kept" | "gone";
+  /** Files an undo left alone because they changed again after the turn. */
+  keptFiles?: string[];
   /** Stopped by the Stop button. Distinct from `failed`: nothing went wrong, the user changed
    *  their mind — and distinct from a finished turn, which has a `done`. */
   abandoned?: boolean;
@@ -217,16 +222,21 @@ export function Verdict({
   v,
   original,
   undone,
+  keptFiles,
   onUndo,
   onFix,
+  fixBlocked = false,
   t,
 }: {
   v: CodeVerified;
   /** What the user asked for. Goes back with the failure so the fix attempt knows both. */
   original: string;
-  undone?: "ok" | "partial" | "gone";
+  undone?: "ok" | "partial" | "kept" | "gone";
+  keptFiles?: string[];
   onUndo: () => void;
   onFix: (text: string) => void;
+  /** A run is already working in this project (one per project), so the fix could not start now. */
+  fixBlocked?: boolean;
   t: TFunc;
 }) {
   const cmd = v.command ?? "";
@@ -241,16 +251,21 @@ export function Verdict({
       <p
         className={cn(
           "text-xs",
-          undone === "ok" ? "text-ok-foreground" : undone === "partial" ? "text-warn-foreground" : "text-bad-foreground",
+          undone === "ok" ? "text-ok-foreground" : undone === "gone" ? "text-bad-foreground" : "text-warn-foreground",
         )}
       >
-        {t(
-          undone === "ok"
-            ? "code.chat.verdict.reverted"
-            : undone === "partial"
-              ? "code.chat.verdict.revertedPartly"
-              : "code.chat.verdict.revertFailed",
-        )}
+        {undone === "kept"
+          ? t("code.chat.verdict.revertedExceptChanged", {
+              n: keptFiles?.length ?? 0,
+              files: (keptFiles ?? []).slice(0, 5).join(", "),
+            })
+          : t(
+              undone === "ok"
+                ? "code.chat.verdict.reverted"
+                : undone === "partial"
+                  ? "code.chat.verdict.revertedPartly"
+                  : "code.chat.verdict.revertFailed",
+            )}
       </p>
     ) : v.revert_token ? (
       <Button size="sm" variant="ghost" onClick={onUndo}>
@@ -290,9 +305,19 @@ export function Verdict({
       ) : (
         <div className="flex flex-wrap gap-2">
           {undo}
-          <Button size="sm" variant="ghost" onClick={() => onFix(fixBrief(original, v, t))}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={fixBlocked}
+            onClick={() => onFix(fixBrief(original, v, t))}
+          >
             <ShieldCheck className="h-3.5 w-3.5" /> {t("code.chat.verdict.fix")}
           </Button>
+          {/* One run per project, and a second is refused rather than queued. This button handed
+              the fix to that refusal and nothing happened; now it says so. */}
+          {fixBlocked ? (
+            <p className="w-full text-xs text-muted-foreground">{t("code.chat.verdict.fixBusy")}</p>
+          ) : null}
         </div>
       )}
     </div>
@@ -557,6 +582,7 @@ export function Conversation({
   workspace,
   openFile,
   onHandOff,
+  runLive = false,
   onBatch,
   onEdited,
   busyElsewhere,
@@ -567,6 +593,7 @@ export function Conversation({
   controls,
   onOpenFile,
   resumeSession,
+  onOpenWindow,
 }: {
   workspace: string;
   openFile: string | null;
@@ -584,6 +611,8 @@ export function Conversation({
   profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
   onHandOff: (text: string) => void;
+  /** A run is working in this project: `onHandOff` would be refused, so the fix button is disabled. */
+  runLive?: boolean;
   /** The user confirmed a decomposition: run these in parallel, each in its own worktree. */
   onBatch: (tasks: string[]) => void;
   /** A turn changed files — refresh the tree, the viewer and git status. */
@@ -596,6 +625,8 @@ export function Conversation({
   onOpenFile?: (path: string) => void;
   /** Continue a stored conversation: its turns are fetched and rendered above the composer. */
   resumeSession?: string | null;
+  /** Open this conversation in a window of its own. Absent inside that window: it already is one. */
+  onOpenWindow?: (sessionId: string) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -647,6 +678,9 @@ export function Conversation({
   // The turns THIS screen started. Their frames arrive twice — on the turn's own stream and on
   // the conversation's — and the second copy is dropped here rather than drawn as a guest's turn.
   const ownTurns = useRef<Set<string>>(new Set());
+  // The turn this screen started and is still waiting on, so Stop can end it on the server. Until
+  // Stop called the server, it only aborted this request, and the turn went on working and spending.
+  const currentTurnRef = useRef<string | null>(null);
   // How far the live stream has been read, so a reconnect asks for what came after.
   const liveSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -925,14 +959,38 @@ export function Conversation({
   // Publish what this turn is doing, so the shell's footer and the activity panel keep working from
   // any screen. There is a test that exists precisely to say the agent must stay visible when you
   // navigate away mid-turn.
-  const { publish } = useAgent();
+  const { publish: publishShared } = useAgent();
+  // Only while this conversation is on screen. Switching conversations unmounts this one while its
+  // turn may still be running, and its handlers used to go on publishing into the one state the bar
+  // reads: turn A finishing set "done, not busy" while turn B was running, and B's Stop disappeared.
+  // Leaving, it hands the state back once, if it was the one working; the turn itself goes on and the
+  // bar still lists it (RunningElsewhere), from the server.
+  const onScreen = useRef(true);
+  const publishedBusy = useRef(false);
+  const publish = useCallback(
+    (next: Partial<Omit<AgentState, "publish">>) => {
+      if (!onScreen.current) return;
+      if (next.busy !== undefined) publishedBusy.current = next.busy;
+      publishShared(next);
+    },
+    [publishShared],
+  );
+  useEffect(() => {
+    onScreen.current = true;
+    return () => {
+      onScreen.current = false;
+      if (publishedBusy.current) {
+        publishShared({ status: "idle", busy: false, tools: [], report: null, stop: () => {}, turnId: null });
+      }
+    };
+  }, [publishShared]);
   // The bar shows a turn this screen is only watching the way it shows one it started: working while
   // it runs, done when it ends. Written here rather than in `applyLive`, which is built before
   // `publish` exists, and keyed on the transition so a followed turn is announced once, not per frame.
   const wasFollowing = useRef(false);
   useEffect(() => {
     if (following) {
-      publish({ status: "thinking", tools: [], report: null, busy: true, stop: abandon });
+      publish({ status: "thinking", tools: [], report: null, busy: true, stop: abandon, turnId: following });
     } else if (wasFollowing.current && followEndedBy.current === "frame") {
       publish({ status: "done", busy: false, report: null });
     }
@@ -1178,12 +1236,18 @@ export function Conversation({
         // Sent on every turn, not just the first: a client that drops it silently restarts the
         // conversation, and the symptom is only that the agent seems forgetful.
         onSession: (id, turnId) => {
-          if (turnId) ownTurns.current.add(turnId);
+          if (turnId) {
+            ownTurns.current.add(turnId);
+            currentTurnRef.current = turnId;
+            publish({ turnId });
+          }
           // Invalidate on the FIRST turn's id, not on every turn: the sidebar lists conversations,
           // and a conversation that already exists in the list has not changed by gaining a message.
           if (id !== sessionId)
             void qc.invalidateQueries({ queryKey: ["code-sessions"] });
           setSessionId(id);
+          // The project's conversation from now on, so leaving the screen and coming back finds it.
+          writeLastSession(workspace, id);
         },
         onToken: (text) => {
           publish({ status: "streaming" });
@@ -1238,6 +1302,7 @@ export function Conversation({
           );
         },
         onDone: (done) => {
+          currentTurnRef.current = null;
           if (done.stopped_reason === "work_started") {
             // Not a turn's receipt: nothing ran here. The exchange keeps the sentence above.
             publish({ status: "done", busy: false, report: null });
@@ -1302,6 +1367,7 @@ export function Conversation({
         // Agents.tsx, Tasks.tsx and editor/Runner.tsx in this same app all show it. Not a design
         // choice about noise; an inconsistency nobody noticed.
         onError: (message) => {
+          currentTurnRef.current = null;
           patchLast((e) => ({ ...e, failed: true, error: message }));
           publish({ status: "idle", busy: false });
           setBusy(false);
@@ -1326,10 +1392,15 @@ export function Conversation({
   /** Abandon the turn in flight. The model call cannot be un-made, but the stream stops arriving and
    *  the composer comes back — which is the difference between waiting and being stuck. */
   function abandon() {
+    // The turn itself, on the server: the one this screen started, or the one it was following.
+    // Asked before the view lets go of it. A 404 means it had already ended, which is no failure.
+    const turn = currentTurnRef.current ?? followingRef.current;
+    currentTurnRef.current = null;
+    if (turn) void stopCodeTurn(turn).catch(() => undefined);
     abortRef.current?.abort();
     abortRef.current = null;
-    // A turn this screen was only watching: nothing of its own to abort, so stopping is to stop
-    // watching, with the same meaning it has for a turn it started. The turn goes on, on the server.
+    // A turn this screen was only watching is stopped on the server above, like one it started,
+    // and the view stops following it.
     followEndedBy.current = "person";
     followingRef.current = null;
     setFollowing(null);
@@ -1357,17 +1428,20 @@ export function Conversation({
     // the files this turn CREATED where they are — which is what happens inside a git repository,
     // and therefore what happens in most projects someone opens here. Reporting that as "Edits
     // undone." describes a state the workspace is not in.
-    let outcome: "ok" | "partial" | "gone" = "gone";
+    let outcome: "ok" | "partial" | "kept" | "gone" = "gone";
+    let kept: string[] = [];
     try {
       const result = await revertCodeTurn(token);
-      outcome = !result.ok ? "gone" : result.left_new_files ? "partial" : "ok";
+      kept = result.kept ?? [];
+      // A fourth: files that changed again after this turn were left as they are, not overwritten.
+      outcome = !result.ok ? "gone" : kept.length ? "kept" : result.left_new_files ? "partial" : "ok";
     } catch {
       // A failed call and a refused token mean the same thing to the user: the edits are still
       // there. Saying "gone" is the honest read of both, and it is the one that does not imply the
       // files were restored.
     }
     setExchanges((prev) =>
-      prev.map((e, j) => (j === index ? { ...e, undone: outcome } : e)),
+      prev.map((e, j) => (j === index ? { ...e, undone: outcome, keptFiles: kept } : e)),
     );
     if (outcome !== "gone") {
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
@@ -1427,6 +1501,16 @@ export function Conversation({
               >
                 <Link2 className="h-3.5 w-3.5" /> {t("code.share.button")}
                 {shareCount > 0 ? ` · ${shareCount}` : ""}
+              </Button>
+            ) : null}
+            {sessionId && onOpenWindow ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                title={t("code.window.openHint")}
+                onClick={() => onOpenWindow(sessionId)}
+              >
+                <AppWindow className="h-3.5 w-3.5" /> {t("code.window.open")}
               </Button>
             ) : null}
             {/* A record of what an agent did to a repository should be able to leave the window it
@@ -1718,9 +1802,11 @@ export function Conversation({
                 <Verdict
                   v={e.verified}
                   undone={e.undone}
+                  keptFiles={e.keptFiles}
                   onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
                   original={e.you}
                   onFix={onHandOff}
+                  fixBlocked={runLive}
                   t={t}
                 />
                 </CardChrome>

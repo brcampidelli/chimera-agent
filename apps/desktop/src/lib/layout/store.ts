@@ -110,6 +110,29 @@ export function saveLayout(layout: Layout, storage: Pick<Storage, "setItem"> | u
   }
 }
 
+/** The person's own layout, saved on request and applied from the command palette (phase 5). */
+export const MINE_KEY = "chimera.layout.v1.code.mine";
+
+export function saveMine(layout: Layout, storage: Pick<Storage, "setItem"> | undefined = safeStorage()): boolean {
+  try {
+    // Saved without focus mode's memory: "mine" is a layout, not a layout plus the one it replaced.
+    storage?.setItem(MINE_KEY, JSON.stringify({ ...layout, beforeFocus: null }));
+    return storage !== undefined;
+  } catch {
+    return false;
+  }
+}
+
+/** The saved layout, parsed like any stored one, or null when there is none. */
+export function loadMine(storage: Pick<Storage, "getItem"> | undefined = safeStorage()): Layout | null {
+  try {
+    const text = storage?.getItem(MINE_KEY);
+    return text ? parseLayout(JSON.parse(text)) : null;
+  } catch {
+    return null;
+  }
+}
+
 function safeStorage(): Storage | undefined {
   try {
     return typeof window === "undefined" ? undefined : window.localStorage;

@@ -66,7 +66,7 @@ interface PanelSpec {
  *  The conversation list stays home: it is drawn by the Code screen with that screen's own props, and
  *  the way to put it away is hiding the left region (phase 1). */
 export const PANELS = {
-  sessions: { zone: "left", movable: false, closable: false, maximizable: true },
+  sessions: { zone: "left", movable: false, closable: false, maximizable: false },
   "activity.tools": { zone: "right", movable: true, closable: true, maximizable: true },
   "activity.tokens": { zone: "right", movable: true, closable: true, maximizable: false },
   "activity.memory": { zone: "right", movable: true, closable: true, maximizable: false },
@@ -138,7 +138,14 @@ export type LayoutAction =
   | { type: "toggle-focus" }
   | { type: "card-pref"; kind: CardKind; mode: "open" | "minimized" }
   | { type: "show-all" }
+  | { type: "preset"; name: LayoutPreset }
+  /** Replace the whole layout, as read back from somewhere (the person's saved layout). The caller
+   *  parses it first (`parseLayout`), so this never takes a value it has not checked. */
+  | { type: "apply"; layout: Layout }
   | { type: "reset" };
+
+/** Layouts one command away (phase 5). Focus is its own action because leaving it goes back exactly. */
+export type LayoutPreset = "review" | "monitor";
 
 export function defaultLayout(): Layout {
   const panels = {} as Record<PanelId, PanelState>;
@@ -310,6 +317,24 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       if (hidden.length === 0) return layout;
       return hidden.reduce((acc, item) => applyLayout(acc, item.restore), layout);
     }
+    case "preset": {
+      // Review: the file viewer as wide as it goes and the conversation list out of the way, for reading
+      // a large diff. Monitor: the right panel as wide as it goes, for watching a long run.
+      const regions =
+        action.name === "review"
+          ? {
+              ...layout.regions,
+              left: { ...layout.regions.left, visible: false },
+              viewer: { ...layout.regions.viewer, size: SIZE_LIMITS.viewer.max },
+            }
+          : {
+              ...layout.regions,
+              right: { visible: true, size: SIZE_LIMITS.right.max },
+            };
+      return { ...layout, regions, maximized: null, beforeFocus: null };
+    }
+    case "apply":
+      return action.layout;
     case "reset":
       return defaultLayout();
     default:

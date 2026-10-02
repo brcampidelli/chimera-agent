@@ -23,6 +23,7 @@ read can call the network, and the turn's own save would wait on it.
 from __future__ import annotations
 
 import contextlib
+import logging
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -30,6 +31,8 @@ from dataclasses import dataclass, replace
 from typing import TypeVar
 
 T = TypeVar("T")
+
+_log = logging.getLogger(__name__)
 
 #: How many times a reader retries when a write lands under it. A save is milliseconds and a write
 #: needs two of them to disagree with one read, so a third disagreement is not a race but a turn
@@ -60,6 +63,11 @@ class LiveTurns:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._turns: dict[str, LiveTurn] = {}
+        # One stop signal per running turn, and what else a stop must reach (an external agent's
+        # prompt). The Stop button used to abort only the screen's request, so a "stopped" turn went
+        # on calling the model, editing files and spending on the server until it ended by itself.
+        self._stops: dict[str, threading.Event] = {}
+        self._cancels: dict[str, list[Callable[[], object]]] = {}
 
     def start(
         self, *, turn_id: str, session_id: str, workspace: str, message: str, live_since: int
@@ -68,10 +76,44 @@ class LiveTurns:
             self._turns[turn_id] = LiveTurn(
                 turn_id, session_id, workspace, message, time.time(), live_since
             )
+            self._stops[turn_id] = threading.Event()
+            self._cancels[turn_id] = []
 
     def finish(self, turn_id: str) -> None:
         with self._lock:
             self._turns.pop(turn_id, None)
+            self._stops.pop(turn_id, None)
+            self._cancels.pop(turn_id, None)
+
+    def should_stop(self, turn_id: str) -> Callable[[], bool]:
+        """What the agent loop polls once per step. A turn that is not registered (a background
+        work's, which the works registry stops) never reads as stopped here."""
+        with self._lock:
+            event = self._stops.get(turn_id)
+        return event.is_set if event is not None else (lambda: False)
+
+    def on_stop(self, turn_id: str, cancel: Callable[[], object]) -> None:
+        """Run ``cancel`` when this turn is asked to stop, or at once if it already was: the stop
+        may land between the turn starting and the external agent being reached."""
+        with self._lock:
+            event = self._stops.get(turn_id)
+            if event is not None and not event.is_set():
+                self._cancels[turn_id].append(cancel)
+                return
+        if event is not None:
+            _run_cancel(cancel)
+
+    def request_stop(self, turn_id: str) -> bool:
+        """Ask a running turn to stop. False when there is no such running turn."""
+        with self._lock:
+            event = self._stops.get(turn_id)
+            cancels = list(self._cancels.get(turn_id, ()))
+        if event is None:
+            return False
+        event.set()
+        for cancel in cancels:
+            _run_cancel(cancel)
+        return True
 
     @contextlib.contextmanager
     def writing(self, turn_id: str) -> Iterator[None]:
@@ -93,6 +135,10 @@ class LiveTurns:
         """Every turn in flight, oldest first."""
         with self._lock:
             return sorted(self._turns.values(), key=lambda t: t.started_at)
+
+    def get(self, turn_id: str) -> LiveTurn | None:
+        with self._lock:
+            return self._turns.get(turn_id)
 
     def of_session(self, session_id: str) -> LiveTurn | None:
         for turn in self.running():
@@ -117,6 +163,15 @@ class LiveTurns:
             if _agree(before, after) or attempt >= READ_ATTEMPTS:
                 return value, after
             time.sleep(0.01)
+
+
+def _run_cancel(cancel: Callable[[], object]) -> None:
+    # A cancel that fails must not keep the stop from reaching the agent loop, which is what ends
+    # the turn; the failure is logged, not raised into the request that pressed Stop.
+    try:
+        cancel()
+    except Exception:  # noqa: BLE001
+        _log.warning("cancelling a turn's external agent failed", exc_info=True)
 
 
 def _agree(before: LiveTurn | None, after: LiveTurn | None) -> bool:

@@ -38,6 +38,16 @@ describe("the turn's warnings", () => {
     expect(screen.getByText("This turn has spent US$ 1.02 so far")).toBeInTheDocument();
   });
 
+  it("says what the turns running at once spent together, and how many they are", () => {
+    renderWithProviders(
+      <NoticeList items={[{ code: "combined_spend", text: "", data: { usd: 2.2049, turns: 3 } }]} />,
+    );
+
+    expect(
+      screen.getByText("The 3 turns running at once have spent US$ 2.20 together"),
+    ).toBeInTheDocument();
+  });
+
   it("says how many steps a long turn has taken, and only the latest count", () => {
     renderWithProviders(
       <NoticeList
@@ -80,6 +90,7 @@ describe("the turn's warnings", () => {
         "code.notice.spendWarn",
         "code.notice.stepsExtended",
         "code.notice.taintedWrite",
+        "code.notice.combinedSpend",
       ]) {
         expect(DICTS[lang.code][key], `${lang.code} is missing ${key}`).toBeTruthy();
       }

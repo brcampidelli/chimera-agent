@@ -29,6 +29,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
 import { aliasesOf, loadProjects, projectLabel } from "@/lib/projects";
 import { cn } from "@/lib/utils";
+import { readLastSession, writeLastSession } from "@/lib/workspace";
 
 /** Past conversations, filed under the project they were about.
  *
@@ -141,6 +142,9 @@ export function SessionSidebar({
     mutationFn: async (target: NonNullable<typeof confirming>) => {
       if (target.kind === "session") {
         await deleteCodeSession(target.session.id);
+        // Not the one its project reopens any more: an unknown id opens empty under the old id.
+        if (readLastSession(target.session.workspace) === target.session.id)
+          writeLastSession(target.session.workspace, null);
         return;
       }
       // A project with no conversations has nothing to delete BUT the bookmark. Sending it to the
@@ -152,6 +156,7 @@ export function SessionSidebar({
         return;
       }
       await deleteCodeProject(target.project);
+      writeLastSession(target.project, null);
     },
     // Closed on settle, not on success: a delete that failed leaves the row on screen, and a dialog
     // that stays open over it reads as "still working" for something that already stopped.

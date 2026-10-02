@@ -109,6 +109,8 @@ class AcpTurn:
         self.write_region = write_region
         self.connect_timeout = connect_timeout
         self.turn_timeout = turn_timeout
+        #: True while `prompt` runs. Read by the registry, which never closes a busy agent.
+        self.busy = False
         self._on_token = on_token
         self._on_tool = on_tool
         self._on_edit = on_edit
@@ -222,6 +224,16 @@ class AcpTurn:
         """Send one message and return once the agent says the turn is over."""
         if self._conn is None or not self._session_id:
             raise AcpError("the session is not open")
+        # Busy for as long as the prompt runs: the registry never closes an agent in this state, to
+        # make room or for being idle (`chimera/acp/registry.py`).
+        self.busy = True
+        try:
+            return self._prompt(text, images)
+        finally:
+            self.busy = False
+
+    def _prompt(self, text: str, images: list[str] | None) -> AcpTurnResult:
+        assert self._conn is not None
         self._result = AcpTurnResult()
         blocks: list[dict[str, Any]] = [{"type": "text", "text": text}]
         for path in images or []:

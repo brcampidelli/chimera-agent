@@ -87,4 +87,44 @@ describe("useHotkeys", () => {
 
     expect(onToggleRegion).not.toHaveBeenCalled();
   });
+
+  it("toggles focus mode, maximises and goes to the approval with the shifted chords", async () => {
+    const onFocusMode = vi.fn();
+    const onMaximize = vi.fn();
+    const onApproval = vi.fn();
+    const { user } = setup({ onFocusMode, onMaximize, onApproval });
+
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
+    await user.keyboard("{Control>}{Shift>}m{/Shift}{/Control}");
+    await user.keyboard("{Control>}{Shift>}a{/Shift}{/Control}");
+
+    expect(onFocusMode).toHaveBeenCalledOnce();
+    expect(onMaximize).toHaveBeenCalledOnce();
+    expect(onApproval).toHaveBeenCalledOnce();
+  });
+
+  it("does not take the shifted chords while the user is typing", async () => {
+    const onFocusMode = vi.fn();
+    const { user } = setup({ onFocusMode });
+
+    await user.click(screen.getByRole("textbox", { name: "composer" }));
+    await user.keyboard("{Control>}{Shift>}f{/Shift}{/Control}");
+
+    expect(onFocusMode).not.toHaveBeenCalled();
+  });
+
+  it("leaves the unshifted chords alone: Ctrl+A still selects, Ctrl+F still finds, Ctrl+M is untouched", async () => {
+    const onFocusMode = vi.fn();
+    const onMaximize = vi.fn();
+    const onApproval = vi.fn();
+    const { user } = setup({ onFocusMode, onMaximize, onApproval });
+
+    await user.keyboard("{Control>}a{/Control}");
+    await user.keyboard("{Control>}f{/Control}");
+    await user.keyboard("{Control>}m{/Control}");
+
+    expect(onApproval).not.toHaveBeenCalled();
+    expect(onFocusMode).not.toHaveBeenCalled();
+    expect(onMaximize).not.toHaveBeenCalled();
+  });
 });

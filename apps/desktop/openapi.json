@@ -657,6 +657,26 @@
           "reason": {
             "title": "Reason",
             "type": "string"
+          },
+          "run_id": {
+            "default": "",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "work": {
+            "default": "",
+            "title": "Work",
+            "type": "string"
+          },
+          "workspace": {
+            "default": "",
+            "title": "Workspace",
+            "type": "string"
           }
         },
         "required": [
@@ -2281,6 +2301,25 @@
           "message"
         ],
         "title": "CodeTurnRequest",
+        "type": "object"
+      },
+      "CodeTurnStopOut": {
+        "description": "A stop that reached a running coding turn. The turn ends at its next step, not at once.",
+        "properties": {
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "stopping"
+        ],
+        "title": "CodeTurnStopOut",
         "type": "object"
       },
       "CompletionOut": {
@@ -9775,6 +9814,42 @@
         "title": "TurnOut",
         "type": "object"
       },
+      "UiLayoutIn": {
+        "properties": {
+          "layout": {
+            "additionalProperties": true,
+            "title": "Layout",
+            "type": "object"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "UiLayoutIn",
+        "type": "object"
+      },
+      "UiLayoutOut": {
+        "description": "The desktop's stored screen layout, or null when none was stored (dynamic screen, phase 6).\n\nOpaque to the server on purpose: the client owns the layout model and reads anything it does not\nrecognise as its default, so a shape checked here would be a second definition that drifts.",
+        "properties": {
+          "layout": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "UiLayoutOut",
+        "type": "object"
+      },
       "UnavailableToolOut": {
         "description": "A tool the registry holds only under a condition that is not met right now.",
         "properties": {
@@ -11865,6 +11940,46 @@
           }
         },
         "summary": "Code Turn Frames"
+      }
+    },
+    "/api/code/turns/{turn_id}/stop": {
+      "post": {
+        "description": "Stop a running coding turn on the server.\n\nUntil this existed the Stop button only aborted the screen's request: the turn went on\ncalling the model, editing files and spending until it finished by itself, while the screen\nsaid it had stopped. The agent loop polls the signal once per step, so the step in progress\nfinishes first; an external agent's prompt is cancelled at once. 404 for a turn that is not\nrunning, never 200-with-nothing: a stop that reached nothing must not read as one that\nworked.",
+        "operationId": "code_turn_stop_api_code_turns__turn_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeTurnStopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Turn Stop"
       }
     },
     "/api/code/works/{work_id}/session": {
@@ -16075,6 +16190,62 @@
           }
         },
         "summary": "Warm Transcriber Route"
+      }
+    },
+    "/api/ui/layout": {
+      "get": {
+        "description": "The screen layout the desktop stored, or null. Null is the ordinary first-run answer, and the\nclient then keeps what its own storage has (and sends it here), or its default.",
+        "operationId": "get_ui_layout_api_ui_layout_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiLayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Ui Layout"
+      },
+      "put": {
+        "description": "Keep the screen layout. 413 for one over the size cap; the shape is the client's to check.",
+        "operationId": "put_ui_layout_api_ui_layout_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiLayoutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiLayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Ui Layout"
       }
     },
     "/api/usage": {

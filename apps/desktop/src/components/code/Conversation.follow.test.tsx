@@ -7,6 +7,7 @@ import {
   getCodeSession,
   listShares,
   listWorks,
+  stopCodeTurn,
   streamCodeTurn,
   streamSessionLive,
   type RunningTurn,
@@ -173,7 +174,11 @@ describe("a conversation reopened while its turn is running", () => {
     expect(await screen.findByText("audit the gateway")).toBeInTheDocument();
   });
 
-  it("stopping only stops watching: the live window closes and the composer comes back", async () => {
+  // This test used to be called "stopping only stops watching", and it was true: Stop aborted the
+  // screen's request and the turn went on working and spending on the server. Stop now ends the
+  // turn itself (POST /api/code/turns/{id}/stop), so the claim is rewritten, not dropped: the view
+  // still lets go, AND the server is asked to stop the turn it was following.
+  it("stopping ends the followed turn on the server, and the live window closes", async () => {
     vi.mocked(getCodeSession).mockResolvedValue({
       id: "s1", workspace: "/proj", exchanges: [], running_turn: TURN,
     });
@@ -185,7 +190,23 @@ describe("a conversation reopened while its turn is running", () => {
     await userEvent.click(await screen.findByRole("button", { name: /stop/i }));
 
     await waitFor(() => expect(live.seen.signal?.aborted).toBe(true));
+    expect(stopCodeTurn).toHaveBeenCalledWith("t1");
     expect(screen.getByRole("button", { name: /^send$/i })).toBeInTheDocument();
+  });
+
+  it("stopping a turn this screen started ends it on the server too", async () => {
+    vi.mocked(getCodeSession).mockResolvedValue({ id: "s1", workspace: "/proj", exchanges: [] });
+    vi.mocked(stopCodeTurn).mockClear();
+    vi.mocked(streamCodeTurn).mockImplementation(async (_req: unknown, h: { onSession?: (id: string, turnId?: string) => void }) => {
+      h.onSession?.("s1", "own-turn");
+      await new Promise<void>(() => {});
+    });
+    mount("s1");
+    await userEvent.type(await screen.findByRole("textbox"), "refactor it{Enter}");
+
+    await userEvent.click(await screen.findByRole("button", { name: /stop/i }));
+
+    expect(stopCodeTurn).toHaveBeenCalledWith("own-turn");
   });
 
   it("leaves another turn's closing frame alone", async () => {

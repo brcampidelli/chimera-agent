@@ -26,6 +26,12 @@ export interface Hotkeys {
   onNavigate: (index: number) => void;
   /** Hide or show a side region: ⌘B the left, ⌘⌥B the right. Optional so a screen can leave it out. */
   onToggleRegion?: (side: "left" | "right") => void;
+  /** ⌘⇧F: focus mode on and off. */
+  onFocusMode?: () => void;
+  /** ⌘⇧M: maximise the panel that holds focus, or restore the one that is maximised. */
+  onMaximize?: () => void;
+  /** ⌘⇧A: go to the approval waiting in the conversation. */
+  onApproval?: () => void;
 }
 
 /**
@@ -34,7 +40,16 @@ export interface Hotkeys {
  * ⌘K is the only one that fires while typing — a palette exists precisely to be reachable without
  * moving your hands, and it opens over the field rather than acting on it.
  */
-export function useHotkeys({ onPalette, onSettings, onNewChat, onNavigate, onToggleRegion }: Hotkeys): void {
+export function useHotkeys({
+  onPalette,
+  onSettings,
+  onNewChat,
+  onNavigate,
+  onToggleRegion,
+  onFocusMode,
+  onMaximize,
+  onApproval,
+}: Hotkeys): void {
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       if (!chord(e)) return;
@@ -46,6 +61,23 @@ export function useHotkeys({ onPalette, onSettings, onNewChat, onNavigate, onTog
       }
 
       if (isTyping(e.target)) return;
+
+      // The shifted chords, by physical key like ⌘B above, and before the unshifted ones below.
+      if (e.shiftKey && e.code === "KeyF" && onFocusMode) {
+        e.preventDefault();
+        onFocusMode();
+        return;
+      }
+      if (e.shiftKey && e.code === "KeyM" && onMaximize) {
+        e.preventDefault();
+        onMaximize();
+        return;
+      }
+      if (e.shiftKey && e.code === "KeyA" && onApproval) {
+        e.preventDefault();
+        onApproval();
+        return;
+      }
 
       if (e.key === ",") {
         e.preventDefault();
@@ -65,5 +97,5 @@ export function useHotkeys({ onPalette, onSettings, onNewChat, onNavigate, onTog
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onPalette, onSettings, onNewChat, onNavigate, onToggleRegion]);
+  }, [onPalette, onSettings, onNewChat, onNavigate, onToggleRegion, onFocusMode, onMaximize, onApproval]);
 }

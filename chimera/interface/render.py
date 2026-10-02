@@ -152,13 +152,32 @@ _NOTICE_WORDS = {
 }
 
 
+def notice_text(code: str, text: str) -> str:
+    """The words for one live warning, without markup: for a surface that is not a terminal.
+
+    ``spend_warn``, ``price_unknown`` and ``steps_extended`` are not in the table on purpose: the
+    agent's own sentence carries the amount, the model's name or the steps done, which a fixed
+    phrase here would drop.
+    """
+    return _NOTICE_WORDS.get(code, text)
+
+
 def notice_line(code: str, text: str) -> str:
     """One live warning that does not stop the turn, printed the moment it is sent.
 
     The sibling of :func:`cut_short_line` for what happens BEFORE a stop: that one explains a reply
     that was cut off, this one says a limit is near while there is still time to act on it.
     """
-    return f"[yellow]⚠ {escape(_NOTICE_WORDS.get(code, text))}[/yellow]"
+    return f"[yellow]⚠ {escape(notice_text(code, text))}[/yellow]"
+
+
+def cut_short_text(report: TurnReport) -> str:
+    """:func:`cut_short_line` without markup, or ``""`` for a finished reply: for a chat platform."""
+    reason = (report.stopped_reason or "").strip()
+    if not reason or reason == "final":
+        return ""
+    note = _CUT_SHORT.get(reason)
+    return f"the turn stopped early: {reason}" if note is None else f"{note} ({reason})"
 
 
 def cut_short_line(report: TurnReport) -> str:

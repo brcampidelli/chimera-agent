@@ -39,6 +39,7 @@ import { SessionSidebar } from "@/components/code/SessionSidebar";
 import { EdgeTab, useRegionEnter } from "@/components/shell/RegionToggle";
 import { Splitter } from "@/components/shell/Splitter";
 import { Dock } from "@/components/shell/Dock";
+import { MaximizeButton } from "@/components/shell/Maximize";
 import { ComposerSettings } from "@/components/code/ComposerSettings";
 import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
@@ -47,7 +48,8 @@ import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
 import { cn } from "@/lib/utils";
 import { shellAllowed, setShellAllowed } from "@/lib/project-shell";
-import { readWorkspace, writeWorkspace } from "@/lib/workspace";
+import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
+import { CONVERSATION_WINDOW_FEATURES, conversationUrl, conversationWindowName } from "@/lib/float/protocol";
 
 const fieldCls = "field w-full px-3 text-sm";
 
@@ -233,12 +235,13 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col border-hairline lg:border-r">
+    <section data-panel="viewer" className="flex min-h-0 flex-1 flex-col border-hairline lg:border-r">
       <div className="flex items-center gap-2 border-b border-hairline px-4 py-2.5">
         <FileCode2 className="h-4 w-4 shrink-0 text-accent" />
         <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
           {path ?? t("code.noFile")}
         </span>
+        <MaximizeButton panel="viewer" name={t("layout.panel.viewer")} />
         {dirty ? <Badge tone="warn">{t("code.dirty")}</Badge> : null}
         {q.data?.truncated ? <Badge tone="warn">{t("code.truncated")}</Badge> : null}
         {savedFlash && !editing ? (
@@ -319,16 +322,29 @@ export function Code() {
   const { layout } = useLayout();
   const showSessions = layout.regions.left.visible;
   const sessionsEnter = useRegionEnter(showSessions, "left");
+  // The file viewer maximised (phase 5): it takes the whole row, and the list and the conversation step
+  // aside until it is restored (its own button, or Escape).
+  const { dispatch: layoutDispatch } = useLayout();
+  const viewerMax = layout.maximized === "viewer";
   const qc = useQueryClient();
   // Lazy initialiser, not `useState(readWorkspace())`: the latter reads storage on every render.
   const [workspace, setWorkspace] = useState(readWorkspace);
   const [openFile, setOpenFile] = useState<string | null>(null);
+  // A maximised viewer with no file is a blank screen: closing the file restores the layout, so the next
+  // file does not open maximised without anyone asking.
+  useEffect(() => {
+    if (!openFile && viewerMax) layoutDispatch({ type: "maximize", panel: null });
+  }, [openFile, viewerMax, layoutDispatch]);
   const [projectDraft, setProjectDraft] = useState(readWorkspace);
   // Which stored conversation is on screen, and a key that remounts the transcript when it
   // changes — the conversation holds its exchanges in state, so switching sessions has to
   // discard them rather than let the previous project's turns sit above the new one.
   const [picking, setPicking] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  // The project's last conversation, read when the screen opens: it used to start at null, so
+  // leaving the screen and coming back landed on a blank conversation. Only READ here and when the
+  // project changes — the conversation on screen records a new one itself, and pushing that back
+  // into `resumeSession` would reload the stored transcript over the turn it is streaming.
+  const [sessionId, setSessionId] = useState<string | null>(() => readLastSession(readWorkspace()));
   const [conversationKey, setConversationKey] = useState(0);
   // The conversation and the run share one workspace, so they share two facts: what the user asked
   // (handed over by "Run with verification") and whether a run is already in flight.
@@ -340,7 +356,8 @@ export function Code() {
   // This is strictly WIDER than what it replaces: the session also sees runs launched from the Work
   // screen, which the local flag never did — so the conversation now refuses to send while ANY run
   // is writing in this workspace, not just one started here.
-  const run = useRunSession();
+  // This project's run: runs work in several projects at once, one per project.
+  const run = useRunSession(workspace);
   // Only when the run is in THIS project. A run elsewhere cannot race this workspace, and
   // blocking on it would be a lie about why. A run with no workspace still blocks: not
   // knowing which directory it is editing is a reason to be careful, not a reason to allow.
@@ -417,7 +434,8 @@ export function Code() {
       setWorkspace(next);
       writeWorkspace(next);
       setProjectDraft(next);
-      setSessionId(null);
+      // That project's own conversation, or a new one: never the one from the project being left.
+      setSessionId(readLastSession(next));
       startConversation();
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
       void qc.invalidateQueries({ queryKey: ["git-status"] });
@@ -537,7 +555,7 @@ export function Code() {
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        {showSessions ? (
+        {showSessions && !viewerMax ? (
         <>
         {/* The width is the layout's (phase 2), dragged on the line beside it. */}
         <div
@@ -554,10 +572,12 @@ export function Code() {
             // A new conversation, not a cleared one: the old transcript stays on disk and stays in
             // the list. Clearing used to be the only way to start over, and it deleted the session.
             setSessionId(null);
+            writeLastSession(workspace, null);
             startConversation();
           }}
           onResume={(session) => {
             setSessionId(session.id);
+            writeLastSession(session.workspace, session.id);
             startConversation();
             if (session.workspace !== workspace) {
               setWorkspace(session.workspace);
@@ -594,13 +614,17 @@ export function Code() {
             conversation rather than sharing the height with it — which is what the note over
             the viewer already says it is: a consequence of opening a file, not a third of the
             window. Close the file and the conversation is back. */}
-        <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col", openFile && "max-lg:hidden")}>
+        <main className={cn("flex min-h-0 min-w-0 flex-1 flex-col", openFile && "max-lg:hidden", viewerMax && "hidden")}>
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}
             workspace={workspace}
             openFile={openFile}
             onOpenFile={setOpenFile}
+            // Two conversations at once: this one in a window of its own, the next one here.
+            onOpenWindow={(id) =>
+              window.open(conversationUrl(id), conversationWindowName(id), CONVERSATION_WINDOW_FEATURES)
+            }
             onHandOff={(text) =>
               // Straight into the shared run — the multi-attempt, revert-if-it-fails path the button
               // actually promises. It used to fill a form below and wait, so the user could set the
@@ -629,6 +653,7 @@ export function Code() {
             onBatch={(tasks) => setBatch({ tasks, at: Date.now() })}
             onEdited={refreshOpenFile}
             busyElsewhere={runBusy}
+            runLive={runBusy}
             posture={posture}
             provider={provider}
             model={model}
@@ -712,11 +737,13 @@ export function Code() {
             it overflowed the row instead and painted across the activity panel. */}
         {openFile ? (
           <>
-          <Splitter region="viewer" grows="left" className="hidden lg:block" />
+          {viewerMax ? null : <Splitter region="viewer" grows="left" className="hidden lg:block" />}
           {/* The width comes from the layout through a variable, because it applies only side by side:
               below `lg` the viewer REPLACES the conversation and takes the whole column. */}
           <div
-            className="flex min-h-0 min-w-0 flex-1 flex-col border-hairline lg:w-(--viewer-w) lg:flex-none lg:shrink-0 lg:border-l"
+            // One line on purpose: `columns-can-shrink.test.ts` reads the roles off it. Maximised (phase 5), the
+            // viewer drops its width and grows; otherwise it holds `--viewer-w` from `lg` up.
+            className={cn("flex min-h-0 min-w-0 flex-1 flex-col border-hairline", viewerMax ? "lg:w-auto" : "lg:w-(--viewer-w) lg:flex-none lg:shrink-0 lg:border-l")}
             style={{ "--viewer-w": `${layout.regions.viewer.size ?? 448}px` } as CSSProperties}
           >
             <Viewer workspace={workspace} path={openFile} />

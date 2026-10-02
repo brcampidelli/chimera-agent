@@ -46,6 +46,7 @@ from pydantic import BaseModel, Field
 # tests that exercise the endpoint have all passed.
 from sse_starlette.sse import EventSourceResponse
 
+from chimera.api.folder_locks import FolderLocks
 from chimera.api.posture import (
     DEFAULT_APPROVAL,
     DEFAULT_REACH,
@@ -68,17 +69,21 @@ from chimera.api.schemas import (
     CodeSessionOut,
     CodeSessionRawOut,
     CodeTurnFramesOut,
+    CodeTurnStopOut,
     DeletedCountOut,
     DictationOut,
     RunningTurnOut,
     TranscriberWarmOut,
     TranscriptOut,
+    UiLayoutIn,
+    UiLayoutOut,
     VisionOut,
     WorkActionOut,
     WorksOut,
 )
 from chimera.api.spoken_log import record_spoken_request
 from chimera.api.sse import SSE_RESPONSE
+from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
 from chimera.governance.approval import ApprovalAnnouncer
@@ -100,6 +105,16 @@ _log = get_logger("api.code")
 #: Hard ceiling on a requested step count. Not a judgement about how many steps a task needs — it
 #: is the difference between a long run and a runaway one, and the client asking is a UI field.
 MAX_RUN_STEPS = 100
+
+#: How long a conversation nobody watches and nothing runs in keeps its live frames. Past it, a
+#: screen that comes back reads the stored conversation, which holds every finished turn.
+IDLE_BUS_SECONDS = 1800.0
+
+#: Turns one conversation may hold at once, running or waiting for it: one running, three queued.
+#: The owner's composer queues a follow-up itself and sends it when the turn before ends, so it never
+#: comes near this; a share link reaches the guest route over the network, and without a bound every
+#: turn a guest sent was one more thread waiting on the conversation's lock.
+MAX_TURNS_PER_CONVERSATION = 4
 
 
 class CodeSeams(BaseModel):
@@ -285,8 +300,21 @@ class CodeSeams(BaseModel):
 #: Snapshots kept so a failed editing turn can be undone if the user asks. Bounded and in-memory: an
 #: offer that outlives the app is an offer nobody remembers making, and persisting whole-workspace
 #: snapshots to disk to support one button is a much larger promise than this button makes.
-_pending_reverts: dict[str, tuple[Any, Any]] = {}
-_MAX_PENDING_REVERTS = 8
+# The undo offers of editing turns, per conversation (`chimera/api/undo_offers.py`). A module-level
+# dict capped at 8 for the whole app used to take away an older conversation's Undo after eight
+# editing turns anywhere.
+_undo_offers = UndoOffers()
+
+
+class _Deleted(Exception):
+    """The turn's conversation was deleted while it ran: nothing more is recorded for it."""
+
+
+class _StoppedWhileWaiting(Exception):
+    """A turn stopped before it started, while it waited for another turn in its folder."""
+
+    MESSAGE = "Stopped before it started: another conversation was working in this folder."
+
 
 #: FastAPI's upload marker, hoisted out of the signatures so a call in an argument default does not
 #: trip the linter. Same object, same behaviour.
@@ -1207,8 +1235,12 @@ def register_code_api(
     graph: Any = None,
     fuse_backend: Any = None,
     static_dir: Path | None = None,
+    folder_locks: FolderLocks | None = None,
 ) -> None:
     """Mount ``POST /api/code/turn`` — a conversational coding turn, streamed.
+
+    ``folder_locks`` is the app's one lock per folder, shared with autonomous runs so a turn and a run
+    never edit one folder at once. A test mounting this alone gets its own.
 
     ``memory``/``graph`` are READ from, and written to in exactly ONE case: an explicit
     "remember that…" in the message the USER typed.
@@ -1232,7 +1264,7 @@ def register_code_api(
     from chimera.core.events import tool as tool_event
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
-    from chimera.core.jobs import jobs_for
+    from chimera.core.jobs import finished_note
     from chimera.core.redact import redact
     from chimera.interface.session import recall_facts
     from chimera.memory.history import files_of_exchange, history_for
@@ -1263,12 +1295,37 @@ def register_code_api(
     from chimera.api.sharing import SHARES_FILE, SessionBus, ShareStore
 
     shares = ShareStore(settings.home / SHARES_FILE)
-    bus = SessionBus()
+
+    def _from_run_log(turn_id: str, after: int, before: int) -> list[dict[str, Any]]:
+        # What the live ring dropped of a turn it still holds part of: the run log keeps every frame
+        # of a coding turn, each with the session number the bus gave it (`emit` below).
+        return [
+            f for f in runlog.frames(settings.home, turn_id, area="code")
+            if isinstance(f.get("session_seq"), int) and after < f["session_seq"] < before
+        ]
+
+    bus = SessionBus(backfill=_from_run_log)
     # The turns running right now, so a screen that left a conversation mid-turn can find its way
     # back: the stored file holds nothing of a turn until the agent finishes.
     from chimera.api.live_turns import LiveTurns
 
     live_turns = LiveTurns()
+    # What the turns running at once have spent together. Each turn warns about its own spend; five
+    # at once could each stay under that and spend five times it without a word (R14, 2026-09-30).
+    from chimera.api.combined_spend import CombinedSpend
+
+    combined_spend = CombinedSpend()
+    # Turns whose conversation was deleted while they ran. Stopped, and they write nothing more of it:
+    # a turn that finished after its conversation was deleted used to save it again, and the deleted
+    # conversation came back.
+    deleted_mid_turn: set[str] = set()
+
+    def forget_running(session_ids: list[str]) -> None:
+        wanted = set(session_ids)
+        for turn in live_turns.running():
+            if turn.session_id in wanted:
+                deleted_mid_turn.add(turn.turn_id)
+                live_turns.request_stop(turn.turn_id)
     # The index of finished turns (`chimera.memory.history`), one per home, shared with the
     # `recall_history` tool every registry mounts. The session file is what a conversation is
     # RESUMED from and trims itself accordingly; this is what a person's question about a turn
@@ -1277,14 +1334,56 @@ def register_code_api(
     # Beside the conversations, not inside them: a project you have added but not yet worked in
     # has no conversation to hang off, which is the whole reason the list cannot be derived.
     projects = CodeProjectRegistry(settings.home / "code_projects.json")
+    # The desktop's screen layout (dynamic screen, phase 6), beside the projects for the same reason:
+    # the webview's own storage does not survive a reinstall.
+    from chimera.core.ui_layout import UiLayoutStore
+
+    ui_layout = UiLayoutStore(settings.home / "ui_layout.json")
     # One lock per session: two concurrent turns on the same conversation would interleave their
     # transcripts and the last save would silently win. Different sessions never wait on each other.
+    # The lock alone did not give that: a turn loads its conversation when the request arrives, so
+    # one that waited here ran on the history it loaded before the other finished, and its save
+    # erased the other's exchange. Every use of the lock now reads the conversation again first
+    # (`store.refresh`), and a save is atomic.
     locks: dict[str, threading.Lock] = {}
     locks_guard = threading.Lock()
 
     def lock_for(session_id: str) -> threading.Lock:
         with locks_guard:
             return locks.setdefault(session_id, threading.Lock())
+
+    # One writer per folder, for every turn (background works included) and every autonomous run,
+    # which share this object (`chimera/api/folder_locks.py`). Two writers in one folder left a
+    # snapshot, a verification and an undo each describing a mix of both, and undoing one reverted
+    # the other's edits. Different folders never wait on each other. Taken before the session lock,
+    # always, so the two can't cross.
+    shared_folders = folder_locks if folder_locks is not None else FolderLocks()
+
+    def folder_lock(ws: Path) -> threading.Lock:
+        return shared_folders.lock(ws)
+
+    # How many turns each conversation holds right now, running or waiting (R17, 2026-09-30).
+    held_turns: dict[str, int] = {}
+
+    def admit_turn(session_id: str) -> None:
+        with locks_guard:
+            if held_turns.get(session_id, 0) >= MAX_TURNS_PER_CONVERSATION:
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        f"this conversation already has {MAX_TURNS_PER_CONVERSATION} turns running or "
+                        "waiting; send this one when one of them ends"
+                    ),
+                )
+            held_turns[session_id] = held_turns.get(session_id, 0) + 1
+
+    def release_turn(session_id: str) -> None:
+        with locks_guard:
+            left = held_turns.get(session_id, 0) - 1
+            if left > 0:
+                held_turns[session_id] = left
+            else:
+                held_turns.pop(session_id, None)
 
     def build_agent(
         req: CodeTurnRequest,
@@ -1498,6 +1597,7 @@ def register_code_api(
             )
         )
         with lock_for(parent_id):
+            store.refresh(parent)
             parent.messages.append({"role": "user", "content": req.message})
             parent.messages.append({
                 "role": "assistant",
@@ -1537,6 +1637,23 @@ def register_code_api(
     )
     app.state.work_manager = works
 
+    def approval_origin(run_id: str) -> dict[str, str]:
+        """The conversation and folder of the turn that asked a question, while it waits.
+
+        A question only exists while its turn waits for the answer, so the running turns (and, for a
+        background work's turn, the work's record) always know it.
+        """
+        turn = live_turns.get(run_id)
+        if turn is not None:
+            return {"session_id": turn.session_id, "workspace": turn.workspace}
+        work = work_store.by_turn(run_id)
+        if work is not None:
+            return {"session_id": work.parent, "workspace": work.workspace, "work": work.title}
+        return {}
+
+    # Read by `GET /api/approvals` (app.py), which lists every waiting question from every screen.
+    app.state.approval_origin = approval_origin
+
     def _launch_turn(
         req: CodeTurnRequest,
         ws: Path,
@@ -1545,6 +1662,36 @@ def register_code_api(
         loop: asyncio.AbstractEventLoop | None = None,
         queue: asyncio.Queue[tuple[str, Any] | None] | None = None,
         background: Work | None = None,
+    ) -> tuple[str, str]:
+        """Admit the turn into its conversation, then build and start it (:func:`_start_admitted`).
+
+        Admitted BEFORE anything is built: past that point the turn is announced on the bus and
+        listed as running, so a refusal after it would leave a turn that never ran on everyone's
+        screen. A conversation's first turn has no id yet and nothing to wait behind; a background
+        work runs on its own session, bounded by the works manager.
+        """
+        held = req.session_id if background is None and req.session_id else ""
+        if held:
+            admit_turn(held)
+        try:
+            return _start_admitted(
+                req, ws, author=author, loop=loop, queue=queue, background=background, held=held
+            )
+        except BaseException:
+            # Nothing was started, so the place goes back. Once the thread runs, it gives it back.
+            if held:
+                release_turn(held)
+            raise
+
+    def _start_admitted(
+        req: CodeTurnRequest,
+        ws: Path,
+        *,
+        author: str,
+        loop: asyncio.AbstractEventLoop | None,
+        queue: asyncio.Queue[tuple[str, Any] | None] | None,
+        background: Work | None,
+        held: str,
     ) -> tuple[str, str]:
         """Build the turn and start its thread; return ``(session_id, turn_id)``.
 
@@ -1651,22 +1798,10 @@ def register_code_api(
         # Background jobs that ended since a turn last looked. Handed to the model here — true for
         # this turn, absent from the stored transcript, like the image note above — so "the
         # download finished, exit 0" reaches the person through the agent instead of through
-        # nobody. Each job is reported once (`finished_unreported` marks it), and the model is told
-        # to read the output rather than guess at what the job produced. Through `job_status`, not
-        # `read_file`: the log lives in the app's data folder, outside the workspace, so a read_file
-        # of it is a jail question on the screen for something the job tool reads freely.
-        finished = jobs_for(live().home).finished_unreported()
-        if finished:
-            lines = [
-                f"- job {j.id} {j.state}"
-                + (f" (exit {j.exit_code})" if j.exit_code is not None else "")
-                + f": {j.command[:160]}"
-                for j in finished
-            ]
-            note = (note + "\n\n" if note else "") + (
-                "Background jobs that finished since your last turn (read their output with "
-                "job_status(job_id=...) before saying what they produced):\n" + "\n".join(lines)
-            )
+        # nobody. See `finished_note`.
+        jobs_note = finished_note(live().home, ws)
+        if jobs_note:
+            note = (note + "\n\n" if note else "") + jobs_note
 
         # What this conversation's background works are up to, for the model that is talking —
         # and the handles to stop or undo one. Only for a conversation that exists: a first message
@@ -1739,31 +1874,42 @@ def register_code_api(
 
         def emit(event: str, payload: Any) -> None:
             numbered = {**payload, "seq": next(seq)} if isinstance(payload, dict) else payload
+            published: dict[str, Any] | None = None
+            if background is None:
+                # Onto the session's bus, for everyone watching this conversation — the owner's
+                # own screen when a guest asked, a guest's when the owner did. The browser picture
+                # goes live and is not kept, for the reason the run log does not keep it.
+                published = bus.publish(
+                    session_id, event,
+                    numbered if isinstance(numbered, dict) else {"value": payload},
+                    turn_id=turn_id, author=author, keep=event != "browser",
+                )
             # A browser frame is a picture of a moment, tens of kilobytes each, and replay is for
             # the words a dropped connection lost — not for redrawing a page that has moved on.
-            # So frames go to the live stream and never to the run log.
+            # So frames go to the live stream and never to the run log. Each frame the bus
+            # numbered carries that number into the run log: the bus keeps the last few thousand
+            # and a long turn outgrows them, so a screen that comes back to it gets the start from
+            # here, and the number says which frames it already has.
             if isinstance(numbered, dict) and event != "browser":
-                runlog.append(settings.home, turn_id, event, numbered, area="code")
+                record = numbered if published is None else {**numbered, "session_seq": published["session_seq"]}
+                runlog.append(settings.home, turn_id, event, record, area="code")
             if loop is not None and queue is not None:
                 loop.call_soon_threadsafe(queue.put_nowait, (event, numbered))
             if background is not None:
                 # The parent conversation hears about the work in compact frames — its state, the
                 # tools it ran, the files it edited, a card it raised — never its every token.
                 _work_frame(background, event, numbered if isinstance(numbered, dict) else {})
-                return
-            # And onto the session's bus, for everyone watching this conversation — the owner's
-            # own screen when a guest asked, a guest's when the owner did. The browser picture goes
-            # live and is not kept, for the reason the run log does not keep it.
-            bus.publish(
-                session_id, event,
-                numbered if isinstance(numbered, dict) else {"value": payload},
-                turn_id=turn_id, author=author, keep=event != "browser",
-            )
 
         # The turn's opening frame on the bus: what was asked and by whom, before any work. A
         # viewer who did not send this message needs both to draw the row the answer will land
         # under; the session file only learns the author when the receipt is written at the end.
         if background is None:
+            # The frames of conversations left alone for a while go first: every conversation ever
+            # opened in this process kept its last few thousand frames until the app closed.
+            bus.trim_idle(
+                max_age=IDLE_BUS_SECONDS,
+                keep={t.session_id for t in live_turns.running()} | {session_id},
+            )
             opening = bus.publish(
                 session_id, "turn_started", {"message": req.message, "author": author},
                 turn_id=turn_id, author=author,
@@ -1855,6 +2001,14 @@ def register_code_api(
         def work() -> None:
             from chimera.orchestration.metering import MeteredBackend as _Meter
 
+            # A background work is stopped through the works registry; every other turn through its
+            # own signal, raised by POST /api/code/turns/{id}/stop.
+            stop_signal = (
+                works.should_stop(background.id) if background is not None else live_turns.should_stop(turn_id)
+            )
+            folder = folder_lock(ws)
+            holds_folder = False
+
             # What the plan gate's call cost, when the turn has one. Out here so the `except` below
             # can still add it to a turn that died after the plan was paid for.
             plan_meter: MeteredBackend | None = None
@@ -1872,6 +2026,22 @@ def register_code_api(
                 # one button would have made pressing Enter silently the weaker of the two, so the
                 # weaker one had to stop being weaker first.
                 from chimera.core.checkpoint import WorkspaceGuard
+
+                # The folder first: the snapshot, the run, the verification and the undo offer all
+                # describe this turn alone. A turn that waits says so, and Stop still reaches it.
+                if not folder.acquire(blocking=False):
+                    on_notice(
+                        "folder_busy",
+                        "Waiting: another conversation or run is working in this folder. This one "
+                        "starts when it finishes.",
+                        {"workspace": str(ws)},
+                    )
+                    while not folder.acquire(timeout=0.25):
+                        if stop_signal():
+                            raise _StoppedWhileWaiting
+                holds_folder = True
+                if stop_signal():
+                    raise _StoppedWhileWaiting
 
                 guard = WorkspaceGuard(ws)
                 before = guard.snapshot()
@@ -1929,10 +2099,9 @@ def register_code_api(
                         # A pass is not consent. The check answers "does this still build", and the
                         # question the button answers is "do I want this", which nothing else on the
                         # screen can answer for the person reading the diff.
-                        token = uuid.uuid4().hex
-                        _pending_reverts[token] = (guard, before)
-                        while len(_pending_reverts) > _MAX_PENDING_REVERTS:
-                            _pending_reverts.pop(next(iter(_pending_reverts)))
+                        # What THIS turn changed, measured now, before the verifier runs: an undo
+                        # puts back these files and no others (`WorkspaceGuard.restore_change`).
+                        token = _undo_offers.offer(session_id, (guard, guard.diff_since(before)))
                         outcome["token"] = token
                         command, source = resolve_verify(None, ws)
                         if command is None:
@@ -1979,10 +2148,19 @@ def register_code_api(
                     # exactly that rather than as a name nobody gave.
                     if author:
                         receipt["author"] = author
-                    session.remember_receipt(receipt)
+                    # This turn's own messages, for the history index below, before the stored
+                    # conversation (which may by now hold a later turn) is read back.
+                    own_messages = session.to_dict()["messages"]
                     try:
-                        with live_turns.writing(turn_id):
-                            store_for.save(session)
+                        # The verification before this can take minutes, and another turn of this
+                        # conversation may have saved meanwhile: the receipt goes on top of what is
+                        # stored now, never back over it with this turn's older copy.
+                        with lock_for(session_id):
+                            if turn_id not in deleted_mid_turn:
+                                store_for.refresh(session)
+                                session.remember_receipt(receipt)
+                                with live_turns.writing(turn_id):
+                                    store_for.save(session)
                     except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
                     # The turn joins the conversation history index — the record that outlives the
@@ -1995,7 +2173,9 @@ def register_code_api(
                     try:
                         from chimera.api.code_replay import exchanges_from_messages
 
-                        exchanges = exchanges_from_messages(session.to_dict()["messages"])
+                        exchanges = exchanges_from_messages(own_messages)
+                        if turn_id in deleted_mid_turn:
+                            raise _Deleted  # the conversation is gone; so is its index
                         history.record(
                             turn_id=turn_id,
                             session_id=session_id,
@@ -2007,6 +2187,8 @@ def register_code_api(
                             tools=[str(t) for t in (payload.get("tool_names") or [])],
                             tainted=bool(payload.get("tainted")),
                         )
+                    except _Deleted:
+                        pass  # deliberately not indexed: its conversation was deleted mid-turn
                     except Exception as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not index the turn in the history: %s", exc)
                     emit("done", payload)
@@ -2099,10 +2281,21 @@ def register_code_api(
                     # snapshot above was already taken, the verifier below still runs, and the
                     # revert offer still applies — which is the entire reason this is a branch
                     # inside the existing turn rather than a second endpoint.
-                    from chimera.api.code_acp import done_payload, run_external_turn
+                    from chimera.api import code_acp
+                    from chimera.api.code_acp import done_payload
 
+                    # A Stop pressed on this turn cancels the external agent's prompt: its loop is
+                    # not ours, so the step-by-step stop signal cannot reach it.
+                    live_turns.on_stop(
+                        turn_id,
+                        lambda: code_acp.cancel_external_turn(
+                            provider=external, command=req.provider_command,
+                            workspace=ws, session_id=session_id,
+                        ),
+                    )
                     with lock_for(session_id):
-                        acp_result = run_external_turn(
+                        store_for.refresh(session)
+                        acp_result = code_acp.run_external_turn(
                             provider=external,
                             command=req.provider_command,
                             message=message,
@@ -2120,14 +2313,26 @@ def register_code_api(
                         # sidebar would show an untitled, empty session for work that really happened.
                         session.messages.append({"role": "user", "content": message})
                         session.messages.append({"role": "assistant", "content": acp_result.answer})
-                        with live_turns.writing(turn_id):
-                            store_for.save(session)
+                        if turn_id not in deleted_mid_turn:
+                            with live_turns.writing(turn_id):
+                                store_for.save(session)
                     _verify_and_finish(
                         done_payload(acp_result, provider=external, tainted=bool(ledger.run_tainted()))
                     )
                     return
 
+                # The meter the agent would have built from the config's `max_usd`/`warn_usd`,
+                # built here instead so it also reports to the sum of the turns running at once.
+                agent_config = getattr(agent, "config", None)
+                turn_spend = combined_spend.budget(
+                    turn_id,
+                    max_usd=getattr(agent_config, "max_usd", None),
+                    warn_usd=getattr(agent_config, "warn_usd", None),
+                )
                 with lock_for(session_id):
+                    # What is stored now, not what was stored when this request arrived: a turn of
+                    # the same conversation may have finished while this one waited for the lock.
+                    store_for.refresh(session)
                     result = session.send(
                         message,
                         # Fusion has no token stream (the engine only implements `complete`), so
@@ -2138,7 +2343,10 @@ def register_code_api(
                         on_todo=on_todo,
                         on_notice=on_notice,
                         images=images or None,
-                        should_stop=works.should_stop(background.id) if background is not None else None,
+                        # A background work is stopped through the works registry; every other
+                        # turn through its own signal, raised by POST /api/code/turns/{id}/stop.
+                        should_stop=stop_signal,
+                        spend=turn_spend,
                     )
                     if fused:
                         agent.backend = original_backend  # type: ignore[assignment]
@@ -2148,8 +2356,9 @@ def register_code_api(
                     answer, grounded, grounded_usd = _check_grounded(grounded_turn, result)
                     if answer != result.answer:
                         session.replace_last_answer(answer)
-                    with live_turns.writing(turn_id):
-                        store_for.save(session)
+                    if turn_id not in deleted_mid_turn:
+                        with live_turns.writing(turn_id):
+                            store_for.save(session)
                 _verify_and_finish(
                     {
                         "answer": answer,
@@ -2249,7 +2458,9 @@ def register_code_api(
                 from chimera.api.code_acp import failure_message
 
                 message_out = (
-                    failure_message(exc)
+                    _StoppedWhileWaiting.MESSAGE
+                    if isinstance(exc, _StoppedWhileWaiting)
+                    else failure_message(exc)
                     if (req.provider or "").strip()
                     else _native_failure(exc)
                 )
@@ -2257,8 +2468,14 @@ def register_code_api(
                 if background is not None:
                     works.fail(background.id, message_out)
             finally:
+                if holds_folder:
+                    folder.release()
                 # Every way out of a turn, so a turn that died still stops being "running".
                 live_turns.finish(turn_id)
+                combined_spend.close(turn_id)
+                deleted_mid_turn.discard(turn_id)
+                if held:
+                    release_turn(held)
                 if loop is not None and queue is not None:
                     loop.call_soon_threadsafe(queue.put_nowait, None)  # sentinel: end of stream
 
@@ -2279,14 +2496,18 @@ def register_code_api(
 
     def _revert(token: str) -> dict[str, Any]:
         """Undo through the same single-use offer the receipt makes (`revert_turn`)."""
-        pending = _pending_reverts.pop(token, None)
+        pending = _undo_offers.take(token)
         if pending is None:
             return {"ok": False, "restored": 0}
-        workspace_guard, snapshot = pending
+        workspace_guard, change = pending
+        report = workspace_guard.restore_change(change)
         return {
             "ok": True,
-            "restored": workspace_guard.restore(snapshot),
-            "left_new_files": not workspace_guard.deletes_new_files(snapshot),
+            "restored": report.restored,
+            "left_new_files": bool(report.left_new),
+            # Files that changed again after the turn, by another conversation or the person: left as
+            # they are and named, rather than overwritten with the turn's "before".
+            "kept": report.kept,
         }
 
     # ------------------------------------------------------------------ the works, from the screen
@@ -2361,6 +2582,23 @@ def register_code_api(
         that the question failed; an error is an error.
         """
         return [_running_out(t) for t in live_turns.running()]
+
+    @app.post(
+        "/api/code/turns/{turn_id}/stop", dependencies=[guard], response_model=CodeTurnStopOut
+    )
+    def code_turn_stop(turn_id: str) -> dict[str, Any]:
+        """Stop a running coding turn on the server.
+
+        Until this existed the Stop button only aborted the screen's request: the turn went on
+        calling the model, editing files and spending until it finished by itself, while the screen
+        said it had stopped. The agent loop polls the signal once per step, so the step in progress
+        finishes first; an external agent's prompt is cancelled at once. 404 for a turn that is not
+        running, never 200-with-nothing: a stop that reached nothing must not read as one that
+        worked.
+        """
+        if not live_turns.request_stop(turn_id):
+            raise HTTPException(status_code=404, detail="no such running turn")
+        return {"turn_id": turn_id, "stopping": True}
 
     @app.get(
         "/api/code/turns/{turn_id}", dependencies=[guard], response_model=CodeTurnFramesOut
@@ -2740,6 +2978,8 @@ def register_code_api(
     def delete_code_session(session_id: str) -> dict[str, bool]:
         """Forget a conversation. An unknown id is ``{ok: false}`` with a 200, not a 404 — that is
         exactly the state a second click on Clear hits, and it is not an error."""
+        # A turn still running in it is stopped first, and told to write nothing more of it.
+        forget_running([session_id])
         try:
             gone = store.delete(session_id)
         except ValueError:
@@ -2749,6 +2989,7 @@ def register_code_api(
         # tokens: a link into a deleted conversation must open nothing.
         history.forget_session(session_id)
         shares.revoke_session(session_id)
+        bus.drop(session_id)
         work_store.forget_parent(session_id)
         return {"ok": gone}
 
@@ -2764,10 +3005,12 @@ def register_code_api(
         # The ids first, then the files, then the index: the index is keyed by session id, and
         # the list is the only place the workspace-to-id mapping exists.
         ids = [str(m["id"]) for m in store.list_meta() if m["workspace"] == workspace]
+        forget_running(ids)
         deleted = store.delete_project(workspace)
         history.forget_sessions(ids)
         for sid in ids:
             shares.revoke_session(sid)
+            bus.drop(sid)
         return {"deleted": deleted}
 
     # The registered projects live at `/workspaces`, NOT at `/projects`, and the distance is
@@ -2805,6 +3048,21 @@ def register_code_api(
         """Forget a bookmark. **Conversations are not touched**, so a project you have worked in
         reappears in the sidebar as one you have talked about rather than one you registered."""
         return [{"path": row.path, "alias": row.alias} for row in projects.remove(path)]
+
+    @app.get("/api/ui/layout", dependencies=[guard], response_model=UiLayoutOut)
+    def get_ui_layout() -> dict[str, Any]:
+        """The screen layout the desktop stored, or null. Null is the ordinary first-run answer, and the
+        client then keeps what its own storage has (and sends it here), or its default."""
+        return {"layout": ui_layout.read()}
+
+    @app.put("/api/ui/layout", dependencies=[guard], response_model=UiLayoutOut)
+    def put_ui_layout(body: UiLayoutIn) -> dict[str, Any]:
+        """Keep the screen layout. 413 for one over the size cap; the shape is the client's to check."""
+        try:
+            ui_layout.write(body.layout)
+        except OverflowError as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
+        return {"layout": body.layout}
 
     # --- sharing: the owner's controls, and the guest app under /guest -------------------------
     #

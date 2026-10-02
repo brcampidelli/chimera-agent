@@ -248,6 +248,21 @@ right panel, the left sidebar and a bottom dock that exists only while it holds 
 handle, a "Move to" menu, minimise and close. The agent's state line is not a panel. The composer's
 settings minimise to one line of chips; the posture note beside them never does.
 
+**Phase 5: maximise and focus.** One panel at a time fills the main area (`shell/Maximize.tsx`) and
+Escape always restores it. Focus mode (the status bar's focus button) remembers the layout it replaced
+and returns to it exactly. "Review", "monitor" and the person's own saved layout are palette commands.
+
+**Phase 6: kept by the server.** The layout also lives in `CHIMERA_HOME/ui_layout.json` through
+`/api/ui/layout` (`lib/layout/sync.tsx`): local goes up the first time, the server's is applied after
+that, a change made before it answers wins, and no server is not an error. A screen's own left sidebar
+(the editor's, in the shell's context slot) follows the left region.
+
+**Phase 7: a panel in its own window.** A dock panel opens in a window from its move menu
+(`lib/float/host.tsx`, `components/shell/FloatWindow.tsx`). The window is the same origin asked by
+`?float=` to draw one panel, with no layout of its own; the agent's state crosses over a
+`BroadcastChannel`. Floating is state of the run, never part of the layout, so nothing stored can point
+at a window that is gone. The tray lists a floating panel with "Bring back", beside what is hidden.
+
 **Dependencies.** `@dnd-kit` (core, sortable, utilities) joined the four Radix packages in phase 4, for
 the reason given above: it buys something harder than a hundred lines, the keyboard half of dragging,
 with every step announced. `react-resizable-panels` was approved for phase 2 and **not adopted**: it sizes sibling
@@ -294,6 +309,10 @@ question a person actually has, or a feature you want them to notice.
 | `⌘N` | new chat |
 | `⌘,` | settings |
 | `⌘B` / `⌘⌥B` | hide or show the left sidebar / the right panel (by the physical B key) |
+| `⌘⇧F` | focus mode on and off |
+| `⌘⇧M` | maximise the panel that holds focus, or restore the maximised one |
+| `⌘⇧A` | go to the approval waiting in the conversation |
+| `Esc` | restore a maximised panel, from anywhere (a menu or dialog open first takes it) |
 
 The palette is what makes a five-icon rail cost nothing in reach: the long tail lives there instead
 of on screen.

@@ -428,10 +428,18 @@ class JobRegistry:
         text = console_text(raw)
         return text[-want:] if len(text) > want else text
 
-    def finished_unreported(self) -> list[Job]:
-        """Jobs that ended and have not been handed to a turn yet — and are, now."""
+    def finished_unreported(self, within: Path | None = None) -> list[Job]:
+        """Jobs that ended and have not been handed to a turn yet — and are, now.
+
+        ``within``: only jobs that ran inside this folder. A job's news used to go to the next turn
+        of ANY project, which marked it reported and could not read its output (the job tools are
+        fenced to the turn's folder), so the project that started it never heard.
+        """
+        root = Path(within).resolve() if within is not None else None
         out: list[Job] = []
         for job in self.all():
+            if root is not None and not _inside(Path(job.cwd), root):
+                continue
             if job.state in ENDED and not job.reported:
                 job.reported = True
                 with self._lock:
@@ -622,6 +630,15 @@ _REGISTRIES: dict[str, JobRegistry] = {}
 _REGISTRIES_LOCK = threading.Lock()
 
 
+def _inside(path: Path, root: Path) -> bool:
+    """The same rule the job tools apply to a turn's folder."""
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    return resolved == root or resolved.is_relative_to(root)
+
+
 def jobs_for(home: Path) -> JobRegistry:
     """One registry per home per process — the live handles have to live somewhere shared by the
     tool that starts a job and the tool, the API and the turn that ask about it."""
@@ -632,3 +649,30 @@ def jobs_for(home: Path) -> JobRegistry:
             registry = JobRegistry(Path(home))
             _REGISTRIES[key] = registry
         return registry
+
+
+def finished_note(home: Path, within: Path) -> str:
+    """The turn note for the background jobs in ``within`` that ended since a turn last looked.
+
+    ``""`` when none did. Each job is reported once (``finished_unreported`` marks it). The model is
+    told to read the output rather than guess at what the job produced, and through ``job_status``,
+    not ``read_file``: the log lives in the data folder, outside the workspace, so a read_file of it
+    is a jail question for something the job tool reads freely.
+
+    Here rather than in the coding route, which was the only caller. A shell command that outlives
+    its timeout becomes a job on every surface, and the terminal and the chat bot never said when
+    one finished, so the news went to nobody.
+    """
+    finished = jobs_for(home).finished_unreported(within=within)
+    if not finished:
+        return ""
+    lines = [
+        f"- job {j.id} {j.state}"
+        + (f" (exit {j.exit_code})" if j.exit_code is not None else "")
+        + f": {j.command[:160]}"
+        for j in finished
+    ]
+    return (
+        "Background jobs that finished since your last turn (read their output with "
+        "job_status(job_id=...) before saying what they produced):\n" + "\n".join(lines)
+    )

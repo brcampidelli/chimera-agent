@@ -118,4 +118,34 @@ describe("hiding and showing the side regions of the shell", () => {
 
     expect(screen.getByRole("button", { name: "Hidden: 1" })).toBeInTheDocument();
   });
+
+  it("hides a screen's own left sidebar with the left region, and its tab brings it back (phase 6)", async () => {
+    function WithContext() {
+      dispatch = useLayout().dispatch;
+      return (
+        <AppShell
+          viewKey="edit"
+          viewLabel="Edit"
+          rail={<nav aria-label="rail">rail</nav>}
+          context={<aside aria-label="editor sidebar">files</aside>}
+        >
+          <p>editor</p>
+        </AppShell>
+      );
+    }
+    renderWithProviders(
+      <AgentProvider>
+        <WithContext />
+      </AgentProvider>,
+    );
+    expect(screen.getByRole("complementary", { name: "editor sidebar" })).toBeInTheDocument();
+
+    act(() => void dispatch?.({ type: "set-region", region: "left", visible: false }));
+    expect(screen.queryByRole("complementary", { name: "editor sidebar" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Show the left sidebar" }));
+    const back = screen.getByRole("complementary", { name: "editor sidebar" });
+    expect(back.parentElement).toHaveClass("region-enter-left");
+  });
 });
+

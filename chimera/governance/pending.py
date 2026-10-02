@@ -112,6 +112,11 @@ class PendingApproval:
     """The decision log's id for the answer that raised it — what the card's *was this dangerous?*
     labels. Empty for a question a rule or the taint ledger raised."""
 
+    run_id: str = ""
+    """The turn (or run) that asked, when the surface named it. What lets a screen say which
+    conversation and which project a question comes from: with several working at once, a list of
+    questions with no origin let the wrong one be approved. Empty for a surface that names none."""
+
     @property
     def age_seconds(self) -> float:
         return max(0.0, time.time() - self.asked_at)
@@ -156,6 +161,7 @@ def pending(home: Path) -> list[PendingApproval]:
                 band=str(data.get("band") or ""),
                 decider_model=str(data.get("decider_model") or ""),
                 decision_id=str(data.get("decision_id") or ""),
+                run_id=str(data.get("run_id") or ""),
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -252,6 +258,9 @@ def ask_durably(
                     **({"band": band} if band else {}),
                     **({"decider_model": decider_model} if decider_model else {}),
                     **({"decision_id": decision_id} if decision_id else {}),
+                    # Which turn asked, on the QUESTION too, not only on the record line: the list of
+                    # waiting questions reads it back to say which conversation and project each is.
+                    **({"run_id": str(named["run_id"])} if named.get("run_id") else {}),
                 },
                 ensure_ascii=False,
             ),

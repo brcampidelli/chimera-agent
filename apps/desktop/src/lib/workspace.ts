@@ -37,3 +37,30 @@ export function writeWorkspace(value: string): void {
     // Same reasoning as theme: the choice just will not survive a restart.
   }
 }
+
+/** The conversation each project was last showing, so the Code screen comes back to it.
+ *
+ * The screen held it in state that started empty, so leaving the screen (for Settings, for Work)
+ * and coming back — or switching project and back — landed on a blank new conversation while the
+ * one you were in sat in the list (R16 of the review of 2026-09-30). One entry per project, because
+ * a conversation belongs to the project it was created in and never moves.
+ */
+const LAST_SESSION_PREFIX = "chimera:code:last-session:";
+
+export function readLastSession(workspace: string): string | null {
+  try {
+    return localStorage.getItem(LAST_SESSION_PREFIX + workspace);
+  } catch {
+    return null;
+  }
+}
+
+/** Remember ``id`` as the project's conversation, or forget it with null. */
+export function writeLastSession(workspace: string, id: string | null): void {
+  try {
+    if (id) localStorage.setItem(LAST_SESSION_PREFIX + workspace, id);
+    else localStorage.removeItem(LAST_SESSION_PREFIX + workspace);
+  } catch {
+    // The screen will open on a new conversation next time, which is what it did before.
+  }
+}

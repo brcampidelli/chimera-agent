@@ -452,6 +452,11 @@ class ChatSession:
     #: by default, byte-identical to before: the messaging gateway, ``/v1/chat/completions`` and the
     #: benches attach nothing and are not gated.
     grounded_answers: Callable[[], Any] | None = None
+    #: Text that is true for this turn only, asked for when the turn starts: the background jobs
+    #: that finished since the last one (`chimera.core.jobs.finished_note`). Given to the model with
+    #: the turn and never recorded. ``None`` by default, byte-identical to before for the HTTP
+    #: route and every bench.
+    turn_note: Callable[[], str] | None = None
     turns: list[ChatTurn] = field(default_factory=list)
 
     def _begin_turn(self, message: str) -> None:
@@ -465,16 +470,28 @@ class ChatSession:
         if self.on_turn_start is not None:
             self.on_turn_start(message)
 
+    def _note_for_turn(self, note: str = "") -> str:
+        """``note`` joined with what :attr:`turn_note` has to say now; a failing provider adds nothing."""
+        if self.turn_note is None:
+            return note
+        try:
+            extra = self.turn_note()
+        except Exception:  # noqa: BLE001 — news about a job must never be what fails the turn
+            _log.debug("turn_note provider raised", exc_info=True)
+            extra = ""
+        return "\n\n".join(part for part in (note, extra) if part)
+
     def send(self, message: str) -> str:
         """Run one user message through the agent and record the exchange."""
         self._begin_turn(message)
+        note = self._note_for_turn()
         messages: list[dict[str, Any]] | None = None
+        facts, _layer = self._recall(message)
         if self._real_history_ready():
-            facts, _layer = self._recall(message)
-            result = self._run_with_history(message, facts)
+            result = self._run_with_history(message, facts, note=note)
             messages = _turn_messages(result, message)
         else:
-            result = self.agent.run(self._compose(message))
+            result = self.agent.run(self._assemble(message, facts, note=note))
         provenance = turn_provenance(
             list(result.tool_names), None, already_tainted=self._thread_tainted()
         )
@@ -511,6 +528,7 @@ class ChatSession:
         self._begin_turn(message)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
+        note = self._note_for_turn(note)
         declined: list[DeclinedTool] = []
         observed: list[ToolActivity] = []
 

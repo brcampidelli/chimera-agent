@@ -1,0 +1,20 @@
+corpus files 1057
+M000 units 861 distinct calls 864 repeated 2
+M001 units 870 distinct calls 875 repeated 0
+M002 units 864 distinct calls 868 repeated 1
+M003 units 865 distinct calls 869 repeated 1
+M004 units 844 distinct calls 846 repeated 3
+M005 units 867 distinct calls 871 repeated 1
+M006 units 865 distinct calls 867 repeated 3
+M007 units 859 distinct calls 862 repeated 2
+M008 units 864 distinct calls 868 repeated 1
+M009 units 864 distinct calls 867 repeated 2
+M010 units 857 distinct calls 857 repeated 5
+M011 units 828 distinct calls 833 repeated 0
+M012 units 877 distinct calls 880 repeated 2
+M013 units 871 distinct calls 874 repeated 2
+M014 units 877 distinct calls 877 repeated 5
+M015 units 858 distinct calls 861 repeated 2
+M016 units 834 distinct calls 838 repeated 1
+M017 units 873 distinct calls 877 repeated 1
+DONE worst repeated: 5
