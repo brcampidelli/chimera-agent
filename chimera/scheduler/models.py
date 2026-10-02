@@ -26,6 +26,9 @@ Trigger = Literal["cron", "event", "webhook"]
 
 CreatedBy = Literal["human", "agent"]
 
+Notify = Literal["always", "on_change", "failures_only"]
+"""When a job's answer is posted to its destination. See :attr:`CronJob.notify`."""
+
 DispatchStatus = Literal["ok", "error", "timeout", "budget", "rejected", "cancelled"]
 """How a dispatch ended.
 
@@ -159,4 +162,30 @@ class CronJob(BaseModel):
     Above 1, a failed attempt is retried with the failure fed back — worth setting only alongside
     `verify`, because without a gate nothing can tell a failed attempt from a finished one.
     """
+    notify: Notify = "always"
+    """When the answer is posted to :attr:`deliver_to`. The result file gets every answer whatever
+    this says — it is the record, the destination is the interruption.
+
+    * ``always`` (the default, and every job written before this field): every answer, as before,
+      except the job's own "nothing new" reply (:data:`~chimera.scheduler.surface.NOTHING_NEW`).
+    * ``on_change``: skipped when the answer is the same as the last one delivered for this job,
+      after whitespace is normalised. "One ping per state, not per tick": a monitor that finds the
+      same thing every five minutes was posting it every five minutes.
+    * ``failures_only``: only a dispatch that did not succeed — its gate rejected the work, or it
+      raised.
+
+    A failure is never suppressed by ``on_change`` either: a job that breaks the same way twice is
+    still broken, and silence is how a broken monitor reads as a quiet day."""
+    tools: list[str] | None = None
+    """The tools this job may use, by name. ``None`` (the default) = every tool, as before.
+
+    The owner's list, not a router's guess: a report job that reads a feed and posts a summary needs
+    three tools, and carrying the other twenty-odd schemas costs thousands of characters per step and
+    offers the model what the job has no business doing. A tool not on the list is REMOVED from the
+    registry (:func:`~chimera.governance.allowlist.restrict_registry`), which a sentence in the
+    prompt cannot do. An empty list grants nothing. Narrows the deployment's own allowlist, never
+    widens it."""
+    last_delivered_hash: str | None = None
+    """Fingerprint of the last answer delivered for this job — what ``notify="on_change"`` compares
+    against. Kept on the job because the job is the only state that survives a restart."""
     metadata: dict[str, Any] = Field(default_factory=dict)

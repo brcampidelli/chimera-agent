@@ -16,7 +16,7 @@ from croniter import croniter
 
 from chimera.concurrency import call_with_deadline
 from chimera.orchestration.budget import BudgetExceeded
-from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus, kill_flag_path
+from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus, Notify, kill_flag_path
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
 
@@ -43,6 +43,14 @@ FAIL_LIMIT = 5
 #: morning · 7h" firing at half past nine is a different promise from the one the screen made.
 JITTER_FRAC = 0.1
 JITTER_CAP_S = 300.0
+
+
+def _clean_tools(tools: list[str] | None) -> list[str] | None:
+    """A job's tool list, trimmed and without repeats, in the order given. None stays None: "no
+    list" (every tool) and "an empty list" (no tool) are opposite instructions."""
+    if tools is None:
+        return None
+    return list(dict.fromkeys(name.strip() for name in tools if name.strip()))
 
 
 def _jitter(key: str, period: float) -> float:
@@ -162,6 +170,8 @@ class Scheduler:
         deliver_to: str | None = None,
         verify: str = "",
         max_attempts: int = 1,
+        notify: Notify = "always",
+        tools: list[str] | None = None,
     ) -> CronJob:
         """Register a job fired by a cron expression.
 
@@ -172,6 +182,9 @@ class Scheduler:
             could write them, so the gate could never arm for any user.
         max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
             without a gate nothing can tell a failed attempt from a finished one.
+        notify: When the answer is posted to the job's destination (`CronJob.notify`); `always`
+            is today's behaviour.
+        tools: The only tools the job may use (`CronJob.tools`); None keeps every tool.
         """
         if not croniter.is_valid(cron_expr):
             raise ValueError(f"invalid cron expression: {cron_expr!r}")
@@ -193,6 +206,8 @@ class Scheduler:
             deliver_to=deliver_to,
             verify=verify,
             max_attempts=max(1, max_attempts),
+            notify=notify,
+            tools=_clean_tools(tools),
         )
         self.store.add(job)
         return job
@@ -206,6 +221,8 @@ class Scheduler:
         created_by: CreatedBy = "human",
         verify: str = "",
         max_attempts: int = 1,
+        notify: Notify = "always",
+        tools: list[str] | None = None,
     ) -> CronJob:
         """Register a job fired by a named event.
 
@@ -216,6 +233,9 @@ class Scheduler:
             could write them, so the gate could never arm for any user.
         max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
             without a gate nothing can tell a failed attempt from a finished one.
+        notify: When the answer is posted to the job's destination (`CronJob.notify`); `always`
+            is today's behaviour.
+        tools: The only tools the job may use (`CronJob.tools`); None keeps every tool.
         """
         job = CronJob(
             id=uuid.uuid4().hex[:8],
@@ -227,6 +247,8 @@ class Scheduler:
             enabled=created_by != "agent",  # agent-created triggers start disabled (same invariant)
             verify=verify,
             max_attempts=max(1, max_attempts),
+            notify=notify,
+            tools=_clean_tools(tools),
         )
         self.store.add(job)
         return job
@@ -240,6 +262,8 @@ class Scheduler:
         created_by: CreatedBy = "human",
         verify: str = "",
         max_attempts: int = 1,
+        notify: Notify = "always",
+        tools: list[str] | None = None,
     ) -> CronJob:
         """Register a job fired by an inbound HTTP POST to ``/webhook/<hook>``.
 
@@ -253,6 +277,9 @@ class Scheduler:
             could write them, so the gate could never arm for any user.
         max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
             without a gate nothing can tell a failed attempt from a finished one.
+        notify: When the answer is posted to the job's destination (`CronJob.notify`); `always`
+            is today's behaviour.
+        tools: The only tools the job may use (`CronJob.tools`); None keeps every tool.
         """
         job = CronJob(
             id=uuid.uuid4().hex[:8],
@@ -263,6 +290,8 @@ class Scheduler:
             created_by=created_by,
             verify=verify,
             max_attempts=max(1, max_attempts),
+            notify=notify,
+            tools=_clean_tools(tools),
         )
         self.store.add(job)
         return job

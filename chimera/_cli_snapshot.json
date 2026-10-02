@@ -1092,6 +1092,27 @@
               ],
               "required": false,
               "type": "int"
+            },
+            {
+              "default": "'always'",
+              "help": "When the answer is posted to the job's destination: always (every answer except the job's own 'nothing new' reply), on_change (skip an answer identical to the last one delivered), or failures_only. The result file gets every answer either way.",
+              "kind": "option",
+              "name": "notify",
+              "opts": [
+                "--notify"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Comma-separated tools this job may use; the rest are removed from its registry. Omit for every tool (the previous behaviour).",
+              "kind": "option",
+              "name": "tools",
+              "opts": [
+                "--tools"
+              ],
+              "required": false,
+              "type": "str"
             }
           ],
           "path": "cron add"

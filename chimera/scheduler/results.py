@@ -37,6 +37,9 @@ class CronResult:
     #: the screen has to be able to tell those apart.
     delivered: bool | None = None
     delivery_detail: str = ""
+    #: Why the answer was held back from its destination on purpose (the job had nothing new, or
+    #: its `notify` setting). Empty when it was posted, or when there was nowhere to post it.
+    skipped: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -88,6 +91,7 @@ def load_results(path: Path, *, job_id: str | None = None, limit: int = 50) -> l
                 answer=str(d.get("answer") or ""),
                 delivered=d.get("delivered") if isinstance(d.get("delivered"), bool) else None,
                 delivery_detail=str(d.get("delivery_detail") or ""),
+                skipped=str(d.get("skipped") or ""),
             )
         )
         if len(fora) >= limit:

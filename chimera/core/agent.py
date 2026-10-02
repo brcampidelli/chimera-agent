@@ -342,6 +342,13 @@ class AgentConfig:
     # is pushed back ONCE with a nudge to actually execute it — the fix for narrate-instead-of-act.
     # Off for plain Q&A (chimera run); on for autonomous task completion (chimera solve).
     insist_on_action: bool = False
+    #: Only the "assume" half of :attr:`insist_on_action`: a run that called no tool and answered
+    #: with questions is told once that nobody can answer and to state its reading and act
+    #: (:data:`_ASSUME_NUDGE`). For a surface where nobody answers but a prose answer with no tool
+    #: call is a legitimate ending — a scheduled report — which the action nudge would push back as
+    #: "you described a solution but did not carry it out". Ignored when ``insist_on_action`` is on,
+    #: which already covers it.
+    assume_on_questions: bool = False
     # Defaults from CHIMERA_COMPACT_SCHEMAS so every construction site inherits the env
     # setting; still overridable explicitly per Agent.
     compact_schemas: bool = field(default_factory=_default_compact_schemas)
@@ -1330,6 +1337,20 @@ class Agent:
                     asked = tool_calls_made == 0 and _looks_like_questions(result.content)
                     nudge = _ASSUME_NUDGE if asked else _ACTION_NUDGE
                     messages.append({"role": "user", "content": nudge})
+                    continue
+                # The same trigger insist_on_action uses for its assume branch, and nothing else: no
+                # tool called and the answer is questions. A report that called no tool and asked
+                # nothing ends here as it always did.
+                if (
+                    self.config.assume_on_questions
+                    and not self.config.insist_on_action
+                    and not nudged
+                    and tool_calls_made == 0
+                    and _looks_like_questions(result.content)
+                ):
+                    nudged = True
+                    messages.append({"role": "assistant", "content": result.content})
+                    messages.append({"role": "user", "content": _ASSUME_NUDGE})
                     continue
                 answer = result.content
                 if not (answer or "").strip():

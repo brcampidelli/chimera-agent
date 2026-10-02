@@ -17,6 +17,7 @@ daemon does not watch itself; it leaves a timestamp where something else can fin
 
 from __future__ import annotations
 
+import inspect
 import json
 import os
 import threading
@@ -24,6 +25,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
+from chimera.orchestration.budget import BudgetExceeded
 from chimera.scheduler.engine import Scheduler
 from chimera.scheduler.models import CronJob, DispatchStatus, JobOutcome
 from chimera.telemetry import get_logger
@@ -106,9 +108,19 @@ def heartbeat_age(path: Path, *, now: float) -> float | None:
     return max(0.0, now - beat["at"])
 
 
+def _takes_status(on_result: Callable[..., None]) -> bool:
+    """Whether a result sink accepts ``status=``. A sink written before it existed is called the old
+    way, with ``(job, answer)``, and keeps exactly the behaviour it had."""
+    try:
+        params = inspect.signature(on_result).parameters
+    except (TypeError, ValueError):  # an unintrospectable callable: assume the old shape
+        return False
+    return "status" in params or any(p.kind is p.VAR_KEYWORD for p in params.values())
+
+
 def make_agent_dispatch(
     run_task: Callable[[str], str],
-    on_result: Callable[[CronJob, str], None] | None = None,
+    on_result: Callable[..., None] | None = None,
     *,
     delivery_retries: int = 2,
     run_job: Callable[[CronJob], JobOutcome | str] | None = None,
@@ -125,29 +137,28 @@ def make_agent_dispatch(
     ``delivery_retries`` extra times and every attempt is logged, so a cron result is never
     silently lost the way a fire-and-forget log line would be. Generic and side-effect-light
     so it's easy to test and to wire.
-    """
 
-    def dispatch(job: CronJob) -> DispatchStatus | None:
-        bruto = run_job(job) if run_job is not None else run_task(job.action)
-        # A bare string is a caller with no verdict — a job that declared no gate has nothing
-        # that could reject it — and is read as `ok`, which is what every caller meant before.
-        outcome = bruto if isinstance(bruto, JobOutcome) else JobOutcome(str(bruto or ''))
-        answer = outcome.answer
-        status: DispatchStatus | None = None if outcome.ok else "rejected"
-        _log.info(
-            "cron '%s' ran%s -> %s",
-            job.name,
-            " (its gate rejected the work)" if status else "",
-            (answer or "").replace('\\n', " ")[:200],
-        )
+    A sink that accepts ``status=`` (as :func:`~chimera.scheduler.delivery.make_deliver` does) is
+    also told how the dispatch went — ``ok``, ``rejected``, and, for a job whose ``notify`` is not
+    ``always``, ``error`` or ``budget`` with the exception as the answer. That last part is what
+    makes ``notify="failures_only"`` mean anything: an exception never reached the sink at all, so
+    "only failures" would have been "only what a verify gate rejected". ``always`` keeps the old
+    contract — a raised dispatch delivers nothing — because that is what it promises.
+    """
+    takes_status = on_result is not None and _takes_status(on_result)
+
+    def _send(job: CronJob, answer: str, status: str) -> None:
         if on_result is None:
-            return status
+            return
         last_exc: Exception | None = None
         for attempt in range(1, delivery_retries + 2):
             try:
-                on_result(job, answer)
+                if takes_status:
+                    on_result(job, answer, status=status)
+                else:
+                    on_result(job, answer)
                 _log.info("cron '%s' result delivered (attempt %d)", job.name, attempt)
-                return status
+                return
             except Exception as exc:  # noqa: BLE001 — retry, then give up loudly
                 last_exc = exc
                 _log.warning("cron '%s' delivery attempt %d failed: %s", job.name, attempt, exc)
@@ -157,6 +168,39 @@ def make_agent_dispatch(
             delivery_retries + 1,
             last_exc,
         )
+
+    def dispatch(job: CronJob) -> DispatchStatus | None:
+        try:
+            bruto = run_job(job) if run_job is not None else run_task(job.action)
+        except Exception as exc:
+            # Re-raised untouched: the engine records the failure and drives the brake from it.
+            # This only tells the sink first, and only where the owner asked for failures.
+            if takes_status and job.notify != "always":
+                falha = "budget" if isinstance(exc, BudgetExceeded) else "error"
+                _send(job, f"The scheduled run did not finish: {type(exc).__name__}: {exc}", falha)
+            raise
+        # A bare string is a caller with no verdict — a job that declared no gate has nothing
+        # that could reject it — and is read as `ok`, which is what every caller meant before.
+        outcome = bruto if isinstance(bruto, JobOutcome) else JobOutcome(str(bruto or ''))
+        answer = outcome.answer
+        if outcome.cancelled:
+            # The operator stopped this run (`cron kill`). `JobOutcome.cancelled` said so and the
+            # engine has a `cancelled` status waiting for it, and this line was the one that never
+            # passed it on: the flag was dropped here, so a killed run was recorded `ok` — zeroing
+            # the failure count over real failures before it — and its partial, unverified answer
+            # was posted to the channel as though the job had finished.
+            _log.info("cron '%s' was stopped by the operator; nothing is delivered", job.name)
+            return "cancelled"
+        status: DispatchStatus | None = None if outcome.ok else "rejected"
+        _log.info(
+            "cron '%s' ran%s -> %s",
+            job.name,
+            " (its gate rejected the work)" if status else "",
+            (answer or "").replace('\\n', " ")[:200],
+        )
+        if on_result is None:
+            return status
+        _send(job, answer, status or "ok")
         return status
 
     return dispatch

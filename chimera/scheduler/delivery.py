@@ -27,6 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from chimera.scheduler.models import CronJob
+from chimera.scheduler.surface import answer_fingerprint, is_nothing_new
 from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.delivery")
@@ -55,12 +56,31 @@ class Delivered:
     detail: str = ""
 
 
+def skip_reason(job: CronJob, answer: str, status: str = "ok") -> str:
+    """Why this answer is NOT posted to the job's destination, or "" when it is.
+
+    ``status`` is how the dispatch went: ``ok``, or one of the failures (``rejected`` by the job's
+    own gate, ``error``, ``budget``). A failure is never skipped, under any ``notify``: the owner
+    who chose quiet chose to hear only when something is wrong, and a job that fails the same way
+    twice is still failing. Everything else follows :attr:`CronJob.notify`.
+    """
+    if status != "ok":
+        return ""
+    if job.notify == "failures_only":
+        return "notify=failures_only, and this run did not fail"
+    if is_nothing_new(answer):
+        return "the job reported nothing new"
+    if job.notify == "on_change" and job.last_delivered_hash == answer_fingerprint(answer):
+        return "notify=on_change, and the answer is the same as the last one delivered"
+    return ""
+
+
 def make_deliver(
     results_path: Path,
     *,
     warn: Callable[[str], None] | None = None,
     send: Callable[[str, str], Delivered] | None = None,
-) -> Callable[[CronJob, str], None]:
+) -> Callable[..., None]:
     """The sink a cron daemon hands its answers to: the file always, the webhook when there is one.
 
     A module function rather than a closure inside the ``chimera app`` command, because the defect
@@ -70,17 +90,32 @@ def make_deliver(
 
     ``warn`` receives one line when a delivery fails; ``send`` exists so a test can drive the
     failure path without a socket.
+
+    The returned sink takes ``(job, answer, status="ok")``. What it does NOT post is decided by
+    :func:`skip_reason` and written into the result record as ``skipped`` — a suppressed answer is
+    still an answer, and the record is where the owner goes to find out what the job said on the
+    days it said nothing to them.
     """
     enviar = send or deliver_to_webhook
 
-    def deliver(job: CronJob, answer: str) -> None:
+    def deliver(job: CronJob, answer: str, status: str = "ok") -> None:
         entrega: Delivered | None = None
-        if job.deliver_to:
+        motivo = skip_reason(job, answer, status)
+        if job.deliver_to and not motivo:
             entrega = enviar(job.deliver_to, f"**{job.name}**\n{answer}")
             if not entrega.ok and warn is not None:
                 # Said out loud rather than swallowed: a delivery that fails silently is
                 # indistinguishable from a job that never ran.
                 warn(f"cron '{job.name}': delivery failed — {entrega.detail}")
+        # The fingerprint moves only when the answer actually reached its destination (or there is
+        # no destination, and the record IS the delivery). A post that failed was not seen, so the
+        # same answer next time is still news to the person it was for.
+        if (
+            job.notify == "on_change"
+            and not motivo
+            and (entrega is None or entrega.ok)
+        ):
+            job.last_delivered_hash = answer_fingerprint(answer)
 
         results_path.parent.mkdir(parents=True, exist_ok=True)
         record: dict[str, object] = {
@@ -91,9 +126,13 @@ def make_deliver(
             "deliver_to": job.deliver_to,
             "answer": answer,
         }
+        if status != "ok":
+            record["status"] = status
         if entrega is not None:
             record["delivered"] = entrega.ok
             record["delivery_detail"] = entrega.detail
+        if motivo:
+            record["skipped"] = motivo
         with results_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 

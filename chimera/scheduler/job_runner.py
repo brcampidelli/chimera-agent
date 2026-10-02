@@ -24,7 +24,45 @@ from chimera.core.instructions import render as render_identity
 from chimera.governance import governed_profile
 from chimera.orchestration.budget import BudgetExceeded
 from chimera.scheduler.models import CronJob, JobOutcome, kill_flag_path
+from chimera.scheduler.surface import scheduled_run_note
 from chimera.tools.builtin import default_registry
+
+
+def _job_allow(job: CronJob, settings: Any, warn: Callable[[str], None]) -> str | None:
+    """The ``allow`` string for this job's governance, or None when the job names no tools.
+
+    Narrowed by the deployment's own allowlist when there is one: an owner who fenced the whole
+    install to five tools did not mean a job could reach a sixth by naming it.
+    """
+    if job.tools is None:
+        return None
+    wanted = [name.strip() for name in job.tools if name.strip()]
+    fence = set(settings.tool_allowlist or ())
+    if fence:
+        outside = [name for name in wanted if name not in fence]
+        if outside:
+            warn(
+                f"cron '{job.name}': tools {', '.join(outside)} are outside the deployment's "
+                "allowlist and were not granted"
+            )
+        wanted = [name for name in wanted if name in fence]
+    # An empty string is an explicit allowlist that grants nothing, which is what `tools: []` says.
+    return ",".join(wanted)
+
+
+def _warn_missing_tools(job: CronJob, registry: Any, warn: Callable[[str], None]) -> None:
+    """Say which of the job's tools it did not get.
+
+    A job that needed a tool it does not have fails quietly otherwise — the only trace is a worse
+    answer. Read off the registry the run actually holds, after governance, so a misspelt name and
+    one the deployment denies are both caught.
+    """
+    if job.tools is None:
+        return
+    held = set(registry.names()) if hasattr(registry, "names") else set()
+    missing = sorted({name.strip() for name in job.tools if name.strip()} - held)
+    if missing:
+        warn(f"cron '{job.name}': runs without {', '.join(missing)} (no such tool, or not allowed)")
 
 
 def make_run_job(
@@ -86,6 +124,9 @@ def make_run_job(
             default_registry(job_root),
             settings=settings,
             home=settings.home,
+            # The job's own tool list (`CronJob.tools`), when it has one. `None` passes `None`, and
+            # governed_profile then applies the deployment's allowlist exactly as before.
+            allow=_job_allow(job, settings, warn),
             surface=f"cron:{job.name}",
             # The job's own action is the person's instruction: a page or a file it names is a
             # fetch the person asked for, and the ledger records it as such.
@@ -93,6 +134,7 @@ def make_run_job(
             workspace=job_root,
             on_ledger=_take_ledger,
         )
+        _warn_missing_tools(job, job_registry, warn)
         # The operator's stop switch, read at dispatch time. `chimera cron kill <id>` writes the
         # flag; the dispatch it actually stops deletes it on the way out — so a kill aimed at a
         # running job takes it down at the next attempt boundary, and a kill aimed at a job
@@ -119,6 +161,14 @@ def make_run_job(
                 # "always answer in {language}" line.
                 instructions=render_identity(load_identity(settings.home)),
                 turn_context=True,
+                # What this run is: unattended, its answer delivered as it stands, nobody to answer
+                # a question, and a fixed reply for "nothing new" (study 28, P3). In the turn
+                # context rather than the system prompt, which stays the same bytes for a cache.
+                turn_notes=scheduled_run_note(job),
+                # And the one nudge that fits a run nobody attends: a run that answered with
+                # questions is told to assume and act. Not `insist_on_action` — that also pushes
+                # back a prose answer with no tool call, which for a report job is the job done.
+                assume_on_questions=True,
                 # The path that runs the most was the one with no step-level record at all. Without
                 # it there is no success-versus-context curve, no replay of a job that went wrong,
                 # and no reliability bench for the 24/7 loop — every one of those reads this file.

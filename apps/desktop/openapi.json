@@ -3016,9 +3016,33 @@
             "title": "Name",
             "type": "string"
           },
+          "notify": {
+            "default": "always",
+            "enum": [
+              "always",
+              "on_change",
+              "failures_only"
+            ],
+            "title": "Notify",
+            "type": "string"
+          },
           "schedule": {
             "title": "Schedule",
             "type": "string"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
           },
           "verify": {
             "default": "",
@@ -3213,9 +3237,33 @@
             ],
             "title": "Next Run"
           },
+          "notify": {
+            "default": "always",
+            "enum": [
+              "always",
+              "on_change",
+              "failures_only"
+            ],
+            "title": "Notify",
+            "type": "string"
+          },
           "schedule": {
             "title": "Schedule",
             "type": "string"
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools"
           },
           "trigger": {
             "title": "Trigger",
@@ -3322,6 +3370,11 @@
           },
           "name": {
             "title": "Name",
+            "type": "string"
+          },
+          "skipped": {
+            "default": "",
+            "title": "Skipped",
             "type": "string"
           }
         },

@@ -179,8 +179,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "ask exception: tests/test_the_agent_may_ask.py (paired run); fence: bench/right_hand_governance"),
     _c("loop.todo", "chimera.core.agent:TODO_PROMPT", "tool", _LOOP, "unmeasured",
        note="four runs per model, see the comment in Agent.run; too few to call measured"),
-    _c("loop.assume_nudge", "chimera.core.agent:_ASSUME_NUDGE", "turn", ("S1",), "unmeasured",
-       note="replaces the action nudge when a solve answered with questions; study 25 defect 5"),
+    _c("loop.assume_nudge", "chimera.core.agent:_ASSUME_NUDGE", "turn", ("S1", "S10"),
+       "unmeasured",
+       note="replaces the action nudge when a solve answered with questions; study 25 defect 5. "
+            "Also sent alone (AgentConfig.assume_on_questions) on every scheduled run, study 28 P3"),
     _c("loop.action_nudge", "chimera.core.agent:_ACTION_NUDGE", "turn", ("S1",), "measured",
        "bench/swe_bench/RESULTS.md measured the trigger (empty patches), not this wording"),
     _i("loop.stop_nudge", "chimera.core.agent:Agent.run", "turn", _LOOP, "measured",
@@ -266,6 +268,10 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("chat.restored_labels", "chimera.interface.session:_RESTORED", "volatile", ("S3", "S10"),
        "unmeasured", render=_restored_labels),
     _i("chat.profile", "chimera.interface.profile:render_profile", "volatile", ("S3", "S10")),
+    _c("cron.scheduled_run_note", "chimera.scheduler.surface:SCHEDULED_RUN_NOTE", "surface",
+       ("S1", "S10"), "unmeasured",
+       note="the turn context of every scheduled run (study 28 P3): unattended, the answer is the "
+            "delivered message, assume instead of asking, and the NOTHING_NEW reply delivery skips"),
     _i("webhook.payload", "chimera.cli.main:_webhook_handler", "volatile", ("S10",),
        note="payload appended to the job prompt inside the fence; sleeper-channels audit, channel 4"),
     # ---- autonomous solve ----------------------------------------------------------------------

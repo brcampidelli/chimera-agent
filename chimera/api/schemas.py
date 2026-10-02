@@ -1138,6 +1138,12 @@ class CronJobOut(BaseModel):
     `verify` runs ungoverned by design, and that is worth reading on the row rather than inferring
     from its absence."""
     max_attempts: int = 1
+    notify: Literal["always", "on_change", "failures_only"] = "always"
+    """When the answer is posted to `deliver_to`: every answer (`always`, the default), only when
+    it differs from the last one delivered (`on_change`), or only when the run failed
+    (`failures_only`). The result file records every answer whatever this says."""
+    tools: list[str] | None = None
+    """The only tools this job may use. None = every tool; an empty list = none."""
 
 
 class CronResultOut(BaseModel):
@@ -1153,6 +1159,11 @@ class CronResultOut(BaseModel):
     has to be able to tell those apart — one is "nobody asked for delivery", the other is "we tried
     and could not"."""
     delivery_detail: str = ""
+    skipped: str = ""
+    """Why this answer was NOT posted to the job's destination, when it was not: the job said it had
+    nothing new, or its `notify` setting held it back. Empty when it was posted (or there was nowhere
+    to post it). A third state beside `delivered`, because "held back on purpose" is neither "nobody
+    asked" nor "we tried and failed"."""
 
 
 class MessagingPlatformOut(BaseModel):
@@ -1228,6 +1239,11 @@ class CronCreateIn(BaseModel):
     max_attempts: int = 1
     """How many times one dispatch may try. Worth raising only alongside `verify`: without a gate
     nothing can tell a failed attempt from a finished one."""
+    notify: Literal["always", "on_change", "failures_only"] = "always"
+    """When the answer is posted to `deliver_to` (see `CronJobOut.notify`). A client that omits it
+    gets `always`, the previous behaviour."""
+    tools: list[str] | None = None
+    """The only tools this job may use. Omitted = every tool, the previous behaviour."""
 
 
 # --- tasks (kanban + projects) --------------------------------------------------------------------

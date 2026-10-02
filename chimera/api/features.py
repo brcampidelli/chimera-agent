@@ -86,6 +86,8 @@ def _job_dict(job: Any) -> dict[str, Any]:
         # than assumed present: the store holds jobs written before these fields existed.
         "verify": getattr(job, "verify", "") or "",
         "max_attempts": int(getattr(job, "max_attempts", 1) or 1),
+        "notify": getattr(job, "notify", "always") or "always",
+        "tools": getattr(job, "tools", None),
     }
 
 
@@ -518,6 +520,7 @@ def register_features(
                 "answer": r.answer,
                 "delivered": r.delivered,
                 "delivery_detail": r.delivery_detail,
+                "skipped": r.skipped,
             }
             for r in load_results(caminho, job_id=job_id, limit=max(1, min(200, limit)))
         ]
@@ -614,6 +617,8 @@ def register_features(
                 deliver_to=body.deliver_to,
                 verify=body.verify,
                 max_attempts=body.max_attempts,
+                notify=body.notify,
+                tools=body.tools,
             )
         except ValueError as exc:  # an invalid cron expression is a client error, not a 500
             raise HTTPException(status_code=400, detail=str(exc)) from exc

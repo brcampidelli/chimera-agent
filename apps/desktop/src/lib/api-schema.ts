@@ -4616,8 +4616,16 @@ export interface components {
             max_attempts: number;
             /** Name */
             name: string;
+            /**
+             * Notify
+             * @default always
+             * @enum {string}
+             */
+            notify: "always" | "on_change" | "failures_only";
             /** Schedule */
             schedule: string;
+            /** Tools */
+            tools?: string[] | null;
             /**
              * Verify
              * @default
@@ -4692,8 +4700,16 @@ export interface components {
             name: string;
             /** Next Run */
             next_run: number | null;
+            /**
+             * Notify
+             * @default always
+             * @enum {string}
+             */
+            notify: "always" | "on_change" | "failures_only";
             /** Schedule */
             schedule: string;
+            /** Tools */
+            tools?: string[] | null;
             /** Trigger */
             trigger: string;
             /**
@@ -4739,6 +4755,11 @@ export interface components {
             job_id: string;
             /** Name */
             name: string;
+            /**
+             * Skipped
+             * @default
+             */
+            skipped: string;
         };
         /**
          * CronSilenceOut
