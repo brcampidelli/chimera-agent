@@ -143,6 +143,10 @@ class WorkStore:
         with self._lock:
             return self._works.get(work_id)
 
+    def by_turn(self, turn_id: str) -> Work | None:
+        with self._lock:
+            return next((w for w in self._works.values() if w.turn_id == turn_id), None)
+
     def for_parent(self, parent: str) -> list[Work]:
         with self._lock:
             return sorted((w for w in self._works.values() if w.parent == parent), key=lambda w: w.created_at)

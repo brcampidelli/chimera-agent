@@ -1,5 +1,5 @@
 ---
-source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
+source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
 ---
 
 # Implantando o Chimera em um servidor (VPS)
@@ -156,8 +156,10 @@ um alerta em vez de uma resposta, rode isso a partir do cron do próprio host:
 
 Isso funciona porque é supervisionado por algo que não é o Chimera — que é justamente o ponto.
 
-`--check` sai com 1 só quando há job atrasado ou falhando, então o e-mail só chega nessa hora; o `cron doctor` sem ele sai sempre com 0, porque responder não é falhar.
+`--check` sai com 1 só quando há job atrasado ou falhando — e agora também quando o heartbeat do daemon está velho, então a linha do host-cron acima pega um daemon morto na próxima execução, seja qual for a agenda do job; o e-mail só chega nessa hora. O `cron doctor` sem ele sai sempre com 0, porque responder não é falhar.
 
+
+**O heartbeat do daemon fecha a janela que os jobs não conseguem.** A cada tick, o daemon escreve seu sinal de vida em `<CHIMERA_HOME>/scheduler/heartbeat.json` (atômico, ao lado de `jobs.json`). O doctor o lê primeiro e responde a uma pergunta que os jobs sozinhos não conseguem: um daemon morto com um job diário parece saudável pelos jobs durante ~23 horas — o job ainda não está atrasado — enquanto o heartbeat para no instante em que o daemon morre. O veredito é julgado contra três ticks do próprio intervalo que o heartbeat registrou, e impresso com o teto usado, para que você discuta o número em vez de se perguntar de onde veio. Três leituras honestas: `alive`/`stale` são julgadas; `unknown` significa que existe um heartbeat sem intervalo de tick registrado (um escritor mais velho), então a frescura não pode ser julgada sem inventar um número — e o leitor se recusa; `none` significa nenhum heartbeat, o que é “sem sinal”, não “morto” — um daemon que nunca rodou não deixou evidência nenhuma. Isto é *liveness*, não taint: a superfície do scheduler ainda não rastreia taint (ver `SECURITY.md`).
 ---
 
 ## 4. Saúde, backups, segurança

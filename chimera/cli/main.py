@@ -1135,6 +1135,7 @@ def agent(
 ) -> None:
     """Run the ReAct agent loop with native tools. Requires a provider key."""
     from chimera.core import Agent, AgentConfig
+    from chimera.core.agent import attended
     from chimera.providers import LLMGateway, MissingCredentialsError
     from chimera.tools import default_registry
 
@@ -1156,13 +1157,18 @@ def agent(
             registry = govern_registry(registry, kernel)
         runner = Agent(
             backend, registry,
-            AgentConfig(
+            attended(AgentConfig(
                 model=model, max_steps=max_steps, project_root=Path(workspace),
                 instructions=owner_identity(get_settings().home),
                 turn_context=True,
-            ),
+            )),
         )
-        result = runner.run(task)
+        # Printed as they come, as `chat` does: the run was given its warnings and nobody heard them.
+        from chimera.interface import render
+
+        result = runner.run(
+            task, on_notice=lambda code, text, _data: console.print(render.notice_line(code, text))
+        )
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
@@ -1258,16 +1264,24 @@ def _run_turn(
     ``send_verbose`` rather than ``send``: the refusals, the token count and the price are on the
     report and were being thrown away by both REPLs.
     """
+    from chimera.core.code_session import _accepts
     from chimera.interface import render
     from chimera.providers import MissingCredentialsError
+
+    def say_notice(code: str, text: str, data: dict[str, Any]) -> None:
+        console.print(render.notice_line(code, text))
 
     try:
         with console.status("[dim]thinking…[/dim]"):
             # Passed only when there are documents: a session written against the older signature
             # (a test double, a published `SupportsRun` surface) is never handed a keyword it lacks.
+            # The same goes for `on_notice`.
+            extra: dict[str, Any] = (
+                {"on_notice": say_notice} if _accepts(session.send_verbose, "on_notice") else {}
+            )
             if documents:
-                return session.send_verbose(message, documents=documents), "ok"
-            return session.send_verbose(message), "ok"
+                return session.send_verbose(message, documents=documents, **extra), "ok"
+            return session.send_verbose(message, **extra), "ok"
     except MissingCredentialsError as exc:
         console.print(f"[red]{escape(str(exc))}[/red]")
         return None, "stop"
@@ -1861,8 +1875,10 @@ def chat(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.agent import attended
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import finished_note
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
@@ -1928,7 +1944,7 @@ def chat(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(
+        attended(AgentConfig(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
@@ -1937,7 +1953,7 @@ def chat(
             # depending on which window you opened.
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
-        ),
+        )),
     )
     mem = None if no_memory else _memory_manager()
 
@@ -1979,6 +1995,9 @@ def chat(
             # A message with `/attach`ed documents is checked against them (study 26); built on
             # such a turn only. The plain gateway: the escalation names its own model.
             grounded_answers=_grounded_answers_for(settings, gateway),
+            # A shell command that outlived its timeout kept running as a job; the next turn hears
+            # that it ended, as on the Code screen.
+            turn_note=lambda: finished_note(settings.home, Path(workspace)),
         ),
         store,
     )
@@ -2122,8 +2141,10 @@ def assist(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.agent import attended
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import finished_note
     from chimera.fusion.route_log import format_route_summary, load_routes, summarize_routes
     from chimera.interface import ChatSession, render
     from chimera.memory.models import project_key
@@ -2160,13 +2181,13 @@ def assist(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(
+        attended(AgentConfig(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
-        ),
+        )),
     )
     # Second-brain defaults: memory + graph + profile preamble always on (unless opted out).
     mem = None if no_memory else _memory_manager()
@@ -2187,6 +2208,7 @@ def assist(
         extractor=_memory_extractor(settings, mem, usage_session),
         cite_facts=settings.memory_extract,
         grounded_answers=_grounded_answers_for(settings, gateway),
+        turn_note=lambda: finished_note(settings.home, Path(workspace)),
     )
     skill_names = _learned_skill_labels(settings)
 
@@ -2361,8 +2383,10 @@ def tui(
     from chimera.cli.right_hand import build_right_hand
     from chimera.cli.spend import BudgetedTurns, session_budget
     from chimera.core import Agent, AgentConfig
+    from chimera.core.agent import attended
     from chimera.core.instructions import load as load_identity
     from chimera.core.instructions import render as render_identity
+    from chimera.core.jobs import finished_note
     from chimera.interface import ChatSession
     from chimera.memory.models import project_key
     from chimera.providers import LLMGateway
@@ -2469,7 +2493,7 @@ def tui(
         # Same workspace, both arguments: the one that roots the tools also carries the
         # project's conventions. Splitting them is how `AGENTS.md` came to be read on
         # four surfaces out of twenty-seven.
-        AgentConfig(
+        attended(AgentConfig(
             model=model,
             max_steps=max_steps,
             project_root=Path(workspace),
@@ -2480,7 +2504,7 @@ def tui(
             # like a stranger's.
             instructions=render_identity(load_identity(settings.home)),
             turn_context=True,
-        ),
+        )),
     )
     mem = None if no_memory else _memory_manager()
     budget = session_budget(max_usd)
@@ -2512,6 +2536,7 @@ def tui(
             # spend is written, by which time `screen` exists.
             extractor=_memory_extractor(settings, mem, lambda: screen.session_id),
             cite_facts=settings.memory_extract,
+            turn_note=lambda: finished_note(settings.home, Path(workspace)),
         ),
         store,
     )
@@ -2645,6 +2670,10 @@ def serve(
             # capability here and not good enough to convey the project's conventions, which is
             # incoherent: `serve --workspace X` is the headless deployment from the README, and
             # its AGENTS.md was never read.
+            #
+            # Not `attended`, unlike the platform bot: the webhook handler sends its jobs through
+            # this same gateway, and a webhook run is unattended like a cron one. Without the step
+            # wall it would have no end that anybody is there to see.
             AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 instructions=owner_identity(settings.home),
@@ -2835,6 +2864,26 @@ def desktop_app(
 
     _kernel_observes_unless_told_otherwise()
     settings = get_settings()
+    # One server per data folder, claimed before anything is built. A server keeps in memory the
+    # turns it runs, the folder each edits, the undo offers and the live frames; a second one on the
+    # same folder believed it was alone, so the one-writer-per-folder lock held only inside each,
+    # and Stop in one window could not reach a turn the other ran. The OS drops the claim with the
+    # process, so a crash never leaves the folder locked (`chimera/core/instance.py`).
+    from chimera.core.instance import claim_home, running_url
+
+    claim = claim_home(Path(settings.home))
+    if claim is None:
+        where = running_url(Path(settings.home))
+        console.print(
+            "[yellow]Chimera Desktop is already running on this data folder"
+            + (f" at {where}" if where else "")
+            + ".[/yellow] Use that one, or give this one another CHIMERA_HOME."
+        )
+        if open_browser and where:
+            import webbrowser
+
+            webbrowser.open(where)
+        raise typer.Exit(code=3)
     if not settings.can_answer():
         # Unlike run/solve/fuse (which need a model to do their job and stay strict), the desktop app
         # can BOOT keyless: LLMGateway() below is lazy (no model call), and the UI opens a first-run
@@ -3109,6 +3158,7 @@ def desktop_app(
     url = f"http://{host}:{port}"
     if emit_port_file:  # discovery channel for a parent process (the Tauri sidecar reads this)
         Path(emit_port_file).write_text(url, encoding="utf-8")
+    claim.announce(url)
     # The desktop bridge learns its port only now. With "Allow Claude to operate this app" on, this
     # writes the discovery file `chimera mcp desktop` reads; off, it only clears a stale one. A
     # wildcard bind is reached on loopback — the bridge is for a client on THIS machine.
@@ -3131,6 +3181,7 @@ def desktop_app(
     finally:
         # First, so the token dies with the server even if a later step raises.
         desktop_bridge.close()
+        claim.release()
         if cron_stop is not None:
             cron_stop.set()  # stop the cron daemon thread on Ctrl+C / shutdown
         messaging.stop_all()  # close any running messaging adapters
@@ -3448,6 +3499,8 @@ def _serve_platform(
 ) -> None:
     """Serve the gateway over a platform adapter: one session per chat; the agent can send."""
     from chimera.core import Agent, AgentConfig
+    from chimera.core.agent import attended
+    from chimera.core.jobs import finished_note
     from chimera.integrations import SendMessageTool
     from chimera.interface import ChatSession
     from chimera.server import MessageGateway
@@ -3480,14 +3533,15 @@ def _serve_platform(
         registry.register(send_tool)
         runner = Agent(
             backend, registry,
-            AgentConfig(
+            # A person is waiting on the other end of the chat, as at the terminal: see `attended`.
+            attended(AgentConfig(
                 model=model, max_steps=max_steps, project_root=workspace_path,
                 # The same identity the app's own bot and the coding turn apply. Without it the
                 # bot `serve --discord` starts answered as a different agent from the one the
                 # owner configured, in whatever language the message happened to be in.
                 instructions=owner_identity(get_settings().home),
                 turn_context=True,
-            ),
+            )),
         )
         return ChatSession(
             runner,
@@ -3495,6 +3549,9 @@ def _serve_platform(
             graph=graph,
             # The path `serve --discord` runs, which is the production bot.
             real_history=get_settings().chat_real_history,
+            # A shell command that outlived its timeout kept running as a job; this is how the
+            # chat hears that it ended.
+            turn_note=lambda: finished_note(get_settings().home, workspace_path),
             # `None` under the shipped `CHIMERA_GOVERNANCE=off`, where no ledger is built at all.
             on_turn_start=(
                 None
@@ -3505,7 +3562,7 @@ def _serve_platform(
             ),
         )
 
-    gateway = MessageGateway(factory)
+    gateway = MessageGateway(factory, warnings_in_reply=True)
     console.print(
         f"[bold]Chimera on {adapter.platform}[/bold] "
         "[dim]— message the bot; each chat is its own session. Ctrl+C to stop.[/dim]"
@@ -6344,9 +6401,52 @@ def cron_doctor(
     import time
 
     from chimera.scheduler.engine import Scheduler
+    from chimera.scheduler.watchdog import (
+        default_heartbeat_path,
+        infer_max_gap,
+        watch_daemon,
+        watch_tick_seconds,
+    )
 
     sched = Scheduler(_cron_store())
     now = time.time()
+
+    # The daemon's own sign of life, read BEFORE the jobs: a dead daemon with a daily job looks
+    # healthy for ~23 hours from the jobs alone (the job is not yet late), and that window is
+    # exactly what the heartbeat closes. The ceiling is derived from the beat's own tick
+    # interval — three ticks of headroom — and printed, so a reader can disagree with the
+    # number rather than wonder where it came from. No beat at all is "nothing to say", not
+    # "dead": a daemon that has never run left no evidence either way.
+    beat_path = default_heartbeat_path(get_settings().home)
+    # The ceiling is derived from the beat's own tick interval BEFORE the verdict — the verdict
+    # is judged against it, not shown beside it. A beat without an interval yields 0, which
+    # reads as "no number": the verdict is `unknown`, and the CLI says so in words.
+    intervalo = watch_tick_seconds(beat_path)
+    teto = infer_max_gap(intervalo) if intervalo > 0 else None
+    watch = watch_daemon(beat_path, now=now, max_gap_seconds=teto)
+    if watch.verdict == "none":
+        console.print("[dim]daemon: no heartbeat on record — `chimera serve --cron` may never "
+                      "have run here, so there is nothing to say about it.[/dim]")
+    elif watch.verdict == "unknown":
+        console.print(
+            f"[dim]daemon: heartbeat {watch.age_seconds:.0f}s old (no tick interval on record, "
+            f"so freshness cannot be judged).[/dim]"
+        )
+    elif watch.verdict == "stale":
+        console.print(
+            f"[red]daemon: heartbeat is {watch.age_seconds:.0f}s old — older than "
+            f"{teto:.0f}s (3 ticks of its own {intervalo:.0f}s interval). "
+            f"The daemon is very likely dead.[/red]"
+        )
+        console.print(
+            "[dim]This is about the daemon, not the jobs: check that `chimera serve --cron` "
+            "(or the app) is up and has been.[/dim]"
+        )
+    else:
+        console.print(
+            f"[green]daemon: alive[/green] [dim](heartbeat {watch.age_seconds:.0f}s old, "
+            f"ceiling {teto:.0f}s)[/dim]"
+        )
 
     atrasados = sched.overdue(now, grace=grace_minutes * 60)
     falhando = sched.failing(at_least=1)
@@ -6379,6 +6479,14 @@ def cron_doctor(
         # The exit code is what a watcher outside Chimera reads (chimera-agent#26). Without it the
         # host-cron line in docs/deploy.md mailed the same report every thirty minutes whether or
         # not anything was wrong, which trains the reader to stop opening it.
+        raise typer.Exit(1)
+
+    # A stale heartbeat is a daemon verdict, and the exit code is the watcher's only ear: a dead
+    # daemon with a daily job produces no overdue row for ~23 hours, so without this the
+    # host-cron line in docs/deploy.md stays silent through exactly the outage it exists to
+    # catch. Checked after the job exit so a job problem is not masked by a daemon one — both
+    # exit 1, and the report above already names both.
+    if check and watch.verdict == "stale":
         raise typer.Exit(1)
 
 
@@ -6478,6 +6586,33 @@ def cron_disable(job_id: str = typer.Argument(..., help="The job id to disable."
         raise typer.Exit(code=1)
     Scheduler(store).disable(job_id)
     console.print(f"[green]disabled[/green] {job_id}")
+
+
+@cron_app.command("kill")
+def cron_kill(job_id: str = typer.Argument(..., help="The job id to stop.")) -> None:
+    """Stop a job's running (or next) dispatch — one run, not the schedule.
+
+    `disable` takes the job off the clock; `kill` answers the other question: the job is running
+    RIGHT NOW and must stop. The daemon's worker polls the flag between steps, the dispatch it
+    stops deletes it, and the run ends `cancelled` — which counts as neither a failure nor a
+    success, so a kill cannot ride the failure counter into the brake.
+    """
+    import time
+
+    from chimera.scheduler import Scheduler
+
+    store = _cron_store()
+    if job_id not in store:
+        console.print(f"[yellow]no job with id {job_id}[/yellow]")
+        raise typer.Exit(code=1)
+    stopped = Scheduler(store).kill(job_id, now=time.time())
+    if stopped:
+        console.print(f"[green]kill requested[/green] {job_id} — the running dispatch will stop")
+    else:
+        console.print(
+            f"[yellow]not stopped[/yellow] {job_id} — the job is disabled, so nothing is running"
+        )
+        raise typer.Exit(code=1)
 
 
 @cron_app.command("fire")

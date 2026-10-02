@@ -7,6 +7,8 @@ that model, deepseek-v4-flash-0731, on 90 paired agent transcripts: 90/90 at 4k,
 every rung within −10 pp. The catalogue row now carries that floor as `useful_k`, and the budget
 spends at most it. gpt-6-luna, the default since 2026-09-26, was measured the same way on
 2026-09-27: every rung to 256k within the margin, so its row carries 255 as a lower bound.
+glm-5.3-flash followed on 2026-09-30, on the Novita route: every rung to 512k within the margin, so
+512 as a lower bound, and the coding route no longer holds it to the 64k kept for unmeasured models.
 """
 
 from __future__ import annotations
@@ -62,3 +64,10 @@ def test_every_measured_row_is_below_its_window_and_names_a_bench_that_exists() 
         cited = re.findall(r"bench/([a-z_]+)", row)
         assert cited, f"{entry.slug}: useful_k with no bench named beside it"
         assert all((REPO / "bench" / name).is_dir() for name in cited), cited
+
+
+def test_glm53_flash_is_budgeted_at_what_it_was_measured_to_read_not_at_the_unmeasured_cap() -> None:
+    slug = "openrouter/z-ai/glm-5.3-flash"
+    assert useful_tokens(slug) == 512_000
+    budget = ContextBudget.for_model(slug, fraction=0.6, unmeasured_cap=64_000)
+    assert budget.budget == 512_000

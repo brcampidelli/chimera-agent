@@ -1,5 +1,5 @@
 ---
-source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
+source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
 ---
 
 # Chimera auf einem Server (VPS) deployen
@@ -162,8 +162,10 @@ Warnung statt einer Antwort will, führt es aus dem Cron des Hosts selbst aus:
 Das funktioniert, weil es von etwas anderem als Chimera beaufsichtigt wird — worin genau der Sinn
 liegt.
 
-`--check` endet nur dann mit 1, wenn ein Job verspätet ist oder fehlschlägt, sodass die Mail nur dann kommt; `cron doctor` ohne die Option endet immer mit 0, denn Antworten ist kein Fehler.
+`--check` endet nur dann mit 1, wenn ein Job verspätet ist oder fehlschlägt — und jetzt auch, wenn der Daemon-Heartbeat veraltet ist, sodass die Zeile im Host-Cron oben einen toten Daemon beim nächsten Durchlauf erkennt, egal wie der Zeitplan des Jobs aussieht; die Mail kommt also nur, wenn etwas wirklich falsch ist. `cron doctor` ohne sie endet immer mit 0, weil Antworten kein Versagen ist.
 
+
+**Der Daemon-Heartbeat schließt das Fenster, das die Jobs nicht schließen können.** Bei jedem Tick schreibt der Daemon sein Lebenszeichen nach `<CHIMERA_HOME>/scheduler/heartbeat.json` (atomar, neben `jobs.json`). Der Doctor liest es zuerst und beantwortet eine Frage, die die Jobs allein nicht stellen können: ein toter Daemon mit einem täglichen Job sieht aus den Jobs heraus ~23 Stunden lang gesund aus — der Job ist noch nicht überfällig —, während der Beat im Moment des Daemon-Tods stillsteht. Das Urteil wird gegen drei Ticks des eigenen Intervalls des Beats geurteilt und mit dem verwendeten Limit ausgegeben, damit Sie mit der Zahl streiten können, statt zu raten, woher sie kommt. Drei ehrliche Lesarten: `alive`/`stale` sind geurteilt; `unknown` heißt, ein Beat existiert, aber ohne Tick-Intervall (ein älterer Schreiber), also lässt sich Frische nicht beurteilen, ohne eine Zahl zu erfinden — und der Leser weigert sich; `none` heißt, gar kein Beat, was „kein Signal“ heißt, nicht „tot“ — ein Daemon, der nie lief, hat sowieso keine Spur hinterlassen. Das ist *Liveness*, kein Taint: die Scheduler-Oberfläche verfolgt weiterhin kein Taint (siehe `SECURITY.md`).
 ---
 
 ## 4. Health, Backups, Sicherheit

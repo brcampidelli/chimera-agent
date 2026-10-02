@@ -109,6 +109,16 @@ def _parse_hunks(patch: str) -> list[tuple[str, str]]:
             raise ValueError("unterminated hunk: expected '=======' then '>>>>>>> REPLACE'") from exc
         search = "\n".join(lines[i + 1 : mid])
         replace = "\n".join(lines[mid + 1 : close])
+        # The first '=======' wins, so a second one used to become file content.
+        for body in (search, replace):
+            for line in body.splitlines():
+                marker = line.strip()
+                if marker in (_HUNK_OPEN, _HUNK_MID, _HUNK_CLOSE):
+                    raise ValueError(
+                        f"hunk {len(hunks) + 1} has a stray {marker!r} line inside it "
+                        "— it would be written into the file; if the file really contains "
+                        "that line, use edit_file"
+                    )
         hunks.append((search, replace))
         i = close + 1
     if not hunks:

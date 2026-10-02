@@ -224,9 +224,13 @@ def test_a_huge_log_is_read_from_its_ends_only(
 # ------------------------------------------------------------------ the observed failure itself
 
 
-def test_a_foreground_timeout_points_at_the_background_form(tmp_path: Path) -> None:
+def test_a_foreground_timeout_keeps_the_command_running_as_a_job(tmp_path: Path) -> None:
     """The 2026-09-27 session: the model gave a tens-of-minutes command a 120 s timeout and got a
-    bare "timed out". The parameter now says when to go background, and so does the timeout."""
+    bare "timed out", and the command was killed at 120 s. This used to assert the kill and a
+    sentence pointing at `background=true`. The owner decided the same day that the shell timeout
+    is not a reason to stop, so a command that outlives it is adopted as a job: still running, still
+    cancellable, and reported to the next turn when it ends. What did not change is a run_shell with
+    no job store at all, which is asserted last."""
     ws = _ws(tmp_path)
     jobs = JobRegistry(tmp_path / "home")
     tool = RunShellTool(ws, LocalSandbox(), confirm=None, jobs=jobs)
@@ -234,12 +238,70 @@ def test_a_foreground_timeout_points_at_the_background_form(tmp_path: Path) -> N
 
     out = tool.run(command=_script(ws, "s.py", SLEEPER), timeout=1)
 
-    assert out.startswith("error: command timed out after 1s"), out
-    assert "background=true" in out and "job_status" in out
+    try:
+        assert out.startswith("job "), out
+        assert "still running after 1s" in out and "NOT stopped" in out and "job_status" in out
+        job_id = out.split()[1]
+        job = jobs.get(job_id)
+        assert job is not None and job.state == "running" and _alive(job.pid)
+    finally:
+        for j in jobs.all():
+            jobs.cancel(j.id)
     bare = RunShellTool(ws, LocalSandbox(), confirm=None, jobs=None).run(
         command=_script(ws, "s.py", SLEEPER), timeout=1
     )
     assert bare == "error: command timed out after 1s", "a registry with no job store offered jobs"
+
+
+def test_an_adopted_command_finishes_as_a_job_with_its_whole_output(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    jobs = JobRegistry(tmp_path / "home")
+    tool = RunShellTool(ws, LocalSandbox(), confirm=None, jobs=jobs)
+    slow = _script(
+        ws, "slow.py",
+        "import sys, time\nprint('first line', flush=True)\ntime.sleep(3)\n"
+        "print('last line')\nprint('to stderr', file=sys.stderr)\n",
+    )
+
+    out = tool.run(command=slow, timeout=1)
+
+    assert out.startswith("job "), out
+    job_id = out.split()[1]
+    _wait(lambda: _state(jobs, job_id) == "finished", seconds=15)
+    status = JobStatusTool(jobs, ws).run(job_id=job_id)
+    assert "first line" in status and "last line" in status and "to stderr" in status
+    job = jobs.get(job_id)
+    assert job is not None and job.exit_code == 0
+    assert [j.id for j in jobs.finished_unreported()] == [job_id], "the next turn is not told"
+
+
+def test_an_adopted_command_can_be_cancelled_like_any_other_job(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    jobs = JobRegistry(tmp_path / "home")
+    tool = RunShellTool(ws, LocalSandbox(), confirm=None, jobs=jobs)
+    out = tool.run(command=_script(ws, "s.py", SLEEPER), timeout=1)
+    job_id = out.split()[1]
+    job = jobs.get(job_id)
+    assert job is not None
+
+    jobs.cancel(job_id)
+
+    _wait(lambda: not _alive(job.pid))
+    assert _state(jobs, job_id) == "cancelled"
+
+
+def test_a_cap_the_owner_set_still_kills_the_command_it_cannot_adopt(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    jobs = JobRegistry(tmp_path / "home", max_running=1)
+    tool = RunShellTool(ws, LocalSandbox(), confirm=None, jobs=jobs)
+    first = _start(tool, _script(ws, "s.py", SLEEPER))
+    try:
+        out = tool.run(command=_script(ws, "s.py", SLEEPER), timeout=1)
+
+        assert out.startswith("error: command timed out after 1s and was stopped"), out
+        assert [j.id for j in jobs.all()] == [first]
+    finally:
+        jobs.cancel(first)
 
 
 # ------------------------------------------------------------------ stop kills the tree

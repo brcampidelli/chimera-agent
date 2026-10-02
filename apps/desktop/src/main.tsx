@@ -5,6 +5,11 @@ import App from "@/App";
 import { I18nProvider } from "@/lib/i18n";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ToastProvider } from "@/components/ui/toast";
+import { LayoutProvider } from "@/lib/layout/context";
+import { LayoutServerSync } from "@/lib/layout/sync";
+import { FloatWindow } from "@/components/shell/FloatWindow";
+import { ConversationWindow } from "@/components/code/ConversationWindow";
+import { conversationFrom, floatPanelFrom } from "@/lib/float/protocol";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
 // After index.css: motion.css consumes the --dur-*/--ease-* tokens declared there, and its
@@ -28,6 +33,11 @@ const queryClient = new QueryClient({
   },
 });
 
+// `?float=<panel>` asks this page to draw one panel in a window of its own; anything else is the app.
+const floating = floatPanelFrom(window.location.search);
+// `?conversation=<id>` asks it to draw one conversation, so two can be worked at once.
+const conversation = conversationFrom(window.location.search);
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
@@ -36,7 +46,21 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
             opens, moving along the rail shows the rest instantly instead of re-waiting. */}
         <TooltipProvider>
           <ToastProvider>
-            <App />
+            {/* The screen's layout (what is hidden, minimised, moved, how wide). Above App so the
+                command palette, which App builds, can restore it. */}
+            {conversation ? (
+              // One conversation in a window of its own. It reads the layout and writes none of it.
+              <ConversationWindow sessionId={conversation} />
+            ) : floating ? (
+              // One panel in a window of its own (phase 7). No layout here: the main window owns it.
+              <FloatWindow panel={floating} />
+            ) : (
+              <LayoutProvider>
+                {/* Keeps the layout on the server too, so a reinstall does not lose it (phase 6). */}
+                <LayoutServerSync />
+                <App />
+              </LayoutProvider>
+            )}
           </ToastProvider>
         </TooltipProvider>
       </I18nProvider>

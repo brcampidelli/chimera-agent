@@ -11,14 +11,23 @@ two transports — Discord/Telegram adapters plug in the same way.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
-from chimera.interface import ChatSession
+from chimera.core.code_session import _accepts
+from chimera.interface import ChatSession, render
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.gateway")
+
+
+def with_warnings(answer: str, warnings: Sequence[str]) -> str:
+    """``answer`` with one ``⚠`` line per warning under it, or ``answer`` alone when there are none."""
+    if not warnings:
+        return answer
+    lines = "\n".join(f"⚠ {w}" for w in warnings)
+    return f"{answer}\n\n{lines}" if answer.strip() else lines
 
 
 def chunk_text(text: str, size: int) -> list[str]:
@@ -106,10 +115,15 @@ class MessageGateway:
         session_factory: Callable[[], ChatSession],
         *,
         max_turns: int | None = GATEWAY_MAX_TURNS,
+        warnings_in_reply: bool = False,
     ) -> None:
         self._factory = session_factory
         self._sessions: dict[str, ChatSession] = {}
         self._max_turns = max_turns
+        #: Append the turn's warnings, and why it was cut short, under the answer. On for a chat
+        #: platform, where the reply is all the person sees. Off for the HTTP ``/chat`` route, whose
+        #: ``reply`` field a program reads as the answer.
+        self._warnings_in_reply = warnings_in_reply
 
     def session_for(self, key: str) -> ChatSession:
         if key not in self._sessions:
@@ -129,7 +143,25 @@ class MessageGateway:
 
     def on_message(self, message: InboundMessage) -> str:
         """Route a message to its chat's session and return the reply."""
-        return self.session_for(message.key).send(message.text)
+        session = self.session_for(message.key)
+        verbose = getattr(session, "send_verbose", None)
+        if not self._warnings_in_reply or verbose is None or not _accepts(verbose, "on_notice"):
+            return session.send(message.text)
+        # The bot used to call `send`, which takes no callbacks, so a warning sent while the turn
+        # ran went nowhere and a reply cut off by a limit read exactly like a finished one. The
+        # terminal prints both; on a chat platform the reply is the only place left to say them.
+        said: list[str] = []
+
+        def hear(code: str, text: str, _data: dict[str, Any]) -> None:
+            line = render.notice_text(code, text)
+            if line not in said:
+                said.append(line)
+
+        report = verbose(message.text, on_notice=hear)
+        cut = render.cut_short_text(report)
+        if cut:
+            said.append(cut)
+        return with_warnings(report.answer, said)
 
     @property
     def active_chats(self) -> int:

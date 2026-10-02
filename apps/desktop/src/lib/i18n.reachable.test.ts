@@ -42,6 +42,20 @@ const DYNAMIC = [
   // `` t(`jobs.state.${job.state}`) `` — the background-jobs panel names a job's state from the
   // token `/api/jobs` sends (`running`, `finished`, `cancelled`, `timed_out`, `lost`).
   "jobs.state.",
+  // `` t(`layout.region.${h.id}`) `` and `` t(`layout.panel.${h.id}`) `` — the hidden-panels tray names
+  // what it lists from the layout model's own ids (`lib/layout/model.ts`), so the names cannot drift.
+  "layout.panel.",
+  "layout.region.",
+  // `` t(shown ? `layout.hide.${side}` : `layout.show.${side}`) `` — the palette words each region's
+  // command for what it will do now (`App.tsx`).
+  "layout.hide.",
+  "layout.show.",
+  // `` t(`layout.card.name.${kind}`) `` and `` t(`layout.card.why.${kind}`) `` — every card of the
+  // conversation names itself and, when it cannot close, says why, from its kind (`code/CardChrome.tsx`).
+  "layout.card.name.",
+  "layout.card.why.",
+  // `` t(`layout.moveTo.${z}`) `` — each panel's "Move to" menu names the zones it can go to (`shell/Dock.tsx`).
+  "layout.moveTo.",
   // `` t(`onboarding.local.runtime.${o.runtime}`) `` — the first-run screen names the local
   // runtime a found model belongs to, from the token `/api/models/local` sends (`ollama`,
   // `lm_studio`), so the client never keeps its own list of runtimes.

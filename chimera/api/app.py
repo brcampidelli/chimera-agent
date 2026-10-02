@@ -600,6 +600,13 @@ def build_api_app(
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
     )
+    # One writer per folder, shared by coding turns and autonomous runs (`chimera/api/folder_locks.py`).
+    from chimera.api.folder_locks import FolderLocks
+
+    folder_locks = FolderLocks()
+    app.state.folder_locks = folder_locks
+    # The runs that can still be stopped, readable from outside for the same reason `/cancel` exists.
+    app.state.run_cancels = _run_cancels
 
     # Cross-origin, only for the origins the operator named, and only when they named some.
     #
@@ -1281,7 +1288,27 @@ def build_api_app(
 
         def work() -> None:
             auto = None
+            folder = folder_locks.lock(ws)
+            holds_folder = False
             try:
+                # The folder first, the way a coding turn takes it: a run and a turn (or two runs) in
+                # one folder each snapshot, edit, verify and revert a tree the other is changing. A run
+                # that waits says so, and Stop still reaches it; stopped there, it never starts.
+                if not folder.acquire(blocking=False):
+                    emit("event", {
+                        "kind": "folder_busy",
+                        "text": "Waiting: another conversation or run is working in this folder. "
+                                "This one starts when it finishes.",
+                    })
+                    while not folder.acquire(timeout=0.25):
+                        if cancel.is_set():
+                            emit("done", {"success": False, "answer": "", "attempts": 0,
+                                          "stopped_reason": "cancelled"})
+                            return
+                holds_folder = True
+                if cancel.is_set():
+                    emit("done", {"success": False, "answer": "", "attempts": 0, "stopped_reason": "cancelled"})
+                    return
                 auto = solve_factory(req, ws, on_event, live_settings(), cancel.is_set)
                 # The receipt persists itself via the agent's run_log at run() — no extra write here.
                 # On the CRASH path it does not, which is what the except block below is for.
@@ -1330,6 +1357,8 @@ def build_api_app(
                 )
                 _persist_crashed_run(settings.home, run_id, req, ws, auto, exc)
             finally:
+                if holds_folder:
+                    folder.release()
                 _run_cancels.pop(
                     run_id, None
                 )  # done (or crashed): the run is no longer cancellable
@@ -1372,6 +1401,13 @@ def build_api_app(
         """
         from chimera.governance.pending import pending
 
+        # Where each question comes from. With several conversations working at once, a list of
+        # questions with no project and no conversation on them let the wrong one be approved.
+        origin_of = getattr(app.state, "approval_origin", None)
+
+        def origin(run_id: str) -> dict[str, str]:
+            return origin_of(run_id) if (origin_of is not None and run_id) else {}
+
         return [
             {
                 "id": q.id,
@@ -1388,6 +1424,8 @@ def build_api_app(
                 "band": q.band,
                 "decider_model": q.decider_model,
                 "decision_id": q.decision_id,
+                "run_id": q.run_id,
+                **origin(q.run_id),
             }
             for q in pending(live_settings().home)
         ]
@@ -1446,7 +1484,13 @@ def build_api_app(
              "threshold": s.threshold, "surfaces": list(s.surfaces), "description": s.description}
             for s in REGISTRY.values()
         ]
-        return {"review_at": review_at, "allow_below": allow_below, "specs": specs, "groups": groups, "recent": recent}
+        from chimera.decisions.drift import alerts as drift_alerts
+
+        return {
+            "review_at": review_at, "allow_below": allow_below, "specs": specs, "groups": groups,
+            "recent": recent,
+            "alerts": [a.as_dict() for a in drift_alerts(rows, review_at=review_at, allow_below=allow_below)],
+        }
 
     @app.get("/api/decisions/models", dependencies=[guard], response_model=SystemOneModelsOut)
     def decision_models_route() -> dict[str, Any]:
@@ -2252,6 +2296,9 @@ def build_api_app(
         fuse_backend=fuse_backend,
         # The built bundle, for the page a guest opens from a share link (`guest.html`).
         static_dir=static_dir,
+        # The same lock per folder the runs below take, so a turn and a run never write one folder
+        # at once.
+        folder_locks=folder_locks,
     )
     # /api/orchestration/* — the hierarchical orchestrator's plan, run, cancel and ledger.
     # Registered unconditionally: `schema_dump` builds the app through this function, so a route

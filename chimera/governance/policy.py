@@ -42,7 +42,7 @@ class Verdict:
 
     band: str = ""
     """Which band of the REVIEW band produced this verdict — ``review`` | ``uncertain`` | ``allow``
-    | ``uncalibrated`` | ``halt`` | ``none``, the values of :class:`~chimera.governance.band.BandReading`.
+    | ``uncalibrated`` | ``halt`` | ``gate`` | ``none``, the values of :class:`~chimera.governance.band.BandReading`.
 
     Empty for every verdict that did not come from the band, which is every rule, every precedent
     and every judge. It travels beside ``confidence`` because the two are only meaningful together:

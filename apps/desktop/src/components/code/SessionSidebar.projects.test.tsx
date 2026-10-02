@@ -16,6 +16,8 @@ import { renderWithProviders } from "@/test/utils";
 // which reads as "the projects are broken" rather than "the mock is short two names".
 vi.mock("@/lib/api", () => ({
   listCodeSessions: vi.fn(),
+  // Asked by the sidebar every few seconds since it marks the conversations that are working.
+  listRunningTurns: vi.fn(async () => []),
   listCodeProjects: vi.fn(),
   registerCodeProject: vi.fn(),
   forgetCodeProject: vi.fn(),

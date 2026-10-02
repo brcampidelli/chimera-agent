@@ -21,7 +21,12 @@ from chimera.fusion.grounded_question import is_question
 HERE = Path(__file__).resolve().parent
 #: ``messages``: written by the classifier's author before the classifier (in-sample by author).
 #: ``heldout``: written afterwards by a separate session that never saw the classifier.
-SETS = {"messages": HERE / "messages.jsonl", "heldout": HERE / "heldout.jsonl"}
+#: ``fresh``: written by another model family in an empty workspace (PREREGISTRATION_fresh.md).
+SETS = {
+    "messages": HERE / "messages.jsonl",
+    "heldout": HERE / "heldout.jsonl",
+    "fresh": HERE / "fresh.jsonl",
+}
 
 
 def load(name: str = "messages") -> list[dict[str, str]]:

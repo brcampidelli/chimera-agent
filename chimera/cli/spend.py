@@ -57,6 +57,7 @@ class BudgetedTurns:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         history: list[MessageLike] | None = None,
         turn_notes: str | None = None,
     ) -> AgentResult:
@@ -65,11 +66,16 @@ class BudgetedTurns:
         ``history`` and ``turn_notes`` are declared and forwarded because ``ChatSession`` reads this
         signature to decide whether real history is possible: a wrapper that dropped them would
         quietly turn the setting off for every conversation with a ceiling.
+
+        ``on_notice`` for the same reason. ``ChatSession`` passes it only to a ``run`` that declares
+        it, and this one did not, so every warning of a conversation with ``--max-usd`` (the steps,
+        the compaction, the repeating call) was dropped without a word.
         """
         result: AgentResult = self.agent.run(
             task,
             on_token=on_token,
             on_tool=on_tool,
+            on_notice=on_notice,
             spend=self.budget,
             history=history,
             turn_notes=turn_notes,

@@ -162,6 +162,20 @@ class DeletedCountOut(BaseModel):
     deleted: int
 
 
+class UiLayoutOut(BaseModel):
+    """The desktop's stored screen layout, or null when none was stored (dynamic screen, phase 6).
+
+    Opaque to the server on purpose: the client owns the layout model and reads anything it does not
+    recognise as its default, so a shape checked here would be a second definition that drifts.
+    """
+
+    layout: dict[str, Any] | None
+
+
+class UiLayoutIn(BaseModel):
+    layout: dict[str, Any]
+
+
 class CodeSessionMetaOut(BaseModel):
     """One row of the coding-conversation list.
 
@@ -174,6 +188,8 @@ class CodeSessionMetaOut(BaseModel):
     workspace: str
     turns: int
     updated_at: float
+    #: A turn of this conversation is running now. Absent for a conversation nobody is working in.
+    running: bool = False
 
 
 class CodeProjectOut(BaseModel):
@@ -265,6 +281,13 @@ class CodeTurnFramesOut(BaseModel):
     seq: int
 
 
+class CodeTurnStopOut(BaseModel):
+    """A stop that reached a running coding turn. The turn ends at its next step, not at once."""
+
+    turn_id: str
+    stopping: bool
+
+
 class WorkOut(BaseModel):
     """A background work of a conversation (``chimera.api.works``): a coding turn run on the
     strong model while the conversation goes on."""
@@ -304,10 +327,33 @@ class WorkActionOut(BaseModel):
     reason: str = ""
 
 
+class RunningTurnOut(BaseModel):
+    """A coding turn that is running now, as much of it as a screen needs to follow it.
+
+    A conversation is stored when the agent finishes, so while a turn works the file has nothing of
+    it. This is the pointer to it: which turn, what it was asked, and where on the conversation's
+    live stream its opening frame is, so a screen that comes back can replay the turn from the start.
+    """
+
+    turn_id: str
+    session_id: str
+    workspace: str
+    message: str
+    started_at: float
+    #: Ask the conversation's live stream for frames after this and the turn comes back whole.
+    live_since: int
+    #: The stored conversation already holds this turn's exchange (the agent has finished and the
+    #: turn is verifying), so a screen that follows it must not draw that exchange twice.
+    transcript_saved: bool
+
+
 class CodeSessionOut(BaseModel):
     id: str
     workspace: str
     exchanges: list[CodeExchangeOut]
+    #: Set while a turn of this conversation is running. A screen follows it instead of showing a
+    #: conversation that looks idle while it is working.
+    running_turn: RunningTurnOut | None = None
 
 
 class CodeSessionRawOut(BaseModel):
@@ -1243,6 +1289,21 @@ class CronFailingOut(BaseModel):
     last_error: str | None = None
 
 
+class CronDaemonWatchOut(BaseModel):
+    """What the daemon's heartbeat says, as of the moment the question was asked.
+
+    Three-valued on purpose: ``alive`` and ``stale`` are judged against ``max_gap_seconds``
+    (three ticks of the beat's own interval); ``unknown`` means a beat exists but carried no
+    tick interval, so freshness cannot be judged without inventing a number — and the reader
+    refuses to invent one. ``none`` is "no signal", not "dead": a daemon that has never run
+    left no evidence either way.
+    """
+
+    verdict: Literal["alive", "stale", "unknown", "none"]
+    age_seconds: float | None = None
+    max_gap_seconds: float | None = None
+
+
 class CronSilenceOut(BaseModel):
     """What the schedule is not telling you: what never ran, and what ran and lost.
 
@@ -1251,10 +1312,15 @@ class CronSilenceOut(BaseModel):
     usual cause is that the app was closed when the job was due. ``failing`` means the job ran, on
     time, and lost every time; that is about the job. A single "problems" list would merge the one
     you fix by opening the app with the one you fix by rewriting the action.
+
+    ``daemon`` is the third answer, from the heartbeat the daemon writes every tick: it can say
+    "the daemon is dead" while both lists are still empty, which is the window a daily job leaves
+    open for ~23 hours after a crash.
     """
 
     overdue: list[CronLateOut]
     failing: list[CronFailingOut]
+    daemon: CronDaemonWatchOut
     grace_seconds: float
     """How far past its time a job may be before it counts as missed.
 
@@ -1596,6 +1662,14 @@ class HitlOut(BaseModel):
 class ApprovalOut(BaseModel):
     """One question waiting for a person, written by `pending.ask_durably` from an attended surface."""
 
+    #: Which turn asked, which conversation it belongs to, and in which folder: what a card needs to
+    #: say where it comes from, with several conversations working at once. Empty when unknown (a
+    #: surface that names no turn, or a turn already gone). ``work`` is a background work's title.
+    run_id: str = ""
+    session_id: str = ""
+    workspace: str = ""
+    work: str = ""
+
     id: str
     action: str  # `<tool>: <command | path | url>` — empty only on a question raised before 0.54
     reason: str
@@ -1611,7 +1685,7 @@ class ApprovalOut(BaseModel):
 
     band: str = ""
     """Which band of the REVIEW band it fell in — ``review`` | ``uncertain`` | ``allow`` |
-    ``uncalibrated`` | ``halt`` | ``none``. Empty when no band was consulted.
+    ``uncalibrated`` | ``halt`` | ``gate`` | ``none``. Empty when no band was consulted.
 
     Sent beside ``p`` because the two are only readable together: 0.45 is a confident ALLOW below
     ``allow_below`` and an uncertain one between the thresholds, and the card is where a person has
@@ -1726,6 +1800,18 @@ class DecisionRowOut(BaseModel):
     source: str | None = None
 
 
+class DecisionAlertOut(BaseModel):
+    """A drift alarm computed from the log alone (``chimera/decisions/drift.py``). It annotates and
+    gates nothing; ``detail`` carries the numbers the screen words it from."""
+
+    kind: str
+    decision: str
+    backend: str
+    model: str
+    prompt_hash: str
+    detail: dict[str, Any]
+
+
 class DecisionsOut(BaseModel):
     """The Decisions screen: the declared decision points, what each instrument's log holds, and the
     latest answers with their labels (study 22, phase 4)."""
@@ -1735,6 +1821,7 @@ class DecisionsOut(BaseModel):
     specs: list[DecisionSpecOut]
     groups: list[DecisionGroupOut]
     recent: list[DecisionRowOut]
+    alerts: list[DecisionAlertOut] = []
 
 
 class SystemOneModelOut(BaseModel):

@@ -44,16 +44,27 @@ describe("Code — a spend ceiling for the turn", () => {
   const ask = (user: ReturnType<typeof userEvent.setup>, text: string) =>
     user.type(screen.getByPlaceholderText(/^Ask about this code/), `${text}{Enter}`);
 
-  it("sends the default ceiling when the user has not touched the box", async () => {
-    // This used to assert the OPPOSITE — that a turn sends no ceiling at all — and that was right
-    // while a turn could take 8 tool-calling steps. The Code screen now sends 40, in an app other
-    // people install, so a first message must not be able to cost whatever a loop feels like.
+  it("sends no ceiling when the user has not typed one", async () => {
+    // This flipped twice. It asserted that a turn sends no ceiling while a turn could take 8
+    // tool-calling steps, then that it sends a default one once the screen sent 40. The owner
+    // decided on 2026-09-27 that spending is a warning and not a stop: the server says what the
+    // turn spent at $1, and a ceiling that halts a turn exists only when someone typed the number.
     const user = await screen_();
 
     await ask(user, "what is this?");
 
     await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
-    expect(vi.mocked(streamCodeTurn).mock.calls[0][0].max_usd).toBeGreaterThan(0);
+    expect(vi.mocked(streamCodeTurn).mock.calls[0][0]).not.toHaveProperty("max_usd");
+  });
+
+  it("sends the ceiling the user typed", async () => {
+    const user = await screen_();
+
+    await user.type(screen.getByRole("spinbutton", { name: /Ceiling/ }), "0.5");
+    await ask(user, "what is this?");
+
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
+    expect(vi.mocked(streamCodeTurn).mock.calls[0][0].max_usd).toBe(0.5);
   });
 
   it("sends no ceiling once the box is cleared", async () => {

@@ -1,5 +1,5 @@
 ---
-source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
+source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
 ---
 
 # Desplegar Chimera en un servidor (VPS)
@@ -158,8 +158,10 @@ alerta en lugar de una respuesta, ejecútalo desde el cron del propio host:
 
 Eso funciona porque lo supervisa algo que no es Chimera — que es justamente el punto.
 
-`--check` sale con 1 solo cuando hay un trabajo atrasado o fallando, así que el correo llega solo entonces; `cron doctor` sin la opción sale siempre con 0, porque responder no es fallar.
+`--check` sale con 1 solo cuando hay un job atrasado o fallando — y ahora también cuando el latido del daemon está rancio, así que la línea del host-cron de arriba detecta un daemon muerto en su próxima ejecución, sea cual sea la programación del job; el correo llega solo entonces. `cron doctor` sin él sale siempre con 0, porque responder no es fallar.
 
+
+**El latido del daemon cierra la ventana que los jobs no pueden.** En cada tick, el daemon escribe su señal de vida en `<CHIMERA_HOME>/scheduler/heartbeat.json` (atómico, junto a `jobs.json`). El doctor lo lee primero y responde una pregunta que los jobs por sí solos no pueden: un daemon muerto con un job diario se ve sano desde los jobs durante ~23 horas — el job aún no está atrasado — mientras el latido se detiene en el momento en que el daemon muere. El veredicto se juzga contra tres ticks del propio intervalo que el latido registró, y se imprime con el techo usado, para que puedas discutir el número en vez de preguntarte de dónde salió. Tres lecturas honestas: `alive`/`stale` se juzgan; `unknown` significa que existe un latido pero sin intervalo de tick registrado (un escritor más viejo), así que no se puede juzgar la frescura sin inventar un número — y el lector se niega; `none` significa que no hay latido alguno, que es “señal ausente”, no “muerto” — un daemon que nunca corrió no dejó evidencia ninguna. Esto es *liveness*, no taint: la superficie del scheduler sigue sin rastrear taint (ver `SECURITY.md`).
 ---
 
 ## 4. Salud, respaldos, seguridad

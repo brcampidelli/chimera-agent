@@ -452,6 +452,11 @@ class ChatSession:
     #: by default, byte-identical to before: the messaging gateway, ``/v1/chat/completions`` and the
     #: benches attach nothing and are not gated.
     grounded_answers: Callable[[], Any] | None = None
+    #: Text that is true for this turn only, asked for when the turn starts: the background jobs
+    #: that finished since the last one (`chimera.core.jobs.finished_note`). Given to the model with
+    #: the turn and never recorded. ``None`` by default, byte-identical to before for the HTTP
+    #: route and every bench.
+    turn_note: Callable[[], str] | None = None
     turns: list[ChatTurn] = field(default_factory=list)
 
     def _begin_turn(self, message: str) -> None:
@@ -465,16 +470,28 @@ class ChatSession:
         if self.on_turn_start is not None:
             self.on_turn_start(message)
 
+    def _note_for_turn(self, note: str = "") -> str:
+        """``note`` joined with what :attr:`turn_note` has to say now; a failing provider adds nothing."""
+        if self.turn_note is None:
+            return note
+        try:
+            extra = self.turn_note()
+        except Exception:  # noqa: BLE001 — news about a job must never be what fails the turn
+            _log.debug("turn_note provider raised", exc_info=True)
+            extra = ""
+        return "\n\n".join(part for part in (note, extra) if part)
+
     def send(self, message: str) -> str:
         """Run one user message through the agent and record the exchange."""
         self._begin_turn(message)
+        note = self._note_for_turn()
         messages: list[dict[str, Any]] | None = None
+        facts, _layer = self._recall(message)
         if self._real_history_ready():
-            facts, _layer = self._recall(message)
-            result = self._run_with_history(message, facts)
+            result = self._run_with_history(message, facts, note=note)
             messages = _turn_messages(result, message)
         else:
-            result = self.agent.run(self._compose(message))
+            result = self.agent.run(self._assemble(message, facts, note=note))
         provenance = turn_provenance(
             list(result.tool_names), None, already_tainted=self._thread_tainted()
         )
@@ -495,11 +512,15 @@ class ChatSession:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
         is reused for both the prompt and the report's fact count (no double search).
+
+        ``on_notice`` gets (code, text, data) for a warning that does not stop the turn, and only
+        reaches an agent whose ``run`` declares it.
 
         ``documents`` are ``(name, text)`` pairs attached to THIS message, folded into it the way
         the coding turn folds them. With :attr:`grounded_answers` set, the answer is checked against
@@ -507,6 +528,7 @@ class ChatSession:
         self._begin_turn(message)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
+        note = self._note_for_turn(note)
         declined: list[DeclinedTool] = []
         observed: list[ToolActivity] = []
 
@@ -528,12 +550,19 @@ class ChatSession:
         messages: list[dict[str, Any]] | None = None
         if self._real_history_ready():
             result = self._run_with_history(
-                turn_message, facts, on_token=on_token, on_tool=watch, note=note
+                turn_message, facts, on_token=on_token, on_tool=watch, on_notice=on_notice,
+                note=note,
             )
             messages = _turn_messages(result, turn_message)
         else:
+            extra: dict[str, Any] = {}
+            if on_notice is not None and _accepts(self.agent.run, "on_notice"):
+                extra["on_notice"] = on_notice
             result = self.agent.run(
-                self._assemble(turn_message, facts, note=note), on_token=on_token, on_tool=watch
+                self._assemble(turn_message, facts, note=note),
+                on_token=on_token,
+                on_tool=watch,
+                **extra,
             )
         answer, grounded, extra_usd = self._check_grounded(grounded_turn, result)
         if messages and answer != result.answer and messages[-1].get("role") == "assistant":
@@ -715,19 +744,24 @@ class ChatSession:
         *,
         on_token: Callable[[str], None] | None = None,
         on_tool: Callable[[ToolActivity], None] | None = None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         note: str = "",
     ) -> AgentResult:
         run = cast(SupportsHistoryRun, self.agent).run
-        if on_token is None and on_tool is None:
+        if on_token is None and on_tool is None and on_notice is None:
             # `send` has never passed callbacks, and an agent that takes history is not thereby
             # promised to take them as well.
             return run(message, history=self._history(), turn_notes=self._turn_notes(facts, note))
+        extra: dict[str, Any] = {}
+        if on_notice is not None and _accepts(run, "on_notice"):
+            extra["on_notice"] = on_notice
         return run(
             message,
             on_token=on_token,
             on_tool=on_tool,
             history=self._history(),
             turn_notes=self._turn_notes(facts, note),
+            **extra,
         )
 
     def reset(self) -> None:

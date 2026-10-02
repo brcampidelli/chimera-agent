@@ -140,6 +140,12 @@ class JobRegistry:
         self.root = Path(home) / "jobs"
         self.max_running = max_running
         self.max_runtime = max_runtime
+        #: A limit is hard (it refuses, or kills) only when somebody set it. The two defaults above
+        #: are advisory: said in the start message, never enforced. A registry built directly, with
+        #: numbers, is a caller that meant them, so it is hard: `configure_from_settings` is the one
+        #: door that can make it advisory.
+        self.hard_running = True
+        self.hard_runtime = True
         self._procs: dict[str, subprocess.Popen[bytes]] = {}
         self._contained: dict[str, Any] = {}
         self._lock = threading.Lock()
@@ -154,6 +160,26 @@ class JobRegistry:
         if max_runtime is not None:
             self.max_runtime = max_runtime if max_runtime >= 1 else DEFAULT_MAX_RUNTIME
 
+    def configure_from_settings(self, max_running: int | None, max_runtime: int | None) -> None:
+        """Apply ``CHIMERA_JOBS_MAX_RUNNING`` / ``CHIMERA_JOBS_MAX_RUNTIME``: a value the owner set is
+        a hard limit, and an unset one leaves the default as a piece of advice.
+
+        The owner decided on 2026-09-27 that "3 at once and 6 hours" stop being reasons for the agent
+        to stop: a job that is refused, or killed at hour six, reads as the agent giving up on a task
+        somebody handed it on purpose. A value below 1 is still "the default", as in `configure`.
+        """
+        self.hard_running = max_running is not None and max_running >= 1
+        self.hard_runtime = max_runtime is not None and max_runtime >= 1
+        self.max_running = max_running if self.hard_running and max_running else DEFAULT_MAX_RUNNING
+        self.max_runtime = max_runtime if self.hard_runtime and max_runtime else DEFAULT_MAX_RUNTIME
+
+    def over_advisory_limit(self) -> tuple[int, int] | None:
+        """``(running, limit)`` when the next job would go past a limit nobody set, else None."""
+        if self.hard_running:
+            return None
+        running = sum(1 for j in self.all() if j.state == "running")
+        return (running, self.max_running) if running >= self.max_running else None
+
     # --- starting ---------------------------------------------------------------------------
 
     def start(self, command: str, *, cwd: Path, env: dict[str, str], argv: list[str] | str,
@@ -165,7 +191,7 @@ class JobRegistry:
 
         with self._start_lock:
             running = [j for j in self.all() if j.state == "running"]
-            if len(running) >= self.max_running:
+            if self.hard_running and len(running) >= self.max_running:
                 raise JobLimitError(running, self.max_running)
             self.root.mkdir(parents=True, exist_ok=True)
             job_id = uuid.uuid4().hex[:12]
@@ -188,7 +214,7 @@ class JobRegistry:
             job = Job(
                 id=job_id, command=command, cwd=str(cwd), pid=proc.pid,
                 started_at=time.time(), log=str(log_path), owner=_PROCESS_TOKEN,
-                max_runtime=float(self.max_runtime),
+                max_runtime=float(self.max_runtime) if self.hard_runtime else 0.0,
             )
             with self._lock:
                 self._procs[job_id] = proc
@@ -198,13 +224,77 @@ class JobRegistry:
                 self._beat(job_id)
         _Reaped.track(self, job_id)
         threading.Thread(
-            target=self._watch, args=(job_id, proc, float(self.max_runtime)),
+            target=self._watch,
+            args=(job_id, proc, float(self.max_runtime) if self.hard_runtime else 0.0),
             name=f"job-{job_id}", daemon=True,
         ).start()
         _log.info("job %s started (pid %s): %s", job_id, proc.pid, command[:120])
         return job
 
-    def _watch(self, job_id: str, proc: subprocess.Popen[bytes], max_runtime: float) -> None:
+    def adopt(self, proc: subprocess.Popen[bytes], command: str, *, cwd: Path) -> Job | None:
+        """Take over a FOREGROUND command that outlived its timeout, instead of killing it.
+
+        The owner decided on 2026-09-27 that the shell timeout stops being a reason to stop: a
+        command killed at sixty seconds is a benchmark stage killed at sixty seconds. The process is
+        already running with its output on pipes this process reads, so the log is written when it
+        ends (`communicate` picks up where the timed-out call left off, including what it had
+        already read), and the job is otherwise an ordinary one: it is watched, it can be cancelled,
+        and the next turn is told when it finishes. Returns None when a limit the owner SET forbids
+        one more job, and the caller kills the command as it did before.
+        """
+        from chimera.proc.decode import console_text
+        from chimera.proc.winjob import contain
+
+        with self._start_lock:
+            running = [j for j in self.all() if j.state == "running"]
+            if self.hard_running and len(running) >= self.max_running:
+                return None
+            self.root.mkdir(parents=True, exist_ok=True)
+            job_id = uuid.uuid4().hex[:12]
+            log_path = self.root / f"{job_id}.log"
+            log_path.write_bytes(b"")
+            contained = contain(proc.pid)
+            job = Job(
+                id=job_id, command=command, cwd=str(cwd), pid=proc.pid,
+                started_at=time.time(), log=str(log_path), owner=_PROCESS_TOKEN,
+                max_runtime=float(self.max_runtime) if self.hard_runtime else 0.0,
+                extra={"adopted": True},
+            )
+            with self._lock:
+                self._procs[job_id] = proc
+                if contained is not None:
+                    self._contained[job_id] = contained
+                self._write(job)
+                self._beat(job_id)
+        drained = threading.Event()
+
+        def drain() -> None:
+            try:
+                raw_out, raw_err = proc.communicate()
+                text = console_text(raw_out) + console_text(raw_err)
+            except Exception as exc:  # noqa: BLE001 - a log that cannot be written is not a crash
+                text = f"[the output could not be collected: {exc}]"
+            with suppress(OSError):
+                log_path.write_text(text, encoding="utf-8")
+            drained.set()
+
+        threading.Thread(target=drain, name=f"job-drain-{job_id}", daemon=True).start()
+        _Reaped.track(self, job_id)
+        threading.Thread(
+            target=self._watch,
+            args=(job_id, proc, float(self.max_runtime) if self.hard_runtime else 0.0, drained),
+            name=f"job-{job_id}", daemon=True,
+        ).start()
+        _log.info("job %s adopted (pid %s): %s", job_id, proc.pid, command[:120])
+        return job
+
+    def _watch(
+        self,
+        job_id: str,
+        proc: subprocess.Popen[bytes],
+        max_runtime: float,
+        drained: threading.Event | None = None,
+    ) -> None:
         """Wait for the process, beating the heartbeat, and write how it ended. At the deadline,
         kill the tree and write ``timed_out``. The only writer of a natural ending."""
         deadline = time.monotonic() + max_runtime if max_runtime > 0 else None
@@ -229,6 +319,10 @@ class JobRegistry:
                 self._beat(job_id)
         with suppress(subprocess.TimeoutExpired):
             proc.wait(timeout=10)
+        if drained is not None:
+            # An adopted command's log is written when its pipes close: the state is not final until
+            # the output a reader will look for is on disk.
+            drained.wait(timeout=30)
         with self._lock:
             contained = self._contained.pop(job_id, None)
             if contained is not None:
@@ -334,10 +428,18 @@ class JobRegistry:
         text = console_text(raw)
         return text[-want:] if len(text) > want else text
 
-    def finished_unreported(self) -> list[Job]:
-        """Jobs that ended and have not been handed to a turn yet — and are, now."""
+    def finished_unreported(self, within: Path | None = None) -> list[Job]:
+        """Jobs that ended and have not been handed to a turn yet — and are, now.
+
+        ``within``: only jobs that ran inside this folder. A job's news used to go to the next turn
+        of ANY project, which marked it reported and could not read its output (the job tools are
+        fenced to the turn's folder), so the project that started it never heard.
+        """
+        root = Path(within).resolve() if within is not None else None
         out: list[Job] = []
         for job in self.all():
+            if root is not None and not _inside(Path(job.cwd), root):
+                continue
             if job.state in ENDED and not job.reported:
                 job.reported = True
                 with self._lock:
@@ -528,6 +630,15 @@ _REGISTRIES: dict[str, JobRegistry] = {}
 _REGISTRIES_LOCK = threading.Lock()
 
 
+def _inside(path: Path, root: Path) -> bool:
+    """The same rule the job tools apply to a turn's folder."""
+    try:
+        resolved = path.resolve()
+    except OSError:
+        return False
+    return resolved == root or resolved.is_relative_to(root)
+
+
 def jobs_for(home: Path) -> JobRegistry:
     """One registry per home per process — the live handles have to live somewhere shared by the
     tool that starts a job and the tool, the API and the turn that ask about it."""
@@ -538,3 +649,30 @@ def jobs_for(home: Path) -> JobRegistry:
             registry = JobRegistry(Path(home))
             _REGISTRIES[key] = registry
         return registry
+
+
+def finished_note(home: Path, within: Path) -> str:
+    """The turn note for the background jobs in ``within`` that ended since a turn last looked.
+
+    ``""`` when none did. Each job is reported once (``finished_unreported`` marks it). The model is
+    told to read the output rather than guess at what the job produced, and through ``job_status``,
+    not ``read_file``: the log lives in the data folder, outside the workspace, so a read_file of it
+    is a jail question for something the job tool reads freely.
+
+    Here rather than in the coding route, which was the only caller. A shell command that outlives
+    its timeout becomes a job on every surface, and the terminal and the chat bot never said when
+    one finished, so the news went to nobody.
+    """
+    finished = jobs_for(home).finished_unreported(within=within)
+    if not finished:
+        return ""
+    lines = [
+        f"- job {j.id} {j.state}"
+        + (f" (exit {j.exit_code})" if j.exit_code is not None else "")
+        + f": {j.command[:160]}"
+        for j in finished
+    ]
+    return (
+        "Background jobs that finished since your last turn (read their output with "
+        "job_status(job_id=...) before saying what they produced):\n" + "\n".join(lines)
+    )

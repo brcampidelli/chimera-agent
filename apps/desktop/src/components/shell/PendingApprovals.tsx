@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ShieldQuestion } from "lucide-react";
 
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
+import { listCodeSessions } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import type { ApprovalQuestion } from "@/lib/types";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import { cn } from "@/lib/utils";
 
@@ -106,11 +109,39 @@ export function PendingApprovals() {
       </button>
       <Dialog open={open} onOpenChange={setOpen} title={t("code.approval.title")}>
         {questions.map((q) => (
-          // `refetch` rather than a local removal: the list is the server's, and the card that was
-          // just answered is not the only thing that may have changed since the last poll.
-          <ApprovalCard key={q.id} question={q} onAnswered={() => void refetch()} />
+          <div key={q.id} className="space-y-1">
+            <ApprovalOrigin question={q} />
+            {/* `refetch` rather than a local removal: the list is the server's, and the card that
+                was just answered is not the only thing that may have changed since the last poll. */}
+            <ApprovalCard question={q} onAnswered={() => void refetch()} />
+          </div>
         ))}
       </Dialog>
     </>
   );
+}
+
+/** The last part of a folder path, which is how the sidebar names a project. */
+function projectName(workspace: string): string {
+  return workspace.replace(/[\\/]+$/, "").split(/[\\/]/).pop() ?? workspace;
+}
+
+/**
+ * Which project and which conversation a question comes from.
+ *
+ * The list above shows every conversation's questions in one place. With several working at once, a
+ * card that said only "run_shell: rm -rf build" could be answered for the wrong project, so each says
+ * where it comes from. The conversation's title is read from the same list the sidebar keeps (one
+ * query key, no new request). Nothing is drawn for a question whose origin the server does not know.
+ */
+function ApprovalOrigin({ question }: { question: ApprovalQuestion }) {
+  const t = useT();
+  const sessions = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions, staleTime: 30_000 });
+  if (!question.session_id && !question.workspace) return null;
+  const project = question.workspace ? projectName(question.workspace) : t("approvals.defaultProject");
+  const title = sessions.data?.find((s) => s.id === question.session_id)?.title;
+  const text = question.work
+    ? t("approvals.fromWork", { project, work: question.work })
+    : t("approvals.from", { project, conversation: title || question.session_id.slice(0, 8) });
+  return <p className="text-xs text-muted-foreground">{text}</p>;
 }

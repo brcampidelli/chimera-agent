@@ -10,6 +10,7 @@ import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  AppWindow,
   ArrowDown,
   Copy,
   Download,
@@ -32,6 +33,7 @@ import {
   listShares,
   listWorks,
   revertCodeTurn,
+  stopCodeTurn,
   stopWork,
   streamCodeTurn,
   streamSessionLive,
@@ -64,6 +66,8 @@ import { BrowserView } from "@/components/code/BrowserView";
 import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
+import { CardChrome, cardId, useCardModes } from "@/components/code/CardChrome";
+import { NoticeList, type NoticeEntry } from "@/components/code/NoticeList";
 import { VoiceMode, type SpokenAnswer, type SpokenAnnouncement } from "@/components/code/VoiceMode";
 import {
   EMPTY_CAST,
@@ -80,9 +84,10 @@ import {
   type TranscriptExchange,
 } from "@/lib/transcript";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
-import { useAgent } from "@/lib/agent-context";
+import { useAgent, type AgentState } from "@/lib/agent-context";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
+import { writeLastSession } from "@/lib/workspace";
 
 /** Share of the model's window this screen spends on the prompt before compacting.
  *
@@ -154,6 +159,8 @@ interface Exchange {
    *  Replaced wholesale on every frame, because the frame carries the whole list: merging
    *  would build a list out of two snapshots and show one that never existed. */
   todos: TodoEntry[];
+  /** Warnings that did not stop the turn, one per code (a repeat replaces, it does not stack). */
+  notices?: NoticeEntry[];
   /** The agent's browser after its last action of this turn, or null. Replaced on every frame
    *  (a picture of a moment), and never replayed. */
   browser?: CodeBrowserFrame | null;
@@ -165,7 +172,9 @@ interface Exchange {
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
-  undone?: "ok" | "partial" | "gone";
+  undone?: "ok" | "partial" | "kept" | "gone";
+  /** Files an undo left alone because they changed again after the turn. */
+  keptFiles?: string[];
   /** Stopped by the Stop button. Distinct from `failed`: nothing went wrong, the user changed
    *  their mind — and distinct from a finished turn, which has a `done`. */
   abandoned?: boolean;
@@ -213,16 +222,21 @@ export function Verdict({
   v,
   original,
   undone,
+  keptFiles,
   onUndo,
   onFix,
+  fixBlocked = false,
   t,
 }: {
   v: CodeVerified;
   /** What the user asked for. Goes back with the failure so the fix attempt knows both. */
   original: string;
-  undone?: "ok" | "partial" | "gone";
+  undone?: "ok" | "partial" | "kept" | "gone";
+  keptFiles?: string[];
   onUndo: () => void;
   onFix: (text: string) => void;
+  /** A run is already working in this project (one per project), so the fix could not start now. */
+  fixBlocked?: boolean;
   t: TFunc;
 }) {
   const cmd = v.command ?? "";
@@ -237,16 +251,21 @@ export function Verdict({
       <p
         className={cn(
           "text-xs",
-          undone === "ok" ? "text-ok-foreground" : undone === "partial" ? "text-warn-foreground" : "text-bad-foreground",
+          undone === "ok" ? "text-ok-foreground" : undone === "gone" ? "text-bad-foreground" : "text-warn-foreground",
         )}
       >
-        {t(
-          undone === "ok"
-            ? "code.chat.verdict.reverted"
-            : undone === "partial"
-              ? "code.chat.verdict.revertedPartly"
-              : "code.chat.verdict.revertFailed",
-        )}
+        {undone === "kept"
+          ? t("code.chat.verdict.revertedExceptChanged", {
+              n: keptFiles?.length ?? 0,
+              files: (keptFiles ?? []).slice(0, 5).join(", "),
+            })
+          : t(
+              undone === "ok"
+                ? "code.chat.verdict.reverted"
+                : undone === "partial"
+                  ? "code.chat.verdict.revertedPartly"
+                  : "code.chat.verdict.revertFailed",
+            )}
       </p>
     ) : v.revert_token ? (
       <Button size="sm" variant="ghost" onClick={onUndo}>
@@ -286,9 +305,19 @@ export function Verdict({
       ) : (
         <div className="flex flex-wrap gap-2">
           {undo}
-          <Button size="sm" variant="ghost" onClick={() => onFix(fixBrief(original, v, t))}>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={fixBlocked}
+            onClick={() => onFix(fixBrief(original, v, t))}
+          >
             <ShieldCheck className="h-3.5 w-3.5" /> {t("code.chat.verdict.fix")}
           </Button>
+          {/* One run per project, and a second is refused rather than queued. This button handed
+              the fix to that refusal and nothing happened; now it says so. */}
+          {fixBlocked ? (
+            <p className="w-full text-xs text-muted-foreground">{t("code.chat.verdict.fixBusy")}</p>
+          ) : null}
         </div>
       )}
     </div>
@@ -391,6 +420,7 @@ const STOP_REASONS: Record<string, string> = {
   tool_loop: "code.chat.stopped.toolLoop",
   budget: "code.chat.stopped.budget",
   spend: "code.chat.stopped.spend",
+  context_stuck: "code.chat.stopped.contextStuck",
   cancelled: "code.chat.stopped.cancelled",
 };
 
@@ -552,6 +582,7 @@ export function Conversation({
   workspace,
   openFile,
   onHandOff,
+  runLive = false,
   onBatch,
   onEdited,
   busyElsewhere,
@@ -562,6 +593,7 @@ export function Conversation({
   controls,
   onOpenFile,
   resumeSession,
+  onOpenWindow,
 }: {
   workspace: string;
   openFile: string | null;
@@ -579,6 +611,8 @@ export function Conversation({
   profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
   onHandOff: (text: string) => void;
+  /** A run is working in this project: `onHandOff` would be refused, so the fix button is disabled. */
+  runLive?: boolean;
   /** The user confirmed a decomposition: run these in parallel, each in its own worktree. */
   onBatch: (tasks: string[]) => void;
   /** A turn changed files — refresh the tree, the viewer and git status. */
@@ -591,6 +625,8 @@ export function Conversation({
   onOpenFile?: (path: string) => void;
   /** Continue a stored conversation: its turns are fetched and rendered above the composer. */
   resumeSession?: string | null;
+  /** Open this conversation in a window of its own. Absent inside that window: it already is one. */
+  onOpenWindow?: (sessionId: string) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -603,6 +639,9 @@ export function Conversation({
   // The question the turn is parked on, if any. One at a time by construction: the tool call
   // that raised it is blocked until it is answered, so a second cannot arrive first.
   const [pendingApproval, setPendingApproval] = useState<CodeApprovalEvent | null>(null);
+  // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
+  // this screen's only; a new conversation screen starts with all of them.
+  const cards = useCardModes();
   // Sharing. How many links this conversation has (the live stream is worth holding open only
   // when someone could be on the other end), whether the panel is open, and who is here now.
   const [shareCount, setShareCount] = useState(0);
@@ -639,6 +678,9 @@ export function Conversation({
   // The turns THIS screen started. Their frames arrive twice — on the turn's own stream and on
   // the conversation's — and the second copy is dropped here rather than drawn as a guest's turn.
   const ownTurns = useRef<Set<string>>(new Set());
+  // The turn this screen started and is still waiting on, so Stop can end it on the server. Until
+  // Stop called the server, it only aborted this request, and the turn went on working and spending.
+  const currentTurnRef = useRef<string | null>(null);
   // How far the live stream has been read, so a reconnect asks for what came after.
   const liveSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -652,6 +694,22 @@ export function Conversation({
   // The tools of the turn in flight, in a ref because `publish` is not a React state updater and
   // reading the previous value from a closure would drop every call after the first.
   const toolsRef = useRef<{ name: string; ok: boolean }[]>([]);
+  // The turn this screen found already running when it opened the conversation, and is watching
+  // through the conversation's live stream rather than a stream of its own. A ref beside the state
+  // because `applyLive` is a memoised callback and must read the current id, not the one it closed over.
+  const [following, setFollowing] = useState<string | null>(null);
+  const followingRef = useRef<string | null>(null);
+  // How the last followed turn ended: the turn's own closing frame, or the person pressing stop.
+  const followEndedBy = useRef<"frame" | "person">("person");
+  /** The followed turn ended, by finishing or by failing: the composer comes back. Only for the turn
+   *  that is being followed, so another turn's closing frame on the same stream leaves it alone. */
+  const endFollowing = useCallback((turnId: string) => {
+    if (followingRef.current !== turnId) return;
+    followEndedBy.current = "frame";
+    followingRef.current = null;
+    setFollowing(null);
+    setBusy(false);
+  }, []);
 
   // Load a resumed conversation's turns. Without this the agent silently carried the whole history
   // while the screen showed nothing — the worst combination, because the next question then worked
@@ -668,20 +726,31 @@ export function Conversation({
         // wiped. `done: null` here used to be the honest thing to write — nothing stored one — and
         // it stopped being honest the moment the server began storing them: it threw away the best
         // thing this app produces on every reopened conversation.
-        setExchanges(
-          session.exchanges.map((e) => ({
-            ...e,
-            // A guest's turn names its author on the receipt; the owner's own turns carry none.
-            author: e.done?.author || undefined,
-            done: (e.done ?? null) as Exchange["done"],
-            verified: (e.verified ?? undefined) as Exchange["verified"],
-            // Empty on a replay, for the reason `CodeExchangeOut` already gives about `edits`: the
-            // list was streamed and never entered the message list, so a reopened conversation can
-            // show the tool call that recorded it but not the list itself. An absent list reads as
-            // "none was kept", which is true, rather than as a claim about the work.
-            todos: [],
-          })),
-        );
+        const stored = session.exchanges.map((e) => ({
+          ...e,
+          // A guest's turn names its author on the receipt; the owner's own turns carry none.
+          author: e.done?.author || undefined,
+          done: (e.done ?? null) as Exchange["done"],
+          verified: (e.verified ?? undefined) as Exchange["verified"],
+          // Empty on a replay, for the reason `CodeExchangeOut` already gives about `edits`: the
+          // list was streamed and never entered the message list, so a reopened conversation can
+          // show the tool call that recorded it but not the list itself. An absent list reads as
+          // "none was kept", which is true, rather than as a claim about the work.
+          todos: [],
+        }));
+        // A turn is still running here. The stored file holds nothing of it until the agent
+        // finishes, so what was read is the conversation BEFORE it — except in the stretch after
+        // the agent has finished and the turn is still verifying, when the file already holds the
+        // exchange and the replay below would draw it a second time. The server says which.
+        const running = session.running_turn ?? null;
+        setExchanges(running?.transcript_saved ? stored.slice(0, -1) : stored);
+        if (running) {
+          // Everything after the sequence before its opening frame: the turn comes back whole.
+          liveSeq.current = running.live_since;
+          followingRef.current = running.turn_id;
+          setFollowing(running.turn_id);
+          setBusy(true);
+        }
         setReplayed(true);
       })
       .catch(() => {
@@ -783,26 +852,41 @@ export function Conversation({
       case "todo":
         patch((e) => ({ ...e, todos: ((data.items ?? []) as TodoEntry[]) }));
         break;
+      case "notice": {
+        const code = String(data.code ?? "");
+        patch((e) => ({
+          ...e,
+          notices: [
+            ...(e.notices ?? []).filter((x) => x.code !== code),
+            { code, text: String(data.text ?? ""), data },
+          ],
+        }));
+        break;
+      }
       case "approval":
         setPendingApproval(data as unknown as CodeApprovalEvent);
         break;
       case "done": {
         const done = data as unknown as CodeTurnDone;
         patch((e) => ({ ...e, answer: done.answer || e.answer, done }));
+        endFollowing(id);
         break;
       }
       case "error":
         patch((e) => ({ ...e, failed: true, error: String(data.message ?? "") }));
+        endFollowing(id);
         break;
       default:
         break;
     }
-  }, [applyWork]);
+  }, [applyWork, endFollowing]);
 
   // The live stream is held open while someone could be on the other end — or while a work
   // could report: its state changes travel on the same stream, and a card it raises lands here.
+  // And while this screen is following a turn it found running, which is the same stream read by
+  // the one person it is for.
   useEffect(() => {
-    if (!sessionId || (shareCount === 0 && !worksActive)) return;
+    if (!sessionId || (shareCount === 0 && !worksActive && !following)) return;
     const controller = new AbortController();
     let alive = true;
     void (async () => {
@@ -818,7 +902,7 @@ export function Conversation({
       alive = false;
       controller.abort();
     };
-  }, [sessionId, shareCount, worksActive, applyLive]);
+  }, [sessionId, shareCount, worksActive, following, applyLive]);
 
   const [proposal, setProposal] = useState<string[] | null>(null);
   const [fuse, setFuse] = useState(false);
@@ -830,10 +914,8 @@ export function Conversation({
    *  behaviour every earlier build had). Session-local like `provider` rather than persisted: a
    *  standing spend limit is a different promise from "cap this piece of work", and a ceiling that
    *  quietly stayed on from last week would stop a turn for a reason nobody remembers choosing. */
-  // Starts ARMED. See DEFAULT_SPEND_CEILING: the step ceiling this screen sends went from the
-  // library's 8 to 40, and an app other people install should not let a first message cost whatever
-  // a loop feels like. The box shows the number and clearing it disarms — a limit nobody can see is
-  // a limit nobody can raise.
+  // Starts with NO ceiling. See DEFAULT_SPEND_CEILING: spending is a warning by default now (the
+  // server says so at US$1), and a ceiling that stops a turn exists only when it is typed here.
   const [maxUsd, setMaxUsd] = useState<number | null>(DEFAULT_SPEND_CEILING);
   const [attached, setAttached] = useState<Attachment[]>([]);
   // Same upload path the paperclip uses — see `useAttachmentUpload`. The button keeps its own
@@ -877,7 +959,44 @@ export function Conversation({
   // Publish what this turn is doing, so the shell's footer and the activity panel keep working from
   // any screen. There is a test that exists precisely to say the agent must stay visible when you
   // navigate away mid-turn.
-  const { publish } = useAgent();
+  const { publish: publishShared } = useAgent();
+  // Only while this conversation is on screen. Switching conversations unmounts this one while its
+  // turn may still be running, and its handlers used to go on publishing into the one state the bar
+  // reads: turn A finishing set "done, not busy" while turn B was running, and B's Stop disappeared.
+  // Leaving, it hands the state back once, if it was the one working; the turn itself goes on and the
+  // bar still lists it (RunningElsewhere), from the server.
+  const onScreen = useRef(true);
+  const publishedBusy = useRef(false);
+  const publish = useCallback(
+    (next: Partial<Omit<AgentState, "publish">>) => {
+      if (!onScreen.current) return;
+      if (next.busy !== undefined) publishedBusy.current = next.busy;
+      publishShared(next);
+    },
+    [publishShared],
+  );
+  useEffect(() => {
+    onScreen.current = true;
+    return () => {
+      onScreen.current = false;
+      if (publishedBusy.current) {
+        publishShared({ status: "idle", busy: false, tools: [], report: null, stop: () => {}, turnId: null });
+      }
+    };
+  }, [publishShared]);
+  // The bar shows a turn this screen is only watching the way it shows one it started: working while
+  // it runs, done when it ends. Written here rather than in `applyLive`, which is built before
+  // `publish` exists, and keyed on the transition so a followed turn is announced once, not per frame.
+  const wasFollowing = useRef(false);
+  useEffect(() => {
+    if (following) {
+      publish({ status: "thinking", tools: [], report: null, busy: true, stop: abandon, turnId: following });
+    } else if (wasFollowing.current && followEndedBy.current === "frame") {
+      publish({ status: "done", busy: false, report: null });
+    }
+    wasFollowing.current = following !== null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [following]);
 
   /** Mutate the turn currently streaming — always the last one, which is the only one that moves. */
   const patchLast = useCallback((fn: (e: Exchange) => Exchange) => {
@@ -1117,12 +1236,18 @@ export function Conversation({
         // Sent on every turn, not just the first: a client that drops it silently restarts the
         // conversation, and the symptom is only that the agent seems forgetful.
         onSession: (id, turnId) => {
-          if (turnId) ownTurns.current.add(turnId);
+          if (turnId) {
+            ownTurns.current.add(turnId);
+            currentTurnRef.current = turnId;
+            publish({ turnId });
+          }
           // Invalidate on the FIRST turn's id, not on every turn: the sidebar lists conversations,
           // and a conversation that already exists in the list has not changed by gaining a message.
           if (id !== sessionId)
             void qc.invalidateQueries({ queryKey: ["code-sessions"] });
           setSessionId(id);
+          // The project's conversation from now on, so leaving the screen and coming back finds it.
+          writeLastSession(workspace, id);
         },
         onToken: (text) => {
           publish({ status: "streaming" });
@@ -1145,6 +1270,13 @@ export function Conversation({
         onTodo: (items) => {
           // Replaced, not appended. Unlike `edits`, each frame is the complete list.
           patchLast((e) => ({ ...e, todos: items }));
+        },
+        onNotice: (n) => {
+          // One line per code: a repeat replaces, it does not stack.
+          patchLast((e) => ({
+            ...e,
+            notices: [...(e.notices ?? []).filter((x) => x.code !== n.code), n],
+          }));
         },
         onBrowser: (frame) => {
           // Replaced too: the panel shows where the browser IS, and the previous frame is a page
@@ -1170,6 +1302,7 @@ export function Conversation({
           );
         },
         onDone: (done) => {
+          currentTurnRef.current = null;
           if (done.stopped_reason === "work_started") {
             // Not a turn's receipt: nothing ran here. The exchange keeps the sentence above.
             publish({ status: "done", busy: false, report: null });
@@ -1234,6 +1367,7 @@ export function Conversation({
         // Agents.tsx, Tasks.tsx and editor/Runner.tsx in this same app all show it. Not a design
         // choice about noise; an inconsistency nobody noticed.
         onError: (message) => {
+          currentTurnRef.current = null;
           patchLast((e) => ({ ...e, failed: true, error: message }));
           publish({ status: "idle", busy: false });
           setBusy(false);
@@ -1258,8 +1392,18 @@ export function Conversation({
   /** Abandon the turn in flight. The model call cannot be un-made, but the stream stops arriving and
    *  the composer comes back — which is the difference between waiting and being stuck. */
   function abandon() {
+    // The turn itself, on the server: the one this screen started, or the one it was following.
+    // Asked before the view lets go of it. A 404 means it had already ended, which is no failure.
+    const turn = currentTurnRef.current ?? followingRef.current;
+    currentTurnRef.current = null;
+    if (turn) void stopCodeTurn(turn).catch(() => undefined);
     abortRef.current?.abort();
     abortRef.current = null;
+    // A turn this screen was only watching is stopped on the server above, like one it started,
+    // and the view stops following it.
+    followEndedBy.current = "person";
+    followingRef.current = null;
+    setFollowing(null);
     // A stop the user pressed is a stop the user decided: whatever continuations were armed for
     // this task are cancelled with it, and the pending one is dropped rather than sent — otherwise
     // the button would stop the turn and the automation would immediately start another one.
@@ -1284,17 +1428,20 @@ export function Conversation({
     // the files this turn CREATED where they are — which is what happens inside a git repository,
     // and therefore what happens in most projects someone opens here. Reporting that as "Edits
     // undone." describes a state the workspace is not in.
-    let outcome: "ok" | "partial" | "gone" = "gone";
+    let outcome: "ok" | "partial" | "kept" | "gone" = "gone";
+    let kept: string[] = [];
     try {
       const result = await revertCodeTurn(token);
-      outcome = !result.ok ? "gone" : result.left_new_files ? "partial" : "ok";
+      kept = result.kept ?? [];
+      // A fourth: files that changed again after this turn were left as they are, not overwritten.
+      outcome = !result.ok ? "gone" : kept.length ? "kept" : result.left_new_files ? "partial" : "ok";
     } catch {
       // A failed call and a refused token mean the same thing to the user: the edits are still
       // there. Saying "gone" is the honest read of both, and it is the one that does not imply the
       // files were restored.
     }
     setExchanges((prev) =>
-      prev.map((e, j) => (j === index ? { ...e, undone: outcome } : e)),
+      prev.map((e, j) => (j === index ? { ...e, undone: outcome, keptFiles: kept } : e)),
     );
     if (outcome !== "gone") {
       void qc.invalidateQueries({ queryKey: ["fs-file"] });
@@ -1354,6 +1501,16 @@ export function Conversation({
               >
                 <Link2 className="h-3.5 w-3.5" /> {t("code.share.button")}
                 {shareCount > 0 ? ` · ${shareCount}` : ""}
+              </Button>
+            ) : null}
+            {sessionId && onOpenWindow ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                title={t("code.window.openHint")}
+                onClick={() => onOpenWindow(sessionId)}
+              >
+                <AppWindow className="h-3.5 w-3.5" /> {t("code.window.open")}
               </Button>
             ) : null}
             {/* A record of what an agent did to a repository should be able to leave the window it
@@ -1510,6 +1667,8 @@ export function Conversation({
                 {e.you}
               </div>
               {e.tools.length > 0 ? (
+                <CardChrome id={cardId(i, "tools")} kind="tools" cards={cards}
+                  summary={t("layout.card.count", { name: t("layout.card.name.tools"), n: e.tools.length })}>
                 <div className="space-y-1 rounded-chip border border-border p-2">
                   <div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
                     <Wrench className="h-3 w-3" /> {t("code.chat.tools")}
@@ -1518,11 +1677,27 @@ export function Conversation({
                     <ToolRow key={j} tool={tool} onOpenFile={onOpenFile} />
                   ))}
                 </div>
+                </CardChrome>
               ) : null}
-              <TodoPanel items={e.todos} />
-              <BrowserView frame={e.browser} />
+              {e.todos.length > 0 ? (
+                <CardChrome id={cardId(i, "todo")} kind="todo" cards={cards}>
+                  <TodoPanel items={e.todos} />
+                </CardChrome>
+              ) : null}
+              {e.notices?.length ? (
+                <CardChrome id={cardId(i, "notices")} kind="notices" cards={cards}
+                  summary={t("layout.card.count", { name: t("layout.card.name.notices"), n: e.notices.length })}>
+                  <NoticeList items={e.notices} />
+                </CardChrome>
+              ) : null}
+              {e.browser ? (
+                <CardChrome id={cardId(i, "browser")} kind="browser" cards={cards}>
+                  <BrowserView frame={e.browser} />
+                </CardChrome>
+              ) : null}
               {e.edits.map((edit, j) => (
-                <div key={j} className="space-y-1">
+                <CardChrome key={j} id={cardId(i, "diff", j)} kind="diff" cards={cards} summary={edit.path}>
+                <div className="space-y-1">
                   <button
                     type="button"
                     onClick={() => onOpenFile?.(edit.path)}
@@ -1532,6 +1707,7 @@ export function Conversation({
                   </button>
                   <DiffView patch={edit.patch} />
                 </div>
+                </CardChrome>
               ))}
               {/* Working, with nothing yet to show for it.
                   Under fusion the backend emits no token frames at all — deliberately, since the
@@ -1579,6 +1755,9 @@ export function Conversation({
                 <p className="text-xs text-muted-foreground">{t("code.chat.abandoned")}</p>
               ) : null}
               {e.failed ? (
+                // Minimises to its first line and never closes: a turn that failed must not look like a
+                // turn that finished.
+                <CardChrome id={cardId(i, "error")} kind="error" cards={cards} summary={t("code.chat.error")}>
                 <div className="space-y-1">
                   <p className="text-xs text-bad-foreground">{t("code.chat.error")}</p>
                   {/* Folded, not hidden: the headline stays one line for the common case where the
@@ -1607,6 +1786,7 @@ export function Conversation({
                     </Button>
                   ) : null}
                 </div>
+                </CardChrome>
               ) : null}
               {e.done?.fused ? (
                 // At the answer, which is the only place it lands in time. The composer warns before
@@ -1618,16 +1798,37 @@ export function Conversation({
                 </p>
               ) : null}
               {e.verified ? (
+                <CardChrome id={cardId(i, "verdict")} kind="verdict" cards={cards}>
                 <Verdict
                   v={e.verified}
                   undone={e.undone}
+                  keptFiles={e.keptFiles}
                   onUndo={() => void undo(i, e.verified?.revert_token ?? "")}
                   original={e.you}
                   onFix={onHandOff}
+                  fixBlocked={runLive}
                   t={t}
                 />
+                </CardChrome>
               ) : null}
-              {e.done ? <TurnReceipt done={e.done} t={t} /> : null}
+              {e.done ? (
+                <CardChrome id={cardId(i, "receipt")} kind="receipt" cards={cards}>
+                  <TurnReceipt done={e.done} t={t} />
+                </CardChrome>
+              ) : null}
+              {/* What was closed in this turn, and the way back to it, where it was. */}
+              {cards.closedInTurn(i) > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => cards.showTurn(i)}
+                  className={cn(
+                    "rounded-chip border border-dashed border-hairline px-2.5 py-0.5 text-xs text-muted-foreground",
+                    "transition-colors duration-1 ease-out hover:border-accent hover:text-foreground",
+                  )}
+                >
+                  {t("layout.card.hiddenInTurn", { n: cards.closedInTurn(i) })}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -1690,7 +1891,12 @@ export function Conversation({
           </div>
         ) : null}
         {pendingApproval ? (
-          <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
+          // Keyed by the question: a NEW approval is a new card, and it opens whatever the last one
+          // was left as. It minimises to one line and never closes.
+          <CardChrome id={`approval:${pendingApproval.id}`} kind="approval" cards={cards}
+            summary={t("layout.card.approvalWaiting")}>
+            <ApprovalCard question={pendingApproval} onAnswered={() => setPendingApproval(null)} />
+          </CardChrome>
         ) : null}
         <textarea
           className={cn(

@@ -19,12 +19,14 @@ from __future__ import annotations
 import hashlib
 import re
 import string
-from typing import TYPE_CHECKING
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
 
 from chimera.eval.anytime import best_possible_wilson, wilson_lower_best_of
 from chimera.evolution.evolver import SkillEvolver
 from chimera.evolution.holdout import HoldoutGate, HoldoutVerdict
 from chimera.evolution.learned_skill import LearnedSkill
+from chimera.evolution.reproduction import FailureReproductionGate, ReproductionVerdict
 from chimera.evolution.skill_store import SkillStore
 from chimera.governance.validator import SkillValidator
 from chimera.telemetry import get_logger
@@ -90,6 +92,7 @@ class AutoSkillEvolver:
         audit: AuditLog | None = None,
         holdout: HoldoutGate | None = None,
         dedupe_at: float = 0.72,
+        reproduction: FailureReproductionGate | None = None,
     ) -> None:
         self.evolver = evolver
         self.store = store
@@ -118,6 +121,11 @@ class AutoSkillEvolver:
         # "point" (raw pass fraction) or "wilson" (lower confidence bound on the
         # fraction) — the honesty upgrade that stops a lucky small-sample pass counting.
         self.accept_mode = accept_mode
+        # Phantom Guardrails gate (arXiv 2607.13083): a failure card must cite a failure that
+        # actually happened. Opt-in and off changes nothing — without it, a narrative alone still
+        # mints a card, exactly as before. With it, the run's own attempts are the evidence the
+        # narrative is judged against, and a contradicted narrative is refused.
+        self.reproduction = reproduction
 
     def _warn_if_gate_unsatisfiable(self, k: int) -> None:
         """Say so, loudly, when no result can ever clear the Wilson gate.
@@ -275,8 +283,41 @@ class AutoSkillEvolver:
             return self._evolve_collective(task, solution, tainted=tainted)
         return self._evolve_single(task, solution, tainted=tainted)
 
+    def _reproduction_verdict(
+        self, detail: str, attempts: Sequence[Any] | None
+    ) -> ReproductionVerdict | None:
+        """Judge the narrative against the run's attempts, and say what was decided.
+
+        Returns None when no gate is configured — the historical behaviour, kept intact. A
+        verdict is recorded either way (kept or refused): a gate whose refusal rate is zero is
+        a gate that supports nothing, and there is no way to notice that from the cards that
+        survived it.
+        """
+        if self.reproduction is None:
+            return None
+        verdict = self.reproduction.evaluate(detail, attempts)
+        if self.audit is not None:
+            self.audit.record(
+                "failure_reproduction",
+                {
+                    "outcome": verdict.outcome,
+                    "verifier_failed": verdict.verifier_failed,
+                    "attempts": verdict.attempts,
+                    "reason": verdict.reason,
+                },
+            )
+        if not verdict.reproduced:
+            _log.info("anti-pattern card refused (%s): %s", verdict.outcome, verdict.reason)
+        return verdict
+
     def maybe_evolve_failure(
-        self, task: str, detail: str, prior_failures: int, *, tainted: bool = False
+        self,
+        task: str,
+        detail: str,
+        prior_failures: int,
+        *,
+        tainted: bool = False,
+        attempts: Sequence[Any] | None = None,
     ) -> LearnedSkill | None:
         """Distill a RECURRING failure into an advisory anti-pattern card.
 
@@ -284,8 +325,17 @@ class AutoSkillEvolver:
         governance validator. There is no executable smoke test — an anti-pattern card is
         advisory (injected into reasoning, never run), so a bad card can only mislead, not
         act, and the verify-or-revert loop still decides success.
+
+        When a reproduction gate is configured, the narrative must also be grounded in the
+        run's own evidence: a failure no verifier ever produced is refused (``unproven``), and
+        one the evidence contradicts — a reviewer overriding a passing verifier — is refused
+        harder (``contradicted``). The paper's fabricated-failure case is the second one; the
+        measured case in this repo's own history is the same shape.
         """
         if prior_failures < self.min_recurrences:
+            return None
+        verdict = self._reproduction_verdict(detail, attempts)
+        if verdict is not None and not verdict.reproduced:
             return None
         card = self.evolver.propose_failure_card(task, detail)
         if card is None:

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "chimera-agent"
-version = "0.63.1"
+version = "0.64.1"
 description = "An open-source, self-evolving AI agent whose reasoning core is an LLM-Fusion engine (panel -> judge -> synthesizer)."
 readme = "README.md"
 # The bound stays, and its REASON changed. It used to track the litellm ceiling below (<1.92, which
@@ -87,7 +87,9 @@ messaging = [
 # The youtube_transcript reference tool. Fragile by nature (YouTube blocks scraping), so
 # it stays opt-in; every other reference tool needs no extra.
 youtube = [
-    "youtube-transcript-api>=0.6",
+    # 1.0 removed the `get_transcript` classmethod the tool used to call; the floor says so, so a
+    # resolver cannot hand us an API the code no longer speaks.
+    "youtube-transcript-api>=1.0",
 ]
 # Local speech-to-text for the transcribe_audio tool (offline/private). Heavy: pulls CTranslate2 +
 # downloads a Whisper model on first use. Opt-in — without it, transcribe_audio uses the OpenAI
@@ -263,8 +265,10 @@ warn_unused_ignores = false
 # pulled numpy in: its shipped stubs use `type` statements, which are Python 3.12 syntax, and we
 # check against 3.11 — so an optional dependency of an optional feature could fail the type gate of
 # the whole project. What a library's own stubs claim about itself is not a fact about our code.
+# `diffusers` is here for the same reason: its `from_pretrained` is untyped, and the `imagegen-local`
+# extra is a GPU-only path the core never takes.
 [[tool.mypy.overrides]]
-module = ["numpy.*", "faster_whisper.*", "ctranslate2.*", "onnxruntime.*", "markitdown.*"]
+module = ["numpy.*", "faster_whisper.*", "ctranslate2.*", "onnxruntime.*", "markitdown.*", "diffusers.*"]
 follow_imports = "skip"
 follow_imports_for_stubs = true
 

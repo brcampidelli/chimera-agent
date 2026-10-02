@@ -39,6 +39,54 @@ const DATA = {
   ],
 };
 
+const ALERTS = [
+  {
+    kind: "model_changed", decision: "governance.danger", backend: "local_logprob", model: "qwen3:4b",
+    prompt_hash: "h", detail: { builds: [{ build: "Q4_K_M", first_seen: 1 }, { build: "Q5_K_M", first_seen: 2 }] },
+  },
+  {
+    kind: "answer_drift", decision: "governance.danger", backend: "local_logprob", model: "qwen3:4b",
+    prompt_hash: "h", detail: { psi: 0.41, p_value: 0.001, reference: 120, recent: 50 },
+  },
+  {
+    kind: "near_threshold", decision: "governance.danger", backend: "local_logprob", model: "qwen3:4b",
+    prompt_hash: "h", detail: { cut: "review_at", value: 0.5, near: 14, of: 50, eps: 0.03 },
+  },
+];
+
+describe("Decisions — the drift alarms", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("shows nothing when there is nothing to say", async () => {
+    vi.mocked(getDecisions).mockResolvedValue({ ...DATA, alerts: [] } as never);
+    renderWithProviders(<Decisions />);
+    await screen.findByText("ls -la");
+    expect(screen.queryByText("Drift alarms")).not.toBeInTheDocument();
+  });
+
+  it("says each alarm in words, and says that none of them gates anything", async () => {
+    vi.mocked(getDecisions).mockResolvedValue({ ...DATA, alerts: ALERTS } as never);
+    renderWithProviders(<Decisions />);
+    expect(await screen.findByText("Drift alarms")).toBeInTheDocument();
+    expect(screen.getByText(/nothing is gated by them/)).toBeInTheDocument();
+    expect(screen.getByText(/the serving build changed \(Q4_K_M → Q5_K_M\)/)).toBeInTheDocument();
+    expect(screen.getByText(/the last 50 answers moved away from the 120 before them \(PSI 0\.41\)/)).toBeInTheDocument();
+    expect(screen.getByText(/14 of the last 50 answers sit within 0\.03 of review_at \(0\.5\)/)).toBeInTheDocument();
+  });
+
+  it("has the wording in every language the app offers", async () => {
+    const { DICTS, LANGS } = await import("@/lib/i18n");
+    for (const lang of LANGS) {
+      for (const key of [
+        "decisions.alerts.title", "decisions.alerts.note", "decisions.alert.modelChanged",
+        "decisions.alert.answerDrift", "decisions.alert.nearThreshold",
+      ]) {
+        expect(DICTS[lang.code][key], `${lang.code} is missing ${key}`).toBeTruthy();
+      }
+    }
+  });
+});
+
 describe("Decisions — what the typed decisions answered", () => {
   beforeEach(() => {
     vi.clearAllMocks();

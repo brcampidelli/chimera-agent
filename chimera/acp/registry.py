@@ -120,7 +120,13 @@ class AcpRegistry:
             self._entries[key] = _Entry(turn)
             self._entries.move_to_end(key)
             over = len(self._entries) - self.max_live
-            oldest = [k for k, _ in list(self._entries.items())[:over]] if over > 0 else []
+            # The least recently used IDLE agents, never one in the middle of a turn: closing that
+            # one killed a conversation's work to make room for another's. With every agent busy,
+            # the registry goes over the limit for a while rather than kill any of them.
+            idle = [k for k, e in self._entries.items() if k != key and not getattr(e.turn, "busy", False)]
+            oldest = idle[:over] if over > 0 else []
+        if over > len(oldest):
+            _log.info("%d external agents are busy; running over the limit of %d", over - len(oldest), self.max_live)
         for stale in oldest:
             _log.debug("closing the least recently used agent: %s", stale.session_id)
             self.close(stale)
@@ -151,7 +157,11 @@ class AcpRegistry:
     def evict_idle(self) -> None:
         now = time.monotonic()
         with self._lock:
-            stale = [k for k, e in self._entries.items() if now - e.used_at > self.idle_seconds]
+            # Never a busy one: a turn longer than the idle limit is working, not forgotten.
+            stale = [
+                k for k, e in self._entries.items()
+                if now - e.used_at > self.idle_seconds and not getattr(e.turn, "busy", False)
+            ]
         for key in stale:
             _log.debug("closing an idle agent: %s", key.session_id)
             self.close(key)

@@ -1,5 +1,5 @@
 ---
-source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
+source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
 ---
 
 # Déployer Chimera sur un serveur (VPS)
@@ -160,8 +160,10 @@ une alerte plutôt qu'une réponse, lancez-le depuis le cron de l'hôte lui-mêm
 
 Cela fonctionne parce que c'est supervisé par autre chose que Chimera — et c'est tout l'intérêt.
 
-`--check` ne sort avec 1 que lorsqu'une tâche est en retard ou échoue, donc le mail n'arrive qu'à ce moment-là ; `cron doctor` sans l'option sort toujours avec 0, car répondre n'est pas un échec.
+`--check` ne sort avec 1 que lorsqu'une tâche est en retard ou échoue — et maintenant aussi quand le battement de cœur du daemon est périmé, si bien que la ligne host-cron ci-dessus attrape un daemon mort à son prochain passage, quelle que soit la planification de la tâche ; le mail n'arrive qu'à ce moment-là. `cron doctor` sans elle sort toujours avec 0, parce que répondre n'est pas échouer.
 
+
+**Le battement de cœur du daemon ferme la fenêtre que les jobs ne peuvent pas.** À chaque tick, le daemon écrit son signe de vie dans `<CHIMERA_HOME>/scheduler/heartbeat.json` (atomique, à côté de `jobs.json`). Le doctor le lit d'abord et répond à une question que les jobs seuls ne peuvent pas poser : un daemon mort avec une tâche journalière paraît sain depuis les jobs pendant ~23 heures — la tâche n'est pas encore en retard — tandis que le battement s'arrête au moment où le daemon meurt. Le verdict est jugé contre trois ticks de l'intervalle que le battement a lui-même enregistré, et imprimé avec le plafond utilisé, pour que vous puissiez contester le nombre plutôt que vous demander d'où il vient. Trois lectures honnêtes : `alive`/`stale` sont jugées ; `unknown` signifie qu'un battement existe mais sans intervalle de tick enregistré (un rédacteur plus ancien), donc la fraîcheur ne peut être jugée sans inventer un nombre — et le lecteur refuse ; `none` signifie aucun battement du tout, ce qui est « aucun signal », pas « mort » — un daemon qui n'a jamais tourné n'a laissé aucune preuve. C'est de la *liveness*, pas du taint : la surface du scheduler ne suit toujours pas le taint (voir `SECURITY.md`).
 ---
 
 ## 4. Santé, sauvegardes, sécurité

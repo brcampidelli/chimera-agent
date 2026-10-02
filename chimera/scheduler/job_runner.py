@@ -23,7 +23,7 @@ from chimera.core.instructions import load as load_identity
 from chimera.core.instructions import render as render_identity
 from chimera.governance import governed_profile
 from chimera.orchestration.budget import BudgetExceeded
-from chimera.scheduler.models import CronJob, JobOutcome
+from chimera.scheduler.models import CronJob, JobOutcome, kill_flag_path
 from chimera.tools.builtin import default_registry
 
 
@@ -68,6 +68,20 @@ def make_run_job(
         # Governance on the path that runs unattended. In `observe` this refuses nothing and
         # records what enforcement would have cost; the count is reported below, per job, which is
         # the whole point of having a middle state.
+        #
+        # `on_ledger` hands back the TaintLedger this call built, so it can reach the autonomous
+        # loop as `taint=`. Until this line the ledger existed on the cron path only as a tool
+        # wrapper: it narrowed dangerous calls after untrusted input, but the LOOP never heard of
+        # it — so a tainted run's memory fact was stored `clean`, its answer was never stripped of
+        # leaked control tokens before delivery, and a pause-on-taint was impossible. The three
+        # defences every other surface gets from provenance were unreachable from the one surface
+        # that runs unattended, every day, for months.
+        job_ledger: Any = None
+
+        def _take_ledger(ledger: Any) -> None:
+            nonlocal job_ledger
+            job_ledger = ledger
+
         job_registry, job_approvals = governed_profile(
             default_registry(job_root),
             settings=settings,
@@ -77,7 +91,16 @@ def make_run_job(
             # fetch the person asked for, and the ledger records it as such.
             instruction=job.action,
             workspace=job_root,
+            on_ledger=_take_ledger,
         )
+        # The operator's stop switch, read at dispatch time. `chimera cron kill <id>` writes the
+        # flag; the dispatch it actually stops deletes it on the way out — so a kill aimed at a
+        # running job takes it down at the next attempt boundary, and a kill aimed at a job
+        # between runs cannot leak into the run after the next one. The poller keeps watching the
+        # file: the kill may arrive mid-run, and one `exists()` per step is the same cost the
+        # trace log already pays.
+        kill_path = kill_flag_path(settings.home, job.id)
+        should_stop: Callable[[], bool] = lambda: kill_path.exists()  # noqa: E731
         agent = Agent(
             backend,
             job_registry,
@@ -136,6 +159,14 @@ def make_run_job(
                 # per dispatch to grade prose nobody asked to be graded.
                 use_manager=False,
             ),
+            # Provenance, finally reaching the loop (see `on_ledger` above): with the ledger here,
+            # a tainted run's memory fact is stored `tainted`, its delivered answer is stripped of
+            # leaked control tokens, and `pause_on_taint` below has something to read. None keeps
+            # the old behaviour exactly — governance `off` builds no ledger at all.
+            taint=job_ledger,
+            # The operator's stop switch (cron kill): polled per step inside the worker and
+            # between attempts by the loop itself.
+            should_stop=should_stop,
             # The receipt. `runs.jsonl` is what the Runs screen reads, and a job that has fired
             # nightly for a month left nothing there to read.
             run_log=settings.home / "runs.jsonl",
@@ -148,6 +179,13 @@ def make_run_job(
             workspace=job_root,
         )
         result = loop.run(job.action)
+        # The flag is consumed by the dispatch it stopped, never left behind: a kill that arrived
+        # mid-run is spent here, and one that arrived between runs is spent by the run it stopped
+        # at the top. Either way the NEXT dispatch starts with no flag — a stop is a request about
+        # one run, not a permanent state of the job. Whether THIS run actually stopped is what the
+        # run itself reports (`ending="cancelled"`); a kill that lands a moment after the answer
+        # is complete does not rewrite a finished run into a cancelled one.
+        kill_path.unlink(missing_ok=True)
         # Summed across attempts rather than read off one: with `max_attempts > 1` a dispatch can
         # pay for several, and reporting the last one would understate the cost of exactly the
         # configuration that costs most. `usd` follows the all-or-nothing rule used everywhere else
@@ -192,7 +230,11 @@ def make_run_job(
         # work, `success` then reflects gates this path does not run, and reporting it would turn
         # every ungated job into a failure. Absence of a verdict is not a failure.
         if not gated:
-            return JobOutcome(result.answer)
-        return JobOutcome(result.answer, ok=bool(result.success))
+            return JobOutcome(result.answer, cancelled=result.ending == "cancelled")
+        return JobOutcome(
+            result.answer,
+            ok=bool(result.success),
+            cancelled=result.ending == "cancelled",
+        )
 
     return run_job

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+from collections.abc import Callable
 from contextlib import suppress
 from pathlib import Path
 
@@ -64,7 +65,17 @@ class LocalSandbox:
         """
         return (command, True)
 
-    def run(self, command: str, *, timeout: int = 60, cwd: Path | None = None) -> SandboxResult:
+    def run(
+        self,
+        command: str,
+        *,
+        timeout: int = 60,
+        cwd: Path | None = None,
+        on_timeout: Callable[[subprocess.Popen[bytes]], str | None] | None = None,
+    ) -> SandboxResult:
+        """Run ``command``. ``on_timeout`` is offered the still-running process when the timeout
+        passes, and returns the id of the background job that took it over, or None to decline; a
+        declined process is killed with its whole tree, as it always was."""
         posix = os.name == "posix"
         target, use_shell = self._command_argv(command, cwd)
         # start_new_session puts the command in its own process GROUP so a timeout can kill the whole
@@ -90,6 +101,10 @@ class LocalSandbox:
             raw_out, raw_err = proc.communicate(timeout=timeout)
             out, err = console_text(raw_out), console_text(raw_err)
         except subprocess.TimeoutExpired:
+            if on_timeout is not None:
+                adopted = on_timeout(proc)
+                if adopted:
+                    return SandboxResult(exit_code=0, adopted=adopted)
             # `kill_tree` rather than a second copy of the same logic. This branch reimplemented the
             # POSIX half and stopped there: on Windows it was a bare `proc.kill()`, which kills the
             # shell and leaves whatever the shell started — `npm test` dies, the node workers holding

@@ -47,6 +47,10 @@ def decide(
     any call. `noul` is P(yes); `confidence` describes how peaked the probabilities are and is not a
     probability of being right. A number is calibrated only where a map exists for exactly this question.
 
+    Exit codes: 0 every question answered; 1 at least one question failed (a halt: the backend was down
+    or the state overflowed) — the output is still printed in full first; 2 usage, or a question the
+    linter refuses before any call.
+
     Measured on a ruler we did not build (`bench/jevbench_local`, the 231 public JevBench items): the
     default local backend answers 0.619 of them right (Jev 1.13: 0.866), 0.324 on the hard tier, with a
     raw top-label ECE of 0.218. Options that share a first token cannot be read locally: name them so
@@ -70,7 +74,10 @@ def decide(
         raise typer.Exit(code=2) from exc
     decider = build_decider(get_settings(), log=not no_log)
     if state:
-        typer.echo(json.dumps(ask(decider, {**template, "state": state}), ensure_ascii=False, indent=2))
+        result = ask(decider, {**template, "state": state})
+        typer.echo(json.dumps(result, ensure_ascii=False, indent=2))
+        if any("error" in a for a in result["answers"].values()):
+            raise typer.Exit(code=1)  # printed in full first; a halt is not an answer
         return
     done = errors = skipped = 0
     t0 = time.perf_counter()
@@ -97,3 +104,5 @@ def decide(
         f"[dim]{done} states in {seconds:.1f}s ({seconds / max(done, 1):.2f}s each) · "
         f"{errors} question errors · {skipped} lines skipped (no '{field}')[/dim]"
     )
+    if errors:
+        raise typer.Exit(code=1)  # every line was written; at least one question halted

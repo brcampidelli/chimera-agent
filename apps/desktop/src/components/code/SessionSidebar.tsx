@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Braces,
@@ -19,14 +19,17 @@ import {
   forkCodeSession,
   getCodeSessionRaw,
   listCodeSessions,
+  listRunningTurns,
   registerCodeProject,
   type CodeSessionMeta,
 } from "@/lib/api";
+import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
 import { aliasesOf, loadProjects, projectLabel } from "@/lib/projects";
 import { cn } from "@/lib/utils";
+import { readLastSession, writeLastSession } from "@/lib/workspace";
 
 /** Past conversations, filed under the project they were about.
  *
@@ -77,6 +80,26 @@ export function SessionSidebar({
   const t = useT();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["code-sessions"], queryFn: listCodeSessions });
+  // Which conversations have a turn running, asked often because the answer is kept in memory on the
+  // server and is one small list. A turn keeps running when the screen that started it goes away, so
+  // this is the only way a person who moved to another conversation learns that one is still working.
+  const running = useQuery({
+    queryKey: ["code-turns-running"],
+    queryFn: listRunningTurns,
+    refetchInterval: 4000,
+  });
+  const runningIds = new Set((running.data ?? []).map((turn) => turn.session_id));
+  // When the set changes the list is stale: a task started in a new conversation has no file until
+  // the agent finishes, so it is not in the list yet, and one that ended has its final title and count.
+  const runningKey = [...runningIds].sort().join(",");
+  const lastRunningKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (running.data === undefined) return;
+    if (lastRunningKey.current !== null && lastRunningKey.current !== runningKey) {
+      void qc.invalidateQueries({ queryKey: ["code-sessions"] });
+    }
+    lastRunningKey.current = runningKey;
+  }, [running.data, runningKey, qc]);
   // Server state since the list stopped being a property of this browser profile. `loadProjects`
   // carries the one-time migration of whatever this webview had stored, so a running install keeps
   // its projects instead of meeting an empty sidebar after an update.
@@ -119,6 +142,9 @@ export function SessionSidebar({
     mutationFn: async (target: NonNullable<typeof confirming>) => {
       if (target.kind === "session") {
         await deleteCodeSession(target.session.id);
+        // Not the one its project reopens any more: an unknown id opens empty under the old id.
+        if (readLastSession(target.session.workspace) === target.session.id)
+          writeLastSession(target.session.workspace, null);
         return;
       }
       // A project with no conversations has nothing to delete BUT the bookmark. Sending it to the
@@ -130,6 +156,7 @@ export function SessionSidebar({
         return;
       }
       await deleteCodeProject(target.project);
+      writeLastSession(target.project, null);
     },
     // Closed on settle, not on success: a delete that failed leaves the row on screen, and a dialog
     // that stays open over it reads as "still working" for something that already stopped.
@@ -169,7 +196,7 @@ export function SessionSidebar({
     // this and the file viewer ate the whole row and the conversation's `flex-1` resolved to zero:
     // measured at 1000x900 it had height 0 at y=1068, off a 900px window, and the shell scrolled to
     // 1424. The list scrolls inside itself already, so a cap costs only how many rows show at once.
-    <aside className="flex max-h-40 min-h-0 w-60 shrink-0 flex-col border-r border-hairline lg:max-h-none">
+    <aside className="flex max-h-40 min-h-0 w-full shrink-0 flex-col border-r border-hairline lg:max-h-none">
       <div className="flex items-center gap-1 p-2">
         <Button size="sm" variant="ghost" className="flex-1 justify-start" onClick={onNew}>
           <Plus className="h-4 w-4" /> {t("code.sessions.new")}
@@ -183,6 +210,7 @@ export function SessionSidebar({
         >
           <FolderPlus className="h-4 w-4" />
         </Button>
+        <HideRegionButton side="left" />
       </div>
       {adding ? (
         <form
@@ -313,6 +341,14 @@ export function SessionSidebar({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
+                    {runningIds.has(session.id) || session.running ? (
+                      <span
+                        role="status"
+                        aria-label={t("code.sessions.running")}
+                        title={t("code.sessions.running")}
+                        className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle"
+                      />
+                    ) : null}
                     {session.title || t("code.sessions.untitled")}
                   </button>
                   <button

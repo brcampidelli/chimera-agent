@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getConfig, getDoctor, getLocalRuntimes } from "@/lib/api";
 import { I18nProvider } from "@/lib/i18n";
+import { LayoutProvider } from "@/lib/layout/context";
 
 /**
  * The first-run gate asks "can this install run a model", not "does it hold a key".
@@ -58,7 +59,10 @@ function renderApp() {
       <I18nProvider>
         <TooltipProvider>
           <ToastProvider>
-            <App />
+            {/* `main.tsx` puts the layout provider here; App reads it for the palette. */}
+            <LayoutProvider>
+              <App />
+            </LayoutProvider>
           </ToastProvider>
         </TooltipProvider>
       </I18nProvider>

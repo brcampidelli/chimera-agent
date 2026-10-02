@@ -496,6 +496,18 @@
             "title": "Tasks",
             "type": "array"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -644,6 +656,26 @@
           },
           "reason": {
             "title": "Reason",
+            "type": "string"
+          },
+          "run_id": {
+            "default": "",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "session_id": {
+            "default": "",
+            "title": "Session Id",
+            "type": "string"
+          },
+          "work": {
+            "default": "",
+            "title": "Work",
+            "type": "string"
+          },
+          "workspace": {
+            "default": "",
+            "title": "Workspace",
             "type": "string"
           }
         },
@@ -1824,6 +1856,11 @@
             "title": "Id",
             "type": "string"
           },
+          "running": {
+            "default": false,
+            "title": "Running",
+            "type": "boolean"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1863,6 +1900,16 @@
           "id": {
             "title": "Id",
             "type": "string"
+          },
+          "running_turn": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunningTurnOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "workspace": {
             "title": "Workspace",
@@ -2212,6 +2259,18 @@
             ],
             "title": "Thinking"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -2242,6 +2301,25 @@
           "message"
         ],
         "title": "CodeTurnRequest",
+        "type": "object"
+      },
+      "CodeTurnStopOut": {
+        "description": "A stop that reached a running coding turn. The turn ends at its next step, not at once.",
+        "properties": {
+          "stopping": {
+            "title": "Stopping",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "stopping"
+        ],
+        "title": "CodeTurnStopOut",
         "type": "object"
       },
       "CompletionOut": {
@@ -2734,6 +2812,18 @@
             "description": "Shell command run in each worker's own worktree; exit 0 merges it. Without one, every worker that did not crash merges \u2014 and workers that touched the same file all lose to the conflict rule.",
             "title": "Verify"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workers": {
             "items": {
               "$ref": "#/components/schemas/CrewWorkerIn"
@@ -2953,6 +3043,48 @@
           "action"
         ],
         "title": "CronCreateIn",
+        "type": "object"
+      },
+      "CronDaemonWatchOut": {
+        "description": "What the daemon's heartbeat says, as of the moment the question was asked.\n\nThree-valued on purpose: ``alive`` and ``stale`` are judged against ``max_gap_seconds``\n(three ticks of the beat's own interval); ``unknown`` means a beat exists but carried no\ntick interval, so freshness cannot be judged without inventing a number \u2014 and the reader\nrefuses to invent one. ``none`` is \"no signal\", not \"dead\": a daemon that has never run\nleft no evidence either way.",
+        "properties": {
+          "age_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age Seconds"
+          },
+          "max_gap_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Gap Seconds"
+          },
+          "verdict": {
+            "enum": [
+              "alive",
+              "stale",
+              "unknown",
+              "none"
+            ],
+            "title": "Verdict",
+            "type": "string"
+          }
+        },
+        "required": [
+          "verdict"
+        ],
+        "title": "CronDaemonWatchOut",
         "type": "object"
       },
       "CronFailingOut": {
@@ -3204,8 +3336,11 @@
         "type": "object"
       },
       "CronSilenceOut": {
-        "description": "What the schedule is not telling you: what never ran, and what ran and lost.\n\nTwo lists rather than one, because the responses have nothing in common. ``overdue`` means\nnothing dispatched \u2014 that is about the daemon, and on the desktop the daemon is the app, so the\nusual cause is that the app was closed when the job was due. ``failing`` means the job ran, on\ntime, and lost every time; that is about the job. A single \"problems\" list would merge the one\nyou fix by opening the app with the one you fix by rewriting the action.",
+        "description": "What the schedule is not telling you: what never ran, and what ran and lost.\n\nTwo lists rather than one, because the responses have nothing in common. ``overdue`` means\nnothing dispatched \u2014 that is about the daemon, and on the desktop the daemon is the app, so the\nusual cause is that the app was closed when the job was due. ``failing`` means the job ran, on\ntime, and lost every time; that is about the job. A single \"problems\" list would merge the one\nyou fix by opening the app with the one you fix by rewriting the action.\n\n``daemon`` is the third answer, from the heartbeat the daemon writes every tick: it can say\n\"the daemon is dead\" while both lists are still empty, which is the window a daily job leaves\nopen for ~23 hours after a crash.",
         "properties": {
+          "daemon": {
+            "$ref": "#/components/schemas/CronDaemonWatchOut"
+          },
           "failing": {
             "items": {
               "$ref": "#/components/schemas/CronFailingOut"
@@ -3228,6 +3363,7 @@
         "required": [
           "overdue",
           "failing",
+          "daemon",
           "grace_seconds"
         ],
         "title": "CronSilenceOut",
@@ -3383,6 +3519,46 @@
           "type"
         ],
         "title": "DecideQuestionIn",
+        "type": "object"
+      },
+      "DecisionAlertOut": {
+        "description": "A drift alarm computed from the log alone (``chimera/decisions/drift.py``). It annotates and\ngates nothing; ``detail`` carries the numbers the screen words it from.",
+        "properties": {
+          "backend": {
+            "title": "Backend",
+            "type": "string"
+          },
+          "decision": {
+            "title": "Decision",
+            "type": "string"
+          },
+          "detail": {
+            "additionalProperties": true,
+            "title": "Detail",
+            "type": "object"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "prompt_hash": {
+            "title": "Prompt Hash",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "decision",
+          "backend",
+          "model",
+          "prompt_hash",
+          "detail"
+        ],
+        "title": "DecisionAlertOut",
         "type": "object"
       },
       "DecisionGroupOut": {
@@ -3729,6 +3905,14 @@
       "DecisionsOut": {
         "description": "The Decisions screen: the declared decision points, what each instrument's log holds, and the\nlatest answers with their labels (study 22, phase 4).",
         "properties": {
+          "alerts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DecisionAlertOut"
+            },
+            "title": "Alerts",
+            "type": "array"
+          },
           "allow_below": {
             "title": "Allow Below",
             "type": "number"
@@ -6109,6 +6293,18 @@
               }
             ],
             "title": "Verify"
+          },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
           },
           "workspace": {
             "anyOf": [
@@ -8611,6 +8807,18 @@
             ],
             "title": "Verify"
           },
+          "warn_usd": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warn Usd"
+          },
           "workspace": {
             "anyOf": [
               {
@@ -8641,6 +8849,50 @@
           "task"
         ],
         "title": "RunRequest",
+        "type": "object"
+      },
+      "RunningTurnOut": {
+        "description": "A coding turn that is running now, as much of it as a screen needs to follow it.\n\nA conversation is stored when the agent finishes, so while a turn works the file has nothing of\nit. This is the pointer to it: which turn, what it was asked, and where on the conversation's\nlive stream its opening frame is, so a screen that comes back can replay the turn from the start.",
+        "properties": {
+          "live_since": {
+            "title": "Live Since",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "started_at": {
+            "title": "Started At",
+            "type": "number"
+          },
+          "transcript_saved": {
+            "title": "Transcript Saved",
+            "type": "boolean"
+          },
+          "turn_id": {
+            "title": "Turn Id",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          }
+        },
+        "required": [
+          "turn_id",
+          "session_id",
+          "workspace",
+          "message",
+          "started_at",
+          "live_since",
+          "transcript_saved"
+        ],
+        "title": "RunningTurnOut",
         "type": "object"
       },
       "SandboxCfgOut": {
@@ -9560,6 +9812,42 @@
           "assistant"
         ],
         "title": "TurnOut",
+        "type": "object"
+      },
+      "UiLayoutIn": {
+        "properties": {
+          "layout": {
+            "additionalProperties": true,
+            "title": "Layout",
+            "type": "object"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "UiLayoutIn",
+        "type": "object"
+      },
+      "UiLayoutOut": {
+        "description": "The desktop's stored screen layout, or null when none was stored (dynamic screen, phase 6).\n\nOpaque to the server on purpose: the client owns the layout model and reads anything it does not\nrecognise as its default, so a shape checked here would be a second definition that drifts.",
+        "properties": {
+          "layout": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Layout"
+          }
+        },
+        "required": [
+          "layout"
+        ],
+        "title": "UiLayoutOut",
         "type": "object"
       },
       "UnavailableToolOut": {
@@ -10989,7 +11277,7 @@
     },
     "/api/code/sessions": {
       "get": {
-        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.",
+        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.",
         "operationId": "list_code_sessions_api_code_sessions_get",
         "responses": {
           "200": {
@@ -11054,7 +11342,7 @@
         "summary": "Delete Code Session"
       },
       "get": {
-        "description": "A stored conversation as the exchanges a person had, ready to render.\n\nResuming used to show an empty screen while the agent silently carried the whole history \u2014\nthe worst of both, because the next question worked for reasons the user could not see.\n\nAn unknown id returns an empty conversation rather than a 404: the store treats a missing\nfile as the ordinary first-turn case, and a screen that errors on a session someone just\ndeleted in another window would be reporting a race as a fault.",
+        "description": "A stored conversation as the exchanges a person had, ready to render.\n\nResuming used to show an empty screen while the agent silently carried the whole history \u2014\nthe worst of both, because the next question worked for reasons the user could not see.\n\nAn unknown id returns an empty conversation rather than a 404: the store treats a missing\nfile as the ordinary first-turn case, and a screen that errors on a session someone just\ndeleted in another window would be reporting a race as a fault.\n\nA turn running in this conversation is named in ``running_turn``, and the file is read\nbetween two looks at it (`LiveTurns.read_consistently`): the agent saves the transcript\nwhen it finishes and the turn goes on verifying after that, so the file can already hold the\nexchange of a turn that is still running, and a screen has to know which of the two it got.",
         "operationId": "get_code_session_api_code_sessions__session_id__get",
         "parameters": [
           {
@@ -11581,6 +11869,29 @@
         "summary": "Code Turn"
       }
     },
+    "/api/code/turns/running": {
+      "get": {
+        "description": "The coding turns running now, oldest first.\n\nA turn keeps running when the screen that started it goes away, and until this existed\nnothing could say so: the conversation is stored when the agent finishes, so a session left\nmid-turn read as empty and was not in the list. Empty here means nothing is running, not\nthat the question failed; an error is an error.",
+        "operationId": "code_turns_running_api_code_turns_running_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunningTurnOut"
+                  },
+                  "title": "Response Code Turns Running Api Code Turns Running Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Code Turns Running"
+      }
+    },
     "/api/code/turns/{turn_id}": {
       "get": {
         "description": "Everything this turn emitted after ``since``, so a dropped stream costs nothing.\n\nThe same shape the orchestration route has had since it landed, on the route that actually\nneeded it: a coding turn is the most expensive thing this product does, and losing the\nconnection threw away work that had already been paid for while the bill stayed.\n\nThe frames go through the SAME handlers the live stream feeds, and a client that ignores a\n`seq` it has already applied gets one state whether it replayed first or not.\n\n404 for an id that was never recorded, never 200-with-nothing: an unknown turn and a turn\nwith no new frames are opposite instructions for a client deciding whether to keep asking.",
@@ -11629,6 +11940,46 @@
           }
         },
         "summary": "Code Turn Frames"
+      }
+    },
+    "/api/code/turns/{turn_id}/stop": {
+      "post": {
+        "description": "Stop a running coding turn on the server.\n\nUntil this existed the Stop button only aborted the screen's request: the turn went on\ncalling the model, editing files and spending until it finished by itself, while the screen\nsaid it had stopped. The agent loop polls the signal once per step, so the step in progress\nfinishes first; an external agent's prompt is cancelled at once. 404 for a turn that is not\nrunning, never 200-with-nothing: a stop that reached nothing must not read as one that\nworked.",
+        "operationId": "code_turn_stop_api_code_turns__turn_id__stop_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "turn_id",
+            "required": true,
+            "schema": {
+              "title": "Turn Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeTurnStopOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Code Turn Stop"
       }
     },
     "/api/code/works/{work_id}/session": {
@@ -12316,7 +12667,7 @@
     },
     "/api/cron/silence": {
       "get": {
-        "description": "Ask the schedule what it is not telling you.\n\nEvery other honesty mechanism in this project sits downstream of a run having happened \u2014\nthe verifier judges a result, the receipt names who approved it. None of them gets a turn\nwhen the run never occurred, and a schedule that produced no result reads exactly like a\nschedule with nothing due. That distinction matters more now that the app shows results:\nan empty row for a job that never fired and one for a job that answered nothing look the\nsame, and only one of them is a problem.\n\nOn the desktop the daemon IS the app, so the common cause of an overdue job is that the\nwindow was closed when its time came. Nothing can watch while the process is down \u2014 a\ncrashed process cannot log its own crash \u2014 so this is a question, not a watcher, and it is\nanswered the moment anything asks.\n\nDeclared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the\nparameterised route would otherwise take `silence` for a job id and 404 a path that exists.",
+        "description": "Ask the schedule what it is not telling you.\n\nEvery other honesty mechanism in this project sits downstream of a run having happened \u2014\nthe verifier judges a result, the receipt names who approved it. None of them gets a turn\nwhen the run never occurred, and a schedule that produced no result reads exactly like a\nschedule with nothing due. That distinction matters more now that the app shows results:\nan empty row for a job that never fired and one for a job that answered nothing look the\nsame, and only one of them is a problem.\n\nOn the desktop the daemon IS the app, so the common cause of an overdue job is that the\nwindow was closed when its time came. Nothing can watch while the process is down \u2014 a\ncrashed process cannot log its own crash \u2014 so this is a question, not a watcher, and it is\nanswered the moment anything asks.\n\n``daemon`` is the third answer, and the one the jobs could not give: the daemon's own\nheartbeat (:mod:`chimera.scheduler.watchdog`), written every tick. A dead daemon with a\ndaily job looks healthy from the jobs alone for ~23 hours \u2014 the job is not yet late \u2014 and\nthe beat closes that window. ``unknown`` is the honest default when the beat carries no\ntick interval to judge freshness against; ``none`` is \"no signal\", not \"dead\".\n\nDeclared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the\nparameterised route would otherwise take `silence` for a job id and 404 a path that exists.",
         "operationId": "cron_silence_api_cron_silence_get",
         "parameters": [
           {
@@ -15839,6 +16190,62 @@
           }
         },
         "summary": "Warm Transcriber Route"
+      }
+    },
+    "/api/ui/layout": {
+      "get": {
+        "description": "The screen layout the desktop stored, or null. Null is the ordinary first-run answer, and the\nclient then keeps what its own storage has (and sends it here), or its default.",
+        "operationId": "get_ui_layout_api_ui_layout_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiLayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Ui Layout"
+      },
+      "put": {
+        "description": "Keep the screen layout. 413 for one over the size cap; the shape is the client's to check.",
+        "operationId": "put_ui_layout_api_ui_layout_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiLayoutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiLayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Ui Layout"
       }
     },
     "/api/usage": {

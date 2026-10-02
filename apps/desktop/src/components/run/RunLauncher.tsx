@@ -48,7 +48,8 @@ export function RunLauncher({
 }) {
   const t = useT();
   const qc = useQueryClient();
-  const run = useRunSession();
+  // This project's run: another project's run no longer stands in the way of starting one here.
+  const run = useRunSession(workspace);
   // The plan the user has read, and possibly rewritten. Empty means "plan for yourself", which is
   // what every run did before this and still does when nobody asks to see it first.
   const [plan, setPlan] = useState("");
@@ -493,6 +494,8 @@ export function RunStream({ lines }: { lines: string[] }) {
 export function liveLine(e: RunEvent, t: TFunc): string | null {
   if (e.kind === "status") return /planning/i.test(e.text) ? t("runs.planning") : e.text;
   if (e.kind === "attempt") return `${t("runs.attempt")} ${e.index} — ${t("runs.verifying")}`;
+  // Runs take the same lock per folder coding turns take: one waiting for a busy folder says so.
+  if (e.kind === "folder_busy") return t("runs.folderBusy");
   if (e.kind === "result")
     return `${t("runs.attempt")} ${e.index}: ${e.success ? t("runs.passed") : t("runs.failed")}`;
   // The one line here that is a CLAIM rather than an observation, which is why it reuses the

@@ -22,6 +22,7 @@ import subprocess
 import sys
 import textwrap
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -296,3 +297,75 @@ def test_reading_still_works_without_taking_a_lock(tmp_path: Path) -> None:
             assert MemoryStore(path).all()[0].id == "a"  # would hang if load() locked
         finally:
             filelock._release(held)
+
+
+# --- how long a collision may last ---------------------------------------------------------------
+#
+# Found on 2026-10-01: the Windows CI job failed once in 40 runs on the reader/writer test above,
+# with PermissionError out of `os.replace`. The retry budget was 20 attempts 10 ms apart, about
+# 0.2 s in all. What holds a file open on Windows is not only our own reader mid-read: the
+# antivirus scans a file the moment it is created or replaced, and a reader thread descheduled on a
+# loaded machine keeps its handle for as long as it is not running. Either outlasts 0.2 s on a busy
+# CI runner, and the write then failed outright, losing the memory being saved.
+
+
+def test_a_file_busy_for_half_a_second_is_still_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Half a second of "in use", simulated so it holds on every platform: the write gets through."""
+    path = tmp_path / "memory.json"
+    store = MemoryStore(path)
+    store.add(_item("a"))
+    real_replace = filelock.os.replace
+    busy_until = {"t": 0.0}
+
+    def held_by_a_scanner(src: str, dst: object) -> None:
+        if not busy_until["t"]:
+            busy_until["t"] = time.monotonic() + 0.5
+        if time.monotonic() < busy_until["t"]:
+            raise PermissionError(13, "Access is denied")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(filelock.os, "replace", held_by_a_scanner)
+
+    store.add(_item("b"))
+
+    assert _ids(path) == {"a", "b"}, "a file busy for half a second lost the write"
+
+
+def test_a_permission_problem_that_does_not_clear_still_surfaces_in_bounded_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The longer budget is a wait, not a hang: a real permission problem is reported in seconds."""
+
+    def always_busy() -> str:
+        raise PermissionError("genuinely not permitted")
+
+    started = time.monotonic()
+    with pytest.raises(PermissionError):
+        filelock.retrying(always_busy)
+    assert time.monotonic() - started < 6.0, "a permanent error took too long to surface"
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="only Windows refuses to replace an open file")
+def test_a_reader_holding_the_file_for_half_a_second_does_not_fail_the_writer(tmp_path: Path) -> None:
+    """The real collision, on the platform that has it: a handle held open while another writes."""
+    path = tmp_path / "memory.json"
+    store = MemoryStore(path)
+    store.add(_item("a"))
+    opened = threading.Event()
+
+    def hold() -> None:
+        with open(path, "rb"):
+            opened.set()
+            time.sleep(0.5)
+
+    holder = threading.Thread(target=hold)
+    holder.start()
+    assert opened.wait(5)
+    try:
+        store.add(_item("b"))
+    finally:
+        holder.join(5)
+
+    assert _ids(path) == {"a", "b"}

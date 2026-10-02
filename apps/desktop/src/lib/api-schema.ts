@@ -392,6 +392,11 @@ export interface paths {
          *     conversations are a flat pile you cannot file. Titles are the first thing the user asked,
          *     derived on read — never generated, so a row is never a paraphrase of the conversation it
          *     points at.
+         *
+         *     A conversation with a turn running is marked, and one whose first turn is still running is
+         *     listed although its file does not exist yet: the file is written when the agent finishes,
+         *     so without this a task started in a new conversation was invisible for exactly as long as it
+         *     took to do.
          */
         get: operations["list_code_sessions_api_code_sessions_get"];
         put?: never;
@@ -419,6 +424,11 @@ export interface paths {
          *     An unknown id returns an empty conversation rather than a 404: the store treats a missing
          *     file as the ordinary first-turn case, and a screen that errors on a session someone just
          *     deleted in another window would be reporting a race as a fault.
+         *
+         *     A turn running in this conversation is named in ``running_turn``, and the file is read
+         *     between two looks at it (`LiveTurns.read_consistently`): the agent saves the transcript
+         *     when it finishes and the turn goes on verifying after that, so the file can already hold the
+         *     exchange of a turn that is still running, and a screen has to know which of the two it got.
          */
         get: operations["get_code_session_api_code_sessions__session_id__get"];
         put?: never;
@@ -634,6 +644,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/turns/running": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Code Turns Running
+         * @description The coding turns running now, oldest first.
+         *
+         *     A turn keeps running when the screen that started it goes away, and until this existed
+         *     nothing could say so: the conversation is stored when the agent finishes, so a session left
+         *     mid-turn read as empty and was not in the list. Empty here means nothing is running, not
+         *     that the question failed; an error is an error.
+         */
+        get: operations["code_turns_running_api_code_turns_running_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/turns/{turn_id}": {
         parameters: {
             query?: never;
@@ -658,6 +693,33 @@ export interface paths {
         get: operations["code_turn_frames_api_code_turns__turn_id__get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/turns/{turn_id}/stop": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Code Turn Stop
+         * @description Stop a running coding turn on the server.
+         *
+         *     Until this existed the Stop button only aborted the screen's request: the turn went on
+         *     calling the model, editing files and spending until it finished by itself, while the screen
+         *     said it had stopped. The agent loop polls the signal once per step, so the step in progress
+         *     finishes first; an external agent's prompt is cancelled at once. 404 for a turn that is not
+         *     running, never 200-with-nothing: a stop that reached nothing must not read as one that
+         *     worked.
+         */
+        post: operations["code_turn_stop_api_code_turns__turn_id__stop_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -994,6 +1056,12 @@ export interface paths {
          *     window was closed when its time came. Nothing can watch while the process is down — a
          *     crashed process cannot log its own crash — so this is a question, not a watcher, and it is
          *     answered the moment anything asks.
+         *
+         *     ``daemon`` is the third answer, and the one the jobs could not give: the daemon's own
+         *     heartbeat (:mod:`chimera.scheduler.watchdog`), written every tick. A dead daemon with a
+         *     daily job looks healthy from the jobs alone for ~23 hours — the job is not yet late — and
+         *     the beat closes that window. ``unknown`` is the honest default when the beat carries no
+         *     tick interval to judge freshness against; ``none`` is "no signal", not "dead".
          *
          *     Declared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the
          *     parameterised route would otherwise take `silence` for a job id and 404 a path that exists.
@@ -2935,6 +3003,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ui/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Ui Layout
+         * @description The screen layout the desktop stored, or null. Null is the ordinary first-run answer, and the
+         *     client then keeps what its own storage has (and sends it here), or its default.
+         */
+        get: operations["get_ui_layout_api_ui_layout_get"];
+        /**
+         * Put Ui Layout
+         * @description Keep the screen layout. 413 for one over the size cap; the shape is the client's to check.
+         */
+        put: operations["put_ui_layout_api_ui_layout_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/usage": {
         parameters: {
             query?: never;
@@ -3279,6 +3372,8 @@ export interface components {
             summarise_compaction: boolean;
             /** Tasks */
             tasks: components["schemas"]["AgentTaskIn"][];
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -3355,6 +3450,26 @@ export interface components {
             p?: number | null;
             /** Reason */
             reason: string;
+            /**
+             * Run Id
+             * @default
+             */
+            run_id: string;
+            /**
+             * Session Id
+             * @default
+             */
+            session_id: string;
+            /**
+             * Work
+             * @default
+             */
+            work: string;
+            /**
+             * Workspace
+             * @default
+             */
+            workspace: string;
         };
         /** ApproveBody */
         ApproveBody: {
@@ -3992,6 +4107,11 @@ export interface components {
         CodeSessionMetaOut: {
             /** Id */
             id: string;
+            /**
+             * Running
+             * @default false
+             */
+            running: boolean;
             /** Title */
             title: string;
             /** Turns */
@@ -4007,6 +4127,7 @@ export interface components {
             exchanges: components["schemas"]["CodeExchangeOut"][];
             /** Id */
             id: string;
+            running_turn?: components["schemas"]["RunningTurnOut"] | null;
             /** Workspace */
             workspace: string;
         };
@@ -4139,10 +4260,22 @@ export interface components {
             summarise_compaction: boolean;
             /** Thinking */
             thinking?: boolean | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
             write_region?: string[] | null;
+        };
+        /**
+         * CodeTurnStopOut
+         * @description A stop that reached a running coding turn. The turn ends at its next step, not at once.
+         */
+        CodeTurnStopOut: {
+            /** Stopping */
+            stopping: boolean;
+            /** Turn Id */
+            turn_id: string;
         };
         /**
          * CompletionOut
@@ -4355,6 +4488,8 @@ export interface components {
              * @description Shell command run in each worker's own worktree; exit 0 merges it. Without one, every worker that did not crash merges — and workers that touched the same file all lose to the conflict rule.
              */
             verify?: string | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workers */
             workers: components["schemas"]["CrewWorkerIn"][];
             /** Workspace */
@@ -4491,6 +4626,27 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /**
+         * CronDaemonWatchOut
+         * @description What the daemon's heartbeat says, as of the moment the question was asked.
+         *
+         *     Three-valued on purpose: ``alive`` and ``stale`` are judged against ``max_gap_seconds``
+         *     (three ticks of the beat's own interval); ``unknown`` means a beat exists but carried no
+         *     tick interval, so freshness cannot be judged without inventing a number — and the reader
+         *     refuses to invent one. ``none`` is "no signal", not "dead": a daemon that has never run
+         *     left no evidence either way.
+         */
+        CronDaemonWatchOut: {
+            /** Age Seconds */
+            age_seconds?: number | null;
+            /** Max Gap Seconds */
+            max_gap_seconds?: number | null;
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "alive" | "stale" | "unknown" | "none";
+        };
         /** CronFailingOut */
         CronFailingOut: {
             /** Consecutive Failures */
@@ -4593,8 +4749,13 @@ export interface components {
          *     usual cause is that the app was closed when the job was due. ``failing`` means the job ran, on
          *     time, and lost every time; that is about the job. A single "problems" list would merge the one
          *     you fix by opening the app with the one you fix by rewriting the action.
+         *
+         *     ``daemon`` is the third answer, from the heartbeat the daemon writes every tick: it can say
+         *     "the daemon is dead" while both lists are still empty, which is the window a daily job leaves
+         *     open for ~23 hours after a crash.
          */
         CronSilenceOut: {
+            daemon: components["schemas"]["CronDaemonWatchOut"];
             /** Failing */
             failing: components["schemas"]["CronFailingOut"][];
             /** Grace Seconds */
@@ -4660,6 +4821,27 @@ export interface components {
              * @enum {string}
              */
             type: "noul" | "choice" | "score";
+        };
+        /**
+         * DecisionAlertOut
+         * @description A drift alarm computed from the log alone (``chimera/decisions/drift.py``). It annotates and
+         *     gates nothing; ``detail`` carries the numbers the screen words it from.
+         */
+        DecisionAlertOut: {
+            /** Backend */
+            backend: string;
+            /** Decision */
+            decision: string;
+            /** Detail */
+            detail: {
+                [key: string]: unknown;
+            };
+            /** Kind */
+            kind: string;
+            /** Model */
+            model: string;
+            /** Prompt Hash */
+            prompt_hash: string;
         };
         /**
          * DecisionGroupOut
@@ -4812,6 +4994,11 @@ export interface components {
          *     latest answers with their labels (study 22, phase 4).
          */
         DecisionsOut: {
+            /**
+             * Alerts
+             * @default []
+             */
+            alerts: components["schemas"]["DecisionAlertOut"][];
             /** Allow Below */
             allow_below: number;
             /** Groups */
@@ -5957,6 +6144,8 @@ export interface components {
             task: string;
             /** Verify */
             verify?: string | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
@@ -7049,10 +7238,36 @@ export interface components {
             thread_id?: string | null;
             /** Verify */
             verify?: string | null;
+            /** Warn Usd */
+            warn_usd?: number | null;
             /** Workspace */
             workspace?: string | null;
             /** Write Region */
             write_region?: string[] | null;
+        };
+        /**
+         * RunningTurnOut
+         * @description A coding turn that is running now, as much of it as a screen needs to follow it.
+         *
+         *     A conversation is stored when the agent finishes, so while a turn works the file has nothing of
+         *     it. This is the pointer to it: which turn, what it was asked, and where on the conversation's
+         *     live stream its opening frame is, so a screen that comes back can replay the turn from the start.
+         */
+        RunningTurnOut: {
+            /** Live Since */
+            live_since: number;
+            /** Message */
+            message: string;
+            /** Session Id */
+            session_id: string;
+            /** Started At */
+            started_at: number;
+            /** Transcript Saved */
+            transcript_saved: boolean;
+            /** Turn Id */
+            turn_id: string;
+            /** Workspace */
+            workspace: string;
         };
         /** SandboxCfgOut */
         SandboxCfgOut: {
@@ -7494,6 +7709,26 @@ export interface components {
             assistant: string;
             /** User */
             user: string;
+        };
+        /** UiLayoutIn */
+        UiLayoutIn: {
+            /** Layout */
+            layout: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * UiLayoutOut
+         * @description The desktop's stored screen layout, or null when none was stored (dynamic screen, phase 6).
+         *
+         *     Opaque to the server on purpose: the client owns the layout model and reads anything it does not
+         *     recognise as its default, so a shape checked here would be a second definition that drifts.
+         */
+        UiLayoutOut: {
+            /** Layout */
+            layout: {
+                [key: string]: unknown;
+            } | null;
         };
         /**
          * UnavailableToolOut
@@ -8885,6 +9120,26 @@ export interface operations {
             };
         };
     };
+    code_turns_running_api_code_turns_running_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunningTurnOut"][];
+                };
+            };
+        };
+    };
     code_turn_frames_api_code_turns__turn_id__get: {
         parameters: {
             query?: {
@@ -8905,6 +9160,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeTurnFramesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    code_turn_stop_api_code_turns__turn_id__stop_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turn_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeTurnStopOut"];
                 };
             };
             /** @description Validation Error */
@@ -12317,6 +12603,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TranscriberWarmOut"];
+                };
+            };
+        };
+    };
+    get_ui_layout_api_ui_layout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiLayoutOut"];
+                };
+            };
+        };
+    };
+    put_ui_layout_api_ui_layout_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UiLayoutIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UiLayoutOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

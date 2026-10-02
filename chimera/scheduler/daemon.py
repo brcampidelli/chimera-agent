@@ -5,13 +5,24 @@ explicitly); this daemon supplies the wall clock, ticking on an interval and dis
 jobs that are due. It's what turns ``chimera serve`` from a purely reactive gateway into an
 agent that also acts on a schedule. Clock and sleep are injected, so the loop is fully
 unit-testable without real time, and a failing tick or job never kills the loop.
+
+**The heartbeat** (:meth:`CronDaemon.tick` → :func:`write_heartbeat`) is the daemon's one
+outward sign of life, and it exists because of the gap `cron doctor` itself names: a crashed
+process cannot log its own crash, so a dead daemon is invisible to every check that lives
+inside it. The heartbeat is written to disk — not to a log, not to memory — so a *separate*
+process (the host cron `docs/deploy.md` already recommends, or the app's next start) can read
+it and notice the silence. That is the whole of issue #26's "own clock and own liveness": the
+daemon does not watch itself; it leaves a timestamp where something else can find it stale.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 
 from chimera.scheduler.engine import Scheduler
 from chimera.scheduler.models import CronJob, DispatchStatus, JobOutcome
@@ -19,10 +30,80 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("scheduler.daemon")
 
+#: Where the daemon leaves its sign of life, relative to ``CHIMERA_HOME``. Beside ``jobs.json``
+#: (same directory), so one folder is the whole scheduler's state and a backup of one is a
+#: backup of both.
+HEARTBEAT_RELPATH = Path("scheduler") / "heartbeat.json"
+
 Dispatch = Callable[[CronJob], "DispatchStatus | None"]
 """A dispatch may report how the job ended. ``None`` means "nothing to report", which the
 engine reads as ``ok`` — every dispatch written before this returns None and keeps its
 meaning, so the new outcome costs nothing to the callers that have no verdict to give."""
+
+
+def write_heartbeat(path: Path, *, now: float, tick_seconds: float, pid: int) -> None:
+    """Write the daemon's sign of life: one small JSON file, atomically replaced.
+
+    Atomic (unique temp + ``os.replace``) for the same reason the job store is: a reader must
+    never see a half-written heartbeat, because a torn file would read as "no heartbeat" and
+    cry wolf about a daemon that is alive. The ``finally`` unlink keeps a failed write from
+    leaving a temp file behind.
+
+    Nothing here is clever on purpose. A reader answers one question — *did the daemon tick
+    recently?* — from three fields: when it last ticked, how often it ticks, and which process
+    was ticking. Everything a verdict needs beyond that (``now``) comes from the reader's own
+    clock, which is the point: the writer being dead must not matter.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.{os.urandom(4).hex()}.tmp")
+    try:
+        tmp.write_text(
+            json.dumps(
+                {"at": now, "tick_seconds": tick_seconds, "pid": pid},
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        tmp.replace(path)
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+def read_heartbeat(path: Path) -> dict[str, float | int] | None:
+    """The last heartbeat, or ``None`` when there is none (or it cannot be read).
+
+    ``None`` is "no signal", not "dead": a daemon that has never run and a corrupt file are
+    both absence of evidence, and the caller decides what absence means — the same rule the
+    engine's ``last_status=None`` already follows for a job that was never dispatched.
+    """
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    at = raw.get("at")
+    if not isinstance(at, (int, float)):
+        return None
+    return {
+        "at": float(at),
+        "tick_seconds": float(raw.get("tick_seconds") or 0.0),
+        "pid": int(raw.get("pid") or 0),
+    }
+
+
+def heartbeat_age(path: Path, *, now: float) -> float | None:
+    """Seconds since the last heartbeat, or ``None`` when there is none.
+
+    The one number a watcher needs. Negative ages (a heartbeat dated in the future — a clock
+    that moved backwards, a restored backup) are reported as 0.0 rather than passed through:
+    "the daemon ticked -5s ago" is not a sentence, and a negative would silently pass every
+    staleness comparison.
+    """
+    beat = read_heartbeat(path)
+    if beat is None:
+        return None
+    return max(0.0, now - beat["at"])
 
 
 def make_agent_dispatch(
@@ -93,6 +174,7 @@ class CronDaemon:
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], None] = time.sleep,
         job_timeout: float | None = 1800.0,
+        heartbeat_path: Path | None = None,
     ) -> None:
         self.scheduler = scheduler
         self.dispatch = dispatch
@@ -104,20 +186,44 @@ class CronDaemon:
         # silently stops the whole schedule. 30 min is generous for an agent job and still bounded;
         # None restores the old unbounded behaviour for a caller that truly wants it.
         self.job_timeout = job_timeout
+        # Where the sign of life goes. Derived from the job store's own directory by default, so
+        # every existing caller (serve, app, the tests) gets a heartbeat without a new argument —
+        # and a caller that wants it elsewhere (a tmp_path in a test) passes one. ``None`` keeps
+        # the old behaviour exactly: no file, no signal, and `cron doctor` reads absence as
+        # "nothing to say about the daemon", which is what it said before this existed.
+        self.heartbeat_path = (
+            heartbeat_path
+            if heartbeat_path is not None
+            else scheduler.store.path.parent / "heartbeat.json"
+        )
 
     def tick(self, now: float | None = None) -> list[CronJob]:
         """One scheduler tick: dispatch every job due at ``now`` (defaults to the real clock).
 
         Reloads the job store first so crons added out-of-process (``chimera cron add`` in
         another shell/container) take effect without restarting the daemon.
+
+        The heartbeat is written AFTER the tick's work, not before: a heartbeat that says "alive"
+        before the work ran would let a daemon that dies mid-tick leave a fresh-looking beat over
+        a tick that never dispatched. The beat is the record of a completed tick.
         """
         try:
             self.scheduler.store.reload_if_changed()
         except Exception as exc:  # noqa: BLE001 — a bad reload must not skip the tick
             _log.warning("cron store reload failed: %s", exc)
-        return self.scheduler.run_due(
-            self._clock() if now is None else now, self.dispatch, job_timeout=self.job_timeout
-        )
+        at = self._clock() if now is None else now
+        ran = self.scheduler.run_due(at, self.dispatch, job_timeout=self.job_timeout)
+        if self.heartbeat_path is not None:
+            try:
+                write_heartbeat(
+                    self.heartbeat_path,
+                    now=at,
+                    tick_seconds=self.tick_seconds,
+                    pid=os.getpid(),
+                )
+            except OSError as exc:  # noqa: BLE001 — a failed beat must not kill the tick
+                _log.warning("cron heartbeat write failed: %s", exc)
+        return ran
 
     def run_forever(self, *, stop: threading.Event | None = None) -> None:
         """Tick, sleep, repeat until ``stop`` is set. A bad tick is logged, never fatal."""

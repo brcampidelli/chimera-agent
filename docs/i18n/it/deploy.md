@@ -1,5 +1,5 @@
 ---
-source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
+source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
 ---
 
 # Distribuire Chimera su un server (VPS)
@@ -157,8 +157,10 @@ avviso invece di una risposta, eseguilo dal cron dell'host stesso:
 
 Funziona perché è sorvegliato da qualcosa che non è Chimera — che è tutto il punto.
 
-`--check` esce con 1 solo quando un job è in ritardo o fallisce, quindi la mail arriva solo allora; `cron doctor` senza l'opzione esce sempre con 0, perché rispondere non è un fallimento.
+`--check` esce con 1 solo quando un job è in ritardo o fallisce — e ora anche quando il battito del daemon è stantio, quindi la riga host-cron qui sopra becca un daemon morto al suo prossimo giro, qualunque sia la programmazione del job; la mail arriva solo allora. `cron doctor` senza di esso esce sempre con 0, perché rispondere non è fallire.
 
+
+**Il battito del daemon chiude la finestra che i job non possono.** A ogni tick, il daemon scrive il suo segno di vita in `<CHIMERA_HOME>/scheduler/heartbeat.json` (atomico, accanto a `jobs.json`). Il doctor lo legge per primo e risponde a una domanda che i job da soli non possono fare: un daemon morto con un job quotidiano appare sano dai job per ~23 ore — il job non è ancora in ritardo — mentre il battito si ferma nel momento in cui il daemon muore. Il verdetto è giudicato contro tre tick dell'intervallo che il battito stesso ha registrato, e stampato con il tetto usato, così puoi contestare il numero invece di chiederti da dove viene. Tre letture onestre: `alive`/`stale` sono giudicate; `unknown` significa che esiste un battito ma senza intervallo di tick registrato (uno scrittore più vecchio), quindi la freschezza non può essere giudicata senza inventare un numero — e il lettore rifiuta; `none` significa nessun battito affatto, che è “nessun segnale”, non “morto” — un daemon che non ha mai girato non ha lasciato prova alcuna. Questo è *liveness*, non taint: la superficie dello scheduler ancora non traccia il taint (vedi `SECURITY.md`).
 ---
 
 ## 4. Salute, backup, sicurezza
