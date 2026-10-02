@@ -959,7 +959,12 @@ class Agent:
             if found.truncated:
                 # Said out loud rather than swallowed: an agent silently handed half a rules file
                 # will follow half the rules, and the half it dropped is unknowable after the fact.
+                # The log alone was not out loud — nobody reads it — so the run's notice channel
+                # carries it too (see `_run`), and the prompt itself carries a marker.
                 _log.info("project instructions truncated to fit: %s", ", ".join(found.truncated))
+                local = getattr(self, "_local", None)
+                if local is not None:
+                    local.instructions_cut = found.omitted
             return found.text
         except Exception as exc:  # noqa: BLE001 — instructions must never break the loop
             _log.debug("project instructions skipped: %s", exc)
@@ -1065,7 +1070,20 @@ class Agent:
                 if on_todo is not None
                 else None,
             )
+        # Thread-local for the same reason as `turn_swap` below: one Agent can serve concurrent runs,
+        # and the composition is three calls deep, where `on_notice` is not in reach.
+        self._local.instructions_cut = ()
         system_prompt = self.compose_system_prompt(task)
+        cut: tuple[tuple[str, int], ...] = getattr(self._local, "instructions_cut", ())
+        self._local.instructions_cut = ()
+        if cut:
+            _notice(
+                on_notice, "instructions_truncated",
+                "project instructions were cut to fit the prompt: "
+                + ", ".join(f"{rel} lost {lost:,} characters" for rel, lost in cut)
+                + " (the agent was told, and can read the file itself)",
+                omitted=dict(cut),
+            )
         # Remembered here so a compaction can put it back. The task arrives as the last user message
         # and, after enough turns, falls out of the tail that compaction keeps — leaving the agent
         # executing a plan whose purpose was deleted. Set at the loop rather than by each caller

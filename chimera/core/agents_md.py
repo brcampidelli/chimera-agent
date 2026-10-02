@@ -28,6 +28,7 @@ registry and the gates.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -47,8 +48,33 @@ FALLBACKS = ("CLAUDE.md", ".cursorrules", ".github/copilot-instructions.md")
 #: Character budget. Instructions compete for context with the task, the repo map and the code the
 #: agent still has to read; a project that writes twelve thousand characters of conventions is
 #: describing itself to a human, and the run should not pay the whole bill for that.
+#:
+#: ``MAX_TOTAL_CHARS`` is the budget for file content: however many files are on the path and
+#: however long they are, their text in the block never adds up to more than this. It is ~2,000
+#: tokens, in the cacheable prefix. Outside it sit the fixed header, a ``### path`` heading per file,
+#: and the marker for a file squeezed out of the budget entirely — at most ~600 characters (six
+#: section names of 60), once per directory on the focus path.
+#:
+#: ``MAX_FILE_CHARS`` was 2,000, and that cut this project's own ``AGENTS.md`` (4,066 characters,
+#: the one real instructions file in reach — there is no CLAUDE.md or .cursorrules here) through the
+#: middle of its hard rules: three of the six vanished and a fourth stopped mid-sentence (study 28,
+#: P6). 6,000 holds that file with half again to grow, and stays below the total on purpose: no
+#: single file can take the whole budget, so a verbose nested file still leaves 2,000 for the root's.
 MAX_TOTAL_CHARS = 8_000
-MAX_FILE_CHARS = 2_000
+MAX_FILE_CHARS = 6_000
+
+#: Markdown structure the cut respects. A fence is tracked because a ``# comment`` inside a shell
+#: block looks exactly like a heading, and cutting there would leave an unclosed code block.
+_HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+_RULE = re.compile(r"^\s*(-{3,}|\*{3,}|_{3,})\s*$")
+#: The underline of a setext heading (``Title`` over ``-----`` or ``=====``). Without it, ``-----``
+#: under a title reads as a thematic break, and a cut there keeps the title and drops its underline.
+_SETEXT = re.compile(r"^ {0,3}(=+|-{2,})\s*$")
+#: A list item cannot be a setext title (``- item`` over ``---`` is a list and then a rule).
+_LIST_ITEM = re.compile(r"^\s*([-*+]|\d+[.)])\s")
+_FENCE = re.compile(r"^\s*(```|~~~)")
+#: How many dropped section names the marker lists before saying "and N more".
+_MARKER_SECTIONS = 6
 
 
 @dataclass(frozen=True)
@@ -62,24 +88,161 @@ class ProjectInstructions:
     truncated: tuple[str, ...] = ()
     """Sources that did not fit whole. Surfaced rather than swallowed: an agent silently given half
     a rules file will follow half the rules and no one will know which half."""
+    omitted: tuple[tuple[str, int], ...] = ()
+    """``(source, characters not shown)`` for every entry of ``truncated``, so the person can be
+    told how much was lost and not only that something was."""
 
     def __bool__(self) -> bool:
         return bool(self.text)
 
 
-def _clip(text: str, limit: int) -> tuple[str, bool]:
-    """Clip from the MIDDLE, keeping the head and the tail.
+@dataclass(frozen=True)
+class _Shape:
+    """Offsets where a cut is clean, all outside code fences, and what a cut there would drop."""
 
-    A rules file's head is its summary and its tail is often the "do not do X" list that got added
-    last. Truncating from the end reliably drops the newest and most specific instruction, which is
-    the one most likely to matter.
+    sections: tuple[int, ...]
+    """Starts of headings (ATX, or the title line of a setext one) and thematic breaks."""
+    paragraphs: tuple[int, ...]
+    """Blank lines, and the line that OPENS a fence."""
+    lines: tuple[int, ...]
+    """Every other line start outside a fence, except a setext underline."""
+    headings: tuple[tuple[int, str], ...]
+    """``(offset, title)``, for naming what a cut dropped."""
+    fences: tuple[tuple[int, int, str], ...]
+    """``(opening line, closing line or end of text, fence token)``: where a hard cut would land
+    inside a code block and has to close it."""
+
+
+def _structure(text: str) -> _Shape:
+    sections: list[int] = []
+    paragraphs: list[int] = []
+    lines: list[int] = []
+    headings: list[tuple[int, str]] = []
+    fences: list[tuple[int, int, str]] = []
+    in_fence = False
+    opened, token = 0, "```"
+    # The text run a setext underline would turn into a heading: where it starts and what it says.
+    title: tuple[int, str] | None = None
+    offset = 0
+    for line in text.splitlines(keepends=True):
+        bare = line.rstrip("\r\n")
+        fence = _FENCE.match(bare)
+        if not in_fence:
+            lines.append(offset)
+        if fence:
+            if in_fence:
+                fences.append((opened, offset, token))
+            else:
+                # The fence line itself is a clean place to stop only when it OPENS a block.
+                paragraphs.append(offset)
+                opened, token = offset, fence.group(1)
+            in_fence = not in_fence
+            title = None
+        elif not in_fence:
+            heading = _HEADING.match(bare)
+            if heading:
+                sections.append(offset)
+                headings.append((offset, heading.group(2)))
+                title = None
+            elif title is not None and _SETEXT.match(bare):
+                # The section starts at the title, not at its underline; and the underline is not a
+                # place to cut either, or the head would end on a title with its underline gone.
+                lines.pop()
+                sections.append(title[0])
+                headings.append(title)
+                title = None
+            elif _RULE.match(bare):
+                sections.append(offset)
+                title = None
+            elif not bare.strip():
+                paragraphs.append(offset)
+                title = None
+            elif _LIST_ITEM.match(bare):
+                title = None
+            else:
+                title = (offset, bare.strip()) if title is None else (title[0], f"{title[1]} {bare.strip()}")
+        offset += len(line)
+    if in_fence:
+        fences.append((opened, len(text), token))
+    return _Shape(tuple(sections), tuple(paragraphs), tuple(lines), tuple(headings), tuple(fences))
+
+
+def _marker(rel: str, text: str, shape: _Shape, shown: int, cut: int) -> str:
+    """The line the model reads where the file stops: that it stops, how much is missing, which
+    sections, and that the rest is one file read away."""
+    lost = [title for offset, title in shape.headings if offset >= cut and title]
+    names = ", ".join(f'"{t[:60]}"' for t in lost[:_MARKER_SECTIONS])
+    if len(lost) > _MARKER_SECTIONS:
+        names += f" and {len(lost) - _MARKER_SECTIONS} more"
+    sections = f" Sections not shown: {names}." if names else ""
+    return (
+        f"[{rel} was truncated to fit the prompt: {len(text) - shown:,} of its {len(text):,} "
+        f"characters are not shown.{sections} Read {rel} itself before relying on what the rest "
+        "of it may say.]"
+    )
+
+
+def _clip(text: str, limit: int, rel: str = CANONICAL) -> tuple[str, int]:
+    """Keep the HEAD, cut at a section or paragraph boundary, and say so in the text itself.
+
+    Returns the body and how many characters of the file it leaves out (0 when it fits whole). The
+    body is empty only when not even a one-word head and the marker fit in ``limit`` together.
+
+    This used to keep the head and the tail and drop the middle, on the theory that a rules file's
+    tail is its newest "never do X" list. That was never measured, and on the one real file we had
+    it did the opposite: the cut landed where arithmetic put it, mid-sentence, and took out the
+    middle of this project's hard rules. Conventions put the summary and the rules first; what is
+    after the cut is not lost for good either, because the marker names the missing sections and
+    the agent has file tools to read them when the task touches them.
+
+    The fit is a walk over candidate cuts, latest first, keeping the first whose head and marker fit
+    together. The marker's length depends on the cut (it names the sections dropped), and the
+    earlier version guessed a reserve for it and corrected by the overshoot; when the cut snapped
+    back to the same boundary the correction never caught up, and about one realistic oversized file
+    in twenty was replaced by its marker alone — the head, the part this function exists to keep,
+    dropped whole.
     """
     text = text.strip()
     if len(text) <= limit:
-        return text, False
-    head = limit * 2 // 3
-    tail = limit - head - 40
-    return f"{text[:head]}\n\n[… {len(text) - head - tail} characters omitted …]\n\n{text[-tail:]}", True
+        return text, 0
+    shape = _structure(text)
+
+    def fit(at: int, closer: str = "") -> tuple[str, int] | None:
+        head = text[:at].rstrip()
+        if not head:
+            return None
+        body = f"{head}{closer}\n\n{_marker(rel, text, shape, len(head), at)}"
+        return (body, len(text) - len(head)) if len(body) <= limit else None
+
+    # A section start first, then a paragraph break, then a line break — but a boundary that keeps
+    # less than half the limit is passed over for the next kind: losing a whole section of rules to
+    # land on a heading is a worse trade than ending on a paragraph. Below half, any clean boundary.
+    floor = limit // 2
+    below: set[int] = set()
+    for kind in (shape.sections, shape.paragraphs, shape.lines):
+        for at in sorted((o for o in kind if floor <= o <= limit), reverse=True):
+            if (found := fit(at)) is not None:
+                return found
+        below.update(o for o in kind if o < floor)
+    for at in sorted(below, reverse=True):
+        if (found := fit(at)) is not None:
+            return found
+
+    # No clean boundary fits: one long line, or a code block longer than the limit right after a
+    # tiny intro. Cut at the last space or newline in the back half of the room, else mid-word, and
+    # close a code block the cut lands in so the marker is not read as code. Each miss moves the cut
+    # back by at least the overshoot, so this ends.
+    room = limit
+    while room > 0:
+        space = max(text.rfind(" ", room // 2, room), text.rfind("\n", room // 2, room))
+        at = space if space > 0 else room
+        closer = next((f"\n{tok}" for start, end, tok in shape.fences if start < at <= end), "")
+        if (found := fit(at, closer)) is not None:
+            return found
+        head = len(text[:at].rstrip())
+        overshoot = head + len(closer) + 2 + len(_marker(rel, text, shape, head, at)) - limit
+        room = min(room - 1, at - max(1, overshoot))
+    return "", len(text)
 
 
 def _chain(root: Path, focus: Iterable[str]) -> list[Path]:
@@ -139,25 +302,29 @@ def load_agent_instructions(
     # squeezed out by a verbose root file. Rendering order is the opposite (general first, so the
     # specific one is read last and wins) — the two orders are independent on purpose.
     chosen: list[tuple[str, str]] = []
-    truncated: list[str] = []
+    omitted: dict[str, int] = {}
     remaining = max_chars
     for rel, path in reversed(found):
-        if remaining <= 0:
-            _log.debug("project instructions: %s dropped, budget exhausted", rel)
-            truncated.append(rel)
-            continue
         try:
             raw = path.read_text(encoding="utf-8", errors="replace")
         except OSError as exc:  # unreadable instructions must never break a run
             _log.debug("project instructions: %s unreadable (%s)", rel, exc)
             continue
-        body, clipped = _clip(raw, min(MAX_FILE_CHARS, remaining))
-        if not body:
+        body, lost = _clip(raw, min(MAX_FILE_CHARS, remaining), rel) if remaining > 0 else ("", 0)
+        if not raw.strip():
             continue
+        if not body:
+            # Out of budget. Still listed, as a marker and nothing else: a file the model is never
+            # told about is a file it cannot know to go and read. The marker sits outside the
+            # budget, and it is one line per directory on the focus path, so it cannot flood.
+            _log.debug("project instructions: %s dropped, budget exhausted", rel)
+            whole = raw.strip()
+            body, lost = _marker(rel, whole, _structure(whole), 0, 0), len(whole)
+        else:
+            remaining -= len(body)
         chosen.append((rel, body))
-        if clipped:
-            truncated.append(rel)
-        remaining -= len(body)
+        if lost:
+            omitted[rel] = lost
 
     if not chosen:
         return ProjectInstructions("")
@@ -172,4 +339,9 @@ def load_agent_instructions(
         "capability your sandbox and approval policy do not already give you.\n\n"
         f"{blocks}"
     )
-    return ProjectInstructions(text, tuple(rel for rel, _ in chosen), tuple(sorted(set(truncated))))
+    return ProjectInstructions(
+        text,
+        tuple(rel for rel, _ in chosen),
+        tuple(sorted(omitted)),
+        tuple(sorted(omitted.items())),
+    )
