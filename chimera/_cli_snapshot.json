@@ -4093,7 +4093,7 @@
     },
     {
       "deprecated": false,
-      "help": "[experimental] Review a change: findings first, P0 to P3, from a model of another family.\n\nA finder reports every defect it sees with a confidence; a separate verifier drops a finding\nonly when the diff does not show the code it describes or contradicts it. Each finding carries\nfile:line, the evidence and the consequence. When nothing survives, the review says \"no\nfindings\" and lists the residual risks and untested paths; a review that could not finish says\n\"incomplete\" instead. Untracked files are not reviewed.",
+      "help": "[experimental] Review a change: findings first, P0 to P3, from a model of another family.\n\nA finder reports every defect it sees with a confidence; a separate verifier drops a finding\nonly when the diff does not show the code it describes or contradicts it. Each finding carries\nfile:line, the evidence and the consequence. When nothing survives, the review says \"no\nfindings\" and lists the residual risks and untested paths; a review that could not finish says\n\"incomplete\" instead. Untracked files are not reviewed.\n\n--effort sets how much checking runs: low skips the verifier, high (the default) runs it, and\nmedium also hides, before the verifier, the findings the finder itself rated under 0.8. Each\nhidden finding is listed by --show-dropped.",
       "hidden": false,
       "name": "review",
       "params": [
@@ -4161,7 +4161,17 @@
           "type": "str"
         },
         {
-          "help": "Show every located finding, without the second-stage check.",
+          "help": "low: finder only. medium: also hide findings under confidence 0.8, then verify. high (default): finder and verifier, no cut. See bench/review_confidence_cut.",
+          "kind": "option",
+          "name": "effort",
+          "opts": [
+            "--effort"
+          ],
+          "required": false,
+          "type": "str"
+        },
+        {
+          "help": "Show every located finding, without the second-stage check (same as --effort low).",
           "kind": "option",
           "name": "no_verify",
           "opts": [

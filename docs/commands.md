@@ -969,6 +969,10 @@ file:line, the evidence and the consequence. When nothing survives, the review s
 findings" and lists the residual risks and untested paths; a review that could not finish says
 "incomplete" instead. Untracked files are not reviewed.
 
+--effort sets how much checking runs: low skips the verifier, high (the default) runs it, and
+medium also hides, before the verifier, the findings the finder itself rated under 0.8. Each
+hidden finding is listed by --show-dropped.
+
 ```bash
 chimera review [REVISION_RANGE]
 ```
@@ -984,7 +988,8 @@ chimera review [REVISION_RANGE]
 | `--json` | Print only the report, as JSON (schema chimera.review/1). |  |
 | `--reviewer-model` | Review with this model (default: CHIMERA_REVIEW_MODEL, else another family's). | `''` |
 | `--author-model` | The model that wrote the change (default: CHIMERA_DEFAULT_MODEL). | `''` |
-| `--no-verify` | Show every located finding, without the second-stage check. |  |
+| `--effort` | low: finder only. medium: also hide findings under confidence 0.8, then verify. high (default): finder and verifier, no cut. See bench/review_confidence_cut. |  |
+| `--no-verify` | Show every located finding, without the second-stage check (same as --effort low). |  |
 | `--show-dropped` | Also list the findings the checks dropped, with the reason. |  |
 | `--context` | Lines of context around each change. | `10` |
 

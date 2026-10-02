@@ -11,6 +11,10 @@ each piece of it answers a measured failure of a single judge:
 - **Findings first, P0–P3, each with ``file:line``, evidence and consequence**; "no findings" is
   said in words, with the residual risks and untested paths, and kept apart from a review that
   could not be completed (:mod:`.report`).
+- **How much checking runs is a level** (:mod:`.effort`): ``low`` is the finder alone, ``high`` adds
+  the verifier, and ``medium`` also cuts on the finder's confidence before verifying. The default
+  is ``high``, because `bench/review_confidence_cut` selected a cut that a second set did not
+  confirm.
 
 `bench/review_seeded` measures the finder's recall on defects seeded into real diffs from this
 repository and what the verifier keeps; `bench/review_reviewer` chose the default reviewer on the
@@ -20,6 +24,7 @@ same set (:data:`.family.MEASURED_REVIEWERS`).
 from __future__ import annotations
 
 from chimera.review.diff import DiffError, ReviewDiff, collect, parse, untracked
+from chimera.review.effort import DEFAULT_EFFORT, EFFORTS, Effort
 from chimera.review.family import ReviewerChoice, choose_reviewer, model_family
 from chimera.review.pipeline import review
 from chimera.review.render import render_text
@@ -27,9 +32,12 @@ from chimera.review.report import SCHEMA, Finding, ReviewReport, Verdict
 from chimera.review.verifier import CautiousVerifier, KeepAll, Verifier
 
 __all__ = [
+    "DEFAULT_EFFORT",
+    "EFFORTS",
     "SCHEMA",
     "CautiousVerifier",
     "DiffError",
+    "Effort",
     "Finding",
     "KeepAll",
     "ReviewDiff",

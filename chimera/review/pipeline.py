@@ -5,7 +5,10 @@ The stages and what each may do to a finding:
 1. **Finder** (a model): proposes findings, all of them, with a confidence.
 2. **Anchor** (arithmetic): a finding whose ``file:line`` is not in the diff is dropped, with that
    reason written on it. This is the cautious verifier's first ground, decided without a model.
-3. **Verifier** (a model, one finding per call): may drop a finding only on the grounds its prompt
+3. **Confidence cut** (arithmetic, only when one is given; :mod:`.effort`): a finding whose own
+   confidence is under the cut is dropped before the verifier spends a call on it. A finding with
+   no confidence is never cut: an unknown is not a low.
+4. **Verifier** (a model, one finding per call): may drop a finding only on the grounds its prompt
    names; an unreadable or failed check keeps the finding.
 
 Nothing leaves silently. A dropped finding is in ``ReviewReport.dropped`` with its stage and reason,
@@ -20,6 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from chimera.providers.gateway import SupportsComplete
 from chimera.review.diff import FileDiff, ReviewDiff
+from chimera.review.effort import Effort
 from chimera.review.family import ReviewerChoice
 from chimera.review.finder import find
 from chimera.review.report import (
@@ -96,12 +100,19 @@ def review(
     verifier: Verifier,
     *,
     untracked_skipped: int = 0,
+    confidence_cut: float | None = None,
+    effort: Effort | None = None,
 ) -> ReviewReport:
-    """Run every stage over ``diff`` and return the report."""
+    """Run every stage over ``diff`` and return the report.
+
+    ``confidence_cut`` hides a located finding whose confidence is under it; ``effort`` is only
+    recorded, so the report names the level that chose the verifier and the cut.
+    """
     who = Reviewer(
         model=reviewer.model, family=reviewer.family, author_model=reviewer.author_model,
         author_family=reviewer.author_family, source=reviewer.source,
-        same_family=reviewer.same_family, verifier=verifier.name,
+        same_family=reviewer.same_family, verifier=verifier.name, effort=effort,
+        confidence_cut=confidence_cut,
     )
     report = ReviewReport(
         status="empty", base=diff.base, base_label=diff.base_label, target=diff.target,
@@ -139,6 +150,9 @@ def review(
                 continue
             located.append((finding.model_copy(update={"file": file.path}), file))
 
+    if confidence_cut is not None:
+        located = _cut(located, confidence_cut, report)
+
     with ThreadPoolExecutor(max_workers=VERIFY_WORKERS) as pool:
         verdicts = list(pool.map(lambda pair: verifier.check(*pair), located))
     kept: list[Finding] = []
@@ -166,6 +180,35 @@ def review(
     else:
         report.status = "findings" if report.findings else "no_findings"
     return report
+
+
+def _cut(
+    located: list[tuple[Finding, FileDiff]], cut: float, report: ReviewReport
+) -> list[tuple[Finding, FileDiff]]:
+    """Move every finding under ``cut`` to ``report.dropped``, and say how many in a note.
+
+    The note is there because a hidden finding is easy to forget about: the cut is a number each
+    model writes about itself, and `bench/review_confidence_cut` saw one model put true defects at
+    0.25. ``--effort high`` shows them; ``--show-dropped`` lists them.
+    """
+    kept: list[tuple[Finding, FileDiff]] = []
+    hidden = 0
+    for finding, file in located:
+        if finding.confidence is None or finding.confidence >= cut:
+            kept.append((finding, file))
+            continue
+        hidden += 1
+        verdict = Verdict(
+            state="dropped", label="under the confidence cut", stage="confidence",
+            reason=f"confidence {finding.confidence:.2f} < {cut:.2f}",
+        )
+        report.dropped.append(finding.model_copy(update={"verdict": verdict}))
+    if hidden:
+        report.notes.append(
+            f"{hidden} finding(s) with a confidence under {cut:.2f} were not shown (the cut of "
+            "--effort medium); --effort high shows them, --show-dropped lists them"
+        )
+    return kept
 
 
 def _reviewer_notes(reviewer: ReviewerChoice) -> list[str]:

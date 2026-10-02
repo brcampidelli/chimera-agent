@@ -79,10 +79,13 @@ def render_text(report: ReviewReport, *, show_dropped: bool = False) -> str:
         out += ["", f"Note: {note}"]
     who = report.reviewer
     cost = "unknown" if report.usage.usd is None else f"US$ {report.usage.usd:.4f}"
+    level = f", effort {who.effort}" if who.effort else ""
+    if who.confidence_cut is not None:
+        level += f", confidence cut {who.confidence_cut:.2f}"
     out += [
         "",
         f"Reviewer {who.model} ({who.family}), author {who.author_model} ({who.author_family}), "
-        f"verifier {who.verifier}.",
+        f"verifier {who.verifier}{level}.",
         f"{report.usage.calls} call(s), {report.usage.prompt_tokens:,} tokens in, "
         f"{report.usage.completion_tokens:,} out, {cost}.",
     ]

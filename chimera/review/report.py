@@ -20,6 +20,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from chimera.review.effort import Effort
+
 SCHEMA = "chimera.review/1"
 
 Priority = Literal["P0", "P1", "P2", "P3"]
@@ -42,7 +44,8 @@ class Verdict(_Strict):
     state: Literal["kept", "dropped", "unverified"]
     label: str
     reason: str = ""
-    stage: Literal["anchor", "verifier", "none"] = "verifier"
+    # ``confidence`` is the cut of ``--effort medium`` (:mod:`.effort`), between anchor and verifier.
+    stage: Literal["anchor", "confidence", "verifier", "none"] = "verifier"
 
 
 class Finding(_Strict):
@@ -73,6 +76,10 @@ class Reviewer(_Strict):
     source: str
     same_family: bool
     verifier: str
+    # Which level ran, and the cut it applied. ``None`` when the caller named no level (a bench
+    # that builds its own verifier): the report then says what ran, not what was asked for.
+    effort: Effort | None = None
+    confidence_cut: float | None = None
 
 
 class NotReviewed(_Strict):
