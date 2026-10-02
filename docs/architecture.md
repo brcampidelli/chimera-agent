@@ -104,11 +104,17 @@ Layered on top of the kernel — heuristic, honest, and never a hard boundary (t
 
 `chimera/orchestration/`
 
+This is machinery, not a recommendation. When Chimera runs more than one agent — flat by default,
+four sanctioned forms, and the measured reasons for leaving out the rest — is decided in the
+[multi-agent policy](multi-agent-policy.md).
+
 - `Role` + `RoleAgent` — role specialization (CrewAI-style).
 - `SequentialCrew` — roles in order, each sees the **consolidated** prior outputs and can
-  write to shared memory.
+  write to shared memory. **Unmeasured** as a team: no bench compares it to one agent at equal cost.
 - `SupervisorCrew` — workers address the task in parallel, outputs are consolidated, and a
-  supervisor synthesizes (CAPRA-style `parallel_review`, `2606.18976`).
+  supervisor synthesizes (CAPRA-style `parallel_review`, `2606.18976`). **Unmeasured** as a team,
+  and the nearest measurement points against it: in the hierarchy, the synthesis over the workers'
+  summaries is where the values they found were lost.
 - `consolidate` — MOC message merging keeps team context lean (`2606.02359`).
 
 ## Self-evolving ecosystem (Tier 4)
@@ -133,7 +139,9 @@ asserted**:
 
 - `HierarchicalOrchestrator` — decompose → dispatch budgeted workers → verify each result →
   synthesize. Read-shaped fan-out delegates; a trivially small subtask is answered inline by the
-  trusted top model.
+  trusted top model. Measured: it saves tokens in multi-step reading of large documents (66.5%
+  fewer), and at the same number of calls it answered **worse** than one agent (−26.7 pp `pass^3`
+  on thirty tasks) — see the [multi-agent policy](multi-agent-policy.md).
 - `CascadeBackend` — weak → gate → mid → gate → fusion, climbing only when a tier's answer fails a
   cheap acceptance gate. The **route log** records every hop, so the cost is the **sum over hops
   tried**, not just the accepted one — escalations are paid for.

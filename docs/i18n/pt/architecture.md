@@ -1,5 +1,5 @@
 ---
-source_sha256: 51704b23e9a37ef270ce9056bd6527db635f6fa9958f189c607e3ab2f1583a49
+source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
 ---
 
 # Chimera — Arquitetura
@@ -116,11 +116,18 @@ fronteira):
 
 `chimera/orchestration/`
 
+Isto é maquinário, não recomendação. Quando o Chimera roda mais de um agente — plano por padrão,
+quatro formas sancionadas e os motivos medidos para deixar o resto de fora — é decidido na
+[política multiagente](../../multi-agent-policy.md) (em inglês).
+
 - `Role` + `RoleAgent` — especialização de papel (estilo CrewAI).
 - `SequentialCrew` — papéis em ordem, cada um vê as saídas anteriores **consolidadas** e pode
-  escrever na memória compartilhada.
+  escrever na memória compartilhada. **Não medido** como time: nenhum bench o compara a um agente só
+  a custo igual.
 - `SupervisorCrew` — trabalhadores endereçam a tarefa em paralelo, as saídas são consolidadas, e
-  um supervisor sintetiza (estilo CAPRA `parallel_review`, `2606.18976`).
+  um supervisor sintetiza (estilo CAPRA `parallel_review`, `2606.18976`). **Não medido** como time,
+  e a medição mais próxima aponta contra: na hierarquia, a síntese sobre os resumos dos trabalhadores
+  é onde se perderam os valores que eles tinham achado.
 - `consolidate` — a fusão de mensagens do MOC mantém o contexto do time enxuto (`2606.02359`).
 
 ## Ecossistema auto-evolutivo (Tier 4)
@@ -145,7 +152,10 @@ A delegação só compensa quando é mais barata do que fazer o trabalho inline,
 
 - `HierarchicalOrchestrator` — decompõe → despacha trabalhadores com orçamento → verifica cada
   resultado → sintetiza. Fan-out no formato de leitura delega; uma subtarefa trivialmente pequena
-  é respondida inline pelo modelo de confiança do topo.
+  é respondida inline pelo modelo de confiança do topo. Medido: economiza tokens na
+  leitura em vários passos de documentos grandes (66,5% a menos) e, com o mesmo número de chamadas,
+  respondeu **pior** que um agente só (−26,7 pp de `pass^3` em trinta tarefas) — veja a
+  [política multiagente](../../multi-agent-policy.md).
 - `CascadeBackend` — fraco → gate → médio → gate → fusão, subindo de nível só quando a resposta de
   um tier falha em um gate de aceitação barato. O **route log** registra cada salto, então o custo
   é a **soma de todos os saltos tentados**, não só o aceito — as escaladas são pagas.

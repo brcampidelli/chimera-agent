@@ -193,6 +193,25 @@ read the binarised count as a statement about the experiment that did not binari
 citing a derived view against an earlier result, open the earlier result's analysis and check which
 DV it used.** One command would have done it.
 
+## 10. Every multi-agent arm has a single-agent arm at equal cost
+
+A mode that runs more than one agent on a task — hierarchy, crew, lifecycle, fusion, a reviewer, a
+Manager — is compared to **one agent given the same budget**: the same number of model calls, or
+the same US$, stated in the pre-registration with which of the two it holds. Where the multi-agent
+arm buys independent attempts, a second control resamples the single agent the same number of
+times. A comparison against a single agent that made fewer calls measures the extra calls, not the
+structure.
+
+The instance is ours: `bench/hierarchy` and `bench/hierarchy_multistep` compared the hierarchy to
+one call, and read as a quality-neutral token story; `bench/hierarchy_equal_calls` gave the single
+agent the hierarchy's calls and the hierarchy lost, `pass^3` −26.7 pp [−36.2, −4.2] on thirty tasks.
+The papers agree for the same reason: at equal calls a Planner-Executor-Critic team did not beat
+one agent (arXiv 2609.04217, 0.769 vs 0.754, p = 0.80), and debate tied or lost to self-consistency
+at matched budget (2609.35875). As of 2026-10-02 only `hierarchy_equal_calls` meets this rule;
+`fusion_paired` registered it and stopped at ceiling, and crew and lifecycle have no bench. A
+multi-agent mode without such an arm is *unmeasured*, whatever it scored against one call — the
+policy that follows from this is `docs/multi-agent-policy.md`.
+
 ## Standing rules this file collects rather than adds
 
 - **Pre-register before the first call**, with the number the paper predicts written down so it can

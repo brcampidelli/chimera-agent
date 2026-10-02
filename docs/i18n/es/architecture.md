@@ -1,5 +1,5 @@
 ---
-source_sha256: 51704b23e9a37ef270ce9056bd6527db635f6fa9958f189c607e3ab2f1583a49
+source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
 ---
 
 # Chimera — Arquitectura
@@ -120,11 +120,18 @@ Superpuesta al kernel — heurística, honesta, y nunca un límite duro (eso es 
 
 `chimera/orchestration/`
 
+Esto es maquinaria, no una recomendación. Cuándo Chimera ejecuta más de un agente — plano por
+defecto, cuatro formas autorizadas y las razones medidas para dejar fuera el resto — lo decide la
+[política multiagente](../../multi-agent-policy.md) (en inglés).
+
 - `Role` + `RoleAgent` — especialización de roles (estilo CrewAI).
 - `SequentialCrew` — roles en orden, cada uno ve las salidas previas **consolidadas** y puede
-  escribir en la memoria compartida.
+  escribir en la memoria compartida. **Sin medir** como equipo: ningún bench lo compara con un solo
+  agente a igual coste.
 - `SupervisorCrew` — los workers abordan la tarea en paralelo, las salidas se consolidan, y un
-  supervisor sintetiza (estilo CAPRA `parallel_review`, `2606.18976`).
+  supervisor sintetiza (estilo CAPRA `parallel_review`, `2606.18976`). **Sin medir** como equipo, y la
+  medición más cercana apunta en contra: en la jerarquía, la síntesis sobre los resúmenes de los
+  workers es donde se perdieron los valores que ellos habían encontrado.
 - `consolidate` — la fusión de mensajes MOC mantiene el contexto del equipo ligero
   (`2606.02359`).
 
@@ -151,7 +158,10 @@ se **mide, no se asume**:
 
 - `HierarchicalOrchestrator` — descomponer → despachar workers con presupuesto → verificar cada
   resultado → sintetizar. Las tareas con forma de lectura se delegan en fan-out; una subtarea
-  trivialmente pequeña la responde en línea el modelo principal de confianza.
+  trivialmente pequeña la responde en línea el modelo principal de confianza. Medido: ahorra tokens
+  en la lectura de varios pasos sobre documentos grandes (66,5 % menos) y, con el mismo número de
+  llamadas, respondió **peor** que un solo agente (−26,7 pp de `pass^3` en treinta tareas) — ver la
+  [política multiagente](../../multi-agent-policy.md).
 - `CascadeBackend` — débil → gate → medio → gate → fusión, escalando solo cuando la respuesta de
   un nivel falla una comprobación de aceptación barata. El **route log** registra cada salto,
   así que el costo es la **suma sobre los saltos intentados**, no solo el aceptado — las

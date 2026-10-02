@@ -1,5 +1,5 @@
 ---
-source_sha256: 51704b23e9a37ef270ce9056bd6527db635f6fa9958f189c607e3ab2f1583a49
+source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
 ---
 
 # Chimera — Architektur
@@ -116,11 +116,18 @@ Ein sich selbst verbessernder Trust-Kernel (AgentTrust v2, `2606.08539`):
 
 `chimera/orchestration/`
 
+Das ist Mechanik, keine Empfehlung. Wann Chimera mehr als einen Agenten laufen lässt — standardmäßig
+flach, vier zugelassene Formen und die gemessenen Gründe, den Rest wegzulassen —, entscheidet die
+[Multi-Agent-Richtlinie](../../multi-agent-policy.md) (englisch).
+
 - `Role` + `RoleAgent` — Rollenspezialisierung (im CrewAI-Stil).
 - `SequentialCrew` — Rollen in fester Reihenfolge, jede sieht die **konsolidierten** vorherigen
-  Ausgaben und kann in den gemeinsamen Speicher schreiben.
+  Ausgaben und kann in den gemeinsamen Speicher schreiben. **Ungemessen** als Team: kein Bench
+  vergleicht es bei gleichen Kosten mit einem einzelnen Agenten.
 - `SupervisorCrew` — Worker bearbeiten die Aufgabe parallel, die Ausgaben werden konsolidiert, und
-  ein Supervisor synthetisiert (im CAPRA-Stil, `parallel_review`, `2606.18976`).
+  ein Supervisor synthetisiert (im CAPRA-Stil, `parallel_review`, `2606.18976`). **Ungemessen** als
+  Team, und die nächste Messung spricht dagegen: in der Hierarchie gingen bei der Synthese über
+  die Zusammenfassungen der Worker die Werte verloren, die diese gefunden hatten.
 - `consolidate` — MOC-Nachrichtenverschmelzung hält den Team-Kontext schlank (`2606.02359`).
 
 ## Sich selbst entwickelndes Ökosystem (Tier 4)
@@ -147,7 +154,10 @@ Behauptung wird **gemessen, nicht nur aufgestellt**:
 
 - `HierarchicalOrchestrator` — zerlegen → budgetierte Worker beauftragen → jedes Ergebnis
   verifizieren → synthetisieren. Read-artige Fan-outs werden delegiert; eine trivial kleine
-  Teilaufgabe wird direkt vom vertrauenswürdigen Top-Modell inline beantwortet.
+  Teilaufgabe wird direkt vom vertrauenswürdigen Top-Modell inline beantwortet. Gemessen: Er spart
+  Tokens beim mehrstufigen Lesen großer Dokumente (66,5 % weniger), und bei gleicher Zahl von Aufrufen
+  antwortete er **schlechter** als ein einzelner Agent (−26,7 pp `pass^3` über dreißig Aufgaben) —
+  siehe die [Multi-Agent-Richtlinie](../../multi-agent-policy.md).
 - `CascadeBackend` — schwach → Gate → mittel → Gate → Fusion, wobei nur dann eskaliert wird, wenn
   die Antwort einer Stufe an einem günstigen Akzeptanz-Gate scheitert. Das **Route-Log**
   protokolliert jeden Hop, sodass die Kosten die **Summe über alle versuchten Hops** sind, nicht

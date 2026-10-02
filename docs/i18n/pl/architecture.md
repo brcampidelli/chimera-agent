@@ -1,5 +1,5 @@
 ---
-source_sha256: 51704b23e9a37ef270ce9056bd6527db635f6fa9958f189c607e3ab2f1583a49
+source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
 ---
 
 # Chimera — Architektura
@@ -119,11 +119,18 @@ Nałożona na jądro — heurystyczna, uczciwa i nigdy niebędąca twardą grani
 
 `chimera/orchestration/`
 
+To jest mechanizm, nie rekomendacja. Kiedy Chimera uruchamia więcej niż jednego agenta — domyślnie
+płasko, cztery dozwolone formy i zmierzone powody, by pominąć resztę — rozstrzyga
+[polityka wieloagentowa](../../multi-agent-policy.md) (po angielsku).
+
 - `Role` + `RoleAgent` — specjalizacja ról (w stylu CrewAI).
 - `SequentialCrew` — role w kolejności, każda widzi **skonsolidowane** wcześniejsze wyniki i może
-  pisać do pamięci wspólnej.
+  pisać do pamięci wspólnej. **Niezmierzony** jako zespół: żaden bench nie porównuje go z jednym
+  agentem przy równym koszcie.
 - `SupervisorCrew` — workerzy zajmują się zadaniem równolegle, wyniki są konsolidowane, a
-  supervisor syntetyzuje (w stylu CAPRA, `parallel_review`, `2606.18976`).
+  supervisor syntetyzuje (w stylu CAPRA, `parallel_review`, `2606.18976`). **Niezmierzony** jako
+  zespół, a najbliższy pomiar przemawia przeciw: w hierarchii to synteza streszczeń workerów zgubiła
+  wartości, które oni znaleźli.
 - `consolidate` — scalanie wiadomości MOC utrzymuje kontekst zespołu szczupły (`2606.02359`).
 
 ## Samo-ewoluujący ekosystem (Tier 4)
@@ -150,7 +157,10 @@ jest **mierzone, nie tylko deklarowane**:
 
 - `HierarchicalOrchestrator` — dekompozycja → wysłanie budżetowanych workerów → weryfikacja
   każdego wyniku → synteza. Fan-out o charakterze odczytowym jest delegowany; trywialnie mały
-  podproblem jest odpowiadany inline przez zaufany model najwyższego poziomu.
+  podproblem jest odpowiadany inline przez zaufany model najwyższego poziomu. Zmierzone: oszczędza
+  tokeny przy wieloetapowym czytaniu dużych dokumentów (o 66,5% mniej), a przy tej samej liczbie wywołań
+  odpowiadał **gorzej** niż jeden agent (−26,7 pp `pass^3` na trzydziestu zadaniach) — zob.
+  [politykę wieloagentową](../../multi-agent-policy.md).
 - `CascadeBackend` — słaby → bramka → średni → bramka → fuzja, eskalując tylko wtedy, gdy
   odpowiedź danego poziomu nie przechodzi taniej bramki akceptacji. **Dziennik trasy** (route
   log) rejestruje każdy przeskok, więc koszt to **suma po wszystkich wypróbowanych

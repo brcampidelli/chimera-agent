@@ -1,5 +1,5 @@
 ---
-source_sha256: 51704b23e9a37ef270ce9056bd6527db635f6fa9958f189c607e3ab2f1583a49
+source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
 ---
 
 # Chimera — Architecture
@@ -124,11 +124,18 @@ l'est) :
 
 `chimera/orchestration/`
 
+Ceci est de la mécanique, pas une recommandation. Quand Chimera fait tourner plus d'un agent — à plat
+par défaut, quatre formes autorisées et les raisons mesurées d'écarter le reste — est décidé dans la
+[politique multi-agents](../../multi-agent-policy.md) (en anglais).
+
 - `Role` + `RoleAgent` — spécialisation par rôle (à la CrewAI).
 - `SequentialCrew` — les rôles s'enchaînent dans l'ordre, chacun voit les sorties précédentes
-  **consolidées** et peut écrire dans la mémoire partagée.
+  **consolidées** et peut écrire dans la mémoire partagée. **Non mesuré** en tant qu'équipe : aucun
+  bench ne le compare à un seul agent à coût égal.
 - `SupervisorCrew` — les workers traitent la tâche en parallèle, les sorties sont consolidées,
-  et un superviseur synthétise (à la CAPRA `parallel_review`, `2606.18976`).
+  et un superviseur synthétise (à la CAPRA `parallel_review`, `2606.18976`). **Non mesuré** en tant
+  qu'équipe, et la mesure la plus proche va contre lui : dans la hiérarchie, c'est la synthèse des
+  résumés des workers qui a perdu les valeurs qu'ils avaient trouvées.
 - `consolidate` — la fusion de messages MOC garde le contexte d'équipe compact (`2606.02359`).
 
 ## Écosystème auto-évolutif (Tier 4)
@@ -155,7 +162,10 @@ l'affirmation est **mesurée, pas assertée** :
 
 - `HierarchicalOrchestrator` — décomposer → distribuer des workers budgétisés → vérifier chaque
   résultat → synthétiser. Un fan-out en forme de lecture délègue ; une sous-tâche trivialement
-  petite est répondue en ligne par le modèle de confiance du sommet.
+  petite est répondue en ligne par le modèle de confiance du sommet. Mesuré : il économise des
+  tokens en lecture multi-étapes de grands documents (66,5 % de moins) et, à nombre d'appels égal, il
+  a répondu **moins bien** qu'un seul agent (−26,7 pp de `pass^3` sur trente tâches) — voir la
+  [politique multi-agents](../../multi-agent-policy.md).
 - `CascadeBackend` — faible → porte → intermédiaire → porte → fusion, en montant seulement
   quand la réponse d'un palier échoue une porte d'acceptation bon marché. Le **journal de
   routage** enregistre chaque saut, si bien que le coût est la **somme sur les sauts tentés**,
