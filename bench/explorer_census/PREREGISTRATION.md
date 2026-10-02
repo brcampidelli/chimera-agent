@@ -147,3 +147,50 @@ not whether the main loop solves as well with a `path:line` block as with the fi
   when it has any read or search; an agent offered the tool may call it less, more, or mid-solve.
 - **The explorer's own model.** It is priced at the main loop's model and size; the role is meant for a
   cheaper model, so its real cost is lower — another conservative side.
+
+## The registered reading: VOID (2026-10-02)
+
+`python bench/explorer_census/census.py --as-registered` → `results/census_registered.json`.
+Of 804 rows, 47 halted; of the 757 left, **79 failed the alignment check and 349 the append-only
+check: 428 of 757 = 57%**, over the 25% the rule allows. **The registered verdict is VOID**, and it
+stands as the registered verdict whatever follows.
+
+**Why the checks failed — the apparatus, not the traces.** Read before any amendment was written:
+
+- **Every one of the 349 prompt drops is into a call that carried no tool schema**
+  (`tools_offered: false`), all in solves stopped at `max_steps`: when the step budget is spent the
+  loop asks for a closing summary without tools, so that request is smaller by the schema — 1,190 to
+  1,780 tokens at the arms' quartiles, about the size of eleven tool definitions — while carrying every
+  message. One drop per trace, always at call index 29→30.
+- **All 79 misaligned traces are the same calls:** the model emitted a tool call on a closing call
+  that offered none, the loop never ran it, and the flat `tool_names` list never named it. Counting
+  only the calls that were offered tools, **757 of 757 traces align exactly and are append-only**.
+
+So my check confused "the schema was not sent" with "context was lost". The registered checks were
+right in intent (drop a trace whose context shrank) and wrong in mechanism, the §2t family: a guard
+that says what it checks and checks something else.
+
+**What I saw before writing the amendment.** The registered run printed its full report, so the
+savings over its 329 usable traces were seen (pooled 12.7%, regime share 43.2%, median in regime
+22.4% in the conservative cell). That subset is not the population: it keeps the solves that ended
+on their own and drops the ones that ran to the step limit, which is most of arms A and D (G gave 196
+of the 329). The amendment's numbers have not been computed.
+
+## Amendment 1 — 2026-10-02, after the VOID, before the amended reading
+
+**Post-hoc. The amended verdict is labelled "post-hoc (Amendment 1)" wherever it is printed, and a
+reader who holds the registered verdict as final should read it as not made.** It changes the two
+checks only:
+
+1. **Alignment** walks the tool-name list over the calls that were offered tools. A tool call emitted
+   on a call with no schema is never run and has no name, so it is not walked.
+2. **Append-only** is checked over the calls that carried the schema. A closing call without it stays
+   in every token sum and is shrunk in the counterfactual like any later call — it carries the reading
+   too — but its smaller size is not read as lost context. A drop between two schema-carrying calls
+   still excludes the trace.
+3. **Read size** is measured only between two schema-carrying calls (otherwise the growth after a read
+   is the read minus the schema).
+
+Unchanged: the phase, D, M, the regime, the counterfactual, the cells, the decision cell, the
+predictions, every threshold of the rule and its labels. `--as-registered` still reproduces the VOID
+byte for byte, and `tests/test_explorer_census.py` pins both joins.

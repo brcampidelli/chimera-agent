@@ -66,6 +66,9 @@ class Call:
     prompt: int
     cache_read: int
     tools: tuple[str, ...]
+    #: Whether the request carried the tool schema. The loop's closing calls at ``max_steps`` do not:
+    #: their prompt is smaller by the schema, and a tool call the model emits there is never run.
+    offered: bool = True
 
 
 @dataclass(frozen=True)
@@ -87,21 +90,32 @@ class Phase:
 
 
 def split_calls(
-    calls: Sequence[dict[str, Any]], tool_names: Sequence[str]
+    calls: Sequence[dict[str, Any]], tool_names: Sequence[str], *, amended: bool = True
 ) -> tuple[Call, ...] | None:
     """Give each recorded model call the tools it emitted, in order. None when the counts disagree.
 
     The trace stores the tool names as one flat list and each call's tool count separately, so the
     only honest join is to walk the list by the counts; a trace whose counts do not sum to the list
-    cannot say which call read what, and is left out rather than guessed."""
-    if sum(int(c.get("tool_calls", 0)) for c in calls) != len(tool_names):
+    cannot say which call read what, and is left out rather than guessed.
+
+    Amendment 1: only calls that were OFFERED tools are walked. A tool call emitted on a closing call
+    with no schema is never executed and never named, so counting it misaligned every such trace
+    (79 of 757). ``amended=False`` is the join as registered, kept to reproduce the VOID."""
+    walked = [c for c in calls if not amended or c.get("tools_offered", True)]
+    if sum(int(c.get("tool_calls", 0)) for c in walked) != len(tool_names):
         return None
     out: list[Call] = []
     k = 0
     for c in calls:
-        n = int(c.get("tool_calls", 0))
+        offered = bool(c.get("tools_offered", True))
+        n = int(c.get("tool_calls", 0)) if (offered or not amended) else 0
         out.append(
-            Call(int(c["prompt"]), int(c.get("cache_read") or 0), tuple(tool_names[k : k + n]))
+            Call(
+                int(c["prompt"]),
+                int(c.get("cache_read") or 0),
+                tuple(tool_names[k : k + n]),
+                offered,
+            )
         )
         k += n
     return tuple(out)
@@ -130,22 +144,28 @@ def exploration_phase(calls: Sequence[Call]) -> Phase:
     return Phase(e=e, reads=reads, searches=searches, post_calls=len(calls) - e)
 
 
-def append_only(calls: Sequence[Call]) -> bool:
+def append_only(calls: Sequence[Call], *, amended: bool = True) -> bool:
     """True when no call's prompt is smaller than the one before it.
 
     The counterfactual subtracts what was read from every later prompt, which is only right if the
     loop kept everything it read. A loop that dropped or compacted context breaks that, and its trace
-    is left out."""
-    return all(b.prompt >= a.prompt for a, b in zip(calls, calls[1:], strict=False))
+    is left out.
+
+    Amendment 1: compared over the calls that carried the tool schema. A closing call without it is
+    smaller by the schema alone (every one of the 349 drops in the registered reading was such a
+    call), and it still carries every message, so it says nothing about lost context."""
+    seq = [c for c in calls if c.offered] if amended else list(calls)
+    return all(b.prompt >= a.prompt for a, b in zip(seq, seq[1:], strict=False))
 
 
-def single_read_sizes(calls: Sequence[Call]) -> list[int]:
+def single_read_sizes(calls: Sequence[Call], *, amended: bool = True) -> list[int]:
     """Prompt growth after each call that emitted exactly one ``read_file``: one read's size, plus
     the assistant message that asked for it (which overstates the read, the conservative side)."""
     return [
         calls[i + 1].prompt - calls[i].prompt
         for i in range(len(calls) - 1)
-        if calls[i].tools == ("read_file",)
+        # Both sides must carry the schema, or the growth is the read minus the schema.
+        if calls[i].tools == ("read_file",) and (calls[i + 1].offered or not amended)
     ]
 
 
@@ -246,9 +266,10 @@ class Loaded:
     misaligned: int
     no_calls: int
     not_append_only: int
+    amended: bool = True
 
 
-def load_primary(path: Path = PRIMARY) -> Loaded:
+def load_primary(path: Path = PRIMARY, *, amended: bool = True) -> Loaded:
     traces: list[Trace] = []
     rows = halted = misaligned = no_calls = not_append = 0
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -262,11 +283,11 @@ def load_primary(path: Path = PRIMARY) -> Loaded:
         if not row.get("calls"):
             no_calls += 1
             continue
-        calls = split_calls(row["calls"], row.get("tool_names") or [])
+        calls = split_calls(row["calls"], row.get("tool_names") or [], amended=amended)
         if calls is None:
             misaligned += 1
             continue
-        if not append_only(calls):
+        if not append_only(calls, amended=amended):
             not_append += 1
             continue
         traces.append(
@@ -277,7 +298,7 @@ def load_primary(path: Path = PRIMARY) -> Loaded:
                 patch_file_count(row.get("patch", "")),
             )
         )
-    return Loaded(traces, rows, halted, misaligned, no_calls, not_append)
+    return Loaded(traces, rows, halted, misaligned, no_calls, not_append, amended)
 
 
 def secondary_sequences() -> dict[str, list[list[str]]]:
@@ -330,13 +351,15 @@ def analyse(loaded: Loaded) -> dict[str, Any]:
     traces = loaded.traces
     sizes_by_arm: dict[str, list[int]] = {}
     for t in traces:
-        sizes_by_arm.setdefault(t.arm, []).extend(single_read_sizes(t.calls))
+        sizes_by_arm.setdefault(t.arm, []).extend(
+            single_read_sizes(t.calls, amended=loaded.amended)
+        )
     pooled_size = {a: (_median(v) or 0.0) for a, v in sizes_by_arm.items()}
 
     per: list[dict[str, Any]] = []
     for t in traces:
         ph = exploration_phase(t.calls)
-        own = single_read_sizes(t.calls)
+        own = single_read_sizes(t.calls, amended=loaded.amended)
         size = float(statistics.median(own)) if own else pooled_size.get(t.arm, 0.0)
         cfs = {
             f"B{b}_{'reread' if rr else 'noreread'}": counterfactual(
@@ -381,6 +404,7 @@ def analyse(loaded: Loaded) -> dict[str, Any]:
 
     report: dict[str, Any] = {
         "source": str(PRIMARY.relative_to(ROOT)).replace("\\", "/"),
+        "reading": "Amendment 1 (post-hoc)" if loaded.amended else "as registered",
         "rows": loaded.rows,
         "excluded": {
             "halted": loaded.halted,
@@ -465,11 +489,14 @@ def render(r: dict[str, Any]) -> str:
 
 
 def main(argv: Sequence[str] = ()) -> int:
-    loaded = load_primary()
+    """``--as-registered`` reproduces the registered reading (VOID); the default is Amendment 1."""
+    amended = "--as-registered" not in argv
+    loaded = load_primary(amended=amended)
     report = analyse(loaded)
     out = HERE / "results"
     out.mkdir(exist_ok=True)
-    (out / "census.json").write_text(render(report) + "\n", encoding="utf-8")
+    name = "census_amended.json" if amended else "census_registered.json"
+    (out / name).write_text(render(report) + "\n", encoding="utf-8")
     print(render(report))
     return 0
 

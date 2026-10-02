@@ -172,3 +172,41 @@ def test_a_recommendation_says_when_its_saving_is_tokens_and_not_money() -> None
     labels = census.verdict(_report(all=cheap))["labels"]
     assert any(label.startswith("token-only") for label in labels)
     assert any(label.startswith("proxy population") for label in labels)
+
+
+# --- Amendment 1: the closing calls at max_steps carry no tool schema ------------------------------
+
+_CLOSING = [
+    {"prompt": 1000, "tool_calls": 1, "tools_offered": True},
+    {"prompt": 3000, "tool_calls": 1, "tools_offered": True},
+    # The step budget is spent: the loop asks for a summary WITHOUT the schema, so the prompt is
+    # smaller by the schema, and the tool call the model emits anyway is never run or named.
+    {"prompt": 1800, "tool_calls": 1, "tools_offered": False},
+    {"prompt": 1900, "tool_calls": 0, "tools_offered": False},
+]
+
+
+def test_a_tool_call_on_a_closing_call_without_a_schema_does_not_misalign_the_trace() -> None:
+    names = ["read_file", "apply_patch"]
+    assert census.split_calls(_CLOSING, names, amended=False) is None  # the registered join
+    calls = census.split_calls(_CLOSING, names)
+    assert calls is not None
+    assert [c.tools for c in calls] == [("read_file",), ("apply_patch",), (), ()]
+    assert [c.offered for c in calls] == [True, True, False, False]
+
+
+def test_a_closing_call_smaller_by_its_schema_is_not_lost_context() -> None:
+    calls = census.split_calls(
+        _CLOSING[:2] + [{**_CLOSING[2], "tool_calls": 0}], ["read_file", "x"]
+    )
+    assert calls is not None
+    assert census.append_only(calls)
+    assert not census.append_only(calls, amended=False)
+    # A real drop between two calls that both carried the schema still fails the check.
+    shrank = (Call(3000, 0, ("read_file",)), Call(2000, 0, ("grep",)))
+    assert not census.append_only(shrank)
+
+
+def test_a_read_followed_by_a_closing_call_is_not_measured_as_a_read() -> None:
+    calls = (Call(1000, 0, ("read_file",)), Call(3000, 0, ("read_file",)), Call(1500, 0, (), False))
+    assert census.single_read_sizes(calls) == [2000]
