@@ -105,6 +105,9 @@ class RunShellTool(Tool):
                 "foreground, or set CHIMERA_SANDBOX=local."
             )
         argv, use_shell = sandbox._command_argv(command, cwd)
+        # Said BEFORE the start, while the count is still the one the person would want to know: a
+        # third job running is fine, and the tenth is worth a sentence, but neither is a refusal.
+        over = self._jobs.over_advisory_limit()
         try:
             job = self._jobs.start(command, cwd=cwd, env=_child_env(), argv=argv, shell=use_shell)
         except JobLimitError as exc:
@@ -117,6 +120,11 @@ class RunShellTool(Tool):
         except OSError as exc:
             return f"error: could not start the background job: {exc}"
         limit = f" It is stopped after {job.max_runtime:.0f}s at most." if job.max_runtime else ""
+        if over is not None:
+            limit += (
+                f" Note: {over[0]} other background jobs were already running (more than the usual "
+                f"{over[1]}); that is a suggestion, not a limit, and it started anyway."
+            )
         return (
             f"job {job.id} started in the background (pid {job.pid}); it keeps running after this "
             f"turn and is NOT stopped by cancelling the turn.{limit} Check it with "
@@ -152,7 +160,24 @@ class RunShellTool(Tool):
             return "error: host execution declined (CHIMERA_HOST_EXEC). Not run."
         if bool(kwargs.get("background", False)):
             return self._start_job(command, cwd, sandbox)
-        result = sandbox.run(command, timeout=timeout, cwd=cwd)
+        if self._jobs is not None and isinstance(sandbox, LocalSandbox):
+            jobs = self._jobs
+
+            def adopt(proc: Any) -> str | None:
+                job = jobs.adopt(proc, command, cwd=cwd)
+                return job.id if job is not None else None
+
+            result = sandbox.run(command, timeout=timeout, cwd=cwd, on_timeout=adopt)
+        else:
+            result = sandbox.run(command, timeout=timeout, cwd=cwd)
+        if result.adopted:
+            return (
+                f"job {result.adopted} is still running after {timeout}s and was NOT stopped: it "
+                f"continues in the background and keeps running after this turn. Its output appears "
+                f"when it finishes; check it with job_status(job_id={result.adopted!r}), stop it with "
+                f"job_cancel(job_id={result.adopted!r}). Do not report the work as done until "
+                "job_status says it finished."
+            )
         if result.timed_out:
             if self._jobs is not None and isinstance(sandbox, LocalSandbox):
                 return (

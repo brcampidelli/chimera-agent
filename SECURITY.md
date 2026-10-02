@@ -80,7 +80,9 @@ environment** when you grant autonomy:
   **summarisation/compaction** (a synthesiser's whole job is to paraphrase, which erases a verbatim
   match). Coverage by surface: the `solve`/`crew`/`hierarchy` CLI paths and the **API server** track
   taint (the server arms the narrowing gate by default — see `CHIMERA_TAINT_NARROW` below); the **TUI
-  and scheduler still do not**. It also only *escalates to review*, so with no approver present a
+  and scheduler still do not**. (The scheduler's daemon heartbeat — `docs/deploy.md`, issue #26 — is
+  *liveness*, not taint: it answers "is the clock alive", never "is this content trusted".) It also
+  only *escalates to review*, so with no approver present a
   tainted action is refused, not silently run, but nothing is hard-blocked.
   **Untrusted local files:** by default the workspace is *trusted* — `read_file` does not taint,
   because `chimera solve` usually runs on your own repo and tainting every file read would make

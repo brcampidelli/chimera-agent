@@ -168,6 +168,42 @@
   animation: view-enter var(--dur-2) var(--ease-out) both;
 }
 
+/* ── Side regions ──────────────────────────────────────────────────────────────────────────────
+   A side region that was hidden and is shown again slides in from its own edge: "a column sliding
+   into place", the one use duration-3 names. Only on coming BACK: a region that is simply there when a
+   screen opens arrives with the view, and animating it twice reads as a stutter. The reduced-motion
+   blanket below collapses it to 1ms like everything else. */
+
+@keyframes region-enter-left {
+  from {
+    opacity: 0;
+    transform: translate3d(-12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes region-enter-right {
+  from {
+    opacity: 0;
+    transform: translate3d(12px, 0, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.region-enter-left {
+  animation: region-enter-left var(--dur-3) var(--ease-out) both;
+}
+
+.region-enter-right {
+  animation: region-enter-right var(--dur-3) var(--ease-out) both;
+}
+
 /* ── Overlays ────────────────────────────────────────────────────────────────────────────────────
    Dialog, command palette, toast. Paired with usePresence, which keeps them mounted through the
    exit.

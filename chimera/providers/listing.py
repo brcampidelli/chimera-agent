@@ -446,8 +446,13 @@ def _price_cache_path() -> Path:
     return Path(get_settings().home) / PRICE_CACHE_NAME
 
 
-def remember_models(models: Sequence[ModelOption]) -> None:
+def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) -> None:
     """Persist what a freshly fetched listing knows about each model. Never raises.
+
+    ``home`` is the data folder to write into; None reads the current settings. A caller that was
+    handed its settings — the warm-up thread — passes their folder, because by the time a thread
+    writes, the process's settings may name another one (2026-09-30: a test's leftover warm-up wrote
+    its fake prices into a later test's folder).
 
     Called from :func:`available_models`, so the map refreshes as a side effect of the picker being
     used — there is no second code path that has to remember to run.
@@ -471,7 +476,7 @@ def remember_models(models: Sequence[ModelOption]) -> None:
     }
     if not kept:
         return
-    path = _price_cache_path()
+    path = Path(home) / PRICE_CACHE_NAME if home is not None else _price_cache_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         # `fetched_at` is stored for a human reading the file, not consulted: a price from last month
@@ -589,6 +594,7 @@ def warm_price_cache(settings: Any) -> None:
             return
         models, reason = openrouter_models()
         if reason == "":
-            remember_models(models)
+            # Into the folder of the settings this warm-up was started with, not the current one.
+            remember_models(models, home=Path(settings.home))
     except Exception as exc:  # noqa: BLE001 — a warm-up must never take the process with it
         _log.debug("price cache warm-up failed: %s", exc)

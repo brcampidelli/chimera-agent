@@ -16,7 +16,8 @@ import { cn } from "@/lib/utils";
  * box that is almost always empty. Polled, like the machine panel beside it, and for the same reason
  * — a second event stream for a side panel is a second thing that can fail mid-turn.
  */
-export function JobsPanel() {
+/** `bare` drops the panel's own frame and title, for a dock that draws both (dynamic screen, phase 4). */
+export function JobsPanel({ bare = false }: { bare?: boolean } = {}) {
   const t = useT();
   const queryClient = useQueryClient();
   const jobs = useQuery({
@@ -34,10 +35,12 @@ export function JobsPanel() {
   if (list.length === 0) return null;
 
   return (
-    <div className="border-t border-hairline px-4 py-3">
-      <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {t("jobs.title")}
-      </div>
+    <div className={bare ? undefined : "border-t border-hairline px-4 py-3"}>
+      {bare ? null : (
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("jobs.title")}
+        </div>
+      )}
       <ul className="space-y-2">
         {list.map((job) => (
           <JobRow

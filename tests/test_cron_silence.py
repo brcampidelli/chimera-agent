@@ -128,7 +128,14 @@ def test_a_healthy_schedule_says_nothing(client: TestClient, tmp_path: Path) -> 
 
 def test_no_schedules_at_all_is_not_an_error(client: TestClient) -> None:
     body = client.get("/api/cron/silence").json()
-    assert body == {"overdue": [], "failing": [], "grace_seconds": 300.0}
+    assert body == {
+        "overdue": [],
+        "failing": [],
+        # No daemon has ever ticked here, so there is no beat — "none" is "no signal", not
+        # "dead" (a daemon that never ran left no evidence either way).
+        "daemon": {"verdict": "none", "age_seconds": None, "max_gap_seconds": None},
+        "grace_seconds": 300.0,
+    }
 
 
 def test_the_path_is_not_taken_for_a_job_id(client: TestClient, tmp_path: Path) -> None:

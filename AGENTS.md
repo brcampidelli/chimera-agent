@@ -34,7 +34,9 @@ npm --prefix apps/desktop run gen:api
 ```
 
 **Run the full Python suite, not the module you touched.** Per-module runs have let regressions
-reach `main` here before. On Windows, run it in WSL.
+reach `main` here before. On Windows, run it in WSL with `scripts/gate_wsl.sh <worktree>`. It
+installs from `uv.lock`, as CI does: an install that resolves the newest versions once reported a
+dependency released that afternoon as a regression.
 
 **Never weaken a test to make it pass.** If a test asserts something false, say so and rewrite it
 with the reasoning in the commit message — one in `test_agent.py` asserted that a run which called

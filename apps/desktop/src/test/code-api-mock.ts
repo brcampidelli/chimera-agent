@@ -111,9 +111,14 @@ export function makeCodeApiMock() {
     // stream it did not ask for. `streamSessionLive` resolves at once (null: stopped), which the
     // reconnect loop reads as "we ended it" and does not retry.
     listShares: vi.fn(async () => ({ shares: [] })),
+    // Coding turns running now: none, until a test says otherwise. Asked by the sidebar every few
+    // seconds, so a bare `vi.fn()` would hand react-query an undefined list on every tick.
+    listRunningTurns: vi.fn(async () => []),
     // Background works (`chimera.api.works`): none, until a test says otherwise.
     listWorks: vi.fn(async () => ({ works: [] })),
     stopWork: vi.fn(),
+    // Stop on a coding turn asks the server to end it (#R1): answered as a stop that reached it.
+    stopCodeTurn: vi.fn(async (turnId: string) => ({ turn_id: turnId, stopping: true })),
     undoWork: vi.fn(),
     shareSession: vi.fn(),
     revokeShare: vi.fn(async () => ({ ok: true })),

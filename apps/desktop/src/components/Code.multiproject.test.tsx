@@ -30,9 +30,10 @@ const IDLE = {
   workspace: null,
   paused: null,
   verify: null,
-  start: () => {},
+  start: () => true,
   stop: () => {},
   clearPaused: () => {},
+  alsoRunning: 0,
 };
 
 function runningIn(workspace: string | null) {

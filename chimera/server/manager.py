@@ -127,6 +127,8 @@ class MessagingManager:
         invisible to it — which is why that gate now walks the whole package.
         """
         from chimera.core import Agent, AgentConfig
+        from chimera.core.agent import attended
+        from chimera.core.jobs import finished_note
         from chimera.governance.profile import governed_profile
         from chimera.integrations import SenderRegistry, SendMessageTool
         from chimera.interface import ChatSession
@@ -153,15 +155,16 @@ class MessagingManager:
             runner = Agent(
                 self._backend,
                 registry,
-                # The same workspace that roots the tools two lines up.
-                AgentConfig(
+                # The same workspace that roots the tools two lines up. `attended` for the same
+                # reason as `_serve_platform`: a person is on the other end of the chat.
+                attended(AgentConfig(
                     model=self._model,
                     max_steps=self._max_steps,
                     project_root=self._workspace,
                     # The owner's identity, as on every surface that answers a person.
                     instructions=owner_identity(self._settings.home),
                     turn_context=True,
-                ),
+                )),
             )
             return ChatSession(
                 runner,
@@ -169,9 +172,11 @@ class MessagingManager:
                 graph=self._graph,
                 remember_from_chat=self._settings.remember_from_chat,
                 real_history=self._settings.chat_real_history,
+                # As in `_serve_platform`: the chat hears when a job it started has ended.
+                turn_note=lambda: finished_note(self._settings.home, self._workspace),
             )
 
-        return MessageGateway(factory).on_message
+        return MessageGateway(factory, warnings_in_reply=True).on_message
 
     def start(self, platform: str) -> None:
         """Start ``platform`` in a background thread. Idempotent; raises ValueError if not configured

@@ -8,6 +8,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getConfig, getDoctor } from "@/lib/api";
 import { I18nProvider } from "@/lib/i18n";
+import { LayoutProvider } from "@/lib/layout/context";
 
 /**
  * `main.tsx`'s stack, not `test/utils`'s.
@@ -26,7 +27,10 @@ function renderApp() {
       <I18nProvider>
         <TooltipProvider>
           <ToastProvider>
-            <App />
+            {/* `main.tsx` puts the layout provider here; App reads it for the palette. */}
+            <LayoutProvider>
+              <App />
+            </LayoutProvider>
           </ToastProvider>
         </TooltipProvider>
       </I18nProvider>

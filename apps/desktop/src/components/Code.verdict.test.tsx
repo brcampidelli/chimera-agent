@@ -142,6 +142,27 @@ describe("Code — the verdict on what a turn wrote", () => {
     await screen.findByText(/files this turn created are still there/i);
   });
 
+  it("names the files an undo left alone because they changed after the turn", async () => {
+    // Undo takes back only what its own turn changed. A file that changed again afterwards (another
+    // conversation in the same folder, or the person) is left as it is, and the screen says which,
+    // rather than "Edits undone." over a folder that still holds those changes.
+    vi.mocked(revertCodeTurn).mockResolvedValue({
+      ok: true,
+      restored: 1,
+      left_new_files: false,
+      kept: ["src/app.py", "README.md"],
+    });
+    const user = await turnWith({
+      command: "python -m pytest -q",
+      source: "inferred:tests/",
+      state: "failed",
+      revert_token: "tok",
+    });
+
+    await user.click(await screen.findByRole("button", { name: /Undo these edits/i }));
+    await screen.findByText(/except 2 file\(s\) that changed after this turn.*src\/app\.py, README\.md/i);
+  });
+
   it("still says plainly undone when it really was", async () => {
     // Or the test above would pass against a version that had started hedging on every undo.
     vi.mocked(revertCodeTurn).mockResolvedValue({

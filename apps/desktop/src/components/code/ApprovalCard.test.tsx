@@ -160,6 +160,21 @@ describe("ApprovalCard — the number that asked", () => {
     }
   });
 
+  it("a question the decision gate raised shows why, in the reason, and no band line", () => {
+    // The gate's refusal has no number, and the band is shown only against one, so the reason is what
+    // the person reads. It has to say the meter was out and not the model.
+    mount(() => {}, {
+      ...question,
+      decision: "review",
+      band: "gate",
+      reason:
+        "the decision gate refused to ask a model about this action (budget), so nothing judged it; a person should approve it before it runs",
+    });
+
+    expect(screen.getByText(/the decision gate refused to ask a model about this action \(budget\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/band /)).not.toBeInTheDocument();
+  });
+
   it("an unknown band is shown as nothing, never raw and never guessed", () => {
     // Same rule the level chip follows: an unrecognised string on a risk line is worse than no line.
     mount(() => {}, { ...question, p: 0.8, band: "escalated" });

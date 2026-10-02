@@ -37,6 +37,7 @@ import socket
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,15 @@ SHARES_FILE = "code_shares.json"
 #: what a viewer who reconnects after a nap needs, and a viewer who has been away longer gets the
 #: stored conversation instead.
 RING = 4000
+
+#: Openings a session remembers after they leave the ring. One per turn; a turn longer than the ring
+#: needs its own back to be followed, and a conversation rarely runs more than a few at once.
+OPENINGS = 64
+
+#: A turn's frames from the run log, those with a session number in ``(after, before)``: what the
+#: ring dropped of a turn it still holds part of. Each frame is the run log's record — ``event``,
+#: ``session_seq`` and the payload's own fields.
+Backfill = Callable[[str, int, int], list[dict[str, Any]]]
 
 
 @dataclass(frozen=True)
@@ -157,6 +167,12 @@ class _Channel:
     seq: int = 0
     ring: deque[dict[str, Any]] = field(default_factory=lambda: deque(maxlen=RING))
     subscribers: dict[int, Subscriber] = field(default_factory=dict)
+    #: The highest session number that has left the ring: a viewer asking from before it is asking
+    #: for something the ring no longer has.
+    dropped_through: int = 0
+    #: Each turn's opening frame, kept past the ring — the frame a screen opens the turn's row on.
+    openings: dict[str, dict[str, Any]] = field(default_factory=dict)
+    last_publish: float = field(default_factory=time.monotonic)
 
 
 class SessionBus:
@@ -167,11 +183,12 @@ class SessionBus:
     through ``call_soon_threadsafe``, the same bridge the turn's own stream uses.
     """
 
-    def __init__(self, *, ring: int = RING) -> None:
+    def __init__(self, *, ring: int | None = None, backfill: Backfill | None = None) -> None:
         self._lock = threading.Lock()
         self._channels: dict[str, _Channel] = {}
         self._ids = itertools.count(1)
-        self._ring = ring
+        self._ring = RING if ring is None else ring
+        self._backfill = backfill
 
     def _channel(self, session_id: str) -> _Channel:
         channel = self._channels.get(session_id)
@@ -203,7 +220,14 @@ class SessionBus:
                 "payload": payload,
             }
             if keep:
+                if channel.ring.maxlen is not None and len(channel.ring) == channel.ring.maxlen:
+                    channel.dropped_through = int(channel.ring[0]["session_seq"])
                 channel.ring.append(frame)
+            if event == "turn_started" and turn_id:
+                channel.openings[turn_id] = frame
+                while len(channel.openings) > OPENINGS:
+                    channel.openings.pop(next(iter(channel.openings)))
+            channel.last_publish = time.monotonic()
             targets = list(channel.subscribers.values())
         for sub in targets:
             # A closed loop is a subscriber whose stream is gone; its own handler unsubscribes it.
@@ -212,11 +236,85 @@ class SessionBus:
         return frame
 
     def replay(self, session_id: str, since: int = 0) -> list[dict[str, Any]]:
+        """Every kept frame after ``since``, oldest first — and, when the ring has dropped some of
+        what was asked for, what it dropped of the turns it still holds.
+
+        A coding turn streams a frame per token, so a long one outgrows the ring. A screen that came
+        back to it asked from the turn's opening and got the tail: no opening frame to draw the row
+        on, and the answer without its start. The opening is kept past the ring and the rest comes
+        from the run log, which keeps every frame of the turn with the session number it had. A
+        turn wholly gone from the ring is not brought back — it has finished, and the stored
+        conversation holds it; its opening alone would open a row nothing ever closes.
+        """
         with self._lock:
             channel = self._channels.get(session_id)
             if channel is None:
                 return []
-            return [f for f in channel.ring if int(f["session_seq"]) > since]
+            kept = [f for f in channel.ring if int(f["session_seq"]) > since]
+            if since >= channel.dropped_through or not kept:
+                return kept
+            start = int(channel.ring[0]["session_seq"])
+            turns: dict[str, dict[str, Any]] = {}
+            for frame in kept:
+                if frame["turn_id"] and frame["turn_id"] not in turns:
+                    turns[frame["turn_id"]] = frame
+            openings = {t: channel.openings.get(t) for t in turns}
+        restored: list[dict[str, Any]] = []
+        for turn_id, first in turns.items():
+            opening = openings[turn_id]
+            if opening is None or int(opening["session_seq"]) >= start:
+                continue  # the ring holds this turn from its opening, or it has none (a background work)
+            if int(opening["session_seq"]) > since:
+                restored.append(opening)
+            restored.extend(self._from_run_log(turn_id, str(first["author"]), since, start))
+        if not restored:
+            return kept
+        restored.sort(key=lambda f: int(f["session_seq"]))
+        return restored + kept
+
+    def _from_run_log(self, turn_id: str, author: str, after: int, before: int) -> list[dict[str, Any]]:
+        if self._backfill is None:
+            return []
+        try:
+            records = self._backfill(turn_id, after, before)
+        except Exception as exc:  # noqa: BLE001 -- a replay short of its start beats no replay
+            _log.warning("could not bring back the start of turn %s: %s", turn_id, exc)
+            return []
+        out: list[dict[str, Any]] = []
+        for record in records:
+            number = record.get("session_seq")
+            if not isinstance(number, int) or not after < number < before:
+                continue
+            payload = {k: v for k, v in record.items() if k not in ("event", "session_seq")}
+            out.append({
+                "session_seq": number, "event": str(record.get("event") or ""),
+                "turn_id": turn_id, "author": author, "payload": payload,
+            })
+        return out
+
+    def trim_idle(self, *, max_age: float, keep: set[str]) -> int:
+        """Forget the kept frames of conversations nobody watches and nothing ran in for
+        ``max_age`` seconds, except those in ``keep`` (the ones with a turn running). A screen that
+        comes back to one reads the stored conversation, which holds every finished turn. The
+        numbering is kept: a screen holding a number would otherwise wait for the count to climb
+        back past it and miss every frame on the way."""
+        now = time.monotonic()
+        trimmed = 0
+        with self._lock:
+            for session_id, channel in self._channels.items():
+                if session_id in keep or channel.subscribers or now - channel.last_publish <= max_age:
+                    continue
+                if channel.ring or channel.openings:
+                    channel.ring.clear()
+                    channel.openings.clear()
+                    channel.dropped_through = channel.seq
+                    trimmed += 1
+        return trimmed
+
+    def drop(self, session_id: str) -> None:
+        """Forget a deleted conversation entirely."""
+        with self._lock:
+            self._channels.pop(session_id, None)
 
     def seq(self, session_id: str) -> int:
         with self._lock:

@@ -33,9 +33,16 @@ def test_no_reading_is_no_distribution_and_a_reading_covers_every_label() -> Non
     assert probs_of({"yes": 0.8, "no": 0.2}, ["no", "yes"]) == {"no": 0.2, "yes": 0.8}
 
 
-def test_only_the_ctx_arm_changes_the_body() -> None:
+def test_the_ship_arm_is_what_the_product_sends() -> None:
+    """The ship arm is, by definition, the body the product sends — and since 2026-09-29 the product
+    sends ``num_ctx`` itself (chimera/decisions/local.py NUM_CTX), because Ollama's default here had
+    fallen to 2,048 tokens and cut long states silently. The two arms now coincide. The A_ship numbers
+    in RESULTS.md were measured before that change, without ``num_ctx``, and stay as measured.
+    This used to assert that the ship body carried no ``num_ctx``: that described the product then,
+    not a property of the bench."""
     backend = LocalLogprobBackend("http://127.0.0.1:1")
     c = as_choice(question_of(_item("noul", ["no", "yes"], {"true": "t", "false": "f"})))
-    assert body_of(backend, "s", c, "ctx")["options"]["num_ctx"] == NUM_CTX
     ship = body_of(backend, "s", c, "ship")
-    assert "num_ctx" not in ship["options"] and ship == backend.body("s", c)
+    assert ship == backend.body("s", c)
+    assert body_of(backend, "s", c, "ctx")["options"]["num_ctx"] == NUM_CTX
+    assert ship["options"]["num_ctx"] == NUM_CTX

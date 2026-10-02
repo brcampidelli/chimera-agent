@@ -1,0 +1,13 @@
+{
+ "item": "P000",
+ "expected": "WILLOW_PARCEL",
+ "seconds": 302.9,
+ "first_chunk_s": null,
+ "chunks": 0,
+ "provider": "",
+ "finish": "",
+ "content": "",
+ "reasoning_chars": 0,
+ "usage": null,
+ "error": "MidStreamFallbackError: litellm.MidStreamFallbackError: litellm.Timeout: Timeout Error: OpenrouterException - Message: A Timeout Occurred, Metadata: {'error_type': 'timeout'}, User ID:  Original exception: Timeout: litellm.T"
+}

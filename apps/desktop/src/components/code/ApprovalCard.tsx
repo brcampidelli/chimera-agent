@@ -54,7 +54,7 @@ export interface ApprovalQuestionLike {
    * and the card shows nothing rather than a `p=0.00` it would be inventing. */
   p?: number | null;
   /** Which band of the REVIEW band it fell in — `review` | `uncertain` | `allow` | `uncalibrated`
-   *  | `halt` | `none`. Empty when no band was consulted. */
+   *  | `halt` | `gate` | `none`. Empty when no band was consulted. */
   band?: string;
   /** The build that answered, when a model did — `qwen3:4b@Q4_K_M`. Empty for a rule. */
   decider_model?: string;
@@ -139,6 +139,7 @@ const BAND_LABEL: Record<string, string | undefined> = {
   review: "code.approval.band.review",
   uncertain: "code.approval.band.uncertain",
   allow: "code.approval.band.allow",
+  gate: "code.approval.band.gate",
   uncalibrated: "code.approval.band.uncalibrated",
   halt: "code.approval.band.halt",
   none: "code.approval.band.none",

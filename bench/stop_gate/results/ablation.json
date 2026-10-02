@@ -1,0 +1,80 @@
+{
+  "turns": 120,
+  "positives": 52,
+  "reached_the_model": 118,
+  "reached_share": 0.983,
+  "A1": {
+    "auroc": [
+      0.9804864253393665,
+      0.9500558035714286,
+      1.0
+    ]
+  },
+  "A2": {
+    "auroc": [
+      0.9804864253393665,
+      0.9500558035714286,
+      1.0
+    ]
+  },
+  "A3": {
+    "auroc": [
+      0.9804864253393665,
+      0.9500558035714286,
+      1.0
+    ]
+  },
+  "delta_A3_minus_A1": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "sweep_claims_done": {
+    "0.5": {
+      "blocks": 59,
+      "caught": 51,
+      "wrong": 8
+    },
+    "0.55": {
+      "blocks": 56,
+      "caught": 51,
+      "wrong": 5
+    },
+    "0.6": {
+      "blocks": 56,
+      "caught": 51,
+      "wrong": 5
+    },
+    "0.65": {
+      "blocks": 53,
+      "caught": 51,
+      "wrong": 2
+    },
+    "0.7": {
+      "blocks": 51,
+      "caught": 49,
+      "wrong": 2
+    },
+    "0.75": {
+      "blocks": 50,
+      "caught": 48,
+      "wrong": 2
+    },
+    "0.8": {
+      "blocks": 48,
+      "caught": 46,
+      "wrong": 2
+    },
+    "0.85": {
+      "blocks": 44,
+      "caught": 42,
+      "wrong": 2
+    },
+    "0.9": {
+      "blocks": 34,
+      "caught": 33,
+      "wrong": 1
+    }
+  },
+  "decision_rule": "ships shadow iff \u0394AUROC \u2265 +0.08 with lower bound > +0.02 and wrong-blocks \u2264 2% at the chosen threshold; null otherwise; publish either way"
+}

@@ -1488,11 +1488,22 @@ class AutonomousAgent:
         # The run ultimately failed: if this failure pattern recurs, distill an advisory
         # anti-pattern card so future attempts are warned. Guarded — the capability is
         # optional, so an evolver that only learns from successes is left untouched.
+        # The attempts are handed over so a configured reproduction gate can judge the
+        # narrative against what actually happened (Phantom Guardrails): a failure no
+        # verifier produced, or one the evidence contradicts, must not become a card.
         if self.auto_evolver is not None:
             evolve_failure = getattr(self.auto_evolver, "maybe_evolve_failure", None)
             if callable(evolve_failure):
                 run_tainted = self.taint.run_tainted() if self.taint is not None else False
-                evolve_failure(task, feedback, prior_failures, tainted=run_tainted)
+                try:
+                    evolve_failure(
+                        task, feedback, prior_failures, tainted=run_tainted, attempts=attempts
+                    )
+                except TypeError:
+                    # An evolver without the attempts parameter (older custom ones, test stubs).
+                    # The gate is opt-in; a caller that cannot receive the evidence behaves
+                    # exactly as before rather than breaking the failure path.
+                    evolve_failure(task, feedback, prior_failures, tainted=run_tainted)
 
         self._record_card_outcome(False)
         self._clear_checkpoint(thread_id)  # exhausted the budget — a terminal state, not resumable

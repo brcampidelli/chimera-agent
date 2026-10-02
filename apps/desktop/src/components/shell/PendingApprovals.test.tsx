@@ -18,6 +18,10 @@ vi.mock("@/lib/api", () => ({
   getGovernanceAudit: vi.fn(),
   getGovernanceInjection: vi.fn(),
   getSandboxState: vi.fn(),
+  // The conversations the sidebar lists: where a question's origin line reads its title.
+  listCodeSessions: vi.fn(async () => [
+    { id: "s-shop", title: "Clean the build", workspace: "/p/shop", turns: 1, updated_at: 0 },
+  ]),
 }));
 
 /** What `GET /api/approvals` returns per parked question. `ApprovalOut` carries `asked_at` and
@@ -39,6 +43,10 @@ function question(id = "q1") {
     band: "",
     decider_model: "",
     decision_id: "",
+    run_id: "",
+    session_id: "",
+    workspace: "",
+    work: "",
   };
 }
 
@@ -66,6 +74,24 @@ describe("PendingApprovals — the question follows you", () => {
     await waitFor(() => expect(getApprovals).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("says which project and which conversation each question comes from", async () => {
+    // Every conversation's questions are listed in one dialog. With several working at once, a card
+    // that said only what it would run could be answered for the wrong project.
+    vi.mocked(getApprovals).mockResolvedValue([
+      { ...question("q1"), run_id: "t1", session_id: "s-shop", workspace: "/p/shop" },
+      { ...question("q2"), run_id: "t2", session_id: "s-blog", workspace: "/p/blog", work: "Resize images" },
+      question("q3"),
+    ]);
+    renderWithProviders(<PendingApprovals />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /3/ }));
+
+    expect(await screen.findByText("From shop · Clean the build")).toBeInTheDocument();
+    expect(screen.getByText("From blog · background work “Resize images”")).toBeInTheDocument();
+    // A question whose origin the server does not know gets no line, never an invented one.
+    expect(screen.getAllByText(/^From /)).toHaveLength(2);
   });
 
   it("shows how many are waiting, and opens the question itself", async () => {

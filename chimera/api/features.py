@@ -538,17 +538,42 @@ def register_features(
         crashed process cannot log its own crash — so this is a question, not a watcher, and it is
         answered the moment anything asks.
 
+        ``daemon`` is the third answer, and the one the jobs could not give: the daemon's own
+        heartbeat (:mod:`chimera.scheduler.watchdog`), written every tick. A dead daemon with a
+        daily job looks healthy from the jobs alone for ~23 hours — the job is not yet late — and
+        the beat closes that window. ``unknown`` is the honest default when the beat carries no
+        tick interval to judge freshness against; ``none`` is "no signal", not "dead".
+
         Declared BEFORE `/api/cron/{job_id}`: FastAPI matches in declaration order, and the
         parameterised route would otherwise take `silence` for a job id and 404 a path that exists.
         """
         import time
 
         from chimera.scheduler.engine import Scheduler
+        from chimera.scheduler.watchdog import (
+            default_heartbeat_path,
+            infer_max_gap,
+            watch_daemon,
+            watch_tick_seconds,
+        )
 
         grace = max(0.0, grace_minutes) * 60
         sched = Scheduler(_cron_store(_settings()))
         now = time.time()
+        beat_path = default_heartbeat_path(_settings().home)
+        # The ceiling is derived from the beat's own tick interval BEFORE the verdict — the
+        # verdict is judged against it, not shown beside it. A beat without an interval yields
+        # 0, which reads as "no number" (None): the reader refuses to judge freshness against
+        # a ceiling the writer never left, so the verdict is `unknown`, not `stale`.
+        intervalo = watch_tick_seconds(beat_path)
+        teto = infer_max_gap(intervalo) if intervalo > 0 else None
+        watch = watch_daemon(beat_path, now=now, max_gap_seconds=teto)
         return {
+            "daemon": {
+                "verdict": watch.verdict,
+                "age_seconds": watch.age_seconds,
+                "max_gap_seconds": teto,
+            },
             "overdue": [
                 {
                     "id": job.id,

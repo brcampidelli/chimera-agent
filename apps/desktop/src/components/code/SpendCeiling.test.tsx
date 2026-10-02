@@ -58,19 +58,20 @@ beforeEach(() => {
 });
 
 describe("SpendCeiling", () => {
-  it("starts armed, and clearing the box disarms it", async () => {
-    // It used to start at nothing, which was defensible while a turn could take 8 tool-calling
-    // steps. The Code screen now sends 40, and this app is installed by people who did not write
-    // it and will not read the settings before their first message.
-    //
-    // Armed AND visible: a limit nobody can see is a limit nobody can raise, so the number sits in
-    // the box rather than in a default somewhere in the backend.
+  it("starts with no ceiling, and arms one only when a person types it", async () => {
+    // It started armed at $1 from the day a turn could take 40 steps. The owner decided on
+    // 2026-09-27 that spending is a warning and not a stop: the server says what the turn has
+    // spent at $1, and a ceiling that halts a turn exists only when someone chose the number.
+    // This used to assert the opposite, and the premise it asserted is what changed.
     const { onChange, field } = ceiling();
 
-    expect(Number((field as HTMLInputElement).value)).toBeGreaterThan(0);
+    expect((field as HTMLInputElement).value).toBe("");
+    expect(onChange).not.toHaveBeenCalled();
+
+    await userEvent.type(field, "2");
+    expect(onChange).toHaveBeenLastCalledWith(2);
 
     await userEvent.clear(field);
-
     expect(onChange).toHaveBeenLastCalledWith(null);
   });
 

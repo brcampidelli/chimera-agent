@@ -16,7 +16,7 @@ from croniter import croniter
 
 from chimera.concurrency import call_with_deadline
 from chimera.orchestration.budget import BudgetExceeded
-from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus
+from chimera.scheduler.models import CreatedBy, CronJob, DispatchStatus, kill_flag_path
 from chimera.scheduler.store import CronStore
 from chimera.telemetry import get_logger
 
@@ -420,6 +420,13 @@ class Scheduler:
                         job, "rejected",
                         "the job ran and its verify command rejected the work, which was reverted",
                     )
+                elif veredito == "cancelled":
+                    # The operator stopped this dispatch (`cron kill`), so the job ran and was
+                    # halted — not failed, not finished. Neither reading is true: counting it as
+                    # a failure would let a kill ride `consecutive_failures` into the brake, and
+                    # counting it as `ok` would zero the counter over real failures that came
+                    # before. Neutral, like `budget`: the counter is left exactly as it was.
+                    self._record(job, "cancelled", "stopped by the operator (cron kill)")
                 else:
                     self._record(job, veredito or "ok", None)
             except TimeoutError:
@@ -442,6 +449,35 @@ class Scheduler:
             ran.append(job)
         return ran
 
+    def kill(self, job_id: str, *, now: float | None = None) -> bool:
+        """Ask for one job's dispatch to stop, and say whether the request landed.
+
+        Two cases, and the caller must be able to tell them apart:
+
+        * the job is **enabled** — the flag is written and the running (or next) dispatch will
+          consume it; the schedule is also pushed past ``now`` so a kill aimed at a job whose
+          minute has not come does not fire it anyway;
+        * the job is **disabled** — there is nothing running to stop, and writing a flag would
+          be a lie the next ``enable`` would spend. Refused, loudly.
+
+        The flag is a file beside ``jobs.json`` because the daemon and the CLI are different
+        processes: the heartbeat already established that the scheduler's cross-process state is
+        files in this folder, and a kill that only worked in-process would be a kill that never
+        worked on a VPS.
+        """
+        job = self.store.get(job_id) if job_id in self.store else None
+        if job is None or not job.enabled:
+            return False
+        # `store.path` is `<home>/scheduler/jobs.json`, so its grandparent is the home the flag
+        # convention is defined against — the same folder the heartbeat and the job store live in.
+        path = kill_flag_path(self.store.path.parent.parent, job_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("kill", encoding="utf-8")
+        if now is not None:
+            job.next_run = now + 1.0
+            self.store.add(job)
+        return True
+
     @staticmethod
     def _record(job: CronJob, status: DispatchStatus, error: str | None) -> None:
         """Set the outcome on the job. `mark_ran` persists it a moment later, in the same tick."""
@@ -450,8 +486,12 @@ class Scheduler:
         # A budget refusal does not count as a failure: the job never ran, so nothing about it
         # failed, and letting it climb this counter would make a spending decision look like forty
         # broken dispatches to anyone reading `failing()`.
+        # A kill is neutral in the other direction: the job RAN and was stopped by a person, so it
+        # is not evidence of breakage (no increment) and not evidence of health (no reset).
         if status in ("ok", "budget"):
             job.consecutive_failures = 0
+        elif status == "cancelled":
+            pass
         else:
             job.consecutive_failures += 1
 

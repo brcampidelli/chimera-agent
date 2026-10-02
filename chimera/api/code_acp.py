@@ -74,6 +74,17 @@ def run_external_turn(
     return turn.prompt(message, images=images)
 
 
+def cancel_external_turn(*, provider: str, command: str | None, workspace: Path, session_id: str) -> bool:
+    """Cancel the prompt this conversation's external agent is running. True when there was one.
+
+    The key is built exactly as `run_external_turn` builds it, so a stop reaches the connection the
+    turn is using and no other conversation's.
+    """
+    spec, _argv = resolve_provider(provider, command)
+    key = SessionKey(session_id=session_id, provider=spec.key, workspace=str(Path(workspace).resolve()))
+    return registry().cancel(key)
+
+
 def done_payload(result: AcpTurnResult, *, provider: str, tainted: bool) -> dict[str, Any]:
     """The `done` frame for an external turn.
 

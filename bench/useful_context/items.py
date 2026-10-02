@@ -280,10 +280,19 @@ def tool_schemas() -> list[dict[str, Any]]:
     ]
 
 
+#: Where the filler reads from. ``chimera`` alone is the registered corpus of every run to 256k and
+#: must stay the default: widening it reorders the shuffle and changes every render. Past ~256k it
+#: runs out and files repeat (23 repeated results at 512k, 144 at 1M), so the large profiles add
+#: ``tests`` (PREREGISTRATION_large.md).
+CORPUS_ROOTS: tuple[str, ...] = ("chimera",)
+
+
 def corpus() -> list[str]:
     """The filler's source files: this repository's product code, as posix paths, sorted."""
-    root = REPO / "chimera"
-    files = [p for p in root.rglob("*.py") if p.stat().st_size > 1_500 and "__pycache__" not in p.parts]
+    files = [
+        p for root in CORPUS_ROOTS for p in (REPO / root).rglob("*.py")
+        if p.stat().st_size > 1_500 and "__pycache__" not in p.parts
+    ]
     return sorted(p.relative_to(REPO).as_posix() for p in files)
 
 

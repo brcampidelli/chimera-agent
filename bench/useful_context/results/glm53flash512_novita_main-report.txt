@@ -1,0 +1,116 @@
+openrouter/z-ai/glm-5.3-flash via Novita  T=0.0  US$4.5935  rows 432  halted 0
+
+PER LENGTH (all valid rows)
+    arm    n   ok    acc       Wilson 95%   fact  rule|1  break forget  med tok  cache   reas    sec     US$
+   4000   54   54  1.000 [0.934, 1.000]  1.000 54/54         0      0     3612   0.20     84    6.9  0.0154
+        kinds: {'ok': 54}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 0 failed
+  16000   54   53  0.981 [0.902, 0.997]  0.981 54/54         0      1    15914   0.01     86    7.5  0.0735
+        kinds: {'ok': 53, 'wrong_service': 1}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 1 failed
+  32000   54   54  1.000 [0.934, 1.000]  1.000 54/54         0      0    31956   0.02    128    8.0  0.1441
+        kinds: {'ok': 54}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 0 failed
+  64000   54   54  1.000 [0.934, 1.000]  1.000 54/54         0      0    63991   0.01    134   10.8  0.2904
+        kinds: {'ok': 54}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 0 failed
+ 128000   54   53  0.981 [0.902, 0.997]  0.981 53/53         1      0   128117   0.01    136   15.1  0.5772
+        kinds: {'no_service': 1, 'ok': 53}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 1 failed
+ 256000   54   54  1.000 [0.934, 1.000]  1.000 54/54         0      0   256038   0.01    148   24.6  1.1565
+        kinds: {'ok': 54}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 0 failed
+ 512000   54   53  0.981 [0.902, 0.997]  0.981 53/53         1      0   512041   0.00    152   46.1  2.3214
+        kinds: {'ok': 53, 'no_service': 1}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 1 failed
+ replay   54   54  1.000 [0.934, 1.000]  1.000 54/54         0      0     3612   0.22     80    6.8  0.0150
+        kinds: {'ok': 54}   no reasoning: 0 rows, 0 failed; with reasoning: 54 rows, 0 failed
+
+FLOOR 4k replay vs 4k: both 54, replay-only 0, 4k-only 0, neither 0 -> 0/54 discordant; exact McNemar p = 1; Newcombe [-0.066, +0.066] -> FLOOR GATE PASS; byte-identical answers 54/54
+
+POSITIVE CONTROL 4k: 54/54 = 1.000 -> PASS
+
+PAIRED vs 4k (Newcombe method 10, 95%; exact McNemar)
+    16000: n=54  both 53  long-only 0  4k-only 1  neither 0  delta -0.019 [-0.098, +0.050]  p=1  within -0.10
+    32000: n=54  both 54  long-only 0  4k-only 0  neither 0  delta +0.000 [-0.066, +0.066]  p=1  within -0.10
+    64000: n=54  both 54  long-only 0  4k-only 0  neither 0  delta +0.000 [-0.066, +0.066]  p=1  within -0.10
+   128000: n=54  both 53  long-only 0  4k-only 1  neither 0  delta -0.019 [-0.098, +0.050]  p=1  within -0.10
+   256000: n=54  both 54  long-only 0  4k-only 0  neither 0  delta +0.000 [-0.066, +0.066]  p=1  within -0.10
+   512000: n=54  both 53  long-only 0  4k-only 1  neither 0  delta -0.019 [-0.098, +0.050]  p=1  within -0.10
+
+USEFUL LENGTH (largest L with every tested L' <= L within margin): the 512,000 cell, median 512,041 provider tokens  -- the top of the ladder: a lower bound
+PROPOSED TRIGGER = floor(0.8 x 512,041, to 1,000) = 409,000 provider tokens
+
+BY TARGET DEPTH (ok/n)
+     4000  d=0.1: 18/18   d=0.5: 18/18   d=0.9: 18/18
+    16000  d=0.1: 18/18   d=0.5: 17/18   d=0.9: 18/18
+    32000  d=0.1: 18/18   d=0.5: 18/18   d=0.9: 18/18
+    64000  d=0.1: 18/18   d=0.5: 18/18   d=0.9: 18/18
+   128000  d=0.1: 17/18   d=0.5: 18/18   d=0.9: 18/18
+   256000  d=0.1: 18/18   d=0.5: 18/18   d=0.9: 18/18
+   512000  d=0.1: 17/18   d=0.5: 18/18   d=0.9: 18/18
+   replay  d=0.1: 18/18   d=0.5: 18/18   d=0.9: 18/18
+
+BY RULE (ok/n)
+     4000  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 9/9
+    16000  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 8/9
+    32000  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 9/9
+    64000  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 9/9
+   128000  snake: 8/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 9/9
+   256000  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 9/9
+   512000  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 8/9  dots: 9/9
+   replay  snake: 9/9  prefix: 9/9  suffix: 9/9  camel: 9/9  bracket: 9/9  dots: 9/9
+
+RAW OUTPUTS: every failure, and 6 random passes per length
+--- 4000: 0 failures
+  M020             ok  want 'THISTLE_CACHE'                got 'THISTLE_CACHE'  finish=stop tools=0
+  M009             ok  want 'tallowGate'                   got 'tallowGate'  finish=stop tools=0
+  M025             ok  want 'tamarind-mesh@ops'            got 'tamarind-mesh@ops'  finish=stop tools=0
+  M041             ok  want 'svc:garnet-pipe'              got 'svc:garnet-pipe'  finish=stop tools=0
+  M003             ok  want 'svc:ember-relay'              got 'svc:ember-relay'  finish=stop tools=0
+  M004             ok  want 'svc:heron-batch'              got 'svc:heron-batch'  finish=stop tools=0
+--- 16000: 1 failures
+  M034  wrong_service  want 'copper.tide'                  got "None so far — the only runbook I've read is velvet.scout, and it's in Auckland, New Zealand."  finish=stop tools=0
+  M053             ok  want 'marrow.sync'                  got 'marrow.sync'  finish=stop tools=0
+  M035             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0
+  M006             ok  want 'sorrel-grid@ops'              got 'sorrel-grid@ops'  finish=stop tools=0
+  M023             ok  want 'svc:flint-harvest'            got 'svc:flint-harvest'  finish=stop tools=0
+  M038             ok  want 'WALNUT_BEACON'                got 'WALNUT_BEACON'  finish=stop tools=0
+  M003             ok  want 'svc:ember-relay'              got 'svc:ember-relay'  finish=stop tools=0
+--- 32000: 0 failures
+  M032             ok  want '[tamarind-mesh]'              got '[tamarind-mesh]'  finish=stop tools=0
+  M013             ok  want '[marrow-sync]'                got '[marrow-sync]'  finish=stop tools=0
+  M002             ok  want 'OCHRE_SPOOL'                  got 'OCHRE_SPOOL'  finish=stop tools=0
+  M005             ok  want 'svc:marrow-sync'              got 'svc:marrow-sync'  finish=stop tools=0
+  M027             ok  want 'velvetScout'                  got 'velvetScout'  finish=stop tools=0
+  M026             ok  want 'lumen-forge@ops'              got 'lumen-forge@ops'  finish=stop tools=0
+--- 64000: 0 failures
+  M004             ok  want 'svc:heron-batch'              got 'svc:heron-batch'  finish=stop tools=0
+  M015             ok  want 'harbor.vane'                  got 'harbor.vane'  finish=stop tools=0
+  M005             ok  want 'svc:marrow-sync'              got 'svc:marrow-sync'  finish=stop tools=0
+  M035             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0
+  M027             ok  want 'velvetScout'                  got 'velvetScout'  finish=stop tools=0
+  M003             ok  want 'svc:ember-relay'              got 'svc:ember-relay'  finish=stop tools=0
+--- 128000: 1 failures
+  M000     no_service  want 'MEADOW_FLARE'                 got 'NIGHT_AUDITOR'  finish=stop tools=0
+  M053             ok  want 'marrow.sync'                  got 'marrow.sync'  finish=stop tools=0
+  M037             ok  want 'BASALT_HOOK'                  got 'BASALT_HOOK'  finish=stop tools=0
+  M008             ok  want 'garnet-pipe@ops'              got 'garnet-pipe@ops'  finish=stop tools=0
+  M015             ok  want 'harbor.vane'                  got 'harbor.vane'  finish=stop tools=0
+  M041             ok  want 'svc:garnet-pipe'              got 'svc:garnet-pipe'  finish=stop tools=0
+  M049             ok  want '[lumen-forge]'                got '[lumen-forge]'  finish=stop tools=0
+--- 256000: 0 failures
+  M037             ok  want 'BASALT_HOOK'                  got 'BASALT_HOOK'  finish=stop tools=0
+  M003             ok  want 'svc:ember-relay'              got 'svc:ember-relay'  finish=stop tools=0
+  M036             ok  want 'ORCHID_RAIL'                  got 'ORCHID_RAIL'  finish=stop tools=0
+  M053             ok  want 'marrow.sync'                  got 'marrow.sync'  finish=stop tools=0
+  M025             ok  want 'tamarind-mesh@ops'            got 'tamarind-mesh@ops'  finish=stop tools=0
+  M052             ok  want 'basalt.hook'                  got 'basalt.hook'  finish=stop tools=0
+--- 512000: 1 failures
+  M048     no_service  want '[harbor-vane]'                got '[habor-vane]'  finish=stop tools=0
+  M014             ok  want '[yarrow-switch]'              got '[yarrow-switch]'  finish=stop tools=0
+  M002             ok  want 'OCHRE_SPOOL'                  got 'OCHRE_SPOOL'  finish=stop tools=0
+  M035             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0
+  M008             ok  want 'garnet-pipe@ops'              got 'garnet-pipe@ops'  finish=stop tools=0
+  M018             ok  want 'COPPER_TIDE'                  got 'COPPER_TIDE'  finish=stop tools=0
+  M026             ok  want 'lumen-forge@ops'              got 'lumen-forge@ops'  finish=stop tools=0
+--- replay: 0 failures
+  M009             ok  want 'tallowGate'                   got 'tallowGate'  finish=stop tools=0
+  M034             ok  want 'copper.tide'                  got 'copper.tide'  finish=stop tools=0
+  M007             ok  want 'lumen-forge@ops'              got 'lumen-forge@ops'  finish=stop tools=0
+  M036             ok  want 'ORCHID_RAIL'                  got 'ORCHID_RAIL'  finish=stop tools=0
+  M019             ok  want 'OSPREY_LEDGER'                got 'OSPREY_LEDGER'  finish=stop tools=0
+  M035             ok  want 'raven.ticket'                 got 'raven.ticket'  finish=stop tools=0

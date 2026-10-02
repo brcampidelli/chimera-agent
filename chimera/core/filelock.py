@@ -52,6 +52,9 @@ _T = TypeVar("_T")
 #: absorbing a collision, not waiting for anything.
 RETRY_ATTEMPTS = 20
 RETRY_PAUSE = 0.01
+#: The longest single pause. Pauses double from RETRY_PAUSE up to this, so a short collision is
+#: retried as fast as before, and the whole budget comes to about 3.8 s.
+RETRY_MAX_PAUSE = 0.25
 
 
 def retrying(action: Callable[[], _T]) -> _T:
@@ -65,12 +68,20 @@ def retrying(action: Callable[[], _T]) -> _T:
     Retrying is the right shape rather than locking the readers: recall waiting on a writer would
     be a real cost for a collision measured in microseconds. After the last attempt the error is
     raised unchanged, because a permission problem that outlives the window is not a race.
+
+    **How long the window is.** It was 20 attempts 10 ms apart, about 0.2 s, sized for our own
+    reader mid-read. Two other things hold a file open on Windows for longer: the antivirus, which
+    scans a file the moment it is created or replaced, and a reader thread descheduled on a loaded
+    machine, which keeps its handle while it is not running. On 2026-10-01 a CI runner outlasted
+    0.2 s and the write failed, which loses the memory being saved. The pauses now double from
+    10 ms to a 250 ms ceiling: the first few retries are as fast as before, and the budget is about
+    3.8 s before a real permission problem is reported.
     """
-    for _ in range(RETRY_ATTEMPTS - 1):
+    for attempt in range(RETRY_ATTEMPTS - 1):
         try:
             return action()
         except PermissionError:  # pragma: no cover - Windows-only timing
-            time.sleep(RETRY_PAUSE)
+            time.sleep(min(RETRY_PAUSE * (2 ** attempt), RETRY_MAX_PAUSE))
     return action()
 
 

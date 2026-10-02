@@ -105,6 +105,47 @@ class FileSnapshot:
     present: set[str] = field(default_factory=set)
 
 
+#: A file's state as a turn left it: whether it is there, and its text (None when it is absent, or
+#: present but binary or unreadable, which a snapshot can see only by presence).
+FileState = tuple[bool, str | None]
+
+
+@dataclass
+class TurnChange:
+    """What one turn changed in a workspace, and both sides of each change.
+
+    Every file whose text or presence differs between the snapshot taken before the turn and the
+    workspace right after it. Measured on the folder, not taken from the edit tool's reports, so a
+    file written through the shell is part of the turn too.
+    """
+
+    #: The changed paths only, as they were before the turn. Not the whole folder: an offer used to
+    #: hold a copy of every file, for as many offers as the app kept.
+    before: FileSnapshot
+    #: Each changed path, as the turn left it.
+    after: dict[str, FileState] = field(default_factory=dict)
+    #: The snapshot before the turn hit the file cap, so "created by the turn" cannot be told from
+    #: "existed but was not captured", and nothing is deleted on an undo.
+    truncated: bool = False
+
+    @property
+    def paths(self) -> list[str]:
+        return sorted(self.after)
+
+
+@dataclass
+class ChangeRestore:
+    """What undoing one turn did."""
+
+    restored: int = 0
+    #: Files that changed again after the turn (another conversation, the person, a formatter): left
+    #: as they are, because putting the old text back would erase work that is not the turn's.
+    kept: list[str] = field(default_factory=list)
+    #: Files the turn created that were not removed: inside a git repository, or after a truncated
+    #: snapshot, a restore never deletes (see `restore`).
+    left_new: list[str] = field(default_factory=list)
+
+
 def fingerprint(snap: FileSnapshot) -> str:
     """A stable digest of everything a snapshot captured — content AND presence.
 
@@ -238,3 +279,63 @@ class WorkspaceGuard:
         if changes:
             _log.debug("restored workspace (%d changes)", changes)
         return changes
+
+    def _state(self, rel: str) -> FileState:
+        path = self.workspace / rel
+        if not path.is_file():
+            return (False, None)
+        try:
+            return (True, path.read_text(encoding="utf-8"))
+        except (UnicodeDecodeError, OSError):
+            return (True, None)
+
+    def diff_since(self, before: FileSnapshot) -> TurnChange:
+        """What changed in the workspace since ``before``: the turn that ran in between."""
+        after = self.snapshot()
+        changed: dict[str, FileState] = {}
+        for rel in before.present | after.present:
+            was: FileState = (rel in before.present, before.files.get(rel))
+            now: FileState = (rel in after.present, after.files.get(rel))
+            if was != now:
+                changed[rel] = now
+        kept = FileSnapshot(
+            files={rel: before.files[rel] for rel in changed if rel in before.files},
+            present={rel for rel in changed if rel in before.present},
+        )
+        return TurnChange(before=kept, after=changed, truncated=len(before.present) >= self.max_files)
+
+    def restore_change(self, change: TurnChange) -> ChangeRestore:
+        """Undo one turn: put back only the files it changed, as they were before it.
+
+        Until this, undoing a turn restored the whole folder to the snapshot taken before it, so with
+        two conversations in one folder, undoing one also reverted what the other had edited since,
+        and whatever the person had typed; outside a git repository it deleted the other's new files.
+
+        A file that no longer holds what the turn left in it changed again afterwards, by someone or
+        something else, and is left as it is and named in ``kept``. The rules that keep a restore from
+        deleting inside a git repository or after a truncated snapshot still apply, to the files the
+        turn created.
+        """
+        report = ChangeRestore()
+        truncated = change.truncated
+        in_git_repo = self._skip_reasons(change.before)[1]
+        for rel in change.paths:
+            if self._state(rel) != change.after[rel]:
+                report.kept.append(rel)
+                continue
+            target = self.workspace / rel
+            if rel in change.before.present:
+                text = change.before.files.get(rel)
+                if text is None:
+                    # Present before but never read (binary or unreadable): nothing to put back.
+                    report.kept.append(rel)
+                    continue
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(text, encoding="utf-8")
+                report.restored += 1
+            elif truncated or in_git_repo:
+                report.left_new.append(rel)
+            else:
+                target.unlink(missing_ok=True)
+                report.restored += 1
+        return report

@@ -139,7 +139,7 @@ def default_registry(
     # tools see only jobs started inside THIS workspace (the jail `run_shell` applies to its cwd),
     # and `job_status` carries the shell tool's own output marker: it returns the shell's output.
     jobs = jobs_for(settings.home)
-    jobs.configure(max_running=settings.jobs_max_running, max_runtime=settings.jobs_max_runtime)
+    jobs.configure_from_settings(settings.jobs_max_running, settings.jobs_max_runtime)
     shell = RunShellTool(workspace, get_sandbox(), confirm=confirm, jobs=jobs)
     registry.register(shell)
     registry.register(JobStatusTool(jobs, shell.workspace, output_like=shell))

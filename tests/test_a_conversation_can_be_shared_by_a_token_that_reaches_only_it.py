@@ -84,9 +84,14 @@ def test_the_bus_numbers_per_session_replays_from_a_point_and_keeps_pictures_out
     assert [f["event"] for f in bus.replay("s1", since=1)] == ["token", "done"]
     assert bus.replay("s2") and bus.replay("s2")[0]["session_seq"] == 1
     assert bus.replay("nobody") == [] and bus.seq("nobody") == 0
-    # The ring is bounded: one more frame and the oldest kept one is gone.
+    # The ring is bounded: one more frame and the oldest kept one leaves it.
     bus.publish("s1", "extra", {}, turn_id="t1")
-    assert [f["session_seq"] for f in bus.replay("s1")] == [3, 4, 5]
+    assert [f["session_seq"] for f in bus.replay("s1", since=1)] == [3, 4, 5]
+    # This line used to read `replay("s1") == [3, 4, 5]`, pinning that a turn still in the ring lost
+    # the frame that opens it — the defect R10 fixed (2026-09-30): a screen opens the turn's row on
+    # that frame, so every later frame had nowhere to land. The opening of a turn the ring still
+    # holds part of is kept past the ring (`tests/test_a_long_turn_followed_late_comes_back_whole.py`).
+    assert [f["session_seq"] for f in bus.replay("s1")] == [1, 3, 4, 5]
 
 
 def test_subscribers_get_frames_published_from_another_thread_and_are_the_presence() -> None:

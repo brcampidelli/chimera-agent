@@ -1,0 +1,60 @@
+{
+  "scenarios": 36,
+  "scored": 34,
+  "no_read": 0,
+  "false_skips_at_shipped_floor": 0,
+  "suppressed_of_sleep": "0/17",
+  "suppression_rate": 0.0,
+  "unsure_band_share": 0.088,
+  "auroc_wake_vs_sleep": [
+    0.7958477508650519,
+    0.6363636363636364,
+    0.9333333333333333
+  ],
+  "sweep": {
+    "0.1": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.15": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.2": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.3": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.5": {
+      "false_skips": 0,
+      "suppressed": 3,
+      "reached": 34
+    }
+  },
+  "repeat_flips": [
+    "resumo-01-timer-unchanged",
+    "resumo-02-timer-same-again"
+  ],
+  "latency_p50_s": 0.34,
+  "latency_p95_s": 0.38,
+  "prompt_tokens_mean": 267.6,
+  "cost_per_1000_ticks_hosted_assumption_usd": 0.0268,
+  "hosted_price_assumption": "US$ 0.1/1M input tokens \u2014 an assumption, not a measurement",
+  "t_baseline_always_wake": {
+    "wakeups": 34,
+    "suppressed": 0,
+    "calls": 0
+  },
+  "seconds_per_call": 0.49,
+  "prompt_tokens_max": 304,
+  "resolved_model": "qwen3:4b@Q4_K_M",
+  "policy_reading": "skip = put-down choice (not_yet/unrelated) with wake-mass \u2264 floor; the registration's \u00a7Why sentence was ambiguous, the table it cites is what the code implements \u2014 recorded, not corrected in silence",
+  "decision_rule": "ships shadow iff false_skips==0 and suppression_rate>=0.5; harm (any false skip) ships nothing and publishes the miss"
+}

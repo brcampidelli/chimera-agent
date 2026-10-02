@@ -87,7 +87,8 @@ class BandReading:
 
     verdict: Verdict | None
     band: str
-    """``review`` · ``uncertain`` · ``allow`` · ``uncalibrated`` · ``halt`` · ``none`` (no number came)."""
+    """``review`` · ``uncertain`` · ``allow`` · ``uncalibrated`` · ``halt`` · ``gate`` (the spend/rate
+    gate refused the ask) · ``none`` (no number came)."""
     p: float | None
     """The calibrated probability, when there was one."""
     raw_p: float | None
@@ -107,6 +108,8 @@ class BandReading:
             out["decider_note"] = self.answer.note
         if self.answer.halt:
             out["decider_halt"] = self.answer.halt[:120]
+        if self.answer.gate:
+            out["gate"] = self.answer.gate
         return out
 
 
@@ -131,6 +134,17 @@ class DecisionBand:
 
     def read(self, action: str) -> BandReading:
         answer = self.decider.decide(self.decision, action, self.question)
+        if answer.halt and answer.gate:
+            # The meter was out, not the model: the ask never happened (`chimera/decisions/gate.py`).
+            # Nothing judged this action, and the owner decided on 2026-09-29 that a refusal by the
+            # gate fails TOWARD scrutiny: a card, where an ordinary halt (the server was down) goes on
+            # to the default. A person is asked because nobody else could be, and only where a limit
+            # was set: with none, the gate does not exist and this branch cannot be reached.
+            reason = (
+                f"the decision gate refused to ask a model about this action ({answer.gate}), so nothing "
+                "judged it; a person should approve it before it runs"
+            )
+            return BandReading(Verdict(Decision.REVIEW, reason, RULE), "gate", None, None, answer)
         if answer.halt:
             _log.debug("decision band halted: %s", answer.halt)
             return BandReading(None, "halt", None, None, answer)

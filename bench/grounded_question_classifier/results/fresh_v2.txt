@@ -1,0 +1,27 @@
+slice  class       n precision  recall
+all    question   80     0.931   0.838
+all    task       80     0.852   0.938
+pt     question   40     0.897   0.875
+pt     task       40     0.878   0.900
+en     question   40     0.970   0.800
+en     task       40     0.830   0.975
+
+18 misread of 160:
+  f-pt-q-02 label=question read=task     Me passa o CNPJ da contratada que aparece no acordo.
+  f-pt-q-04 label=question read=task     prazo?
+  f-pt-q-12 label=question read=task     Informe a tensão nominal especificada no manual do equipamento.
+  f-pt-q-30 label=question read=task     Por favor, localize o valor da multa por atraso no contrato.
+  f-pt-q-40 label=question read=task     Diz aí qual é o consumo de energia informado na etiqueta.
+  f-pt-t-04 label=task     read=question Será que dá pra reescrever este e-mail para ficar cordial, mas sem prometer um reembolso?
+  f-pt-t-12 label=task     read=question O que você mudaria neste currículo para uma vaga de analista de dados?
+  f-pt-t-17 label=task     read=question A proposta de investimento parece adequada ao perfil conservador descrito no formulário? Justifique a avaliação.
+  f-pt-t-36 label=task     read=question Me ajuda a decidir como proceder com essa cobrança? Considere as informações da carta e apresente opções.
+  f-en-q-04 label=question read=task     deadline?
+  f-en-q-07 label=question read=task     I need to know what daily dosage the doctor recorded on the prescription.
+  f-en-q-12 label=question read=task     State the rated voltage specified in the equipment manual.
+  f-en-q-15 label=question read=task     Would you tell me the name of the school shown on the transcript?
+  f-en-q-17 label=question read=task     Give me the deadline for submitting the bid.
+  f-en-q-22 label=question read=task     Could you check whether the insurance policy covers flood damage?
+  f-en-q-28 label=question read=task     Please give me the full address of the branch shown in the letter.
+  f-en-q-30 label=question read=task     Find the late-payment penalty in the contract.
+  f-en-t-34 label=task     read=question Tell me whether the construction schedule seems risky and what dependencies could cause delays.

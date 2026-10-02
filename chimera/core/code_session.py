@@ -26,16 +26,20 @@ from __future__ import annotations
 
 import inspect
 import json
+import os
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity
 from chimera.core.redact import redact
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
+
+if TYPE_CHECKING:
+    from chimera.orchestration.budget import SpendBudget
 
 _log = get_logger("core.code_session")
 
@@ -156,10 +160,16 @@ class CodeSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
         on_todo: Callable[[list[dict[str, str]]], None] | None = None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
+        spend: SpendBudget | None = None,
     ) -> AgentResult:
         """Run one turn with the previous turns as history, and absorb the result.
+
+        ``spend`` is the turn's meter when the caller owns it (the app's, which also sums what the
+        turns running at once spend). Forwarded like ``should_stop``: only when given, and only to
+        an agent whose ``run`` declares it.
 
         ``should_stop`` is the agent loop's own cooperative stop, polled once per step — what a
         background work is stopped by from the screen or by the voice. Forwarded only when given
@@ -186,8 +196,13 @@ class CodeSession:
         extra: dict[str, Any] = {"images": images} if images else {}
         if on_todo is not None and _accepts(self.agent.run, "on_todo"):
             extra["on_todo"] = on_todo
+        # Same reason as on_todo above: only an agent whose run declares it can be handed it.
+        if on_notice is not None and _accepts(self.agent.run, "on_notice"):
+            extra["on_notice"] = on_notice
         if should_stop is not None and _accepts(self.agent.run, "should_stop"):
             extra["should_stop"] = should_stop
+        if spend is not None and _accepts(self.agent.run, "spend"):
+            extra["spend"] = spend
         result = self.agent.run(
             task,
             on_token=on_token,
@@ -326,7 +341,43 @@ class CodeSessionStore:
         # pass through untouched.
         path = self._path(session.session_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(redact(json.dumps(session.to_dict())), encoding="utf-8")
+        # Atomic: written beside the file, then put in its place. A reader that met half a file used
+        # to read it as unreadable, and `load` starts an unreadable conversation fresh, so a list or a
+        # next turn landing mid-save could see the conversation vanish or restart.
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
+        try:
+            tmp.write_text(redact(json.dumps(session.to_dict())), encoding="utf-8")
+            os.replace(tmp, path)
+        finally:
+            tmp.unlink(missing_ok=True)
+
+    def load_existing(self, session_id: str, agent: SupportsCodeRun) -> CodeSession | None:
+        """The stored session, or None when nothing readable is stored under this id.
+
+        Unlike `load`, which answers a fresh conversation for a missing or unreadable file (right
+        for a first turn), this is for bringing an existing session object up to date, where a fresh
+        one would silently replace a real conversation with an empty one.
+        """
+        if not self._path(session_id).is_file():
+            return None
+        stored = self.load(session_id, agent)
+        return stored if stored.messages or stored.receipts or stored.workspace else None
+
+    def refresh(self, session: CodeSession) -> None:
+        """Bring ``session`` up to what is stored now: its messages, receipts and, if it has none,
+        its workspace. Called under the session's lock, just before a turn uses or writes it.
+
+        A turn loads its conversation when the request arrives and may wait for the lock behind
+        another turn of the same conversation. Without this it then ran on the history it loaded
+        before the other turn finished, and its save erased that turn's exchange.
+        """
+        stored = self.load_existing(session.session_id, session.agent)
+        if stored is None:
+            return
+        session.messages = stored.messages
+        session.receipts = stored.receipts
+        if not session.workspace:
+            session.workspace = stored.workspace
 
     def load(self, session_id: str, agent: SupportsCodeRun) -> CodeSession:
         """Return the stored session, or a fresh one under that id if there is nothing stored.

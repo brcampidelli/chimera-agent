@@ -73,7 +73,20 @@ const COLUMNS = [
     what: "the session sidebar",
     file: join("components", "code", "SessionSidebar.tsx"),
     marker: "<aside className=",
-    must: ["w-60", "shrink-0", "min-h-0"],
+    // The sidebar's width used to be `w-60` here. Since the dynamic screen's phase 2 it is the
+    // layout's, set on the wrapper in `Code.tsx` and dragged on the separator beside it; the aside
+    // fills that wrapper (`w-full`). What has not changed is its ROLE: it does not shrink.
+    must: ["w-full", "shrink-0", "min-h-0"],
+    mustNot: ["flex-1"],
+  },
+  {
+    // The wrapper that carries the sidebar's width (phase 2) is the flex child of the row now, so it
+    // is the one that must not shrink; the width itself is inline, from the layout.
+    what: "the session sidebar's wrapper",
+    file: join("components", "Code.tsx"),
+    // A column since phase 4: the list above, the panels moved to the left below it.
+    marker: '"flex min-h-0 shrink-0 flex-col", sessionsEnter',
+    must: ["shrink-0", "min-h-0"],
     mustNot: ["flex-1"],
   },
   {
@@ -86,7 +99,8 @@ const COLUMNS = [
   {
     what: "the file viewer",
     file: join("components", "Code.tsx"),
-    marker: "lg:w-md",
+    // `lg:w-md` until phase 2; now the width is the layout's, reached through `--viewer-w`.
+    marker: "lg:w-(--viewer-w)",
     // `flex-1` WITHOUT a breakpoint would be wrong, and `flex-1` with `lg:flex-none` is the only
     // way to be right on both axes: below `lg` the row is a column and the viewer must fill the
     // height it is given and scroll inside; from `lg` up the row is a row and it must hold 28rem.

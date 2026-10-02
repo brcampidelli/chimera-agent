@@ -37,6 +37,7 @@ from textual.suggester import SuggestFromList
 from textual.widgets import Footer, Header, Input, RichLog, Static
 
 from chimera.core.agent import ToolActivity
+from chimera.core.code_session import _accepts
 from chimera.interface import ChatSession, render
 from chimera.interface.render import scrub_provider_ids
 from chimera.interface.session import TurnReport
@@ -69,6 +70,15 @@ class ToolStarted(Message):
 
     def __init__(self, activity: ToolActivity) -> None:
         self.activity = activity
+        super().__init__()
+
+
+class NoticeSent(Message):
+    """A warning the turn sent without stopping (worker thread → UI)."""
+
+    def __init__(self, code: str, text: str) -> None:
+        self.code = code
+        self.text = text
         super().__init__()
 
 
@@ -270,10 +280,18 @@ class ChimeraTUI(App[None]):
     # -- worker (thread) ---------------------------------------------------
     def _respond(self, text: str) -> None:
         try:
+            # `on_notice` as `chat` passes it, and on the same condition: without it the steps,
+            # the compaction and the repeating-call warnings of this surface went nowhere.
+            notices: dict[str, Any] = (
+                {"on_notice": self._emit_notice}
+                if _accepts(self.session.send_verbose, "on_notice")
+                else {}
+            )
             report = self.session.send_verbose(
                 text,
                 on_token=self._emit_token if self.stream_enabled else None,
                 on_tool=self._emit_tool,
+                **notices,
             )
         except Exception as exc:  # noqa: BLE001 — keep the TUI alive on transient errors
             self.post_message(TurnFinished(None, note=f"error: {scrub_provider_ids(str(exc))}"))
@@ -306,7 +324,13 @@ class ChimeraTUI(App[None]):
     def _emit_tool(self, activity: ToolActivity) -> None:
         self.post_message(ToolStarted(activity))
 
+    def _emit_notice(self, code: str, text: str, _data: dict[str, Any]) -> None:
+        self.post_message(NoticeSent(code, text))
+
     # -- UI-thread handlers ------------------------------------------------
+    def on_notice_sent(self, message: NoticeSent) -> None:
+        self._append(render.notice_line(message.code, message.text))
+
     def on_token_delta(self, message: TokenDelta) -> None:
         self._live += message.text
         self.query_one("#live", Static).update(f"[magenta]chimera ›[/magenta] {escape(self._live)}▌")

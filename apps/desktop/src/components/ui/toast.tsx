@@ -8,13 +8,22 @@ import { usePresence } from "@/lib/usePresence";
 
 type Tone = "info" | "ok" | "bad";
 
+/** One thing the person can do about what the toast says, while it is on screen. Undo, for now. */
+export interface ToastAction {
+  label: string;
+  run: () => void;
+}
+
 interface Toast {
   id: number;
   message: string;
   tone: Tone;
+  action?: ToastAction;
 }
 
-const ToastContext = createContext<((message: string, tone?: Tone) => void) | null>(null);
+type Show = (message: string, tone?: Tone, action?: ToastAction) => void;
+
+const ToastContext = createContext<Show | null>(null);
 
 /**
  * Transient feedback.
@@ -26,6 +35,10 @@ const ToastContext = createContext<((message: string, tone?: Tone) => void) | nu
  *
  * Deliberately not for errors that need a decision. A toast disappears; anything the user must act
  * on belongs in the surface that owns it.
+ *
+ * An `action` is the one exception it allows, and only for undoing what the person just did: closing a
+ * card says "closed" with an Undo beside it (dynamic screen, phase 3). Nothing is lost when it goes;
+ * the same card is also one click away where it was.
  */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -36,11 +49,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const show = useCallback(
-    (message: string, tone: Tone = "info") => {
+    (message: string, tone: Tone = "info", action?: ToastAction) => {
       const id = nextId.current++;
-      setToasts((prev) => [...prev, { id, message, tone }]);
-      // Errors stay longer: they are read more slowly and more carefully.
-      setTimeout(() => dismiss(id), tone === "bad" ? 7000 : 4000);
+      setToasts((prev) => [...prev, { id, message, tone, action }]);
+      // Errors stay longer: they are read more slowly and more carefully. So does one that offers an
+      // action, which has to be noticed, decided on and reached.
+      setTimeout(() => dismiss(id), tone === "bad" || action ? 7000 : 4000);
     },
     [dismiss],
   );
@@ -85,6 +99,22 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     >
       <Icon className={cn("h-4 w-4 shrink-0", TONE_CLASS[toast.tone])} />
       <span className="max-w-sm">{toast.message}</span>
+      {toast.action ? (
+        <button
+          type="button"
+          onClick={() => {
+            toast.action?.run();
+            onDismiss();
+          }}
+          className={cn(
+            "rounded-sm px-1 font-medium text-accent-ink",
+            "transition-colors duration-1 ease-out hover:text-foreground",
+            focusRing,
+          )}
+        >
+          {toast.action.label}
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onDismiss}
@@ -101,8 +131,19 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   );
 }
 
+/** Show a toast, or do nothing where no provider is mounted.
+ *
+ *  For a component whose toast is a convenience on top of a way that already exists: a closed card's
+ *  Undo is also the "show" chip in its turn, so a screen drawn without the provider loses a shortcut,
+ *  not a capability. Anything whose only feedback is the toast uses `useToast`, which throws. */
+export function useOptionalToast(): Show {
+  return useContext(ToastContext) ?? noop;
+}
+
+function noop(): void {}
+
 /** Show a toast. Throws outside the provider rather than silently doing nothing. */
-export function useToast(): (message: string, tone?: Tone) => void {
+export function useToast(): Show {
   const show = useContext(ToastContext);
   if (!show) throw new Error("useToast must be used inside <ToastProvider>");
   return show;

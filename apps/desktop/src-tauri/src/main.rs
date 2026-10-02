@@ -14,12 +14,13 @@ use std::io::{BufRead, BufReader};
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
+use tauri::webview::NewWindowResponse;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_updater::UpdaterExt;
@@ -170,6 +171,94 @@ fn remembered_port(memo: &Path) -> u16 {
 /// The port out of `http://host:port`, if it parses.
 fn port_of(url: &str) -> Option<u16> {
     url.trim_end_matches('/').rsplit(':').next()?.parse().ok()
+}
+
+/// The label every panel window starts with. The capability file names `main` alone, so a window
+/// with this label is granted nothing.
+const FLOAT_LABEL: &str = "float-";
+
+/// Labels must be unique for the life of the app; a closed window's label is never reused.
+static FLOAT_WINDOWS: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether the page may open `target` as a window of its own: one panel of the screen, drawn apart
+/// (dynamic screen, phase 7).
+///
+/// Without a handler, this runtime refuses every new window — wry marks WebView2's request handled
+/// and opens nothing — so this is the only door, and it opens for exactly one address: this backend's
+/// origin, the root path, and a single `float` parameter naming a panel. Another site, another port,
+/// another path, credentials, a fragment or a second parameter are refused, as everything was before.
+///
+/// Or a single `conversation` parameter holding a session id: one conversation drawn in a window of its
+/// own, so two can be worked at once (the review of several conversations at once, 2026-09-30). The id
+/// is held to what the session store keeps: letters, digits, `-` and `_`, at most 64.
+///
+/// The window it opens is no stronger than the one that asked. It loads the same http origin, and
+/// `capabilities/default.json` lists the window `main` alone, so a `float-` window reaches no IPC.
+fn is_float_url(target: &tauri::Url, origin: &str) -> bool {
+    let Ok(origin) = tauri::Url::parse(origin) else {
+        return false;
+    };
+    let same_origin = target.scheme() == origin.scheme()
+        && target.host_str() == origin.host_str()
+        && target.port_or_known_default() == origin.port_or_known_default();
+    if !same_origin || !target.username().is_empty() || target.password().is_some() {
+        return false;
+    }
+    if target.path() != "/" || target.fragment().is_some() {
+        return false;
+    }
+    let pairs: Vec<(String, String)> = target.query_pairs().into_owned().collect();
+    let [(key, value)] = pairs.as_slice() else {
+        return false;
+    };
+    if value.is_empty() || value.len() > 64 {
+        return false;
+    }
+    match key.as_str() {
+        // A panel id: lowercase words joined by dots ("activity.jobs"). The page checks it names a real
+        // panel; this only keeps the address to the shape one can have.
+        "float" => value.chars().all(|c| c.is_ascii_lowercase() || c == '.'),
+        // A session id, as the store writes it.
+        "conversation" => value.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'),
+        _ => false,
+    }
+}
+
+/// Whether `target` is a page on the web to hand to the system browser: an external link the page
+/// asked to open in a new window (`target="_blank"`, `window.open`).
+///
+/// Until this, every such link was a silent no-op in the desktop app — the runtime refuses new windows
+/// unless told otherwise — while the same links worked in the browser build. The rule is narrow on
+/// purpose: `http` or `https`, a host, no credentials in the address, and not this backend's own origin
+/// (a page of the app itself is a panel window or nothing, never a browser tab). `file:`, `javascript:`,
+/// custom protocols and anything that does not parse stay refused, so a link cannot make the OS run
+/// something. The page gains no power from this: it cannot choose the program, only ask for an address,
+/// and the address is re-serialised by the URL parser before the OS sees it.
+fn is_external_url(target: &tauri::Url, origin: &str) -> bool {
+    if !matches!(target.scheme(), "http" | "https") || target.host_str().is_none_or(str::is_empty) {
+        return false;
+    }
+    if !target.username().is_empty() || target.password().is_some() {
+        return false;
+    }
+    let Ok(origin) = tauri::Url::parse(origin) else {
+        return false;
+    };
+    !(target.scheme() == origin.scheme()
+        && target.host_str() == origin.host_str()
+        && target.port_or_known_default() == origin.port_or_known_default())
+}
+
+/// Close every panel window. Called when the main window goes, so the app ends as it did before
+/// there were other windows (and the sidecar goes with it), and when the backend moved to another
+/// port, which leaves those windows talking to nothing. Their panels return to their docks: which
+/// panels float is never stored.
+fn close_floats<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    for (label, window) in app.webview_windows() {
+        if label.starts_with(FLOAT_LABEL) {
+            let _ = window.close();
+        }
+    }
 }
 
 /// Launch the sidecar and return the running child plus the URL it reported.
@@ -731,6 +820,28 @@ mod tests {
         // is indented. Production resumes after that.
         let depois = resto.split_once("\n}\n").map_or("", |(_, d)| d);
         format!("{antes}{depois}")
+    }
+
+    /// A second launch hands over to the running app, and it does so before anything else: the
+    /// single-instance plugin is the first one registered, and what it does is bring the main
+    /// window forward. Without it a second click started a second backend on the same data folder,
+    /// which the backend now refuses — so the second click ended in an error dialog.
+    #[test]
+    fn a_second_launch_hands_over_before_anything_else_runs() {
+        let fonte = producao();
+        let (_, main) = fonte.split_once("fn main() {").expect("main exists");
+        let primeiro = main
+            .find(".plugin(")
+            .expect("main registers plugins");
+        assert!(
+            main[primeiro..].starts_with(".plugin(tauri_plugin_single_instance::init("),
+            "the single-instance plugin is not the first one registered"
+        );
+        let (_, trazer) = fonte.split_once("fn bring_forward(").expect("bring_forward exists");
+        let corpo = trazer.split_once("\n}\n").map_or("", |(c, _)| c);
+        for passo in ["get_webview_window(\"main\")", "unminimize()", "show()", "set_focus()"] {
+            assert!(corpo.contains(passo), "bring_forward no longer calls {passo}");
+        }
     }
 
     use std::net::TcpListener;
@@ -2210,8 +2321,22 @@ async fn check_for_update(
     app.restart();
 }
 
+/// Bring the main window forward: what a second launch of the app does instead of starting a
+/// second backend on the same data folder.
+fn bring_forward(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 fn main() {
     tauri::Builder::default()
+        // First, as the plugin requires: a second launch must hand over before anything else runs,
+        // the backend above all. Two backends on one data folder each believed they were alone
+        // (R12 of the review of 2026-09-30), and the backend now refuses the second one.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| bring_forward(app)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -2246,10 +2371,42 @@ fn main() {
             });
             app.manage(Arc::clone(&sidecar));
 
+            // The origin a panel window may load. Shared with the supervisor, which moves it when the
+            // backend comes back on another port.
+            let float_origin = Arc::new(Mutex::new(url.clone()));
+            let allowed = Arc::clone(&float_origin);
+            let opener = app.handle().clone();
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
                 .title("Chimera")
                 .inner_size(1200.0, 800.0)
                 .min_inner_size(760.0, 520.0)
+                .on_new_window(move |target, features| {
+                    let origin = allowed.lock().map(|origin| origin.clone()).unwrap_or_default();
+                    if !is_float_url(&target, &origin) {
+                        // An external link goes to the system browser; the page itself opens nothing.
+                        if is_external_url(&target, &origin) {
+                            let _ = open::that_detached(target.as_str());
+                        }
+                        return NewWindowResponse::Deny;
+                    }
+                    let n = FLOAT_WINDOWS.fetch_add(1, Ordering::Relaxed);
+                    // `window_features` puts the new webview in the opener's environment, which
+                    // WebView2 requires to hand it over; it also carries the size the page asked for.
+                    match WebviewWindowBuilder::new(&opener, format!("{FLOAT_LABEL}{n}"), WebviewUrl::External(target))
+                        .window_features(features)
+                        .title("Chimera")
+                        // The page names its panel ("Tools · Chimera"); the taskbar should too,
+                        // or every panel window reads as a second copy of the app.
+                        .on_document_title_changed(|window, title| {
+                            let _ = window.set_title(&title);
+                        })
+                        .min_inner_size(280.0, 200.0)
+                        .build()
+                    {
+                        Ok(window) => NewWindowResponse::Create { window },
+                        Err(_) => NewWindowResponse::Deny,
+                    }
+                })
                 .build()?;
 
             // Tray: check for updates, and quit (which kills the sidecar via the exit hook below).
@@ -2298,6 +2455,7 @@ fn main() {
             let supervisor = app.handle().clone();
             let watched = paths.clone();
             let mut showing = url.clone();
+            let moved_origin = Arc::clone(&float_origin);
             std::thread::spawn(move || {
                 supervise(sidecar, watched, Tuning::default(), dialogo(), move |event| match event {
                     Supervised::Restarted(fresh) => {
@@ -2307,6 +2465,11 @@ fn main() {
                         // talking to nothing — so move the window, which costs a reload and the
                         // per-origin `localStorage` behind it, and is still the only way back.
                         if fresh != showing {
+                            // Panel windows point at the old port; they close and their panels return.
+                            if let Ok(mut origin) = moved_origin.lock() {
+                                origin.clone_from(&fresh);
+                            }
+                            close_floats(&supervisor);
                             if let (Some(window), Ok(target)) =
                                 (supervisor.get_webview_window("main"), fresh.parse::<tauri::Url>())
                             {
@@ -2363,7 +2526,121 @@ fn main() {
                 tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
                     kill_sidecar(app_handle);
                 }
+                // Closing the main window closes the panel windows, so the last window closing
+                // still means the app is done: without this, a floating panel kept the app (and
+                // the backend) alive after the person closed the window they think of as the app.
+                tauri::RunEvent::WindowEvent { label, event: tauri::WindowEvent::Destroyed, .. }
+                    if label == "main" =>
+                {
+                    close_floats(app_handle);
+                }
                 _ => {}
             }
         });
+}
+
+#[cfg(test)]
+mod float_window_tests {
+    use super::*;
+
+    const ORIGIN: &str = "http://127.0.0.1:8765";
+
+    fn allowed(target: &str) -> bool {
+        is_float_url(&tauri::Url::parse(target).expect("a url"), ORIGIN)
+    }
+
+    #[test]
+    fn a_panel_address_at_this_origin_opens() {
+        assert!(allowed("http://127.0.0.1:8765/?float=activity.jobs"));
+        assert!(allowed("http://127.0.0.1:8765/?float=activity.tools"));
+        // The origin as the port file writes it, with or without a trailing slash.
+        assert!(is_float_url(&tauri::Url::parse("http://127.0.0.1:8765/?float=activity.jobs").unwrap(), "http://127.0.0.1:8765/"));
+    }
+
+    #[test]
+    fn anything_else_stays_refused_as_it_was() {
+        for target in [
+            "https://example.com/?float=activity.jobs",
+            "http://127.0.0.1:8766/?float=activity.jobs",
+            "http://localhost:8765/?float=activity.jobs",
+            "https://127.0.0.1:8765/?float=activity.jobs",
+            "http://127.0.0.1:8765/settings?float=activity.jobs",
+            "http://127.0.0.1:8765/",
+            "http://127.0.0.1:8765/?float=",
+            "http://127.0.0.1:8765/?float=activity.jobs&next=https://example.com",
+            "http://127.0.0.1:8765/?float=activity.jobs#x",
+            "http://127.0.0.1:8765/?float=Activity.Jobs",
+            "http://127.0.0.1:8765/?float=%3Cscript%3E",
+            "http://user:pw@127.0.0.1:8765/?float=activity.jobs",
+            "http://127.0.0.1:8765/?other=activity.jobs",
+        ] {
+            assert!(!allowed(target), "{target} must be refused");
+        }
+    }
+
+    #[test]
+    fn a_conversation_address_at_this_origin_opens_and_nothing_near_it() {
+        assert!(allowed("http://127.0.0.1:8765/?conversation=3f2a9c0d8e7b4a1f9c6d5e4b3a2f1e0d"));
+        assert!(allowed("http://127.0.0.1:8765/?conversation=a-b_C9"));
+        for target in [
+            "http://127.0.0.1:8765/?conversation=",
+            "http://127.0.0.1:8765/?conversation=..%2F..%2Fetc",
+            "http://127.0.0.1:8765/?conversation=a%20b",
+            "http://127.0.0.1:8765/?conversation=abc&float=activity.jobs",
+            "http://127.0.0.1:8765/code?conversation=abc",
+            "https://example.com/?conversation=abc",
+        ] {
+            assert!(!allowed(target), "{target} must be refused");
+        }
+        let long = format!("http://127.0.0.1:8765/?conversation={}", "a".repeat(65));
+        assert!(!allowed(&long), "an id longer than the store keeps must be refused");
+    }
+
+    #[test]
+    fn an_origin_that_does_not_parse_allows_nothing() {
+        assert!(!is_float_url(&tauri::Url::parse("http://127.0.0.1:8765/?float=activity.jobs").unwrap(), "not a url"));
+    }
+
+    #[test]
+    fn a_web_page_goes_to_the_system_browser() {
+        let external = |target: &str| is_external_url(&tauri::Url::parse(target).expect("a url"), ORIGIN);
+        assert!(external("https://github.com/brcampidelli/chimera-agent"));
+        assert!(external("http://example.com/docs?page=2#install"));
+        // A local development server is a web page too, as long as it is not this app.
+        assert!(external("http://localhost:3000/"));
+        assert!(external("http://127.0.0.1:8766/"));
+    }
+
+    #[test]
+    fn nothing_else_leaves_the_app() {
+        let external = |target: &str| is_external_url(&tauri::Url::parse(target).expect("a url"), ORIGIN);
+        for target in [
+            // The app's own pages: a panel window or nothing, never a browser tab.
+            "http://127.0.0.1:8765/",
+            "http://127.0.0.1:8765/settings",
+            "http://127.0.0.1:8765/?float=activity.jobs",
+            // Schemes that would have the OS open or run something other than a web page.
+            "file:///C:/Windows/System32/calc.exe",
+            "javascript:alert(1)",
+            "ms-settings:privacy",
+            "mailto:someone@example.com",
+            "ftp://example.com/file",
+            // Credentials in the address.
+            "https://user:secret@example.com/",
+        ] {
+            assert!(!external(target), "{target} must not reach the system browser");
+        }
+        assert!(!is_external_url(&tauri::Url::parse("https://example.com/").unwrap(), "not a url"));
+    }
+
+    /// The panel windows are no stronger than the main one only while the capability file grants to
+    /// `main` alone. A glob there ("*", "float-*") would hand IPC to every window this code opens.
+    #[test]
+    fn the_capability_file_grants_to_the_main_window_alone() {
+        let text = include_str!("../capabilities/default.json");
+        let json: serde_json::Value = serde_json::from_str(text).expect("the capability file parses");
+        assert_eq!(json["windows"], serde_json::json!(["main"]));
+        assert!(json.get("webviews").is_none(), "a webview grant would reach the panel windows");
+        assert!(!FLOAT_LABEL.starts_with("main"));
+    }
 }

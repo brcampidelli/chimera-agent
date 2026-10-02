@@ -151,6 +151,20 @@ That works because it is supervised by something other than Chimera — which is
 
 `--check` exits 1 only when a job is late or failing, so the mail arrives only then; plain `cron doctor` always exits 0, because answering is not a failure.
 
+**The daemon's heartbeat closes the window the jobs cannot.** Every tick, the daemon writes its
+sign of life to `<CHIMERA_HOME>/scheduler/heartbeat.json` (atomic, beside `jobs.json`). The
+doctor reads it first and answers a question the jobs alone cannot: a dead daemon with a daily
+job looks healthy for ~23 hours from the jobs — the job is not yet late — while the beat stops
+the moment the daemon dies. The verdict is judged against three ticks of the beat's own
+interval, and is printed with the ceiling used, so you can disagree with the number rather than
+wonder where it came from. `--check` exits 1 on a stale beat too, so the host-cron line above
+now catches a dead daemon on its next run, whatever the job's schedule. Three honest readings:
+`alive`/`stale` are judged; `unknown` means a beat exists but carried no tick interval (an older
+writer), so freshness cannot be judged without inventing a number — and the reader refuses;
+`none` means no beat at all, which is "no signal", not "dead" — a daemon that never ran left no
+evidence either way. This is *liveness*, not taint: the scheduler surface still does not track
+taint (see `SECURITY.md`).
+
 ---
 
 ## 4. Health, backups, security

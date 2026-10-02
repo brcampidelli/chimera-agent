@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import math
 import threading
 import time
 from collections.abc import Callable
@@ -200,6 +201,27 @@ def _looks_like_unexecuted_plan(text: str) -> bool:
     )
 
 
+#: What the model is told the first time a tool starts repeating, when `loop_correction` is on. It
+#: names the repetition and asks for a different action; it does not tell the model to stop, because
+#: the point of this level is to give the run a chance before the net catches it.
+_LOOP_CORRECTION = (
+    "You are repeating yourself ({what}). Change approach: use different arguments or a different "
+    "tool, or, if you are blocked, say what is blocking you and give your best answer so far."
+)
+
+
+def _notice(
+    on_notice: Callable[[str, str, dict[str, Any]], None] | None, code: str, text: str, **data: Any
+) -> None:
+    """Tell the caller something that is not a stop. A broken callback must never break a run."""
+    if on_notice is None:
+        return
+    try:
+        on_notice(code, text, data)
+    except Exception:  # noqa: BLE001 - a warning channel must not be able to fail the run
+        _log.debug("on_notice callback raised for %s", code, exc_info=True)
+
+
 def _default_compact_schemas() -> bool:
     from chimera.config import get_settings
 
@@ -224,6 +246,22 @@ def _default_browser_situation() -> bool:
     from chimera.config import get_settings
 
     return get_settings().browser_situation
+
+
+def _default_model() -> str:
+    """The model a gateway run with no ``config.model`` calls: the gateway falls back to this setting.
+
+    Read by :func:`attended` so the context budget can be sized for that model. Sized for an empty
+    slug instead, a run on the default model got the 128k fallback window and the unmeasured cap,
+    and compacted at about 51k on a model measured to read 255k. ``""`` when the settings cannot be
+    read, which leaves the fallback the budget had before.
+    """
+    try:
+        from chimera.config import get_settings
+
+        return get_settings().default_model or ""
+    except Exception:  # noqa: BLE001 — sizing a context must not be what takes a run down
+        return ""
 
 
 #: The sentence that turns the task-list schema into a task list. See `Agent.run` for the
@@ -282,6 +320,13 @@ class AgentConfig:
 
     model: str | None = None
     max_steps: int = 8
+    #: Keep going when a window of `max_steps` steps is used up, with no total ceiling. Off it is the
+    #: loop every bench was measured with: `max_steps` is a wall and the run closes on it. On,
+    #: `max_steps` is the size of a window: at its end the run says so (`steps_extended`) and takes
+    #: another one, and only the loop breaker, a cancel, a spend ceiling the person set, or a full
+    #: context ends it. A surface where a person is waiting turns this on: a long task stopping at
+    #: an arbitrary number of steps and asking to be told to "continue" is the agent giving up.
+    auto_continue: bool = False
     temperature: float = field(default_factory=_default_temperature)
     #: ``False`` asks a reasoning model not to think before answering (the gateway says where
     #: that reaches the provider); ``None`` leaves the model as it is. Passed to the backend only
@@ -304,6 +349,12 @@ class AgentConfig:
     # repeats / ping-pong / no-progress polling) instead of grinding to max_steps. Conservative
     # thresholds, so a genuine multi-step run is untouched.
     detect_tool_loops: bool = True
+    #: Warn, ask the model to change approach, and only then break. Off it is the breaker every
+    #: bench was measured with (warn at 3, break at 5). On, the first warning per tool also adds a
+    #: note asking for a different approach, and the breaker moves out to a net that catches a run
+    #: that is truly spinning (10 identical, 8 unchanged, 6 ping-pong cycles). A surface where a
+    #: person is waiting turns this on; a bench does not, so its baseline does not move.
+    loop_correction: bool = False
     # Study 24, M6: when the breaker trips, hand the rest of the run to this (stronger) model instead
     # of asking for a final answer. Off by default (None): the stored runs show the breaker ending 6.4%
     # of solves at a mean score of 0.416 against 0.681, a gap that mixes task difficulty with the cost
@@ -357,6 +408,16 @@ class AgentConfig:
     # (`CatalogEntry.useful_k`), compacting once the prompt crosses `trigger` of it. Off by default
     # because compaction discards messages, and a caller that has not asked for it should not get it.
     context_budget: float | None = None
+    #: Ceiling on the compaction budget for a model the catalogue has no `useful_k` for. None keeps
+    #: the window share, which is what every bench was measured with; a surface with a person waiting
+    #: passes `UNMEASURED_USEFUL_TOKENS` so a model nobody measured compacts before its cliff.
+    unmeasured_context_tokens: int | None = None
+    #: The model the context budget is sized for while :attr:`model` is None. None sizes it for an
+    #: unknown model (the fallback window), which is what a library caller with its own backend
+    #: gets: "no model" means whatever that backend picks, and guessing high costs a dead run.
+    #: :func:`attended` sets it to the configured default, because every surface that calls it
+    #: runs on the gateway, where "no model" IS that default.
+    budget_model: str | None = None
     # Replace the dropped span with a model-written summary of what still BINDS, instead of the
     # structural note. Off pending `bench/compaction`, and the reason is the note's own docstring:
     # a summary is believed in a way a note is not, so a bad one is worse than an honest count.
@@ -367,11 +428,15 @@ class AgentConfig:
     # once the spend reaches it — checked BEFORE the call, so the money is never spent to discover
     # it was over budget.
     #
-    # A call whose model has no known price also stops the run, by the owner's decision: a ceiling
-    # that skips what it cannot price shows green while the real spend climbs. Local models are
-    # priced at zero rather than unknown, so `ollama/` runs are unaffected. See
+    # With a ceiling set, a call whose model has no known price also stops the run, by the owner's
+    # decision: a ceiling that skips what it cannot price shows green while the real spend climbs.
+    # Without one the same call is only a warning (`price_unknown`). Local models are priced at zero
+    # rather than unknown, so `ollama/` runs are unaffected. See
     # chimera.orchestration.budget.SpendBudget.
     max_usd: float | None = None
+    #: Dollars at which the run SAYS what it has spent, once, without stopping (`spend_warn`). The
+    #: ceiling above is the only thing that stops a run for money; this is the default way to know.
+    warn_usd: float | None = None
     #: Turns kept verbatim at the tail when compacting — where the current sub-task lives.
     keep_recent: int = 6
     # The workspace whose AGENTS.md the run should follow. None = read no project instructions,
@@ -392,6 +457,35 @@ class AgentConfig:
     #: a step log nothing ever persists is a measurement with no consumer, which is the failure this
     #: whole line of work exists to avoid. The CLI and the desktop API both set it.
     trace_path: Path | None = None
+
+
+def attended(config: AgentConfig) -> AgentConfig:
+    """``config`` as a surface where a person is waiting for the answer runs it.
+
+    Five settings that the library leaves off so every bench keeps its baseline: say what was spent
+    at US$1, ask a repeating run to change approach before the breaker, treat ``max_steps`` as a
+    window, and compact a conversation that outgrows its model instead of ending it.
+
+    One function rather than five keywords at each call site, because the keywords were copied to
+    the four terminal commands and not to the three that serve a chat platform. The Discord bot kept
+    the six-step wall and died on its first long thread, while the release notes said the limits
+    had become warnings. A surface that answers a person calls this; a cron job does not, because
+    nobody is there to read a warning.
+    """
+    from dataclasses import replace
+
+    from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+    from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
+
+    return replace(
+        config,
+        warn_usd=DEFAULT_SPEND_WARN_USD,
+        loop_correction=True,
+        auto_continue=True,
+        context_budget=DEFAULT_BUDGET_FRACTION,
+        unmeasured_context_tokens=UNMEASURED_USEFUL_TOKENS,
+        budget_model=config.budget_model or _default_model() or None,
+    )
 
 
 @dataclass
@@ -658,11 +752,8 @@ class Agent:
         self.backend = backend
         self.tools = tools
         self.config = config or AgentConfig()
-        self._budget = (
-            ContextBudget.for_model(self.config.model or "", fraction=self.config.context_budget)
-            if self.config.context_budget
-            else None
-        )
+        self._budget_for: tuple[str, float, int | None] | None = None
+        self._budget_built: ContextBudget | None = None
         #: What a compaction must restore. A caller that knows the open file, the plan or the task
         #: list assigns it here; left empty, compaction still keeps the recent tail.
         self.run_state = RunState()
@@ -689,6 +780,30 @@ class Agent:
         self.cards = cards
         # Per-thread state of the run in progress (see `run`, where the turn context is swapped).
         self._local = threading.local()
+
+    @property
+    def _budget(self) -> ContextBudget | None:
+        """The context budget for the model this run will call, or None when compaction is off.
+
+        Built on first use and rebuilt when the model changes, not fixed at construction. Fixed at
+        construction it had two defects that a person could not see:
+        - with no ``config.model`` (every terminal command run without ``--model``, and the
+          Discord bot), it was sized for an empty slug, so the measured context of the default
+          model was never read. Those surfaces now say which model that is
+          (:attr:`AgentConfig.budget_model`, set by :func:`attended`);
+        - ``/model`` in ``chimera chat`` swaps ``config.model`` and kept the old model's budget.
+        """
+        fraction = self.config.context_budget
+        if not fraction:
+            return None
+        model = self.config.model or self.config.budget_model or ""
+        key = (model, fraction, self.config.unmeasured_context_tokens)
+        if self._budget_for != key:
+            self._budget_built = ContextBudget.for_model(
+                model, fraction=fraction, unmeasured_cap=self.config.unmeasured_context_tokens
+            )
+            self._budget_for = key
+        return self._budget_built
 
     def compose_system_prompt(self, task: str) -> str:
         """The system message this agent sends for ``task``, in the order it is assembled.
@@ -858,6 +973,7 @@ class Agent:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_edit: Callable[[str, str], None] | None = None,
         on_todo: Callable[[list[dict[str, str]]], None] | None = None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         history: list[MessageLike] | None = None,
         images: list[str] | None = None,
         should_stop: Callable[[], bool] | None = None,
@@ -887,6 +1003,10 @@ class Agent:
         is the agent's own claim about its progress — unlike ``on_edit``, which reports a diff read
         off disk — so a consumer that renders it owes the reader that distinction.
 
+        ``on_notice`` fires with (code, text, data) for a warning that does not stop the run: a tool
+        loop near its break, a compaction, the last steps before max_steps. It never changes what
+        the run does; a callback that raises is ignored.
+
         ``turn_notes`` is :attr:`AgentConfig.turn_notes` for this run only, for a caller that keeps
         one agent across turns (``ChatSession`` under real history). Setting the config instead
         would leave one turn's recalled facts on the agent for the next. None reads the config."""
@@ -899,8 +1019,8 @@ class Agent:
         # built here gave a three-attempt run three separate ceilings: measured, a run asking for
         # $0.000002 spent $0.0129 and the loop never noticed. A caller that spans several `run`
         # calls passes its own, and every attempt then draws on the same money.
-        if spend is None and self.config.max_usd:
-            spend = SpendBudget(self.config.max_usd)
+        if spend is None and (self.config.max_usd or self.config.warn_usd):
+            spend = SpendBudget(self.config.max_usd or math.inf, warn_usd=self.config.warn_usd)
         # Open on this thread for as long as the loop runs, so a tool that runs a model of its own
         # can charge THIS run instead of nothing (`enclosing_run`). Closed in `finally`: a run that
         # raised must not stay open and collect a later tool's spend.
@@ -909,7 +1029,7 @@ class Agent:
         try:
             return self._run(
                 task, usage=usage, spend=spend, on_token=on_token, on_tool=on_tool,
-                on_edit=on_edit, on_todo=on_todo, history=history, images=images,
+                on_edit=on_edit, on_todo=on_todo, on_notice=on_notice, history=history, images=images,
                 should_stop=should_stop, turn_notes=turn_notes,
             )
         finally:
@@ -925,6 +1045,7 @@ class Agent:
         on_tool: Callable[[ToolActivity], None] | None,
         on_edit: Callable[[str, str], None] | None,
         on_todo: Callable[[list[dict[str, str]]], None] | None,
+        on_notice: Callable[[str, str, dict[str, Any]], None] | None,
         history: list[MessageLike] | None,
         images: list[str] | None,
         should_stop: Callable[[], bool] | None,
@@ -994,7 +1115,10 @@ class Agent:
 
         steplog.system_sha = fingerprint(system_prompt)
         nudged = False
-        loop_detector = ToolLoopDetector() if self.config.detect_tool_loops else None
+        loop_detector = self._new_loop_detector() if self.config.detect_tool_loops else None
+        #: Tools already warned about this run, and the correction waiting for the end of the step.
+        warned_loops: set[str] = set()
+        loop_nudge: str | None = None
         # The model this run's steps go to. Set once, when the breaker trips and an escalation model
         # is configured; per RUN, so the Agent's own config is never mutated for the runs after it.
         run_model: str | None = None
@@ -1008,7 +1132,25 @@ class Agent:
         #: the ceiling" and "start a new conversation" are opposite advice.
         contexto_travado: str | None = None
 
-        for step in range(1, self.config.max_steps + 1):
+        step = 0
+        window_end = self.config.max_steps
+        while True:
+            step += 1
+            if step > window_end:
+                if not self.config.auto_continue:
+                    step -= 1
+                    break
+                window_end += self.config.max_steps
+                _notice(
+                    on_notice, "steps_extended",
+                    f"{step - 1} steps done, and it is still working", steps=step - 1,
+                )
+            if (
+                not self.config.auto_continue
+                and self.config.max_steps > 4
+                and step == window_end - 2
+            ):
+                _notice(on_notice, "steps_low", "2 steps left before this turn stops", steps_left=2)
             # Cooperative cancel, checked once per step. A model call in flight cannot be
             # interrupted, so a step boundary is the finest grain available — and it is much finer
             # than what the caller had before. `AutonomousLoop` checked its stop flag only BETWEEN
@@ -1048,6 +1190,9 @@ class Agent:
                         step_tools = narrow(tool_schema, picked)
                 result = self._step(step_messages, tools=step_tools, on_token=on_token, usage=usage, spend=spend,
                                     model=run_model)
+                if spend is not None:
+                    for code, text, data in spend.take_notices():
+                        _notice(on_notice, code, text, **data)
                 router = self.config.tool_router
                 if hinted is not None and router is not None:
                     calls = getattr(result, "tool_calls", None) or []
@@ -1120,10 +1265,11 @@ class Agent:
             # just sent — the most accurate number available, and free. The next step's prompt is
             # this one plus whatever we are about to append, so acting here means acting one step
             # before the wall rather than at it.
+            budget = self._budget
             if (
-                self._budget is not None
+                budget is not None
                 and result.prompt_tokens
-                and self._budget.should_compact(result.prompt_tokens)
+                and budget.should_compact(result.prompt_tokens)
             ):
                 messages, compacted = compact(
                     messages,
@@ -1133,9 +1279,13 @@ class Agent:
                 )
                 if compacted:
                     record.compacted = True
+                    _notice(
+                        on_notice, "compacted", "the conversation was compacted to keep going",
+                        prompt_tokens=result.prompt_tokens,
+                    )
                     _log.info(
                         "compacted at %d tokens (threshold %d of %d-token window)",
-                        result.prompt_tokens, self._budget.threshold, self._budget.window,
+                        result.prompt_tokens, budget.threshold, budget.window,
                     )
                 else:
                     # `compact`'s own docstring asks for this and nothing implemented it: "callers
@@ -1152,7 +1302,7 @@ class Agent:
                     _log.warning(
                         "context is stuck at %d tokens (threshold %d) and there is nothing left to "
                         "compact; answering with what the run has",
-                        result.prompt_tokens, self._budget.threshold,
+                        result.prompt_tokens, budget.threshold,
                     )
                     # The content of the call that just returned IS "what the run has": the
                     # assistant message is only appended further down, on the branch this break
@@ -1251,6 +1401,15 @@ class Agent:
                         break
                 if loop_detector is not None:
                     verdict = loop_detector.record(call.name, call.arguments, observation, ok=ran)
+                    if verdict.level == "warn" and call.name not in warned_loops:
+                        # Once per tool: the third repeat and the fourth are the same fact.
+                        warned_loops.add(call.name)
+                        _notice(
+                            on_notice, "tool_loop_warn",
+                            verdict.reason or f"{call.name} is repeating", tool=call.name,
+                        )
+                        if self.config.loop_correction:
+                            loop_nudge = _LOOP_CORRECTION.format(what=verdict.reason or call.name)
                     if verdict.tripped:
                         tripped = verdict.reason
                         # A batch that ran together has already run: its remaining observations
@@ -1276,6 +1435,12 @@ class Agent:
                         "tool_call_id": call.id,
                         "content": f"error: not run — {stopper}.",
                     })
+            if loop_nudge is not None:
+                if tripped is None:
+                    # After every tool reply of the step, never between them: an assistant message
+                    # that announced tool calls needs all of its answers before anything else.
+                    messages.append({"role": "user", "content": loop_nudge})
+                loop_nudge = None
             if handover is not None:
                 # No further step and no retry: the page will ask the same thing again. One closing
                 # call, like every other stop, and the answer opens with the harness's own line, so
@@ -1305,7 +1470,7 @@ class Agent:
                 _log.info("tool-loop breaker tripped (%s): escalating to %s", tripped, run_model)
                 if self.config.snapshot_on_tool_loop is not None:
                     _snapshot_workspace(self.config.project_root, self.config.snapshot_on_tool_loop)
-                loop_detector = ToolLoopDetector()
+                loop_detector = self._new_loop_detector()
                 continue
             if tripped is not None:
                 # Physically spinning: stop burning budget. Ask once, no tools, for a final answer
@@ -1382,6 +1547,14 @@ class Agent:
         # Never `final.reasoning`, even when the route filed the text there (see the note).
         filed = filed or final.answer_in_reasoning
         return final, _empty_close_note(tool_names, filed_as_reasoning=filed)
+
+    def _new_loop_detector(self) -> ToolLoopDetector:
+        """The breaker this run uses: the measured one, or the wider net when correcting first."""
+        if self.config.loop_correction:
+            return ToolLoopDetector(
+                window=16, repeat_break=10, pingpong_cycles_break=6, stall_break=8
+            )
+        return ToolLoopDetector()
 
     def _step(
         self,

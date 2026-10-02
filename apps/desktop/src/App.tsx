@@ -15,11 +15,16 @@ import { AppShell } from "@/components/shell/AppShell";
 import { CommandPalette, type Command } from "@/components/shell/CommandPalette";
 import { useHotkeys } from "@/lib/hotkeys";
 import { AgentProvider } from "@/lib/agent-context";
+import { FloatHost } from "@/lib/float/host";
 import { RunSessionProvider } from "@/lib/run-session";
 import { Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { getDoctor } from "@/lib/api";
 import { useT } from "@/lib/i18n";
+import { useLayout } from "@/lib/layout/context";
+import { PANELS, type PanelId } from "@/lib/layout/model";
+import { loadMine, saveMine } from "@/lib/layout/store";
+import { useToast } from "@/components/ui/toast";
 import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
@@ -185,15 +190,62 @@ export default function App() {
 
   // Every destination, plus every session by title. This is the long tail the rail no longer
   // carries — and the reason collapsing the rail cost nothing in reach.
+  // And the layout's own commands. "Restore the default layout" is always here, even with nothing
+  // hidden: the status bar shows nothing at zero, so this is where the way back lives meanwhile.
+  const { dispatch: layoutDispatch, hidden, layout } = useLayout();
+  const anyHidden = hidden.length > 0;
+  const toast = useToast();
+  const focusOn = layout.beforeFocus !== null;
+  const shown = {
+    left: layout.regions.left.visible,
+    right: layout.regions.right.visible,
+    rail: layout.regions.rail.visible,
+  };
   const commands: Command[] = useMemo(() => {
     const views: View[] = ["code", "edit", "work", "knowledge", "automation", "settings"];
-    return views.map((v) => ({
+    const go = views.map((v) => ({
       id: `go-${v}`,
       label: t(`nav.${v}`),
       group: t("palette.group.go"),
       run: () => navigate(v),
     }));
-  }, [t, navigate]);
+    // One command per side region, worded for what it will do now: "Hide…" while it is shown.
+    const toggles: Command[] = (["left", "right", "rail"] as const).map((side) => ({
+      id: `layout-toggle-${side}`,
+      label: t(shown[side] ? `layout.hide.${side}` : `layout.show.${side}`),
+      group: t("palette.group.layout"),
+      run: () => void layoutDispatch({ type: "set-region", region: side, visible: !shown[side] }),
+    }));
+    // Layouts one command away (phase 5), and the person's own, saved and applied from here.
+    const mine = loadMine();
+    const presets: Command[] = [
+      { id: "layout-focus", label: t(focusOn ? "layout.focus.exit" : "layout.focus.enter"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "toggle-focus" }) },
+      { id: "layout-review", label: t("layout.preset.review"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "preset", name: "review" }) },
+      { id: "layout-monitor", label: t("layout.preset.monitor"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "preset", name: "monitor" }) },
+      { id: "layout-save-mine", label: t("layout.mine.save"), group: t("palette.group.layout"),
+        run: () => {
+          if (saveMine(layout)) toast(t("layout.mine.saved"), "ok");
+        } },
+      ...(mine
+        ? [{ id: "layout-apply-mine", label: t("layout.mine.apply"), group: t("palette.group.layout"),
+             run: () => void layoutDispatch({ type: "apply", layout: mine }) }]
+        : []),
+    ];
+    const layoutCommands: Command[] = [
+      ...toggles,
+      ...presets,
+      ...(anyHidden
+        ? [{ id: "layout-show-all", label: t("layout.hidden.showAll"), group: t("palette.group.layout"),
+             run: () => void layoutDispatch({ type: "show-all" }) }]
+        : []),
+      { id: "layout-reset", label: t("layout.reset"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "reset" }) },
+    ];
+    return [...go, ...layoutCommands];
+  }, [t, navigate, layoutDispatch, anyHidden, shown.left, shown.right, shown.rail, focusOn, layout, toast]);
 
   useHotkeys({
     onPalette: () => setPaletteOpen((o) => !o),
@@ -202,6 +254,24 @@ export default function App() {
     // where someone looks for it. A global shortcut that jumps you to a screen AND clears it is two
     // actions wearing one key.
     onNewChat: () => navigate("code"),
+    onFocusMode: () => void layoutDispatch({ type: "toggle-focus" }),
+    // The panel that holds focus, or the one already maximised: ⌘⇧M goes in and out of the same place.
+    onMaximize: () => {
+      if (layout.maximized) return void layoutDispatch({ type: "maximize", panel: null });
+      const id = (document.activeElement as HTMLElement | null)?.closest("[data-panel]")?.getAttribute("data-panel");
+      if (id && id in PANELS && PANELS[id as PanelId].maximizable) {
+        layoutDispatch({ type: "maximize", panel: id as PanelId });
+      }
+    },
+    // The approval waiting in the conversation, minimised or not: brought into view with focus on its
+    // first control, which is the one that opens it again when it was minimised.
+    onApproval: () => {
+      const card = document.querySelector<HTMLElement>('[data-card="approval"]');
+      card?.scrollIntoView({ block: "center" });
+      card?.querySelector<HTMLElement>("button:not([aria-disabled='true'])")?.focus();
+    },
+    onToggleRegion: (side) =>
+      void layoutDispatch({ type: "set-region", region: side, visible: !shown[side] }),
     onNavigate: (i) => {
       // The same order as the rail, which is the only reason a number key is guessable at all.
       const order: View[] = ["code", "edit", "work", "knowledge", "automation"];
@@ -255,6 +325,8 @@ export default function App() {
           cannot live inside that screen. This is what keeps the progress and the Stop alive when
           you navigate away mid-run. */}
       <RunSessionProvider>
+      {/* Panels in windows of their own (phase 7). Inside the agent's provider: it sends that state on. */}
+      <FloatHost>
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} commands={commands} />
       <Framed banner={outage}>
       <AppShell
@@ -308,6 +380,7 @@ export default function App() {
         {view === "settings" && <Settings />}
       </AppShell>
       </Framed>
+      </FloatHost>
       </RunSessionProvider>
     </AgentProvider>
   );

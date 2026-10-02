@@ -83,6 +83,27 @@ def test_the_dispatch_writes_a_receipt() -> None:
     assert 'run_log=settings.home / "runs.jsonl"' in _dispatch_source()
 
 
+def test_the_taint_ledger_reaches_the_loop() -> None:
+    """`governed_profile` built a TaintLedger on this path all along and handed it back only
+    through `on_ledger`, which nobody used — so the loop never heard of it: a tainted run's
+    memory fact was stored `clean`, its delivered answer was never stripped of leaked control
+    tokens, and pause-on-taint was impossible. Source-level, like the wiring above: the
+    behavioural proof of provenance lives with the memory store's own tests."""
+    source = _dispatch_source()
+
+    assert "on_ledger=_take_ledger" in source
+    assert "taint=job_ledger" in source
+
+
+def test_the_kill_switch_is_wired_to_the_loop() -> None:
+    """`cron kill` works only if the dispatch polls the flag and the loop is told about it."""
+    source = _dispatch_source()
+
+    assert "kill_flag_path(settings.home, job.id)" in source
+    assert "should_stop=should_stop" in source
+    assert 'result.ending == "cancelled"' in source
+
+
 def test_cron_still_has_no_reviewer() -> None:
     """The control. Wrapping the worker in the loop must not quietly add a model call per dispatch
     to grade prose nobody asked to have graded."""

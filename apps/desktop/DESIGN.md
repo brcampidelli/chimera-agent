@@ -178,8 +178,8 @@ twice before this file existed.
 | `focusRing` | `ui/focus.ts` | the one focus-ring definition |
 | `BrandMark` | `BrandMark.tsx` | |
 
-**Dependencies:** four headless Radix packages (dialog, tooltip, select, dropdown-menu) and nothing
-else. Tabs, Switch and Toast are hand-built — each is well under a hundred lines, and a dependency
+**Dependencies:** four headless Radix packages (dialog, tooltip, select, dropdown-menu), and `@dnd-kit` since
+the dynamic screen's phase 4. Tabs, Switch and Toast are hand-built — each is well under a hundred lines, and a dependency
 should buy something harder than that. Radix earns its place on the parts that are genuinely hard to
 get right: focus traps, collision detection, typeahead.
 
@@ -198,6 +198,77 @@ The shell provides slots; a screen fills the ones it needs.
 
 A screen that opts out of the shell entirely is what made this app feel like a menu of features
 rather than one workspace. Opt out only with a reason.
+
+### Dynamic layout
+
+The owner approved, on 2026-09-29, a screen where anything can be minimised, maximised, closed,
+dragged, resized and brought back. It lands in phases; phase 0 is the model it all draws from:
+`lib/layout/model.ts` (one serialisable value and one pure `applyLayout`), `lib/layout/store.ts`
+(local storage, one key per screen, moving to the server in phase 6) and `lib/layout/context.tsx`.
+
+**Five things never disappear.** Each can shrink; none can go without a trace, because hiding it
+would leave the person not knowing what the agent is doing, or unable to stop it.
+
+| | May | What stays when it shrinks |
+|---|---|---|
+| Approval card | minimise | one line, and the approvals chip in the status bar; a new approval reopens it |
+| Stop | nothing | always in the composer and in the status bar |
+| Status bar | compact (a later phase) | the state and the way back to anything hidden |
+| Spend and limit warnings | minimise | a count on the turn |
+| A failed turn's error | minimise | the error line, without the detail |
+
+These are enforced in `applyLayout`, not in the buttons: a refused action returns the same object,
+and Stop and the status bar are not panels at all, so no action can reach them. Tested in
+`model.test.ts`, each rule sabotaged once and watched to fail.
+
+**Every hidden thing has a way back that needs no remembered shortcut.** The status bar's hidden
+tray (`shell/HiddenTray.tsx`) lists it with "Show". It renders nothing while nothing is hidden, the
+same rule `PendingApprovals` follows about an indicator at zero, so "Restore default layout" lives
+in the command palette, where it is always reachable.
+
+**Phase 1: side regions.** The rail, the conversation list and the right panel hide from a button in
+their own header, from `⌘B` / `⌘⌥B` and from the palette. A hidden region leaves a tab on its edge
+(`shell/RegionToggle.tsx`), and hiding moves focus onto that tab. A region that comes back slides in
+from its edge at `duration-3`, only on coming back; its parent owns the animation, because the parent
+stays mounted and can tell "shown again" from "the screen just opened".
+
+**Phase 2: widths.** The conversation list, the right panel and the file viewer take their widths
+from the layout, dragged on `shell/Splitter.tsx` (the WAI-ARIA window splitter: arrows move 16px,
+Home and a double click restore the starting width). One drag is one step to undo.
+
+**Phase 3: cards.** Every card of the conversation carries the same three controls in its corner
+(`code/CardChrome.tsx`), rather than a new title bar that would repeat the heading each card already
+has: minimise to one line, minimise the whole kind (kept in the layout), close. Closing is for this
+screen only, with an Undo (the toast's one action) and a "hidden in this turn" chip where the card was.
+The approval card, spend warnings and a failed turn's error keep a disabled close button whose tooltip
+says why.
+
+**Phase 4: docks.** The right panel's sections are panels (`shell/Dock.tsx`) that move between the
+right panel, the left sidebar and a bottom dock that exists only while it holds one. Each has a drag
+handle, a "Move to" menu, minimise and close. The agent's state line is not a panel. The composer's
+settings minimise to one line of chips; the posture note beside them never does.
+
+**Phase 5: maximise and focus.** One panel at a time fills the main area (`shell/Maximize.tsx`) and
+Escape always restores it. Focus mode (the status bar's focus button) remembers the layout it replaced
+and returns to it exactly. "Review", "monitor" and the person's own saved layout are palette commands.
+
+**Phase 6: kept by the server.** The layout also lives in `CHIMERA_HOME/ui_layout.json` through
+`/api/ui/layout` (`lib/layout/sync.tsx`): local goes up the first time, the server's is applied after
+that, a change made before it answers wins, and no server is not an error. A screen's own left sidebar
+(the editor's, in the shell's context slot) follows the left region.
+
+**Phase 7: a panel in its own window.** A dock panel opens in a window from its move menu
+(`lib/float/host.tsx`, `components/shell/FloatWindow.tsx`). The window is the same origin asked by
+`?float=` to draw one panel, with no layout of its own; the agent's state crosses over a
+`BroadcastChannel`. Floating is state of the run, never part of the layout, so nothing stored can point
+at a window that is gone. The tray lists a floating panel with "Bring back", beside what is hidden.
+
+**Dependencies.** `@dnd-kit` (core, sortable, utilities) joined the four Radix packages in phase 4, for
+the reason given above: it buys something harder than a hundred lines, the keyboard half of dragging,
+with every step announced. `react-resizable-panels` was approved for phase 2 and **not adopted**: it sizes sibling
+panels inside one group, while here the right panel lives in the shell and the conversation list inside
+the Code screen, and the layout already keeps the widths, their limits and their storage. The splitter
+it would have bought is one small file.
 
 ### Information architecture
 
@@ -237,6 +308,11 @@ question a person actually has, or a feature you want them to notice.
 | `⌘1`–`⌘5` | rail positions |
 | `⌘N` | new chat |
 | `⌘,` | settings |
+| `⌘B` / `⌘⌥B` | hide or show the left sidebar / the right panel (by the physical B key) |
+| `⌘⇧F` | focus mode on and off |
+| `⌘⇧M` | maximise the panel that holds focus, or restore the maximised one |
+| `⌘⇧A` | go to the approval waiting in the conversation |
+| `Esc` | restore a maximised panel, from anywhere (a menu or dialog open first takes it) |
 
 The palette is what makes a five-icon rail cost nothing in reach: the long tail lives there instead
 of on screen.

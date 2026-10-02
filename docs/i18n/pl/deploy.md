@@ -1,5 +1,5 @@
 ---
-source_sha256: 37b19416c063dbabf48b46f1577e7448667f89882dae3f4bbb258c22a319545b
+source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
 ---
 
 # Wdrażanie Chimery na serwerze (VPS)
@@ -155,8 +155,10 @@ alertu, a nie odpowiedzi, uruchamiaj to z crona samego hosta:
 
 To działa, bo nadzoruje to coś innego niż Chimera — i o to właśnie chodzi.
 
-`--check` kończy się kodem 1 tylko wtedy, gdy zadanie jest spóźnione albo zawodzi, więc mail przychodzi tylko wtedy; `cron doctor` bez tej opcji zawsze kończy się kodem 0, bo odpowiedź nie jest błędem.
+`--check` kończy się kodem 1 tylko wtedy, gdy zadanie jest spóźnione albo zawodzi — a od teraz także gdy bicie serca demona jest nieświeże, więc linia host-cron powyżej wyłapie martwego demona przy kolejnym przebiegu, niezależnie od harmonogramu zadania; mail przychodzi tylko wtedy. `cron doctor` bez niego zawsze kończy się kodem 0, bo odpowiadanie nie jest porażką.
 
+
+**Bicie serca demona zamyka okno, którego zadania zamknąć nie potrafią.** Przy każdym ticku demon zapisuje swój znak życia do `<CHIMERA_HOME>/scheduler/heartbeat.json` (atomowo, obok `jobs.json`). Doctor czyta je najpierw i odpowiada na pytanie, którego same zadania zadać nie potrafią: martwy demon z dziennym zadaniem wygląda zdrowo z perspektywy zadań przez ~23 godziny — zadanie jeszcze nie jest spóźnione — podczas gdy bicie zatrzymuje się w chwili śmierci demona. Werdykt jest oceniany względem trzech ticków własnego interwału zapisanego przez bicie i wypisywany razem z używanym limitem, więc możesz się z liczbą spierać, zamiast zgadywać, skąd się wzięła. Trzy uczciwe odczyty: `alive`/`stale` są oceniane; `unknown` znaczy, że bicie istnieje, ale nie zapisało interwału ticku (starszy zapisujący), więc świeżości nie da się ocenić bez wymyślenia liczby — a czytelnik odmawia; `none` znaczy brak bicia w ogóle, co jest “brakiem sygnału”, nie “śmiercią” — demon, który nigdy nie działał, nie zostawił żadnego dowodu. To *liveness*, nie taint: powierzchnia schedulera nadal nie śledzi taint (patrz `SECURITY.md`).
 ---
 
 ## 4. Zdrowie, kopie zapasowe, bezpieczeństwo

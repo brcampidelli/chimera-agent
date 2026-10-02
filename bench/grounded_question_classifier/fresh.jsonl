@@ -1,0 +1,160 @@
+{"id":"f-pt-q-01","lang":"pt","label":"question","text":"No contrato de locação, qual é o valor mensal do aluguel?"}
+{"id":"f-pt-q-02","lang":"pt","label":"question","text":"Me passa o CNPJ da contratada que aparece no acordo."}
+{"id":"f-pt-q-03","lang":"pt","label":"question","text":"Qual foi a data de emissão indicada no relatório financeiro?"}
+{"id":"f-pt-q-04","lang":"pt","label":"question","text":"prazo?"}
+{"id":"f-pt-q-05","lang":"pt","label":"question","text":"Você consegue identificar quem assina como responsável técnico no projeto?"}
+{"id":"f-pt-q-06","lang":"pt","label":"question","text":"Quantos dias de férias estão previstos na política de RH anexada?"}
+{"id":"f-pt-q-07","lang":"pt","label":"question","text":"Preciso saber qual dose diária o médico registrou na receita."}
+{"id":"f-pt-q-08","lang":"pt","label":"question","text":"O edital menciona alguma taxa de inscrição? Se sim, quanto?"}
+{"id":"f-pt-q-09","lang":"pt","label":"question","text":"onde fica a sala indicada no comunicado da escola"}
+{"id":"f-pt-q-10","lang":"pt","label":"question","text":"Qual é a taxa de juros descrita na proposta de financiamento?"}
+{"id":"f-pt-q-11","lang":"pt","label":"question","text":"Tem o número do processo no PDF?"}
+{"id":"f-pt-q-12","lang":"pt","label":"question","text":"Informe a tensão nominal especificada no manual do equipamento."}
+{"id":"f-pt-q-13","lang":"pt","label":"question","text":"A ata registra quem fez a apresentação?"}
+{"id":"f-pt-q-14","lang":"pt","label":"question","text":"Qual foi o total de despesas de viagem, sem contar hospedagem?"}
+{"id":"f-pt-q-15","lang":"pt","label":"question","text":"Poderia me dizer o nome da escola indicada no histórico?"}
+{"id":"f-pt-q-16","lang":"pt","label":"question","text":"O laudo informa o tamanho do nódulo?"}
+{"id":"f-pt-q-17","lang":"pt","label":"question","text":"Me diga a data limite para enviar a proposta."}
+{"id":"f-pt-q-18","lang":"pt","label":"question","text":"Qual é o código de rastreio anotado no comprovante?"}
+{"id":"f-pt-q-19","lang":"pt","label":"question","text":"A cláusula de confidencialidade tem prazo de vigência?"}
+{"id":"f-pt-q-20","lang":"pt","label":"question","text":"qual o nome da pessoa aprovada pra vaga"}
+{"id":"f-pt-q-21","lang":"pt","label":"question","text":"Que porcentagem do orçamento foi reservada para materiais?"}
+{"id":"f-pt-q-22","lang":"pt","label":"question","text":"Com licença, a apólice cobre danos causados por alagamento?"}
+{"id":"f-pt-q-23","lang":"pt","label":"question","text":"Quantos apartamentos há no bloco B, conforme a planta?"}
+{"id":"f-pt-q-24","lang":"pt","label":"question","text":"Na planilha, qual fornecedor tem o menor preço unitário?"}
+{"id":"f-pt-q-25","lang":"pt","label":"question","text":"O prontuário menciona alergia a algum medicamento?"}
+{"id":"f-pt-q-26","lang":"pt","label":"question","text":"Quais são os três critérios de avaliação listados no formulário?"}
+{"id":"f-pt-q-27","lang":"pt","label":"question","text":"A ata diz em que horário a reunião foi encerrada?"}
+{"id":"f-pt-q-28","lang":"pt","label":"question","text":"Me fala o endereço completo da filial que aparece na carta."}
+{"id":"f-pt-q-29","lang":"pt","label":"question","text":"Qual norma técnica é citada no memorial descritivo?"}
+{"id":"f-pt-q-30","lang":"pt","label":"question","text":"Por favor, localize o valor da multa por atraso no contrato."}
+{"id":"f-pt-q-31","lang":"pt","label":"question","text":"A nota fiscal está identificada como paga ou pendente?"}
+{"id":"f-pt-q-32","lang":"pt","label":"question","text":"Quem é o contato de emergência listado na ficha do aluno?"}
+{"id":"f-pt-q-33","lang":"pt","label":"question","text":"O relatório de inspeção informa a temperatura máxima registrada?"}
+{"id":"f-pt-q-34","lang":"pt","label":"question","text":"Qual era o cargo da funcionária antes da promoção?"}
+{"id":"f-pt-q-35","lang":"pt","label":"question","text":"Esse recibo mostra quantas parcelas foram pagas até agora?"}
+{"id":"f-pt-q-36","lang":"pt","label":"question","text":"A receita foi emitida em qual data e por qual especialidade?"}
+{"id":"f-pt-q-37","lang":"pt","label":"question","text":"Qual é o nome do condomínio mencionado no aviso?"}
+{"id":"f-pt-q-38","lang":"pt","label":"question","text":"No paper, qual tamanho de amostra os autores analisaram?"}
+{"id":"f-pt-q-39","lang":"pt","label":"question","text":"A mensagem do cliente menciona um horário preferido para a visita?"}
+{"id":"f-pt-q-40","lang":"pt","label":"question","text":"Diz aí qual é o consumo de energia informado na etiqueta."}
+{"id":"f-pt-t-01","lang":"pt","label":"task","text":"Resuma o relatório de auditoria em cinco tópicos, destacando os achados principais."}
+{"id":"f-pt-t-02","lang":"pt","label":"task","text":"o que você acha dessa cláusula de renovação? avalie riscos pra mim"}
+{"id":"f-pt-t-03","lang":"pt","label":"task","text":"Transforme as recomendações médicas anexadas em uma lista simples de cuidados para levar à consulta."}
+{"id":"f-pt-t-04","lang":"pt","label":"task","text":"Será que dá pra reescrever este e-mail para ficar cordial, mas sem prometer um reembolso?"}
+{"id":"f-pt-t-05","lang":"pt","label":"task","text":"Compare as duas propostas de fornecedores e diga qual parece oferecer melhor custo-benefício, explicando seu critério."}
+{"id":"f-pt-t-06","lang":"pt","label":"task","text":"deixa esse texto mais curto por favor"}
+{"id":"f-pt-t-07","lang":"pt","label":"task","text":"Revise a minuta do contrato e aponte trechos ambíguos que eu deveria esclarecer antes de assinar."}
+{"id":"f-pt-t-08","lang":"pt","label":"task","text":"Pode explicar esse comunicado da escola como se eu estivesse contando para uma criança de oito anos?"}
+{"id":"f-pt-t-09","lang":"pt","label":"task","text":"Organize os dados deste extrato por mês e categoria numa tabela."}
+{"id":"f-pt-t-10","lang":"pt","label":"task","text":"me ajuda a responder a imobiliária, quero pedir o conserto do vazamento sem soar grosseiro"}
+{"id":"f-pt-t-11","lang":"pt","label":"task","text":"Avalie se as metas do plano de projeto são realistas diante dos recursos descritos."}
+{"id":"f-pt-t-12","lang":"pt","label":"task","text":"O que você mudaria neste currículo para uma vaga de analista de dados?"}
+{"id":"f-pt-t-13","lang":"pt","label":"task","text":"Traduza o resumo do artigo para português brasileiro, preservando os termos técnicos."}
+{"id":"f-pt-t-14","lang":"pt","label":"task","text":"Preciso que você converta as instruções do manual em passos numerados e bem objetivos."}
+{"id":"f-pt-t-15","lang":"pt","label":"task","text":"Veja o parecer anexado e me aconselhe sobre como conversar com o RH, sem tratar isso como orientação jurídica."}
+{"id":"f-pt-t-16","lang":"pt","label":"task","text":"faça uma versão mais profissional dessa mensagem aqui"}
+{"id":"f-pt-t-17","lang":"pt","label":"task","text":"A proposta de investimento parece adequada ao perfil conservador descrito no formulário? Justifique a avaliação."}
+{"id":"f-pt-t-18","lang":"pt","label":"task","text":"Extraia as ações pendentes da ata e agrupe por responsável."}
+{"id":"f-pt-t-19","lang":"pt","label":"task","text":"Reescreva este texto acadêmico para reduzir o jargão sem perder o sentido."}
+{"id":"f-pt-t-20","lang":"pt","label":"task","text":"consegue fazer um resumo executivo desse plano de negócios?"}
+{"id":"f-pt-t-21","lang":"pt","label":"task","text":"Analise os pontos fracos do protocolo de segurança e sugira perguntas para a equipe técnica."}
+{"id":"f-pt-t-22","lang":"pt","label":"task","text":"Monte um quadro comparando as coberturas e exclusões das duas apólices."}
+{"id":"f-pt-t-23","lang":"pt","label":"task","text":"Me ajuda a preparar uma resposta educada recusando o convite, usando o e-mail como contexto."}
+{"id":"f-pt-t-24","lang":"pt","label":"task","text":"essa política de bônus é justa pra equipe? avalie os possíveis impactos"}
+{"id":"f-pt-t-25","lang":"pt","label":"task","text":"Reformate o conteúdo do boletim escolar em tópicos separados por disciplina."}
+{"id":"f-pt-t-26","lang":"pt","label":"task","text":"Compare o laudo atual com o anterior e explique as diferenças em linguagem acessível."}
+{"id":"f-pt-t-27","lang":"pt","label":"task","text":"Encurte a carta para caber em uma página, mantendo os argumentos essenciais."}
+{"id":"f-pt-t-28","lang":"pt","label":"task","text":"Por favor, critique a justificativa apresentada no relatório e indique onde faltam evidências."}
+{"id":"f-pt-t-29","lang":"pt","label":"task","text":"Transforme esse procedimento de laboratório num checklist que a equipe possa imprimir."}
+{"id":"f-pt-t-30","lang":"pt","label":"task","text":"O contrato de prestação de serviços oferece proteção equilibrada para as duas partes? Explique o que chama atenção."}
+{"id":"f-pt-t-31","lang":"pt","label":"task","text":"faça uma versão em linguagem simples desse texto jurídico"}
+{"id":"f-pt-t-32","lang":"pt","label":"task","text":"Sugira uma pauta de reunião a partir dos problemas listados no relatório de manutenção."}
+{"id":"f-pt-t-33","lang":"pt","label":"task","text":"Reescreva meu pedido de aumento com tom confiante e respeitoso, usando os dados da avaliação."}
+{"id":"f-pt-t-34","lang":"pt","label":"task","text":"Diga se o cronograma da obra parece arriscado e quais dependências podem atrasá-lo."}
+{"id":"f-pt-t-35","lang":"pt","label":"task","text":"Organize os achados do artigo em uma tabela com benefício, limitação e evidência."}
+{"id":"f-pt-t-36","lang":"pt","label":"task","text":"Me ajuda a decidir como proceder com essa cobrança? Considere as informações da carta e apresente opções."}
+{"id":"f-pt-t-37","lang":"pt","label":"task","text":"Revise a tradução anexada e ajuste expressões que soem pouco naturais em português."}
+{"id":"f-pt-t-38","lang":"pt","label":"task","text":"dá pra transformar essas anotações em um email pros pais dos alunos?"}
+{"id":"f-pt-t-39","lang":"pt","label":"task","text":"Explique os principais riscos da reforma descrita no orçamento e sugira pontos para negociar."}
+{"id":"f-pt-t-40","lang":"pt","label":"task","text":"Crie um resumo em tópicos da troca de e-mails, separando decisões e assuntos ainda em aberto."}
+{"id":"f-en-q-01","lang":"en","label":"question","text":"What is the monthly rent listed in the lease?"}
+{"id":"f-en-q-02","lang":"en","label":"question","text":"Tell me the contractor's registration number shown in the agreement."}
+{"id":"f-en-q-03","lang":"en","label":"question","text":"On what date was the financial report issued?"}
+{"id":"f-en-q-04","lang":"en","label":"question","text":"deadline?"}
+{"id":"f-en-q-05","lang":"en","label":"question","text":"Could you identify the engineer named as the project's technical lead?"}
+{"id":"f-en-q-06","lang":"en","label":"question","text":"How many days of annual leave does the HR policy provide?"}
+{"id":"f-en-q-07","lang":"en","label":"question","text":"I need to know what daily dosage the doctor recorded on the prescription."}
+{"id":"f-en-q-08","lang":"en","label":"question","text":"Does the school notice mention a registration fee, and if so, how much is it?"}
+{"id":"f-en-q-09","lang":"en","label":"question","text":"where is the meeting room mentioned in the memo"}
+{"id":"f-en-q-10","lang":"en","label":"question","text":"What interest rate is stated in the loan offer?"}
+{"id":"f-en-q-11","lang":"en","label":"question","text":"Is there a case number in this PDF?"}
+{"id":"f-en-q-12","lang":"en","label":"question","text":"State the rated voltage specified in the equipment manual."}
+{"id":"f-en-q-13","lang":"en","label":"question","text":"Does the meeting minutes say who gave the presentation?"}
+{"id":"f-en-q-14","lang":"en","label":"question","text":"What was the total travel expense excluding lodging?"}
+{"id":"f-en-q-15","lang":"en","label":"question","text":"Would you tell me the name of the school shown on the transcript?"}
+{"id":"f-en-q-16","lang":"en","label":"question","text":"Does the medical report state the size of the lesion?"}
+{"id":"f-en-q-17","lang":"en","label":"question","text":"Give me the deadline for submitting the bid."}
+{"id":"f-en-q-18","lang":"en","label":"question","text":"What tracking code is printed on the receipt?"}
+{"id":"f-en-q-19","lang":"en","label":"question","text":"Is a duration specified for the confidentiality clause?"}
+{"id":"f-en-q-20","lang":"en","label":"question","text":"who got the job offer"}
+{"id":"f-en-q-21","lang":"en","label":"question","text":"What share of the budget was allocated to materials?"}
+{"id":"f-en-q-22","lang":"en","label":"question","text":"Could you check whether the insurance policy covers flood damage?"}
+{"id":"f-en-q-23","lang":"en","label":"question","text":"According to the building plans, how many apartments are in block B?"}
+{"id":"f-en-q-24","lang":"en","label":"question","text":"Which supplier has the lowest unit price in the spreadsheet?"}
+{"id":"f-en-q-25","lang":"en","label":"question","text":"Does the patient record mention any medication allergies?"}
+{"id":"f-en-q-26","lang":"en","label":"question","text":"What three evaluation criteria are listed on the form?"}
+{"id":"f-en-q-27","lang":"en","label":"question","text":"Do the minutes give the time the meeting ended?"}
+{"id":"f-en-q-28","lang":"en","label":"question","text":"Please give me the full address of the branch shown in the letter."}
+{"id":"f-en-q-29","lang":"en","label":"question","text":"Which engineering standard is cited in the design specification?"}
+{"id":"f-en-q-30","lang":"en","label":"question","text":"Find the late-payment penalty in the contract."}
+{"id":"f-en-q-31","lang":"en","label":"question","text":"Is the invoice marked paid or outstanding?"}
+{"id":"f-en-q-32","lang":"en","label":"question","text":"Who is listed as the student's emergency contact?"}
+{"id":"f-en-q-33","lang":"en","label":"question","text":"Does the inspection report state the highest temperature recorded?"}
+{"id":"f-en-q-34","lang":"en","label":"question","text":"What was the employee's role before the promotion?"}
+{"id":"f-en-q-35","lang":"en","label":"question","text":"Does this receipt show how many installments have been paid so far?"}
+{"id":"f-en-q-36","lang":"en","label":"question","text":"On what date was the prescription issued, and what specialty is listed?"}
+{"id":"f-en-q-37","lang":"en","label":"question","text":"What is the name of the condominium mentioned in the notice?"}
+{"id":"f-en-q-38","lang":"en","label":"question","text":"In the paper, what sample size did the authors analyze?"}
+{"id":"f-en-q-39","lang":"en","label":"question","text":"Does the customer's email mention a preferred time for the visit?"}
+{"id":"f-en-q-40","lang":"en","label":"question","text":"Tell me the energy consumption shown on the product label."}
+{"id":"f-en-t-01","lang":"en","label":"task","text":"Summarize the audit report in five bullets, focusing on its main findings."}
+{"id":"f-en-t-02","lang":"en","label":"task","text":"What do you think of this renewal clause? Assess the risks for me."}
+{"id":"f-en-t-03","lang":"en","label":"task","text":"Turn the attached care instructions into a simple list of points I can discuss at my appointment."}
+{"id":"f-en-t-04","lang":"en","label":"task","text":"Could you rewrite this email to sound warm without promising a refund?"}
+{"id":"f-en-t-05","lang":"en","label":"task","text":"Compare the two supplier proposals and say which seems to offer better value, explaining your reasoning."}
+{"id":"f-en-t-06","lang":"en","label":"task","text":"make this shorter pls"}
+{"id":"f-en-t-07","lang":"en","label":"task","text":"Review the draft agreement and flag wording that is ambiguous and worth clarifying before I sign."}
+{"id":"f-en-t-08","lang":"en","label":"task","text":"Can you explain this school announcement as if I were telling it to an eight-year-old?"}
+{"id":"f-en-t-09","lang":"en","label":"task","text":"Reorganize the statement data by month and category in a table."}
+{"id":"f-en-t-10","lang":"en","label":"task","text":"help me reply to the property manager: ask them to fix the leak but don't make me sound rude"}
+{"id":"f-en-t-11","lang":"en","label":"task","text":"Assess whether the project plan's targets are realistic given the resources described."}
+{"id":"f-en-t-12","lang":"en","label":"task","text":"What would you change in this resume for a data analyst role?"}
+{"id":"f-en-t-13","lang":"en","label":"task","text":"Translate the paper's abstract into English while preserving the technical terminology."}
+{"id":"f-en-t-14","lang":"en","label":"task","text":"Please convert the manual's instructions into clear, numbered steps."}
+{"id":"f-en-t-15","lang":"en","label":"task","text":"Read the HR memo and advise me on how to approach the conversation, without presenting this as legal advice."}
+{"id":"f-en-t-16","lang":"en","label":"task","text":"make this message sound more professional"}
+{"id":"f-en-t-17","lang":"en","label":"task","text":"Does this investment proposal fit the conservative risk profile in the questionnaire? Explain your assessment."}
+{"id":"f-en-t-18","lang":"en","label":"task","text":"Extract the outstanding action items from the minutes and group them by owner."}
+{"id":"f-en-t-19","lang":"en","label":"task","text":"Rewrite this academic passage to reduce jargon without changing its meaning."}
+{"id":"f-en-t-20","lang":"en","label":"task","text":"Could you make an executive summary of this business plan?"}
+{"id":"f-en-t-21","lang":"en","label":"task","text":"Analyze weaknesses in the safety protocol and suggest questions for the engineering team."}
+{"id":"f-en-t-22","lang":"en","label":"task","text":"Create a comparison table of the coverage and exclusions in these two insurance policies."}
+{"id":"f-en-t-23","lang":"en","label":"task","text":"Help me write a polite reply declining the invitation, using the email for context."}
+{"id":"f-en-t-24","lang":"en","label":"task","text":"Is this bonus policy fair to the team? Evaluate its likely effects."}
+{"id":"f-en-t-25","lang":"en","label":"task","text":"Reformat the school newsletter as bullet points grouped by subject."}
+{"id":"f-en-t-26","lang":"en","label":"task","text":"Compare the current medical report with the earlier one and explain the differences in plain language."}
+{"id":"f-en-t-27","lang":"en","label":"task","text":"Shorten the letter to one page while keeping its essential arguments."}
+{"id":"f-en-t-28","lang":"en","label":"task","text":"Please critique the report's rationale and point out where supporting evidence is missing."}
+{"id":"f-en-t-29","lang":"en","label":"task","text":"Turn this lab procedure into a printable checklist for the team."}
+{"id":"f-en-t-30","lang":"en","label":"task","text":"Does this service agreement protect both parties fairly? Explain what stands out to you."}
+{"id":"f-en-t-31","lang":"en","label":"task","text":"put this legal text into plain English"}
+{"id":"f-en-t-32","lang":"en","label":"task","text":"Suggest a meeting agenda based on the issues listed in the maintenance report."}
+{"id":"f-en-t-33","lang":"en","label":"task","text":"Rewrite my raise request to sound confident and respectful, drawing on the performance review."}
+{"id":"f-en-t-34","lang":"en","label":"task","text":"Tell me whether the construction schedule seems risky and what dependencies could cause delays."}
+{"id":"f-en-t-35","lang":"en","label":"task","text":"Organize the paper's findings in a table with benefits, limitations, and evidence."}
+{"id":"f-en-t-36","lang":"en","label":"task","text":"Help me decide how to respond to this demand letter. Lay out options based on its contents."}
+{"id":"f-en-t-37","lang":"en","label":"task","text":"Review the attached translation and smooth out any phrases that sound unnatural in English."}
+{"id":"f-en-t-38","lang":"en","label":"task","text":"can you turn these notes into an email to the students' parents"}
+{"id":"f-en-t-39","lang":"en","label":"task","text":"Explain the main risks of the renovation described in the estimate and suggest points to negotiate."}
+{"id":"f-en-t-40","lang":"en","label":"task","text":"Create a bullet-point summary of the email thread, separating decisions from unresolved issues."}

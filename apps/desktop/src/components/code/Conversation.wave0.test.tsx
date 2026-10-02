@@ -168,16 +168,17 @@ describe("the empty screen", () => {
     expect(streamCodeTurn).not.toHaveBeenCalled();
   });
 
-  it("arms a spend ceiling before the first message", async () => {
-    // The step ceiling this screen sends went from the library's 8 to 40, in an app other people
-    // install. A first message should not be able to cost whatever a loop feels like, and a limit
-    // nobody can see is a limit nobody can raise — so it is armed AND in the box.
+  it("sends no spend ceiling by default: the server warns at $1 instead of stopping", async () => {
+    // This used to assert that a $1 ceiling was armed before the first message. The owner decided
+    // on 2026-09-27 that spending is a warning and not a stop, so the default turn carries no
+    // `max_usd` at all and the server's `spend_warn` says what it spent. A ceiling the person
+    // types still travels (see SpendCeiling.test.tsx); what must not happen is one nobody typed.
     mount();
     const box = await screen.findByRole("textbox");
     await userEvent.type(box, "arruma o cabeçalho{Enter}");
 
     await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
     const enviado = vi.mocked(streamCodeTurn).mock.calls[0]?.[0] as { max_usd?: number };
-    expect(enviado.max_usd).toBeGreaterThan(0);
+    expect(enviado.max_usd).toBeUndefined();
   });
 });

@@ -1,0 +1,94 @@
+resumo-01-timer-unchanged        not_yet    wake p_wake=0.8362456379483341 5.5s
+resumo-02-timer-same-again       not_yet    wake p_wake=0.5555822364787499 0.3s
+resumo-03-webhook-differs        wake       wake p_wake=0.9952024945875944 0.3s
+resumo-04-webhook-same           not_yet    wake p_wake=0.663604699171949 0.3s
+resumo-05-file-added             wake       wake p_wake=0.9620426294772636 0.3s
+resumo-06-timer-skip3            not_yet    wake p_wake=0.5609384831959296 0.3s
+resumo-07-timer-skip-limit       wake       wake p_wake=0.8932009008456102 0.3s
+resumo-08-webhook-unrelated      unrelated  wake p_wake=0.7756678591187125 0.3s
+resumo-09-webhook-unrelated2     unrelated  wake p_wake=0.8988739148473943 0.3s
+resumo-10-timer-corrupt          wake       wake p_wake=0.7566415665301877 0.3s
+resumo-11-timer-empty            wake       wake p_wake=0.7736127650356139 0.3s
+resumo-12-webhook-divergence     wake       wake p_wake=0.9939677571993762 0.3s
+resumo-13-timer-same-5           not_yet    wake p_wake=0.711498646408319 0.3s
+resumo-14-webhook-manual-edit    wake       wake p_wake=0.9949236302273027 0.4s
+resumo-15-timer-ok               not_yet    not_yet p_wake=0.4679875093435011 0.4s
+resumo-16-timer-ok-2             not_yet    wake p_wake=0.8481781620473116 0.4s
+resumo-17-webhook-delete         wake       wake p_wake=0.9872574177833071 0.3s
+resumo-18-webhook-ci-green       unrelated  wake p_wake=0.9397195318203472 0.3s
+resumo-19-timer-failed           wake       wake p_wake=0.9550354446553115 0.3s
+resumo-20-timer-budget           wake       wake p_wake=0.5456340540374537 0.3s
+resumo-21-webhook-price-site     wake       wake p_wake=0.9923013352645572 0.3s
+resumo-22-timer-quiet-weekend    not_yet    wake p_wake=0.5308742209066026 0.3s
+resumo-23-webhook-newsletter     unrelated  wake p_wake=0.7092035438155467 0.4s
+resumo-24-timer-degraded         wake       wake p_wake=0.7393316832651553 0.4s
+resumo-25-timer-first-run        wake       wake p_wake=0.6125320243478447 0.4s
+resumo-26-webhook-same-day2      not_yet    wake p_wake=0.8273635931188675 0.4s
+resumo-27-timer-late-result      wake       wake p_wake=0.8215856026501059 0.3s
+resumo-28-webhook-backup-ok      unrelated  wake p_wake=0.946246170032137 0.3s
+resumo-29-timer-mid-run          not_yet    not_yet p_wake=0.42803282602604475 0.4s
+resumo-30-webhook-owner-ask      wake       wake p_wake=0.8592136748887498 0.3s
+resumo-31-timer-stale-week       wake       wake p_wake=0.9066224848908009 0.3s
+resumo-32-timer-ok-3             not_yet    not_yet p_wake=0.35215381344511737 0.4s
+resumo-33-webhook-alert-other-job unrelated  wake p_wake=0.6350607720669136 0.3s
+resumo-34-timer-summary-grew     wake       wake p_wake=0.9558831618631811 0.3s
+{
+  "scenarios": 36,
+  "scored": 34,
+  "no_read": 0,
+  "false_skips_at_shipped_floor": 0,
+  "suppressed_of_sleep": "0/17",
+  "suppression_rate": 0.0,
+  "unsure_band_share": 0.088,
+  "auroc_wake_vs_sleep": [
+    0.7958477508650519,
+    0.6363636363636364,
+    0.9333333333333333
+  ],
+  "sweep": {
+    "0.1": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.15": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.2": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.3": {
+      "false_skips": 0,
+      "suppressed": 0,
+      "reached": 34
+    },
+    "0.5": {
+      "false_skips": 0,
+      "suppressed": 3,
+      "reached": 34
+    }
+  },
+  "repeat_flips": [
+    "resumo-01-timer-unchanged",
+    "resumo-02-timer-same-again"
+  ],
+  "latency_p50_s": 0.34,
+  "latency_p95_s": 0.38,
+  "prompt_tokens_mean": 267.6,
+  "cost_per_1000_ticks_hosted_assumption_usd": 0.0268,
+  "hosted_price_assumption": "US$ 0.1/1M input tokens \u2014 an assumption, not a measurement",
+  "t_baseline_always_wake": {
+    "wakeups": 34,
+    "suppressed": 0,
+    "calls": 0
+  },
+  "seconds_per_call": 0.49,
+  "prompt_tokens_max": 304,
+  "resolved_model": "qwen3:4b@Q4_K_M",
+  "policy_reading": "skip = put-down choice (not_yet/unrelated) with wake-mass \u2264 floor; the registration's \u00a7Why sentence was ambiguous, the table it cites is what the code implements \u2014 recorded, not corrected in silence",
+  "decision_rule": "ships shadow iff false_skips==0 and suppression_rate>=0.5; harm (any false skip) ships nothing and publishes the miss"
+}

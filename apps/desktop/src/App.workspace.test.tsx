@@ -7,6 +7,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { getConfig, getDoctor, browseDirs, getFsTree } from "@/lib/api";
 import { I18nProvider } from "@/lib/i18n";
+import { LayoutProvider } from "@/lib/layout/context";
 import { WORKSPACE_KEY } from "@/lib/workspace";
 
 /**
@@ -61,7 +62,10 @@ function renderApp() {
       <I18nProvider>
         <TooltipProvider>
           <ToastProvider>
-            <App />
+            {/* `main.tsx` puts the layout provider here; App reads it for the palette. */}
+            <LayoutProvider>
+              <App />
+            </LayoutProvider>
           </ToastProvider>
         </TooltipProvider>
       </I18nProvider>

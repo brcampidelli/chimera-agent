@@ -1,0 +1,34 @@
+== control (answerable questions; known: 0/141 declined in bench/verified_cascade arm D)
+declined                                       0 /  30    0.0%  [ 0.0%, 11.4%]
+control gate: PASS
+routes: {'supported': 30}
+
+== tasks forced through the check
+routes: {'gate_declined': 2, 'drafter_declined': 2, 'escalated': 0, 'supported': 56, 'unverified': 0, 'lexical': 0}
+PRIMARY gate_declined                          2 /  60    3.3%  [ 0.9%, 11.4%]
+verdict: MODERATE (neither)
+  pt                                           1 /  30    3.3%  [ 0.6%, 16.7%]
+  en                                           1 /  30    3.3%  [ 0.6%, 16.7%]
+  advise                                       0 /  10    0.0%  [ 0.0%, 27.8%]
+  appraise                                     1 /  10   10.0%  [ 1.8%, 40.4%]
+  critique                                     1 /  10   10.0%  [ 1.8%, 40.4%]
+  rewrite                                      0 /  10    0.0%  [ 0.0%, 27.8%]
+  summarize                                    0 /  10    0.0%  [ 0.0%, 27.8%]
+  translate                                    0 /  10    0.0%  [ 0.0%, 27.8%]
+any decline shipped (gate + drafter)           4 /  60    6.7%  [ 2.6%, 15.9%]
+escalated to Sol (cost)                        2 /  60    3.3%  [ 0.9%, 11.4%]
+
+== the product's path: tasks the classifier reads as questions (descriptive, small n)
+gate_declined                                  2 /  10   20.0%  [ 5.7%, 51.0%]
+
+spend: tasks US$ 0.0157, control US$ 0.0054, total US$ 0.0211
+
+== every task whose shipped text is not its draft, verbatim (for the manual reading, §4.3)
+
+--- T:pt:appraise:3 [gate_declined] p=0.679 :: A forma descrita aqui é adequada para uso em produção? Justifique.
+DRAFT: O documento não informa se essa forma é adequada para uso em produção. Ele descreve o gate a executar antes de abrir um PR — lint, tipagem e testes — e orientações para mudanças e testes. Portanto, não é possível concluir, com base apenas nele, se isso basta para garantir prontidão para produção.
+SHIPPED: Os trechos fornecidos não dizem se essa forma é adequada para uso em produção. Eles descrevem verificações antes de abrir um PR, mas não estabelecem critérios para avaliar o uso em produção.
+
+--- T:en:critique:3 [gate_declined] p=0.3689 :: What are the weak spots in this documentation?
+DRAFT: Based on this excerpt, the main weak spots are:  - **Key terms are undefined.** Phrases such as “same governed assembly,” “fully-rendered,” “quarantined,” and “ready to switch on” sound important but aren’t explained here. - **The scheduler’s condition is easy to miss.** “Acts on time” is qualified by “with the built-in scheduler running,” but the excerpt doesn’t say how to run it or what happens if it’s stopped or a job is missed. - **Capabilities are broad but underspecified.** The text lists chat platforms, web access, tools, and built-in features without showing setup steps, examples, prerequisites, or limits. - **The security caveat needs more context.** It says the structured extractio
+SHIPPED: The sources provided don't cover this.

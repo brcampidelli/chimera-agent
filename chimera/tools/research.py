@@ -90,10 +90,14 @@ class YouTubeTranscriptTool(Tool):
         except ImportError:
             return "error: youtube_transcript needs the extra: uv sync --extra youtube"
         try:
-            chunks = YouTubeTranscriptApi.get_transcript(video_id)
+            # youtube-transcript-api 1.x: `fetch` is an INSTANCE method returning a FetchedTranscript
+            # of snippets. The 0.x classmethod `get_transcript` was removed in 1.0, so the old call
+            # raised AttributeError on every invocation — which the `except` below swallowed into
+            # "transcript unavailable", making a dead tool look like a flaky one.
+            chunks = YouTubeTranscriptApi().fetch(video_id)
         except Exception as exc:  # noqa: BLE001 - the library raises many types; often unavailable
             return f"error: transcript unavailable: {exc}"
-        text = " ".join(str(chunk.get("text", "")) for chunk in chunks).strip()
+        text = " ".join(str(chunk.text) for chunk in chunks).strip()
         if len(text) > _MAX_OUTPUT_CHARS:
             text = text[:_MAX_OUTPUT_CHARS] + f"\n... [truncated, {len(text)} chars total]"
         return text or "error: empty transcript"

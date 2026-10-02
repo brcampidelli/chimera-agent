@@ -3,6 +3,7 @@ import { FolderTree, Search } from "lucide-react";
 
 import { FileTree } from "@/components/editor/FileTree";
 import { SearchPanel } from "@/components/editor/SearchPanel";
+import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
 import { useT } from "@/lib/i18n";
@@ -37,13 +38,18 @@ export function EditSidebar({
         <label className="sr-only" htmlFor="edit-workspace">
           {t("code.workspace")}
         </label>
-        <input
-          id="edit-workspace"
-          value={workspace}
-          onChange={(e) => onWorkspace(e.target.value)}
-          placeholder={t("code.workspacePlaceholder")}
-          className="field w-full px-2 text-xs"
-        />
+        {/* The editor's sidebar is the left region too (dynamic screen, phase 6): it hides from here,
+            leaves a tab on its edge, and comes back like the conversation list does. */}
+        <div className="flex items-center gap-1">
+          <input
+            id="edit-workspace"
+            value={workspace}
+            onChange={(e) => onWorkspace(e.target.value)}
+            placeholder={t("code.workspacePlaceholder")}
+            className="field min-w-0 flex-1 px-2 text-xs"
+          />
+          <HideRegionButton side="left" />
+        </div>
         <div className="mt-2 flex overflow-hidden rounded-chip border border-border">
           {(
             [
