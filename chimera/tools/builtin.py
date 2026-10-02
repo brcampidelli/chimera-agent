@@ -68,6 +68,10 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "skill_view",
     # Switched on by `CHIMERA_DECIDE_TOOL` (a schema in every prompt; off by default).
     "decide",
+    # A test/demo tool that returns its input. Never in `default_registry`: tests and benches that
+    # need it register `EchoTool()` themselves. Listed here so its translated description (an i18n
+    # key nobody may delete) still has a tool to describe.
+    "echo",
 })
 
 
@@ -88,6 +92,10 @@ def default_registry(
     resolved from settings + whether stdin is a TTY (see :func:`resolve_host_exec_confirm`): an
     interactive terminal confirms each host command, headless runs with a one-time warning. Pass
     ``None`` to force no gate (e.g. a server that must never block on stdin), or a custom callback.
+
+    :class:`EchoTool` is not in it. It used to be registered first here, so the terminal, desktop,
+    Discord bot and cron all offered the model a tool that does nothing, its schema resent on every
+    step (study 28, P7). Tests and benches that want it register it directly.
     """
     from chimera.config import get_settings
     from chimera.sandbox import get_sandbox
@@ -101,7 +109,6 @@ def default_registry(
     trust_workspace = settings.trust_workspace
 
     registry = ToolRegistry()
-    registry.register(EchoTool())
     registry.register(ReadFileTool(workspace, trust_workspace=trust_workspace))
     registry.register(WriteFileTool(workspace, write_region=write_region))
     registry.register(EditFileTool(workspace, write_region=write_region))

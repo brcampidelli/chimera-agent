@@ -122,6 +122,7 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
     So these are read off the classes rather than off the registry: a description is a fact about
     the tool, not about whether this machine happens to have its API key.
     """
+    from chimera.tools.builtin import EchoTool
     from chimera.tools.calendar import CalendarEventsTool
     from chimera.tools.decide import DecideTool
     from chimera.tools.email import ReadEmailTool, SendEmailTool
@@ -137,6 +138,8 @@ def test_the_optional_tools_english_is_pinned_too() -> None:
         ReadEmailTool,
         CalendarEventsTool,
         DecideTool,
+        # Not key-gated but opt-in: out of the default registry, so only this check still sees it.
+        EchoTool,
     ]
     keys = _english_dict()
 

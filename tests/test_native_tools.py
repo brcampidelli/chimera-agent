@@ -145,8 +145,10 @@ def test_http_get_blocks_non_http_scheme() -> None:
 
 def test_default_registry_includes_native_tools(tmp_path: Path) -> None:
     registry = default_registry(tmp_path)
-    for name in ("echo", "read_file", "write_file", "list_dir", "run_shell", "http_get"):
+    for name in ("read_file", "write_file", "list_dir", "run_shell", "http_get"):
         assert name in registry
+    # `echo` used to lead this list. It is a test/demo tool and is no longer offered to the model on
+    # every surface; `test_echo_is_not_in_the_default_registry_but_still_works_when_registered` pins it.
 
 
 def test_write_file_is_byte_exact_no_newline_translation(tmp_path: Path) -> None:

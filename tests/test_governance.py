@@ -157,9 +157,12 @@ def test_governed_tool_review_requires_approval() -> None:
 
 
 def test_govern_registry_wraps_all(tmp_path: Path) -> None:
+    # Every tool, not a sample of three: the sample led with `echo`, which the default registry no
+    # longer carries, and "all" is what the name of this test promises.
     governed = govern_registry(default_registry(tmp_path), TrustKernel())
-    for name in ("echo", "read_file", "run_shell"):
-        assert isinstance(governed.get(name), GovernedTool)
+    assert {"read_file", "run_shell"} <= set(governed.names())
+    for name in governed.names():
+        assert isinstance(governed.get(name), GovernedTool), name
 
 
 # --- evolver integration ----------------------------------------------------

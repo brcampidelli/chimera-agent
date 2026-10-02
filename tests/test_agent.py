@@ -55,7 +55,9 @@ def test_run_injects_relevant_skill_context() -> None:
     # A task whose keywords match a skill's name/description gets that skill surfaced in the system prompt.
     backend = ScriptedBackend([CompletionResult(content="done", model="fake")])
     agent = Agent(backend, _echo_registry(), AgentConfig(), skills=_skill_registry_with_echo())
-    agent.run("please echo this message back to me")
+    # Two shared words ("echo", "text"): retrieval asks for two since one shared word put the
+    # data-analysis skill on every autonomous run through the harness's own "Task:" (study 28, P7).
+    agent.run("please echo this text back to me")
     system = backend.calls[0]["messages"][0]
     assert system["role"] == "system"
     assert SKILLS_HEADER in system["content"] and "echo" in system["content"]

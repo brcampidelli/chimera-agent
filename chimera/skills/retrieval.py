@@ -13,7 +13,9 @@ import re
 from chimera.skills.base import Skill
 from chimera.skills.registry import SkillRegistry
 
-_TOKEN = re.compile(r"[a-z0-9]+")
+#: A word is a run of letters/digits in ANY script. It used to be ``[a-z0-9]+``, which cut every
+#: accented word into fragments ("análise" -> "an", "lise"), and a fragment is a match nobody meant.
+_TOKEN = re.compile(r"[^\W_]+")
 
 # Grammatical glue that would otherwise match every skill's description and surface irrelevant skills
 # for any task (e.g. "the"/"of" in a geography question). Filtered from both sides before scoring so
@@ -30,14 +32,49 @@ _STOPWORDS = frozenset(
 )
 
 
+#: Words the HARNESS writes around a task, never the person. ``AutonomousAgent._compose`` heads
+#: every autonomous prompt with ``Task:`` (and ``Plan:`` / ``Feedback from the previous attempt
+#: (address this):`` on a plan or a retry), and that whole string is what reaches retrieval.
+#: ``data_analysis`` describes itself as "a data task", so one shared word was enough: every cron
+#: job, ``solve`` and ``/api/runs`` run got the data-analysis skill whatever it was about, 26 of 26
+#: realistic tasks measured (study 28, P7). Pinned to ``_compose`` by a test, so a new header word
+#: fails there instead of quietly matching.
+_HARNESS_WORDS = frozenset({"task", "plan", "feedback", "previous", "attempt", "address"})
+
+#: Instruction verbs inside the skill descriptions themselves ("WRITE runnable Python ... RUN the
+#: RESULT with the code sandbox"). They say how a skill is used, not what it is about, and they
+#: matched "Write a haiku" and "Run the tests and report the result" to both data skills. Read off
+#: the same 26-task set the fix was measured on, so that set does not validate this list.
+_HOW_TO_WORDS = frozenset({"write", "run", "result", "results"})
+
+_IGNORED = _STOPWORDS | _HARNESS_WORDS | _HOW_TO_WORDS
+
+#: Shared content words a skill needs before it counts as relevant. One was the old bar, and one
+#: word is a coincidence more often than a topic: "text" put `echo` on "Translate this text", and
+#: the Portuguese "data" (a date) put both data skills on "Qual a data de hoje?". A real request
+#: names its topic more than once ("load the dataset, train a classifier": load, dataset, train).
+MIN_SHARED_WORDS = 2
+
+
 def _tokenize(text: str) -> set[str]:
-    return {tok for tok in _TOKEN.findall(text.lower()) if len(tok) >= 3 and tok not in _STOPWORDS}
+    return {tok for tok in _TOKEN.findall(text.lower()) if len(tok) >= 3 and tok not in _IGNORED}
 
 
 def retrieve_relevant_skills(
     registry: SkillRegistry, query: str, *, k: int = 3
 ) -> list[Skill]:
-    """Return up to ``k`` skills whose name/description best match ``query`` on shared content words."""
+    """Up to ``k`` skills sharing at least :data:`MIN_SHARED_WORDS` content words with ``query``.
+
+    The descriptions are English and nothing here translates, so a Portuguese request matches only
+    where it happens to use two of the same words, which is usually never. That costs real hits:
+    "Analise o dataset vendas.csv..." and "Corrija o bug no parser" each reached the right skill
+    through one loanword, and no longer do. Matching across languages needs translation or
+    embeddings, not a lower bar, since one shared word is also what matched "Task:".
+
+    ``query`` is whatever the caller hands in. The autonomous runner hands in the composed prompt,
+    recalled lessons included, so words from that context still count: with a two-lesson block in
+    front, 2 of the 26 measured tasks picked up a wrong ``data_visualization`` (study 28, P7).
+    """
     terms = _tokenize(query)
     if not terms:
         return []
@@ -45,7 +82,7 @@ def retrieve_relevant_skills(
     for skill in registry.skills():
         haystack = _tokenize(f"{skill.name} {skill.description}")
         score = len(terms & haystack)
-        if score:
+        if score >= MIN_SHARED_WORDS:
             scored.append((score, skill.name, skill))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return [skill for _, _, skill in scored[:k]]

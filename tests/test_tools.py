@@ -47,6 +47,12 @@ def test_registry_unknown_tool_raises() -> None:
         registry.get("nope")
 
 
-def test_default_registry_has_echo() -> None:
-    registry = default_registry()
-    assert "echo" in registry
+def test_default_registry_no_longer_has_echo_but_it_can_still_be_registered() -> None:
+    # This test used to assert the opposite, and its premise is what changed: `echo` returns its
+    # input, so offering it on every surface (terminal, desktop, Discord bot, cron) gave the model a
+    # do-nothing tool and resent its schema every step (study 28, P7). It is a test/demo tool now,
+    # registered by whoever needs it, and must keep working when they do.
+    assert "echo" not in default_registry()
+    registry = ToolRegistry()
+    registry.register(EchoTool())
+    assert registry.get("echo").run(text="hi") == "hi"
