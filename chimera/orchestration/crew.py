@@ -7,8 +7,8 @@ Two coordination patterns over role agents:
 * :class:`SupervisorCrew` — workers address the task in parallel, their outputs are
   consolidated, and a supervisor synthesizes the final answer.
 * :class:`IsolatedCrew` — tool-using workers each edit the SAME task in their OWN git
-  worktree in parallel; non-conflicting edits merge back and cross-worker conflicts are
-  reported. Composes tool-using roles + worktree isolation + distilled results.
+  worktree in parallel; ONE approved worker's tree lands whole and is checked again in the
+  workspace. Composes tool-using roles + worktree isolation + distilled results.
 
 ``parallel_review`` runs several reviewers concurrently (CAPRA-style verification).
 """
@@ -19,13 +19,13 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from chimera.core.worktree import is_git_repo
 from chimera.memory.manager import MemoryManager
 from chimera.orchestration.comms import AgentMessage, consolidate, render
 from chimera.orchestration.events import OrchEvent, OrchEventSink
-from chimera.orchestration.isolation import run_isolated
+from chimera.orchestration.isolation import IsolatedResult, run_isolated
 from chimera.orchestration.metering import MeteredBackend
 from chimera.orchestration.receipts import DelegationReceipt
 from chimera.orchestration.roles import Role, RoleAgent
@@ -34,6 +34,9 @@ from chimera.telemetry import get_logger
 from chimera.tools.registry import ToolRegistry
 
 _log = get_logger("orchestration.crew")
+
+#: How much of each worker's diff rides on its progress frame. The full diff is on the result.
+_DIFF_FRAME_CHARS = 20_000
 
 
 @dataclass
@@ -165,10 +168,27 @@ class IsolatedCrewResult:
     #: said the opposite. Present for rejected and failed workers too: a discarded attempt cost
     #: exactly as much as a kept one, and a cost report that only counts successes is an advert.
     receipts: list[DelegationReceipt] = field(default_factory=list)
+    #: The worker whose tree landed — empty when nothing did, and always empty under
+    #: ``merge="union"``, where every approved worker lands its uncontested files.
+    selected: str = ""
+    #: The check run AGAIN on the workspace after the merge: ``""`` when it did not run (no check
+    #: configured, or nothing landed), else ``"passed"``, ``"failed"`` or ``"abstained"``. A worker
+    #: passing in its own checkout is a claim about that checkout; the person's folder can differ
+    #: from HEAD, and under ``union`` the merged set never existed in any checkout at all.
+    reverify: str = ""
+    reverify_output: str = ""
+    #: Every worker's unified diff, the selected one's and the rest. The worktrees are removed when
+    #: the run ends, so for a runner-up this is the only copy of a solution that also passed.
+    diffs: dict[str, str] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
-        return not self.failures and not self.rejected and not self.conflicts
+        return (
+            not self.failures
+            and not self.rejected
+            and not self.conflicts
+            and self.reverify != "failed"
+        )
 
 
 def _receipts_from(metered: list[tuple[str, MeteredBackend]]) -> list[DelegationReceipt]:
@@ -200,14 +220,51 @@ def _receipts_from(metered: list[tuple[str, MeteredBackend]]) -> list[Delegation
     return receipts
 
 
+def select_worker(
+    candidates: list[IsolatedResult[WorkerOutcome]], *, checked: bool
+) -> str | None:
+    """Which ONE approved worker's tree lands. Deterministic; ``None`` lands nothing.
+
+    The rule, in order:
+
+    1. **A worker that changed nothing is not a candidate.** A check that passes on an untouched
+       tree does not discriminate, and letting the empty answer compete would make the laziest
+       worker win every tie below.
+    2. **A check that actually ran beats one that abstained** (``checked`` says a check was
+       configured; ``WorkerOutcome.abstained`` says it reached no verdict for this worker).
+    3. **Fewest changed lines** (added plus removed). Among solutions the same check accepted, the
+       smaller one carries less code the check did not exercise, and is less for a person to
+       review. Cost was the other candidate and was rejected: it describes how the worker got
+       there, not what lands, and an unpriced model reports ``None``, which cannot be ordered.
+    4. **Fewest changed files**, then **the order the person listed the workers in** — the last
+       tie-break is one the person chose, and it makes the result reproducible.
+    """
+    ranked: list[tuple[int, int, int, int, str]] = []
+    for index, result in enumerate(candidates):
+        if not result.changed_paths:
+            continue
+        abstained = result.value.abstained if result.value is not None else False
+        strength = 0 if checked and not abstained else 1
+        ranked.append(
+            (strength, result.changed_lines, len(result.changed_paths), index, result.name)
+        )
+    if not ranked:
+        return None
+    return min(ranked)[-1]
+
+
 class IsolatedCrew:
     """Tool-using workers each tackle the task in their own git worktree, in parallel.
 
     Every worker runs a real agent loop (via a tool-using :class:`RoleAgent`) against an
-    isolated checkout, so concurrent edits never collide mid-flight. On merge-back, a file
-    two successful workers both changed is a conflict: it is left out and reported rather than
-    silently clobbered (mechanical one-file-one-owner). A worker that crashes fails its own
-    unit, not the run. Outside a git repo, workers run in-place (no isolation).
+    isolated checkout, so concurrent edits never collide mid-flight. The workers are rival
+    attempts at ONE task, so exactly one approved worker's tree lands, whole
+    (:func:`select_worker`), and the check runs again on the workspace afterwards. The
+    alternative this replaced — copying every approved worker's uncontested files — fused two
+    verified solutions into a hybrid nobody verified, and dropped the file both had to change.
+    ``merge="union"`` keeps that behaviour for workers given genuinely DISJOINT parts, where a
+    union is the point; it is re-verified too. A worker that crashes fails its own unit, not the
+    run. Outside a git repo, workers run in-place (no isolation).
     """
 
     def __init__(
@@ -260,8 +317,17 @@ class IsolatedCrew:
         verify: str | None = None,
         verify_source: str = "user",
         timeout: float | None = None,
+        merge: Literal["select", "union"] = "select",
     ) -> IsolatedCrewResult:
         """Run the workers in parallel-isolated worktrees; merge only the verified ones.
+
+        ``merge="select"`` (the default) lands one approved worker's tree whole, chosen by
+        :func:`select_worker`. ``merge="union"`` lands every approved worker's files except those
+        two of them changed — for workers that were given different parts of the task. Either way,
+        when ``verify`` is set and something landed, it runs again on ``workspace`` and the
+        verdict is reported in ``reverify``. A failing re-check is reported, not reverted: the
+        merged files are the evidence a person needs to see what went wrong, and the workspace may
+        hold their own uncommitted work that a revert would have to reason about.
 
         ``verify`` is a shell command run in each worker's own worktree after it finishes
         (exit 0 == pass). A worker whose changes fail verification is *rejected* — its edits
@@ -361,6 +427,11 @@ class IsolatedCrew:
             return run_worker
 
         units = [(w.role.name, make_unit(w)) for w in self.workers]
+        checked = bool(verify)
+
+        def choose(candidates: list[IsolatedResult[WorkerOutcome]]) -> str | None:
+            return select_worker(candidates, checked=checked)
+
         batch = run_isolated(
             Path(workspace),
             units,
@@ -378,6 +449,7 @@ class IsolatedCrew:
             # Safe by the same rule as before: an abandoned worker has no `WorkerOutcome`, so
             # `succeeded` is False and its worktree is discarded rather than merged.
             cancelled=self.should_stop,
+            select=choose if merge == "select" else None,
         )
         transcript: list[AgentMessage] = []
         failures: dict[str, str] = {}
@@ -400,7 +472,12 @@ class IsolatedCrew:
             failures=failures,
             rejected=rejected,
             receipts=_receipts_from(metered),
+            selected=batch.selected,
+            diffs={r.name: r.diff for r in batch.results if r.diff},
         )
+        stopped = self.should_stop is not None and self.should_stop()
+        if verify and batch.merged and not stopped:
+            self._reverify(crew_result, verify, Path(workspace), verify_source)
         # What each worker actually produced, emitted here and not from inside `run_worker`,
         # because here is where it exists: `run_isolated` reads each worktree's changed files as
         # it collects, which is the last moment before the worktree is removed. Asking mid-flight
@@ -413,12 +490,16 @@ class IsolatedCrew:
         for result in batch.results:
             answer = result.value.answer if result.value is not None else ""
             # Split, because passing the check and landing are DIFFERENT THINGS and conflating
-            # them is the exact dishonesty this screen exists to avoid: two workers who both pass
-            # on one file both lose it, so a card saying "the files it wrote, and that landed"
-            # sat directly above a panel saying nothing landed. `ok` is the verifier's verdict;
-            # only `changed - conflicts` actually reached the workspace.
-            landed = [p for p in result.changed_paths if result.ok and p not in contested]
-            lost = [p for p in result.changed_paths if not result.ok or p in contested]
+            # them is the exact dishonesty this screen exists to avoid. `ok` is the verifier's
+            # verdict; what reached the workspace is the selected worker's tree, or under `union`
+            # the approved files no other approved worker also changed.
+            if merge == "select":
+                won = bool(batch.selected) and result.name == batch.selected
+                landed = list(result.changed_paths) if won else []
+            else:
+                won = False
+                landed = [p for p in result.changed_paths if result.ok and p not in contested]
+            lost = [p for p in result.changed_paths if p not in landed]
             self._emit(
                 "worker_produced",
                 task_id=result.name,
@@ -428,13 +509,18 @@ class IsolatedCrew:
                 # as the progress frames; the merged files themselves are on disk to be read.
                 answer=answer[:2000],
                 landed=bool(landed),
+                selected=won,
+                # A runner-up passed the same check and its worktree is about to be gone: the diff
+                # is the only way the person can still compare it with what landed. Capped for the
+                # same reason as the answer.
+                diff=result.diff[:_DIFF_FRAME_CHARS],
             )
         # One frame per contested file, not one lump. A conflict is a file two workers both
         # changed and NEITHER landed — the thing a person has to go look at by name.
         for path in batch.conflicts:
             self._emit("conflict", text=path, path=path)
         if self.supervisor is not None:
-            self._emit("synthesizing", text=f"{len(transcript)} merged")
+            self._emit("synthesizing", text=f"{len(transcript)} approved")
             crew_result.summary = self._synthesize(task, crew_result)
         self._emit(
             "done",
@@ -444,6 +530,9 @@ class IsolatedCrew:
             failed=sorted(failures),
             rejected=sorted(rejected),
             answer=crew_result.summary,
+            selected=crew_result.selected,
+            reverify=crew_result.reverify,
+            reverify_detail=crew_result.reverify_output[:2000],
             # False means the workers ran IN PLACE, sharing one folder, because this is not a git
             # repository. Everything above about isolation stops being true, and the screen has to
             # be able to say so — the same honesty `/api/agents` already ships as `is_repo`.
@@ -453,12 +542,45 @@ class IsolatedCrew:
         )
         return crew_result
 
+    def _reverify(
+        self, result: IsolatedCrewResult, verify: str, workspace: Path, verify_source: str
+    ) -> None:
+        """Run the check on the workspace the merge just wrote, and record what it said.
+
+        Never fatal: the merge has happened, and a check that cannot even be started is reported
+        as its own failure rather than raised over a result the caller needs.
+        """
+        from chimera.core.verify import CommandVerifier
+
+        try:
+            outcome = CommandVerifier(verify, workspace, source=verify_source).verify()
+        except Exception as exc:  # noqa: BLE001 -- see the docstring
+            result.reverify, result.reverify_output = "failed", f"{type(exc).__name__}: {exc}"
+            return
+        if outcome.abstained:
+            result.reverify = "abstained"
+        else:
+            result.reverify = "passed" if outcome.passed else "failed"
+        result.reverify_output = outcome.output or ""
+        if result.reverify == "failed":
+            _log.warning(
+                "crew: the merged workspace fails the check that approved %s",
+                result.selected or "the merged workers",
+            )
+
     def _synthesize(self, task: str, result: IsolatedCrewResult) -> str:
-        """Have the supervisor fold the merged workers' outputs into one unified report."""
+        """Have the supervisor fold the approved workers' outputs into one unified report."""
         assert self.supervisor is not None
         parts: list[str] = []
         if result.transcript:
-            parts.append("Merged worker outputs:\n" + render(consolidate(result.transcript)))
+            parts.append("Approved worker outputs:\n" + render(consolidate(result.transcript)))
+        if result.selected:
+            parts.append(
+                f"Only the changes of {result.selected} were merged; the other approved "
+                "workers' changes were not."
+            )
+        if result.reverify:
+            parts.append(f"The check, run again on the merged workspace: {result.reverify}.")
         if result.conflicts:
             parts.append("Files in conflict (NOT merged): " + ", ".join(result.conflicts))
         if result.rejected:

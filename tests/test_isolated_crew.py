@@ -58,26 +58,60 @@ def _worker(name: str, path: str, content: str) -> IsolatedWorker:
     return IsolatedWorker(Role(name, f"SYS-{name}"), _writer_tools, backend=WritingBackend(path, content))
 
 
-def test_disjoint_workers_merge(tmp_path: Path) -> None:
+def test_disjoint_workers_land_one_tree_by_default(tmp_path: Path) -> None:
+    """Rewritten in study 28 (MA1): this test used to assert BOTH files landed.
+
+    That was the defect, asserted as the feature. Crew workers attempt the same task, so landing
+    a.txt from one and b.txt from the other fuses two solutions into one nobody checked.
+    """
     _init_repo(tmp_path)
     crew = IsolatedCrew(WritingBackend("_", "_"), [_worker("a", "a.txt", "AAA"), _worker("b", "b.txt", "BBB")])
     res = crew.run("do your part", tmp_path)
+    assert res.ok and res.merged == 1 and res.selected == "a"
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "AAA"
+    assert not (tmp_path / "b.txt").exists()
+    # Both passed, so both are still in the transcript; only one of them landed.
+    assert {m.sender for m in res.transcript} == {"a", "b"}
+
+
+def test_disjoint_workers_merge_under_union(tmp_path: Path) -> None:
+    """The old behaviour, kept on request for workers given DIFFERENT parts of a task."""
+    _init_repo(tmp_path)
+    crew = IsolatedCrew(WritingBackend("_", "_"), [_worker("a", "a.txt", "AAA"), _worker("b", "b.txt", "BBB")])
+    res = crew.run("do your part", tmp_path, merge="union")
     assert res.ok and res.merged == 2
     assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "AAA"
     assert (tmp_path / "b.txt").read_text(encoding="utf-8") == "BBB"
     assert {m.sender for m in res.transcript} == {"a", "b"}
 
 
-def test_conflicting_workers_are_reported(tmp_path: Path) -> None:
+def test_conflicting_workers_are_reported_under_union(tmp_path: Path) -> None:
+    _init_repo(tmp_path)
+    crew = IsolatedCrew(
+        WritingBackend("_", "_"),
+        [_worker("a", "shared.txt", "from-A"), _worker("b", "shared.txt", "from-B")],
+    )
+    res = crew.run("edit shared", tmp_path, merge="union")
+    assert res.conflicts == ["shared.txt"]
+    assert res.merged == 0 and not res.ok
+    assert not (tmp_path / "shared.txt").exists()  # neither version silently wins
+
+
+def test_the_shared_file_lands_from_the_selected_worker_by_default(tmp_path: Path) -> None:
+    """Rewritten in study 28 (MA1): under one-file-one-owner this file landed from NEITHER worker.
+
+    Two workers that both changed the file the task was about, and both passed, is the crew
+    working — not a conflict. One of them is selected and its version lands.
+    """
     _init_repo(tmp_path)
     crew = IsolatedCrew(
         WritingBackend("_", "_"),
         [_worker("a", "shared.txt", "from-A"), _worker("b", "shared.txt", "from-B")],
     )
     res = crew.run("edit shared", tmp_path)
-    assert res.conflicts == ["shared.txt"]
-    assert res.merged == 0 and not res.ok
-    assert not (tmp_path / "shared.txt").exists()  # neither version silently wins
+    assert res.conflicts == [] and res.ok
+    assert res.selected == "a" and res.merged == 1
+    assert (tmp_path / "shared.txt").read_text(encoding="utf-8") == "from-A"
 
 
 def test_failing_worker_does_not_sink_the_crew(tmp_path: Path) -> None:
@@ -153,7 +187,9 @@ def test_a_worker_that_passed_but_lost_its_file_is_not_reported_as_landing_it(tm
         on_event=seen.append,
     )
 
-    res = crew.run("edit shared", tmp_path)
+    # Under union, where losing a contested file still happens. By default one worker is
+    # selected and lands it; `test_a_crew_lands_one_verified_worker_not_a_hybrid` covers that.
+    res = crew.run("edit shared", tmp_path, merge="union")
 
     produced = {e.task_id: e.data for e in seen if e.kind == "worker_produced"}
     assert set(produced) == {"a", "b"}
@@ -179,6 +215,7 @@ def test_a_worker_that_actually_landed_says_so(tmp_path: Path) -> None:
     produced = {e.task_id: e.data for e in seen if e.kind == "worker_produced"}
     assert produced["a"]["landed"] is True and produced["a"]["files"] == ["a.txt"]
     assert produced["a"]["lost"] == []
+    assert produced["a"]["selected"] is True
 
 
 def _events(crew_kwargs: dict[str, Any], tmp_path: Path, **run_kwargs: Any) -> list[Any]:

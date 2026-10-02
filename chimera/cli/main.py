@@ -5274,7 +5274,7 @@ def solve_batch(
 
 @app.command(name="crew-isolated")
 def crew_isolated(
-    task: str = typer.Argument(..., help="The shared task the workers divide."),
+    task: str = typer.Argument(..., help="The task every worker attempts (or divides, with --merge-all)."),
     worker: list[str] = _CREW_WORKER_OPT,
     workspace: str = typer.Option(".", "--workspace", "-w", help="Repository root (a git repo, to isolate)."),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
@@ -5282,15 +5282,22 @@ def crew_isolated(
     max_steps: int = typer.Option(6, "--max-steps", help="Max tool-calling steps per worker."),
     max_workers: int = typer.Option(4, "--max-workers", help="Max concurrent isolated workers."),
     synthesize: bool = typer.Option(False, "--synthesize", help="A supervisor folds the merged results into one unified report."),
+    merge_all: bool = typer.Option(
+        False, "--merge-all",
+        help="Workers do DISJOINT parts: land every approved worker's files instead of one "
+        "worker's whole tree (files two of them changed land from neither).",
+    ),
     fuse: bool = typer.Option(False, "--fuse", help="Route worker turns through fusion."),
     taint: bool = typer.Option(False, "--taint", help="Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless — it's always on for fan-out."),
 ) -> None:
-    """Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.
+    """Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated.
 
     Define workers with repeated --worker 'name:instruction'. Each runs a real agent loop
-    (search/read/edit) against an isolated checkout; non-conflicting edits that pass --verify
-    merge back, files two workers both changed are flagged as conflicts, and a worker whose
-    check fails is rejected (its edits discarded). Needs a git repo to isolate.
+    (search/read/edit) against an isolated checkout; a worker whose check fails is rejected (its
+    edits discarded). Of the workers that pass, ONE lands whole — a check that ran beats one that
+    could not, then the smallest diff, then the order given — and --verify runs again on the
+    merged workspace. With --merge-all, every approved worker's files land instead, and files two
+    of them changed are flagged as conflicts. Needs a git repo to isolate.
     """
     from chimera.governance import SharedTaint, TaintLedger, ledger_registry
     from chimera.orchestration import IsolatedCrew, IsolatedWorker, Role, RoleAgent
@@ -5370,20 +5377,35 @@ def crew_isolated(
         )
     crew = IsolatedCrew(backend, workers, supervisor=supervisor, max_workers=max_workers)
     try:
-        result = crew.run(task, Path(workspace), verify=verify)
+        result = crew.run(task, Path(workspace), verify=verify, merge="union" if merge_all else "select")
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
     for msg in result.transcript:
-        console.print(f"[green]✓ {msg.sender}[/green] merged")
+        if merge_all:
+            console.print(f"[green]✓ {msg.sender}[/green] merged")
+        elif msg.sender == result.selected:
+            console.print(f"[green]✓ {msg.sender}[/green] selected and merged")
+        else:
+            # Passed too. Said, because a second passing solution is information — and its diff is
+            # gone with its worktree unless it is printed here.
+            console.print(f"[cyan]✓ {msg.sender}[/cyan] passed, not selected")
+            if result.diffs.get(msg.sender):
+                console.print(result.diffs[msg.sender], markup=False, highlight=False)
     for name in result.rejected:
         console.print(f"[yellow]✗ {name}[/yellow] rejected (failed --verify)")
     for name, err in result.failures.items():
         console.print(f"[red]✗ {name}[/red] crashed: {err}")
     if result.conflicts:
         console.print(f"[yellow]conflicts (not merged):[/yellow] {', '.join(result.conflicts)}")
-    console.print(f"[dim]merged {result.merged} file(s) from {len(result.transcript)} worker(s)[/dim]")
+    landed_from = len(result.transcript) if merge_all else (1 if result.selected else 0)
+    console.print(f"[dim]merged {result.merged} file(s) from {landed_from} worker(s)[/dim]")
+    if result.reverify == "failed":
+        console.print("[red]the merged workspace FAILS --verify:[/red]")
+        console.print(result.reverify_output[-2000:], markup=False, highlight=False)
+    elif result.reverify:
+        console.print(f"[dim]--verify on the merged workspace: {result.reverify}[/dim]")
     if result.summary:
         console.print(Panel(result.summary, title="unified report", border_style="cyan"))
     colluded = _report_collusion(ledgers)

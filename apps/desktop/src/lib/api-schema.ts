@@ -4405,6 +4405,24 @@ export interface components {
             merged: number;
             /** Rejected */
             rejected?: string[];
+            /**
+             * Reverify
+             * @description The check run again on the workspace after the merge: passed | failed | abstained, or empty when it did not run (no check, or nothing landed).
+             * @default
+             */
+            reverify: string;
+            /**
+             * Reverify Detail
+             * @description What that second run printed, truncated.
+             * @default
+             */
+            reverify_detail: string;
+            /**
+             * Selected
+             * @description The worker whose tree landed. Empty when nothing landed.
+             * @default
+             */
+            selected: string;
         };
         /**
          * CrewRunIn
@@ -4521,6 +4539,12 @@ export interface components {
              */
             answer: string;
             /**
+             * Diff
+             * @description The worker's unified diff, truncated. For a worker that passed and was not selected this is the only copy left: its worktree is removed when the run ends.
+             * @default
+             */
+            diff: string;
+            /**
              * Files
              * @description The files this worker wrote that actually reached the workspace.
              */
@@ -4536,6 +4560,12 @@ export interface components {
              * @description The files it wrote that did NOT — discarded by the check, or contested by another worker. Reported because a discarded attempt leaves nothing else behind: the worktree is removed when the run ends.
              */
             lost?: string[];
+            /**
+             * Selected
+             * @description This worker's tree is the one that landed. A crew lands ONE approved worker whole; another worker can have passed the same check and still not be selected.
+             * @default false
+             */
+            selected: boolean;
             /**
              * Task Id
              * @default

@@ -1,15 +1,16 @@
 """Ready-made approaches for a crew, chosen so that two of them produce different diffs.
 
 Every worker in an :class:`~chimera.orchestration.crew.IsolatedCrew` attacks the SAME task in
-its own checkout, and the merge rule is mechanical one-file-one-owner: a file two *successful*
-workers both changed is a conflict and lands from NEITHER of them
-(:func:`~chimera.orchestration.isolation._merge_back`). Read that twice, because it inverts the
-intuition — the more workers pass the check, the less of their work survives.
+its own checkout, and exactly ONE of the workers that pass the check lands, whole
+(:func:`~chimera.orchestration.crew.select_worker`): a check that ran beats one that abstained,
+then the smallest diff wins. (Until study 28 the rule was one-file-one-owner — every passing
+worker's uncontested files landed, so two verified solutions fused into a hybrid nobody verified,
+and the file both had to change landed from neither.)
 
-So a crew is not "more attempts, more chance one works". It is a *competitive* mechanism, and it
-pays only when the check DISCRIMINATES: several attempts, most eliminated, ideally one survivor
-per file. Two workers running the same approach are the pathological case — near-identical
-diffs, both passing, both discarded.
+So a crew is not "more attempts, more chance one works" for free. It is a *competitive*
+mechanism, and it pays only when the check DISCRIMINATES: several attempts, most eliminated.
+Two workers running the same approach are the wasteful case — near-identical diffs, both
+passing, one of them paid for and thrown away.
 
 Which is what this catalogue is for. These are not personalities; picking "optimistic" and
 "pessimistic" would be theatre, because both write the same code. Each entry here changes

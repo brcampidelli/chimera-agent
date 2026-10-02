@@ -194,6 +194,36 @@ class GitWorktree:
             if line.strip() and not any(part in _IGNORE_DIRS for part in Path(line).parts)
         ]
 
+    def diff_stat(self) -> tuple[str, int]:
+        """The staged unified diff against HEAD, and how many lines it adds plus removes.
+
+        Read with the same ``_IGNORE_DIRS`` filter as :meth:`changed_paths`, so bytecode the verify
+        command wrote is neither shown to a person as part of a solution nor counted as its size.
+        A binary file has no line count (git prints ``-``) and is counted as one line: it is a
+        change, and counting it as zero would make a worker that only rewrote a binary look like
+        the smallest edit in the crew.
+
+        The filter is passed to git as exclude pathspecs rather than as the list of kept paths: a
+        worker that touched thousands of files would otherwise put all of them on one command line,
+        which Windows caps at 32k characters.
+        """
+        self.changed_paths()  # stages untracked files, so they appear in the diff below
+        spec = ["--", ".", *(f":(exclude,glob)**/{name}/**" for name in sorted(_IGNORE_DIRS))]
+        lines = 0
+        numstat = _git(["diff", "--cached", "--numstat", "HEAD", *spec], self.path)
+        for row in numstat.stdout.splitlines():
+            added, _, rest = row.partition("\t")
+            removed, _, path = rest.partition("\t")
+            if not path or any(part in _IGNORE_DIRS for part in Path(path).parts):
+                continue
+            if added == "-" or removed == "-":
+                lines += 1
+                continue
+            with suppress(ValueError):
+                lines += int(added) + int(removed)
+        patch = _git(["diff", "--cached", "HEAD", *spec], self.path)
+        return patch.stdout, lines
+
     def copy_back_to(self, dest: Path, *, only: set[str] | None = None) -> int:
         """Apply the changed files to ``dest``. Returns the number of changes.
 

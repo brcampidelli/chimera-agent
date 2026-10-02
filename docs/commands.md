@@ -25,7 +25,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`chat`](#chat) | Interactive multi-turn chat — your terminal right-hand. Requires a key. |
 | [`context-curve`](#context-curve) | Did runs carrying more context do worse? Measured on THIS machine's own logs. |
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
-| [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated. |
+| [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
 | [`decide`](#decide) | Ask typed questions — yes/no, a choice, a score — and get probabilities back. |
 | [`decisions`](#decisions) | Typed decisions: which model answers them, the log of what they answered, labels, a report and a refit. |
@@ -394,12 +394,14 @@ chimera crew TASK
 
 ## crew-isolated
 
-Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.
+Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated.
 
 Define workers with repeated --worker 'name:instruction'. Each runs a real agent loop
-(search/read/edit) against an isolated checkout; non-conflicting edits that pass --verify
-merge back, files two workers both changed are flagged as conflicts, and a worker whose
-check fails is rejected (its edits discarded). Needs a git repo to isolate.
+(search/read/edit) against an isolated checkout; a worker whose check fails is rejected (its
+edits discarded). Of the workers that pass, ONE lands whole — a check that ran beats one that
+could not, then the smallest diff, then the order given — and --verify runs again on the
+merged workspace. With --merge-all, every approved worker's files land instead, and files two
+of them changed are flagged as conflicts. Needs a git repo to isolate.
 
 ```bash
 chimera crew-isolated TASK
@@ -407,7 +409,7 @@ chimera crew-isolated TASK
 
 | Argument | |
 | --- | --- |
-| `TASK` | The shared task the workers divide. |
+| `TASK` | The task every worker attempts (or divides, with --merge-all). |
 
 | Option | | Default |
 | --- | --- | --- |
@@ -418,6 +420,7 @@ chimera crew-isolated TASK
 | `--max-steps` | Max tool-calling steps per worker. | `6` |
 | `--max-workers` | Max concurrent isolated workers. | `4` |
 | `--synthesize` | A supervisor folds the merged results into one unified report. |  |
+| `--merge-all` | Workers do DISJOINT parts: land every approved worker's files instead of one worker's whole tree (files two of them changed land from neither). |  |
 | `--fuse` | Route worker turns through fusion. |  |
 | `--taint` | Arm each worker's adaptive allowlist (dangerous-when-tainted tools require approval). The cross-agent collusion monitor runs regardless — it's always on for fan-out. |  |
 

@@ -2589,6 +2589,24 @@
             },
             "title": "Rejected",
             "type": "array"
+          },
+          "reverify": {
+            "default": "",
+            "description": "The check run again on the workspace after the merge: passed | failed | abstained, or empty when it did not run (no check, or nothing landed).",
+            "title": "Reverify",
+            "type": "string"
+          },
+          "reverify_detail": {
+            "default": "",
+            "description": "What that second run printed, truncated.",
+            "title": "Reverify Detail",
+            "type": "string"
+          },
+          "selected": {
+            "default": "",
+            "description": "The worker whose tree landed. Empty when nothing landed.",
+            "title": "Selected",
+            "type": "string"
           }
         },
         "title": "CrewDoneOut",
@@ -2891,6 +2909,12 @@
             "title": "Answer",
             "type": "string"
           },
+          "diff": {
+            "default": "",
+            "description": "The worker's unified diff, truncated. For a worker that passed and was not selected this is the only copy left: its worktree is removed when the run ends.",
+            "title": "Diff",
+            "type": "string"
+          },
           "files": {
             "description": "The files this worker wrote that actually reached the workspace.",
             "items": {
@@ -2912,6 +2936,12 @@
             },
             "title": "Lost",
             "type": "array"
+          },
+          "selected": {
+            "default": false,
+            "description": "This worker's tree is the one that landed. A crew lands ONE approved worker whole; another worker can have passed the same check and still not be selected.",
+            "title": "Selected",
+            "type": "boolean"
           },
           "task_id": {
             "default": "",

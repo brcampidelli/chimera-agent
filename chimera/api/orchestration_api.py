@@ -389,6 +389,20 @@ class CrewWorkerProducedOut(BaseModel):
         default=False,
         description="Whether these files were merged. False means the work existed and was thrown away.",
     )
+    selected: bool = Field(
+        default=False,
+        description=(
+            "This worker's tree is the one that landed. A crew lands ONE approved worker whole; "
+            "another worker can have passed the same check and still not be selected."
+        ),
+    )
+    diff: str = Field(
+        default="",
+        description=(
+            "The worker's unified diff, truncated. For a worker that passed and was not selected "
+            "this is the only copy left: its worktree is removed when the run ends."
+        ),
+    )
 
 
 class CrewDoneOut(BaseModel):
@@ -397,6 +411,17 @@ class CrewDoneOut(BaseModel):
     failed: list[str] = Field(default_factory=list)
     rejected: list[str] = Field(default_factory=list)
     answer: str = ""
+    selected: str = Field(
+        default="", description="The worker whose tree landed. Empty when nothing landed."
+    )
+    reverify: str = Field(
+        default="",
+        description=(
+            "The check run again on the workspace after the merge: passed | failed | abstained, "
+            "or empty when it did not run (no check, or nothing landed)."
+        ),
+    )
+    reverify_detail: str = Field(default="", description="What that second run printed, truncated.")
     is_repo: bool = Field(
         default=False,
         description=(

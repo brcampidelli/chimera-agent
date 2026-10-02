@@ -900,12 +900,12 @@
     },
     {
       "deprecated": false,
-      "help": "Tier-3: tool-using workers split ONE task, each in its own git worktree, verify-gated.\n\nDefine workers with repeated --worker 'name:instruction'. Each runs a real agent loop\n(search/read/edit) against an isolated checkout; non-conflicting edits that pass --verify\nmerge back, files two workers both changed are flagged as conflicts, and a worker whose\ncheck fails is rejected (its edits discarded). Needs a git repo to isolate.",
+      "help": "Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated.\n\nDefine workers with repeated --worker 'name:instruction'. Each runs a real agent loop\n(search/read/edit) against an isolated checkout; a worker whose check fails is rejected (its\nedits discarded). Of the workers that pass, ONE lands whole \u2014 a check that ran beats one that\ncould not, then the smallest diff, then the order given \u2014 and --verify runs again on the\nmerged workspace. With --merge-all, every approved worker's files land instead, and files two\nof them changed are flagged as conflicts. Needs a git repo to isolate.",
       "hidden": false,
       "name": "crew-isolated",
       "params": [
         {
-          "help": "The shared task the workers divide.",
+          "help": "The task every worker attempts (or divides, with --merge-all).",
           "kind": "argument",
           "name": "task",
           "opts": [
@@ -986,6 +986,16 @@
           "name": "synthesize",
           "opts": [
             "--synthesize"
+          ],
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "help": "Workers do DISJOINT parts: land every approved worker's files instead of one worker's whole tree (files two of them changed land from neither).",
+          "kind": "option",
+          "name": "merge_all",
+          "opts": [
+            "--merge-all"
           ],
           "required": false,
           "type": "boolean"

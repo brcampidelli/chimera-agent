@@ -52,6 +52,11 @@ class IsolatedResult(Generic[T]):
     value: T | None = None
     error: str = ""
     changed_paths: list[str] = field(default_factory=list)
+    #: Lines added plus removed, and the unified diff itself. Read at the same moment as
+    #: ``changed_paths`` and for the same reason: the worktree is removed when the batch ends, so a
+    #: unit whose edits did not land leaves no other account of what it wrote.
+    changed_lines: int = 0
+    diff: str = ""
 
 
 @dataclass
@@ -61,10 +66,17 @@ class IsolatedBatch(Generic[T]):
     results: list[IsolatedResult[T]]
     conflicts: list[str] = field(default_factory=list)
     merged: int = 0  # changed files copied back to the real workspace
+    #: The one unit whose tree landed, when the caller asked for selection (``select=``). Empty
+    #: in the default merge-every-unit mode, and when no candidate was chosen.
+    selected: str = ""
 
     @property
     def ok(self) -> bool:
         return all(result.ok for result in self.results)
+
+
+#: Picks the one unit whose tree lands, from the successful ones (in unit order), or ``None``.
+Selector = Callable[[list[IsolatedResult[T]]], str | None]
 
 
 def _batch_deadline(timeout: float | None) -> float | None:
@@ -99,6 +111,7 @@ def run_isolated(
     max_workers: int = 4,
     timeout: float | None = None,
     cancelled: Callable[[], bool] | None = None,
+    select: Selector[T] | None = None,
 ) -> IsolatedBatch[T]:
     """Run each unit in its own git worktree concurrently; merge non-conflicting edits back.
 
@@ -116,6 +129,15 @@ def run_isolated(
     pressed Stop: a unit stuck inside a model call never reads a cooperative flag, so without this
     the batch waited out the whole four hours for it. A unit abandoned this way has no outcome,
     fails ``succeeded``, and is therefore NOT merged — cancelling cannot land half an edit.
+
+    ``select`` changes what merging MEANS, and it exists for units that attack the SAME task. The
+    default copies every successful unit's non-conflicting files, which is right when the units
+    did different jobs (``solve-batch``, the kanban) and wrong when they are rival solutions to one
+    job: the union of two solutions that each passed a check is a third program that nobody
+    checked, and the file both of them had to change lands from neither. With ``select``, the
+    callable is handed the successful units (in unit order) and names one; that unit's tree lands
+    whole, every other unit's lands not at all, and nothing is reported as a conflict because
+    nothing was dropped for being contested. Returning ``None`` lands nothing.
     """
     workspace = Path(workspace).resolve()
     if not units:
@@ -142,14 +164,22 @@ def run_isolated(
         stopped = bool(cancelled and cancelled())
         for name, _ in units:
             results[name] = _collect(outcomes[name], trees[name], succeeded, deadline, stopped)
-        conflicts, merged = _merge_back(workspace, trees, results)
+        if select is not None:
+            conflicts: list[str] = []
+            selected, merged = _merge_selected(workspace, trees, results, [n for n, _ in units], select)
+        else:
+            selected = ""
+            conflicts, merged = _merge_back(workspace, trees, results)
     finally:
         for tree in trees.values():
             if tree is not None:
                 tree.remove()
 
     return IsolatedBatch(
-        results=[results[name] for name, _ in units], conflicts=conflicts, merged=merged
+        results=[results[name] for name, _ in units],
+        conflicts=conflicts,
+        merged=merged,
+        selected=selected,
     )
 
 
@@ -177,10 +207,16 @@ def _collect(
     # the last moment it can be asked. Guarded because a unit that crashed may have left the tree
     # in a state git refuses to read, and a report is never worth failing a batch over.
     changed: list[str] = []
+    diff, lines = "", 0
     if tree is not None:
         with suppress(Exception):
             changed = tree.changed_paths()
-    return IsolatedResult(slot.name, ok=ok, value=value, changed_paths=changed)
+        if changed:
+            with suppress(Exception):
+                diff, lines = tree.diff_stat()
+    return IsolatedResult(
+        slot.name, ok=ok, value=value, changed_paths=changed, changed_lines=lines, diff=diff
+    )
 
 
 def _merge_back(
@@ -208,6 +244,38 @@ def _merge_back(
     if conflicts:
         _log.debug("isolated run: %d conflicting file(s) not merged: %s", len(conflicts), conflicts)
     return conflicts, merged
+
+
+def _merge_selected(
+    workspace: Path,
+    trees: dict[str, GitWorktree | None],
+    results: dict[str, IsolatedResult[T]],
+    order: list[str],
+    select: Selector[T],
+) -> tuple[str, int]:
+    """Copy back ONE successful unit's tree, whole; return (its name, files merged).
+
+    Only units that ran in a worktree are candidates. Outside a git repo every unit wrote straight
+    into the workspace, so there is nothing to choose between and nothing to copy — the caller
+    already said so with ``is_repo``.
+    """
+    candidates = [
+        results[name] for name in order if results[name].ok and trees.get(name) is not None
+    ]
+    if not candidates:
+        return "", 0
+    chosen = select(candidates)
+    if not chosen:
+        return "", 0
+    tree = trees.get(chosen)
+    if tree is None or not results[chosen].ok:
+        # The selector named something it was not offered. Landing it anyway would put an
+        # unverified tree into the workspace on a typo; landing nothing is the safe reading.
+        _log.warning("isolated run: selector chose %r, which was not a candidate", chosen)
+        return "", 0
+    merged = tree.copy_back_to(workspace)
+    _log.debug("isolated run: selected %s, merged %d file(s)", chosen, merged)
+    return chosen, merged
 
 
 def run_in_processes(
