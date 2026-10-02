@@ -132,6 +132,7 @@ class MessagingManager:
         from chimera.governance.profile import governed_profile
         from chimera.integrations import SenderRegistry, SendMessageTool
         from chimera.interface import ChatSession
+        from chimera.interface.profile import session_preamble
         from chimera.server import MessageGateway
         from chimera.tools import default_registry
 
@@ -170,13 +171,17 @@ class MessagingManager:
                 runner,
                 memory=self._memory,
                 graph=self._graph,
+                # As in `_serve_platform`, which had the same gap: the owner's profile, and recalled
+                # facts quoted the way the terminal quotes them. Still no extractor (see there).
+                profile=session_preamble(self._settings.home, self._memory),
+                cite_facts=self._settings.memory_extract,
                 remember_from_chat=self._settings.remember_from_chat,
                 real_history=self._settings.chat_real_history,
                 # As in `_serve_platform`: the chat hears when a job it started has ended.
                 turn_note=lambda: finished_note(self._settings.home, self._workspace),
             )
 
-        return MessageGateway(factory, warnings_in_reply=True).on_message
+        return MessageGateway(factory, warnings_in_reply=True, name_the_channel=True).on_message
 
     def start(self, platform: str) -> None:
         """Start ``platform`` in a background thread. Idempotent; raises ValueError if not configured

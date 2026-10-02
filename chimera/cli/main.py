@@ -221,12 +221,9 @@ def _session_profile(mem: Any) -> str:
     Byte-stable for the same profile (the cacheable prefix); memory-derived facts go
     in a separated volatile section so they never break the stable prefix.
     """
-    from chimera.interface.profile import load_profile, profile_path, render_profile
+    from chimera.interface.profile import session_preamble
 
-    settings = get_settings()
-    stored = load_profile(profile_path(settings.home))
-    memory_part = mem.profile() if mem is not None else ""
-    return render_profile(stored, memory_part)
+    return session_preamble(get_settings().home, mem)
 
 
 def _cascade_backend(gateway: SupportsComplete, settings: Any) -> SupportsComplete:
@@ -3543,12 +3540,22 @@ def _serve_platform(
                 turn_context=True,
             )),
         )
+        live = get_settings()
         return ChatSession(
             runner,
             memory=memory,
             graph=graph,
+            # The three things the terminal gives its session and this one did not: who the owner
+            # is (the stored profile and memory's persona), recalled facts quoted with their source
+            # and date under the "possibly stale" header, and the owner's own "remember that…"
+            # switch. The production bot was the one surface answering the owner without them.
+            # `remember_from_chat` is passed through as set, never turned on here; and there is
+            # still no `extractor`: anyone who can reach a bot would be writing the owner's memory.
+            profile=_session_profile(memory),
+            cite_facts=live.memory_extract,
+            remember_from_chat=live.remember_from_chat,
             # The path `serve --discord` runs, which is the production bot.
-            real_history=get_settings().chat_real_history,
+            real_history=live.chat_real_history,
             # A shell command that outlived its timeout kept running as a job; this is how the
             # chat hears that it ended.
             turn_note=lambda: finished_note(get_settings().home, workspace_path),
@@ -3562,7 +3569,7 @@ def _serve_platform(
             ),
         )
 
-    gateway = MessageGateway(factory, warnings_in_reply=True)
+    gateway = MessageGateway(factory, warnings_in_reply=True, name_the_channel=True)
     console.print(
         f"[bold]Chimera on {adapter.platform}[/bold] "
         "[dim]— message the bot; each chat is its own session. Ctrl+C to stop.[/dim]"

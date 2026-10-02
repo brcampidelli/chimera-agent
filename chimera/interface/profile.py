@@ -112,3 +112,17 @@ def render_profile(profile: UserProfile, memory_profile: str = "") -> str:
         volatile = "## Recalled facts (volatile)\n" + memory_profile.strip()
         return f"{stable}\n\n{volatile}" if stable else volatile
     return stable
+
+
+def session_preamble(home: Path, memory: object | None) -> str:
+    """The preamble a conversation with the owner gets: the stored profile, then memory's persona.
+
+    One function for every surface that answers a person, because the bots used to build their
+    sessions without it: the terminal rendered both halves, the HTTP gateway only memory's, and the
+    Discord bot neither, so the production bot was the one surface that did not know who it worked
+    for. ``memory`` is duck-typed on ``profile()``; a backend without it contributes nothing.
+    """
+    stored = load_profile(profile_path(home))
+    persona = getattr(memory, "profile", None)
+    memory_part = persona() if callable(persona) else ""
+    return render_profile(stored, str(memory_part or ""))

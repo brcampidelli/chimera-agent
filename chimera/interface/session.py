@@ -481,10 +481,15 @@ class ChatSession:
             extra = ""
         return "\n\n".join(part for part in (note, extra) if part)
 
-    def send(self, message: str) -> str:
-        """Run one user message through the agent and record the exchange."""
+    def send(self, message: str, *, channel_note: str = "") -> str:
+        """Run one user message through the agent and record the exchange.
+
+        ``channel_note`` says where the message came from (:func:`chimera.server.gateway.channel_note`)
+        and travels like the other per-turn notes: in the turn, never in the system prompt and never
+        in the record.
+        """
         self._begin_turn(message)
-        note = self._note_for_turn()
+        note = self._note_for_turn(channel_note)
         messages: list[dict[str, Any]] | None = None
         facts, _layer = self._recall(message)
         if self._real_history_ready():
@@ -514,6 +519,7 @@ class ChatSession:
         on_tool: Callable[[ToolActivity], None] | None = None,
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
+        channel_note: str = "",
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
@@ -524,11 +530,13 @@ class ChatSession:
 
         ``documents`` are ``(name, text)`` pairs attached to THIS message, folded into it the way
         the coding turn folds them. With :attr:`grounded_answers` set, the answer is checked against
-        them before it is recorded (`chimera/fusion/verified.py`)."""
+        them before it is recorded (`chimera/fusion/verified.py`).
+
+        ``channel_note`` is as in :meth:`send`."""
         self._begin_turn(message)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
-        note = self._note_for_turn(note)
+        note = self._note_for_turn("\n\n".join(part for part in (channel_note, note) if part))
         declined: list[DeclinedTool] = []
         observed: list[ToolActivity] = []
 
