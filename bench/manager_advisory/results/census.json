@@ -1,0 +1,181 @@
+{
+  "c1": {
+    "files_scanned": 1056,
+    "unreadable": 0,
+    "files_with_labels": {},
+    "labels_total": 0
+  },
+  "c2": {
+    "datasets": [
+      {
+        "bench": "harness_bench factorial",
+        "solves": 552,
+        "manager": false,
+        "verifier": false,
+        "source": "harness_bench/PREREGISTRATION.md:36 --no-manager"
+      },
+      {
+        "bench": "swe_bench baseline arms",
+        "solves": 82,
+        "manager": false,
+        "verifier": false,
+        "source": "swe_bench/run_swe.py _ARMS['baseline'] --no-manager"
+      },
+      {
+        "bench": "swe_bench treatment arms",
+        "solves": 126,
+        "manager": true,
+        "verifier": false,
+        "source": "swe_bench/run_swe.py _SCAFFOLD (no --no-manager, no --verify, --keep-workspace)",
+        "run_verdict_stored": false,
+        "manager_saw_diff": false
+      },
+      {
+        "bench": "tool_defer",
+        "solves": 60,
+        "manager": true,
+        "verifier": false,
+        "source": "tool_defer/run_paired.py _solve (no --no-manager, no --verify)",
+        "run_verdict_stored": true,
+        "manager_saw_diff": true
+      },
+      {
+        "bench": "test_gate_two_sided",
+        "solves": 98,
+        "manager": false,
+        "verifier": false,
+        "source": "test_gate_two_sided/run_patches.py:35 --no-manager",
+        "note": "patches-all.jsonl is the union of the other two files; deduplicated by (task, replica, model)"
+      },
+      {
+        "bench": "unattended_claims",
+        "solves": 34,
+        "manager": false,
+        "verifier": false,
+        "source": "unattended_claims/run.py:231 use_manager=False"
+      },
+      {
+        "bench": "local_lift journals",
+        "solves": 212,
+        "manager": "half",
+        "verifier": true,
+        "source": "local_lift/run_paired.py --verify on both arms"
+      },
+      {
+        "bench": "learning_lift",
+        "solves": 1140,
+        "manager": true,
+        "verifier": true,
+        "source": "learning_lift/run_learning.py:154 --verify"
+      },
+      {
+        "bench": "retry_lift",
+        "solves": 360,
+        "manager": true,
+        "verifier": true,
+        "source": "retry_lift/run_retry.py:82 --verify"
+      },
+      {
+        "bench": "edit_tools",
+        "solves": 62,
+        "manager": true,
+        "verifier": true,
+        "source": "edit_tools/run_pilot.py:80 --verify"
+      }
+    ],
+    "solves_total": 2726,
+    "manager_decides": 186,
+    "manager_decides_share": 0.068,
+    "manager_decides_with_verdict_and_oracle": 60
+  },
+  "c3": {
+    "runs": 60,
+    "halted": 0,
+    "approved_pass": 33,
+    "approved_fail": 4,
+    "failed_pass": 0,
+    "failed_fail": 23,
+    "approved_precision": 0.892,
+    "share_all_attempts_reverted": 0.383
+  },
+  "c4": {
+    "fields_stored_per_row": [
+      "arm",
+      "completed",
+      "exit",
+      "needs",
+      "network",
+      "prompt_tokens",
+      "reached",
+      "repeat",
+      "seconds",
+      "steps",
+      "tail",
+      "task",
+      "timed_out",
+      "tools"
+    ],
+    "reverted_work_recoverable": false,
+    "failed_runs_whose_answer_mentions_the_expected_value": 10,
+    "failed_runs_on_value_tasks": 10,
+    "failed_runs": 23
+  },
+  "c5": {
+    "control_reproduces_47_246_2_139": true,
+    "unexpected_verdicts": [],
+    "all_385": {
+      "n": 385,
+      "true": 246,
+      "false": 139,
+      "gate": {
+        "approved_true": 47,
+        "approved_false": 2,
+        "TPR": 0.191,
+        "FPR": 0.014
+      },
+      "advisory": {
+        "TPR": 1.0,
+        "FPR": 1.0
+      },
+      "delta_TPR": 0.809,
+      "delta_FPR": 0.986,
+      "p_false_base": 0.361,
+      "p_false_given_revise": 0.408,
+      "p_false_given_approve": 0.041,
+      "revise_lift_ci": [
+        0.021,
+        0.074
+      ]
+    },
+    "productive_evidence_rows": {
+      "n": 262,
+      "true": 197,
+      "false": 65,
+      "gate": {
+        "approved_true": 47,
+        "approved_false": 2,
+        "TPR": 0.239,
+        "FPR": 0.031
+      },
+      "advisory": {
+        "TPR": 1.0,
+        "FPR": 1.0
+      },
+      "delta_TPR": 0.761,
+      "delta_FPR": 0.969,
+      "p_false_base": 0.248,
+      "p_false_given_revise": 0.296,
+      "p_false_given_approve": 0.041,
+      "revise_lift_ci": [
+        0.012,
+        0.081
+      ]
+    }
+  },
+  "decision": {
+    "D1_advisory_default": false,
+    "D2_identifiable": false,
+    "D2_opt_in": null,
+    "ships": "nothing"
+  }
+}
