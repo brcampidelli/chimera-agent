@@ -9,8 +9,8 @@ would reopen each line. Every claim cites a bench in this repository or a paper 
 
 **The topology is flat: one strong agent does the work.** A second agent is allowed in four forms
 only, each for the reason it was measured to pay, each turned on by an explicit request with its
-cost shown first, and each answerable to a single-agent arm at equal cost
-([`bench/PROTOCOL.md`](../bench/PROTOCOL.md) §10).
+cost shown first, and each answerable to a single-agent arm at equal cost — the same model calls
+or the same US$, with the pre-registration saying which ([`bench/PROTOCOL.md`](../bench/PROTOCOL.md) §10).
 
 ## What we measured
 
@@ -19,12 +19,12 @@ The numbers below are quoted from the files in the source column; a test
 
 | question | measured | source |
 |---|---|---|
-| Does a hierarchy beat one agent given the same number of calls? | No: `pass^3` `−26.7 pp`, interval `[−36.2, −4.2]` over 30 tasks, discordant `2 for the hierarchy, 10 for the single agent` (3B backbone on every role) | [hierarchy_equal_calls](../bench/hierarchy_equal_calls/RESULTS.md) |
-| Where does the hierarchy lose? | In the synthesis over the workers' summaries: hierarchy `0.28` / `0.10` against workers alone `0.44` / `0.23` (`pass@1` / `pass^3`, 30 tasks) | [hierarchy_equal_calls](../bench/hierarchy_equal_calls/RESULTS.md) |
+| Does a hierarchy beat one agent given the same number of calls? | Not on a `3B` backbone on every role over 30 synthetic read-heavy extraction tasks, and only as a direction: `pass^3` `−26.7 pp`, interval `[−36.2, −4.2]`, discordant `2 for the hierarchy, 10 for the single agent`, with the point estimate inside the `33–47%` flip floor — so the registered sentence stays "one agent that re-reads the documents does as well or better on tasks like these". The arms held equal *calls*, not tokens: the single agent spent `13,611` tokens per task against the hierarchy's `1,962`, about 7× | [hierarchy_equal_calls](../bench/hierarchy_equal_calls/RESULTS.md) |
+| Where does the hierarchy lose? | On a weak synthesiser: with `3B` on every role, hierarchy `0.28` / `0.10` against workers alone `0.44` / `0.23` (`pass@1` / `pass^3`, 30 tasks). With the production synthesiser `claude-opus-5` over the same `3B` workers, the hierarchy scored `0.63` / `0.50` on ten tasks, level with the workers alone (`0.57` / `0.50`); no single-agent arm at equal calls has run on that tier | [hierarchy_equal_calls](../bench/hierarchy_equal_calls/RESULTS.md) |
 | Does context isolation pay? | Multi-step reading of large documents: token reduction `+66.5%`, pass rate `100%` in both arms (n=6) | [hierarchy_multistep](../bench/hierarchy_multistep/RESULTS.md) |
 | …and in single-shot reading of small documents? | No: the split cost more, a token "reduction" of `−46.9%` | [hierarchy](../bench/hierarchy/RESULTS.md) |
 | Are three panel models three votes? | No: `34 of 50 items unanimous where 16.5 were expected`, `1.46 independent votes` | [panel_correlation](../bench/panel_correlation/RESULTS.md) |
-| Can an LLM Manager gate an attempt no executable check decided? | It rejects most correct work: approves `47/246 = 0.19` true successes and `2/139 = 0.01` false ones with the diff, `5/246 = 0.02` with prose only | [manager_diff](../bench/manager_diff/RESULTS.md), [manager_p](../bench/manager_p/RESULTS.md) |
+| Can an LLM Manager gate an attempt no executable check decided? | It rejects most correct work: approves `47/246 = 0.19` true successes and `2/139 = 0.01` false ones with the diff, `5/246 = 0.02` with prose only. Of the 385 rows, `123` showed the Manager a "no productive change" that was a blind spot of the reconstruction; on the `262` with real evidence it approves `47/197 = 0.24` — a correct attempt rejected three times in four | [manager_diff](../bench/manager_diff/RESULTS.md), [manager_p](../bench/manager_p/RESULTS.md) |
 | Does a planner role help the solve loop? | No: `+0.003` on the oracle, `[−0.022, +0.029]`, 23 tasks × 8 arms × k=3 | [harness_bench](../bench/harness_bench/RESULTS.md) |
 | Does a cross-family reviewer find real defects? | Yes, and it also flags clean code: recall `39/40 = 97.5%`, `8.5` findings per ten clean diffs | [review_reviewer](../bench/review_reviewer/RESULTS.md) |
 | Is a sequential retry an independent attempt? | No: the second attempt recovered `4 of 21` where independence predicts `12.5` | [retry_contamination](../bench/retry_contamination/RESULTS.md) |
@@ -35,9 +35,10 @@ The numbers below are quoted from the files in the source column; a test
 
 - **2609.04217** — at an equal number of model calls, a Planner-Executor-Critic team scored 0.769
   against a single agent's 0.754 (p = 0.80) on ALFWorld; all realised value was in the executor.
-- **2609.35875** — 23 models, 5,500+ runs: at matched budget, debate ties or loses to
-  self-consistency at 3.4× the tokens; personas reduce accuracy; mixed-model teams lose to the
-  majority vote of their own members; nearly all of debate's benefit is in the first exchange.
+- **2609.35875** — 23 *small* language models, 5,500+ runs: at matched budget, debate ties or
+  loses to self-consistency at 3.4× the tokens; personas reduce accuracy; mixed-model teams lose to
+  the majority vote of their own members; nearly all of debate's benefit is in the first exchange;
+  and a silent context overflow had made debate's deficit (−1.8 points became parity once fixed).
 - **2609.03718** — with information access and repair budget fixed, one generic harness scored
   96.4% against 88.2% for multi-agent systems on FoamBench; execution-feedback repair was the lift
   (71.8% → 96.4%).
@@ -66,8 +67,10 @@ The numbers below are quoted from the files in the source column; a test
 ## The four sanctioned forms
 
 1. **A read-only sub-agent for context isolation.** It reads, the caller keeps its conclusion, it
-   cannot write and cannot spawn. It pays in multi-step reading over large documents and costs
-   tokens in single-shot reading (above). Today this is `ExploreRepositoryTool`, off by default on
+   cannot write and cannot spawn. The regime that pays — multi-step reading over large documents,
+   against single-shot reading where the split costs tokens (above) — was measured on the
+   hierarchy's bounded workers, not on the explorer or `spawn_subagent`, which no bench measures
+   (study 28 MA5); carrying it over is an inference by analogy. Today this is `ExploreRepositoryTool`, off by default on
    the Code screen; it becomes a default only if a census of real turns finds the paying regime often
    enough (study 28 MA5). `spawn_subagent` (only with `solve --subagents`) is wider than this form —
    the caller may grant it write tools — and stays opt-in and unmeasured.
@@ -92,12 +95,12 @@ The numbers below are quoted from the files in the source column; a test
 
 | out | the measured reason |
 |---|---|
-| An LLM manager or supervisor with a veto where nothing executes | rejects about four in five correct attempts (`manager_diff`); flat beat loop-back authority (2609.14767) |
+| An LLM manager or supervisor with a veto where nothing executes | rejects about three in four correct attempts on the rows with real evidence (`manager_diff`); flat beat loop-back authority (2609.14767) |
 | A planner role in front of a strong executor | `+0.003`, inside the noise, at a cost (`harness_bench`); 2609.04217 |
-| Debate or multi-round peer review | ties or loses to self-consistency at 3.4× tokens (2609.35875) |
-| Personas or "personality" roles | reduce accuracy (2609.35875); useful diversity is structural |
+| Debate or multi-round peer review | ties or loses to self-consistency at 3.4× tokens, on small language models (2609.35875) |
+| Personas or "personality" roles | reduce accuracy on small language models (2609.35875); useful diversity is structural |
 | A bigger or more mixed panel as more independent votes | three models carry 1.46 votes (`panel_correlation`); 2609.17306 |
-| Deep hierarchies | each hop keeps 0.571 (2609.17464); the synthesis step is where our values were lost |
+| Deep hierarchies | each hop keeps 0.571 (2609.17464); on a weak (3B) synthesiser the synthesis step is where our values were lost |
 | A multi-agent trading desk on the eToro mandate | 2608.24069, 2609.05663, 2608.27734; trading numbers stay in deterministic scripts |
 | Proactive fan-out in the Discord bot or cron jobs | no measurement asks for it, and every hop is a place a number can be corrupted |
 

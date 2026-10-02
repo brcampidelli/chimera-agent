@@ -74,3 +74,31 @@ def test_the_protocol_rule_the_policy_points_at_exists() -> None:
     protocol = PROTOCOL.read_text(encoding="utf-8")
     assert "PROTOCOL.md` §10" in policy or "PROTOCOL.md) §10" in policy
     assert "## 10. Every multi-agent arm has a single-agent arm at equal cost" in protocol
+
+
+def test_every_equal_calls_row_names_the_backbone_and_what_was_held_equal() -> None:
+    """The equal-calls bench ran a 3B model on every role and held calls, not tokens.
+
+    The first version of this page quoted −26.7 pp correctly and still misread it: it called the
+    synthesis step the place the hierarchy loses, when that held on the 3B synthesiser and not on
+    the production one (0.63 / 0.50, addendum 2), and it said "equal cost" where the bench held
+    calls and the single agent spent ~7x the tokens. Both slips passed the verbatim check above,
+    because a number can be quoted exactly and scoped wrong. This pins the scope to the rows.
+    """
+    rows = [r for r in _measured_rows() if any("hierarchy_equal_calls" in str(p) for p in r[2])]
+    assert rows, "no row cites hierarchy_equal_calls"
+    for question, figures, _ in rows:
+        assert "3B" in figures, f"row {question!r} does not name the 3B backbone it measured"
+    quoted = {f for _, figures, _ in rows for f in figures}
+    assert "0.63" in quoted, "the production-synthesiser result (addendum 2) is missing"
+    assert "13,611" in quoted, "the rows do not say the arms held calls, not tokens"
+
+
+def test_the_architecture_page_scopes_the_equal_calls_number() -> None:
+    """docs/architecture.md is where a reader meets the hierarchy as a feature; the scope goes there too."""
+    text = (ROOT / "docs" / "architecture.md").read_text(encoding="utf-8")
+    bullet = text[text.index("- `HierarchicalOrchestrator`") :]
+    bullet = bullet[: bullet.index("\n- ")]
+    for needed in ("−26.7", "3B", "0.63", "multi-agent-policy.md"):
+        assert needed in bullet, f"the HierarchicalOrchestrator bullet lacks {needed!r}"
+    assert "worse" not in bullet, "the registered reading is a direction, not 'worse'"

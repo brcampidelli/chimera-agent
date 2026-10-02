@@ -1,5 +1,5 @@
 ---
-source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
+source_sha256: e39717130faf730675cb8625321788f13b88dfe484745739ac6398e5682e3c82
 ---
 
 # Chimera — Architecture
@@ -134,8 +134,9 @@ par défaut, quatre formes autorisées et les raisons mesurées d'écarter le re
   bench ne le compare à un seul agent à coût égal.
 - `SupervisorCrew` — les workers traitent la tâche en parallèle, les sorties sont consolidées,
   et un superviseur synthétise (à la CAPRA `parallel_review`, `2606.18976`). **Non mesuré** en tant
-  qu'équipe, et la mesure la plus proche va contre lui : dans la hiérarchie, c'est la synthèse des
-  résumés des workers qui a perdu les valeurs qu'ils avaient trouvées.
+  qu'équipe. La mesure la plus proche est l'étape de synthèse de la hiérarchie, et elle dépend du
+  synthétiseur : avec un modèle 3B à tous les rôles, la synthèse des résumés des workers a perdu des
+  valeurs qu'ils avaient trouvées ; avec le synthétiseur de production, non.
 - `consolidate` — la fusion de messages MOC garde le contexte d'équipe compact (`2606.02359`).
 
 ## Écosystème auto-évolutif (Tier 4)
@@ -163,8 +164,12 @@ l'affirmation est **mesurée, pas assertée** :
 - `HierarchicalOrchestrator` — décomposer → distribuer des workers budgétisés → vérifier chaque
   résultat → synthétiser. Un fan-out en forme de lecture délègue ; une sous-tâche trivialement
   petite est répondue en ligne par le modèle de confiance du sommet. Mesuré : il économise des
-  tokens en lecture multi-étapes de grands documents (66,5 % de moins) et, à nombre d'appels égal, il
-  a répondu **moins bien** qu'un seul agent (−26,7 pp de `pass^3` sur trente tâches) — voir la
+  tokens en lecture multi-étapes de grands documents (66,5 % de moins). À nombre d'appels égal, avec
+  un backbone 3B à tous les rôles et 30 tâches synthétiques d'extraction à forte lecture, il n'a pas
+  battu un seul agent : la direction va contre la hiérarchie, `pass^3` −26,7 pp, intervalle
+  [−36,2, −4,2], une estimation ponctuelle à l'intérieur du plancher de bascule de 33–47 %. Avec le
+  synthétiseur de production il a obtenu 0,63 / 0,50 (`pass@1` / `pass^3`, dix tâches), et aucun
+  bras à agent unique à appels égaux n'a tourné à ce niveau — voir la
   [politique multi-agents](../../multi-agent-policy.md).
 - `CascadeBackend` — faible → porte → intermédiaire → porte → fusion, en montant seulement
   quand la réponse d'un palier échoue une porte d'acceptation bon marché. Le **journal de

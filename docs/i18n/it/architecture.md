@@ -1,5 +1,5 @@
 ---
-source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
+source_sha256: e39717130faf730675cb8625321788f13b88dfe484745739ac6398e5682e3c82
 ---
 
 # Chimera — Architettura
@@ -127,9 +127,10 @@ default, quattro forme ammesse e le ragioni misurate per escludere il resto — 
   scrivere nella memoria condivisa. **Non misurato** come team: nessun bench lo confronta con un solo
   agente a parità di costo.
 - `SupervisorCrew` — i worker affrontano il task in parallelo, gli output vengono consolidati, e
-  un supervisor sintetizza (stile CAPRA `parallel_review`, `2606.18976`). **Non misurato** come team,
-  e la misura più vicina va contro: nella gerarchia è la sintesi sui riassunti dei worker che ha perso
-  i valori che loro avevano trovato.
+  un supervisor sintetizza (stile CAPRA `parallel_review`, `2606.18976`). **Non misurato** come team.
+  La misura più vicina è il passo di sintesi della gerarchia, e dipende dal sintetizzatore: con un
+  modello 3B in ogni ruolo, la sintesi sui riassunti dei worker ha perso valori che loro avevano
+  trovato; con il sintetizzatore di produzione no.
 - `consolidate` — la fusione dei messaggi MOC mantiene snello il contesto del team (`2606.02359`).
 
 ## Ecosistema auto-evolutivo (Tier 4)
@@ -156,8 +157,12 @@ La delega paga solo quando è più economica del fare il lavoro inline, e l'affe
 - `HierarchicalOrchestrator` — decompone → dispaccia worker con budget → verifica ogni
   risultato → sintetizza. Il fan-out a forma di lettura delega; una sottotask banalmente piccola
   viene risposta inline dal modello di fiducia al vertice. Misurato: risparmia token nella
-  lettura a più passi di documenti grandi (66,5% in meno) e, a parità di chiamate, ha risposto
-  **peggio** di un agente singolo (−26,7 pp di `pass^3` su trenta task) — vedi la
+  lettura a più passi di documenti grandi (66,5% in meno). A parità di chiamate, con un backbone 3B
+  in ogni ruolo e 30 task sintetici di estrazione ad alta lettura, non ha battuto un agente singolo:
+  la direzione è contro la gerarchia, `pass^3` −26,7 pp, intervallo [−36,2, −4,2], una stima
+  puntuale dentro la soglia di oscillazione del 33–47%. Con il sintetizzatore di produzione ha fatto
+  0,63 / 0,50 (`pass@1` / `pass^3`, dieci task), e a quel livello non è mai girato un braccio ad
+  agente singolo a parità di chiamate — vedi la
   [policy multi-agente](../../multi-agent-policy.md).
 - `CascadeBackend` — debole → gate → medio → gate → fusione, salendo di livello solo quando la
   risposta di un livello fallisce un gate di accettazione economico. Il **route log** registra

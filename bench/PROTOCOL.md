@@ -204,7 +204,11 @@ structure.
 
 The instance is ours: `bench/hierarchy` and `bench/hierarchy_multistep` compared the hierarchy to
 one call, and read as a quality-neutral token story; `bench/hierarchy_equal_calls` gave the single
-agent the hierarchy's calls and the hierarchy lost, `pass^3` −26.7 pp [−36.2, −4.2] on thirty tasks.
+agent the hierarchy's calls and the hierarchy did not beat it — `pass^3` −26.7 pp [−36.2, −4.2] on
+thirty tasks, a 3B backbone on every role, read as a direction because the point estimate sits
+inside the flip floor. That bench held *calls*, not tokens: re-reading the documents, the single
+agent spent 13,611 tokens per task against the hierarchy's 1,962, about 7×, so the multi-agent arm
+was the cheaper one in tokens and equal-token comparison is still unrun.
 The papers agree for the same reason: at equal calls a Planner-Executor-Critic team did not beat
 one agent (arXiv 2609.04217, 0.769 vs 0.754, p = 0.80), and debate tied or lost to self-consistency
 at matched budget (2609.35875). As of 2026-10-02 only `hierarchy_equal_calls` meets this rule;

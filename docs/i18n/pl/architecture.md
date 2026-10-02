@@ -1,5 +1,5 @@
 ---
-source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
+source_sha256: e39717130faf730675cb8625321788f13b88dfe484745739ac6398e5682e3c82
 ---
 
 # Chimera — Architektura
@@ -129,8 +129,9 @@ płasko, cztery dozwolone formy i zmierzone powody, by pominąć resztę — roz
   agentem przy równym koszcie.
 - `SupervisorCrew` — workerzy zajmują się zadaniem równolegle, wyniki są konsolidowane, a
   supervisor syntetyzuje (w stylu CAPRA, `parallel_review`, `2606.18976`). **Niezmierzony** jako
-  zespół, a najbliższy pomiar przemawia przeciw: w hierarchii to synteza streszczeń workerów zgubiła
-  wartości, które oni znaleźli.
+  zespół. Najbliższy pomiar to krok syntezy w hierarchii i zależy on od modelu syntezującego: z
+  modelem 3B w każdej roli synteza streszczeń workerów zgubiła wartości, które oni znaleźli; z
+  produkcyjnym modelem syntezującym — nie.
 - `consolidate` — scalanie wiadomości MOC utrzymuje kontekst zespołu szczupły (`2606.02359`).
 
 ## Samo-ewoluujący ekosystem (Tier 4)
@@ -158,8 +159,12 @@ jest **mierzone, nie tylko deklarowane**:
 - `HierarchicalOrchestrator` — dekompozycja → wysłanie budżetowanych workerów → weryfikacja
   każdego wyniku → synteza. Fan-out o charakterze odczytowym jest delegowany; trywialnie mały
   podproblem jest odpowiadany inline przez zaufany model najwyższego poziomu. Zmierzone: oszczędza
-  tokeny przy wieloetapowym czytaniu dużych dokumentów (o 66,5% mniej), a przy tej samej liczbie wywołań
-  odpowiadał **gorzej** niż jeden agent (−26,7 pp `pass^3` na trzydziestu zadaniach) — zob.
+  tokeny przy wieloetapowym czytaniu dużych dokumentów (o 66,5% mniej). Przy tej samej liczbie
+  wywołań, z backbone'em 3B w każdej roli i 30 syntetycznymi zadaniami ekstrakcji z dużą ilością
+  czytania, nie pokonał jednego agenta: kierunek jest przeciw hierarchii, `pass^3` −26,7 pp,
+  przedział [−36,2, −4,2], estymata punktowa wewnątrz progu zmienności 33–47%. Z produkcyjnym
+  modelem syntezującym uzyskał 0,63 / 0,50 (`pass@1` / `pass^3`, dziesięć zadań), a na tym poziomie
+  nie uruchomiono ramienia z jednym agentem przy tej samej liczbie wywołań — zob.
   [politykę wieloagentową](../../multi-agent-policy.md).
 - `CascadeBackend` — słaby → bramka → średni → bramka → fuzja, eskalując tylko wtedy, gdy
   odpowiedź danego poziomu nie przechodzi taniej bramki akceptacji. **Dziennik trasy** (route

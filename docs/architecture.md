@@ -112,9 +112,10 @@ four sanctioned forms, and the measured reasons for leaving out the rest — is 
 - `SequentialCrew` — roles in order, each sees the **consolidated** prior outputs and can
   write to shared memory. **Unmeasured** as a team: no bench compares it to one agent at equal cost.
 - `SupervisorCrew` — workers address the task in parallel, outputs are consolidated, and a
-  supervisor synthesizes (CAPRA-style `parallel_review`, `2606.18976`). **Unmeasured** as a team,
-  and the nearest measurement points against it: in the hierarchy, the synthesis over the workers'
-  summaries is where the values they found were lost.
+  supervisor synthesizes (CAPRA-style `parallel_review`, `2606.18976`). **Unmeasured** as a team.
+  The nearest measurement is the hierarchy's synthesis step, and it depends on the synthesiser: with
+  a 3B model on every role, the synthesis over the workers' summaries lost values they had found;
+  with the production synthesiser it did not.
 - `consolidate` — MOC message merging keeps team context lean (`2606.02359`).
 
 ## Self-evolving ecosystem (Tier 4)
@@ -140,8 +141,12 @@ asserted**:
 - `HierarchicalOrchestrator` — decompose → dispatch budgeted workers → verify each result →
   synthesize. Read-shaped fan-out delegates; a trivially small subtask is answered inline by the
   trusted top model. Measured: it saves tokens in multi-step reading of large documents (66.5%
-  fewer), and at the same number of calls it answered **worse** than one agent (−26.7 pp `pass^3`
-  on thirty tasks) — see the [multi-agent policy](multi-agent-policy.md).
+  fewer). At the same number of calls, with a 3B backbone on every role and 30 synthetic read-heavy
+  extraction tasks, it did not beat one agent: the direction is against the hierarchy, `pass^3`
+  −26.7 pp, interval [−36.2, −4.2], a point estimate inside the 33–47% flip floor. With the
+  production synthesiser it scored 0.63 / 0.50 (`pass@1` / `pass^3`, ten tasks), and no
+  single-agent arm at equal calls has run on that tier — see the
+  [multi-agent policy](multi-agent-policy.md).
 - `CascadeBackend` — weak → gate → mid → gate → fusion, climbing only when a tier's answer fails a
   cheap acceptance gate. The **route log** records every hop, so the cost is the **sum over hops
   tried**, not just the accepted one — escalations are paid for.

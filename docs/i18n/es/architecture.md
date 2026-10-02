@@ -1,5 +1,5 @@
 ---
-source_sha256: a536ca9b3ea9de0ff8540f24367275079773260ed96c8d7ed931bdea87e12f58
+source_sha256: e39717130faf730675cb8625321788f13b88dfe484745739ac6398e5682e3c82
 ---
 
 # Chimera — Arquitectura
@@ -129,9 +129,10 @@ defecto, cuatro formas autorizadas y las razones medidas para dejar fuera el res
   escribir en la memoria compartida. **Sin medir** como equipo: ningún bench lo compara con un solo
   agente a igual coste.
 - `SupervisorCrew` — los workers abordan la tarea en paralelo, las salidas se consolidan, y un
-  supervisor sintetiza (estilo CAPRA `parallel_review`, `2606.18976`). **Sin medir** como equipo, y la
-  medición más cercana apunta en contra: en la jerarquía, la síntesis sobre los resúmenes de los
-  workers es donde se perdieron los valores que ellos habían encontrado.
+  supervisor sintetiza (estilo CAPRA `parallel_review`, `2606.18976`). **Sin medir** como equipo. La
+  medición más cercana es el paso de síntesis de la jerarquía, y depende del sintetizador: con un
+  modelo 3B en todos los roles, la síntesis sobre los resúmenes de los workers perdió valores que
+  ellos habían encontrado; con el sintetizador de producción, no.
 - `consolidate` — la fusión de mensajes MOC mantiene el contexto del equipo ligero
   (`2606.02359`).
 
@@ -159,8 +160,12 @@ se **mide, no se asume**:
 - `HierarchicalOrchestrator` — descomponer → despachar workers con presupuesto → verificar cada
   resultado → sintetizar. Las tareas con forma de lectura se delegan en fan-out; una subtarea
   trivialmente pequeña la responde en línea el modelo principal de confianza. Medido: ahorra tokens
-  en la lectura de varios pasos sobre documentos grandes (66,5 % menos) y, con el mismo número de
-  llamadas, respondió **peor** que un solo agente (−26,7 pp de `pass^3` en treinta tareas) — ver la
+  en la lectura de varios pasos sobre documentos grandes (66,5 % menos). Con el mismo número de
+  llamadas, con un backbone 3B en todos los roles y 30 tareas sintéticas de extracción con mucha
+  lectura, no superó a un solo agente: la dirección va contra la jerarquía, `pass^3` −26,7 pp,
+  intervalo [−36,2, −4,2], una estimación puntual dentro del piso de variación del 33–47 %. Con el
+  sintetizador de producción obtuvo 0,63 / 0,50 (`pass@1` / `pass^3`, diez tareas), y en ese nivel
+  no se ha corrido ningún brazo de un solo agente con las mismas llamadas — ver la
   [política multiagente](../../multi-agent-policy.md).
 - `CascadeBackend` — débil → gate → medio → gate → fusión, escalando solo cuando la respuesta de
   un nivel falla una comprobación de aceptación barata. El **route log** registra cada salto,
