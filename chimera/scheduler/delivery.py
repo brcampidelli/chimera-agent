@@ -109,9 +109,13 @@ def make_deliver(
                 warn(f"cron '{job.name}': delivery failed — {entrega.detail}")
         # The fingerprint moves only when the answer actually reached its destination (or there is
         # no destination, and the record IS the delivery). A post that failed was not seen, so the
-        # same answer next time is still news to the person it was for.
+        # same answer next time is still news to the person it was for. And only for a successful
+        # run: a failure is posted as a failure, and a later success with the same text is a
+        # different message to its reader — skipping it as "the same as last time" would hide the
+        # one run that worked behind the one that did not.
         if (
             job.notify == "on_change"
+            and status == "ok"
             and not motivo
             and (entrega is None or entrega.ok)
         ):
@@ -131,7 +135,10 @@ def make_deliver(
         if entrega is not None:
             record["delivered"] = entrega.ok
             record["delivery_detail"] = entrega.detail
-        if motivo:
+        # Only when there was somewhere to post it: `skipped` means "held back from the destination
+        # on purpose", and a job with no destination held nothing back. Recorded there it would read
+        # as a decision that never had anything to decide.
+        if motivo and job.deliver_to:
             record["skipped"] = motivo
         with results_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")

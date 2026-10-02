@@ -502,3 +502,109 @@ def test_the_route_stores_notify_and_tools_and_reads_them_back(tmp_path: Path) -
         "name": "x", "schedule": "* * * * *", "action": "y", "notify": "sometimes",
     })
     assert refused.status_code == 422
+
+
+# --------------------------------------------------------------------------- review fixes
+
+
+def test_on_change_does_not_take_a_failure_for_the_last_answer_delivered(tmp_path: Path) -> None:
+    """A failure is posted as a failure. If its text became the fingerprint, the next SUCCESSFUL run
+    saying the same words would be skipped as "the same as last time" — and the owner, who only ever
+    saw those words under a failure, would never hear that the job worked."""
+    sink = _Sink()
+    deliver = make_deliver(tmp_path / "r.jsonl", send=sink)
+    job = _job(deliver_to=WEBHOOK, notify="on_change")
+
+    deliver(job, "deploy at 3f2a1c", status="rejected")
+    assert job.last_delivered_hash is None
+    deliver(job, "deploy at 3f2a1c")
+
+    assert len(sink.sent) == 2, "the success was held back behind the failure that preceded it"
+
+
+def test_a_job_with_nowhere_to_post_records_no_skip_reason(tmp_path: Path) -> None:
+    """`skipped` means "held back from the destination on purpose". A job with no destination held
+    nothing back, so its records must not claim a decision was taken."""
+    results = tmp_path / "r.jsonl"
+    deliver = make_deliver(results, send=_Sink())
+
+    deliver(_job(), NOTHING_NEW)
+    deliver(_job(notify="failures_only"), "all quiet")
+
+    assert [r.get("skipped") for r in _records(results)] == [None, None]
+    assert [r.skipped for r in load_results(results)] == ["", ""]
+
+
+@pytest.fixture
+def _fresh_settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
+    from chimera.config import get_settings
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    yield tmp_path / "home"
+    get_settings.cache_clear()
+
+
+def test_a_webhook_job_refuses_a_tool_list_it_could_not_enforce(
+    tmp_path: Path, _fresh_settings: Path
+) -> None:
+    """A webhook job runs through the chat gateway, which applies neither the tool list nor notify.
+    Stored, `cron list` would print `tools=read_file` over a run holding every tool — a fence that
+    reads as enforced and is not. So the scheduler and the CLI refuse the combination."""
+    from typer.testing import CliRunner
+
+    from chimera.cli.main import app
+
+    sched = Scheduler(CronStore(tmp_path / "jobs.json"))
+    with pytest.raises(ValueError, match="webhook"):
+        sched.schedule_webhook("on push", "gh-push", "summarise", tools=["read_file"])
+    with pytest.raises(ValueError, match="webhook"):
+        sched.schedule_webhook("on push", "gh-push", "summarise", tools=[])
+    with pytest.raises(ValueError, match="webhook"):
+        sched.schedule_webhook("on push", "gh-push", "summarise", notify="on_change")
+    assert sched.store.list() == []
+
+    runner = CliRunner()
+    for extra in (["--tools", "read_file"], ["--notify", "failures_only"]):
+        refused = runner.invoke(
+            app, ["cron", "add", "on push", "gh-push", "summarise", "--webhook", *extra]
+        )
+        assert refused.exit_code == 1, refused.output
+        # Refused with a message, not by a traceback: an uncaught ValueError also exits 1.
+        assert isinstance(refused.exception, SystemExit), refused.exception
+        assert "webhook" in refused.output
+    jobs = _fresh_settings / "scheduler" / "jobs.json"
+    assert not jobs.exists() or CronStore(jobs).list() == []
+
+    plain = runner.invoke(app, ["cron", "add", "on push", "gh-push", "summarise", "--webhook"])
+    assert plain.exit_code == 0, plain.output
+    (job,) = CronStore(jobs).list()
+    assert job.trigger == "webhook" and job.tools is None and job.notify == "always"
+
+
+def test_the_webhook_server_will_not_run_a_hand_written_job_with_a_tool_list(
+    _fresh_settings: Path,
+) -> None:
+    """jobs.json is a file an owner can edit. A webhook job carrying `tools` got there by hand, and
+    the gateway would run it with every tool; not running it is the only honest outcome."""
+    from chimera.cli.main import _cron_store, _webhook_handler
+
+    store = _cron_store()
+    store.add(CronJob(
+        id="w1", name="fenced", trigger="webhook", schedule="gh-push", action="summarise",
+        tools=["read_file"],
+    ))
+    store.add(CronJob(
+        id="w2", name="open", trigger="webhook", schedule="gh-push", action="summarise",
+    ))
+
+    received: list[str] = []
+
+    class _Gateway:
+        def on_message(self, message: Any) -> str:
+            received.append(message.text)
+            return "ok"
+
+    _webhook_handler(_Gateway())("gh-push", {})  # type: ignore[arg-type]  # duck-typed gateway
+
+    assert received == ["summarise"], "the hand-written fenced job ran with the gateway's registry"

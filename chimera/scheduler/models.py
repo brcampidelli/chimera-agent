@@ -175,7 +175,11 @@ class CronJob(BaseModel):
       raised.
 
     A failure is never suppressed by ``on_change`` either: a job that breaks the same way twice is
-    still broken, and silence is how a broken monitor reads as a quiet day."""
+    still broken, and silence is how a broken monitor reads as a quiet day.
+
+    Applies to cron and event jobs. A webhook job answers through the chat gateway, which does not
+    read this field, so :meth:`~chimera.scheduler.engine.Scheduler.schedule_webhook` refuses
+    anything but ``always``."""
     tools: list[str] | None = None
     """The tools this job may use, by name. ``None`` (the default) = every tool, as before.
 
@@ -184,7 +188,11 @@ class CronJob(BaseModel):
     offers the model what the job has no business doing. A tool not on the list is REMOVED from the
     registry (:func:`~chimera.governance.allowlist.restrict_registry`), which a sentence in the
     prompt cannot do. An empty list grants nothing. Narrows the deployment's own allowlist, never
-    widens it."""
+    widens it.
+
+    Applies to cron and event jobs only. A webhook job runs through the chat gateway with the
+    gateway's registry, so a list here would not be enforced: ``schedule_webhook`` refuses it, and
+    the webhook handler refuses to run a job that has one (written into jobs.json by hand)."""
     last_delivered_hash: str | None = None
     """Fingerprint of the last answer delivered for this job — what ``notify="on_change"`` compares
     against. Kept on the job because the job is the only state that survives a restart."""

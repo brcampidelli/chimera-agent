@@ -277,10 +277,24 @@ class Scheduler:
             could write them, so the gate could never arm for any user.
         max_attempts: How many times one dispatch may try. Worth raising only alongside `verify` —
             without a gate nothing can tell a failed attempt from a finished one.
-        notify: When the answer is posted to the job's destination (`CronJob.notify`); `always`
-            is today's behaviour.
-        tools: The only tools the job may use (`CronJob.tools`); None keeps every tool.
+        notify: Must be ``always``. See below.
+        tools: Must be None. See below.
+
+        Raises:
+            ValueError: ``tools`` or a ``notify`` other than ``always``. A webhook job is dispatched
+                by ``chimera serve`` through the chat gateway, with the gateway's own registry and
+                reply path — not through the scheduled-run path that applies ``CronJob.tools``,
+                ``notify`` and the unattended-run note. Storing them would print ``tools=read_file``
+                in ``cron list`` over a run that holds every tool: a fence that reads as enforced
+                and is not, which is worse than no fence. Refused until the webhook path honours
+                them.
         """
+        if tools is not None or notify != "always":
+            raise ValueError(
+                "a webhook job cannot take --tools or --notify yet: it runs through the chat "
+                "gateway, which does not apply either, so the job would hold every tool and post "
+                "every answer while its listing said otherwise"
+            )
         job = CronJob(
             id=uuid.uuid4().hex[:8],
             name=name,
@@ -459,6 +473,11 @@ class Scheduler:
                 else:
                     self._record(job, veredito or "ok", None)
             except TimeoutError:
+                # Known gap: raised here, outside the dispatch, so the delivery sink never hears
+                # of it — a `notify=failures_only` or `on_change` job is NOT told its run timed
+                # out (the record and `last_status` are). And the abandoned thread may still call
+                # the sink later and move `last_delivered_hash` on a job this tick already saved,
+                # so that move can be lost. Left for a follow-up that posts the timeout from here.
                 _log.warning(
                     "cron job %s (%s) exceeded %ss and was abandoned; the schedule continues",
                     job.name, job.id, job_timeout,

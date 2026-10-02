@@ -1095,7 +1095,7 @@
             },
             {
               "default": "'always'",
-              "help": "When the answer is posted to the job's destination: always (every answer except the job's own 'nothing new' reply), on_change (skip an answer identical to the last one delivered), or failures_only. The result file gets every answer either way.",
+              "help": "When the answer is posted to the job's destination: always (every answer except the job's own 'nothing new' reply), on_change (skip an answer identical to the last one delivered), or failures_only. The result file gets every answer either way. Not with --webhook: a webhook job answers through the chat gateway.",
               "kind": "option",
               "name": "notify",
               "opts": [
@@ -1105,7 +1105,7 @@
               "type": "str"
             },
             {
-              "help": "Comma-separated tools this job may use; the rest are removed from its registry. Omit for every tool (the previous behaviour).",
+              "help": "Comma-separated tools this job may use; the rest are removed from its registry. Omit for every tool (the previous behaviour). Refused with --webhook: a webhook job runs through the chat gateway, which does not apply the list.",
               "kind": "option",
               "name": "tools",
               "opts": [
