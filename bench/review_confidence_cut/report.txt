@@ -1,0 +1,50 @@
+POSITIVE CONTROL (no cut; must reproduce the published figures)
+  selection D: seeds shown 34/40 (published 34/40); clean shown 19 over 20 diffs (published 19) ok
+  selection L: seeds shown 39/40 (published 39/40); clean shown 17 over 20 diffs (published 17) ok
+  selection Q: seeds shown 27/38 (published 27/38); clean shown 25 over 19 diffs (published per-replica 13.0 per 10) ok
+  confirmation D1: seeds shown 17/20 (published 17/20); clean shown 8 (published 8) ok
+  confirmation D2: seeds shown 17/19 (published 17/19); clean shown 12 (published 12) ok
+  confirmation G: seeds shown 11/11 (published 11/11); clean shown 8 (published 8) ok
+  -> reproduced
+
+SELECTION (review_reviewer D, L, Q; both replicas). Per cell: seeds shown after/before · clean findings shown after/before
+    0.5  seeds kept 99/100 = 99.0%  clean removed 10/61 = 16.4%  checks 170/182  | D 33/34 · 12/19  L 39/39 · 17/17  Q 27/27 · 22/25
+    0.6  seeds kept 99/100 = 99.0%  clean removed 17/61 = 27.9%  checks 163/182  | D 33/34 · 10/19  L 39/39 · 17/17  Q 27/27 · 17/25
+    0.7  seeds kept 99/100 = 99.0%  clean removed 28/61 = 45.9%  checks 149/182  | D 33/34 · 7/19  L 39/39 · 15/17  Q 27/27 · 11/25
+   0.75  seeds kept 98/100 = 98.0%  clean removed 35/61 = 57.4%  checks 137/182  | D 32/34 · 4/19  L 39/39 · 14/17  Q 27/27 · 8/25   <- passes
+    0.8  seeds kept 97/100 = 97.0%  clean removed 39/61 = 63.9%  checks 132/182  | D 32/34 · 4/19  L 38/39 · 11/17  Q 27/27 · 7/25   <- passes
+   0.85  seeds kept 93/100 = 93.0%  clean removed 48/61 = 78.7%  checks 112/182  | D 31/34 · 1/19  L 37/39 · 10/17  Q 25/27 · 2/25
+    0.9  seeds kept 92/100 = 92.0%  clean removed 50/61 = 82.0%  checks 108/182  | D 31/34 · 1/19  L 37/39 · 8/17  Q 24/27 · 2/25
+
+  cuts passing the selection rule: [0.75, 0.8]; chosen: 0.8
+
+CONFIRMATION (review_seeded D1, D2, G)
+    0.5  seeds kept 43/45 = 95.6%  clean removed 12/28 = 42.9%  checks 68/88  | D1 16/17 · 6/8  D2 17/17 · 8/12  G 10/11 · 2/8
+    0.6  seeds kept 43/45 = 95.6%  clean removed 16/28 = 57.1%  checks 61/88  | D1 16/17 · 5/8  D2 17/17 · 6/12  G 10/11 · 1/8
+    0.7  seeds kept 41/45 = 91.1%  clean removed 20/28 = 71.4%  checks 55/88  | D1 15/17 · 2/8  D2 17/17 · 5/12  G 9/11 · 1/8
+   0.75  seeds kept 40/45 = 88.9%  clean removed 23/28 = 82.1%  checks 51/88  | D1 15/17 · 2/8  D2 16/17 · 3/12  G 9/11 · 0/8
+    0.8  seeds kept 39/45 = 86.7%  clean removed 23/28 = 82.1%  checks 50/88  | D1 15/17 · 2/8  D2 16/17 · 3/12  G 8/11 · 0/8
+   0.85  seeds kept 39/45 = 86.7%  clean removed 25/28 = 89.3%  checks 46/88  | D1 15/17 · 1/8  D2 16/17 · 2/12  G 8/11 · 0/8
+    0.9  seeds kept 38/45 = 84.4%  clean removed 26/28 = 92.9%  checks 44/88  | D1 15/17 · 1/8  D2 16/17 · 1/12  G 7/11 · 0/8
+
+  at the chosen cut 0.8: seeds kept 86.7% (bar 90%), clean removed 82.1% (bar 30%) -> NOT confirmed
+
+DECISION (by the frozen rule)
+  medium's cut: 0.8
+  default effort: high
+
+REPORTED, NOT DECIDED ON (at cut 0.8)
+  selection, hit findings shown: n 113, no confidence 0; 0.3:1, 0.4:1, 0.6:1, 0.7:2, 0.72:1, 0.74:1, 0.76:1, 0.8:5, 0.84:1, 0.85:1, 0.88:1, 0.9:13, 0.94:1, 0.95:17, 0.96:3, 0.97:2, 0.98:7, 0.99:11, 1:43
+  selection, clean findings shown: n 61, no confidence 0; 0.3:6, 0.4:4, 0.5:7, 0.6:9, 0.65:2, 0.7:6, 0.72:1, 0.75:1, 0.77:2, 0.78:1, 0.8:8, 0.82:1, 0.87:1, 0.89:1, 0.9:3, 0.93:1, 0.95:1, 0.96:2, 0.97:1, 0.98:3
+  selection: other anchored findings on seeded diffs (truth unknown) 33 -> 17
+  confirmation, hit findings shown: n 57, no confidence 0; 0.25:2, 0.3:1, 0.35:1, 0.4:2, 0.5:3, 0.6:2, 0.7:1, 0.75:1, 0.8:1, 0.85:1, 0.9:14, 0.92:1, 0.95:11, 0.97:1, 0.99:1, 1:14
+  confirmation, clean findings shown: n 28, no confidence 0; 0.15:1, 0.2:1, 0.25:1, 0.3:4, 0.35:1, 0.4:3, 0.45:1, 0.5:4, 0.6:4, 0.7:3, 0.8:2, 0.85:1, 0.9:2
+  confirmation: other anchored findings on seeded diffs (truth unknown) 27 -> 6
+  known-true clean finding, selection D: conf 0.9, verifier kept, shown at the cut: True
+  known-true clean finding, selection D: conf 0.8, verifier kept, shown at the cut: True
+  known-true clean finding, selection L: conf 0.98, verifier kept, shown at the cut: True
+  known-true clean finding, selection L: conf 0.93, verifier kept, shown at the cut: True
+  known-true clean finding, selection Q: conf 0.7, verifier kept, shown at the cut: False
+  known-true clean finding, confirmation D1: conf 0.9, verifier kept, shown at the cut: True
+  known-true clean finding, confirmation D2: conf 0.8, verifier dropped, shown at the cut: False
+  known-true clean finding, confirmation G: conf 0.7, verifier kept, shown at the cut: False

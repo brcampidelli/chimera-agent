@@ -46,7 +46,9 @@ PUBLISHED_CONFIRMATION = {"D1": (17, 20, 8), "D2": (17, 19, 12), "G": (11, 11, 8
 
 #: A clean diff that was not clean (review_seeded RESULTS.md, "What the hand read found"): the
 #: allowlist finding there is true, so cutting it is a loss the precision proxy books as a gain.
-KNOWN_TRUE_CLEAN = ("924aaa76", "chimera/governance/allowlist.py")
+#: Matched by place (the line that computes ``escapes``, ±3), as the seeds are; a first version
+#: matched the word "escape" anywhere in the file's findings and caught two that are not it.
+KNOWN_TRUE_CLEAN = ("924aaa76", "chimera/governance/allowlist.py", 60)
 
 
 def shown(v: dict[str, Any], cut: float | None) -> bool:
@@ -233,13 +235,13 @@ def _reported(s_turns: list[Any], c_turns: list[Any], cut: float) -> None:
         base, t = tally(turns, None), tally(turns, cut)
         print(f"  {name}: other anchored findings on seeded diffs (truth unknown) "
               f"{_pool(base, 'other')} -> {_pool(t, 'other')}")
-    commit, path = KNOWN_TRUE_CLEAN
+    commit, path, line = KNOWN_TRUE_CLEAN
     for name, turns in (("selection", s_turns), ("confirmation", c_turns)):
         for cell, row, turn in turns:
             if row["commit"] != commit:
                 continue
             for v in turn["verified"]:
-                if v["file"] == path and "escape" in (v["title"] + v["evidence"]).lower():
+                if v["file"] == path and abs(v["line"] - line) <= 3:
                     print(f"  known-true clean finding, {name} {cell}: conf {v.get('confidence')}"
                           f", verifier {v['verdict']}, shown at the cut: {shown(v, cut)}")
 
