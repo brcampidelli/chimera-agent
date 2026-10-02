@@ -877,20 +877,27 @@ class Agent:
         """The block that heads this turn's user message, or "" when :attr:`AgentConfig.turn_context`
         is off.
 
-        Everything in it changes between turns, which is why none of it is in the system message.
-        The environment comes first because it frames the rest; the notes come last, closest to the
-        user's words, because they are the most specific. ``notes`` replaces
-        :attr:`AgentConfig.turn_notes` for this turn when given (see ``run``).
+        Everything in it can change between turns, which is why none of it is in the system message.
+        Inside it the order runs from the most stable to the most volatile, because a provider's
+        prefix cache stops at the first byte that differs from a request it has seen (study 28, P1):
+        - the system, shell and working directory, the same on every turn of a session;
+        - the skills and cards, the same whenever the task is (a scheduled job, every run);
+        - the notes, true of this turn: recalled facts, a job that finished, the approved plan;
+        - git and the clock, last. The clock opened the block to the minute, so nothing after it
+          was ever reused, not even a cron job's skills on its next run.
+
+        ``notes`` replaces :attr:`AgentConfig.turn_notes` for this turn when given (see ``run``).
         """
         if not self.config.turn_context:
             return ""
-        from chimera.prompts.context import environment_facts, turn_context
+        from chimera.prompts.context import moment_facts, session_facts, turn_context
 
         return turn_context(
-            environment_facts(self.config.project_root),
+            session_facts(self.config.project_root),
             self._skill_context(task),
             self._card_context(task),
             self.config.turn_notes if notes is None else notes,
+            moment_facts(self.config.project_root),
         )
 
     def _skill_context(self, task: str) -> str:

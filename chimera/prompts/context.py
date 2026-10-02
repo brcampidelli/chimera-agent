@@ -25,6 +25,13 @@ others, where it would break the cache again.
 
 This block also carries the facts every vendor prompt the study read injects, and Chimera's did not:
 the date, the system and shell, the working directory, the state of git.
+
+Inside the block, the order runs from the most stable to the most volatile (study 28, P1): the system,
+shell and working directory first, then the retrieved skills and cards, then the notes, and the state
+of git and the clock last. The clock used to open the block, to the minute, so the first bytes of the
+turn's message changed every minute and a prefix cache could reuse nothing written after them. That
+cost every surface that sends the same words again: a scheduled job runs the same task with the same
+skills every time, and the flattened chat replays its profile and conversation after the block.
 """
 
 from __future__ import annotations
@@ -36,9 +43,14 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+#: Says where the user's words are without saying they come right after the tag. The flattened chat
+#: puts the profile, the recalled facts and the replayed conversation between the tag and the new
+#: message, and an attached document can follow the message, so "the user's message follows the
+#: closing tag" was false on the Discord bot and the terminal chat. What holds on every surface is
+#: that the user's words are later in the same message.
 TURN_CONTEXT_OPEN = (
-    "<turn-context: facts about this turn, rebuilt every turn. They are not the user's words; the "
-    "user's message follows the closing tag.>"
+    "<turn-context: facts about this turn, rebuilt every turn. They are not the user's words; those "
+    "come after the closing tag, in this same message.>"
 )
 TURN_CONTEXT_CLOSE = "</turn-context>"
 #: The header of recalled facts inside the turn context. Memory is recall, not proof of the present.
@@ -79,8 +91,28 @@ def _git(cwd: Path) -> str:
     return f"branch {branch}, {changed} changed file{'s' if changed != 1 else ''}"
 
 
-def environment_facts(cwd: Path | None, *, now: datetime | None = None, git: bool = True) -> str:
-    """Date, system, shell, working directory and git state, as one short block.
+def session_facts(cwd: Path | None) -> str:
+    """The system, the shell and the working directory: what stays the same from turn to turn.
+
+    These open the turn context because they are its most stable lines. Bytes that do not change
+    between two turns are bytes a provider's prefix cache can reuse, and only while everything
+    before them is unchanged too.
+    """
+    system = f"{platform.system()} {platform.release()}".strip()
+    shell = _shell()
+    lines = ["Environment:", f"- system: {system}" + (f"; shell: {shell}" if shell else "")]
+    if cwd is not None:
+        lines.append(f"- working directory: {cwd}")
+    return "\n".join(lines)
+
+
+def moment_facts(cwd: Path | None, *, now: datetime | None = None, git: bool = True) -> str:
+    """The state of git and the clock at the start of this turn: the turn context's last lines.
+
+    Last because they are the most volatile: the clock moves every minute and git with every edit,
+    and whatever follows a changed byte cannot be served from a prefix cache. The clock comes after
+    git because it changes more often. The time is kept to the minute rather than cut to the date:
+    a reminder "in two hours", "what is next on my calendar" and "what time is it" all need it.
 
     ``now`` defaults to the local time, with its offset. A date without an offset is how a model
     turns "tomorrow" into the wrong day for a person eight hours away. Git is read with a short
@@ -89,18 +121,11 @@ def environment_facts(cwd: Path | None, *, now: datetime | None = None, git: boo
     moment = (now or datetime.now().astimezone())
     offset = moment.strftime("%z")
     zone = f"UTC{offset[:3]}:{offset[3:]}" if offset else "local time"
-    lines = [
-        "Environment at the start of this turn (a snapshot; it does not update during the turn):",
-        f"- date: {moment.strftime('%A %Y-%m-%d, %H:%M')} ({zone})",
-    ]
-    system = f"{platform.system()} {platform.release()}".strip()
-    shell = _shell()
-    lines.append(f"- system: {system}" + (f"; shell: {shell}" if shell else ""))
-    if cwd is not None:
-        lines.append(f"- working directory: {cwd}")
-        state = _git(Path(cwd)) if git else ""
-        if state:
-            lines.append(f"- git: {state}")
+    lines = ["At the start of this turn (a snapshot; it does not update during the turn):"]
+    state = _git(Path(cwd)) if git and cwd is not None else ""
+    if state:
+        lines.append(f"- git: {state}")
+    lines.append(f"- date: {moment.strftime('%A %Y-%m-%d, %H:%M')} ({zone})")
     return "\n".join(lines)
 
 

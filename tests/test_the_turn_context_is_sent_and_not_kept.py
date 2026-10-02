@@ -33,8 +33,9 @@ from chimera.core.agent import Agent, AgentConfig
 from chimera.prompts.context import (
     TURN_CONTEXT_CLOSE,
     TURN_CONTEXT_OPEN,
-    environment_facts,
     facts_block,
+    moment_facts,
+    session_facts,
     turn_context,
 )
 from chimera.providers.gateway import CompletionResult, ToolCall
@@ -112,10 +113,12 @@ def test_off_by_default_nothing_moves(tmp_path: Path) -> None:
 
 def test_the_environment_block_says_when_and_where(tmp_path: Path) -> None:
     now = datetime(2026, 9, 25, 17, 48, tzinfo=timezone(timedelta(hours=-3)))
-    text = environment_facts(tmp_path, now=now)
-    assert "Friday 2026-09-25, 17:48 (UTC-03:00)" in text
-    assert f"working directory: {tmp_path}" in text
-    assert "git:" not in text  # not a repository: left out, never guessed
+    where, when = session_facts(tmp_path), moment_facts(tmp_path, now=now)
+    assert "Friday 2026-09-25, 17:48 (UTC-03:00)" in when
+    assert f"working directory: {tmp_path}" in where
+    # The stable half carries nothing that moves: the clock in it would end the reusable prefix.
+    assert "2026" not in where and "git:" not in where
+    assert "git:" not in when  # not a repository: left out, never guessed
 
 
 def test_the_environment_block_reads_git_when_there_is_a_repository(tmp_path: Path) -> None:
@@ -123,7 +126,10 @@ def test_the_environment_block_reads_git_when_there_is_a_repository(tmp_path: Pa
         pytest.skip("git is not installed here, and the block leaves git out when it cannot read it")
     subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
     (tmp_path / "new.txt").write_text("x", encoding="utf-8")
-    assert "git: branch main (no commits yet), 1 changed file" in environment_facts(tmp_path)
+    when = moment_facts(tmp_path)
+    assert "git: branch main (no commits yet), 1 changed file" in when
+    # The clock is the last line: it changes more often than git does.
+    assert when.splitlines()[-1].startswith("- date: ")
 
 
 def test_facts_are_labelled_as_recall_and_nothing_empty_is_sent() -> None:

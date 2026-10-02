@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -84,13 +85,25 @@ _REPLY = (
 _CLOCK = {"minute": 0}
 
 
-def _pinned_environment(cwd: Any = None, **_kwargs: Any) -> str:
-    """The environment block with a pinned clock: two minutes per turn, fixed within a turn."""
-    return (
-        "Environment at the start of this turn (a snapshot; it does not update during the turn):\n"
-        f"- date: Thursday 2026-09-25, 10:{_CLOCK['minute']:02d} (UTC-03:00)\n"
-        "- system: Linux 6.6; shell: bash"
-    )
+def _pinned_session(cwd: Any = None, **_kwargs: Any) -> str:
+    """The stable environment lines, the same on every machine that runs this."""
+    return "Environment:\n- system: Linux 6.6; shell: bash"
+
+
+def _pinned_moment(cwd: Any = None, **_kwargs: Any) -> str:
+    """The clock, pinned: two minutes per turn, fixed within a turn. Formatted by the product's own
+    `moment_facts`, so the bench sends the layout the product sends."""
+    now = datetime(2026, 9, 25, 10, _CLOCK["minute"], tzinfo=timezone(timedelta(hours=-3)))
+    return _REAL_MOMENT(None, now=now, git=False)
+
+
+_REAL_MOMENT = context_module.moment_facts
+#: What `run_arm` pins, by the name the agent looks it up under at every turn. Until study 28 (P1)
+#: one function, `environment_facts`, put the clock at the head of the turn context; the clock moved
+#: to the end and the function split in two. Assigning to a name the module no longer defines would
+#: add an attribute nobody reads, and the bench would quietly measure the real clock, so `run_arm`
+#: refuses a name the module does not have.
+_PINS: dict[str, Any] = {"session_facts": _pinned_session, "moment_facts": _pinned_moment}
 
 
 class _Memory:
@@ -156,8 +169,12 @@ def run_arm(real: bool) -> tuple[list[list[dict[str, Any]]], list[int]]:
         model="m", inject_skill_context=False, prefix_nonce="", turn_context=True, project_root=None,
     ))
     session = ChatSession(agent, memory=_Memory(), gate=None, profile=PROFILE, real_history=real)
-    original = context_module.environment_facts
-    context_module.environment_facts = _pinned_environment  # type: ignore[assignment]
+    missing = [name for name in _PINS if not hasattr(context_module, name)]
+    if missing:
+        raise SystemExit(f"chimera.prompts.context no longer defines {missing}; the clock would not be pinned")
+    originals = {name: getattr(context_module, name) for name in _PINS}
+    for name, pin in _PINS.items():
+        setattr(context_module, name, pin)
     firsts: list[int] = []
     try:
         for index, turn in enumerate(TURNS):
@@ -166,7 +183,8 @@ def run_arm(real: bool) -> tuple[list[list[dict[str, Any]]], list[int]]:
             firsts.append(len(backend.requests))
             session.send(turn["ask"])
     finally:
-        context_module.environment_facts = original  # type: ignore[assignment]
+        for name, original in originals.items():
+            setattr(context_module, name, original)
     return backend.requests, firsts
 
 

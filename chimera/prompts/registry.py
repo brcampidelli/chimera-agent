@@ -218,7 +218,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        ("S2", "S3", "S4", "S10"), "unmeasured",
        note="recalled facts, labelled as recall that the present overrides; chat sends it under "
             "CHIMERA_CHAT_REAL_HISTORY"),
-    _i("context.environment", "chimera.prompts.context:environment_facts", "volatile", _ALL),
+    _i("context.environment", "chimera.prompts.context:session_facts", "volatile", _ALL,
+       note="system, shell and working directory; the first lines of the turn context"),
+    _i("context.moment", "chimera.prompts.context:moment_facts", "volatile", _ALL,
+       note="git and the clock; the last lines of the turn context, so a cache reuses the rest"),
     _i("context.cited_fact", "chimera.prompts.context:cited_fact", "volatile", ("S2", "S3"),
        note="a recalled fact quoted with its source and date; only under CHIMERA_MEMORY_EXTRACT"),
     # ---- compaction and memory -----------------------------------------------------------------
