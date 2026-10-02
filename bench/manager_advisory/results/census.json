@@ -1,6 +1,7 @@
 {
   "c1": {
     "files_scanned": 1056,
+    "excluded": "bench/manager_advisory/",
     "unreadable": 0,
     "files_with_labels": {},
     "labels_total": 0
@@ -12,21 +13,37 @@
         "solves": 552,
         "manager": false,
         "verifier": false,
-        "source": "harness_bench/PREREGISTRATION.md:36 --no-manager"
+        "source": "b25588c5:bench/harness_bench/hb_solve.sh:30 --no-manager"
       },
       {
         "bench": "swe_bench baseline arms",
         "solves": 82,
         "manager": false,
         "verifier": false,
-        "source": "swe_bench/run_swe.py _ARMS['baseline'] --no-manager"
+        "source": "9aaaffa5:bench/swe_bench/run_swe.py:53 _ARMS['baseline'] --no-manager"
       },
       {
-        "bench": "swe_bench treatment arms",
-        "solves": 126,
+        "bench": "swe_bench treatment arm",
+        "solves": 63,
         "manager": true,
         "verifier": false,
-        "source": "swe_bench/run_swe.py _SCAFFOLD (no --no-manager, no --verify, --keep-workspace)",
+        "source": "9aaaffa5:bench/swe_bench/run_swe.py:51,54 _SCAFFOLD (no --no-manager, no --verify; --keep-workspace at :46)",
+        "gates_beside_manager": [
+          "--checklist: an LLM requirement grader, a second LLM gate when no verifier ran (9aaaffa5:chimera/core/autonomous.py:527)"
+        ],
+        "run_verdict_stored": false,
+        "manager_saw_diff": false
+      },
+      {
+        "bench": "swe_bench treatment_diff arm",
+        "solves": 63,
+        "manager": true,
+        "verifier": false,
+        "source": "9aaaffa5:bench/swe_bench/run_swe.py:51,56 _SCAFFOLD + --require-diff",
+        "gates_beside_manager": [
+          "--checklist: an LLM requirement grader, a second LLM gate when no verifier ran (9aaaffa5:chimera/core/autonomous.py:527)",
+          "--require-diff (9aaaffa5:chimera/core/autonomous.py:571)"
+        ],
         "run_verdict_stored": false,
         "manager_saw_diff": false
       },
@@ -35,7 +52,10 @@
         "solves": 60,
         "manager": true,
         "verifier": false,
-        "source": "tool_defer/run_paired.py _solve (no --no-manager, no --verify)",
+        "source": "0400d99d:bench/tool_defer/run_paired.py:64-66 _solve (no --no-manager, no --verify)",
+        "gates_beside_manager": [
+          "0400d99d:chimera/core/autonomous.py:1053-1055 (unverified_and_unchanged)"
+        ],
         "run_verdict_stored": true,
         "manager_saw_diff": true
       },
@@ -44,7 +64,7 @@
         "solves": 98,
         "manager": false,
         "verifier": false,
-        "source": "test_gate_two_sided/run_patches.py:35 --no-manager",
+        "source": "3f4141ae:bench/test_gate_two_sided/run_patches.py:35 --no-manager",
         "note": "patches-all.jsonl is the union of the other two files; deduplicated by (task, replica, model)"
       },
       {
@@ -52,41 +72,41 @@
         "solves": 34,
         "manager": false,
         "verifier": false,
-        "source": "unattended_claims/run.py:231 use_manager=False"
+        "source": "aa6924ff:bench/unattended_claims/run.py:231 use_manager=False"
       },
       {
         "bench": "local_lift journals",
         "solves": 212,
         "manager": "half",
         "verifier": true,
-        "source": "local_lift/run_paired.py --verify on both arms"
+        "source": "9aaaffa5:bench/local_lift/run_paired.py:178 --verify on both arms"
       },
       {
         "bench": "learning_lift",
         "solves": 1140,
         "manager": true,
         "verifier": true,
-        "source": "learning_lift/run_learning.py:154 --verify"
+        "source": "9aaaffa5:bench/learning_lift/run_learning.py:152 and 76d01514 (same file):154 --verify; 9aaaffa5:bench/learning_lift/probe_attempts.py:68-69 --verify"
       },
       {
         "bench": "retry_lift",
         "solves": 360,
         "manager": true,
         "verifier": true,
-        "source": "retry_lift/run_retry.py:82 --verify"
+        "source": "9aaaffa5:bench/retry_lift/run_retry.py:82 --verify"
       },
       {
         "bench": "edit_tools",
         "solves": 62,
         "manager": true,
         "verifier": true,
-        "source": "edit_tools/run_pilot.py:80 --verify"
+        "source": "c1562e6e:bench/edit_tools/run_pilot.py:80 --verify"
       }
     ],
     "solves_total": 2726,
-    "manager_decides": 186,
-    "manager_decides_share": 0.068,
-    "manager_decides_with_verdict_and_oracle": 60
+    "manager_llm_gate_no_verifier": 186,
+    "manager_llm_gate_no_verifier_share": 0.068,
+    "manager_llm_gate_no_verifier_with_verdict_and_oracle": 60
   },
   "c3": {
     "runs": 60,
@@ -115,6 +135,7 @@
       "timed_out",
       "tools"
     ],
+    "deciding_gate_per_attempt_recorded": false,
     "reverted_work_recoverable": false,
     "failed_runs_whose_answer_mentions_the_expected_value": 10,
     "failed_runs_on_value_tasks": 10,

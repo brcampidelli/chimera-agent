@@ -7,8 +7,15 @@ C1 attempt `evidence` labels in stored rows; C2 the configured regime of every b
 rows; C3 tool_defer's run verdict x oracle; C4 whether a reverted attempt is recoverable; C5 the
 manager_diff corpus, control first.
 
-The regime of each dataset is read from its runner (cited per row), because the artifacts do not
-record their own configuration — the limit PREREGISTRATION.md names under §2m.
+The regime of each dataset is read from its runner AS IT STOOD AT THE COMMIT THAT ADDED THE RESULT
+FILE (cited per row as `commit:path:line`), because the artifacts do not record their own configuration
+— the limit PREREGISTRATION.md names under §2m. A path in the current tree would drift with every edit
+to the runner; the commit does not.
+
+"Manager on, no executable verifier" is the regime where the Manager is an LLM gate with nothing
+executable above it. It is NOT "the Manager decides every attempt": other gates decide beside it in
+that regime, and each dataset row names them (`gates_beside_manager`). The first version of this file
+said otherwise; RESULTS.md carries the erratum.
 """
 
 from __future__ import annotations
@@ -25,6 +32,9 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 BENCH = REPO / "bench"
 EVIDENCE_VALUES = {"verifier", "diff+manager", "manager", "diff", "none"}
+#: This bench's own output is excluded from C1: scanning it would count the census inside the census,
+#: and a rerun would scan one file more than the run that published the number.
+_OWN_DIR = "bench/manager_advisory/"
 PASS = 0.8  # manager_p / manager_diff: oracle >= 0.8 is a true success
 
 
@@ -53,7 +63,8 @@ def _walk_evidence(node: Any, hits: list[str]) -> None:
 
 
 def c1_receipts() -> dict[str, Any]:
-    files = [p for p in _tracked("bench") if p.suffix in (".json", ".jsonl")]
+    files = [p for p in _tracked("bench") if p.suffix in (".json", ".jsonl")
+             and not p.relative_to(REPO).as_posix().startswith(_OWN_DIR)]
     by_file: dict[str, dict[str, int]] = {}
     unreadable = 0
     for path in files:
@@ -70,7 +81,8 @@ def c1_receipts() -> dict[str, Any]:
             for h in hits:
                 counts[h] = counts.get(h, 0) + 1
             by_file[str(path.relative_to(REPO))] = counts
-    return {"files_scanned": len(files), "unreadable": unreadable, "files_with_labels": by_file,
+    return {"files_scanned": len(files), "excluded": _OWN_DIR, "unreadable": unreadable,
+            "files_with_labels": by_file,
             "labels_total": sum(sum(c.values()) for c in by_file.values())}
 
 
@@ -94,9 +106,18 @@ def _count_learning(path: Path) -> int:
     return sum(len(v.get("passed", [])) for v in doc.get("by_arm", {}).values())
 
 
+#: The gate that fails an attempt with no productive diff when no verifier ran, whatever the Manager
+#: said — present at the tool_defer commit, absent at the SWE-bench ones (there only `--require-diff`).
+_DIFF_GATE = "0400d99d:chimera/core/autonomous.py:1053-1055 (unverified_and_unchanged)"
+_CHECKLIST = ("--checklist: an LLM requirement grader, a second LLM gate when no verifier ran "
+              "(9aaaffa5:chimera/core/autonomous.py:527)")
+
+
 def c2_regimes() -> dict[str, Any]:
     swe = _swe_rows()
     swe_base = sum(1 for r in swe if r["arm"] == "baseline")
+    swe_treat = sum(1 for r in swe if r["arm"] == "treatment")
+    swe_diff = sum(1 for r in swe if r["arm"] == "treatment_diff")
     unattended = sum(len(r["runs"]) for p in _tracked("bench/unattended_claims/results/*.jsonl") for r in _jsonl(p))
     local = sum(2 * len(_jsonl(p)) for p in _tracked("bench/local_lift/_reverify_*/journal.jsonl"))
     learning = sum(_count_learning(p) for p in _tracked("bench/learning_lift/results*/learning.json"))
@@ -105,39 +126,53 @@ def c2_regimes() -> dict[str, Any]:
                  for p in _tracked("bench/test_gate_two_sided/results/patches*.jsonl") for r in _jsonl(p)}
     edit = sum(len(json.loads(p.read_text(encoding="utf-8"))["rows"])
                for p in _tracked("bench/edit_tools/results/*.json"))
-    # Each row carries how it was configured and the runner line that says so.
+    # Each row carries how it was configured and the runner line that says so, at the commit that
+    # added its results (`git log --diff-filter=A`). run_swe.py did not change between 9aaaffa5 (runs
+    # 1-2, probes) and fa196f0b (run 4), so one citation covers every SWE-bench family.
     datasets: list[dict[str, Any]] = [
         {"bench": "harness_bench factorial", "solves": len(_jsonl(BENCH / "harness_bench/results/2026-09-13-factorial.jsonl")),
-         "manager": False, "verifier": False, "source": "harness_bench/PREREGISTRATION.md:36 --no-manager"},
+         "manager": False, "verifier": False, "source": "b25588c5:bench/harness_bench/hb_solve.sh:30 --no-manager"},
         {"bench": "swe_bench baseline arms", "solves": swe_base, "manager": False, "verifier": False,
-         "source": "swe_bench/run_swe.py _ARMS['baseline'] --no-manager"},
-        {"bench": "swe_bench treatment arms", "solves": len(swe) - swe_base, "manager": True, "verifier": False,
-         "source": "swe_bench/run_swe.py _SCAFFOLD (no --no-manager, no --verify, --keep-workspace)",
+         "source": "9aaaffa5:bench/swe_bench/run_swe.py:53 _ARMS['baseline'] --no-manager"},
+        {"bench": "swe_bench treatment arm", "solves": swe_treat, "manager": True, "verifier": False,
+         "source": "9aaaffa5:bench/swe_bench/run_swe.py:51,54 _SCAFFOLD (no --no-manager, no --verify; "
+                   "--keep-workspace at :46)",
+         "gates_beside_manager": [_CHECKLIST],
+         "run_verdict_stored": False, "manager_saw_diff": False},
+        {"bench": "swe_bench treatment_diff arm", "solves": swe_diff, "manager": True, "verifier": False,
+         "source": "9aaaffa5:bench/swe_bench/run_swe.py:51,56 _SCAFFOLD + --require-diff",
+         "gates_beside_manager": [_CHECKLIST, "--require-diff (9aaaffa5:chimera/core/autonomous.py:571)"],
          "run_verdict_stored": False, "manager_saw_diff": False},
         {"bench": "tool_defer", "solves": len(_jsonl(BENCH / "tool_defer/results.jsonl")), "manager": True,
-         "verifier": False, "source": "tool_defer/run_paired.py _solve (no --no-manager, no --verify)",
+         "verifier": False,
+         "source": "0400d99d:bench/tool_defer/run_paired.py:64-66 _solve (no --no-manager, no --verify)",
+         "gates_beside_manager": [_DIFF_GATE],
          "run_verdict_stored": True, "manager_saw_diff": True},
         {"bench": "test_gate_two_sided", "solves": len(test_gate), "manager": False, "verifier": False,
-         "source": "test_gate_two_sided/run_patches.py:35 --no-manager",
+         "source": "3f4141ae:bench/test_gate_two_sided/run_patches.py:35 --no-manager",
          "note": "patches-all.jsonl is the union of the other two files; deduplicated by (task, replica, model)"},
         {"bench": "unattended_claims", "solves": unattended, "manager": False, "verifier": False,
-         "source": "unattended_claims/run.py:231 use_manager=False"},
+         "source": "aa6924ff:bench/unattended_claims/run.py:231 use_manager=False"},
         {"bench": "local_lift journals", "solves": local, "manager": "half", "verifier": True,
-         "source": "local_lift/run_paired.py --verify on both arms"},
+         "source": "9aaaffa5:bench/local_lift/run_paired.py:178 --verify on both arms"},
         {"bench": "learning_lift", "solves": learning, "manager": True, "verifier": True,
-         "source": "learning_lift/run_learning.py:154 --verify"},
+         "source": "9aaaffa5:bench/learning_lift/run_learning.py:152 and 76d01514 (same file):154 --verify; "
+                   "9aaaffa5:bench/learning_lift/probe_attempts.py:68-69 --verify"},
         {"bench": "retry_lift", "solves": len(json.loads((BENCH / "retry_lift/results/retry.json").read_text())["rows"]),
-         "manager": True, "verifier": True, "source": "retry_lift/run_retry.py:82 --verify"},
+         "manager": True, "verifier": True, "source": "9aaaffa5:bench/retry_lift/run_retry.py:82 --verify"},
         {"bench": "edit_tools", "solves": edit, "manager": True, "verifier": True,
-         "source": "edit_tools/run_pilot.py:80 --verify"},
+         "source": "c1562e6e:bench/edit_tools/run_pilot.py:80 --verify"},
     ]
     total = sum(d["solves"] for d in datasets)
-    deciding = sum(d["solves"] for d in datasets if d["manager"] is True and not d["verifier"])
+    # The Manager is an LLM gate with nothing executable above it in these solves. Other gates sit
+    # beside it (each row's `gates_beside_manager`), so this does NOT count solves the Manager alone
+    # decided — no stored row says which gate failed an attempt.
+    llm_gate = sum(d["solves"] for d in datasets if d["manager"] is True and not d["verifier"])
     usable = sum(d["solves"] for d in datasets
                  if d["manager"] is True and not d["verifier"] and d.get("run_verdict_stored"))
-    return {"datasets": datasets, "solves_total": total, "manager_decides": deciding,
-            "manager_decides_share": round(deciding / total, 3),
-            "manager_decides_with_verdict_and_oracle": usable}
+    return {"datasets": datasets, "solves_total": total, "manager_llm_gate_no_verifier": llm_gate,
+            "manager_llm_gate_no_verifier_share": round(llm_gate / total, 3),
+            "manager_llm_gate_no_verifier_with_verdict_and_oracle": usable}
 
 
 # --- C3 / C4 ----------------------------------------------------------------------------------------
@@ -168,6 +203,9 @@ def c3_c4_tool_defer() -> dict[str, Any]:
                "approved_precision": round(table["approved_pass"] / approved, 3) if approved else None,
                "share_all_attempts_reverted": round(failed / len(live), 3) if live else None},
         "c4": {"fields_stored_per_row": keys_per_row,
+               # The Manager's REVISE and the diff gate (an unproductive diff fails the attempt when no
+               # verifier ran) both fail attempts here; no stored field names which one failed each.
+               "deciding_gate_per_attempt_recorded": any(k in keys_per_row for k in ("evidence", "attempts")),
                "reverted_work_recoverable": any(k in keys_per_row for k in ("diffs", "discarded_at", "attempts")),
                # A regex can only say the value is MENTIONED; whether the answer claims to have
                # written it, or says it could not, is read by eye in RESULTS.md (§2e).
