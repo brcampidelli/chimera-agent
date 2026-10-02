@@ -159,9 +159,11 @@ stands as the registered verdict whatever follows.
 
 - **Every one of the 349 prompt drops is into a call that carried no tool schema**
   (`tools_offered: false`), all in solves stopped at `max_steps`: when the step budget is spent the
-  loop asks for a closing summary without tools, so that request is smaller by the schema — 1,190 to
-  1,780 tokens at the arms' quartiles, about the size of eleven tool definitions — while carrying every
-  message. One drop per trace, always at call index 29→30.
+  loop asks for a closing summary without tools, so that request is smaller by the schema — 16 to 1,858 tokens, interquartile about 1.2k to 1.8k
+  in arms A, D and Q (0.6k to 0.9k in G's seven), about the size of eleven tool definitions — while
+  carrying every message. One drop per trace, into the call after the 30th step (index 30, or 31 in
+  three traces). *(Wording corrected in the results commit: the first version gave the range as
+  1,190–1,780 and the index as "always 29→30"; the counts and the amendment are unchanged.)*
 - **All 79 misaligned traces are the same calls:** the model emitted a tool call on a closing call
   that offered none, the loop never ran it, and the flat `tool_names` list never named it. Counting
   only the calls that were offered tools, **757 of 757 traces align exactly and are append-only**.

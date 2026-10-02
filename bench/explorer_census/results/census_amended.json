@@ -1,0 +1,361 @@
+{
+  "source": "bench/default_model/results/main_solves.jsonl",
+  "reading": "Amendment 1 (post-hoc)",
+  "rows": 804,
+  "excluded": {
+    "halted": 47,
+    "no_calls": 0,
+    "misaligned": 0,
+    "not_append_only": 0
+  },
+  "usable": 757,
+  "regime_rule": "reads >= 3 in the opening read-only phase and >= 3 calls after it",
+  "regime_n": 306,
+  "regime_share": 0.4042,
+  "regime_share_by_arm": {
+    "A": 0.301,
+    "D": 0.2292,
+    "G": 0.5911,
+    "Q": 0.5
+  },
+  "histogram_reads_in_phase": {
+    "0": 177,
+    "1": 139,
+    "2": 126,
+    "3": 92,
+    "4-5": 121,
+    "6-9": 72,
+    "10+": 30
+  },
+  "histogram_post_calls": {
+    "0": 0,
+    "1-2": 10,
+    "3-9": 117,
+    "10-19": 172,
+    "20-29": 279,
+    "30+": 179
+  },
+  "median_reads_in_phase": 2,
+  "median_phase_calls": 4,
+  "median_read_size_tokens": 678.0,
+  "all": {
+    "n": 757,
+    "B300_reread": {
+      "pooled_token_saving": 0.139,
+      "median_token_saving": 0.0861,
+      "pooled_usd_saving": 0.0599,
+      "negative_rows": 112
+    },
+    "B300_noreread": {
+      "pooled_token_saving": 0.1939,
+      "median_token_saving": 0.1895,
+      "pooled_usd_saving": 0.1172,
+      "negative_rows": 36
+    },
+    "B1000_reread": {
+      "pooled_token_saving": 0.098,
+      "median_token_saving": 0.0125,
+      "pooled_usd_saving": 0.0058,
+      "negative_rows": 194
+    },
+    "B1000_noreread": {
+      "pooled_token_saving": 0.1551,
+      "median_token_saving": 0.1204,
+      "pooled_usd_saving": 0.082,
+      "negative_rows": 104
+    }
+  },
+  "regime": {
+    "n": 306,
+    "B300_reread": {
+      "pooled_token_saving": 0.277,
+      "median_token_saving": 0.2698,
+      "pooled_usd_saving": 0.1644,
+      "negative_rows": 7
+    },
+    "B300_noreread": {
+      "pooled_token_saving": 0.343,
+      "median_token_saving": 0.3471,
+      "pooled_usd_saving": 0.2271,
+      "negative_rows": 0
+    },
+    "B1000_reread": {
+      "pooled_token_saving": 0.2294,
+      "median_token_saving": 0.2105,
+      "pooled_usd_saving": 0.1256,
+      "negative_rows": 22
+    },
+    "B1000_noreread": {
+      "pooled_token_saving": 0.2982,
+      "median_token_saving": 0.2944,
+      "pooled_usd_saving": 0.1925,
+      "negative_rows": 3
+    }
+  },
+  "regime_by_arm": {
+    "A": {
+      "n": 59,
+      "B300_reread": {
+        "pooled_token_saving": 0.2586,
+        "median_token_saving": 0.2326,
+        "pooled_usd_saving": 0.2109,
+        "negative_rows": 3
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.3243,
+        "median_token_saving": 0.309,
+        "pooled_usd_saving": 0.2734,
+        "negative_rows": 0
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.21,
+        "median_token_saving": 0.175,
+        "pooled_usd_saving": 0.1657,
+        "negative_rows": 8
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.2783,
+        "median_token_saving": 0.2497,
+        "pooled_usd_saving": 0.2332,
+        "negative_rows": 2
+      }
+    },
+    "D": {
+      "n": 44,
+      "B300_reread": {
+        "pooled_token_saving": 0.1854,
+        "median_token_saving": 0.1606,
+        "pooled_usd_saving": 0.0508,
+        "negative_rows": 1
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.2494,
+        "median_token_saving": 0.2443,
+        "pooled_usd_saving": 0.1125,
+        "negative_rows": 0
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.1335,
+        "median_token_saving": 0.1075,
+        "pooled_usd_saving": 0.0172,
+        "negative_rows": 6
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.1995,
+        "median_token_saving": 0.1781,
+        "pooled_usd_saving": 0.0813,
+        "negative_rows": 0
+      }
+    },
+    "G": {
+      "n": 120,
+      "B300_reread": {
+        "pooled_token_saving": 0.3437,
+        "median_token_saving": 0.3063,
+        "pooled_usd_saving": 0.1582,
+        "negative_rows": 2
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.4247,
+        "median_token_saving": 0.3805,
+        "pooled_usd_saving": 0.233,
+        "negative_rows": 0
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.294,
+        "median_token_saving": 0.2499,
+        "pooled_usd_saving": 0.1214,
+        "negative_rows": 6
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.38,
+        "median_token_saving": 0.3305,
+        "pooled_usd_saving": 0.2036,
+        "negative_rows": 0
+      }
+    },
+    "Q": {
+      "n": 83,
+      "B300_reread": {
+        "pooled_token_saving": 0.296,
+        "median_token_saving": 0.2767,
+        "pooled_usd_saving": 0.219,
+        "negative_rows": 1
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.3522,
+        "median_token_saving": 0.3281,
+        "pooled_usd_saving": 0.2728,
+        "negative_rows": 0
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.2531,
+        "median_token_saving": 0.2308,
+        "pooled_usd_saving": 0.1808,
+        "negative_rows": 2
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.3114,
+        "median_token_saving": 0.2867,
+        "pooled_usd_saving": 0.2368,
+        "negative_rows": 1
+      }
+    }
+  },
+  "all_by_arm": {
+    "A": {
+      "n": 196,
+      "B300_reread": {
+        "pooled_token_saving": 0.1123,
+        "median_token_saving": 0.0172,
+        "pooled_usd_saving": 0.0746,
+        "negative_rows": 43
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.1669,
+        "median_token_saving": 0.0975,
+        "pooled_usd_saving": 0.1323,
+        "negative_rows": 21
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.0665,
+        "median_token_saving": 0.0,
+        "pooled_usd_saving": 0.0133,
+        "negative_rows": 76
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.1232,
+        "median_token_saving": 0.0257,
+        "pooled_usd_saving": 0.0862,
+        "negative_rows": 42
+      }
+    },
+    "D": {
+      "n": 192,
+      "B300_reread": {
+        "pooled_token_saving": 0.0562,
+        "median_token_saving": 0.0,
+        "pooled_usd_saving": -0.0141,
+        "negative_rows": 23
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.0931,
+        "median_token_saving": 0.0071,
+        "pooled_usd_saving": 0.0339,
+        "negative_rows": 1
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.0276,
+        "median_token_saving": 0.0,
+        "pooled_usd_saving": -0.0702,
+        "negative_rows": 42
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.0655,
+        "median_token_saving": 0.0,
+        "pooled_usd_saving": 0.0103,
+        "negative_rows": 24
+      }
+    },
+    "G": {
+      "n": 203,
+      "B300_reread": {
+        "pooled_token_saving": 0.2553,
+        "median_token_saving": 0.2409,
+        "pooled_usd_saving": 0.1022,
+        "negative_rows": 10
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.3302,
+        "median_token_saving": 0.3526,
+        "pooled_usd_saving": 0.1701,
+        "negative_rows": 1
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.21,
+        "median_token_saving": 0.1595,
+        "pooled_usd_saving": 0.0671,
+        "negative_rows": 26
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.2894,
+        "median_token_saving": 0.2889,
+        "pooled_usd_saving": 0.1429,
+        "negative_rows": 5
+      }
+    },
+    "Q": {
+      "n": 166,
+      "B300_reread": {
+        "pooled_token_saving": 0.2218,
+        "median_token_saving": 0.187,
+        "pooled_usd_saving": 0.1489,
+        "negative_rows": 36
+      },
+      "B300_noreread": {
+        "pooled_token_saving": 0.2913,
+        "median_token_saving": 0.261,
+        "pooled_usd_saving": 0.2163,
+        "negative_rows": 13
+      },
+      "B1000_reread": {
+        "pooled_token_saving": 0.1706,
+        "median_token_saving": 0.1276,
+        "pooled_usd_saving": 0.0977,
+        "negative_rows": 50
+      },
+      "B1000_noreread": {
+        "pooled_token_saving": 0.2427,
+        "median_token_saving": 0.1978,
+        "pooled_usd_saving": 0.1709,
+        "negative_rows": 33
+      }
+    }
+  },
+  "cache_read_share_of_prompt": {
+    "A": 0.8626,
+    "D": 0.8845,
+    "G": 0.9253,
+    "Q": 0.598
+  },
+  "law_reference_median_(D-1)/D": 0.75,
+  "secondary": {
+    "directive_boundary": {
+      "runs": 120,
+      "share_reads_ge_3": 0.2583,
+      "histogram_reads_before_first_action": {
+        "0": 9,
+        "1": 40,
+        "2": 40,
+        "3": 30,
+        "4-5": 1,
+        "6+": 0
+      }
+    },
+    "unattended_claims": {
+      "runs": 20,
+      "share_reads_ge_3": 0.35,
+      "histogram_reads_before_first_action": {
+        "0": 4,
+        "1": 4,
+        "2": 5,
+        "3": 0,
+        "4-5": 2,
+        "6+": 5
+      }
+    }
+  },
+  "decision_key": "B1000_reread",
+  "verdict": {
+    "verdict": "DO NOT RECOMMEND",
+    "conditions": {
+      "regime_share >= 0.25": true,
+      "median saving in regime >= 0.20": true,
+      "pooled saving over all >= 0.10": false
+    },
+    "labels": [
+      "proxy population: unattended SWE-bench solves, not attended Code turns",
+      "token-only: the cache-weighted input-dollar saving is under 5%"
+    ]
+  }
+}
