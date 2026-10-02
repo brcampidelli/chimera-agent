@@ -1,0 +1,174 @@
+"""The explorer census — its arithmetic, pinned on traces small enough to compute by hand.
+
+The census reads stored traces and estimates what an explorer sub-agent would have saved. Every
+number it publishes comes from three decisions: where the opening read-only phase ends, which traces
+it may use at all, and the counterfactual's call-by-call sum. Each is pinned here before it runs on
+the data, so a later edit that moves a number has to move a test first.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+BENCH = Path(__file__).resolve().parents[1] / "bench" / "explorer_census"
+sys.path.insert(0, str(BENCH))
+
+census = pytest.importorskip("census", reason="bench/explorer_census not on the path")
+
+Call = census.Call
+Trace = census.Trace
+
+
+def _calls(*spec: tuple[int, tuple[str, ...]]) -> tuple[Any, ...]:
+    return tuple(Call(p, 0, tools) for p, tools in spec)
+
+
+#: Three single reads of ~2000 tokens, then four solving calls. Small enough to sum by hand.
+_HAND = _calls(
+    (1000, ("read_file",)),
+    (3000, ("read_file",)),
+    (5000, ("read_file",)),
+    (7000, ("apply_patch",)),
+    (7500, ("run_shell",)),
+    (8000, ("run_shell",)),
+    (8500, ()),
+)
+
+
+def test_the_opening_phase_ends_at_the_first_call_that_changes_something() -> None:
+    calls = _calls(
+        (1, ("grep", "glob")),
+        (2, ("todo_write",)),
+        (3, ("read_file", "read_file")),
+        (4, ("read_file", "edit_file")),
+        (5, ("read_file",)),
+        (6, ()),
+    )
+    phase = census.exploration_phase(calls)
+    assert phase.e == 3
+    assert phase.reads == 2  # the read in the editing call is solving, not locating
+    assert phase.searches == 2
+    assert phase.post_calls == 3
+
+
+def test_a_silent_call_between_reads_does_not_end_the_phase_but_the_answer_does() -> None:
+    between = census.exploration_phase(
+        _calls((1, ("read_file",)), (2, ()), (3, ("read_file",)), (4, ()))
+    )
+    assert between.e == 3 and between.reads == 2 and between.post_calls == 1
+    only_reads = census.exploration_phase(_calls((1, ("read_file",)), (2, ())))
+    assert only_reads.e == 1 and only_reads.post_calls == 1
+
+
+def test_a_trace_whose_tool_counts_do_not_sum_to_its_tool_list_is_left_out() -> None:
+    calls = [{"prompt": 10, "tool_calls": 2}, {"prompt": 20, "tool_calls": 1}]
+    assert census.split_calls(calls, ["grep", "read_file"]) is None
+    joined = census.split_calls(calls, ["grep", "read_file", "apply_patch"])
+    assert joined is not None
+    assert [c.tools for c in joined] == [("grep", "read_file"), ("apply_patch",)]
+
+
+def test_a_trace_whose_prompt_shrank_is_not_append_only() -> None:
+    assert census.append_only(_HAND)
+    assert not census.append_only(_calls((10, ()), (9, ())))
+
+
+def test_the_counterfactual_matches_the_sum_done_by_hand() -> None:
+    trace = Trace("A", "x", _HAND, patch_files=1)
+    phase = census.exploration_phase(_HAND)
+    assert (phase.e, phase.reads, phase.post_calls) == (3, 3, 4)
+    plain = census.counterfactual(trace, phase, block=1000, reread=False, read_size=2000)
+    # base 40000; R = 6000; removed = 6000 - 60 - 1000 = 4940 from each of the 4 later calls;
+    # explorer arm = 1000 (ask) + 9000 (replayed reads) + 7000 (closing call) + 31000 - 4*4940.
+    assert plain.base_tokens == 40000
+    assert plain.cf_tokens == 28240
+    assert plain.saving == pytest.approx(0.294)
+    reread = census.counterfactual(trace, phase, block=1000, reread=True, read_size=2000)
+    # One file patched is opened again: removed = 2940, plus one extra call at 7000 - 2940.
+    assert reread.cf_tokens == 1000 + 9000 + 7000 + (31000 - 4 * 2940) + 4060
+    assert reread.saving < 0  # a short solving phase does not pay for the hand-off
+
+
+def test_a_trace_with_nothing_to_delegate_costs_the_same_in_both_arms() -> None:
+    calls = _calls((1000, ("apply_patch",)), (1500, ()))
+    trace = Trace("A", "x", calls, patch_files=1)
+    cf = census.counterfactual(
+        trace, census.exploration_phase(calls), block=300, reread=True, read_size=500
+    )
+    assert cf.cf_tokens == cf.base_tokens and cf.saving == 0
+
+
+def test_the_removed_tokens_leave_the_cached_part_of_the_prompt() -> None:
+    calls = (
+        Call(1000, 0, ("read_file",)),
+        Call(9000, 8000, ("apply_patch",)),
+        Call(9500, 9000, ()),
+    )
+    trace = Trace("A", "x", calls, patch_files=1)
+    cf = census.counterfactual(
+        trace, census.exploration_phase(calls), block=300, reread=False, read_size=0
+    )
+    # 27% fewer tokens, and MORE dollars: what leaves was cached at a quarter of the price, while
+    # the explorer's replay of the reading and its closing call are paid in full.
+    assert cf.saving == pytest.approx(1 - 14220 / 19500)
+    assert cf.usd_saving < 0 < cf.saving
+
+
+def test_the_regime_needs_three_reads_and_three_calls_after_them() -> None:
+    assert census.in_regime(census.Phase(e=4, reads=3, searches=1, post_calls=3))
+    assert not census.in_regime(census.Phase(e=4, reads=2, searches=2, post_calls=9))
+    assert not census.in_regime(census.Phase(e=4, reads=5, searches=0, post_calls=2))
+
+
+def test_a_patch_counts_each_file_once() -> None:
+    patch = "diff --git a/x.py b/x.py\n@@\ndiff --git a/y.py b/y.py\n@@\ndiff --git a/x.py b/x.py\n"
+    assert census.patch_file_count(patch) == 2
+    assert census.patch_file_count("") == 0
+
+
+def test_reads_before_the_first_action_ignore_reads_after_it() -> None:
+    assert census.sequence_reads(["grep", "read_file", "read_file", "run_shell", "read_file"]) == 2
+
+
+def _report(**over: Any) -> dict[str, Any]:
+    key = "B1000_reread"
+    base: dict[str, Any] = {
+        "decision_key": key,
+        "usable": 500,
+        "excluded": {"misaligned": 0, "not_append_only": 0},
+        "regime_share": 0.5,
+        "regime": {key: {"median_token_saving": 0.3}},
+        "all": {key: {"pooled_token_saving": 0.2, "pooled_usd_saving": 0.1}},
+    }
+    base.update(over)
+    return base
+
+
+def test_the_rule_recommends_only_when_all_three_conditions_hold() -> None:
+    key = "B1000_reread"
+    assert census.verdict(_report())["verdict"] == "RECOMMEND"
+    assert census.verdict(_report(regime_share=0.24))["verdict"] == "DO NOT RECOMMEND"
+    assert (
+        census.verdict(_report(regime={key: {"median_token_saving": 0.19}}))["verdict"]
+        == "DO NOT RECOMMEND"
+    )
+    low_pool = {key: {"pooled_token_saving": 0.09, "pooled_usd_saving": 0.1}}
+    assert census.verdict(_report(all=low_pool))["verdict"] == "DO NOT RECOMMEND"
+
+
+def test_the_rule_is_void_on_too_few_traces_or_too_many_failed_checks() -> None:
+    assert census.verdict(_report(usable=99))["verdict"] == "VOID"
+    failed = {"misaligned": 100, "not_append_only": 100}
+    assert census.verdict(_report(usable=500, excluded=failed))["verdict"] == "VOID"
+
+
+def test_a_recommendation_says_when_its_saving_is_tokens_and_not_money() -> None:
+    key = "B1000_reread"
+    cheap = {key: {"pooled_token_saving": 0.2, "pooled_usd_saving": 0.02}}
+    labels = census.verdict(_report(all=cheap))["labels"]
+    assert any(label.startswith("token-only") for label in labels)
+    assert any(label.startswith("proxy population") for label in labels)
