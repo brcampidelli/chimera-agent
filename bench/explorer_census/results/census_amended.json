@@ -346,6 +346,44 @@
     }
   },
   "decision_key": "B1000_reread",
+  "sensitivity_explorer_uncached": {
+    "read_by_no_rule": true,
+    "what": "B1000_reread, input-$ saving with every explorer call billed with no cache read; the main loop's calls keep their cache. Tokens are unchanged.",
+    "pooled_usd_saving_all": -0.2529,
+    "pooled_usd_saving_regime": -0.3838,
+    "pooled_usd_saving_all_by_arm": {
+      "A": -0.1315,
+      "D": -0.2148,
+      "G": -0.9239,
+      "Q": -0.061
+    }
+  },
+  "exploratory_gated_delegation": {
+    "read_by_no_rule": true,
+    "regime_share_of_prompt_tokens": 0.4197,
+    "all": {
+      "pooled_token_saving": 0.0963,
+      "pooled_usd_saving": 0.0503
+    },
+    "all_by_arm": {
+      "A": {
+        "pooled_token_saving": 0.0745,
+        "pooled_usd_saving": 0.0587
+      },
+      "D": {
+        "pooled_token_saving": 0.0318,
+        "pooled_usd_saving": 0.0044
+      },
+      "G": {
+        "pooled_token_saving": 0.2009,
+        "pooled_usd_saving": 0.0821
+      },
+      "Q": {
+        "pooled_token_saving": 0.1528,
+        "pooled_usd_saving": 0.1027
+      }
+    }
+  },
   "verdict": {
     "verdict": "DO NOT RECOMMEND",
     "conditions": {

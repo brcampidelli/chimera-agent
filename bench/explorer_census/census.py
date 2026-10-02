@@ -10,7 +10,14 @@ each call it spends SOLVING. An explorer sub-agent pays for the reading once, in
 hands the main loop a short ``path:line`` block instead. The census estimates, per stored solve, what
 the main loop would have paid had its opening read-only phase gone through the explorer.
 
-Run: ``python bench/explorer_census/census.py`` (writes ``results/census.json`` and prints the report).
+Run: ``python bench/explorer_census/census.py`` writes ``results/census_amended.json`` (Amendment 1,
+the default) and prints the report; ``--as-registered`` writes ``results/census_registered.json``
+(the registered reading, which is VOID).
+
+Two blocks of the report are read by no rule and are labelled so: ``sensitivity_explorer_uncached``
+(the dollar reading with the explorer's own calls billed with no cache read, the other end of a
+modelling choice the pre-registration did not fix) and ``exploratory_gated_delegation`` (the saving
+if only traces in the regime delegated). Both were added after the amended reading, on review.
 """
 
 from __future__ import annotations
@@ -195,7 +202,13 @@ def _usd(prompt: int, cache: int, price: tuple[float, float]) -> float:
 
 
 def counterfactual(
-    trace: Trace, phase: Phase, *, block: int, reread: bool, read_size: float
+    trace: Trace,
+    phase: Phase,
+    *,
+    block: int,
+    reread: bool,
+    read_size: float,
+    explorer_cached: bool = True,
 ) -> Counterfactual:
     """Prompt tokens (and input dollars) of the trace as it ran, and as it would have run with its
     opening read-only phase delegated to an explorer.
@@ -212,7 +225,15 @@ def counterfactual(
     * the re-reads are extra calls of the same size as the first post-explorer call.
 
     Completion tokens are left out of both arms: they are the same work in both, apart from the
-    explorer's block, which is counted on the prompt side of every call that carries it."""
+    explorer's block, which is counted on the prompt side of every call that carries it.
+
+    Dollars: the explorer's own calls (its replay of the phase and its closing call) are priced, by
+    default, with the cache-read tokens the MAIN loop had on the same calls. That is a modelling
+    choice the pre-registration did not fix, not "paid in full": a sub-agent with its own system
+    prompt starts from a colder cache, and how cold is not in the traces. ``explorer_cached=False``
+    is the other end, every explorer call billed with no cache read; the main loop's own calls (the
+    ask, the shrunk later calls and the re-reads) keep their cache either way. Tokens do not depend
+    on it."""
     calls = trace.calls
     price = PRICES.get(trace.arm, (1.0, 0.1))
     base_tokens = sum(c.prompt for c in calls)
@@ -236,10 +257,14 @@ def counterfactual(
         return p, _usd(p, cache, price)
 
     cf_tokens = calls[0].prompt + sum(c.prompt for c in calls[:e]) + calls[e].prompt
+
+    def explorer_cache(c: Call) -> int:
+        return c.cache_read if explorer_cached else 0
+
     cf_usd = (
         _usd(calls[0].prompt, calls[0].cache_read, price)
-        + sum(_usd(c.prompt, c.cache_read, price) for c in calls[:e])
-        + _usd(calls[e].prompt, calls[e].cache_read, price)
+        + sum(_usd(c.prompt, explorer_cache(c), price) for c in calls[:e])
+        + _usd(calls[e].prompt, explorer_cache(calls[e]), price)
     )
     for c in calls[e:]:
         p, u = shrunk(c)
@@ -368,7 +393,10 @@ def analyse(loaded: Loaded) -> dict[str, Any]:
             for b in BLOCKS
             for rr in (True, False)
         }
-        per.append({"trace": t, "phase": ph, "cf": cfs, "read_size": size})
+        uncached = counterfactual(
+            t, ph, block=CONSERVATIVE_BLOCK, reread=True, read_size=size, explorer_cached=False
+        )
+        per.append({"trace": t, "phase": ph, "cf": cfs, "read_size": size, "cf_uncached": uncached})
 
     key = f"B{CONSERVATIVE_BLOCK}_reread"
 
@@ -391,6 +419,12 @@ def analyse(loaded: Loaded) -> dict[str, Any]:
 
     regime = [p for p in per if in_regime(p["phase"])]
     arms = sorted({p["trace"].arm for p in per})
+
+    def uncached_usd(sel: list[dict[str, Any]]) -> float | None:
+        bu = sum(p["cf_uncached"].base_usd for p in sel)
+        cu = sum(p["cf_uncached"].cf_usd for p in sel)
+        return round(1 - cu / bu, 4) if bu else None
+
     cache_share = {
         a: round(
             sum(c.cache_read for p in per if p["trace"].arm == a for c in p["trace"].calls)
@@ -455,9 +489,53 @@ def analyse(loaded: Loaded) -> dict[str, Any]:
             for name, seqs in sec.items()
         },
         "decision_key": key,
+        "sensitivity_explorer_uncached": {
+            "read_by_no_rule": True,
+            "what": f"{key}, input-$ saving with every explorer call billed with no cache read; "
+            "the main loop's calls keep their cache. Tokens are unchanged.",
+            "pooled_usd_saving_all": uncached_usd(per),
+            "pooled_usd_saving_regime": uncached_usd(regime),
+            "pooled_usd_saving_all_by_arm": {
+                a: uncached_usd([p for p in per if p["trace"].arm == a]) for a in arms
+            },
+        },
+        "exploratory_gated_delegation": gated_delegation(per, key),
     }
     report["verdict"] = verdict(report)
     return report
+
+
+def gated_delegation(per: Sequence[dict[str, Any]], key: str) -> dict[str, Any]:
+    """Exploratory, read by no rule: the saving if ONLY traces in the regime delegated.
+
+    An agent cannot know in advance that it is about to read three files, so this is not a policy
+    the product could run; it says how much of the pooled number the short phases cost. Traces out
+    of the regime are charged as they ran."""
+
+    def pooled(sel: Sequence[dict[str, Any]]) -> dict[str, float | None]:
+        base = sum(p["cf"][key].base_tokens for p in sel)
+        cf = sum(
+            p["cf"][key].cf_tokens if in_regime(p["phase"]) else p["cf"][key].base_tokens
+            for p in sel
+        )
+        bu = sum(p["cf"][key].base_usd for p in sel)
+        cu = sum(
+            p["cf"][key].cf_usd if in_regime(p["phase"]) else p["cf"][key].base_usd for p in sel
+        )
+        return {
+            "pooled_token_saving": round(1 - cf / base, 4) if base else None,
+            "pooled_usd_saving": round(1 - cu / bu, 4) if bu else None,
+        }
+
+    total = sum(p["cf"][key].base_tokens for p in per)
+    in_reg = sum(p["cf"][key].base_tokens for p in per if in_regime(p["phase"]))
+    arms = sorted({p["trace"].arm for p in per})
+    return {
+        "read_by_no_rule": True,
+        "regime_share_of_prompt_tokens": round(in_reg / total, 4) if total else None,
+        "all": pooled(per),
+        "all_by_arm": {a: pooled([p for p in per if p["trace"].arm == a]) for a in arms},
+    }
 
 
 def verdict(r: dict[str, Any]) -> dict[str, Any]:
@@ -511,6 +589,7 @@ __all__ = [
     "Trace",
     "counterfactual",
     "exploration_phase",
+    "gated_delegation",
     "in_regime",
     "patch_file_count",
     "sequence_reads",

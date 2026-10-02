@@ -34,7 +34,12 @@ D 192, G 203, Q 166); 47 halted rows are out of every denominator (PROTOCOL §2)
 | regime share (D ≥ 3 reads in the opening phase, ≥ 3 calls after it) ≥ 25% | **40.4%** (306/757) | yes |
 | median saving within the regime ≥ 20% | **21.1%** | yes |
 | pooled saving over all usable solves ≥ 10% | **9.8%** | **no** |
-| (label) cache-weighted input-dollar saving, pooled | **0.6%** | → *token-only* |
+| (label) cache-weighted input-dollar saving, pooled | **0.6%**¹ | → *token-only* |
+
+¹ With the explorer's own calls priced at the main loop's cache-read pattern, a modelling choice the
+pre-registration did not fix (see "The dollar reading depends on a choice", below). Billed with no
+cache read, the same cell is **−25.3%**. The label applies under either reading; the rule decides on
+tokens, which the choice does not move.
 
 The pooled condition fails by 0.2 pp. It is not loosened: the threshold was frozen before any number
 was read, and a saving that lands on its bar in the conservative cell is not one to build a screen on.
@@ -67,7 +72,10 @@ solves, D in 23%. Per arm n is 166–203, so these are descriptions, not compari
 **The arm that matters most is a post-hoc subgroup.** The default model changed after this bake-off:
 it is now G (`gpt-6-luna`). On G alone the conservative cell clears every bar
 of the rule — regime 59.1% ≥ 25%, median in regime 25.0% ≥ 20%, pooled 21.0% ≥ 10% — and the input-$
-saving (6.7%) is over the *token-only* line. The frozen rule pools the four arms and was not written
+saving is over the *token-only* line **only under the cache choice the table uses**: priced at the main
+loop's cache pattern it is 6.7%; with the explorer's calls billed uncached it is **−92.4%**, because G's
+prompts are 93% cache reads and the replayed phase is what that assumption discounts. So G's token case
+stands and its dollar case is open. The frozen rule pools the four arms and was not written
 per model, so this does not change the verdict; it changes what the next measurement should be
 (below). On the previous default (A) the explorer would save 6.7% of tokens and 1.3% of dollars.
 
@@ -92,7 +100,7 @@ per model, so this does not change the verdict; it changes what the next measure
 | 1 | regime share ≈ 50%, inside 30–70% | 40.4% | **held** (inside the range, under the point) |
 | 2 | median saving in the regime ≈ 25%, inside 10–40% | 21.1% | **held** |
 | 3 | pooled saving ≈ 15% | 9.8% | **missed** — lower |
-| 4 | input-$ saving under 10% and under half the token saving | 0.6% against 9.8% | **held** |
+| 4 | input-$ saving under 10% and under half the token saving | 0.6% against 9.8% (−25.3% with the explorer uncached) | **held** under either cache choice |
 | 5 | small fixtures: share with ≥ 3 reads ≤ 25% in each file | 25.8% and 35.0% (n = 20) | **missed** — both above |
 
 Prediction 5 missing matters for the reading: small interactive turns reach three reads before acting
@@ -102,7 +110,8 @@ the reading that the saving lives on, and the secondary files cannot price that.
 ## Honest reading
 
 **The regime exists, and it is not where the law's number lives.** 40% of the solves read three or
-more files before their first action, and those solves hold 42% of all prompt tokens. Inside them the
+more files before their first action, and those solves hold 42% of all prompt tokens
+(`exploratory_gated_delegation.regime_share_of_prompt_tokens`). Inside them the
 conservative saving is about a fifth (21.1% median), against a median (D−1)/D of 75% for the same
 solves. The gap is the mechanism the law does not have: `bench/hierarchy_multistep` sends every
 document on every turn and nothing else, while a coding loop **keeps reading after it starts solving**
@@ -111,10 +120,31 @@ and second looks), and it must **open again the files it edits**, which hands pa
 The law is an upper bound for a loop that only reads; this census is what a loop that also works
 leaves of it.
 
-**The dollar saving is nearly nothing.** What the explorer takes out of a later prompt is its oldest
-part, which the provider has already cached: 86–93% of these prompts were cache reads (Q 60%), billed
-at a quarter (A) to a thirtieth (D) of the input price. The explorer's own calls are paid in full. Pooled, the
-conservative cell saves 9.8% of tokens and 0.6% of input dollars; on arm D it costs 7% more. This is
+**The dollar saving is nearly nothing, at best.** What the explorer takes out of a later prompt is its
+oldest part, which the provider has already cached: 86–93% of these prompts were cache reads (Q 60%),
+billed at a quarter (A) to a thirtieth (D) of the input price. Pooled, the conservative cell saves 9.8%
+of tokens and 0.6% of input dollars; on arm D it costs 7% more.
+
+**The dollar reading depends on a choice.** `census.counterfactual` prices the explorer's own calls,
+its replay of the opening phase and its closing call, with the cache-read tokens the **main loop** had
+on those same calls (63% of their prompt tokens over the delegated traces). An earlier version of this
+file, the results commit message and a test comment said those calls were "paid in full"; that
+described the other end of the choice, not the code that produced the numbers, and is corrected here.
+The pre-registration fixed which part of a later prompt the explorer removes (the oldest, cached part),
+not how warm the explorer's own cache is, and the traces cannot say: a sub-agent with its own system
+prompt starts colder than the main loop, but not necessarily cold. The two ends, decision cell
+(`sensitivity_explorer_uncached` in `results/census_amended.json`, read by no rule):
+
+| explorer's own calls priced | pooled input $, all | in the regime | A | D | G | Q |
+|---|---|---|---|---|---|---|
+| at the main loop's cache pattern (the tables above) | 0.6% | 12.6% | 1.3% | −7.0% | 6.7% | 9.8% |
+| with no cache read | **−25.3%** | −38.4% | −13.2% | −21.5% | **−92.4%** | −6.1% |
+
+The reviewer's independent recomputation, with its own choice of which calls count as the explorer's,
+gave −26.9% pooled and −96.4% on G; the script's definition (only the explorer's calls lose their
+cache; the main loop's ask, its later calls and its re-reads keep theirs) gives the row above. Under
+either end the pooled dollar saving is under 5%, so the *token-only* label and the verdict stand; what
+moves is how much a dollar argument for the explorer can rest on, and on this evidence it cannot. This is
 the caveat `bench/hierarchy_multistep` wrote and could not reproduce on its route (zero cache reads
 there); here the cache is on and it eats the win, as PROTOCOL §3 says it can.
 
@@ -122,12 +152,13 @@ there); here the cache is on and it eats the win, as PROTOCOL §3 says it can.
 the main loop carries 21–29% less on every later call. In the regime the conservative cell pays 21–23%
 fewer prompt tokens (median and pooled), most of it on the long tail of solving calls. That would
 matter for a model with a short useful context, and it is the explorer's honest pitch — not cost.
+Unlike the dollar reading, these token numbers do not depend on the cache choice.
 
 ## The recommendation
 
 1. **Do not offer the explorer on the Code screen now.** The frozen rule says no. Pooled over the
-   models measured, the conservative saving is 9.8% of tokens and 0.6% of dollars before any quality
-   cost, and a toggle whose benefit is that small is a choice nobody can make well.
+   models measured, the conservative saving is 9.8% of tokens and between 0.6% and −25.3% of input
+   dollars (depending on how warm the explorer's cache is) before any quality cost, and a toggle whose benefit is that small is a choice nobody can make well.
 2. **Keep it where it is**, opt-in in the run launcher and the CLI. The run launcher's long multi-file
    runs are the closest thing to the regime the census found.
 3. **What would reopen this**, each a separate pre-registration:
@@ -136,17 +167,31 @@ matter for a model with a short useful context, and it is the explorer's honest 
    - the explorer on a **cheaper model** than the main loop, which is what its role is for: the census
      priced it at the main model's size and rate, its most conservative side;
    - **first in line:** a **paired live A/B on today's default model (G)**, which reads before it acts
-     in 59% of solves and is the one model whose post-hoc slice clears every bar here. Pre-registered
-     before it runs, reading quality first (resolution, paired), tokens and dollars second — the only
-     thing that can say whether a `path:line` block solves as well as the files it replaced, and the
-     only way the G slice stops being post-hoc.
+     in 59% of solves and is the one model whose post-hoc slice clears every token bar here.
+     Pre-registered before it runs, reading quality first (resolution, paired), tokens and dollars
+     second — the only thing that can say whether a `path:line` block solves as well as the files it
+     replaced, the only way the G slice stops being post-hoc, and the only way to read the explorer's
+     real cache-read share, which decides whether G's input dollars land near 6.7% or near −92.4%.
 
 ### Exploratory, not a verdict
 
 If the agent delegated **only** when it was about to read three or more files (which it cannot know in
-advance), the pooled saving would be 9.6% of tokens and 5.0% of input dollars (A 7.4% / 5.9%). Gating
+advance), the pooled saving would be 9.6% of tokens and 5.0% of input dollars (A 7.4% / 5.9%), with the
+explorer priced at the main loop's cache pattern. The regime's solves hold 42.0% of all prompt tokens.
+Both are in `exploratory_gated_delegation` in `results/census_amended.json`, labelled read by no rule. Gating
 by regime does not rescue the pooled number; it only stops the explorer costing money on short phases.
 Computed after the amended reading, for the record; no rule reads it.
+
+## Errata
+
+- **"Paid in full" (corrected on review).** See "The dollar reading depends on a choice": the
+  explorer's calls were priced at the main loop's cache pattern, not in full. The message of the
+  results commit `0f84a3ee` says otherwise and is not rewritten; this file and the test comment are
+  the correction.
+- **PREREGISTRATION.md was edited in the results commit** (`0f84a3ee`): a wording correction to the
+  VOID diagnosis (drop range 16–1,858 tokens, call index 30 or 31), labelled in place, touching no
+  prediction, threshold or rule. It belonged here as an erratum; it is recorded here so the
+  pre-registration's history reads honestly.
 
 ## Facts checked against the code on the way
 

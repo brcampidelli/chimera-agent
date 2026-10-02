@@ -113,9 +113,50 @@ def test_the_removed_tokens_leave_the_cached_part_of_the_prompt() -> None:
         trace, census.exploration_phase(calls), block=300, reread=False, read_size=0
     )
     # 27% fewer tokens, and MORE dollars: what leaves was cached at a quarter of the price, while
-    # the explorer's replay of the reading and its closing call are paid in full.
+    # the explorer's replay of the reading and its closing call are priced at the main loop's cache
+    # pattern, which here is cold on the replay (cache 0) and warm on the closing call (8000).
     assert cf.saving == pytest.approx(1 - 14220 / 19500)
     assert cf.usd_saving < 0 < cf.saving
+
+
+def test_billing_the_explorer_uncached_moves_dollars_and_not_tokens() -> None:
+    calls = (
+        Call(1000, 0, ("read_file",)),
+        Call(9000, 8000, ("apply_patch",)),
+        Call(9500, 9000, ()),
+    )
+    trace = Trace("A", "x", calls, patch_files=1)
+    phase = census.exploration_phase(calls)
+    warm = census.counterfactual(trace, phase, block=300, reread=False, read_size=0)
+    cold = census.counterfactual(
+        trace, phase, block=300, reread=False, read_size=0, explorer_cached=False
+    )
+    assert cold.cf_tokens == warm.cf_tokens and cold.base_usd == warm.base_usd
+    # Only the explorer's closing call (9000 tokens, 8000 of them cached) changes price: the 8000
+    # go from the cache-read rate to the input rate. The main loop's calls keep their cache.
+    in_price, cache_price = census.PRICES["A"]
+    assert cold.cf_usd - warm.cf_usd == pytest.approx(8000 * (in_price - cache_price) / 1e6)
+
+
+def test_gated_delegation_charges_traces_out_of_the_regime_as_they_ran() -> None:
+    key = "B1000_reread"
+    long_tail = _HAND + _calls((9000, ()), (9500, ()))
+    short = _calls((1000, ("read_file",)), (3000, ("apply_patch",)), (3500, ()))
+    per = []
+    for i, calls in enumerate((long_tail, short)):
+        trace = Trace("A", str(i), calls, patch_files=1)
+        phase = census.exploration_phase(calls)
+        cf = census.counterfactual(trace, phase, block=1000, reread=True, read_size=2000)
+        per.append({"trace": trace, "phase": phase, "cf": {key: cf}})
+    assert census.in_regime(per[0]["phase"]) and not census.in_regime(per[1]["phase"])
+    out = census.gated_delegation(per, key)
+    base = sum(p["cf"][key].base_tokens for p in per)
+    expected = 1 - (per[0]["cf"][key].cf_tokens + per[1]["cf"][key].base_tokens) / base
+    assert out["all"]["pooled_token_saving"] == pytest.approx(expected, abs=1e-4)
+    assert out["regime_share_of_prompt_tokens"] == pytest.approx(
+        per[0]["cf"][key].base_tokens / base, abs=1e-4
+    )
+    assert out["read_by_no_rule"] is True
 
 
 def test_the_regime_needs_three_reads_and_three_calls_after_them() -> None:
