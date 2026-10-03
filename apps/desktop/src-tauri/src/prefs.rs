@@ -80,13 +80,44 @@ pub fn load(data_dir: &Path) -> (Prefs, Option<String>) {
 
 /// Write the preferences, atomically: a crash mid-write must not leave half a file that then reads
 /// as "malformed" and resets everything to defaults.
-pub fn save(data_dir: &Path, prefs: &Prefs) -> Result<(), String> {
+///
+/// Returns where a broken file was moved, if one was. A file that does not parse is someone's hand
+/// edit — a chord with a typo, a missing comma — and the switches in memory are the defaults that
+/// stood in for it. Writing them over it would throw that edit away without a word on the first
+/// click of any switch. So it is moved aside first (`shell-prefs.json.bad`, or a dated name when
+/// that is taken), and if it cannot be moved nothing is written: the edit outranks the click.
+pub fn save(data_dir: &Path, prefs: &Prefs) -> Result<Option<PathBuf>, String> {
     let path = prefs_path(data_dir);
     let tmp = data_dir.join(format!("{PREFS_FILE}.tmp"));
     let body = serde_json::to_string_pretty(prefs).map_err(|e| e.to_string())?;
     std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
+    let set_aside = set_aside_if_broken(data_dir, &path)?;
     std::fs::write(&tmp, body).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    Ok(set_aside)
+}
+
+/// Move the file out of the way when it exists and does not parse; say where it went.
+fn set_aside_if_broken(data_dir: &Path, path: &Path) -> Result<Option<PathBuf>, String> {
+    let broken = match std::fs::read_to_string(path) {
+        Ok(text) => serde_json::from_str::<Prefs>(&text).is_err(),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        // Unreadable (a lock, a permission): not provably ours to replace, so not replaced.
+        Err(e) => return Err(e.to_string()),
+    };
+    if !broken {
+        return Ok(None);
+    }
+    let mut aside = data_dir.join(format!("{PREFS_FILE}.bad"));
+    if aside.exists() {
+        // An earlier broken edit is already there; keep it too.
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_secs());
+        aside = data_dir.join(format!("{PREFS_FILE}.bad-{secs}"));
+    }
+    std::fs::rename(path, &aside).map_err(|e| e.to_string())?;
+    Ok(Some(aside))
 }
 
 /// What closing the main window does.
@@ -154,8 +185,9 @@ mod tests {
             quick_entry: true,
             quick_entry_chord: "Alt+Shift+K".into(),
         };
-        save(&d, &wanted).expect("saved");
-        assert_eq!(load(&d), (wanted, None));
+        assert_eq!(save(&d, &wanted), Ok(None), "a missing file has nothing to set aside");
+        assert_eq!(load(&d), (wanted.clone(), None));
+        assert_eq!(save(&d, &wanted), Ok(None), "a good file is replaced, not set aside");
         assert!(!d.join("shell-prefs.json.tmp").exists(), "the temporary file was left behind");
     }
 
@@ -178,5 +210,25 @@ mod tests {
         let (prefs, problem) = load(&d);
         assert_eq!(prefs, Prefs::default());
         assert!(problem.is_some(), "a malformed file read as a clean first run");
+    }
+
+    /// The first switch clicked after a broken hand edit does not erase the edit: the file is moved
+    /// aside with its bytes intact, and a second broken edit does not overwrite the first one.
+    #[test]
+    fn a_broken_file_is_set_aside_before_the_first_save() {
+        let d = dir("aside");
+        let edit = "{ \"quick_entry_chord\": \"Ctrl+Alt+K\", }";
+        std::fs::write(prefs_path(&d), edit).unwrap();
+        let on = Prefs { keep_in_tray: true, ..Prefs::default() };
+        let aside = save(&d, &on).expect("saved").expect("the broken file was moved somewhere");
+        assert_eq!(aside, d.join("shell-prefs.json.bad"));
+        assert_eq!(std::fs::read_to_string(&aside).unwrap(), edit, "the hand edit was lost");
+        assert_eq!(load(&d), (on.clone(), None));
+
+        std::fs::write(prefs_path(&d), "not json either").unwrap();
+        let second = save(&d, &on).expect("saved").expect("set aside again");
+        assert_ne!(second, aside, "the second broken file overwrote the first");
+        assert_eq!(std::fs::read_to_string(&aside).unwrap(), edit);
+        assert_eq!(std::fs::read_to_string(&second).unwrap(), "not json either");
     }
 }

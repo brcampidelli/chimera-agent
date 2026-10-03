@@ -1012,6 +1012,7 @@ mod tests {
             ("atalho_falhou", d.atalho_falhou),
             ("autostart_falhou", d.autostart_falhou),
             ("prefs_falhou", d.prefs_falhou),
+            ("prefs_guardado", d.prefs_guardado),
             ("sem_acesso", d.sem_acesso),
             ("dica_rodando", d.dica_rodando),
             ("dica_gasto", d.dica_gasto),
@@ -1079,6 +1080,7 @@ mod tests {
                 ("autostart_falhou", d.autostart_falhou, "{e}"),
                 ("prefs_falhou", d.prefs_falhou, "{f}"),
                 ("prefs_falhou", d.prefs_falhou, "{e}"),
+                ("prefs_guardado", d.prefs_guardado, "{f}"),
                 ("sem_acesso", d.sem_acesso, "{e}"),
                 ("dica_rodando", d.dica_rodando, "{n}"),
                 ("dica_gasto", d.dica_gasto, "{usd}"),
@@ -2060,6 +2062,9 @@ struct Dialogo {
     autostart_falhou: &'static str,
     /// `{f}` the preferences file, `{e}` the OS's words.
     prefs_falhou: &'static str,
+    /// `{f}` where a preferences file that did not parse was moved before the first save over it,
+    /// so a hand edit with a typo is kept rather than overwritten by the click of a switch.
+    prefs_guardado: &'static str,
     /// `{e}` is what the backend answered. The tray must not read a refusal as "nothing pending".
     sem_acesso: &'static str,
     /// Tooltip pieces, shown only while the app keeps running in the tray.
@@ -2102,6 +2107,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "Shortcut {k} is not active: {e}",
         autostart_falhou: "Could not change start at sign-in: {e}",
         prefs_falhou: "Tray preferences not saved or read ({f}): {e}",
+        prefs_guardado: "The tray preferences file did not parse; it was kept as {f} and replaced by the switches as they are now",
         sem_acesso: "No access to the backend ({e}): approvals and spending cannot be shown here",
         dica_rodando: "{n} running",
         dica_gasto: "US$ {usd} today (UTC)",
@@ -2131,6 +2137,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "O atalho {k} não está ativo: {e}",
         autostart_falhou: "Não foi possível mudar o início com o sistema: {e}",
         prefs_falhou: "Preferências da bandeja não gravadas ou lidas ({f}): {e}",
+        prefs_guardado: "O arquivo de preferências da bandeja não pôde ser lido; foi guardado como {f} e substituído pelas opções atuais",
         sem_acesso: "Sem acesso ao backend ({e}): aprovações e gasto não podem ser mostrados aqui",
         dica_rodando: "{n} rodando",
         dica_gasto: "US$ {usd} hoje (UTC)",
@@ -2160,6 +2167,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "El atajo {k} no está activo: {e}",
         autostart_falhou: "No se pudo cambiar el inicio con el sistema: {e}",
         prefs_falhou: "Preferencias de la bandeja no guardadas o leídas ({f}): {e}",
+        prefs_guardado: "El archivo de preferencias de la bandeja no se pudo leer; se guardó como {f} y se reemplazó por las opciones actuales",
         sem_acesso: "Sin acceso al backend ({e}): aquí no se pueden mostrar aprobaciones ni gasto",
         dica_rodando: "{n} en curso",
         dica_gasto: "US$ {usd} hoy (UTC)",
@@ -2189,6 +2197,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "Le raccourci {k} n'est pas actif : {e}",
         autostart_falhou: "Impossible de modifier le démarrage avec le système : {e}",
         prefs_falhou: "Préférences de la zone de notification non enregistrées ou lues ({f}) : {e}",
+        prefs_guardado: "Le fichier de préférences de la zone de notification était illisible ; il a été conservé sous {f} et remplacé par les options actuelles",
         sem_acesso: "Pas d'accès au backend ({e}) : les approbations et les dépenses ne peuvent pas être affichées ici",
         dica_rodando: "{n} en cours",
         dica_gasto: "{usd} US$ aujourd'hui (UTC)",
@@ -2218,6 +2227,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "Das Tastenkürzel {k} ist nicht aktiv: {e}",
         autostart_falhou: "Autostart konnte nicht geändert werden: {e}",
         prefs_falhou: "Einstellungen des Infobereichs nicht gespeichert oder gelesen ({f}): {e}",
+        prefs_guardado: "Die Einstellungsdatei des Infobereichs war nicht lesbar; sie wurde als {f} aufbewahrt und durch die aktuellen Schalter ersetzt",
         sem_acesso: "Kein Zugriff auf das Backend ({e}): Freigaben und Kosten können hier nicht angezeigt werden",
         dica_rodando: "{n} laufen",
         dica_gasto: "US$ {usd} heute (UTC)",
@@ -2247,6 +2257,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "La scorciatoia {k} non è attiva: {e}",
         autostart_falhou: "Impossibile modificare l'avvio con il sistema: {e}",
         prefs_falhou: "Preferenze dell'area di notifica non salvate o lette ({f}): {e}",
+        prefs_guardado: "Il file delle preferenze dell'area di notifica non era leggibile; è stato conservato come {f} e sostituito dalle opzioni attuali",
         sem_acesso: "Nessun accesso al backend ({e}): approvazioni e spesa non possono essere mostrate qui",
         dica_rodando: "{n} in esecuzione",
         dica_gasto: "US$ {usd} oggi (UTC)",
@@ -2276,6 +2287,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "Skrót {k} nie jest aktywny: {e}",
         autostart_falhou: "Nie udało się zmienić uruchamiania z systemem: {e}",
         prefs_falhou: "Ustawienia zasobnika nie zostały zapisane ani odczytane ({f}): {e}",
+        prefs_guardado: "Plik ustawień zasobnika był nieczytelny; zachowano go jako {f} i zastąpiono bieżącymi ustawieniami",
         sem_acesso: "Brak dostępu do backendu ({e}): nie można tu pokazać zatwierdzeń ani wydatków",
         dica_rodando: "Uruchomione: {n}",
         dica_gasto: "US$ {usd} dzisiaj (UTC)",
@@ -2305,6 +2317,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "快捷键 {k} 未生效：{e}",
         autostart_falhou: "无法更改随系统启动：{e}",
         prefs_falhou: "托盘偏好未能保存或读取（{f}）：{e}",
+        prefs_guardado: "托盘偏好文件无法解析；已保留为 {f}，并以当前开关状态替换",
         sem_acesso: "无法访问后端（{e}）：此处无法显示待批准事项和花费",
         dica_rodando: "{n} 个运行中",
         dica_gasto: "今日 US$ {usd}（UTC）",
@@ -2334,6 +2347,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "ショートカット {k} は有効ではありません: {e}",
         autostart_falhou: "システムと一緒に起動する設定を変更できませんでした: {e}",
         prefs_falhou: "トレイの設定を保存または読み込めませんでした ({f}): {e}",
+        prefs_guardado: "トレイの設定ファイルを解析できませんでした。{f} として保存し、現在の設定で置き換えました",
         sem_acesso: "バックエンドにアクセスできません ({e}): 承認待ちと支出はここに表示できません",
         dica_rodando: "{n} 件実行中",
         dica_gasto: "本日 US$ {usd}（UTC）",
@@ -2363,6 +2377,7 @@ const DIALOGO: [Dialogo; 10] = [
         atalho_falhou: "Сочетание {k} не активно: {e}",
         autostart_falhou: "Не удалось изменить автозапуск: {e}",
         prefs_falhou: "Настройки трея не сохранены или не прочитаны ({f}): {e}",
+        prefs_guardado: "Файл настроек трея не удалось разобрать; он сохранён как {f} и заменён текущими настройками",
         sem_acesso: "Нет доступа к бэкенду ({e}): одобрения и расходы здесь показать нельзя",
         dica_rodando: "Выполняется: {n}",
         dica_gasto: "US$ {usd} сегодня (UTC)",
@@ -2574,6 +2589,10 @@ struct Shell {
     /// a flash for an approval the owner is already looking at is noise.
     focused: AtomicBool,
     problems: Mutex<Problems>,
+    /// The tray line for a broken preferences file this session moved aside, kept for the rest of
+    /// the session: the save after it succeeds, and clearing the line then would hide where the
+    /// person's edit went one click after saying it.
+    prefs_set_aside: Mutex<Option<String>>,
 }
 
 impl Shell {
@@ -2627,7 +2646,8 @@ fn set_problem(app: &tauri::AppHandle, pick: impl FnOnce(&mut Problems) -> &mut 
 }
 
 /// Change one preference and write the file. A write that fails is SAID in the tray: the switch
-/// still takes effect for this session, and the person learns it will not survive a restart.
+/// still takes effect for this session, and the person learns it will not survive a restart. A
+/// broken file that the write had to move aside is said too, with where it went.
 fn change_prefs(app: &tauri::AppHandle, edit: impl FnOnce(&mut Prefs)) {
     let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
     let saved = match shell.prefs.lock() {
@@ -2637,7 +2657,18 @@ fn change_prefs(app: &tauri::AppHandle, edit: impl FnOnce(&mut Prefs)) {
         }
         Err(_) => Err("preferences lock poisoned".to_string()),
     };
-    let problem = saved.err().map(|e| prefs_problem(dialogo(), &shell.data_dir, &e));
+    let problem = match saved {
+        Err(e) => Some(prefs_problem(dialogo(), &shell.data_dir, &e)),
+        Ok(Some(aside)) => {
+            let line = dialogo().prefs_guardado.replace("{f}", &aside.display().to_string());
+            eprintln!("chimera tray: preferences file did not parse; moved to {}", aside.display());
+            if let Ok(mut kept) = shell.prefs_set_aside.lock() {
+                *kept = Some(line.clone());
+            }
+            Some(line)
+        }
+        Ok(None) => shell.prefs_set_aside.lock().ok().and_then(|kept| kept.clone()),
+    };
     set_problem(app, |p| &mut p.prefs, problem);
 }
 
@@ -2779,16 +2810,48 @@ fn still_refused(asked: bool, refused_now: bool, refused_before: bool, wanted: b
     }
 }
 
+/// What one read of the approval list asks the tray to do.
+#[derive(Debug, PartialEq, Eq)]
+struct OnApprovals {
+    /// Ask for the owner's attention: a question nobody has been called for yet, and the flash on.
+    flash: bool,
+    /// Rewrite the tooltip now rather than at the next 30-second tick: the waiting set changed while
+    /// the app lives in the tray.
+    retip: bool,
+}
+
+/// The rule for one read, pure so the tests can hold it.
+///
+/// `retip` is the half that matters when the window is HIDDEN. `request_user_attention` acts on the
+/// window's taskbar button, and a hidden window has none: in tray mode the flash reaches nothing.
+/// That is the mode where an unseen approval is most likely to refuse itself at 300 s, so the
+/// tray's own tooltip is brought up to date the moment the set changes, not half a minute later.
+fn on_approvals(seen: &[String], now: &[String], call_attention: bool, keep_in_tray: bool) -> OnApprovals {
+    OnApprovals {
+        flash: call_attention && sidecar_http::has_new(seen, now),
+        retip: keep_in_tray && sidecar_http::changed(seen, now),
+    }
+}
+
 /// Watch the backend for the two things the tray shows: approvals waiting (to flash the taskbar
 /// while the window is not in front — P2.4) and, while the app lives in the tray, the tooltip
 /// (P2.2). A thread of its own, for the reason the supervisor gives: it sleeps and blocks on I/O.
+///
+/// The flash only reaches a window that is on the taskbar. With "Keep in tray" on and the window
+/// closed (hidden), the only signal is the tooltip — which is why the approval list is read in that
+/// mode even with the flash off, and why a change in it rewrites the tooltip at once.
 ///
 /// A backend that is down or restarting is NOT reported from here: the supervisor owns that, and
 /// the window says it. A 401 is, every time, because nothing else would.
 fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<Mutex<String>>, shell: Arc<Shell>) {
     let d = dialogo();
-    let mut flashed: Vec<String> = Vec::new();
+    // The waiting questions as last read: what has been flashed for, and what the tooltip shows.
+    let mut seen: Vec<String> = Vec::new();
     let mut waiting: Option<usize> = None;
+    // The last running count and spend read, kept so an approval-driven rewrite of the tooltip does
+    // not re-read the whole usage log.
+    let mut running: Option<usize> = None;
+    let mut spent: Option<f64> = None;
     let mut last_tooltip: Option<Instant> = None;
     let mut refused_before = false;
     loop {
@@ -2805,23 +2868,34 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
         // front, the tooltip is not due) has learned nothing about access and must not clear — or
         // re-announce — a 401 seen a moment ago.
         let mut asked = false;
+        let mut retip = false;
 
-        if prefs.call_attention && !shell.focused.load(Ordering::SeqCst) {
+        let unfocused = !shell.focused.load(Ordering::SeqCst);
+        if unfocused && (prefs.call_attention || prefs.keep_in_tray) {
             asked = true;
             match sidecar_http::get_json(&origin, "/api/approvals", token, Duration::from_secs(3)) {
                 Fetch::Json(list) => {
                     let ids = sidecar_http::pending_ids(&list);
-                    if sidecar_http::has_new(&flashed, &ids) {
+                    let todo = on_approvals(&seen, &ids, prefs.call_attention, prefs.keep_in_tray);
+                    if todo.flash {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.request_user_attention(Some(UserAttentionType::Informational));
                         }
                     }
+                    retip = todo.retip;
                     waiting = Some(ids.len());
-                    flashed = ids;
+                    seen = ids;
                 }
-                Fetch::Unauthorized => refused = true,
-                Fetch::Failed(_) => {}
+                Fetch::Unauthorized => {
+                    refused = true;
+                    waiting = None;
+                }
+                Fetch::Failed(_) => waiting = None,
             }
+        } else if !unfocused {
+            // The person is looking at the window, which shows the questions itself; a count kept
+            // from before would be stale, so the tooltip leaves it out until the next read.
+            waiting = None;
         }
 
         if prefs.keep_in_tray {
@@ -2831,11 +2905,14 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
                 let look = |path: &str| sidecar_http::get_json(&origin, path, token, Duration::from_secs(5));
                 let (turns, usage) = (look("/api/code/turns/running"), look("/api/usage"));
                 refused |= matches!(turns, Fetch::Unauthorized) || matches!(usage, Fetch::Unauthorized);
-                let running = match &turns { Fetch::Json(v) => sidecar_http::running_count(v), _ => None };
-                let spent = match &usage {
+                running = match &turns { Fetch::Json(v) => sidecar_http::running_count(v), _ => None };
+                spent = match &usage {
                     Fetch::Json(v) => sidecar_http::spent_on(v, &sidecar_http::utc_today()),
                     _ => None,
                 };
+                retip = true;
+            }
+            if retip {
                 if let Some(tray) = app.tray_by_id("main") {
                     let _ = tray.set_tooltip(Some(tooltip(d, running, spent, waiting)));
                 }
@@ -2924,11 +3001,17 @@ fn main() {
             let shell = Arc::new(Shell {
                 data_dir: paths.data_dir.clone(),
                 prefs: Mutex::new(loaded),
-                focused: AtomicBool::new(!autostarted),
+                // Not in front until the window SAYS so. Starting at "focused" on a normal launch
+                // was wrong whenever Windows' focus-stealing prevention opened the window behind
+                // another one: no Focused(true) ever came, so no Focused(false) either, and the
+                // watcher never looked until the person had activated and left the window once.
+                // Corrected from the window itself just after it is built, below.
+                focused: AtomicBool::new(false),
                 problems: Mutex::new(Problems {
                     prefs: prefs_unreadable.map(|e| prefs_problem(dialogo(), &paths.data_dir, &e)),
                     ..Problems::default()
                 }),
+                prefs_set_aside: Mutex::new(None),
             });
             app.manage(Arc::clone(&shell));
 
@@ -2990,6 +3073,12 @@ fn main() {
                 tauri::WindowEvent::Focused(focused) => closing.focused.store(*focused, Ordering::SeqCst),
                 _ => {}
             });
+            // Read the truth once the handler is in place, so a Focused event that fired between
+            // build() and the handler is not lost. `fetch_or`, not `store`: an event the handler
+            // has just stored wins over this read, never the other way round.
+            shell
+                .focused
+                .fetch_or(main_window.is_focused().unwrap_or(false), Ordering::SeqCst);
 
             // Tray: check for updates, and quit (which kills the sidecar via the exit hook below).
             //
@@ -3457,16 +3546,65 @@ mod tray_tests {
         assert!(main.contains(concat!("watch_for_the_", "tray(watcher")), "the watcher is never started");
         let watch = body_of(&source, concat!("fn watch_for_the_", "tray("));
         for needle in [
-            concat!("prefs.call_attention && !shell.focused.", "load("),
+            concat!("let unfocused = !shell.focused.", "load("),
+            concat!("if unfocused && (prefs.call_attention || prefs.keep_in_", "tray)"),
             concat!("request_user_attention(Some(UserAttentionType::Inform", "ational))"),
-            concat!("sidecar_http::has_", "new(&flashed, &ids)"),
-            concat!("Fetch::Unauthorized => refused = ", "true"),
+            concat!("on_approvals(&seen, &ids, prefs.call_attention, prefs.keep_in_", "tray)"),
+            concat!("if todo.fla", "sh {"),
+            concat!("retip = todo.re", "tip;"),
+            concat!("if retip {
+                if let Some(tray) = app.tray_by_", "id(\"main\")"),
+            concat!("Fetch::Unauthorized => {
+                    refused = ", "true;"),
             concat!("set_problem(&app, |p| &mut p.back", "end"),
             concat!("still_refused(asked, refused, refused_", "before"),
             concat!("sidecar_http::token_", "now()"),
         ] {
             assert!(watch.contains(needle), "the watcher no longer does {needle}");
         }
+    }
+
+    /// The rule behind one read of the approval list. In tray mode the window is hidden and the
+    /// flash reaches nothing, so a change in the waiting set must rewrite the tooltip at once —
+    /// with the flash on or off — and the flash must still be once per question.
+    #[test]
+    fn in_the_tray_a_change_in_approvals_rewrites_the_tooltip_at_once() {
+        let ids = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        let (none, a) = (ids(&[]), ids(&["a"]));
+        assert_eq!(on_approvals(&none, &a, true, true), OnApprovals { flash: true, retip: true });
+        assert_eq!(
+            on_approvals(&none, &a, false, true),
+            OnApprovals { flash: false, retip: true },
+            "with the flash off, the tray is the only signal left"
+        );
+        assert_eq!(on_approvals(&none, &a, true, false), OnApprovals { flash: true, retip: false });
+        assert_eq!(on_approvals(&a, &a, true, true), OnApprovals { flash: false, retip: false }, "same question, no news");
+        assert_eq!(
+            on_approvals(&a, &none, true, true),
+            OnApprovals { flash: false, retip: true },
+            "an answered question must leave the tooltip, not linger 30 s"
+        );
+    }
+
+    /// The window starts as NOT focused and is corrected from the window itself, so a window that
+    /// focus-stealing prevention opened in the background is watched from the first tick.
+    #[test]
+    fn focus_is_read_from_the_window_not_assumed_at_launch() {
+        let main = body_of(&production_only(), concat!("fn ", "main() {"));
+        assert!(main.contains(concat!("focused: AtomicBool::new(fal", "se),")), "focus is assumed again");
+        assert!(main.contains(concat!(".fetch_or(main_window.is_focu", "sed().unwrap_or(false)")));
+    }
+
+    /// A broken prefs file moved aside before the save is said in the tray with where it went, and
+    /// stays said: the next successful save must not take the line away.
+    #[test]
+    fn a_set_aside_prefs_file_is_said_and_stays_said() {
+        let body = body_of(&production_only(), concat!("fn change_", "prefs("));
+        assert!(body.contains(concat!("Ok(Some(aside)) => {")));
+        assert!(body.contains(concat!("prefs_guardado.replace(\"{f}\", &aside.dis", "play()")));
+        assert!(body.contains(concat!("Ok(None) => shell.prefs_set_aside.lock()")));
+        let line = DIALOGO[0].prefs_guardado.replace("{f}", "C:/x/shell-prefs.json.bad");
+        assert!(line.contains("shell-prefs.json.bad") && !line.contains("{f}"), "{line}");
     }
 
     /// The webview gains nothing: no permission for either plugin is granted to any window.

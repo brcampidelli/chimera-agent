@@ -180,21 +180,36 @@ fn dechunk(mut rest: &[u8]) -> Result<Vec<u8>, String> {
     }
 }
 
-/// The ids of the approvals still waiting for an answer (`GET /api/approvals`).
+/// The ids of the approvals waiting for the owner (`GET /api/approvals`): every item in the list.
 ///
-/// A question already decided but not yet collected by its turn carries a `decision`; it is not
-/// waiting on anybody, and flashing for it would be calling the owner to something already done.
+/// Every item, because that is what the list IS. `pending()` (chimera/governance/pending.py) returns
+/// one entry per `<id>.ask.json`, and an answer never marks that file: it is written beside it as
+/// `<id>.answer.json`, and the turn that asked deletes both when it collects it — within one of its
+/// own polls. The item's `decision` field is NOT an answer. It is the level of the verdict that
+/// raised the question (`block` | `review` | `warn`, default `review`), always present and never
+/// empty; the first version of this function read it as "already decided" and therefore returned
+/// nothing for every real question, so the flash it exists for never fired. The test below reads
+/// the backend's own schema to keep that from coming back.
+///
+/// What this counts that is not strictly waiting: a question answered in the last moment before its
+/// turn collected it, and the question of a turn that died, which stays until the backend's sweep.
+/// The window's own list shows both too, so the tray says what the window would say.
 pub fn pending_ids(approvals: &Value) -> Vec<String> {
     approvals
         .as_array()
         .map(|items| {
             items
                 .iter()
-                .filter(|q| q.get("decision").is_none_or(|d| d.is_null() || d.as_str() == Some("")))
                 .filter_map(|q| q.get("id").and_then(Value::as_str).map(str::to_string))
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Whether the set of waiting questions is different from the last one seen — a question arrived or
+/// one went away. Order is not a change: the backend sorts by level, then age.
+pub fn changed(before: &[String], now: &[String]) -> bool {
+    before.len() != now.len() || now.iter().any(|id| !before.contains(id))
 }
 
 /// Whether anything in `now` has not been flashed for yet.
@@ -251,8 +266,8 @@ pub fn utc_today() -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        get_json, has_new, parse_response, pending_ids, running_count, server_token, spent_on,
-        utc_day, Fetch,
+        changed, get_json, has_new, parse_response, pending_ids, running_count, server_token,
+        spent_on, utc_day, Fetch,
     };
     use serde_json::json;
     use std::io::{Read, Write};
@@ -338,15 +353,70 @@ mod tests {
         }
     }
 
+    /// Fixtures in the shape `GET /api/approvals` really has: every item carries a `decision`, and
+    /// it is the LEVEL that raised the question, never the owner's answer. All three are waiting.
     #[test]
-    fn only_questions_still_waiting_count() {
+    fn every_question_the_backend_lists_is_waiting_whatever_its_level() {
         let list = json!([
-            {"id": "a", "action": "shell: ls", "decision": null},
-            {"id": "b", "action": "shell: rm", "decision": "approve"},
-            {"id": "c", "action": "write_file: x"},
+            {"id": "a", "action": "shell: ls", "reason": "r", "asked_at": 1.0, "age_seconds": 2.0, "decision": "review"},
+            {"id": "b", "action": "shell: rm", "reason": "r", "asked_at": 1.0, "age_seconds": 2.0, "decision": "block"},
+            {"id": "c", "action": "write_file: x", "reason": "r", "asked_at": 1.0, "age_seconds": 2.0, "decision": "warn"},
         ]);
-        assert_eq!(pending_ids(&list), vec!["a".to_string(), "c".to_string()]);
+        assert_eq!(pending_ids(&list), vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert!(pending_ids(&json!([])).is_empty());
         assert!(pending_ids(&json!({"detail": "x"})).is_empty());
+    }
+
+    /// The fixture above is tied to the backend: if `decision` stops being the level with a
+    /// "review" default, or the list grows a field that says a question was answered, this turns
+    /// red and `pending_ids` has to be looked at again — instead of a made-up schema passing.
+    #[test]
+    fn the_fixture_is_the_backends_own_schema() {
+        let schemas = include_str!("../../../../chimera/api/schemas.py");
+        let approval_out = schemas
+            .split_once("class ApprovalOut(BaseModel):")
+            .expect("ApprovalOut is still in chimera/api/schemas.py")
+            .1
+            .split("
+class ")
+            .next()
+            .unwrap_or("");
+        assert!(
+            approval_out.contains("decision: str = \"review\"  # the level of the verdict that raised it"),
+            "ApprovalOut.decision is no longer the level with a review default"
+        );
+        // Field declarations only (`    name: type`), not the docstrings that talk about answers.
+        let fields: Vec<&str> = approval_out
+            .lines()
+            .filter(|l| l.starts_with("    ") && !l.starts_with("     "))
+            .filter_map(|l| l.trim().split_once(':').map(|(name, _)| name))
+            .filter(|name| name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !name.is_empty())
+            .collect();
+        assert!(fields.contains(&"id") && fields.contains(&"decision"), "the field reader found {fields:?}");
+        for name in &fields {
+            assert!(
+                !name.contains("answer") && !name.contains("approved"),
+                "ApprovalOut gained `{name}`: answered questions can now be told apart, and pending_ids must use it"
+            );
+        }
+        let pending = include_str!("../../../../chimera/governance/pending.py");
+        assert!(
+            pending.contains("decision=str(data.get(\"decision\") or \"review\")"),
+            "pending() no longer fills decision with the level"
+        );
+        assert!(
+            pending.contains("directory.glob(\"*.ask.json\")") && pending.contains("{request_id}.answer.json"),
+            "pending() no longer lists the ask files with answers kept beside them"
+        );
+    }
+
+    #[test]
+    fn a_change_in_the_waiting_set_is_seen_but_not_its_order() {
+        let ids = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        assert!(!changed(&ids(&[]), &ids(&[])));
+        assert!(changed(&ids(&[]), &ids(&["a"])), "a question arrived");
+        assert!(changed(&ids(&["a", "b"]), &ids(&["a"])), "a question went away");
+        assert!(!changed(&ids(&["a", "b"]), &ids(&["b", "a"])), "the order is the backend's sort");
     }
 
     #[test]
