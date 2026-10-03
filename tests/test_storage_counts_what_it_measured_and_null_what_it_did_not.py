@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import time
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 import pytest
@@ -21,8 +21,9 @@ from chimera.core.storage import measure, rotate_logs, summary_rows, tree_size
 
 
 @pytest.fixture(autouse=True)
-def _isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Temp and the worktree folder are the test's own, so nothing on this machine is counted."""
+def _isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
+    """Temp and the worktree folder are the test's own, so nothing on this machine is counted —
+    and nothing a test makes lands in the machine's temp. Yields that temp folder."""
     import tempfile
 
     temp = tmp_path / "tmp"
@@ -31,7 +32,7 @@ def _isolated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CHIMERA_WORKTREE_DIR", "")
     monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path / "browsers"))
     get_settings.cache_clear()
-    yield
+    yield temp
     get_settings.cache_clear()
 
 
@@ -159,33 +160,43 @@ def test_a_first_rotation_frees_nothing_and_says_so(tmp_path: Path) -> None:
 
 
 def test_the_whole_report_keeps_one_time_limit_and_says_what_it_did_not_reach(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, _isolated: Path
 ) -> None:
     """Review finding: the 5 s budget was per COUNT — per category and per worktree — so one report
     could take (categories + worktrees + 2) x 5 s, and the Settings screen asked for two at once.
 
-    Every walk here takes 0.3 s unless its deadline comes first. Twenty worktrees and the named
-    categories are well past a 1 s report limit: the report must come back near that limit, with the
-    rows it did not reach null and noted — never a size for a walk that was cut short."""
+    Every walk here takes 0.25 s unless its deadline comes first. Twenty worktrees and the named
+    categories are well past a 1 s report limit: the report must stop AT that limit, with the rows
+    it did not reach null and noted — never a size for a walk that was cut short.
+
+    Time here is a clock the walks advance, not real sleeps. Sleeping "until the deadline" on
+    Windows' 15.6 ms ``time.monotonic`` landed exactly on the deadline about half the time, and the
+    count's ``now > deadline`` let every worktree in that tick be measured: ``assert (200 is None)``.
+    On this clock (0.25 s is exact in binary) the walks reach the deadline exactly, every run — the
+    case that failed."""
     import tempfile
 
+    now = [1000.0]
+    monkeypatch.setattr(storage, "clock", lambda: now[0])
     for _ in range(20):
-        write(Path(tempfile.mkdtemp(prefix="chimera-wt-")) / "f.bin", 10)
+        write(Path(tempfile.mkdtemp(prefix="chimera-wt-", dir=_isolated)) / "f.bin", 10)
     real = storage.tree_size
 
     def slow(path: Path, *, exclude: Iterable[Path] = (), deadline: float | None = None) -> storage.Size:
         assert deadline is not None, "every count in a report carries a deadline"
-        time.sleep(max(0.0, min(0.3, deadline - time.monotonic())))
+        now[0] += max(0.0, min(0.25, deadline - now[0]))
         return real(path, exclude=exclude, deadline=deadline)
 
     monkeypatch.setattr(storage, "tree_size", slow)
     monkeypatch.setattr(storage, "REPORT_BUDGET_SECONDS", 1.0)
 
-    started = time.monotonic()
+    started = now[0]
     report = measure(tmp_path / "home")
-    elapsed = time.monotonic() - started
+    elapsed = now[0] - started
 
-    assert elapsed < 3.0, f"the report took {elapsed:.1f} s against a 1 s limit"
+    assert Path(report["worktree_dir"]) == _isolated, "the report looked at the test's temp only"
+    assert len(report["worktrees"]) == 20
+    assert elapsed <= 1.0, f"the report took {elapsed:.2f} s against a 1 s limit"
     worktrees = category(report, "worktrees")
     assert worktrees["bytes"] is None and "stopped counting" in str(worktrees["note"])
     assert any(w["bytes"] is None for w in report["worktrees"])

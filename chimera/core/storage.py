@@ -25,7 +25,7 @@ import shutil
 import sys
 import threading
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -33,6 +33,13 @@ from typing import Any
 from chimera.telemetry import get_logger
 
 _log = get_logger("core.storage")
+
+#: The clock every deadline here is read on. ``time.monotonic`` — named, so a test can drive the
+#: report's time limit by a clock it advances itself instead of by real sleeps. On Windows before
+#: Python 3.13 ``time.monotonic`` is ``GetTickCount64``, which moves in 15.625 ms steps; a test that
+#: sleeps "until the deadline" lands on that grid and its result depended on which side of a tick
+#: the sleep woke.
+clock: Callable[[], float] = time.monotonic
 
 #: Seconds one category may spend being counted. A storage screen that hangs for a minute on a
 #: worktree full of `node_modules` is worse than one that says "not measured" for that row.
@@ -117,8 +124,8 @@ def tree_size(
     """Count the bytes and files under ``path``, without following links.
 
     A path that does not exist is a measurement: zero. A folder that cannot be read, or a count that
-    runs past ``deadline`` (a ``time.monotonic()`` value), is not, and comes back as None with a
-    note saying which. ``exclude`` names files counted by another category.
+    reaches ``deadline`` (a :data:`clock` value), is not, and comes back as None with a note saying
+    which. ``exclude`` names files counted by another category.
     """
     skip = {os.path.normcase(str(p)) for p in exclude}
     path = Path(path)
@@ -132,7 +139,10 @@ def tree_size(
     total, files = 0, 0
     stack = [str(path)]
     while stack:
-        if deadline is not None and time.monotonic() > deadline:
+        # Reached, not passed: a deadline is a multiple of the clock's step plus a whole budget, so on
+        # a coarse clock "now == deadline" is a reading that lasts a full step (15.6 ms on Windows) —
+        # and with ``>`` every walk started in that step ran to the end and reported a size.
+        if deadline is not None and clock() >= deadline:
             return Size(None, None, "stopped counting at the time limit")
         current = stack.pop()
         try:
@@ -228,7 +238,7 @@ def _disk(path: Path) -> tuple[int | None, dict[str, Any]]:
 
 def _budget(report_deadline: float) -> float:
     """One count's deadline: its own budget, cut short by what is left of the report's."""
-    return min(time.monotonic() + CATEGORY_BUDGET_SECONDS, report_deadline)
+    return min(clock() + CATEGORY_BUDGET_SECONDS, report_deadline)
 
 
 def _home_categories(
@@ -261,7 +271,7 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
     """
     from chimera.core.worktree import classify_worktree_dir, find_worktree_dirs, worktree_parent
 
-    report_deadline = time.monotonic() + REPORT_BUDGET_SECONDS
+    report_deadline = clock() + REPORT_BUDGET_SECONDS
     home = Path(home).resolve()
     parent = worktree_parent(workspace)
     named, home_total = _home_categories(home, parent, report_deadline)
@@ -338,11 +348,11 @@ def measure_shared(home: Path, workspace: Path | None = None) -> dict[str, Any]:
     with flight:
         with _shared_lock:
             cached = _shared.get(key)
-        if cached is not None and time.monotonic() - cached[0] < SHARED_REPORT_SECONDS:
+        if cached is not None and clock() - cached[0] < SHARED_REPORT_SECONDS:
             return copy.deepcopy(cached[1])
         report = measure(home, workspace)
         with _shared_lock:
-            _shared[key] = (time.monotonic(), report)
+            _shared[key] = (clock(), report)
         return copy.deepcopy(report)
 
 
