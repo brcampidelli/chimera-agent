@@ -119,6 +119,20 @@ describe("the guest page", () => {
     expect(document.querySelector('img[src^="https://evil.example"]')).toBeNull();
   });
 
+  it("does not show the guest the owner's workspace images", async () => {
+    // Same origin as the owner's app, so the workspace image endpoint is reachable from here. The
+    // owner may see their own files; a guest holding a share link may not.
+    vi.mocked(getGuestSession).mockResolvedValue({
+      ...SESSION,
+      exchanges: [{ you: "show it", answer: "here ![c](/api/fs/image?path=secret/plan.png)", tools: [], edits: [], done: { answer: "here" } }],
+    });
+    openStream();
+    await join();
+    expect(await screen.findByTestId("markdown-withheld-image")).toBeInTheDocument();
+    expect(document.querySelector('img[src*="/api/fs/image"]')).toBeNull();
+    expect(document.querySelector('a[href*="/api/fs/image"]')).toBeNull();
+  });
+
   it("sends what was typed, as the guest, and clears the box", async () => {
     openStream();
     const user = await join("Bia");

