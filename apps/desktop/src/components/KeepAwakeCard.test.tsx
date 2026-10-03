@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,7 +17,7 @@ import { renderWithProviders as render } from "@/test/utils";
  * system with no mechanism), because "keeping awake" there would be a claim about the OS that is
  * false.
  */
-vi.mock("@/lib/api", () => ({ getKeepAwake: vi.fn() }));
+vi.mock("@/lib/api", () => ({ getKeepAwake: vi.fn(), getConfig: vi.fn() }));
 
 const api = await import("@/lib/api");
 
@@ -33,7 +33,15 @@ function state(over: Partial<KeepAwakeState> = {}): KeepAwakeState {
   };
 }
 
-beforeEach(() => vi.clearAllMocks());
+/** The owner's choice, as `GET /api/config` reports it; the status line asks the keeper only when on. */
+function chosen(mode: string) {
+  vi.mocked(api.getConfig).mockResolvedValue({ keep_awake: { mode, on_battery: false } } as never);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  chosen("working");
+});
 
 describe("the status bar line", () => {
   it("names what is keeping the machine awake while it is", async () => {
@@ -60,9 +68,31 @@ describe("the status bar line", () => {
     expect(await screen.findByRole("status")).toHaveTextContent(/on battery/i);
     expect(screen.queryByText(/keeping awake/i)).not.toBeInTheDocument();
   });
+
+  it("does not ask the keeper at all while the switch is off", async () => {
+    // The feature ships off. A status bar polling every ten seconds for a line it cannot show is
+    // background traffic for nothing — and a 404 on every poll against a server older than the
+    // route. The config answer arriving is awaited, so the absence below is the decision.
+    chosen("off");
+    vi.mocked(api.getKeepAwake).mockResolvedValue(state({ active: true, reasons: ["turn"] }));
+    render(<KeepAwakeIndicator />);
+
+    await waitFor(() => expect(api.getConfig).toHaveBeenCalled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.getKeepAwake).not.toHaveBeenCalled();
+    expect(screen.queryByText(/keeping awake/i)).not.toBeInTheDocument();
+  });
 });
 
 describe("the settings card", () => {
+  it("does not ask the keeper while the mode is off", async () => {
+    vi.mocked(api.getKeepAwake).mockResolvedValue(state({ mode: "off" }));
+    render(<KeepAwakeCard mode="off" onBattery={false} onSave={vi.fn()} />);
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.getKeepAwake).not.toHaveBeenCalled();
+  });
+
   it("ships off and saves the mode the person picks", async () => {
     vi.mocked(api.getKeepAwake).mockResolvedValue(state({ mode: "off" }));
     const onSave = vi.fn();

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Coffee } from "lucide-react";
 
-import { getKeepAwake } from "@/lib/api";
+import { getConfig, getKeepAwake } from "@/lib/api";
 import { useT, type TFunc } from "@/lib/i18n";
 
 /** One word per reason the server sends. Literal keys, so the i18n reachability test can see them. */
@@ -26,9 +26,22 @@ function reasonText(t: TFunc, reason: string): string {
  */
 export function KeepAwakeIndicator() {
   const t = useT();
-  const state = useQuery({ queryKey: ["keep-awake"], queryFn: () => getKeepAwake(), refetchInterval: 10000 });
+  // Asked only while the owner has the switch on. The feature ships off, and a status bar polling a
+  // route every ten seconds for a line it will never show is traffic for nothing — against a server
+  // older than the route, a 404 every poll, each one retried. The shared ["config"] query is the
+  // one Settings already reads, so this adds no request of its own. A closure rather than the bare
+  // function, so a test that mocks the API without `getConfig` still renders the bar.
+  const config = useQuery({ queryKey: ["config"], queryFn: () => getConfig() });
+  const on = (config.data?.keep_awake?.mode ?? "off") !== "off";
+  const state = useQuery({
+    queryKey: ["keep-awake"],
+    queryFn: () => getKeepAwake(),
+    refetchInterval: 10000,
+    enabled: on,
+    retry: false,
+  });
   const data = state.data;
-  if (!data?.active) return null;
+  if (!on || !data?.active) return null;
   const why = (data.reasons ?? []).map((reason) => reasonText(t, reason)).join(", ");
   const text = t("keepAwake.status", { reason: why });
   return (

@@ -3210,6 +3210,10 @@ def _start_cron_daemon(
         max_steps=max_steps,
         usage_path=usage_path,
         warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+        # Per dispatch, not off `settings` above: this daemon lives as long as the app, and the cap
+        # is set from the Usage screen. Read off the snapshot, a cap saved there braked nothing
+        # until the next launch while the screen said it was set.
+        daily_cap=lambda: get_settings().daily_usd_cap,
     )
 
     def run_task(task: str) -> str:
@@ -3251,20 +3255,20 @@ def _start_cron_daemon(
         enabled=lambda: get_settings().cron_notify_failures,
     )
 
+    # A job that is running holds the machine whatever fired it (`holding`), and a clock job due
+    # within the next minutes holds it too (the probe below). Both here, beside the daemon that
+    # fires them, because a schedule nobody in this process will fire is no reason to stay up. Both
+    # do nothing unless CHIMERA_KEEP_AWAKE is on (`chimera/core/keep_awake.py`).
+    from chimera.core.keep_awake import cron_due_probe, holding
+    from chimera.core.keep_awake import service as keep_awake_service
+
     daemon = CronDaemon(
         scheduler,
-        make_agent_dispatch(run_task, deliver, run_job=run_job),
+        holding("cron", make_agent_dispatch(run_task, deliver, run_job=run_job)),
         tick_seconds=tick,
         on_outcome=notices,
     )
     _thread, stop = daemon.start()
-    # A job due within the next minutes keeps the machine awake for it, and so does the one running
-    # now (its `next_run` advances only after it returns). Registered here, beside the daemon that
-    # fires them, because a schedule nobody in this process will fire is no reason to stay up. Does
-    # nothing unless CHIMERA_KEEP_AWAKE is on (`chimera/core/keep_awake.py`).
-    from chimera.core.keep_awake import cron_due_probe
-    from chimera.core.keep_awake import service as keep_awake_service
-
     keep_awake_service().add_probe("cron", cron_due_probe(scheduler))
     jobs = len(scheduler.store.list())
     console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")
@@ -3715,7 +3719,11 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
         # daemon reloads each tick, but this handler holds a frozen store, so without this a newly
         # registered hook would silently do nothing until a restart.
         scheduler.store.reload_if_changed()
-        scheduler.fire_webhook(hook, time.time(), dispatch)
+        # Held while it runs, like a clock job: the hint says "a scheduled task", and a webhook job
+        # is one (`chimera/core/keep_awake.py`; nothing unless CHIMERA_KEEP_AWAKE is on).
+        from chimera.core.keep_awake import holding
+
+        scheduler.fire_webhook(hook, time.time(), holding("cron", dispatch))
         return results
 
     return webhooks
@@ -6863,8 +6871,12 @@ def cron_fire(
         warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
     )
     agora = time.time()
+    # Held while it runs, like a clock job (`chimera/core/keep_awake.py`; nothing unless
+    # CHIMERA_KEEP_AWAKE is on). A deploy hook firing an hour-long job should not lose it to sleep.
+    from chimera.core.keep_awake import holding
+
     ran = scheduler.fire_event(
-        event, agora, make_agent_dispatch(_sem_job, deliver, run_job=run_job)
+        event, agora, holding("cron", make_agent_dispatch(_sem_job, deliver, run_job=run_job))
     )
     # The same failure notice the daemon gives a scheduled job, posted inline: this is a one-shot
     # command, and a notice handed to a background thread would die with the process before it

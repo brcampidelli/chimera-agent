@@ -43,9 +43,12 @@ from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 _log = logging.getLogger(__name__)
+
+_T = TypeVar("_T")
+_R = TypeVar("_R")
 
 MODES = ("off", "working", "always")
 #: How often the keeper looks at its probes when nothing woke it sooner. Windows' shortest idle
@@ -309,8 +312,12 @@ class KeepAwake:
         self._wake.set()
 
     def nudge(self) -> None:
-        """Have the keeper's thread decide again now — after a setting changed, say."""
-        self._wake.set()
+        """Have the keeper decide again now — after a setting changed, say.
+
+        Starts the thread when the mode is on and it is not running: the thread exists only while
+        the mode is not ``off`` (see :meth:`ensure_running`), so a switch turned on from the screen
+        has to bring it up here rather than at the next launch."""
+        self.ensure_running()
 
     def count(self) -> int:
         with self._lock:
@@ -382,21 +389,68 @@ class KeepAwake:
 
     # ------------------------------------------------------------------ the thread
 
+    def ensure_running(self) -> None:
+        """Start the thread if the mode asks for one, or wake it if it is already running.
+
+        With the mode ``off`` no thread is started at all. Not tidiness: the thread reads the
+        settings every :data:`POLL_SECONDS`, and here a settings read on an empty cache exports
+        ``.env`` credentials into ``os.environ`` and caches whatever the environment holds at that
+        instant — from a background thread, racing whoever else is changing it (every test in the
+        suite, since every process that builds the API builds a keeper). A switch that ships off
+        should cost nothing, and a thread that wakes four times a minute to read "off" is not
+        nothing. The mode is read here, on the caller's thread.
+
+        A running thread is woken under the lock, so it cannot slip out between this check and the
+        wake: the thread decides to exit only under the same lock, and only with no wake pending.
+        """
+        try:
+            wanted = normalize_mode(getattr(self.settings(), "keep_awake", "off")) != "off"
+        except Exception:  # noqa: BLE001 — a settings read that fails must not break its caller
+            _log.debug("keep awake: settings read failed", exc_info=True)
+            wanted = False
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                self._wake.set()
+                return
+            if wanted:
+                self._start_locked()
+
     def start(self) -> None:
-        """Start the keeper's thread once. Idempotent; a daemon, so it never holds the process up."""
+        """Start the keeper's thread whatever the mode. Idempotent; a daemon, so it never holds the
+        process up. Production goes through :meth:`ensure_running`; tests drive this directly."""
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
                 return
-            self._stop.clear()
-            self._thread = threading.Thread(target=self._loop, name="chimera-keep-awake", daemon=True)
-            self._thread.start()
+            self._start_locked()
+
+    def _start_locked(self) -> None:
+        self._stop.clear()
+        self._thread = threading.Thread(target=self._loop, name="chimera-keep-awake", daemon=True)
+        self._thread.start()
+
+    def running(self) -> bool:
+        with self._lock:
+            return self._thread is not None and self._thread.is_alive()
 
     def _loop(self) -> None:
         while not self._stop.is_set():
+            state: KeepAwakeState | None = None
             try:
-                self.tick()
+                state = self.tick()
             except Exception:  # noqa: BLE001 — the keeper outlives a bad tick
                 _log.debug("keep awake: tick failed", exc_info=True)
+            # Off, holding nothing, and nobody asked for another look since this tick: nothing is
+            # left for the thread to do, so it ends rather than read "off" four times a minute until
+            # the process exits. `nudge` starts a fresh one when the mode comes back on.
+            with self._lock:
+                if (
+                    state is not None
+                    and state.mode == "off"
+                    and not self._held
+                    and not self._wake.is_set()
+                ):
+                    self._thread = None
+                    return
             self._wake.wait(self.poll)
             self._wake.clear()
         if self._held and self._inhibitor is not None:
@@ -417,7 +471,10 @@ def cron_due_probe(
     scheduler: Any, *, lead: float = CRON_LEAD_SECONDS, clock: Callable[[], float] = time.time
 ) -> Callable[[], int]:
     """How many enabled cron jobs fire within ``lead`` seconds — or are overdue, which includes
-    the one running now: the engine advances ``next_run`` only after the dispatch returns."""
+    the one running now: the engine advances ``next_run`` only after the dispatch returns.
+
+    Clock jobs only, because only they have a time to look ahead to. A job of any trigger is held
+    while it RUNS by :func:`holding` around the dispatch that runs it."""
 
     def probe() -> int:
         horizon = clock() + lead
@@ -438,7 +495,11 @@ _service_lock = threading.Lock()
 
 
 def service() -> KeepAwake:
-    """The process's keeper, started on first use. One per process because the OS state is."""
+    """The process's keeper. One per process because the OS state is.
+
+    Its thread starts only when the mode is not ``off`` (:meth:`KeepAwake.ensure_running`): with
+    the default, building the API leaves no thread behind and nothing reads the settings in the
+    background."""
     global _service
     with _service_lock:
         if _service is None:
@@ -447,5 +508,21 @@ def service() -> KeepAwake:
             _service = KeepAwake(settings=get_settings)
             atexit.register(_service.shutdown, 2.0)
         keeper = _service
-    keeper.start()
+    keeper.ensure_running()
     return keeper
+
+
+def holding(reason: str, fn: Callable[[_T], _R]) -> Callable[[_T], _R]:
+    """``fn`` wrapped in a hold on the process's keeper — for the scheduler's dispatches.
+
+    A job that is RUNNING holds the machine whatever fired it: the clock, a webhook, an event.
+    :func:`cron_due_probe` sees clock jobs only, because only they have a ``next_run`` to look
+    ahead to, and a webhook job that was already running held nothing. The keeper is looked up per
+    call rather than when the wrapper is built, so wrapping costs nothing until a job runs.
+    """
+
+    def wrapped(arg: _T) -> _R:
+        with service().hold(reason):
+            return fn(arg)
+
+    return wrapped

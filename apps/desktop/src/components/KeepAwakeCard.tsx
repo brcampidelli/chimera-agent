@@ -37,7 +37,14 @@ export function KeepAwakeCard({
   const t = useT();
   const headingId = useId();
   const current: Mode = isMode(mode) ? mode : "off";
-  const live = useQuery({ queryKey: ["keep-awake"], queryFn: () => getKeepAwake(), refetchInterval: 10000 });
+  // Only while the mode is on: off, the card has nothing live to say (see the indicator).
+  const live = useQuery({
+    queryKey: ["keep-awake"],
+    queryFn: () => getKeepAwake(),
+    refetchInterval: 10000,
+    enabled: current !== "off",
+    retry: false,
+  });
   const blocked = current === "off" ? "" : (live.data?.blocked ?? "");
   const labels: Record<Mode, [string, string]> = {
     off: [t("settings.keepAwake.off"), t("settings.keepAwake.offHint")],

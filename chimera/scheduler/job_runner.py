@@ -74,8 +74,16 @@ def make_run_job(
     max_steps: int,
     usage_path: Path,
     warn: Callable[[str], None] = lambda _linha: None,
+    daily_cap: Callable[[], float | None] | None = None,
 ) -> Callable[[CronJob], JobOutcome]:
-    """Build the dispatch for one serve loop. Everything it used to close over is a parameter now."""
+    """Build the dispatch for one serve loop. Everything it used to close over is a parameter now.
+
+    ``daily_cap`` is asked per dispatch when given. A serve loop runs for weeks on the ``settings``
+    it was built with, and the cap is now set from a screen (``PATCH /api/config``): read off that
+    snapshot, a cap saved at noon braked nothing until the app was relaunched, while the screen
+    said it was set. Omitted, the cap is read from ``settings`` as before — right for a one-shot
+    command that builds its settings and exits.
+    """
 
     def run_job(job: CronJob) -> JobOutcome:
         """One dispatch, inside whatever the money allows.
@@ -86,7 +94,7 @@ def make_run_job(
         did not: the log was written only by the chat turn, so a daily cap read from it would have
         been blind to exactly the spend it exists to bound.
         """
-        cap = settings.daily_usd_cap
+        cap = daily_cap() if daily_cap is not None else settings.daily_usd_cap
         if cap and not job.critical:
             today = datetime.now(UTC).strftime("%Y-%m-%d")
             spent, unpriced = spent_today(usage_path, today=today)

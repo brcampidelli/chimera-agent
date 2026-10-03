@@ -401,6 +401,38 @@ def test_shutting_down_while_held_lets_the_machine_go() -> None:
     assert fake.kinds == ["acquire", "release"]
 
 
+def test_with_the_switch_off_the_process_keeper_runs_no_thread_until_it_is_turned_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every process that builds the API builds a keeper — the whole test suite included. A thread
+    reading the settings four times a minute from the background, with the switch off, raced every
+    test that changes the environment: on an empty cache that read exports `.env` credentials into
+    `os.environ` and caches whatever the environment holds at that instant. Off costs nothing now,
+    and the screen's switch is what brings the thread up (and, turned off again, lets it end)."""
+    fake = _FakeInhibitor()
+    settings = _settings("off")
+    keeper = KeepAwake(settings=lambda: settings, inhibitor_factory=lambda: fake, poll=0.05)
+    monkeypatch.setattr(ka, "_service", keeper)
+    try:
+        assert ka.service() is keeper
+        assert not keeper.running(), "a keeper thread started with the switch off"
+
+        settings.keep_awake = "working"
+        keeper.nudge()  # what `PATCH /api/config` does when either switch is saved
+        assert keeper.running()
+        keeper.acquire("turn")
+        assert _wait(lambda: keeper.state().active)
+
+        settings.keep_awake = "off"
+        keeper.nudge()
+        assert _wait(lambda: not keeper.running()), "the thread outlived the switch"
+        assert not keeper.state().active
+        assert fake.kinds == ["acquire", "release"]
+    finally:
+        keeper.release("turn")
+        keeper.shutdown()
+
+
 # ---------------------------------------------------------------------------------------- the app
 
 
@@ -480,3 +512,69 @@ def test_the_screen_may_write_both_switches_and_reads_them_back(tmp_path: Path) 
 
     chosen = Settings(CHIMERA_KEEP_AWAKE="always", CHIMERA_KEEP_AWAKE_ON_BATTERY="1")  # type: ignore[call-arg]
     assert read_config(chosen)["keep_awake"] == {"mode": "always", "on_battery": True}
+
+
+def test_a_running_scheduled_job_holds_the_machine_whatever_fired_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, app_keeper: KeepAwake
+) -> None:
+    """The cron probe looks ahead by `next_run`, which only clock jobs have, so a webhook or event job
+    that was already running held nothing while the hint said "a scheduled task". Each of the three
+    dispatch paths is driven for real here — the daemon's, the webhook handler's and `cron fire` —
+    with only the agent behind them faked, and each must hold while the job runs and let go after."""
+    from typer.testing import CliRunner
+
+    import chimera.scheduler as scheduler_pkg
+    import chimera.scheduler.job_runner as job_runner
+    from chimera.cli.main import _cron_store, _start_cron_daemon, _webhook_handler, app
+    from chimera.config import get_settings
+    from chimera.scheduler import Scheduler
+    from chimera.scheduler.models import CronJob, JobOutcome
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path / "home"))
+    get_settings.cache_clear()
+    seen: list[tuple[str, int]] = []
+
+    def fake_make_run_job(**_kwargs: Any) -> Any:
+        def run_job(job: CronJob) -> JobOutcome:
+            seen.append((job.trigger, app_keeper.count()))
+            return JobOutcome(answer="feito")
+
+        return run_job
+
+    dispatches: list[Any] = []
+
+    class _NoThread:
+        def __init__(self, _scheduler: Any, dispatch: Any, **_kwargs: Any) -> None:
+            dispatches.append(dispatch)
+
+        def start(self) -> tuple[None, threading.Event]:
+            return None, threading.Event()
+
+    monkeypatch.setattr(job_runner, "make_run_job", fake_make_run_job)
+    monkeypatch.setattr(scheduler_pkg, "CronDaemon", _NoThread)
+    monkeypatch.setattr("chimera.providers.LLMGateway", lambda *_a, **_k: object())
+
+    # The daemon's dispatch, for a clock job and for an event job handed to it.
+    _start_cron_daemon(object(), "fake/model", 3, tmp_path, 30)  # type: ignore[arg-type]  # a fake backend
+    (dispatch,) = dispatches
+    for trigger in ("cron", "event"):
+        dispatch(CronJob(id=trigger, name=trigger, trigger=trigger, schedule="* * * * *", action="x"))  # type: ignore[arg-type]  # the literal is one of the three
+
+    # A webhook job, through the handler `chimera serve` mounts.
+    scheduler = Scheduler(_cron_store())
+    scheduler.schedule_webhook("on push", "gh-push", "Summarise the push.")
+
+    class _Gateway:
+        def on_message(self, _message: Any) -> str:
+            seen.append(("webhook", app_keeper.count()))
+            return "ok"
+
+    _webhook_handler(_Gateway())("gh-push", {})  # type: ignore[arg-type]  # a fake gateway
+
+    # An event job, through `chimera cron fire`.
+    scheduler.schedule_event("on deploy", "deploy", "Check the deploy.")
+    result = CliRunner().invoke(app, ["cron", "fire", "deploy"])
+    assert result.exit_code == 0, result.output
+
+    assert seen == [("cron", 1), ("event", 1), ("webhook", 1), ("event", 1)]
+    assert app_keeper.count() == 0, "a dispatch that ended did not let the machine go"
