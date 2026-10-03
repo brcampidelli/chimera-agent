@@ -2049,8 +2049,18 @@ def register_code_api(
                 max_age=IDLE_BUS_SECONDS,
                 keep={t.session_id for t in live_turns.running()} | {session_id},
             )
+            # How many files the turn carries, never which: a screen that FOLLOWS this turn (it
+            # came back mid-turn, or another window started it) has no other way to know the turn
+            # had any, and a retry it sent of a refusal would go out without them, unannounced
+            # (study 29 P5.7). The ids stay off the bus because guests read it too.
             opening = bus.publish(
-                session_id, "turn_started", {"message": req.message, "author": author},
+                session_id,
+                "turn_started",
+                {
+                    "message": req.message,
+                    "author": author,
+                    "attachment_count": len(req.attachments),
+                },
                 turn_id=turn_id, author=author,
             )
             # Findable from outside until it ends. `live_since` is the sequence BEFORE the opening

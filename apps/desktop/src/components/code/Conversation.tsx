@@ -182,7 +182,9 @@ interface Exchange {
   /** The provider refused this turn on content policy: what refused it, for the card that offers
    *  the owner another model (study 29 P5.7). Absent for every other failure. */
   blocked?: PolicyBlockInfo;
-  /** The attachment ids this turn was sent with, so a retry of it sends the same files. */
+  /** The attachment ids this turn was sent with, so a retry of it sends the same files. Absent
+   *  when unknown: a turn this screen followed rather than sent, whose opening frame said it
+   *  carried files (or did not say) — and then no retry of a refusal is offered from here. */
   attachments?: string[];
   /** The owner's retry of a refusal: one native model, never fused, whatever the composer says. */
   policyRetry?: boolean;
@@ -825,7 +827,12 @@ export function Conversation({
     const patch = (fn: (e: Exchange) => Exchange) =>
       setExchanges((prev) => prev.map((e) => (e.turnId === id ? fn(e) : e)));
     switch (frame.event) {
-      case "turn_started":
+      case "turn_started": {
+        // The frame says how many files the turn carried, not which. None is a known empty list,
+        // which a retry can send as it is; any, or a frame that does not say, leaves the list
+        // unknown — and a retry of a refusal is then not offered from here, since it would go
+        // out without the document the turn was about (study 29 P5.7).
+        const count = data.attachment_count;
         setExchanges((prev) =>
           prev.some((e) => e.turnId === id)
             ? prev
@@ -840,10 +847,12 @@ export function Conversation({
                   edits: [],
                   todos: [],
                   done: null,
+                  ...(count === 0 ? { attachments: [] } : {}),
                 },
               ],
         );
         break;
+      }
       case "token":
         patch((e) => ({ ...e, answer: e.answer + String(data.text ?? "") }));
         break;
@@ -1826,15 +1835,17 @@ export function Conversation({
                       block={e.blocked}
                       current={model}
                       canRetry={i === exchanges.length - 1 && !busy && !busyElsewhere}
+                      filesMissing={e.attachments === undefined}
                       onRetry={(picked) => {
                         const blocked = e.blocked;
-                        if (!blocked) return;
+                        // Unknown files are not sent as no files: see `turn_started` in applyLive.
+                        if (!blocked || e.attachments === undefined) return;
                         send(true, e.you, false, false, {
                           model: picked,
                           of: blocked.model
                             ? { blocked_model: blocked.model, request_id: blocked.request_id }
                             : undefined,
-                          attachments: e.attachments ?? [],
+                          attachments: e.attachments,
                         });
                       }}
                       t={t}

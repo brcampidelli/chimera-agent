@@ -308,6 +308,26 @@ def test_a_retry_that_would_not_run_on_its_model_is_refused(
     assert response.status_code == 422
 
 
+def test_the_opening_frame_says_how_many_files_the_turn_carried_and_not_which(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A screen that FOLLOWS a turn (it came back mid-turn, or another window sent it) builds the
+    # row from this frame alone. Without the count, a refusal's retry from there went out with no
+    # files and nothing said so: the new model answered without the document the turn was about.
+    client = _client(tmp_path, monkeypatch)
+    ids = ["a" * 32, "b" * 32]
+
+    frames = _frames(
+        client.post("/api/code/turn", json={"message": "refuse this", "attachments": ids}).text
+    )
+
+    bus = client.app.state.session_bus  # type: ignore[attr-defined]  # set by build_api_app
+    started = [f for f in bus.replay(frames["session"]["session_id"]) if f["event"] == "turn_started"]
+    assert started[-1]["payload"]["attachment_count"] == 2
+    # The ids themselves stay off the bus: guests read it too.
+    assert not any(i in json.dumps(started[-1]["payload"]) for i in ids)
+
+
 # --- the bot: only the sentence ------------------------------------------------------------------
 
 

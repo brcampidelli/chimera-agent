@@ -1,13 +1,18 @@
-import { screen, waitFor, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Conversation, TurnReceipt } from "@/components/code/Conversation";
 import {
+  getCodeSession,
+  listShares,
+  listWorks,
   streamCodeTurn,
+  streamSessionLive,
   type CodeTurnDone,
   type CodeTurnHandlers,
   type CodeTurnInput,
+  type SessionLiveFrame,
 } from "@/lib/api";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
 import { renderWithProviders } from "@/test/utils";
@@ -62,12 +67,13 @@ async function ask(text: string, opts: { fuse?: boolean; provider?: string } = {
   return user;
 }
 
-/** Open the refusal's model list and pick the one other model the mock catalogue offers. */
-async function retryOnMid(user: ReturnType<typeof userEvent.setup>) {
+/** Open the refusal's model list, pick the one other model the mock catalogue offers, and return
+ *  what went out — the `calls`-th turn this screen sent (the refused one was the first). */
+async function retryOnMid(user: ReturnType<typeof userEvent.setup>, calls = 2) {
   await user.click(await screen.findByRole("button", { name: /try with another model/i }));
   await user.click(await screen.findByText("Vendor: Mid"));
-  await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(2));
-  return vi.mocked(streamCodeTurn).mock.calls[1]?.[0] as CodeTurnInput;
+  await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(calls));
+  return vi.mocked(streamCodeTurn).mock.calls[calls - 1]?.[0] as CodeTurnInput;
 }
 
 describe("a turn the provider refused on content policy", () => {
@@ -147,6 +153,80 @@ describe("a turn the provider refused on content policy", () => {
     await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(2));
     // An ordinary retry is not a retry of a refusal, and its receipt must not say it was.
     expect((vi.mocked(streamCodeTurn).mock.calls[1]?.[0] as CodeTurnInput).retry_of).toBeUndefined();
+  });
+});
+
+describe("a refusal on a turn this screen followed rather than sent", () => {
+  // Coming back to a conversation mid-turn, the row is built from the `turn_started` frame, which
+  // never carried the turn's files. A retry from there went out with `attachments: []`, silently:
+  // the new model answered without the document, and the grounded check had nothing to check.
+  beforeEach(() => {
+    vi.mocked(streamCodeTurn).mockReset();
+    vi.mocked(streamSessionLive).mockReset().mockResolvedValue(null);
+    vi.mocked(listShares).mockReset().mockResolvedValue({ shares: [] });
+    vi.mocked(listWorks).mockReset().mockResolvedValue({ works: [] });
+    vi.mocked(getCodeSession).mockReset().mockResolvedValue({
+      id: "s1",
+      workspace: "/proj",
+      exchanges: [],
+      running_turn: {
+        turn_id: "t1",
+        session_id: "s1",
+        workspace: "/proj",
+        message: "lê o contrato",
+        started_at: 1,
+        live_since: 7,
+        transcript_saved: false,
+      },
+    });
+    localStorage.clear();
+  });
+
+  async function followRefused(attachmentCount: number) {
+    let onFrame: ((f: SessionLiveFrame) => void) | null = null;
+    vi.mocked(streamSessionLive).mockImplementation((_sid, _since, handler) => {
+      onFrame = handler;
+      return new Promise<string | null>(() => {});
+    });
+    renderWithProviders(
+      <Conversation
+        workspace="/proj"
+        openFile={null}
+        resumeSession="s1"
+        posture={{ reach: "workspace" as never, approval: "ask" as never }}
+        profile={"balanced" as never}
+        onHandOff={() => {}}
+        onBatch={() => {}}
+        onEdited={() => {}}
+        busyElsewhere={false}
+        controls={null}
+        onOpenFile={() => {}}
+      />,
+    );
+    await waitFor(() => expect(onFrame).not.toBeNull());
+    const say = (seq: number, event: string, payload: Record<string, unknown>) =>
+      act(() => onFrame?.({ session_seq: seq, event, turn_id: "t1", author: "", payload }));
+    await say(8, "turn_started", { message: "lê o contrato", attachment_count: attachmentCount });
+    await say(9, "error", { message: "Blocked", reason: "content_policy", ...BLOCK });
+    return screen.findByTestId("policy-blocked");
+  }
+
+  it("does not offer a retry that would go out without the turn's files, and says why", async () => {
+    const card = await followRefused(1);
+
+    expect(within(card).getByTestId("policy-files-missing")).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: /try with another model/i })).toBeNull();
+  });
+
+  it("offers it when the turn carried none, and sends none", async () => {
+    await followRefused(0);
+    const user = userEvent.setup();
+
+    // The refused turn was sent by another screen: the retry is the first this one sends.
+    const retry = await retryOnMid(user, 1);
+
+    expect(retry.attachments).toEqual([]);
+    expect(screen.queryByTestId("policy-files-missing")).toBeNull();
   });
 });
 

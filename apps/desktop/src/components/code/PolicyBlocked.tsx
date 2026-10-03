@@ -26,6 +26,7 @@ export function PolicyBlocked({
   block,
   current,
   canRetry,
+  filesMissing = false,
   onRetry,
   t,
 }: {
@@ -34,6 +35,10 @@ export function PolicyBlocked({
   current: string;
   /** False while a turn runs, on any exchange but the last, or when a run holds the project. */
   canRetry: boolean;
+  /** The turn's files are not known on this screen (it was followed, not sent from here). A retry
+   *  would go out without them and answer a different question, so it is not offered; the card
+   *  says what to do instead. */
+  filesMissing?: boolean;
   /** Redo the refused turn on `model` ("" = the install default). */
   onRetry: (model: string) => void;
   t: TFunc;
@@ -57,7 +62,12 @@ export function PolicyBlocked({
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground">{t("code.chat.policy.notRetried")}</p>
-      {canRetry ? (
+      {canRetry && filesMissing ? (
+        <p className="text-xs text-warn-foreground" data-testid="policy-files-missing">
+          {t("code.chat.policy.filesMissing")}
+        </p>
+      ) : null}
+      {canRetry && !filesMissing ? (
         <Button size="sm" variant="ghost" onClick={() => setPicking(true)}>
           {t("code.chat.policy.tryAnother")}
         </Button>
