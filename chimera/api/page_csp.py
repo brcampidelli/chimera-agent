@@ -19,8 +19,8 @@ app is the second layer, there so the person sees what was withheld instead of a
 * images the app itself builds as `data:` (the browser pane's JPEG frames) and `blob:` (workspace
   images, downloads);
 * one self-hosted web font face: the stylesheet declares OpenDyslexic from `/fonts` (same origin,
-  `font-src 'self'`; never a CDN). The file is not bundled yet, so today the face loads nothing,
-  and the Appearance row that offers it checks that it loads first.
+  `font-src 'self'`; never a CDN). The file ships in `apps/desktop/public/fonts` with its SIL OFL
+  licence, and the Appearance row that offers it still checks that it loads first.
 
 **Why `script-src` is looser than the rest.** The HTML preview is an `iframe srcdoc`, and a srcdoc
 document *inherits the parent's policy*: both policies must allow a script for it to run. The
