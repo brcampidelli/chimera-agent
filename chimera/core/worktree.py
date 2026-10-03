@@ -103,50 +103,85 @@ OWNER_FILE = "chimera-owner.json"
 _live_here: set[Path] = set()
 
 
-def worktree_parent(repo_root: Path | None = None) -> Path:
-    """Where a new worktree is made: ``CHIMERA_WORKTREE_DIR``, or the system temp folder.
+def _configured_worktree_dir() -> Path | None:
+    """``CHIMERA_WORKTREE_DIR`` as an absolute path; None when it is empty or not absolute."""
+    from chimera.config import get_settings
 
-    The configured folder is refused — with a warning, and temp used instead — when it is not an
-    absolute path, when it lies inside the repository the worktree is made from (that repository's
-    status, search and checkpoints would all start reading the run's checkout), or when it cannot
-    be created. Refusing loudly would fail the run over a setting; ignoring silently would leave
-    the owner believing their disk was being spared. The warning is the middle.
+    configured = (get_settings().worktree_dir or "").strip()
+    if not configured:
+        return None
+    folder = Path(configured).expanduser()
+    return folder if folder.is_absolute() else None
+
+
+def is_inside(folder: Path, root: Path) -> bool:
+    """Whether ``folder`` is ``root`` or lies under it, compared resolved. False when unknowable."""
+    try:
+        return Path(folder).resolve().is_relative_to(Path(root).resolve())
+    except (OSError, ValueError):
+        return False
+
+
+def worktree_parent(repo_root: Path | None = None) -> Path:
+    """Where the next worktree made from ``repo_root`` goes: ``CHIMERA_WORKTREE_DIR``, or temp.
+
+    Pure — it decides, it never creates. It used to make the configured folder too, and so every
+    READ that asked where worktrees go (`GET /api/storage`, `GET /api/diagnostics`, `chimera doctor`,
+    the boot-time prune) created a directory — inside the owner's project, when that is where the
+    setting pointed. Only :func:`_make_worktree_parent`, on the way to an actual worktree, creates.
+
+    The configured folder is passed over for temp when it is not an absolute path, when it lies
+    inside ``repo_root`` (that repository's status, search and checkpoints would all start reading
+    the run's checkout), or when something that is not a folder is in its place. Every caller that
+    REPORTS this must pass the same ``repo_root`` the run will: asked without it, this answered the
+    configured folder while `create` put the worktree in temp, and the card said one thing while the
+    code did another.
     """
+    temp = Path(tempfile.gettempdir())
+    folder = _configured_worktree_dir()
+    if folder is None:
+        return temp
+    if repo_root is not None and is_inside(folder, repo_root):
+        return temp
+    with suppress(OSError):
+        if folder.exists() and not folder.is_dir():
+            return temp
+    return folder
+
+
+def _make_worktree_parent(repo_root: Path) -> Path:
+    """:func:`worktree_parent`, created — the one place that may make the folder, and warns when the
+    setting is passed over. Refusing would fail the run over a setting; ignoring silently would leave
+    the owner believing their disk was being spared. The warning is the middle."""
     from chimera.config import get_settings
 
     temp = Path(tempfile.gettempdir())
     configured = (get_settings().worktree_dir or "").strip()
-    if not configured:
+    parent = worktree_parent(repo_root)
+    if configured and parent == temp:
+        _log.warning(
+            "CHIMERA_WORKTREE_DIR=%r is not absolute, is inside the project %s, or is not a folder;"
+            " using %s", configured, repo_root, temp,
+        )
         return temp
-    folder = Path(configured).expanduser()
-    if not folder.is_absolute():
-        _log.warning("CHIMERA_WORKTREE_DIR=%r is not an absolute path; using %s", configured, temp)
-        return temp
-    if repo_root is not None:
-        with suppress(OSError, ValueError):
-            if folder.resolve().is_relative_to(Path(repo_root).resolve()):
-                _log.warning(
-                    "CHIMERA_WORKTREE_DIR=%s is inside the project %s; using %s",
-                    folder, repo_root, temp,
-                )
-                return temp
     try:
-        folder.mkdir(parents=True, exist_ok=True)
+        parent.mkdir(parents=True, exist_ok=True)
     except OSError as exc:
-        _log.warning("CHIMERA_WORKTREE_DIR=%s cannot be created (%s); using %s", folder, exc, temp)
+        _log.warning("CHIMERA_WORKTREE_DIR=%s cannot be created (%s); using %s", parent, exc, temp)
         return temp
-    return folder
+    return parent
 
 
 def worktree_parents() -> list[Path]:
     """Every folder a worktree may have been made in: temp, and the configured one if any.
 
     Both, always: changing the setting does not move the worktrees already made, and a leftover in
-    the old place is still a leftover.
+    the old place is still a leftover. The configured folder is listed whatever project it lies in —
+    a run in another repository may have used it — and a folder that does not exist holds nothing.
     """
     parents = [Path(tempfile.gettempdir())]
-    configured = worktree_parent()
-    if configured not in parents:
+    configured = _configured_worktree_dir()
+    if configured is not None and configured not in parents:
         parents.append(configured)
     return parents
 
@@ -406,7 +441,7 @@ class GitWorktree:
                 # reason to refuse to start this run.
                 prune_orphans(repo_root, prefix=prefix)
         branch = f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
-        path = Path(tempfile.mkdtemp(prefix=WORKTREE_PREFIX, dir=worktree_parent(repo_root)))
+        path = Path(tempfile.mkdtemp(prefix=WORKTREE_PREFIX, dir=_make_worktree_parent(repo_root)))
         # Counted as live from before git knows it: the age gate covers other processes in that
         # window, and this covers this one for as long as the run lasts, however long that is.
         _live_here.add(path.resolve())

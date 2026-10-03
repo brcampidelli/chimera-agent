@@ -580,7 +580,8 @@ def doctor(
     from chimera.core.storage import measure, summary_rows
 
     disk = Table(title="Storage", show_header=False, title_style="bold")
-    for label, value in summary_rows(measure(settings.home)):
+    # The workspace every CLI command defaults to (`-w .`): where "worktree location" is decided for.
+    for label, value in summary_rows(measure(settings.home, Path.cwd())):
         disk.add_row(label, value)
     console.print(disk)
 

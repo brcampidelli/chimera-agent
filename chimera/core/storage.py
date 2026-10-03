@@ -234,12 +234,17 @@ def _home_categories(home: Path, worktree_parent: Path) -> tuple[list[Category],
     return categories, tree_size(home, exclude=[worktree_parent], deadline=_budget())
 
 
-def measure(home: Path) -> dict[str, Any]:
-    """The whole report: categories, the worktrees one by one, and the drives they sit on."""
+def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
+    """The whole report: categories, the worktrees one by one, and the drives they sit on.
+
+    ``workspace`` is the project a run would make its worktree from. ``worktree_dir`` is where THAT
+    worktree goes, so the screen's "the next worktree goes to" is what `GitWorktree.create` will do:
+    a configured folder inside the project is passed over for temp there, and must be here too.
+    """
     from chimera.core.worktree import classify_worktree_dir, find_worktree_dirs, worktree_parent
 
     home = Path(home).resolve()
-    parent = worktree_parent()
+    parent = worktree_parent(workspace)
     named, home_total = _home_categories(home, parent)
     by_key = {c.key: c for c in named}
 

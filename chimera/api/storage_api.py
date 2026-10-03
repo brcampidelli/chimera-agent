@@ -86,7 +86,7 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
     home = Path(settings.home).resolve()
     crash = crash_report(home)
     health = doctor(settings)
-    report = storage if storage is not None else measure(home)
+    report = storage if storage is not None else measure(home, workspace)
     lines = [
         "Chimera diagnostics",
         f"backend version: {__version__}",
@@ -94,7 +94,7 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
         f"platform: {platform.platform()}",
         f"home: {home}",
         f"workspace: {workspace}",
-        f"worktree location: {worktree_parent()}",
+        f"worktree location: {worktree_parent(workspace)}",
         f"default model: {health['default_model']}",
         f"configured providers: {', '.join(health['configured_providers']) or 'none'}",
         f"memory backend: {health['memory_backend']}",
@@ -113,7 +113,7 @@ def diagnostics(settings: Settings, workspace: Path, *, storage: dict[str, Any] 
         "platform": platform.platform(),
         "home": str(home),
         "workspace": str(workspace),
-        "worktree_dir": str(worktree_parent()),
+        "worktree_dir": str(worktree_parent(workspace)),
         "crash": crash,
         "report": scrub("\n".join(lines)),
     }
@@ -146,7 +146,7 @@ def register_storage_api(
         """What this install keeps on disk, by kind. A category that could not be counted is null."""
         from chimera.core.storage import measure
 
-        return measure(home)
+        return measure(home, workspace)
 
     @app.post(
         "/api/storage/worktrees/prune", dependencies=[guard], response_model=WorktreePruneOut

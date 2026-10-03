@@ -235,3 +235,48 @@ def test_a_folder_that_breaks_the_rules_falls_back_to_temp(
 
 def test_empty_is_the_temp_folder_as_before(repo: Path) -> None:
     assert worktree_parent(repo) == Path(tempfile.gettempdir())
+
+
+def test_the_reported_worktree_folder_is_where_the_next_worktree_actually_goes(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: with the folder set inside the project, the card said "the next worktree goes
+    to <project>/wts" while `create` used temp — the report asked without the project, the run with
+    it. Both now ask with it."""
+    from chimera.core.storage import measure
+
+    monkeypatch.setenv("CHIMERA_WORKTREE_DIR", str(repo / "wts"))
+    get_settings.cache_clear()
+
+    reported = Path(measure(tmp_path / "home", repo)["worktree_dir"])
+    tree = GitWorktree.create(repo)
+    try:
+        assert tree.path.parent == reported == Path(tempfile.gettempdir())
+    finally:
+        tree.remove()
+
+
+def test_asking_where_worktrees_go_creates_no_folder(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: every read — the storage route, diagnostics, `chimera doctor`, the boot-time
+    prune — made the configured folder, inside the owner's project when that is where it pointed.
+    Only a worktree being made may create it."""
+    from chimera.core.storage import measure
+
+    inside = repo / "wts"
+    elsewhere = tmp_path / "elsewhere" / "wts"
+    for configured in (inside, elsewhere):
+        monkeypatch.setenv("CHIMERA_WORKTREE_DIR", str(configured))
+        get_settings.cache_clear()
+        measure(tmp_path / "home", repo)
+        measure(tmp_path / "home")
+        wt.find_worktree_dirs()
+        prune_orphans(repo)
+        assert not configured.exists(), f"a read created {configured}"
+
+    tree = GitWorktree.create(repo)
+    try:
+        assert elsewhere.is_dir() and tree.path.parent in (elsewhere, elsewhere.resolve())
+    finally:
+        tree.remove()

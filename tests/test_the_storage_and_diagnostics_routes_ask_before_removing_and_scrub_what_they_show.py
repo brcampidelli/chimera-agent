@@ -202,3 +202,25 @@ def test_the_doctor_prints_the_same_storage_summary(
     assert "Storage" in out
     for label in ("sessions", "memory", "worktrees", "worktree location"):
         assert label in out, label
+
+
+def test_a_worktree_folder_inside_the_project_is_refused_at_the_save(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: the save only asked for an absolute path, so `<project>/wts` was stored — and
+    then passed over for temp by every run in that project. A setting that silently does nothing is
+    refused where the owner is looking: at the save."""
+    from chimera.api.config_api import patch_config
+
+    monkeypatch.delenv("CHIMERA_WORKTREE_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)  # the route writes `.env` in the working directory
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    with pytest.raises(ValueError, match="inside the project"):
+        patch_config({"CHIMERA_WORKTREE_DIR": str(ws / "wts")}, env_path=tmp_path / ".env", workspace=ws)
+
+    client = client_for(tmp_path / "home", tmp_path)
+    refused = client.patch("/api/config", json={"CHIMERA_WORKTREE_DIR": str(ws / "wts")})
+    assert refused.status_code == 400 and "inside the project" in refused.json()["detail"]
+    accepted = client.patch("/api/config", json={"CHIMERA_WORKTREE_DIR": str(tmp_path / "outside")})
+    assert accepted.status_code == 200

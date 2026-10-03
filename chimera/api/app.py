@@ -665,7 +665,7 @@ def build_api_app(
         from chimera.api.config_api import patch_config
 
         try:
-            result = patch_config(updates)
+            result = patch_config(updates, workspace=workspace)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         # The bridge's switches apply live: saving one writes or deletes the discovery file now,

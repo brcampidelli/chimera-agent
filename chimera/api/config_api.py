@@ -643,13 +643,25 @@ def _check_keep_awake(value: str) -> None:
         raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
 
 
-def _check_worktree_dir(value: str) -> None:
-    """Empty (temp) or an absolute path. A relative one would resolve against wherever the backend
-    happened to start, which for a packaged app is the install folder — so it is refused here, at
-    the save, rather than ignored with a warning in a log the owner never reads."""
+def _check_worktree_dir(value: str, workspace: Path | None = None) -> None:
+    """Empty (temp) or an absolute path outside the project. Refused here, at the save, rather than
+    ignored with a warning in a log the owner never reads.
+
+    A relative path would resolve against wherever the backend happened to start, which for a
+    packaged app is the install folder. A folder inside the workspace is passed over for temp by
+    `GitWorktree.create` — the project's own status, search and checkpoints would read the run's
+    checkout — so saving it would be a setting that silently does nothing for that project."""
     text = value.strip()
     if text and not Path(text).expanduser().is_absolute():
         raise ValueError("CHIMERA_WORKTREE_DIR must be an absolute path, or empty for the temp folder")
+    if text and workspace is not None:
+        from chimera.core.worktree import is_inside
+
+        if is_inside(Path(text).expanduser(), workspace):
+            raise ValueError(
+                f"CHIMERA_WORKTREE_DIR may not be inside the project ({workspace}); "
+                "a worktree there would be read as part of it"
+            )
 
 
 def _check_boolean(key: str) -> Callable[[str], None]:
@@ -666,7 +678,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
-    "CHIMERA_WORKTREE_DIR": _check_worktree_dir,
+    # CHIMERA_WORKTREE_DIR is checked in `patch_config` itself: its check needs the workspace.
 }
 
 
@@ -688,7 +700,9 @@ def _check_decision_choice(updates: dict[str, str]) -> None:
     check_choice(backend, model, list_models() if model.strip() else SystemOneListing(models=()))
 
 
-def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> dict[str, Any]:
+def patch_config(
+    updates: dict[str, str], *, env_path: Path | None = None, workspace: Path | None = None
+) -> dict[str, Any]:
     """Persist ``updates`` (env-var -> value) to ``.env`` after allowlisting the keys.
 
     Returns ``{"updated": [keys]}``. Raises ``ValueError`` naming any rejected key (so the endpoint
@@ -707,6 +721,10 @@ def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> di
         check = _VALUE_CHECKS.get(key)
         if check is not None:
             check(str(value))
+    if "CHIMERA_WORKTREE_DIR" in updates:
+        # The one check that needs to know which project the backend serves; `workspace` is the
+        # API's, and a caller without one (the CLI) gets the path check above only.
+        _check_worktree_dir(str(updates["CHIMERA_WORKTREE_DIR"]), workspace)
     _check_decision_choice(updates)
     path = env_path or Path(".env")
     for key, value in updates.items():
