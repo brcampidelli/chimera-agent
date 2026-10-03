@@ -99,7 +99,7 @@ class Share:
 
 #: Told which links a revoke removed, after the file is written. How a stream a guest already holds
 #: open is ended at the revoke rather than at its next frame (`guest_api.build_guest_app`).
-RevokeListener = Callable[[list[Share]], None]
+RevokeListener = Callable[[list[Share]], object]
 
 
 class ShareStore:
