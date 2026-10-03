@@ -64,7 +64,10 @@ class SlackAdapter:
         channel = str(event.get("channel", ""))
         if not text or not channel or not user_id:
             return None
-        return InboundMessage(text=text, chat_id=channel, platform=self.platform, user=user_id)
+        return InboundMessage(
+            text=text, chat_id=channel, platform=self.platform, user=user_id,
+            from_bot=bool(subtype == "bot_message" or event.get("bot_id")),
+        )
 
     def start(self, route: Callable[[InboundMessage], str]) -> None:
         """Connect via Socket Mode and serve until :meth:`stop` (blocking)."""

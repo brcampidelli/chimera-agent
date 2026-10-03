@@ -292,17 +292,38 @@ def deliverer_for(settings: Any) -> Any:
     url = str(getattr(settings, "approval_webhook", "") or "").strip()
     if not url:
         return None
+    from chimera.server.chat_approval import offers_chat_code
 
-    def send(text: str) -> None:
+    return WebhookDeliverer(url, offers_chat_code=offers_chat_code(settings))
+
+
+class WebhookDeliverer:
+    """The owner's approval webhook, as a ``deliver`` callable.
+
+    A class rather than a closure for one attribute: ``offers_chat_code`` tells
+    `pending.ask_durably` that this channel reaches the owner AND that a bot will accept an answer
+    typed back (``CHIMERA_APPROVE_VIA_CHAT`` on, some bot with an allowlist). Only then does a
+    question carry a one-time code. Read off the deliverer instead of passed beside it because four
+    surfaces build the deliverer and every one of them would have had to remember the second
+    argument — and a ``deliver`` that is not this webhook (a test, a screen) never offers one.
+    """
+
+    def __init__(self, url: str, *, offers_chat_code: bool = False) -> None:
+        self._url = url
+        self.offers_chat_code = offers_chat_code
+
+    def __repr__(self) -> str:
+        # The URL is a credential: never in a repr a traceback or a log line could print.
+        return f"WebhookDeliverer(offers_chat_code={self.offers_chat_code})"
+
+    def __call__(self, text: str) -> None:
         from chimera.scheduler.delivery import deliver_to_webhook
 
-        result = deliver_to_webhook(url, text)
+        result = deliver_to_webhook(self._url, text)
         if not result.ok:
             # `detail` is host-only by construction — see `scheduler/delivery.webhook_host_only`.
             # The URL is a credential and this line goes to a log somebody else may read.
             _log.warning("approval question not delivered: %s", result.detail)
-
-    return send
 
 
 def approver_for(

@@ -190,7 +190,19 @@ class MessagingManager:
                 turn_note=lambda: finished_note(self._settings.home, self._workspace),
             )
 
-        return MessageGateway(factory, warnings_in_reply=True, name_the_channel=True).on_message
+        # The same interceptor `chimera serve` installs (`cli/main._chat_approvals`): an approval
+        # typed into the chat is answered — or refused — before it can become a turn, setting on or
+        # off. The warning goes to the app's log, as the open-bot one does.
+        from chimera.server.chat_approval import ChatApprovals, startup_warning
+
+        platform = str(getattr(adapter, "platform", ""))
+        warning = startup_warning(self._settings, platform)
+        if warning:
+            _log.warning(warning)
+        return MessageGateway(
+            factory, warnings_in_reply=True, name_the_channel=True,
+            intercept=ChatApprovals(self._settings, self._settings.home).intercept,
+        ).on_message
 
     def start(self, platform: str) -> None:
         """Start ``platform`` in a background thread. Idempotent; raises ValueError if not configured

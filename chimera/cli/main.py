@@ -3591,7 +3591,10 @@ def _serve_platform(
             ),
         )
 
-    gateway = MessageGateway(factory, warnings_in_reply=True, name_the_channel=True)
+    gateway = MessageGateway(
+        factory, warnings_in_reply=True, name_the_channel=True,
+        intercept=_chat_approvals(settings, adapter.platform),
+    )
     console.print(
         f"[bold]Chimera on {adapter.platform}[/bold] "
         "[dim]— message the bot; each chat is its own session. Ctrl+C to stop.[/dim]"
@@ -3605,6 +3608,25 @@ def _serve_platform(
         raise typer.Exit(code=1) from None
     finally:
         adapter.stop()
+
+
+def _chat_approvals(settings: Settings, platform: str) -> Any:
+    """The bot's interceptor for approvals typed into the chat, warning when it cannot apply.
+
+    Installed whether or not `CHIMERA_APPROVE_VIA_CHAT` is on: with it off, a message shaped like
+    an answer is still refused and still kept out of the session, so a code pasted into the chat
+    never reaches the model. See `chimera/server/chat_approval.py`.
+    """
+    from chimera.server.chat_approval import ChatApprovals, enabled_platforms, startup_warning
+
+    warning = startup_warning(settings, platform)
+    if warning:
+        console.print(f"[bold red]WARNING:[/bold red] [yellow]{warning}[/yellow]")
+    elif platform in enabled_platforms(settings):
+        console.print(
+            f"[dim]approvals from {platform}: on — `aprovar <id> <code>` from a listed id[/dim]"
+        )
+    return ChatApprovals(settings, settings.home).intercept
 
 
 def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
@@ -6349,7 +6371,7 @@ def approve(
         # whichever way the default fell, half the answers would be the one nobody chose.
         console.print("[yellow]say which: --yes or --no[/yellow]")
         raise typer.Exit(code=1)
-    if not responder(home, request_id, yes):
+    if not responder(home, request_id, yes, via="cli"):
         console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
         raise typer.Exit(code=1)
     console.print(f"[green]{'approved' if yes else 'refused'}[/green] {request_id}")

@@ -443,6 +443,20 @@ class Settings(BaseSettings):
     # token, an invite and a server to administer. **The URL is a credential** — whoever holds it
     # can post into that channel — so it is never logged in full.
     approval_webhook: str = Field(default="", validation_alias="CHIMERA_APPROVAL_WEBHOOK")
+    # --- Answer that question from the chat bot, with a one-time code (study 29, P3.3).
+    #
+    # Off, an approval delivered to the webhook is answered only with `chimera approve` in a
+    # terminal — which is exactly what the owner's phone does not have. On, each question delivered
+    # through `approval_webhook` carries a fresh six-digit code, and the bot accepts
+    # `aprovar <id> <code>` / `recusar <id> <code>` from an id in THAT platform's allowlist, before
+    # the message can become a turn (`chimera/server/chat_approval.py`).
+    #
+    # Off by default because approving from a chat opens a spoofing surface where there was none,
+    # and approvals are the owner's. Refused outright — with a warning at startup — for a platform
+    # whose allowlist is empty: "anyone who can message the bot" may not approve anything. Not
+    # editable from the app (`config_api`), on purpose: the desktop bridge can drive the settings
+    # API, and the switch that lets a chat approve must not be one a model can flip.
+    approve_via_chat: bool = Field(default=False, validation_alias="CHIMERA_APPROVE_VIA_CHAT")
 
     # --- Auto-fuse error-sensitive turns in solve/crew without an explicit --fuse.
     # Off by default (fusion costs 2-3x); when on, the cost-aware router still keeps

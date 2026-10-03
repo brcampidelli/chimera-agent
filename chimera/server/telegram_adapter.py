@@ -63,7 +63,10 @@ class TelegramAdapter:
         chat_id = str((message.get("chat") or {}).get("id", ""))
         if not text or not chat_id:
             return None
-        return InboundMessage(text=text, chat_id=chat_id, platform=self.platform, user=user_id)
+        return InboundMessage(
+            text=text, chat_id=chat_id, platform=self.platform, user=user_id,
+            from_bot=bool(sender.get("is_bot")),
+        )
 
     def _url(self, method: str) -> str:
         return f"{_API}/bot{self.token}/{method}"

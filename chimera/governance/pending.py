@@ -40,7 +40,12 @@ recorded as a timeout rather than folded into "refused".
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import hmac
 import json
+import re
+import secrets
+import threading
 import time
 import uuid
 from dataclasses import dataclass
@@ -167,16 +172,119 @@ def pending(home: Path) -> list[PendingApproval]:
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
 
 
-def answer(home: Path, request_id: str, approved: bool) -> bool:
-    """Record a person's decision. False when there is no such question waiting."""
+def answer(home: Path, request_id: str, approved: bool, *, via: str = "") -> bool:
+    """Record a person's decision. False when there is no such question waiting.
+
+    ``via`` is the surface that answered — ``cli``, ``app``, ``discord:<chat>`` — and lands on the
+    history line as ``answered_via``, so "how often does anybody answer" can be split by where the
+    answers come from. Empty keeps the answer file exactly as it was.
+    """
     directory = _dir(home)
     pergunta = directory / f"{request_id}.ask.json"
     if not pergunta.exists():
         return False
     (directory / f"{request_id}.answer.json").write_text(
-        json.dumps({"approved": bool(approved), "answered_at": time.time()}), encoding="utf-8"
+        json.dumps(
+            {
+                "approved": bool(approved),
+                "answered_at": time.time(),
+                **({"via": str(via)[:120]} if via else {}),
+            }
+        ),
+        encoding="utf-8",
     )
     return True
+
+
+#: How many digits the one-time code has. Six: typed on a phone in a second, and with the per-sender
+#: limit in `server/chat_approval.py` (five failures per fifteen minutes) a guess at one code
+#: succeeds with odds of about one in two hundred thousand before the question times out.
+CODE_DIGITS = 6
+
+#: What a request id looks like: `uuid4().hex[:12]`. Checked before the id is ever turned into a
+#: path, because on the chat path the id is text somebody typed.
+_REQUEST_ID = re.compile(r"[0-9a-f]{12}")
+
+#: One code is checked and consumed at a time in this process. The bot runs each message's route on
+#: a worker thread (Discord's executor), so two copies of the same message could otherwise both
+#: read the code as unused before either consumed it — a reused code that worked twice.
+_CODE_LOCK = threading.Lock()
+
+
+def _code_hash(request_id: str, code: str) -> str:
+    """The code as stored: salted with its own request id, so it is valid for that request only.
+
+    Hashed so the question file, a backup of it, or a route that ever serialised it raw does not
+    hand out the code. Not a defence against whoever can READ `<home>/approvals/`: a six-digit space
+    falls to a loop — and whoever can read that directory can write an answer file there anyway.
+    """
+    return hashlib.sha256(f"{request_id}:{code}".encode()).hexdigest()
+
+
+def new_code() -> str:
+    """A fresh code from the OS's CSPRNG. Never `random`: a seeded generator is a guessable one."""
+    return f"{secrets.randbelow(10**CODE_DIGITS):0{CODE_DIGITS}d}"
+
+
+#: The ways a code-carrying answer ends. ``applied`` is the only one that wrote an answer; the rest
+#: are logged for the owner and never told to the sender, who sees one neutral line for all of them.
+CODE_OUTCOMES = (
+    "applied", "bad_id", "no_such_request", "no_code", "expired", "already_answered", "wrong_code",
+)
+
+
+def answer_with_code(
+    home: Path,
+    request_id: str,
+    code: str,
+    approved: bool,
+    *,
+    via: str,
+    now: float | None = None,
+) -> str:
+    """Answer a question with the one-time code it was delivered with. Returns a :data:`CODE_OUTCOMES`.
+
+    The code is valid once, for this request only, and only until the question expires — the wait
+    the asker set, written as ``expires_at`` beside the hash. A question asked without a code (the
+    setting off, or no webhook to carry one) cannot be answered this way at all: ``no_code``.
+
+    Consumed BEFORE the answer is written: the hash is removed from the question file under
+    :data:`_CODE_LOCK`, so a second message with the same code finds nothing to match even in the
+    two seconds before the asker's poll picks the answer up and deletes both files.
+    """
+    if not _REQUEST_ID.fullmatch(request_id or ""):
+        return "bad_id"
+    directory = _dir(home)
+    pergunta = directory / f"{request_id}.ask.json"
+    resposta = directory / f"{request_id}.answer.json"
+    agora = time.time() if now is None else now
+    with _CODE_LOCK:
+        try:
+            data = json.loads(pergunta.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return "no_such_request"
+        stored = data.get("code_hash") if isinstance(data, dict) else None
+        if not isinstance(stored, str) or not stored:
+            # Never issued, or already consumed: the same answer, because to the sender they are.
+            return "no_code"
+        if resposta.exists():
+            return "already_answered"
+        expires_at = data.get("expires_at")
+        if not isinstance(expires_at, (int, float)) or agora >= float(expires_at):
+            return "expired"
+        if not hmac.compare_digest(stored, _code_hash(request_id, str(code))):
+            return "wrong_code"
+        data.pop("code_hash", None)
+        data["code_used_at"] = agora
+        try:
+            pergunta.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            # A code that could not be marked used is not applied: applying it would leave it
+            # reusable, and the owner still has `chimera approve`.
+            return "no_code"
+        if not answer(home, request_id, approved, via=via):
+            return "no_such_request"
+        return "applied"
 
 
 def ask_durably(
@@ -242,6 +350,13 @@ def ask_durably(
     # One clock reading for the file, the announcement and the record. There used to be one per
     # site, and a time-to-answer measured between two of them carried their difference.
     asked_at = time.time()
+    # A one-time code for answering from the chat bot (study 29, P3.3), issued only when the text
+    # channel says it can carry one: `approval.deliverer_for` marks the owner's webhook with
+    # `offers_chat_code` when CHIMERA_APPROVE_VIA_CHAT is on and some bot has an allowlist. A code
+    # shown where no bot would accept it would be an instruction that cannot work. It is shown only
+    # in the delivered text — never on the announcement, the card, `GET /api/approvals` or the
+    # record line, which are all places a model can end up reading.
+    code = new_code() if deliver is not None and getattr(deliver, "offers_chat_code", False) else ""
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
@@ -261,6 +376,16 @@ def ask_durably(
                     # Which turn asked, on the QUESTION too, not only on the record line: the list of
                     # waiting questions reads it back to say which conversation and project each is.
                     **({"run_id": str(named["run_id"])} if named.get("run_id") else {}),
+                    # The one-time code, hashed, and when it stops being valid. Only when the
+                    # deliverer says the chat can carry an answer back — see `code` above.
+                    **(
+                        {
+                            "code_hash": _code_hash(request_id, code),
+                            "expires_at": asked_at + float(wait_seconds),
+                        }
+                        if code
+                        else {}
+                    ),
                 },
                 ensure_ascii=False,
             ),
@@ -292,6 +417,15 @@ def ask_durably(
                 f"Chimera needs a decision.\n\n{reason or 'review required'}\n"
                 f"Action: {action[:300]}\n\n"
                 f"Answer with:  chimera approve {request_id} --yes   (or --no)"
+                + (
+                    # Each answer on a line of its own, so a phone can copy exactly one of them.
+                    "\n\nOr send the bot one of these lines (the code works once, for this "
+                    "request only, until the question times out):\n"
+                    f"aprovar {request_id} {code}\n"
+                    f"recusar {request_id} {code}"
+                    if code
+                    else ""
+                )
             )
         except Exception as exc:  # noqa: BLE001 — a failed delivery must not fail the run
             _log.warning("approval request not delivered: %s", exc)
@@ -301,10 +435,12 @@ def ask_durably(
     while clock() < limite:
         if resposta.exists():
             answered_at: float | None = None
+            via = ""
             try:
                 dados = json.loads(resposta.read_text(encoding="utf-8"))
                 decidido = bool(dados.get("approved"))
                 answered_at = float(dados.get("answered_at") or 0.0) or None
+                via = str(dados.get("via") or "")
                 outcome = "approved" if decidido else "refused"
             except (OSError, ValueError):
                 decidido = False
@@ -312,6 +448,7 @@ def ask_durably(
             _record(
                 directory, request_id, action, reason, asked_at, outcome, answered_at,
                 decision=decision, facts=facts, p=p, band=band, decider_model=decider_model,
+                answered_via=via,
             )
             _cleanup(directory, request_id)
             return decidido
@@ -374,6 +511,7 @@ def _record(
     p: float | None = None,
     band: str = "",
     decider_model: str = "",
+    answered_via: str = "",
 ) -> None:
     resolved_at = time.time()
     line: dict[str, Any] = {
@@ -390,6 +528,9 @@ def _record(
         ),
         "waited_seconds": max(0.0, resolved_at - asked_at),
         "outcome": outcome,
+        # Which surface answered — `cli`, `app`, `discord:<chat>`. Its own key, not `surface`: that
+        # one is the surface that ASKED, and a cron question answered from Discord has both.
+        **({"answered_via": answered_via[:120]} if answered_via else {}),
     }
     # The number and what it was read against, merged under whatever the caller named in `facts` —
     # so a caller that passes them either way lands the same column. `p` is written only when there

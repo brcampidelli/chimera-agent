@@ -90,6 +90,10 @@ class InboundMessage:
     chat_id: str = "default"
     platform: str = "local"
     user: str = "user"
+    #: Sent by a bot account. Adapters drop bots unless built with ``respond_to_bots``, and always
+    #: drop their own messages; when a bot does get through, this is how the gateway still knows it
+    #: is not a person — a bot can hold a conversation, it can never answer an approval.
+    from_bot: bool = False
 
     @property
     def key(self) -> str:
@@ -156,8 +160,14 @@ class MessageGateway:
         max_turns: int | None = GATEWAY_MAX_TURNS,
         warnings_in_reply: bool = False,
         name_the_channel: bool = False,
+        intercept: Callable[[InboundMessage], str | None] | None = None,
     ) -> None:
         self._factory = session_factory
+        #: Consulted before a message can become a turn; a non-``None`` answer is the whole reply
+        #: and no session is touched. The chat bots pass
+        #: :meth:`~chimera.server.chat_approval.ChatApprovals.intercept`, so an approval code typed
+        #: into the chat never reaches the model, its history or memory.
+        self._intercept = intercept
         self._sessions: dict[str, ChatSession] = {}
         self._max_turns = max_turns
         #: Append the turn's warnings, and why it was cut short, under the answer. On for a chat
@@ -187,6 +197,11 @@ class MessageGateway:
 
     def on_message(self, message: InboundMessage) -> str:
         """Route a message to its chat's session and return the reply."""
+        if self._intercept is not None:
+            # First, before `session_for`: an intercepted message must not even create a session.
+            handled = self._intercept(message)
+            if handled is not None:
+                return handled
         session = self.session_for(message.key)
         note = channel_note(message) if self._name_the_channel else ""
         verbose = getattr(session, "send_verbose", None)

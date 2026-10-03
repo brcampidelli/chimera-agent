@@ -67,7 +67,8 @@ class DiscordAdapter:
         if not text:
             return None
         return InboundMessage(
-            text=text, chat_id=str(channel_id), platform=self.platform, user=str(author_id)
+            text=text, chat_id=str(channel_id), platform=self.platform, user=str(author_id),
+            from_bot=author_is_bot,
         )
 
     async def _respond(

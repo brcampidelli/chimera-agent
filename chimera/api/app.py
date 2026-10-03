@@ -1440,7 +1440,7 @@ def build_api_app(
         """
         from chimera.governance.pending import answer
 
-        return {"ok": answer(live_settings().home, request_id, bool(req.approved))}
+        return {"ok": answer(live_settings().home, request_id, bool(req.approved), via="app")}
 
     @app.get("/api/decisions", dependencies=[guard], response_model=DecisionsOut)
     def decisions_route(limit: int = 50) -> dict[str, Any]:

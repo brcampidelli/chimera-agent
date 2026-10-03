@@ -53,6 +53,11 @@ class SignalAdapter:
         source = str(envelope.get("source") or "")
         if not text or not source:
             return None
+        if source == self.number:
+            # This bot's own number. The bridge reports what the account sends as a sync message,
+            # not a dataMessage, so this should not arrive at all; if it ever does, it is the bot
+            # talking to itself — never a person, and never an answer to an approval.
+            return None
         if self.allowed_users is not None and source not in self.allowed_users:
             # No reply, for the reason in the Discord adapter; the id is logged for the owner.
             _log.debug("signal: ignored a message from %s (not in the allowlist)", source)
