@@ -33,6 +33,11 @@ actions. So the exception is decided per request, against
   request goes to a declared port the same URL is asked with an ``OPTIONS`` — which runs no route's
   handler — and a port that answers with the mark, or does not answer, is refused for that request.
 
+- **who sends the request**: the driver's guard lets a request reach a declared port only from a
+  page that is itself on one, or as the agent's own top-level navigation and its redirect hops
+  (``RequestGuard`` in `browser_playwright`). Any other site the agent visits cannot send the dev
+  server an image, a form or a script navigation.
+
 **What this cannot close.** The floor resolves a public name once and Chromium resolves it again; a
 name that answers public to the first and loopback to the second (rebinding) is the gap the floor
 always had, on every port, sidecar included. Declaring a port does not widen it toward Chimera's own

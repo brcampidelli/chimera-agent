@@ -24,7 +24,7 @@ Three things study 24 found missing (``bench/PLAN-study24-jev-practice.md``, ite
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
@@ -100,6 +100,15 @@ class RequestGuard:
     document request is judged, the narrower reading. ``cache=False`` hands caching to the predicate:
     `BrowserReach` caches the DNS-heavy floor itself and must re-decide a loopback port on every
     request, because Chimera's own listeners bind after the browser starts.
+
+    ``local`` (study 29 P5.2, after review) is the reach's ``declared_local``: a request to a declared
+    loopback port is sent only when the page asking for it is itself on one, or when it is the
+    agent's own top-level navigation (:meth:`expecting`, set by the driver around ``navigate`` and
+    ``back``) and the redirect hops of that navigation. Without it any site the agent visited could
+    write to the dev server across origins: an ``<img>``, a ``no-cors`` POST, a form, a
+    ``location=`` — the guard judged the target and never who sent it. Who sent it is read from the
+    frame the request belongs to, whose committed address the driver feeds in from
+    ``Page.frameNavigated`` (:meth:`frame_navigated`); a frame not seen yet is not local.
     """
 
     def __init__(
@@ -108,14 +117,84 @@ class RequestGuard:
         *,
         listed: Callable[[str], bool] | None = None,
         cache: bool = True,
+        local: Callable[[str], bool] | None = None,
     ) -> None:
         self._allowed = allowed or is_safe_url
         self._listed = listed
         self._cache = cache
+        self._local = local
         self._hosts: dict[str, bool] = {}
+        self._frames: dict[str, str] = {}
+        self._parents: dict[str, str] = {}
+        self._expected: tuple[str, str] | None = None
+        self._local_navigations: set[str] = set()
         self.blocked_navigations: list[str] = []
         self.offsite: set[str] = set()
+        self.foreign: set[str] = set()
         self.blocked_requests = 0
+
+    # --- who is asking (only with ``local``) -----------------------------------------------------
+
+    def frame_navigated(self, params: dict[str, Any]) -> None:
+        """``Page.frameNavigated``: a frame committed a document at this address."""
+        frame = params.get("frame") or {}
+        frame_id = str(frame.get("id") or "")
+        if not frame_id:
+            return
+        self._frames[frame_id] = str(frame.get("url") or "")
+        if frame.get("parentId"):
+            self._parents[frame_id] = str(frame["parentId"])
+
+    def frame_attached(self, params: dict[str, Any]) -> None:
+        """``Page.frameAttached``: a child frame exists, before it has loaded anything."""
+        if params.get("frameId") and params.get("parentFrameId"):
+            self._parents[str(params["frameId"])] = str(params["parentFrameId"])
+
+    @contextlib.contextmanager
+    def expecting(self, url: str, frame: str | None) -> Iterator[None]:
+        """The agent itself is navigating ``frame`` to ``url`` (``*``: anywhere — ``back`` goes to a
+        page the agent already opened; a page cannot push another origin into its history)."""
+        self._expected = (url if url == "*" else _origin(url), frame) if frame else None
+        try:
+            yield
+        finally:
+            self._expected = None
+
+    def _local_page(self, frame_id: str | None) -> bool:
+        """The document in ``frame_id`` is on a declared local port. ``about:blank``/``srcdoc``
+        frames are their parent's origin, and a ``blob:`` carries its origin inside it."""
+        seen: set[str] = set()
+        while frame_id and frame_id not in seen and self._local is not None:
+            seen.add(frame_id)
+            url = self._frames.get(frame_id, "")
+            if url.startswith("about:"):
+                frame_id = self._parents.get(frame_id)
+                continue
+            return self._local(url[len("blob:"):] if url.startswith("blob:") else url)
+        return False
+
+    def _sent_locally(self, url: str, params: dict[str, Any], main_frame: str | None) -> bool:
+        frame = params.get("frameId")
+        frame_id = str(frame) if frame else None
+        if params.get("resourceType") != "Document":
+            return self._local_page(frame_id)
+        if main_frame is not None and frame_id == main_frame:
+            network = str(params.get("networkId") or "")
+            if network and network in self._local_navigations:
+                return True  # a redirect hop of the agent's own navigation to a local page
+            expected = self._expected
+            if expected is not None and expected[1] == frame_id:
+                # The agent's own navigation is in flight: only its own target counts. Not the page
+                # being left — a dev page the agent is navigating AWAY from must not lend its origin
+                # to the hop a public server redirects that navigation to.
+                if expected[0] not in ("*", _origin(url)):
+                    return False
+                if network:
+                    self._local_navigations.add(network)
+                return True
+            return self._local_page(frame_id)
+        # A frame's document: the frame's own page navigating it, or the page embedding it.
+        return self._local_page(frame_id) or self._local_page(self._parents.get(frame_id or ""))
 
     def permits(self, url: str) -> bool:
         parsed = urlparse(url)
@@ -147,16 +226,24 @@ class RequestGuard:
         so a failed command is dropped, never retried as the opposite verdict."""
         request_id = params.get("requestId")
         url = ""
-        offsite = False
+        offsite = foreign = False
         try:
             url = str((params.get("request") or {}).get("url", ""))
-            allow = self.permits(url)
+            # Who is asking, BEFORE the predicate: a request refused for its sender never costs the
+            # dev server the probe the predicate would send it.
+            local = self._local is not None and self._local(url)
+            if local and not self._sent_locally(url, params, main_frame):
+                allow, foreign = False, True
+            else:
+                allow = self.permits(url)
             if allow and self._off_the_list(url, params, main_frame):
                 allow, offsite = False, True
         except Exception:  # noqa: BLE001 — cannot decide: fail closed
             allow = False
         if offsite:
             self.offsite.add(url)
+        if foreign:
+            self.foreign.add(url)
         if not allow:
             self.blocked_requests += 1
             if params.get("resourceType") == "Document":
@@ -175,12 +262,27 @@ class RequestGuard:
 
     def refusal(self, url: str) -> str:
         """The error a refused navigation becomes, naming the rule that refused it."""
+        if url in self.foreign:
+            return (
+                f"blocked navigation to a declared local port from a page that is not on one: {url} "
+                "(navigate to it directly)"
+            )
         if url in self.offsite:
             return (
                 f"blocked navigation outside the browser's site list: {url} (navigate to it "
                 "directly; a site off the list needs a person's yes)"
             )
         return f"blocked navigation to an internal address: {url}"
+
+
+def _origin(url: str) -> str:
+    parsed = urlparse(url)
+    try:
+        port = parsed.port
+    except ValueError:
+        port = None
+    port = port or (443 if parsed.scheme == "https" else 80)
+    return f"{parsed.scheme}://{parsed.hostname or ''}:{port}"
 
 
 class PlaywrightDriver:
@@ -207,12 +309,21 @@ class PlaywrightDriver:
         self._context = self._browser.new_context()
         # With a reach (study 29, P5.2) every request goes through ITS predicate, the same object the
         # tool checks a navigate target with, and top-level navigations through its site list.
+        # With declared local ports, the guard also asks who sent a request to one of them, which
+        # needs every frame's address: only then is `Page.enable` sent and its events read.
+        self._track_frames = reach is not None and bool(reach.local_ports)
         self.guard = (
-            RequestGuard(reach.permits, listed=reach.listed if reach.sites else None, cache=False)
+            RequestGuard(
+                reach.permits,
+                listed=reach.listed if reach.sites else None,
+                cache=False,
+                local=reach.declared_local if reach.local_ports else None,
+            )
             if reach is not None
             else RequestGuard(allowed)
         )
         self._sessions: list[Any] = []
+        self._mains: list[tuple[Any, str | None]] = []
         # Every page of the context gets the guard: the driver's own page before its first request;
         # a popup the page opens as soon as the context reports it (its first request may race it,
         # and a popup is never read by this driver).
@@ -228,7 +339,15 @@ class PlaywrightDriver:
         # own frames. Unknown (None) makes the guard judge every document, the narrower reading.
         main: str | None = None
         with contextlib.suppress(Exception):
-            main = str(session.send("Page.getFrameTree")["frameTree"]["frame"]["id"])
+            root = session.send("Page.getFrameTree")["frameTree"]["frame"]
+            main = str(root["id"])
+            if self._track_frames:
+                self.guard.frame_navigated({"frame": root})
+        self._mains.append((page, main))
+        if self._track_frames:
+            session.on("Page.frameNavigated", self.guard.frame_navigated)
+            session.on("Page.frameAttached", self.guard.frame_attached)
+            session.send("Page.enable")
         session.on(
             "Fetch.requestPaused", lambda params: self.guard.on_paused(session, params, main_frame=main)
         )
@@ -284,8 +403,14 @@ class PlaywrightDriver:
             raise ValueError(f"ref {ref!r} matches {count} elements — the page changed; read it again")
         return locator
 
+    def _main_frame(self) -> str | None:
+        return next((main for page, main in self._mains if page is self._page), None)
+
     def navigate(self, url: str) -> list[Element]:
-        return self._guarded(lambda: self._page.goto(url, wait_until="domcontentloaded"))
+        # The agent's own navigation: the one top-level request to a declared local port that no
+        # local page sent (`RequestGuard.expecting`).
+        with self.guard.expecting(url, self._main_frame()):
+            return self._guarded(lambda: self._page.goto(url, wait_until="domcontentloaded"))
 
     def read(self) -> list[Element]:
         return self._snapshot()
@@ -311,7 +436,8 @@ class PlaywrightDriver:
         return self._snapshot()
 
     def back(self) -> list[Element]:
-        return self._guarded(lambda: self._page.go_back(wait_until="domcontentloaded"))
+        with self.guard.expecting("*", self._main_frame()):
+            return self._guarded(lambda: self._page.go_back(wait_until="domcontentloaded"))
 
     def page_html(self) -> str:
         return str(self._page.content())  # the rendered DOM (post-JS), for HTML->Markdown

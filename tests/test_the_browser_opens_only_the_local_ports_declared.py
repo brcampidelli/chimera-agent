@@ -413,7 +413,7 @@ def world() -> Iterator[dict[str, Any]]:
     })
     yield {
         "sidecar": sidecar, "sidecar_port": sidecar_port,
-        "dev_port": dev_port, "public_port": public_port,
+        "dev": dev, "dev_port": dev_port, "public_port": public_port,
     }
     for server in (sidecar, dev, public):
         server.shutdown()
@@ -447,9 +447,12 @@ def test_a_real_redirect_from_a_public_site_to_the_sidecar_never_reaches_it(
     with pytest.raises(ValueError, match="blocked navigation"):
         reach_driver.navigate(f"http://127.0.0.1:{world['public_port']}/to-sidecar")
     assert world["sidecar"].hits == []
-    # ...while the same redirect to the declared port loads.
-    reach_driver.navigate(f"http://127.0.0.1:{world['public_port']}/to-dev")
-    assert "dev-home" in reach_driver.page_text()
+    # ...and the same redirect to the DECLARED port too: a public server chose that hop, not the
+    # agent, and a GET it can aim at the dev server is a write it can aim there. (This asserted the
+    # opposite until the review of P5.2; `test_a_declared_port_is_reached_only_from_a_local_page`.)
+    with pytest.raises(ValueError, match="from a page that is not on one"):
+        reach_driver.navigate(f"http://127.0.0.1:{world['public_port']}/to-dev")
+    assert world["dev"].hits == []
 
 
 def test_a_real_click_or_script_on_the_dev_server_cannot_reach_the_sidecar(
