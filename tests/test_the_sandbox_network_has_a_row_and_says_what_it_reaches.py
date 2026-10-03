@@ -25,7 +25,14 @@ from typing import Any
 
 import pytest
 
-from chimera.api.config_api import APPLIES_WHEN, doctor, is_editable, patch_config, read_config
+from chimera.api.config_api import (
+    APPLIES_WHEN,
+    COMMANDS_NOW,
+    doctor,
+    is_editable,
+    patch_config,
+    read_config,
+)
 from chimera.config import Settings, get_settings
 from chimera.sandbox import DockerSandbox, get_sandbox, sandbox_network
 from chimera.tools import code as code_mod
@@ -123,9 +130,32 @@ def test_bridge_reaches_the_container_the_tools_are_given(tmp_path: Path) -> Non
     assert "bridge" in built._argv("n", "true", tmp_path, [])
 
 
-def test_it_declares_that_it_waits_for_the_next_conversation() -> None:
-    """Read when `default_registry` builds the shell and code tools; an open chat keeps its tools."""
-    assert APPLIES_WHEN["CHIMERA_SANDBOX_NETWORK"] == "next_conversation"
+def test_it_declares_that_commands_take_it_now_and_an_open_chat_later() -> None:
+    """Not "next conversation": that described only the chat's tools, which keep their sandbox.
+
+    A `!` command, a workflow or cron shell step and the verifier build their sandbox on every use,
+    so a save of `bridge` reaches them at once — the side that widens access was labelled later
+    than it is.
+    """
+    assert APPLIES_WHEN["CHIMERA_SANDBOX_NETWORK"] == COMMANDS_NOW == "commands_now"
+
+
+def test_a_save_reaches_the_sandbox_built_per_use_at_once(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """What the workflow shell step and the verifier call — `get_sandbox()` — sees the save."""
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    monkeypatch.setenv("CHIMERA_SANDBOX", "docker")
+    monkeypatch.setenv("CHIMERA_SANDBOX_NETWORK", "none")
+    get_settings.cache_clear()
+    before = get_sandbox()
+
+    patch_config({"CHIMERA_SANDBOX_NETWORK": "bridge"}, env_path=tmp_path / ".env")
+    after = get_sandbox()
+    get_settings.cache_clear()
+
+    assert isinstance(before, DockerSandbox) and before.network is False
+    assert isinstance(after, DockerSandbox) and after.network is True
 
 
 # --- what a command can reach HERE, which is not the setting --------------------------------------

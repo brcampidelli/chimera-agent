@@ -209,6 +209,11 @@ def is_editable(key: str) -> bool:
 #: gateway and the request handlers read through instead of holding a boot-time snapshot.
 NEXT_CONVERSATION = "next_conversation"
 NEXT_LAUNCH = "next_launch"
+#: Two moments at once: what builds its sandbox per use (a `!` command, a workflow or cron shell
+#: step, the verifier) takes the new value immediately, while an open conversation keeps the tools
+#: it was built with. Saying only "next conversation" would describe the side that WIDENS access as
+#: later than it is.
+COMMANDS_NOW = "commands_now"
 APPLIES_WHEN: dict[str, str] = {
     # Decided when a conversation is built (`factory()` in `chimera app`), so an open conversation
     # keeps the behaviour it started with — deliberately: changing a running chat's guard or backend
@@ -226,10 +231,13 @@ APPLIES_WHEN: dict[str, str] = {
     # a Code turn builds both afresh, so there it is the next turn. The research agent and the
     # explorer's contract are read only on the Code turn, per turn, so they are absent: next call.
     "CHIMERA_BROWSER_SITUATION": NEXT_CONVERSATION,
-    # Read when `default_registry` builds the shell and code tools, each with its own sandbox object
-    # (`get_sandbox()` in `chimera/tools/builtin.py`). An open chat keeps the container settings its
-    # tools were built with; a Code turn builds them afresh.
-    "CHIMERA_SANDBOX_NETWORK": NEXT_CONVERSATION,
+    # Read at two points. `default_registry` builds the chat's shell and code tools, each with its
+    # own sandbox object (`get_sandbox()` in `chimera/tools/builtin.py`), so an open chat keeps the
+    # network its tools were built with; a Code turn builds them afresh. But three callers build the
+    # sandbox on every use and so take a save at once: the user's `!` command
+    # (`api/exec_stream.py`), a workflow or cron shell step (`workflow/executors.py`, unattended),
+    # and the verifier (`core/verify.py`). Hence COMMANDS_NOW, not NEXT_CONVERSATION.
+    "CHIMERA_SANDBOX_NETWORK": COMMANDS_NOW,
     # The governance band builds its decider once per assembly (`governance/band.py::build_band`), so
     # a chat already running keeps the instrument it started with; the next one reads the new pair.
     # `POST /api/decide` and the `decide` tool rebuild on the next call.

@@ -58,7 +58,8 @@ const CONFIG = {
   automation: { cron: true },
   guard: { chat: false },
   providers: [],
-  applies: { CHIMERA_SANDBOX_NETWORK: "next_conversation" },
+  // Mirrors `config_api.APPLIES_WHEN`: commands take a save now, an open chat at its next start.
+  applies: { CHIMERA_SANDBOX_NETWORK: "commands_now" },
   pinned: [],
 };
 
@@ -201,8 +202,12 @@ describe("Settings — the network a command can reach", () => {
     const select = await within(region).findByRole("combobox", { name: "Command network" });
     expect(select).toHaveValue("none");
     expect(within(region).getByText(/The container has no network/)).toBeInTheDocument();
-    // When it applies is said on the row, because an open chat keeps the tools it was built with.
-    expect(within(region).getByText(/next conversation/i)).toBeInTheDocument();
+    // When it applies is said on the row, and both moments are said: a `!` command, a workflow and
+    // the verifier take a save at once; only an open chat keeps the network it started with. "Next
+    // conversation" alone described the side that widens access as later than it is.
+    const note = within(region).getByText(/new commands, workflows and the verifier use it now/);
+    expect(note).toHaveTextContent(/an open conversation keeps the network it started with/);
+    expect(within(region).queryByText(/applies to your next conversation/)).not.toBeInTheDocument();
 
     await user.selectOptions(select, "bridge");
     await waitFor(() => expect(patchConfig).toHaveBeenCalledOnce());

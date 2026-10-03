@@ -83,16 +83,18 @@ const RowLabelContext = createContext("");
  */
 function AppliesNote({ when }: { when?: string }) {
   const t = useT();
-  if (when !== "next_conversation" && when !== "next_launch") return null;
-  return (
-    <div className="text-xs text-warn-foreground">
-      {t(
-        when === "next_launch"
-          ? "settings.applies.nextLaunch"
-          : "settings.applies.nextConversation",
-      )}
-    </div>
-  );
+  // `commands_now`: two moments, not one. What builds its sandbox per use (a `!` command, a
+  // workflow, the verifier) takes the save at once; an open chat keeps the tools it was built with.
+  const key =
+    when === "next_launch"
+      ? "settings.applies.nextLaunch"
+      : when === "next_conversation"
+        ? "settings.applies.nextConversation"
+        : when === "commands_now"
+          ? "settings.applies.commandsNow"
+          : null;
+  if (!key) return null;
+  return <div className="text-xs text-warn-foreground">{t(key)}</div>;
 }
 
 /** The env vars this server inherited from its own environment, so a Row can say it is one of them. */
