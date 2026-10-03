@@ -53,6 +53,37 @@ class _Span:
                 self._s.set_attribute(key, value)
 
 
+#: The modules :func:`configure_otel` imports to export anything — the `[otel]` extra. Named once, so
+#: the privacy card's "is anything exported?" asks the same question the exporter does.
+_EXPORTER_MODULES = (
+    "opentelemetry.sdk.trace",
+    "opentelemetry.sdk.metrics",
+    "opentelemetry.exporter.otlp.proto.http.trace_exporter",
+    "opentelemetry.exporter.otlp.proto.http.metric_exporter",
+)
+
+
+def otel_requested(settings: Any) -> bool:
+    """Whether the owner asked for export: ``CHIMERA_OTEL`` or the standard OTLP endpoint variable."""
+    return bool(getattr(settings, "otel", False)) or bool(os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"))
+
+
+def otel_exporter_installed() -> bool:
+    """Whether the `[otel]` extra is importable — without it :func:`configure_otel` exports nothing.
+
+    ``find_spec`` on a dotted name imports its parents and raises when one is missing, so a missing
+    top-level package is an answer here, not an exception."""
+    import importlib.util
+
+    for name in _EXPORTER_MODULES:
+        try:
+            if importlib.util.find_spec(name) is None:
+                return False
+        except (ImportError, ValueError):
+            return False
+    return True
+
+
 def configure_otel(settings: Settings | None = None) -> bool:
     """Initialise the OTLP tracer + meters if enabled and the extra is installed. Idempotent.
 
@@ -67,7 +98,7 @@ def configure_otel(settings: Settings | None = None) -> bool:
     from chimera.config import get_settings
 
     settings = settings or get_settings()
-    enabled = bool(getattr(settings, "otel", False)) or bool(os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT"))
+    enabled = otel_requested(settings)
     if not enabled:
         return False
 

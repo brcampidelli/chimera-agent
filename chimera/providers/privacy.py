@@ -232,15 +232,29 @@ def privacy_snapshot(settings: Settings) -> dict[str, Any]:
         "openrouter_data_collection": settings.openrouter_data_collection,
         "openrouter_zdr": settings.openrouter_zdr,
         "routes": prompt_routes(settings),
-        # The OpenTelemetry exporter turns on from either switch (`chimera/obs.py`), so the card
-        # reports the effective state, not the setting alone.
-        "telemetry": bool(settings.otel) or bool(os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")),
+        # The exporter turns on from either switch AND only with the `[otel]` extra installed
+        # (`chimera/obs.py: configure_otel` logs "tracing stays off" without it). `telemetry` is what
+        # is actually exported; `telemetry_requested` lets the card say "asked for, nothing sent".
+        "telemetry": _telemetry_requested(settings) and _telemetry_installed(),
+        "telemetry_requested": _telemetry_requested(settings),
         # A surface that reaches OpenRouter WITHOUT the preference above. Named rather than hidden:
         # an owner who set `deny` would otherwise believe every call carries it. `decisions` when the
         # Decisions API is the chosen backend; `decisions_fallback` when it only stands behind the
         # local verifier — the default install with an OpenRouter key, so the common case.
         "unscoped": _unscoped(settings),
     }
+
+
+def _telemetry_requested(settings: Settings) -> bool:
+    from chimera.obs import otel_requested
+
+    return otel_requested(settings)
+
+
+def _telemetry_installed() -> bool:
+    from chimera.obs import otel_exporter_installed
+
+    return otel_exporter_installed()
 
 
 def _unscoped(settings: Settings) -> list[str]:

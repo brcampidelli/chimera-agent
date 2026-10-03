@@ -780,7 +780,10 @@ class PrivacyCfgOut(BaseModel):
     openrouter_zdr: bool = False
     routes: list[PromptRouteOut] = Field(default_factory=list)
     telemetry: bool = False
-    """Whether the OpenTelemetry exporter is on (``CHIMERA_OTEL`` or ``OTEL_EXPORTER_OTLP_ENDPOINT``)."""
+    """Whether anything is exported: OpenTelemetry asked for (``CHIMERA_OTEL`` or
+    ``OTEL_EXPORTER_OTLP_ENDPOINT``) AND the ``[otel]`` extra installed."""
+    telemetry_requested: bool = False
+    """Whether it was asked for, installed or not — so "requested, nothing exported" can be said."""
     unscoped: list[str] = Field(default_factory=list)
     """Surfaces that reach OpenRouter WITHOUT the preference above, so the card can say so instead of
     letting ``deny`` read as covering every call: ``decisions`` (the Decisions API is the chosen

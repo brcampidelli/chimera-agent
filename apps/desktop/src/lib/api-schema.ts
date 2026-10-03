@@ -7268,6 +7268,11 @@ export interface components {
              * @default false
              */
             telemetry: boolean;
+            /**
+             * Telemetry Requested
+             * @default false
+             */
+            telemetry_requested: boolean;
             /** Unscoped */
             unscoped?: string[];
         };

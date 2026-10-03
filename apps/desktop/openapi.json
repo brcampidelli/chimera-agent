@@ -8326,6 +8326,11 @@
             "title": "Telemetry",
             "type": "boolean"
           },
+          "telemetry_requested": {
+            "default": false,
+            "title": "Telemetry Requested",
+            "type": "boolean"
+          },
           "unscoped": {
             "items": {
               "type": "string"

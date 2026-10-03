@@ -127,12 +127,44 @@ def test_the_card_reports_what_was_set() -> None:
     assert snapshot["openrouter_zdr"] is True
 
 
-def test_telemetry_is_reported_on_from_either_switch(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_telemetry_is_reported_on_from_either_switch_when_the_exporter_is_installed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import chimera.obs
+
+    monkeypatch.setattr(chimera.obs, "otel_exporter_installed", lambda: True)
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
     assert privacy_snapshot(_settings())["telemetry"] is False
     assert privacy_snapshot(_settings(CHIMERA_OTEL="true"))["telemetry"] is True
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
     assert privacy_snapshot(_settings())["telemetry"] is True
+
+
+def test_telemetry_asked_for_without_the_otel_extra_is_reported_as_nothing_exported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`configure_otel` logs "tracing stays off" and exports nothing without the extra; the card
+    said "export is on: tool calls and token counts go to the configured collector"."""
+    import chimera.obs
+
+    monkeypatch.setattr(chimera.obs, "otel_exporter_installed", lambda: False)
+    snapshot = privacy_snapshot(_settings(CHIMERA_OTEL="true"))
+    assert snapshot["telemetry"] is False
+    assert snapshot["telemetry_requested"] is True
+
+
+def test_the_exporter_check_answers_for_a_missing_package_instead_of_raising(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import importlib.util
+
+    import chimera.obs
+
+    def missing(name: str, *_a: object) -> None:
+        raise ModuleNotFoundError(name)
+
+    monkeypatch.setattr(importlib.util, "find_spec", missing)
+    assert chimera.obs.otel_exporter_installed() is False
 
 
 def test_the_block_never_carries_a_credential(monkeypatch: pytest.MonkeyPatch) -> None:

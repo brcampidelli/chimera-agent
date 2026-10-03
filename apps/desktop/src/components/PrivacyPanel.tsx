@@ -112,7 +112,13 @@ export function PrivacyPanel({
 
       <Section title={t("governance.privacy.telemetry")}>
         <Line>
-          {privacy.telemetry ? t("governance.privacy.telemetryOn") : t("governance.privacy.telemetryOff")}
+          {/* `telemetry` is what is exported; asked for without the [otel] extra exports nothing,
+              and saying "on" there would be a claim the code does not keep. */}
+          {privacy.telemetry
+            ? t("governance.privacy.telemetryOn")
+            : privacy.telemetry_requested
+              ? t("governance.privacy.telemetryMissing")
+              : t("governance.privacy.telemetryOff")}
         </Line>
       </Section>
 

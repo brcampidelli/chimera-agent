@@ -171,6 +171,16 @@ describe("Governance — the privacy card", () => {
     expect(panel.getByText("telegram: anyone")).toBeInTheDocument();
   });
 
+  it("says telemetry asked for without the [otel] extra exports nothing", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({ ...PRIVACY, telemetry: false, telemetry_requested: true }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.getByText(/\[otel\] extra is not installed: nothing is exported/)).toBeInTheDocument();
+    expect(panel.queryByText(/OpenTelemetry export is on/)).toBeNull();
+  });
+
   it("never shows a credential, not even the hint the API-keys card uses", async () => {
     vi.mocked(getConfig).mockResolvedValue(config(PRIVACY));
     renderWithProviders(<Governance />);
