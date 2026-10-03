@@ -24,6 +24,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
 import { Switch } from "@/components/ui/switch";
+import {
+  CodeFontSelect,
+  MotionSelect,
+  TextSizeSelect,
+  ThemeSelect,
+  TranscriptWidthSelect,
+  UiFontSelect,
+} from "@/components/AppearanceControls";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { Connections } from "@/components/Connections";
 import { Governance } from "@/components/Governance";
@@ -1064,6 +1072,31 @@ export function Settings({
                     hint={t("settings.hint.language")}
                   >
                     <LanguageSelect />
+                  </Row>
+                  {/* Display only, and every default is the page as it was before these rows:
+                      the OS theme and motion, medium text, the medium conversation width and the
+                      system fonts. Kept by this machine (lib/theme.ts) except the width, which is
+                      part of the screen's layout. */}
+                  <Row label={t("settings.row.theme")} hint={t("settings.hint.theme")}>
+                    <ThemeSelect name={t("settings.row.theme")} />
+                  </Row>
+                  <Row label={t("settings.row.motion")} hint={t("settings.hint.motion")}>
+                    <MotionSelect name={t("settings.row.motion")} />
+                  </Row>
+                  <Row label={t("settings.row.textSize")} hint={t("settings.hint.textSize")}>
+                    <TextSizeSelect name={t("settings.row.textSize")} />
+                  </Row>
+                  <Row
+                    label={t("settings.row.transcriptWidth")}
+                    hint={t("settings.hint.transcriptWidth")}
+                  >
+                    <TranscriptWidthSelect name={t("settings.row.transcriptWidth")} />
+                  </Row>
+                  <Row label={t("settings.row.uiFont")} hint={t("settings.hint.uiFont")}>
+                    <UiFontSelect name={t("settings.row.uiFont")} />
+                  </Row>
+                  <Row label={t("settings.row.codeFont")} hint={t("settings.hint.codeFont")}>
+                    <CodeFontSelect name={t("settings.row.codeFont")} />
                   </Row>
                 </Card>
 

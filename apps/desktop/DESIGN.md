@@ -71,6 +71,19 @@ A drop shadow is a depth cue and it **lies** when nothing is actually in front.
 These override Tailwind's defaults on purpose. A sixth size is a design decision — make it in
 `tailwind.config.js`, don't smuggle it in as `text-[12px]`.
 
+The person can scale all five at once, and only that way: Settings › Appearance › Text size stamps
+`data-text-size` on `<html>`, which moves the rem root to 93.75% or 112.5%. Every size, space and
+radius is in rem, so the interface scales together and the scale stays five sizes. The fonts work the
+same way: Interface font and Code font stamp `data-font` / `data-font-code`, which swap the **value**
+of `--font-sans` / `--font-mono` and nothing else. OpenDyslexic is declared by an `@font-face` that
+points at `public/fonts/OpenDyslexic-Regular.woff2` — the app's own files, never a CDN — but **the file
+is not in the repository yet** (bundling it, with its SIL OFL licence, waits on the owner's yes to
+download it). Until it is, the row checks that the file loads and offers no OpenDyslexic at all; a
+build that has it offers it with no code change. The code fonts are the computer's own and the row
+marks one it does not have ("not on this computer"); a shipped font that fails to load says "not
+available in this build", because the computer is not what lacks it. Each default stamps no
+attribute, so someone who never opens the card sees the page as it was.
+
 ### Motion
 
 | Token | Value | Use it for |
@@ -131,8 +144,10 @@ arriving*. It never replays on re-render or on HMR.
 ### Reduced motion — the contract
 
 Honour **both** `@media (prefers-reduced-motion: reduce)` and `[data-motion="reduced"]` (the user
-override in Settings › Appearance; on Windows the OS flag is often off while the person still wants
-calm UI).
+override: Settings › Appearance › Motion, System / Full / Reduced; on Windows the OS flag is often off
+while the person still wants calm UI). The appearance provider behind that row (`lib/appearance.tsx`)
+calls `applyMotion`, and the gate fails if nothing outside `lib/theme.ts` does: for a while this
+paragraph promised a row that did not exist, and the function had no caller at all.
 
 **Collapse durations to 1ms. Never `animation: none`.** That is the obvious move and it is a bug
 factory: any element whose keyframes start at `opacity: 0` stays invisible forever, and
@@ -241,7 +256,11 @@ Home and a double click restore the starting width). One drag is one step to und
 has: minimise to one line, minimise the whole kind (kept in the layout), close. Closing is for this
 screen only, with an Undo (the toast's one action) and a "hidden in this turn" chip where the card was.
 The approval card, spend warnings and a failed turn's error keep a disabled close button whose tooltip
-says why.
+says why. Two palette commands set every kind at once: "Cards: compact" minimises the tool list, the
+receipt and the browser, "Cards: detailed" opens everything. Neither ever minimises those three
+(`cardPresetActions` in the model checks each kind), and each is one step to undo. The conversation's
+width (narrow / medium / wide, mapped to `max-w-2xl` / `3xl` / `5xl`) is part of the layout too, set
+from Settings › Appearance or the palette, so it travels to the server with the rest.
 
 **Phase 4: docks.** The right panel's sections are panels (`shell/Dock.tsx`) that move between the
 right panel, the left sidebar and a bottom dock that exists only while it holds one. Each has a drag

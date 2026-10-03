@@ -67,6 +67,8 @@ import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
 import { CardChrome, cardId, useCardModes } from "@/components/code/CardChrome";
+import { useLayout } from "@/lib/layout/context";
+import { TRANSCRIPT_WIDTH_CLASS } from "@/lib/layout/model";
 import { NoticeList, type NoticeEntry } from "@/components/code/NoticeList";
 import { VoiceMode, type SpokenAnswer, type SpokenAnnouncement } from "@/components/code/VoiceMode";
 import {
@@ -616,6 +618,9 @@ export function Conversation({
   // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
   // this screen's only; a new conversation screen starts with all of them.
   const cards = useCardModes();
+  // How wide the conversation runs (Settings › Appearance and the palette); medium is the width it
+  // always had. Read from the layout so it travels with the rest of the screen, server included.
+  const transcriptWidth = TRANSCRIPT_WIDTH_CLASS[useLayout().layout.transcriptWidth];
   // Sharing. How many links this conversation has (the live stream is worth holding open only
   // when someone could be on the other end), whether the panel is open, and who is here now.
   const [shareCount, setShareCount] = useState(0);
@@ -1601,7 +1606,7 @@ export function Conversation({
         <div
           role="log"
           aria-busy={busy}
-          className="mx-auto max-w-3xl space-y-3 p-3"
+          className={cn("mx-auto space-y-3 p-3", transcriptWidth)}
         >
           {exchanges.length === 0 && replayed ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">

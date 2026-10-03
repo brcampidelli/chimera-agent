@@ -22,10 +22,10 @@ import { ErrorState } from "@/components/ui/async";
 import { getDoctor } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
-import { PANELS, type PanelId } from "@/lib/layout/model";
+import { PANELS, type PanelId, type TranscriptWidth } from "@/lib/layout/model";
 import { loadMine, saveMine } from "@/lib/layout/store";
 import { useToast } from "@/components/ui/toast";
-import { applyTheme, readTheme, resolveTheme, type Theme } from "@/lib/theme";
+import { AppearanceProvider, useAppearance } from "@/lib/appearance";
 import { readWorkspace, writeWorkspace } from "@/lib/workspace";
 import { useIgnition } from "@/lib/useIgnition";
 
@@ -70,36 +70,12 @@ function Loading({ children }: { children: ReactNode }) {
  */
 export const HEARTBEAT_MS = 5_000;
 
-/**
- * The theme preference, persisted.
- *
- * The inline script in index.html has already painted the right theme by the time this runs; this
- * hook exists so the toggle can change it. `dark` is the *resolved* theme (what is on screen), so
- * the icon always matches reality even while the preference is "system".
- */
-function useTheme() {
-  const [theme, setTheme] = useState<Theme>(readTheme);
-  const [dark, setDark] = useState(() => resolveTheme(readTheme()) === "dark");
-
-  useEffect(() => {
-    setDark(applyTheme(theme) === "dark");
-  }, [theme]);
-
-  useEffect(() => {
-    // Follow the OS while the preference is "system" — someone flipping their system to night mode
-    // mid-session should see the app follow, not wait for a restart.
-    if (theme !== "system" || typeof matchMedia !== "function") return;
-    const mq = matchMedia("(prefers-color-scheme: light)");
-    const onChange = () => setDark(applyTheme("system") === "dark");
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, [theme]);
-
-  // The rail button is a two-state control over a three-state preference: tapping it commits to an
-  // explicit choice, which is what someone reaching for the toggle means. "System" is set in
-  // Settings › Appearance.
-  return { dark, theme, setTheme, toggle: () => setTheme(dark ? "light" : "dark") };
-}
+/** The palette's width commands. Keys written out so the i18n reachability test can see them. */
+const transcriptWidths: { value: TranscriptWidth; key: string }[] = [
+  { value: "narrow", key: "layout.transcript.narrow" },
+  { value: "medium", key: "layout.transcript.medium" },
+  { value: "wide", key: "layout.transcript.wide" },
+];
 
 /**
  * When the backend comes back, tell every other query about it.
@@ -142,9 +118,23 @@ function Framed({ banner, children }: { banner: ReactNode; children: ReactNode }
   );
 }
 
+/**
+ * The app, with its appearance held above it.
+ *
+ * The provider sits here rather than in `main.tsx` so every way of mounting the app — the real one
+ * and each test that mounts it whole — gets the same theme the rail button and Settings agree on.
+ */
 export default function App() {
+  return (
+    <AppearanceProvider>
+      <Workspace />
+    </AppearanceProvider>
+  );
+}
+
+function Workspace() {
   const t = useT();
-  const { dark, toggle } = useTheme();
+  const { dark, toggleTheme: toggle } = useAppearance();
   // The app's one piece of choreography. Runs on cold start only; see useIgnition.
   const ignite = useIgnition();
   // First-run gate: no way to answer (no provider key AND no local model) => show the Onboarding
@@ -225,6 +215,21 @@ export default function App() {
         run: () => void layoutDispatch({ type: "preset", name: "review" }) },
       { id: "layout-monitor", label: t("layout.preset.monitor"), group: t("palette.group.layout"),
         run: () => void layoutDispatch({ type: "preset", name: "monitor" }) },
+      // Every card kind at once, one step to undo. Approval, spend warnings and a failed turn's error
+      // stay open in both (`cardPresetActions` checks each kind); a card's corner still changes one.
+      { id: "layout-cards-compact", label: t("layout.cards.compact"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "card-preset", name: "compact" }) },
+      { id: "layout-cards-detailed", label: t("layout.cards.detailed"), group: t("palette.group.layout"),
+        run: () => void layoutDispatch({ type: "card-preset", name: "detailed" }) },
+      // The conversation's width, offering the two it is not now.
+      ...transcriptWidths
+        .filter((width) => width.value !== layout.transcriptWidth)
+        .map((width) => ({
+          id: `layout-transcript-${width.value}`,
+          label: t(width.key),
+          group: t("palette.group.layout"),
+          run: () => void layoutDispatch({ type: "transcript-width", width: width.value }),
+        })),
       { id: "layout-save-mine", label: t("layout.mine.save"), group: t("palette.group.layout"),
         run: () => {
           if (saveMine(layout)) toast(t("layout.mine.saved"), "ok");
