@@ -21,8 +21,10 @@ import {
   type Attachment,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useDictateKey } from "@/lib/hotkeys";
 import { useI18n, useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { preferredVoiceLang } from "@/lib/voice/speaker";
 
 /** The two ways to put something into a message that is not typing.
  *
@@ -179,6 +181,19 @@ export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) 
   );
 }
 
+/** Whether someone can see this element: it and every ancestor rendered. `checkVisibility` where
+ *  the engine has it (the WebView2 does), else a walk up for `display: none` or `hidden`. */
+function onScreen(el: HTMLElement | null): boolean {
+  if (!el || !el.isConnected) return false;
+  if (typeof el.checkVisibility === "function") return el.checkVisibility({ visibilityProperty: true });
+  for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+    if (node.hidden) return false;
+    const style = getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+  }
+  return true;
+}
+
 export function DictateButton({ onText }: { onText: (text: string) => void }) {
   const { t, lang } = useI18n();
   const recorder = useRef<MediaRecorder | null>(null);
@@ -191,16 +206,62 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   // so "add an API key" would send someone to add the wrong one.
   const support = useQuery({ queryKey: ["dictation"], queryFn: getDictationSupport });
   const unavailable = support.data?.support === "no";
+  /** Asking for the microphone, between the press and the recorder existing. */
+  const opening = useRef(false);
+  /** The chord was let go while the microphone was still being asked for. */
+  const releasedEarly = useRef(false);
+  /** This recording was started by holding the chord, so letting go of it stops it. A recording
+   *  started with the button is not stopped by the release of a hold that started nothing. */
+  const byKey = useRef(false);
+  const button = useRef<HTMLButtonElement | null>(null);
+
+  // Hold the chord to dictate, let go to stop: the button's own start and stop, so the two ways in
+  // cannot drift apart. A keydown is a gesture as much as a click is — the microphone still opens
+  // only when someone asks, never on its own.
+  useDictateKey(
+    () => {
+      if (state !== "idle" || unavailable || opening.current) return;
+      // Mounted is not on screen. The Code screen keeps the conversation mounted under `hidden`
+      // while the viewer is maximised, or while a file is open on a narrow window; a hold there
+      // would open the microphone and type into a draft nobody can see, with the recording
+      // state, the "working" note and any error all hidden with it.
+      if (!onScreen(button.current)) return;
+      byKey.current = true;
+      void start();
+    },
+    () => {
+      if (!byKey.current) return;
+      byKey.current = false;
+      if (recorder.current) stop();
+      else if (opening.current) releasedEarly.current = true;
+    },
+  );
 
   async function start() {
+    // Already asking for the microphone, or already recording: a click landing while a held
+    // chord's request is still out would ask again, overwrite the recorder, and leave the first
+    // one recording with the microphone open for good.
+    if (opening.current || recorder.current) return;
     setNote("");
+    releasedEarly.current = false;
+    opening.current = true;
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
       // Refused permission, or no microphone. Both are "we cannot hear you", and neither is an
       // error the user needs a stack trace for.
+      byKey.current = false;
       setNote(t("code.dictate.noMic"));
+      return;
+    } finally {
+      opening.current = false;
+    }
+    if (releasedEarly.current) {
+      // A tap, not a hold: the key was up before there was anything to record. Give the
+      // microphone straight back rather than record a silence nobody will stop.
+      releasedEarly.current = false;
+      for (const track of stream.getTracks()) track.stop();
       return;
     }
     chunks.current = [];
@@ -226,7 +287,9 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
     // this wait exists exactly once and looks identical to a hang if nobody says why.
     setNote(t("code.dictate.working"));
     try {
-      const result = await transcribe(audio, "speech.webm", lang);
+      // The voice's language from Settings, else the interface's — the hint the transcriber
+      // gets, so a short clip is not guessed into the wrong language.
+      const result = await transcribe(audio, "speech.webm", preferredVoiceLang(lang));
       if (result.text) {
         onText(result.text);
         setNote("");
@@ -247,11 +310,13 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   return (
     <>
       <Button
+        ref={button}
         size="sm"
         variant={state === "recording" ? "primary" : "ghost"}
         disabled={state === "working" || unavailable}
-        title={unavailable ? t("code.dictate.unavailable") : t("code.dictate.hint")}
+        title={unavailable ? t("code.dictate.unavailable") : `${t("code.dictate.hint")} ${t("code.dictate.keyHint")}`}
         aria-pressed={state === "recording"}
+        aria-keyshortcuts="Control+Shift+Space Meta+Shift+Space"
         onClick={() => (state === "recording" ? stop() : void start())}
       >
         {state === "working" ? (

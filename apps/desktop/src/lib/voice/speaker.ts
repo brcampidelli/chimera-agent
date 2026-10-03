@@ -19,6 +19,8 @@
  * and the mode says so on screen instead of pretending.
  */
 
+import { LANGS, type Lang } from "@/lib/i18n";
+
 export interface SpeakerLike {
   available(): boolean;
   /** Queue `text` after whatever is being read; resolves when this piece ends or is cancelled.
@@ -84,6 +86,65 @@ export function setPreferredVoiceName(name: string): void {
   }
 }
 
+/** Where this window keeps how fast the answers are read — a multiple of the engine's own pace.
+ *  Per window for the same reason as the voice: it goes with the voice, not with the account. */
+export const VOICE_RATE_KEY = "chimera.voiceRate";
+
+/** The paces offered. Four steps rather than a slider: a rate between these is not something
+ *  anyone hears the difference of, and a slider invites 0.93. 1 is the engine's normal pace and
+ *  what every window reads at until someone picks another. */
+export const VOICE_RATES = [0.8, 1, 1.25, 1.5] as const;
+
+export function preferredVoiceRate(): number {
+  try {
+    const stored = Number(localStorage.getItem(VOICE_RATE_KEY));
+    // Only an offered step: a value edited by hand to 9 would read faster than anyone can follow.
+    return (VOICE_RATES as readonly number[]).includes(stored) ? stored : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function setPreferredVoiceRate(rate: number): void {
+  try {
+    if (rate === 1) localStorage.removeItem(VOICE_RATE_KEY);
+    else localStorage.setItem(VOICE_RATE_KEY, String(rate));
+  } catch {
+    // a window that will not remember still reads, at the normal pace
+  }
+}
+
+/** Where this window keeps the language the voice speaks and listens in (a two-letter code; ""
+ *  is the interface's). Separate from the interface because the two are different questions: an
+ *  app read in English by someone who dictates in Portuguese is an ordinary setup. */
+export const VOICE_LANG_KEY = "chimera.voiceLang";
+
+/** The language chosen in Settings while the app still offers it, or "" — follow the interface.
+ *  What the Settings card shows; the voice itself asks `preferredVoiceLang`. */
+export function chosenVoiceLang(): Lang | "" {
+  try {
+    const stored = localStorage.getItem(VOICE_LANG_KEY) ?? "";
+    return LANGS.find((l) => l.code === stored)?.code ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** The language the voice uses: the chosen one, otherwise the interface's — which is what every
+ *  window did before there was a choice. */
+export function preferredVoiceLang(appLang: Lang): Lang {
+  return chosenVoiceLang() || appLang;
+}
+
+export function setPreferredVoiceLang(code: Lang | ""): void {
+  try {
+    if (code) localStorage.setItem(VOICE_LANG_KEY, code);
+    else localStorage.removeItem(VOICE_LANG_KEY);
+  } catch {
+    // a window that will not remember follows the interface
+  }
+}
+
 const sameLanguage = (tag: string, locale: string) =>
   tag.toLowerCase().replace("_", "-").split("-")[0] === locale.toLowerCase().split("-")[0];
 
@@ -96,14 +157,25 @@ export function voicesOf(locale: string): SpeechSynthesisVoice[] {
 
 /** The voice that reads: the one chosen by name when the window still has it, else the
  *  highest-scoring voice with the exact tag, else the highest-scoring one of the same language,
- *  else none (the engine's default then reads). Ties keep the list's order. */
+ *  else none (the engine's default then reads). Ties keep the list's order.
+ *
+ *  `sameLanguageOnly`: honour the named voice only while it speaks the language being read. Set
+ *  when a voice language was chosen in Settings — then the language is a decision, and a
+ *  Portuguese voice chosen before it became English would read English with a Portuguese mouth
+ *  while the card (which lists that language's voices only) says "Automatic" over it. Unset, the
+ *  named voice reads whatever its language, as it always did: an Edge "Multilingual" voice
+ *  declares en-US and reads Portuguese well, and someone who picked one and then changed the
+ *  interface's language keeps hearing it. */
 export function pickVoice(
   voices: SpeechSynthesisVoice[],
   locale: string,
   preferred = "",
+  sameLanguageOnly = false,
 ): SpeechSynthesisVoice | null {
   if (preferred) {
-    const named = voices.find((v) => v.name === preferred);
+    const named = voices.find(
+      (v) => v.name === preferred && (!sameLanguageOnly || sameLanguage(v.lang, locale)),
+    );
     if (named) return named;
   }
   const norm = (tag: string) => tag.toLowerCase().replace("_", "-");
@@ -178,7 +250,10 @@ export class BrowserSpeaker implements SpeakerLike {
         if (settled) return;
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = locale;
-        const voice = pickVoice(voices, locale, preferredVoiceName());
+        utterance.rate = preferredVoiceRate();
+        // Strict about the voice's language only once one was chosen — before that, the named
+        // voice reads as it did before there was a choice.
+        const voice = pickVoice(voices, locale, preferredVoiceName(), chosenVoiceLang() !== "");
         if (voice) utterance.voice = voice;
         utterance.onend = done;
         // A cancel fires `error` with `interrupted`/`canceled` — the same ending for the caller.

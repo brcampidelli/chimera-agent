@@ -397,6 +397,11 @@ export interface paths {
          *     listed although its file does not exist yet: the file is written when the agent finishes,
          *     so without this a task started in a new conversation was invisible for exactly as long as it
          *     took to do.
+         *
+         *     Each row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.
+         *     ``archived=true`` lists the archived conversations instead of the others. This is also where
+         *     ``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied — on the look, so no thread has to run for it, and
+         *     never to a conversation working, waiting, with a background work or with a share link open.
          */
         get: operations["list_code_sessions_api_code_sessions_get"];
         put?: never;
@@ -439,6 +444,30 @@ export interface paths {
          *     exactly the state a second click on Clear hits, and it is not an error.
          */
         delete: operations["delete_code_session_api_code_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Code Session
+         * @description Move a conversation out of the list. **Nothing is touched**: no transcript, folder or
+         *     worktree, and a share link keeps working — it is a timestamp beside the transcripts.
+         *
+         *     Refused (409) while a turn or background work of it runs or a question of it waits: the
+         *     archive is a collapsed section, and an agent's state must not be hidden by tidying a list.
+         */
+        post: operations["archive_code_session_api_code_sessions__session_id__archive_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -531,6 +560,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seen Code Session
+         * @description The owner's screen drew this conversation, so its last edits are no longer unseen.
+         *
+         *     Its own route rather than a side effect of reading the conversation: the desktop bridge
+         *     reads conversations too, and an agent reading one is not the owner looking at its diff.
+         *     Not in the bridge's table for the same reason.
+         */
+        post: operations["seen_code_session_api_code_sessions__session_id__seen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/share": {
         parameters: {
             query?: never;
@@ -580,6 +633,26 @@ export interface paths {
         post?: never;
         /** Revoke Share */
         delete: operations["revoke_share_api_code_sessions__session_id__shares__token__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Code Session
+         * @description Bring a conversation back into the list. Idempotent: one already there stays there.
+         */
+        post: operations["unarchive_code_session_api_code_sessions__session_id__unarchive_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4098,6 +4171,19 @@ export interface components {
             path: string;
         };
         /**
+         * CodeSessionArchiveOut
+         * @description A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.
+         *
+         *     Archiving touches no file, folder or worktree — it is a timestamp beside the transcripts. A
+         *     refusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.
+         */
+        CodeSessionArchiveOut: {
+            /** Archived At */
+            archived_at?: number | null;
+            /** Id */
+            id: string;
+        };
+        /**
          * CodeSessionMetaOut
          * @description One row of the coding-conversation list.
          *
@@ -4105,6 +4191,8 @@ export interface components {
          *     be grouped by project instead of being a flat pile of past questions with no owner.
          */
         CodeSessionMetaOut: {
+            /** Archived At */
+            archived_at?: number | null;
             /** Id */
             id: string;
             /**
@@ -4112,6 +4200,12 @@ export interface components {
              * @default false
              */
             running: boolean;
+            /**
+             * State
+             * @default idle
+             * @enum {string}
+             */
+            state: "running" | "waiting" | "failed" | "review" | "idle";
             /** Title */
             title: string;
             /** Turns */
@@ -4146,6 +4240,14 @@ export interface components {
             id: string;
             /** Text */
             text: string;
+        };
+        /**
+         * CodeSessionSeenOut
+         * @description Whether marking a conversation seen changed anything: false when there was nothing unseen.
+         */
+        CodeSessionSeenOut: {
+            /** Changed */
+            changed: boolean;
         };
         /** CodeToolOut */
         CodeToolOut: {
@@ -4712,6 +4814,11 @@ export interface components {
             created_by: string;
             /** Deliver To */
             deliver_to?: string | null;
+            /**
+             * Disabled By
+             * @default
+             */
+            disabled_by: string;
             /** Enabled */
             enabled: boolean;
             /** Id */
@@ -8743,7 +8850,9 @@ export interface operations {
     };
     list_code_sessions_api_code_sessions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8757,6 +8866,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSessionMetaOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -8812,6 +8930,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_code_session_api_code_sessions__session_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionArchiveOut"];
                 };
             };
             /** @description Validation Error */
@@ -8953,6 +9102,37 @@ export interface operations {
             };
         };
     };
+    seen_code_session_api_code_sessions__session_id__seen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionSeenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     share_session_api_code_sessions__session_id__share_post: {
         parameters: {
             query?: never;
@@ -9040,6 +9220,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_code_session_api_code_sessions__session_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionArchiveOut"];
                 };
             };
             /** @description Validation Error */

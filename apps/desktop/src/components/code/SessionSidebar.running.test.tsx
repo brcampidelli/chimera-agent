@@ -6,6 +6,8 @@ import { listCodeSessions, listRunningTurns, type RunningTurn } from "@/lib/api"
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  // The sidebar reads the waiting questions from the cache the status bar polls; none here.
+  getApprovals: vi.fn(async () => []),
   listCodeSessions: vi.fn(),
   listRunningTurns: vi.fn(),
   forkCodeSession: vi.fn(),

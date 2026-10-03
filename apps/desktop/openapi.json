@@ -1849,9 +1849,45 @@
         "title": "CodeProjectOut",
         "type": "object"
       },
+      "CodeSessionArchiveOut": {
+        "description": "A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.\n\nArchiving touches no file, folder or worktree \u2014 it is a timestamp beside the transcripts. A\nrefusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.",
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "CodeSessionArchiveOut",
+        "type": "object"
+      },
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1860,6 +1896,18 @@
             "default": false,
             "title": "Running",
             "type": "boolean"
+          },
+          "state": {
+            "default": "idle",
+            "enum": [
+              "running",
+              "waiting",
+              "failed",
+              "review",
+              "idle"
+            ],
+            "title": "State",
+            "type": "string"
           },
           "title": {
             "title": "Title",
@@ -1946,6 +1994,20 @@
           "bytes"
         ],
         "title": "CodeSessionRawOut",
+        "type": "object"
+      },
+      "CodeSessionSeenOut": {
+        "description": "Whether marking a conversation seen changed anything: false when there was nothing unseen.",
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "title": "CodeSessionSeenOut",
         "type": "object"
       },
       "CodeToolOut": {
@@ -3208,6 +3270,11 @@
               }
             ],
             "title": "Deliver To"
+          },
+          "disabled_by": {
+            "default": "",
+            "title": "Disabled By",
+            "type": "string"
           },
           "enabled": {
             "title": "Enabled",
@@ -11385,8 +11452,20 @@
     },
     "/api/code/sessions": {
       "get": {
-        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.",
+        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.\n\nEach row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.\n``archived=true`` lists the archived conversations instead of the others. This is also where\n``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied \u2014 on the look, so no thread has to run for it, and\nnever to a conversation working, waiting, with a background work or with a share link open.",
         "operationId": "list_code_sessions_api_code_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Archived",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -11401,6 +11480,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "List Code Sessions"
@@ -11486,6 +11575,46 @@
           }
         },
         "summary": "Get Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/archive": {
+      "post": {
+        "description": "Move a conversation out of the list. **Nothing is touched**: no transcript, folder or\nworktree, and a share link keeps working \u2014 it is a timestamp beside the transcripts.\n\nRefused (409) while a turn or background work of it runs or a question of it waits: the\narchive is a collapsed section, and an agent's state must not be hidden by tidying a list.",
+        "operationId": "archive_code_session_api_code_sessions__session_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionArchiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Code Session"
       }
     },
     "/api/code/sessions/{session_id}/fork": {
@@ -11670,6 +11799,46 @@
         "summary": "Raw Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/seen": {
+      "post": {
+        "description": "The owner's screen drew this conversation, so its last edits are no longer unseen.\n\nIts own route rather than a side effect of reading the conversation: the desktop bridge\nreads conversations too, and an agent reading one is not the owner looking at its diff.\nNot in the bridge's table for the same reason.",
+        "operationId": "seen_code_session_api_code_sessions__session_id__seen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionSeenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Seen Code Session"
+      }
+    },
     "/api/code/sessions/{session_id}/share": {
       "post": {
         "description": "A new token for this conversation. One per person, so one can be revoked alone.",
@@ -11816,6 +11985,46 @@
           }
         },
         "summary": "Revoke Share"
+      }
+    },
+    "/api/code/sessions/{session_id}/unarchive": {
+      "post": {
+        "description": "Bring a conversation back into the list. Idempotent: one already there stays there.",
+        "operationId": "unarchive_code_session_api_code_sessions__session_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionArchiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Code Session"
       }
     },
     "/api/code/sessions/{session_id}/works": {

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 /** Cmd on macOS, Ctrl everywhere else. */
 function chord(e: KeyboardEvent): boolean {
@@ -98,4 +98,65 @@ export function useHotkeys({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onPalette, onSettings, onNewChat, onNavigate, onToggleRegion, onFocusMode, onMaximize, onApproval]);
+}
+
+/** Hold to dictate: ⌘⇧Space on macOS, Ctrl+Shift+Space elsewhere — by the physical key, like ⌘B.
+ *
+ *  Not Ctrl+D, the obvious letter: that one is the browser's "bookmark this page", and the app is
+ *  also served to a plain browser tab. Not a bare Ctrl+Space either: on Windows that toggles the
+ *  Chinese and Japanese input methods. Space is the same key on every layout, ABNT2 included. */
+export function isDictateChord(e: KeyboardEvent): boolean {
+  return chord(e) && e.shiftKey && !e.altKey && e.code === "Space";
+}
+
+/** The keys whose release ends a hold: the space bar or any modifier of the chord. A modifier
+ *  counts because macOS sends no keyup for a key released while ⌘ is down — letting go of ⌘ first
+ *  is the only release the window ever hears. */
+function releasesDictation(e: KeyboardEvent): boolean {
+  return e.code === "Space" || e.key === "Shift" || e.key === "Control" || e.key === "Meta";
+}
+
+/**
+ * Push-to-talk inside the window: `onPress` when the dictation chord goes down, `onRelease` when
+ * any key of it comes up — or when the window loses focus mid-hold, because the keyup then goes
+ * to another application and a recording would otherwise run until someone noticed the button.
+ *
+ * The one shortcut besides ⌘K that works while typing, and on purpose: the composer is where
+ * someone is when they want to dictate into it, and dictation appends to the draft rather than
+ * acting on it, so it can destroy nothing. A held key repeats; only the first keydown is a press.
+ *
+ * The handlers are kept in refs so the listener is installed once: re-installing it on every
+ * render would forget, mid-hold, that a hold was in progress — and the release would be lost.
+ */
+export function useDictateKey(onPress: () => void, onRelease: () => void): void {
+  const press = useRef(onPress);
+  const release = useRef(onRelease);
+  press.current = onPress;
+  release.current = onRelease;
+  useEffect(() => {
+    let held = false;
+    function end() {
+      if (!held) return;
+      held = false;
+      release.current();
+    }
+    function down(e: KeyboardEvent) {
+      if (!isDictateChord(e)) return;
+      e.preventDefault();
+      if (e.repeat || held) return;
+      held = true;
+      press.current();
+    }
+    function up(e: KeyboardEvent) {
+      if (held && releasesDictation(e)) end();
+    }
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", end);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", end);
+    };
+  }, []);
 }

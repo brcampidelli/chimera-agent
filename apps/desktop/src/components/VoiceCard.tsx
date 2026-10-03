@@ -2,11 +2,16 @@ import { Volume2 } from "lucide-react";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/lib/i18n";
+import { DICTS, LANGS, useI18n, useNum, type Lang } from "@/lib/i18n";
 import {
   BrowserSpeaker,
+  chosenVoiceLang,
   preferredVoiceName,
+  preferredVoiceRate,
+  setPreferredVoiceLang,
   setPreferredVoiceName,
+  setPreferredVoiceRate,
+  VOICE_RATES,
   voiceScore,
   voicesOf,
 } from "@/lib/voice/speaker";
@@ -24,14 +29,28 @@ import { speechLocale } from "@/lib/voice/speech-text";
  * as the window still has it. The Listen button reads one sentence in the app's language, so the
  * choice is made by ear rather than by name.
  *
+ * Two more rows, kept the same way: how fast the voice reads (four steps, the engine's normal
+ * pace by default) and the language it speaks and listens in — the interface's by default, which
+ * is the only thing it could be before. A separate language is for the person who reads the app in
+ * one language and talks to it in another; it changes which voices are listed, the language each
+ * answer is read in, and the hint dictation sends to the transcriber.
+ *
  * `children` are the rows that belong to the same card but to the server's settings — the model
  * a spoken turn is answered by — rendered by the Settings screen with its own row and field.
  */
 export function VoiceCard({ children }: { children?: ReactNode }) {
   const { t, lang } = useI18n();
+  const num = useNum();
   const headingId = useId();
   const selectId = useId();
-  const locale = useMemo(() => speechLocale(lang), [lang]);
+  const rateId = useId();
+  const langId = useId();
+  // "" is "same as the interface": stored as nothing, so a window keeps following the interface
+  // when the interface changes, rather than freezing the language it had on the day.
+  const [langChoice, setLangChoice] = useState<Lang | "">(() => chosenVoiceLang());
+  const voiceLang = langChoice || lang;
+  const [rate, setRate] = useState<number>(() => preferredVoiceRate());
+  const locale = useMemo(() => speechLocale(voiceLang), [voiceLang]);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>(() => voicesOf(locale));
   const [chosen, setChosen] = useState<string>(() => preferredVoiceName());
   const speaker = useMemo(() => new BrowserSpeaker(), []);
@@ -66,7 +85,7 @@ export function VoiceCard({ children }: { children?: ReactNode }) {
           <div className="text-xs text-muted-foreground">{t("settings.hint.voice")}</div>
           {ranked.length === 0 ? (
             <div className="text-xs text-muted-foreground" data-testid="voice-none">
-              {t("settings.voice.none")}
+              {t(langChoice ? "settings.voice.noneLang" : "settings.voice.none")}
             </div>
           ) : null}
         </div>
@@ -96,13 +115,66 @@ export function VoiceCard({ children }: { children?: ReactNode }) {
             data-testid="voice-listen"
             onClick={() => {
               speaker.cancel();
-              void speaker.speak(t("settings.voice.sample"), locale);
+              // The sentence in the language the voice speaks: a Portuguese voice reading the
+              // English sample would judge nothing.
+              void speaker.speak(DICTS[voiceLang]["settings.voice.sample"] ?? t("settings.voice.sample"), locale);
             }}
           >
             <Volume2 className="h-4 w-4" />
             {t("settings.voice.listen")}
           </Button>
         </div>
+      </div>
+      <div className="flex items-center justify-between gap-4 px-4 py-3">
+        <div className="min-w-0">
+          <label htmlFor={rateId} className="text-sm font-medium">
+            {t("settings.row.voiceRate")}
+          </label>
+          <div className="text-xs text-muted-foreground">{t("settings.hint.voiceRate")}</div>
+        </div>
+        <select
+          id={rateId}
+          className="field h-8 w-72 shrink-0 px-2.5 text-sm"
+          value={String(rate)}
+          data-testid="voice-rate"
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            setRate(next);
+            setPreferredVoiceRate(next);
+          }}
+        >
+          {VOICE_RATES.map((r) => (
+            <option key={r} value={String(r)}>
+              {r === 1 ? t("settings.voice.rateNormal", { rate: num(r) }) : `${num(r)}×`}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center justify-between gap-4 px-4 py-3">
+        <div className="min-w-0">
+          <label htmlFor={langId} className="text-sm font-medium">
+            {t("settings.row.voiceLang")}
+          </label>
+          <div className="text-xs text-muted-foreground">{t("settings.hint.voiceLang")}</div>
+        </div>
+        <select
+          id={langId}
+          className="field h-8 w-72 shrink-0 px-2.5 text-sm"
+          value={langChoice}
+          data-testid="voice-lang"
+          onChange={(e) => {
+            const next = e.target.value as Lang | "";
+            setLangChoice(next);
+            setPreferredVoiceLang(next);
+          }}
+        >
+          <option value="">{t("settings.voice.langSame")}</option>
+          {LANGS.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.label}
+            </option>
+          ))}
+        </select>
       </div>
       {children}
       </div>

@@ -10,6 +10,7 @@ import { LayoutServerSync } from "@/lib/layout/sync";
 import { FloatWindow } from "@/components/shell/FloatWindow";
 import { ConversationWindow } from "@/components/code/ConversationWindow";
 import { conversationFrom, floatPanelFrom } from "@/lib/float/protocol";
+import { installFocusBeacon } from "@/lib/notify";
 import { followStoredAppearance } from "@/lib/theme";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
@@ -41,6 +42,10 @@ const conversation = conversationFrom(window.location.search);
 // Neither window mounts the appearance provider (App does), so each follows the main window's
 // theme, text size and fonts through storage instead of keeping the ones it loaded with.
 if (conversation || floating) followStoredAppearance();
+
+// Every window, whatever it draws: a notification is held back while ANY Chimera window has focus,
+// and each window learns that from the one that has it (see `windowIsWatched`).
+installFocusBeacon();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

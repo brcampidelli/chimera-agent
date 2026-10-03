@@ -3338,9 +3338,10 @@ def acp_server(
 ) -> None:
     """Serve Chimera to an editor over the Agent Client Protocol (stdio).
 
-    The mirror of what `chimera code --provider claude` does: there we drive somebody else's agent,
-    here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at `chimera acp` and the
-    loop, the verifier and the receipt are available without installing a second tool.
+    The mirror of what a Code-screen turn with `provider: claude` does: there we drive somebody
+    else's agent, here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at
+    `chimera acp` and the loop, the verifier and the receipt are available without installing a
+    second tool.
 
     Nothing on this path may write to stdout — it IS the protocol. A stray print corrupts the frame
     the editor is parsing, and the symptom is an editor that hangs rather than output in the wrong
@@ -3674,6 +3675,7 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
 
     from chimera.governance.ledger_tool import fence
     from chimera.scheduler import Scheduler
+    from chimera.scheduler.weekly_review import builtin_of
     from chimera.server import InboundMessage
 
     scheduler = Scheduler(_cron_store())
@@ -3690,6 +3692,13 @@ def _webhook_handler(gateway: MessageGateway) -> Any:
                 raise ValueError(
                     f"webhook job {job.name!r} sets tools/notify, which the webhook path does not "
                     "apply; refusing to run it with every tool"
+                )
+            if builtin_of(job):
+                # A builtin (the weekly review) is computed by code and only `make_run_job` knows
+                # how. Here its action text would reach the gateway's model as a prompt — the one
+                # thing a builtin exists not to do. Only a hand edit of jobs.json gets here.
+                raise ValueError(
+                    f"webhook job {job.name!r} names a builtin, which only the cron daemon runs"
                 )
             prompt = job.action
             if payload:
@@ -6324,6 +6333,9 @@ app.command("decide")(_decide)
 from chimera.cli.review_cmd import review as _review  # noqa: E402
 
 app.command("review")(_review)
+from chimera.cli.code_cmd import code_app  # noqa: E402
+
+app.add_typer(code_app, name="code")
 
 
 # --- cron subcommands ---------------------------------------------------------
@@ -6917,6 +6929,91 @@ def cron_learn(
         else:
             console.print(f"  [dim]skipped[/dim] {proposal.name}")
     console.print(f"created {created} cron(s) of {len(proposals)} proposed.")
+
+
+# --- report subcommands -------------------------------------------------------
+
+report_app = typer.Typer(
+    help="Reports counted by code from this home's own logs — no model call.",
+    no_args_is_help=True,
+)
+app.add_typer(report_app, name="report")
+
+
+@report_app.command("weekly")
+def report_weekly(
+    print_now: bool = typer.Option(
+        False, "--print",
+        help="Print the last 7 days' review now instead of proposing the weekly job. Reads only.",
+    ),
+    deliver_to: str | None = typer.Option(
+        None, "--deliver-to",
+        help="Chat webhook URL (Discord or Slack) the weekly job posts to. Stored on the proposal; "
+             "never printed in full.",
+    ),
+    lang: str | None = typer.Option(
+        None, "--lang",
+        help="pt or en. Default: the owner's identity language (Portuguese unless it names another).",
+    ),
+) -> None:
+    """Weekly review: spend, runs, approvals and failing jobs over the last 7 days.
+
+    Every number is computed by code from the same logs the app's screens read (`usage.jsonl`,
+    `runs.jsonl`, `approvals/history.jsonl`, `scheduler/jobs.json`); no model writes or restates
+    any of them. Without `--print` this registers the weekly job — Mondays 09:00, DISABLED — once:
+    it runs only after `chimera cron enable <id>`, and posts only where `--deliver-to` says.
+    """
+    import time
+
+    from chimera.scheduler import Scheduler
+    from chimera.scheduler.delivery import webhook_host_only
+    from chimera.scheduler.weekly_review import (
+        Lang,
+        build_weekly_review,
+        owner_lang,
+        propose,
+        render_weekly_review,
+        valid_webhook,
+    )
+
+    escolhida: Lang | None
+    if lang is None:
+        escolhida = None
+    elif lang in ("pt", "en"):
+        escolhida = "pt" if lang == "pt" else "en"
+    else:
+        console.print("[red]--lang must be pt or en[/red]")
+        raise typer.Exit(code=1)
+
+    settings = get_settings()
+    if print_now:
+        if deliver_to is not None:
+            console.print("[red]--deliver-to is for the weekly job; --print only prints[/red]")
+            raise typer.Exit(code=1)
+        texto = render_weekly_review(
+            build_weekly_review(settings.home), escolhida or owner_lang(settings.home)
+        )
+        # Plain print, not rich: the text carries backticks and brackets that rich would read as
+        # markup, and a number must reach the reader exactly as it was computed.
+        print(texto)
+        return
+
+    destino = (deliver_to or "").strip() or None
+    if destino is not None and not valid_webhook(destino):
+        console.print("[red]--deliver-to must be an http(s) webhook URL with a host[/red]")
+        raise typer.Exit(code=1)
+    job, created = propose(
+        Scheduler(_cron_store()), now=time.time(), deliver_to=destino, lang=escolhida
+    )
+    estado = "enabled" if job.enabled else "disabled"
+    verbo = "proposed" if created else "already proposed"
+    console.print(f"[green]{verbo}[/green] job {job.id} ({job.name}, '{job.schedule}', {estado})")
+    console.print(
+        f"  posts to: {webhook_host_only(job.deliver_to) if job.deliver_to else 'nowhere yet — the result log only'}"
+    )
+    if not job.enabled:
+        console.print(f"  [dim]switch it on with: chimera cron enable {job.id}[/dim]")
+    console.print("  [dim]see what it would say: chimera report weekly --print[/dim]")
 
 
 # --- mcp subcommands ----------------------------------------------------------

@@ -606,7 +606,15 @@ def answer_stats(home: Path) -> dict[str, Any]:
     is not an answer. ``p50``/``p90`` are seconds-to-answer over the answered ones only, and are
     ``None`` until there is something to measure — a rate of zero over zero questions is not a rate.
     """
-    rows = history(home)
+    return summarize_answers(history(home))
+
+
+def summarize_answers(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """:func:`answer_stats` over any subset of the history — a week of it, for the weekly review.
+
+    One function, so the review's approval figures and the line ``chimera approve`` prints cannot
+    be computed two ways: they differ only in which rows they were given.
+    """
     answered = [r for r in rows if r.get("outcome") in ("approved", "refused")]
     times = sorted(
         float(r["seconds_to_answer"]) for r in answered if r.get("seconds_to_answer") is not None

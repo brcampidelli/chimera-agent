@@ -331,12 +331,16 @@ question a person actually has, or a feature you want them to notice.
 | `⌘⇧F` | focus mode on and off |
 | `⌘⇧M` | maximise the panel that holds focus, or restore the maximised one |
 | `⌘⇧A` | go to the approval waiting in the conversation |
+| `⌘⇧Space` (hold) | dictate into the composer while held, by the physical key; release to stop. Only where the composer and its Dictate button are on screen — visible, not just mounted: a composer kept under a maximised viewer does not listen. Not `⌘D`, the browser's bookmark |
 | `Esc` | restore a maximised panel, from anywhere (a menu or dialog open first takes it) |
 
 The palette is what makes a five-icon rail cost nothing in reach: the long tail lives there instead
 of on screen.
 
-**Every shortcut except `⌘K` is suppressed while the user is typing.** `⌘N` inside the composer
-would discard a half-written message, and a shortcut that destroys work is worse than no shortcut.
-`⌘K` is the deliberate exception — a palette exists to be reachable without moving your hands, and
-it opens *over* the field rather than acting on it.
+**Every shortcut except `⌘K` and the dictation hold is suppressed while the user is typing.** `⌘N`
+inside the composer would discard a half-written message, and a shortcut that destroys work is worse
+than no shortcut. `⌘K` is the deliberate exception — a palette exists to be reachable without moving
+your hands, and it opens *over* the field rather than acting on it. Dictation is the other, for the
+same kind of reason: the composer is where you are when you want to dictate into it, and it appends
+to the draft rather than acting on it. Holding the chord is a gesture like clicking Dictate; the
+microphone still never opens on its own.
