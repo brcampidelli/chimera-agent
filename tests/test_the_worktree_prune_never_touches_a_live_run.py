@@ -82,12 +82,14 @@ def age(path: Path) -> None:
     os.utime(path, (old, old))
 
 
-def as_if_another_process_made_it(tree: GitWorktree, pid: int, created: float) -> None:
-    """This process forgets the worktree, and its owner record names someone else."""
+def as_if_another_process_made_it(tree: GitWorktree, pid: int, **record: object) -> None:
+    """This process forgets the worktree, and its owner record names someone else — written the way
+    `_write_owner` writes it for that process, with ``record`` overriding any field."""
     wt._live_here.discard(tree.path.resolve())
     admin = wt._admin_dir(tree.path)
     assert admin is not None
-    (admin / OWNER_FILE).write_text(json.dumps({"pid": pid, "created": created}), encoding="utf-8")
+    owner = {"pid": pid, "created": time.time(), **wt.process_identity(pid), **record}
+    (admin / OWNER_FILE).write_text(json.dumps(owner), encoding="utf-8")
     age(tree.path)
 
 
@@ -116,8 +118,7 @@ def test_a_run_in_another_process_is_left_while_that_process_lives_and_collected
     (tree.path / "work-in-progress.txt").write_text("unsaved\n", encoding="utf-8")
     child = sleeper()
     try:
-        # A moment after the child started: the record a real maker writes once it has the worktree.
-        as_if_another_process_made_it(tree, child.pid, time.time() + 2)
+        as_if_another_process_made_it(tree, child.pid)
         assert classify_worktree_dir(tree.path).state == "live"
         assert prune_worktree_dirs()["removed"] == 0
         assert (tree.path / "work-in-progress.txt").exists(), "a live run's edits were deleted"
@@ -135,11 +136,71 @@ def test_a_run_in_another_process_is_left_while_that_process_lives_and_collected
 
 
 def test_a_reused_pid_does_not_keep_a_dead_run_alive(repo: Path) -> None:
-    """The pid is running — but that process started after the worktree was made, so it is not the
-    one that made it."""
+    """The pid is running — but it runs another program, started at another time: not the maker."""
     tree = GitWorktree.create(repo)
-    as_if_another_process_made_it(tree, os.getpid(), created=time.time() - 10 * 24 * 3600)
+    as_if_another_process_made_it(
+        tree,
+        os.getpid(),
+        started=time.time() - 10 * 24 * 3600,
+        exe=str(Path(tempfile.gettempdir()) / "some-other-program.exe"),
+        cmdline=["some-other-program", "--serve"],
+    )
     assert classify_worktree_dir(tree.path).reason == "owner_gone"
+
+
+@pytest.mark.parametrize("skew", [-5.0, 5.0])
+def test_a_clock_that_jumped_does_not_make_a_live_maker_look_dead(
+    skew: float, repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding, reproduced: the maker's start time (psutil) was compared with the WALL CLOCK
+    when the worktree was made, within one second. A wall clock stepped back five seconds made a live
+    run read as a reused pid, and the prune deleted its edits with the run still going.
+
+    Both shapes of the jump: the record's wall-clock time off by five seconds, and the OS start time
+    itself shifted (Linux/WSL compute it from boot time, which moves with the clock). The maker is
+    alive and runs the same program; the worktree may be live or kept, never collected."""
+    import psutil
+
+    tree = GitWorktree.create(repo)
+    (tree.path / "wip.txt").write_text("unsaved\n", encoding="utf-8")
+    child = sleeper()
+    try:
+        as_if_another_process_made_it(tree, child.pid, created=time.time() - skew)
+        real = psutil.Process.create_time
+        monkeypatch.setattr(psutil.Process, "create_time", lambda self: real(self) + skew)
+
+        state = classify_worktree_dir(tree.path)
+        assert state.state in ("live", "kept"), state
+        assert prune_worktree_dirs()["removed"] == 0
+        assert (tree.path / "wip.txt").exists(), "a live run's edits were deleted"
+    finally:
+        child.kill()
+        child.wait(30)
+        shutil.rmtree(tree.path, ignore_errors=True)
+
+
+def test_the_same_program_with_a_disagreeing_start_time_is_kept_not_guessed_dead(repo: Path) -> None:
+    """A clock jump and a pid reused by another copy of the same program look the same from here.
+    Nothing says which, so the worktree is kept — the cost is disk, the other cost is a run's work."""
+    tree = GitWorktree.create(repo)
+    as_if_another_process_made_it(tree, os.getpid(), started=time.time() - 10 * 24 * 3600)
+    state = classify_worktree_dir(tree.path)
+    assert (state.state, state.reason) == ("kept", "owner_uncertain")
+
+
+def test_the_owner_record_carries_the_os_start_time_of_its_maker(repo: Path) -> None:
+    import psutil
+
+    tree = GitWorktree.create(repo)
+    try:
+        admin = wt._admin_dir(tree.path)
+        assert admin is not None
+        owner = json.loads((admin / OWNER_FILE).read_text(encoding="utf-8"))
+        assert owner["pid"] == os.getpid()
+        assert owner["started"] == psutil.Process(os.getpid()).create_time()
+        assert owner["exe"] and owner["cmdline"]
+    finally:
+        tree.remove()
 
 
 def test_a_worktree_with_no_owner_record_is_kept_not_guessed_dead(repo: Path) -> None:
@@ -193,7 +254,7 @@ def test_the_first_run_in_one_repository_leaves_a_long_run_in_another_alone(tmp_
         (tree_b.path / "edit.txt").write_text("in progress\n", encoding="utf-8")
         # Aged last: a write updates the folder's time, and a fresh folder is protected by the
         # creation window rather than by the rule this test is about.
-        as_if_another_process_made_it(tree_b, child.pid, time.time() + 2)
+        as_if_another_process_made_it(tree_b, child.pid)
 
         prune_orphans(repo_a)
 

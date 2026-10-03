@@ -21,7 +21,7 @@ from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, TypeVar
+from typing import Any, Literal, TypeVar
 
 from chimera.core.checkpoint import _IGNORE_DIRS
 from chimera.telemetry import get_logger
@@ -217,37 +217,93 @@ def _admin_dir(path: Path) -> Path | None:
     return admin
 
 
+#: Two readings of one process's start time, both from the OS, agree to well within this. Wider than
+#: the float rounding psutil does on its own, and far narrower than any pid reuse could be.
+_SAME_START_SECONDS = 2.0
+
+
+def process_identity(pid: int) -> dict[str, Any]:
+    """What identifies the process ``pid`` beyond its number: its start time AS THE OS REPORTS IT,
+    its executable and its command line. Whatever cannot be read is left out, never guessed."""
+    try:
+        import psutil
+    except ImportError:
+        return {}
+    identity: dict[str, Any] = {}
+    try:
+        proc = psutil.Process(pid)
+        identity["started"] = float(proc.create_time())
+    except (psutil.Error, OSError):
+        return identity
+    with suppress(psutil.Error, OSError):
+        identity["exe"] = proc.exe()
+    with suppress(psutil.Error, OSError):
+        identity["cmdline"] = list(proc.cmdline())
+    return identity
+
+
 def _write_owner(path: Path) -> None:
     """Record which process made this worktree. Best-effort: a run is not refused for this, and a
-    worktree without the record is simply never collected by anything but its own `remove`."""
+    worktree without the record is simply never collected by anything but its own `remove`.
+
+    ``created`` is the wall clock and is kept for a person reading the file; it is never compared
+    with anything. Liveness is judged on ``started``, this process's start time read from the same
+    source the check will read it from later — see :func:`_owner_state`.
+    """
     admin = _admin_dir(path)
     if admin is None:
         return
+    record = {"pid": os.getpid(), "created": time.time(), **process_identity(os.getpid())}
     with suppress(OSError):
-        (admin / OWNER_FILE).write_text(
-            json.dumps({"pid": os.getpid(), "created": time.time()}), encoding="utf-8"
-        )
+        (admin / OWNER_FILE).write_text(json.dumps(record), encoding="utf-8")
 
 
-def _process_alive(pid: int, created: float) -> bool | None:
-    """Whether the process that made a worktree at ``created`` is still running; None if unknown.
+OwnerState = Literal["running", "gone", "unknown", "uncertain"]
+
+
+def _owner_state(owner: dict[str, Any]) -> OwnerState:
+    """Whether the process recorded in ``owner`` is still the one running under its pid.
+
+    ``gone`` is the only answer that lets a worktree be collected, so it is given only on evidence:
+    no process has the pid, or the process that has it is visibly a different program (another
+    executable or command line). It used to be decided by comparing the process's start time from
+    psutil with the WALL CLOCK at the moment the worktree was made, within one second — two clocks.
+    A wall clock that stepped back after the backend started (a w32time correction, a dual-boot
+    machine whose RTC is in UTC, a resumed VM) made a live maker look like a reused pid, and the
+    prune deleted a working run's checkout. Reproduced in review with the record five seconds off.
+
+    Now both sides are psutil's ``create_time``. On Windows that is the kernel's fixed creation
+    stamp and does not move; on Linux/WSL it is boot time plus ticks and moves WITH a clock jump, so
+    a mismatch alone is not proof either — it is ``uncertain`` unless the program differs.
 
     Not ``os.kill(pid, 0)``: on Windows signal 0 is CTRL_C_EVENT, and that call would interrupt the
-    process it was asking about. A pid whose process started AFTER the worktree was made has been
-    reused by somebody else — the maker is gone. A process we may not inspect is counted as alive:
-    the cost of keeping a dead run's checkout is disk, the cost of the opposite is someone's work.
+    process it was asking about. A process we may not inspect is counted as running: the cost of
+    keeping a dead run's checkout is disk, the cost of the opposite is someone's work.
     """
     try:
         import psutil
     except ImportError:
-        return None
+        return "unknown"
     try:
-        started = float(psutil.Process(pid).create_time())
+        proc = psutil.Process(int(owner["pid"]))
+        started = float(proc.create_time())
     except psutil.NoSuchProcess:
-        return False
+        return "gone"
     except (psutil.Error, OSError):
-        return True
-    return started <= created + 1.0
+        return "running"
+    recorded = owner.get("started")
+    if isinstance(recorded, int | float) and abs(started - float(recorded)) <= _SAME_START_SECONDS:
+        return "running"
+    try:
+        if "exe" in owner and os.path.normcase(proc.exe()) != os.path.normcase(str(owner["exe"])):
+            return "gone"
+        if "cmdline" in owner and list(proc.cmdline()) != list(owner["cmdline"]):
+            return "gone"
+    except psutil.NoSuchProcess:
+        return "gone"
+    except (psutil.Error, OSError, TypeError):
+        return "uncertain"
+    return "uncertain"
 
 
 WorktreeState = Literal["live", "orphan", "kept"]
@@ -259,7 +315,8 @@ class WorktreeDir:
 
     ``live`` and ``kept`` are never touched; only ``orphan`` is. ``kept`` is the honest third
     answer — a worktree whose maker cannot be identified (made by a version that recorded no
-    owner, or on a machine where processes cannot be inspected) is not called dead on a guess.
+    owner, on a machine where processes cannot be inspected, or whose pid runs the same program
+    with a start time that disagrees with the record) is not called dead on a guess.
     ``reason`` is a fixed word, so a screen can translate it.
     """
 
@@ -286,15 +343,19 @@ def classify_worktree_dir(path: Path, *, now: float | None = None) -> WorktreeDi
         return WorktreeDir(path, "orphan", "unregistered", False)
     try:
         owner = json.loads((admin / OWNER_FILE).read_text(encoding="utf-8"))
-        pid, created = int(owner["pid"]), float(owner["created"])
+        if not isinstance(owner, dict):
+            raise TypeError("owner record is not an object")
+        int(owner["pid"])
     except (OSError, ValueError, KeyError, TypeError):
         return WorktreeDir(path, "kept", "no_owner", True)
-    alive = _process_alive(pid, created)
-    if alive is None:
-        return WorktreeDir(path, "kept", "owner_unknown", True)
-    if alive:
+    owner_state = _owner_state(owner)
+    if owner_state == "running":
         return WorktreeDir(path, "live", "owner_running", True)
-    return WorktreeDir(path, "orphan", "owner_gone", True)
+    if owner_state == "gone":
+        return WorktreeDir(path, "orphan", "owner_gone", True)
+    # `unknown`: processes cannot be inspected here. `uncertain`: the pid runs the same program but
+    # its start time disagrees with the record — a clock jump or a reuse, and nothing says which.
+    return WorktreeDir(path, "kept", f"owner_{owner_state}", True)
 
 
 def _remove_registered(path: Path, admin: Path) -> None:
