@@ -21,6 +21,7 @@ or rotate its own token.
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -36,6 +37,22 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
 
 _log = get_logger("api.access")
+
+
+class AccessServerOut(BaseModel):
+    """The app's own listener: where ``chimera desktop`` bound it.
+
+    ``chimera desktop --host 0.0.0.0`` is a supported option, and then the guest app mounted at
+    ``/guest`` on this listener answers the network with any share link — a network door the card
+    used to call "Closed" because it looked only at the separate LAN listener."""
+
+    bind: str | None = None
+    """The host the app listens on; None when this process was not started by ``chimera desktop``
+    (a test, or an app embedded elsewhere) and so does not know."""
+    port: int | None = None
+    network: bool = False
+    """True when ``bind`` is not a loopback address: a machine on the network can reach this
+    listener, the share links under ``/guest`` included."""
 
 
 class AccessServerTokenOut(BaseModel):
@@ -93,6 +110,7 @@ class AccessGuestDoorOut(BaseModel):
 
 
 class AccessOut(BaseModel):
+    server: AccessServerOut
     server_token: AccessServerTokenOut
     bridge: AccessBridgeOut
     sharing: AccessSharingOut
@@ -118,6 +136,33 @@ def _bridge_out(bridge: DesktopBridge, settings: Settings) -> dict[str, Any]:
     }
 
 
+#: Where the app's listener is bound, as ``(host, port)``; None when nobody said.
+BoundAddress = Callable[[], tuple[str, int] | None]
+
+
+def _unbound() -> tuple[str, int] | None:
+    return None
+
+
+def is_loopback_host(host: str) -> bool:
+    """Whether a bind host reaches only this machine. A name other than ``localhost`` is not
+    assumed to: the card would rather call a door open than call an open one shut."""
+    if host.strip().lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip().strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
+def _server_out(bound: BoundAddress) -> dict[str, Any]:
+    address = bound()
+    if address is None:
+        return {"bind": None, "port": None, "network": False}
+    host, port = address
+    return {"bind": host, "port": port, "network": not is_loopback_host(host)}
+
+
 def _link_out(share: Share, titles: dict[str, str]) -> dict[str, Any]:
     return {
         "id": share.id,
@@ -141,8 +186,12 @@ def register_access_api(
     door: GuestServer,
     live_settings: Callable[[], Settings],
     session_titles: Callable[[], dict[str, str]] = dict,
+    bound: BoundAddress = _unbound,
 ) -> None:
-    """Mount ``/api/security/access`` and its narrowing controls behind the server's guard."""
+    """Mount ``/api/security/access`` and its narrowing controls behind the server's guard.
+
+    ``bound`` reports where the app's own listener is bound — read per request, because the CLI
+    binds the socket after the app is built."""
 
     def _titles() -> dict[str, str]:
         # A title is a nicety on this card, not a reason for it to fail: a conversation file that
@@ -159,6 +208,7 @@ def register_access_api(
         settings = live_settings()
         titles = _titles()
         return {
+            "server": _server_out(bound),
             "server_token": {"set": bool(settings.server_token)},
             "bridge": _bridge_out(bridge, settings),
             "sharing": {

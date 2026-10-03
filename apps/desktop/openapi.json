@@ -187,6 +187,9 @@
             "title": "Links",
             "type": "array"
           },
+          "server": {
+            "$ref": "#/components/schemas/AccessServerOut"
+          },
           "server_token": {
             "$ref": "#/components/schemas/AccessServerTokenOut"
           },
@@ -195,6 +198,7 @@
           }
         },
         "required": [
+          "server",
           "server_token",
           "bridge",
           "sharing",
@@ -228,6 +232,40 @@
           "revoked"
         ],
         "title": "AccessRevokedOut",
+        "type": "object"
+      },
+      "AccessServerOut": {
+        "description": "The app's own listener: where ``chimera desktop`` bound it.\n\n``chimera desktop --host 0.0.0.0`` is a supported option, and then the guest app mounted at\n``/guest`` on this listener answers the network with any share link \u2014 a network door the card\nused to call \"Closed\" because it looked only at the separate LAN listener.",
+        "properties": {
+          "bind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bind"
+          },
+          "network": {
+            "default": false,
+            "title": "Network",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          }
+        },
+        "title": "AccessServerOut",
         "type": "object"
       },
       "AccessServerTokenOut": {

@@ -30,6 +30,7 @@ vi.mock("@/lib/api", () => ({
 
 function access(over: Record<string, unknown> = {}) {
   return {
+    server: { bind: "127.0.0.1", port: 8765, network: false },
     server_token: { set: false },
     bridge: { enabled: false, active: false, tier: null, hint: "" },
     sharing: { enabled: true, expiry_hours: null },
@@ -139,6 +140,34 @@ describe("the access card", () => {
     expect(await screen.findByText(/Open on port 8123/)).toBeInTheDocument();
     await userEvent.setup().click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(closeNetworkShare).toHaveBeenCalledTimes(1));
+  });
+
+  it("calls the app's own listener a network door when it is bound to the network", async () => {
+    // `chimera desktop --host 0.0.0.0`: the guest app at /guest answers the network with any link,
+    // with the separate LAN door shut. "Closed" here was the one false line on the card.
+    vi.mocked(getAccess).mockResolvedValue(
+      access({ server: { bind: "0.0.0.0", port: 8765, network: true } }),
+    );
+    renderWithProviders(<AccessCard />);
+    expect(
+      await screen.findByText(
+        "Open: the app itself listens on 0.0.0.0:8765, so a machine on your network can open any share link through it.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Closed. Share links open only from this computer.")).toBeNull();
+    // Nothing on the card can close the app's own listener, so no Close is offered for it.
+    expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
+  });
+
+  it("does not say a set bearer keeps the programs on this computer out", async () => {
+    // The page `/` hands the token to any loopback client that loads it, so "every route asks for
+    // it" read as a lock against local programs that it is not.
+    vi.mocked(getAccess).mockResolvedValue(access({ server_token: { set: true } }));
+    renderWithProviders(<AccessCard />);
+    expect(
+      await screen.findByText(/hands it to any program on this computer that loads that page/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Every route of the app asks for it/)).toBeNull();
   });
 
   it("names the sharing state: off, and on with an expiry", async () => {

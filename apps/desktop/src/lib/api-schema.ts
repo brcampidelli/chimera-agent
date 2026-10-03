@@ -3464,6 +3464,7 @@ export interface components {
             guest_door: components["schemas"]["AccessGuestDoorOut"];
             /** Links */
             links: components["schemas"]["AccessLinkOut"][];
+            server: components["schemas"]["AccessServerOut"];
             server_token: components["schemas"]["AccessServerTokenOut"];
             sharing: components["schemas"]["AccessSharingOut"];
         };
@@ -3476,6 +3477,25 @@ export interface components {
         AccessRevokedOut: {
             /** Revoked */
             revoked: number;
+        };
+        /**
+         * AccessServerOut
+         * @description The app's own listener: where ``chimera desktop`` bound it.
+         *
+         *     ``chimera desktop --host 0.0.0.0`` is a supported option, and then the guest app mounted at
+         *     ``/guest`` on this listener answers the network with any share link — a network door the card
+         *     used to call "Closed" because it looked only at the separate LAN listener.
+         */
+        AccessServerOut: {
+            /** Bind */
+            bind?: string | null;
+            /**
+             * Network
+             * @default false
+             */
+            network: boolean;
+            /** Port */
+            port?: number | null;
         };
         /**
          * AccessServerTokenOut

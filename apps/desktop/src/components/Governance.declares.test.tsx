@@ -18,6 +18,7 @@ vi.mock("@/lib/api", () => ({
   // The screen also mounts the access card (`AccessCard.tsx`, tested on its own); an empty
   // machine keeps it out of the way of the panels this file is about.
   getAccess: vi.fn(async () => ({
+    server: { bind: "127.0.0.1", port: 8765, network: false },
     server_token: { set: false },
     bridge: { enabled: false, active: false, tier: null, hint: "" },
     sharing: { enabled: true, expiry_hours: null },

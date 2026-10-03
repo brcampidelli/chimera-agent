@@ -2364,6 +2364,8 @@ def build_api_app(
         door=app.state.guest_server,
         live_settings=live_settings,
         session_titles=app.state.code_session_titles,
+        # Set by `chimera desktop` once its socket is bound (after this app is built).
+        bound=lambda: getattr(app.state, "bound_address", None),
     )
 
     if static_dir is not None:

@@ -100,6 +100,21 @@ function bridgeState(data: AccessState["bridge"], t: TFunc): string {
   return data.enabled ? t("governance.access.bridgeWaiting") : t("governance.access.bridgeOff");
 }
 
+/** The network door in a sentence. Two listeners can answer the network with a share link: the LAN
+ *  door opened from a Share dialog, and the app's own listener when `chimera desktop --host` bound
+ *  it to a network address — in which case the guest app at `/guest` is on the network too, and
+ *  "Closed" would be the one false thing on a card about every way in. */
+function doorState(data: AccessState, t: TFunc): string {
+  if (data.guest_door.open) {
+    return t("governance.access.doorOpen", { port: data.guest_door.port ?? "" });
+  }
+  if (data.server.network) {
+    const address = data.server.port ? `${data.server.bind}:${data.server.port}` : data.server.bind;
+    return t("governance.access.doorAppOnNetwork", { address: address ?? "" });
+  }
+  return t("governance.access.doorClosed");
+}
+
 function sharingState(data: AccessState["sharing"], t: TFunc): string {
   if (!data.enabled) return t("governance.access.sharingOff");
   return data.expiry_hours
@@ -197,12 +212,8 @@ export function AccessCard({ onOpenSettings }: { onOpenSettings?: () => void }) 
       />
       <DoorRow
         label={t("governance.access.door")}
-        state={
-          data.guest_door.open
-            ? t("governance.access.doorOpen", { port: data.guest_door.port ?? "" })
-            : t("governance.access.doorClosed")
-        }
-        warn={data.guest_door.open}
+        state={doorState(data, t)}
+        warn={data.guest_door.open || data.server.network}
         action={
           data.guest_door.open ? (
             <Button
