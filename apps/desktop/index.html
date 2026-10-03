@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Chimera</title>
     <!--
-      Resolve theme + motion BEFORE first paint. React sets these in an effect, which runs after the
+      Resolve theme, motion, text size and fonts BEFORE first paint. React sets these in an effect, which runs after the
       first frame — so without this the app painted dark, then flipped. Kept inline and dependency-
       free on purpose: an external file would be one more round-trip in front of the flash it exists
       to prevent. Storage keys are mirrored in src/lib/theme.ts and asserted equal by theme.test.ts.
@@ -31,6 +31,13 @@
         var m = pick("chimera.motion", ["full", "reduced", "system"], "system");
         // Only stamp an explicit override; "system" leaves the CSS media query in charge.
         if (m !== "system") d.dataset.motion = m;
+        // Text size and fonts, the same way: a default stamps nothing, so it is today's page.
+        var s = pick("chimera.textSize", ["small", "medium", "large"], "medium");
+        if (s !== "medium") d.dataset.textSize = s;
+        var f = pick("chimera.font", ["system", "serif", "dyslexic"], "system");
+        if (f !== "system") d.dataset.font = f;
+        var c = pick("chimera.codeFont", ["default", "cascadia", "jetbrains"], "default");
+        if (c !== "default") d.dataset.fontCode = c;
       })();
     </script>
   </head>

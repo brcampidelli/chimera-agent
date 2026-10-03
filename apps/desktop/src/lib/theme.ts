@@ -1,8 +1,10 @@
 /**
- * Theme and motion preferences.
+ * Appearance preferences: theme, motion, text size and the two fonts.
  *
- * Both are three-state (`system` | explicit | explicit) and both are written to the `<html>` element
- * as data attributes, because CSS needs to see them and CSS cannot read React state.
+ * Each is a small closed set with one default, and each is written to the `<html>` element as a
+ * data attribute, because CSS needs to see them and CSS cannot read React state. React reaches them
+ * through `AppearanceProvider` (`lib/appearance.tsx`), so the rail's theme button and the rows in
+ * Settings › Appearance read and change the same value.
  *
  * The same resolution runs twice: once in the inline script in `index.html` (before first paint, so
  * there is no flash) and once here (so React can change it at runtime). That duplication is
@@ -84,4 +86,64 @@ export function applyMotion(motion: Motion): void {
   if (motion === "system") delete root.dataset.motion;
   else root.dataset.motion = motion;
   writePreference(MOTION_KEY, motion);
+}
+
+/*
+ * Text size and fonts: the same mechanism, one attribute each on `<html>`.
+ *
+ * Each has a default that writes NO attribute, so someone who never opens Settings › Appearance gets
+ * exactly the page they had before these existed: the CSS that reacts to them (`index.css`) only
+ * matches an explicit value. The inline script in `index.html` stamps them before first paint for the
+ * same reason the theme is stamped there — a size or a typeface that changes after the first frame
+ * is a visible jump on every launch.
+ */
+
+export type TextSize = "small" | "medium" | "large";
+export type UiFont = "system" | "serif" | "dyslexic";
+export type CodeFont = "default" | "cascadia" | "jetbrains";
+
+export const TEXT_SIZE_KEY = "chimera.textSize";
+export const UI_FONT_KEY = "chimera.font";
+export const CODE_FONT_KEY = "chimera.codeFont";
+
+/** Exported so `theme.test.ts` can assert the inline script accepts exactly these values. */
+export const TEXT_SIZES: readonly TextSize[] = ["small", "medium", "large"];
+export const UI_FONTS: readonly UiFont[] = ["system", "serif", "dyslexic"];
+export const CODE_FONTS: readonly CodeFont[] = ["default", "cascadia", "jetbrains"];
+
+export function readTextSize(): TextSize {
+  return readPreference<TextSize>(TEXT_SIZE_KEY, TEXT_SIZES, "medium");
+}
+
+export function readUiFont(): UiFont {
+  return readPreference<UiFont>(UI_FONT_KEY, UI_FONTS, "system");
+}
+
+export function readCodeFont(): CodeFont {
+  return readPreference<CodeFont>(CODE_FONT_KEY, CODE_FONTS, "default");
+}
+
+/** Stamp an explicit value; remove the attribute for the default, so the default is today's page. */
+function stamp(attribute: "textSize" | "font" | "fontCode", value: string, fallback: string): void {
+  const root = document.documentElement;
+  if (value === fallback) delete root.dataset[attribute];
+  else root.dataset[attribute] = value;
+}
+
+/** `data-text-size` scales the rem root, so the five type sizes stay five and all move together. */
+export function applyTextSize(size: TextSize): void {
+  stamp("textSize", size, "medium");
+  writePreference(TEXT_SIZE_KEY, size);
+}
+
+/** `data-font` swaps the VALUE of `--font-sans`; nothing that reads the token has to know. */
+export function applyUiFont(font: UiFont): void {
+  stamp("font", font, "system");
+  writePreference(UI_FONT_KEY, font);
+}
+
+/** `data-font-code` swaps the value of `--font-mono`, which the editor and code blocks read. */
+export function applyCodeFont(font: CodeFont): void {
+  stamp("fontCode", font, "default");
+  writePreference(CODE_FONT_KEY, font);
 }
