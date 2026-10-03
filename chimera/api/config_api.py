@@ -250,17 +250,24 @@ APPLIES_WHEN: dict[str, str] = {
 
 
 def _browser_reach_lists(settings: Settings) -> dict[str, Any]:
+    """The two lists as the browser reads them, and — when either does not parse — why.
+
+    A value that does not parse is not "empty": `default_registry` leaves the browser out of the
+    registry altogether (`BrowserReach.from_settings` raises), so empty lists alone would show the
+    owner "any public site" for a browser that exists in no conversation. ``invalid`` carries the
+    parser's own message, which names the key and the entry."""
     from chimera.tools.browser_reach import parse_ports, parse_sites
 
+    errors: list[str] = []
     try:
         sites = list(parse_sites(settings.browser_sites))
-    except ValueError:
-        sites = []
+    except ValueError as exc:
+        sites, errors = [], [*errors, str(exc)]
     try:
         ports = sorted(parse_ports(settings.browser_local_ports))
-    except ValueError:
-        ports = []
-    return {"sites": sites, "local_ports": ports}
+    except ValueError as exc:
+        ports, errors = [], [*errors, str(exc)]
+    return {"sites": sites, "local_ports": ports, "invalid": "; ".join(errors) or None}
 
 
 def _fusion_kinship(panel: list[str], judge: str) -> dict[str, Any]:

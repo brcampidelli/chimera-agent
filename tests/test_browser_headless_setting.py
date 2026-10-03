@@ -29,12 +29,19 @@ def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
     headful = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_BROWSER_HEADLESS="false")  # type: ignore[arg-type]
 
     # The block also carries the browser's site list and local ports (study 29, P5.2), both empty
-    # unless the owner wrote them; the whole block is compared so neither can appear by default.
-    assert read_config(headful)["browser"] == {"headless": False, "sites": [], "local_ports": []}
+    # unless the owner wrote them, and `invalid`, None unless `.env` holds one that does not parse;
+    # the whole block is compared so none of them can appear by default.
+    assert read_config(headful)["browser"] == {
+        "headless": False,
+        "sites": [],
+        "local_ports": [],
+        "invalid": None,
+    }
     assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["browser"] == {  # type: ignore[arg-type]
         "headless": True,
         "sites": [],
         "local_ports": [],
+        "invalid": None,
     }
 
 

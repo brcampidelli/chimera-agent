@@ -313,6 +313,35 @@ def test_a_hand_edited_value_that_does_not_parse_leaves_the_browser_out(
         get_settings.cache_clear()
 
 
+def test_a_value_that_does_not_parse_is_reported_on_the_wire_not_shown_as_empty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Review of P5.2: the screen read `sites: []` — "any public site" — for a browser that exists in
+    no conversation. GET /api/config now says why, in the parser's words."""
+    from fastapi.testclient import TestClient
+
+    from chimera.api import build_api_app
+    from chimera.config import Settings, get_settings
+
+    monkeypatch.setenv("CHIMERA_HOME", str(tmp_path))
+    client = TestClient(build_api_app(lambda: None, settings=Settings(CHIMERA_HOME=str(tmp_path))))  # type: ignore[arg-type,call-arg]
+
+    def browser_block(sites: str, ports: str) -> dict[str, Any]:
+        monkeypatch.setenv("CHIMERA_BROWSER_SITES", sites)  # a hand edit of `.env`
+        monkeypatch.setenv("CHIMERA_BROWSER_LOCAL_PORTS", ports)
+        get_settings.cache_clear()
+        block: dict[str, Any] = client.get("/api/config").json()["browser"]
+        return block
+
+    try:
+        invalid = browser_block("https://github.com", "3000,all")["invalid"]
+        assert "CHIMERA_BROWSER_SITES" in invalid and "https://github.com" in invalid
+        assert "CHIMERA_BROWSER_LOCAL_PORTS" in invalid and "'all'" in invalid
+        assert browser_block("github.com", "3000")["invalid"] is None
+    finally:
+        get_settings.cache_clear()
+
+
 # --- the tool --------------------------------------------------------------------------------------
 
 

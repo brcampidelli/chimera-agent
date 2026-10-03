@@ -1536,6 +1536,14 @@ export function Settings({
                       onSave={(v) => save({ CHIMERA_BROWSER_LOCAL_PORTS: v })}
                     />
                   </Row>
+                  {/* A hand-edited `.env` value that does not parse leaves the browser out of every
+              conversation. The two rows above would then read empty — "any public site" — so the
+              server's reason is shown here, in its own words (it names the key and the entry). */}
+                  {c.browser?.invalid ? (
+                    <p role="alert" className="text-xs text-bad-foreground">
+                      {t("settings.browserReach.invalid", { error: c.browser.invalid })}
+                    </p>
+                  ) : null}
                   {/* The switch the posture line names when it reports a conversation as unguarded. Off
               by default (`chimera/config.py`: `guard_chat: bool = Field(default=False)`), which is
               a real exposure and the reason the posture line has to say so.

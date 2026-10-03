@@ -1481,6 +1481,17 @@
             "title": "Headless",
             "type": "boolean"
           },
+          "invalid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalid"
+          },
           "local_ports": {
             "items": {
               "type": "integer"

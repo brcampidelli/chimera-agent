@@ -100,6 +100,27 @@ describe("Settings — where the browser may go", () => {
     expect(screen.getByRole("textbox", { name: "Local ports the browser may open" })).toHaveValue("");
   });
 
+  it("says the browser is off when .env holds a value that does not parse", async () => {
+    // The two rows read empty then — "any public site" — for a browser that is in no conversation.
+    const reason = "CHIMERA_BROWSER_SITES: 'https://github.com' is not a host";
+    vi.mocked(getConfig).mockResolvedValue(
+      config({ headless: true, sites: [], local_ports: [], invalid: reason }) as never,
+    );
+    renderWithProviders(<Settings />);
+    const alert = await screen.findByText(/the agent's browser is off in every conversation/);
+    expect(alert).toHaveTextContent(reason);
+    expect(alert).toHaveAttribute("role", "alert");
+  });
+
+  it("says nothing of the kind when both lists parse", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({ headless: true, sites: ["github.com"], local_ports: [], invalid: null }) as never,
+    );
+    renderWithProviders(<Settings />);
+    await screen.findByRole("textbox", { name: "Sites the browser opens without asking" });
+    expect(screen.queryByText(/browser is off in every conversation/)).toBeNull();
+  });
+
   it("writes each list to its own key", async () => {
     vi.mocked(getConfig).mockResolvedValue(config({ headless: true, sites: [], local_ports: [] }) as never);
     const user = userEvent.setup();
