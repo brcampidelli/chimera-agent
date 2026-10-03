@@ -175,7 +175,7 @@ class ShareStore:
         time; the caller holds the lock."""
         found: Share | None = None
         for share in self._shares:
-            if hmac.compare_digest(share.token, token):
+            if _same(share.token, token):
                 found = share
         return found
 
@@ -219,11 +219,11 @@ class ShareStore:
         return gone
 
     def revoke(self, token: str) -> bool:
-        return bool(self._remove(lambda s: hmac.compare_digest(s.token, token)))
+        return bool(self._remove(lambda s: _same(s.token, token)))
 
     def revoke_id(self, share_id: str) -> Share | None:
         """Revoke the link whose :attr:`Share.id` this is; the share removed, or None."""
-        gone = self._remove(lambda s: hmac.compare_digest(s.id, share_id))
+        gone = self._remove(lambda s: _same(s.id, share_id))
         return gone[0] if gone else None
 
     def revoke_session(self, session_id: str) -> int:
@@ -234,6 +234,18 @@ class ShareStore:
         """Every link of every conversation."""
         return len(self._remove(lambda s: True))
 
+
+def _same(stored: str, given: str) -> bool:
+    """A constant-time compare of two strings, as bytes.
+
+    ``hmac.compare_digest`` refuses a ``str`` holding a character outside ASCII with a TypeError,
+    and the given side comes from a URL or a header: ``?t=%C3%A9`` on a guest route, or an id in the
+    access card's DELETE path, was answered with a 500 instead of "this opens nothing". Encoded,
+    every string compares; ``surrogatepass`` so a lone surrogate a decoder let through cannot raise
+    either."""
+    return hmac.compare_digest(
+        stored.encode("utf-8", "surrogatepass"), given.encode("utf-8", "surrogatepass")
+    )
 
 
 def _expiry(value: Any) -> float | None:
