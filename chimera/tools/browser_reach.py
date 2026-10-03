@@ -71,6 +71,24 @@ _LOCAL_NAMES = frozenset({"localhost", "127.0.0.1", "::1"})
 _SITE = re.compile(r"^(?:\*\.)?[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$")
 
 
+def ascii_host(host: str) -> str:
+    """``host`` as Chromium sends it: lowercased, trailing dot dropped, and an internationalised
+    name in punycode (UTS #46, non-transitional — Chromium's reading). A person approves
+    ``bücher.de`` while Chromium asks for ``xn--bcher-kva.de``; compared in two spellings, the yes
+    never matched the request and the page never loaded, however many times it was given. A host the
+    encoder refuses (an IP literal with colons, an underscore) is kept as written: it was never IDN.
+    """
+    host = (host or "").strip().lower().rstrip(".")
+    if host.isascii() and "xn--" not in host:
+        return host
+    try:
+        import idna  # httpx's own dependency, so always installed beside Chimera
+
+        return str(idna.encode(host, uts46=True, transitional=False).decode("ascii"))
+    except Exception:  # noqa: BLE001 — not a name the encoder takes: compare it as written
+        return host
+
+
 def _entries(raw: str) -> list[str]:
     return [part.strip() for part in re.split(r"[,\s]+", raw or "") if part.strip()]
 
@@ -81,7 +99,10 @@ def parse_sites(raw: str) -> tuple[str, ...]:
     rather than read as "no site matches"."""
     out: list[str] = []
     for entry in _entries(raw):
-        site = entry.lower().rstrip(".")
+        # `*.bücher.de` and `bücher.de` are stored as the browser will ask for them, so the list can
+        # be written the way a person writes a name.
+        wild = entry.startswith("*.")
+        site = ("*." if wild else "") + ascii_host(entry[2:] if wild else entry)
         if not _SITE.match(site):
             raise ValueError(
                 f"{SITES_ENV}: {entry!r} is not a host — write example.com or *.example.com, "
@@ -126,7 +147,7 @@ def chimera_ports(home: Path | None) -> frozenset[int]:
 
 
 def _host(url: str) -> str:
-    return (urlparse(url).hostname or "").rstrip(".")
+    return ascii_host(urlparse(url).hostname or "")
 
 
 def _port(url: str) -> int | None:
