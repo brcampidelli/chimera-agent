@@ -680,6 +680,10 @@ def build_api_app(
         # from a settings read, so it holds for an app built with injected settings too; the guest
         # routes refuse every link while the switch is off whether or not the door is open.
         if str(updates.get("CHIMERA_SHARING", "")).strip().lower() in _OFF_WORDS:
+            # Every guest stream already open ends too, through either door: "off" is a promise
+            # about what a link opens from now on, and a tab left open is the common case. First,
+            # so the LAN door's connections are already finishing when it is asked to close.
+            app.state.session_bus.end_guests()
             app.state.guest_server.stop()
         return result
 

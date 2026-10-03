@@ -205,6 +205,10 @@ def build_guest_app(
     """
     guest = FastAPI(title="Chimera — shared conversation", docs_url=None, redoc_url=None)
     _mount_guest_page(guest, static_dir)
+    # A revoke, from any route, ends the streams the removed links opened at that moment. Each
+    # stream also re-checks its link before every frame (`live` below), which is what keeps a frame
+    # from reaching a revoked guest; this is what keeps the connection from idling on until then.
+    store.on_revoke(lambda gone: bus.end_guests({share.id for share in gone}))
 
     def share_of(request: Request) -> Share:
         header = request.headers.get("authorization", "")
@@ -245,7 +249,24 @@ def build_guest_app(
     async def live(
         request: Request, since: int = 0, name: str = "", share: Share = opened
     ) -> EventSourceResponse:
-        return live_stream(bus, share.session_id, since=since, name=_clean_name(name), request=request)
+        token = share.token
+
+        # `opened` admitted this stream once, when it connected. A stream lives for as long as the
+        # guest keeps the tab open — hours — and every one of the owner's controls (revoke, sharing
+        # off, an expiry) is a promise about what the link opens from that moment on. So the same
+        # question `share_of` asks is asked again before every frame and every heartbeat.
+        def still_open() -> bool:
+            return sharing_on() and store.resolve(token) is not None
+
+        return live_stream(
+            bus,
+            share.session_id,
+            since=since,
+            name=_clean_name(name),
+            request=request,
+            still_open=still_open,
+            share_id=share.id,
+        )
 
     @guest.post("/api/turn", responses=SSE_RESPONSE)
     async def turn(body: GuestTurnIn, share: Share = opened) -> Any:
@@ -298,6 +319,10 @@ def _mount_guest_page(guest: FastAPI, static_dir: Path | None) -> None:
         return FileResponse(icon)
 
 
+def _open_always() -> bool:
+    return True
+
+
 async def live_frames(
     bus: SessionBus,
     session_id: str,
@@ -306,28 +331,42 @@ async def live_frames(
     name: str,
     disconnected: Callable[[], Awaitable[bool]],
     heartbeat_seconds: float = 15,
+    still_open: Callable[[], bool] = _open_always,
+    share_id: str = "",
 ) -> AsyncIterator[dict[str, str]]:
     """Replay what the viewer missed, then everything as it happens, until they leave.
 
     One implementation for the guest and the owner: the frames are the same, the presence list is
     the same, and the only difference between the two is which door they came through. Subscribed
     for exactly as long as the iteration runs — the presence list is who is iterating.
+
+    ``still_open`` is asked before every frame and every heartbeat, and the stream ends the first
+    time it says no: a guest's link can be revoked, expire, or have sharing switched off under it
+    while the stream is open, and the stream was admitted only once, when it connected. The owner's
+    window passes nothing — its door is the server token, checked per request. ``share_id`` names
+    the link a guest came in with, so a revoke can end exactly its streams (`SessionBus.end_guests`).
     """
     loop = asyncio.get_running_loop()
-    sub = bus.subscribe(session_id, name=name, loop=loop)
+    sub = bus.subscribe(session_id, name=name, loop=loop, share_id=share_id)
     try:
         for frame in bus.replay(session_id, since):
+            if not still_open():
+                return
             yield {"event": frame["event"], "data": json.dumps(frame)}
         while True:
-            if await disconnected():
+            if await disconnected() or not still_open():
                 break
             try:
                 item = await asyncio.wait_for(sub.queue.get(), timeout=heartbeat_seconds)
             except TimeoutError:
+                # Asked here too: an idle stream is exactly the one an expiry has to reach, and a
+                # heartbeat is what would otherwise keep it open past the hour forever.
+                if not still_open():
+                    break
                 # A heartbeat, so a proxy between the two never decides the stream is dead.
                 yield {"event": "heartbeat", "data": "{}"}
                 continue
-            if item is None:
+            if item is None or not still_open():
                 break
             yield {"event": item["event"], "data": json.dumps(item)}
     finally:
@@ -335,10 +374,25 @@ async def live_frames(
 
 
 def live_stream(
-    bus: SessionBus, session_id: str, *, since: int, name: str, request: Request
+    bus: SessionBus,
+    session_id: str,
+    *,
+    since: int,
+    name: str,
+    request: Request,
+    still_open: Callable[[], bool] = _open_always,
+    share_id: str = "",
 ) -> EventSourceResponse:
     return EventSourceResponse(
-        live_frames(bus, session_id, since=since, name=name, disconnected=request.is_disconnected)
+        live_frames(
+            bus,
+            session_id,
+            since=since,
+            name=name,
+            disconnected=request.is_disconnected,
+            still_open=still_open,
+            share_id=share_id,
+        )
     )
 
 

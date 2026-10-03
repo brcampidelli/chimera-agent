@@ -38,7 +38,7 @@ import socket
 import threading
 import time
 from collections import deque
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -97,6 +97,11 @@ class Share:
         return f"…{self.token[-4:]}" if len(self.token) > 8 else ""
 
 
+#: Told which links a revoke removed, after the file is written. How a stream a guest already holds
+#: open is ended at the revoke rather than at its next frame (`guest_api.build_guest_app`).
+RevokeListener = Callable[[list[Share]], None]
+
+
 class ShareStore:
     """The share tokens of one home, on disk."""
 
@@ -104,7 +109,23 @@ class ShareStore:
         self.path = Path(path)
         self._lock = threading.Lock()
         self._shares: list[Share] = []
+        self._listeners: list[RevokeListener] = []
         self._load()
+
+    def on_revoke(self, listener: RevokeListener) -> None:
+        """Call ``listener`` with the removed links after every revoke, whichever route made it —
+        the Share dialog, the access card, or deleting the conversation."""
+        self._listeners.append(listener)
+
+    def _revoked(self, gone: list[Share]) -> None:
+        # Outside the store's lock: a listener reaches into the bus, which has its own.
+        if not gone:
+            return
+        for listener in list(self._listeners):
+            try:
+                listener(gone)
+            except Exception as exc:  # noqa: BLE001 -- the revoke is written; a listener cannot undo it
+                _log.warning("a revoke listener failed: %s", exc)
 
     def _load(self) -> None:
         try:
@@ -188,43 +209,31 @@ class ShareStore:
         with self._lock:
             return list(self._shares)
 
-    def revoke(self, token: str) -> bool:
+    def _remove(self, doomed: Callable[[Share], bool]) -> list[Share]:
         with self._lock:
-            before = len(self._shares)
-            self._shares = [s for s in self._shares if not hmac.compare_digest(s.token, token)]
-            if len(self._shares) != before:
+            gone = [s for s in self._shares if doomed(s)]
+            if gone:
+                self._shares = [s for s in self._shares if not doomed(s)]
                 self._write()
-                return True
-        return False
+        self._revoked(gone)
+        return gone
+
+    def revoke(self, token: str) -> bool:
+        return bool(self._remove(lambda s: hmac.compare_digest(s.token, token)))
 
     def revoke_id(self, share_id: str) -> Share | None:
         """Revoke the link whose :attr:`Share.id` this is; the share removed, or None."""
-        with self._lock:
-            gone = next((s for s in self._shares if hmac.compare_digest(s.id, share_id)), None)
-            if gone is None:
-                return None
-            self._shares = [s for s in self._shares if s is not gone]
-            self._write()
-        return gone
+        gone = self._remove(lambda s: hmac.compare_digest(s.id, share_id))
+        return gone[0] if gone else None
 
     def revoke_session(self, session_id: str) -> int:
         """Every token of one conversation — what deleting the conversation must also do."""
-        with self._lock:
-            before = len(self._shares)
-            self._shares = [s for s in self._shares if s.session_id != session_id]
-            gone = before - len(self._shares)
-            if gone:
-                self._write()
-        return gone
+        return len(self._remove(lambda s: s.session_id == session_id))
 
     def revoke_all(self) -> int:
         """Every link of every conversation."""
-        with self._lock:
-            gone = len(self._shares)
-            if gone:
-                self._shares = []
-                self._write()
-        return gone
+        return len(self._remove(lambda s: True))
+
 
 
 def _expiry(value: Any) -> float | None:
@@ -244,6 +253,9 @@ class Subscriber:
     name: str
     loop: asyncio.AbstractEventLoop
     queue: asyncio.Queue[dict[str, Any] | None]
+    #: The :attr:`Share.id` of the link a guest came in with; empty for the owner's own window.
+    #: What lets a revoke end exactly the streams that link opened, and nobody else's.
+    share_id: str = ""
 
 
 @dataclass
@@ -405,8 +417,17 @@ class SessionBus:
             channel = self._channels.get(session_id)
             return channel.seq if channel else 0
 
-    def subscribe(self, session_id: str, *, name: str, loop: asyncio.AbstractEventLoop) -> Subscriber:
-        sub = Subscriber(id=next(self._ids), name=name, loop=loop, queue=asyncio.Queue())
+    def subscribe(
+        self,
+        session_id: str,
+        *,
+        name: str,
+        loop: asyncio.AbstractEventLoop,
+        share_id: str = "",
+    ) -> Subscriber:
+        sub = Subscriber(
+            id=next(self._ids), name=name, loop=loop, queue=asyncio.Queue(), share_id=share_id
+        )
         with self._lock:
             self._channel(session_id).subscribers[sub.id] = sub
         self._announce_presence(session_id)
@@ -419,6 +440,26 @@ class SessionBus:
                 return
             del channel.subscribers[sub_id]
         self._announce_presence(session_id)
+
+    def end_guests(self, share_ids: Collection[str] | None = None) -> int:
+        """End the open streams of guests: those that came in with one of ``share_ids``, or every
+        guest when it is None. The owner's own windows are never ended here.
+
+        A stream checks its link before every frame it sends, so a revoked link already delivers
+        nothing more; this is what makes it stop NOW — the connection closes instead of idling on
+        heartbeats until a frame comes along to be refused. The end is the same ``None`` a stream
+        already reads as "stop", put on the subscriber's own loop."""
+        with self._lock:
+            targets = [
+                sub
+                for channel in self._channels.values()
+                for sub in channel.subscribers.values()
+                if sub.share_id and (share_ids is None or sub.share_id in share_ids)
+            ]
+        for sub in targets:
+            with contextlib.suppress(RuntimeError):  # a closed loop: that stream is already gone
+                sub.loop.call_soon_threadsafe(sub.queue.put_nowait, None)
+        return len(targets)
 
     def presence(self, session_id: str) -> list[str]:
         """Who is watching, by the name each gave. Duplicates are two windows of one person."""
