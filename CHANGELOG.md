@@ -6,15 +6,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **Cron jobs post only what is worth posting, and hold only their tools** (#736).
+  - A scheduled run is told it is unattended, where its answer goes, and to assume rather than ask. It may answer
+    with a fixed "nothing new" sentinel, which is never delivered.
+  - Each job takes `notify` (`always`, the default and today's behaviour; `on_change`, which skips an answer identical
+    to the last one delivered; `failures_only`) and a `tools` allowlist that reaches the registry. Old `jobs.json` files
+    load unchanged; a webhook job refuses both fields, because the webhook path cannot enforce them.
+- **`chimera review --effort low|medium|high`** (#743). `medium` cuts findings below the finder's confidence 0.8;
+  `low` is the finder alone. The default stays `high`, today's behaviour: the 0.8 cut was selected on one bench and
+  not confirmed on the other (`bench/review_confidence_cut/RESULTS.md`).
+- **A one-page multi-agent policy** (`docs/multi-agent-policy.md`, #744): a flat topology by default, four sanctioned
+  forms, what is out and the measurement that put it out, and the invariants that must be code. `bench/PROTOCOL.md`
+  now requires every multi-agent arm to meet a single agent at equal cost.
+- **Two pre-registered censuses, both without a product change** (#741, #742). The Manager never decided an attempt
+  alone in the stored runs, so no advisory mode ships (`bench/manager_advisory`). The explorer's regime is not common
+  enough on attended turns to turn it on in the Code screen (`bench/explorer_census`).
+
 ### Fixed
 
-- **A slow Intel dmg no longer holds back the update of every platform.**
-  - **What was wrong:** on the `macos-15-intel` runner, Tauri's `bundle_dmg.sh` took 1.5 minutes for v0.61.2,
-    4 for v0.62.1, 8 for v0.63.0 and 9 for v0.63.1, and failed after 10 on v0.64.0, twice. The dmg was the same
-    272 MB every time. The failed job skipped `latest.json`, so the installed apps of every platform kept being
-    offered 0.63.1, and v0.64.0 was never marked Latest.
-  - **Now:** the Intel job bundles the app and its updater only. The Intel dmg is built by its own `hdiutil`
-    step, which may fail without taking the release down.
+- **The chat bot knows who it works for and where it is talking** (#735). The Discord, Telegram, Slack and Signal
+  bots, and the app's messaging bot, now get the owner's profile, recalled facts with the "possibly stale" header, and
+  `remember_from_chat` as set. Each turn names the platform, chat and sender as quoted data that grants no authority,
+  in the turn notes, never in the cached system prompt. The HTTP `/chat` route is unchanged.
+- **The project's rules reach the prompt whole** (#737). AGENTS.md files were cut in the middle at 2,000 characters,
+  so Chimera's own lost four of its six hard rules. The cap is now 6,000; a longer file is cut at a section or
+  paragraph boundary, keeping the head, with a marker for the model and an `instructions_truncated` notice for the
+  person.
+- **The harness's own "Task:" no longer picks a skill, and `echo` leaves the default registry** (#738). The
+  autonomous runner's prefix matched "data task" in a skill description, so nearly every cron, solve and run turn got
+  the data-analysis skill. Retrieval now needs two content words and ignores the harness's own words.
+- **The clock closes the turn context** (#739), so a provider's prefix cache can reuse everything before it; the
+  header no longer claims the user's message follows it when it does not.
+- **The crew lands one approved worker's tree whole, then re-verifies it** (#740). It used to copy every
+  non-conflicting file from EACH approved worker, fusing two verified solutions into a hybrid nobody verified.
+
 - **The browser works in the installed desktop app.**
   - **What was wrong:** the browser tool runs Playwright's own driver (a bundled node and its CLI), and in the
     frozen sidecar that driver is package data, which the freeze did not collect. The installed app could neither
@@ -25,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ## [0.64.1] - 2026-10-01
 ### Fixed
 
+- **A slow Intel dmg no longer holds back the update of every platform** (#732, in the 0.64.1 tag).
+  - **What was wrong:** on the `macos-15-intel` runner, Tauri's `bundle_dmg.sh` took 1.5 minutes for v0.61.2,
+    4 for v0.62.1, 8 for v0.63.0 and 9 for v0.63.1, and failed after 10 on v0.64.0, twice. The dmg was the same
+    272 MB every time. The failed job skipped `latest.json`, so the installed apps of every platform kept being
+    offered 0.63.1, and v0.64.0 was never marked Latest.
+  - **Now:** the Intel job bundles the app and its updater only. The Intel dmg is built by its own `hdiutil`
+    step, which may fail without taking the release down.
 - **The chat bot gets what 0.64 said a person waiting gets.**
   - **What was wrong:** 0.64.0 turned the limits into warnings, and that reached `chimera chat` and the desktop
     app only. The Discord bot (`serve --discord`, and the same bot started from the app's Messaging switch) kept
