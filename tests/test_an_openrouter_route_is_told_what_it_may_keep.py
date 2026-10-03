@@ -254,6 +254,30 @@ def test_a_callers_own_route_pin_keeps_the_owners_preference(monkeypatch: pytest
     assert seen[-1]["extra_body"] == {"provider": {**pin, "data_collection": "deny"}}
 
 
+def test_with_privacy_off_a_callers_pin_is_sent_exactly_as_before_whatever_the_owners_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Privacy ships OFF and OFF must change nothing. A bench that pins `only: [deepinfra]` while the
+    owner has `CHIMERA_PROVIDER_ORDER=novita` used to send `{"only": ["deepinfra"]}`; a one-level merge
+    sent `order: [novita]` + `allow_fallbacks: false` beside it — a route outside the pin, read as the
+    pre-registered one with no error anywhere."""
+    seen: list[dict[str, Any]] = []
+    gateway = _kwargs_gateway(monkeypatch, seen, CHIMERA_PROVIDER_ORDER="novita")
+    gateway.complete(HI, model=OR_MODEL, extra_body={"provider": {"only": ["deepinfra"]}})
+    assert seen[-1]["extra_body"] == {"provider": {"only": ["deepinfra"]}}
+
+
+def test_under_deny_a_callers_pin_carries_the_preference_but_not_the_owners_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[dict[str, Any]] = []
+    gateway = _kwargs_gateway(
+        monkeypatch, seen, CHIMERA_PROVIDER_ORDER="novita", CHIMERA_OPENROUTER_DATA_COLLECTION="deny"
+    )
+    gateway.complete(HI, model=OR_MODEL, extra_body={"provider": {"only": ["deepinfra"]}})
+    assert seen[-1]["extra_body"] == {"provider": {"data_collection": "deny", "only": ["deepinfra"]}}
+
+
 def test_a_caller_that_names_the_field_still_wins(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[dict[str, Any]] = []
     gateway = _kwargs_gateway(monkeypatch, seen, CHIMERA_OPENROUTER_DATA_COLLECTION="deny")

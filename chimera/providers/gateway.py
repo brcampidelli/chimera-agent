@@ -35,7 +35,7 @@ from chimera.providers.failover import (
     rate_limit_origin,
     trace_of,
 )
-from chimera.providers.privacy import openrouter_privacy
+from chimera.providers.privacy import PRIVACY_FIELDS, openrouter_privacy
 from chimera.providers.prompt_cache import apply_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
 from chimera.telemetry import get_logger
@@ -225,10 +225,13 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
     ``provider_order`` lost its pin the moment the caller added anything of its own. The caller still
     wins on a key both set; only the keys it did not name survive now.
 
-    The OpenRouter ``provider`` object is merged one level further, for the same reason: every bench
-    here pins its route with its own ``{"provider": {"order": …}}``, and a whole-object replace
-    dropped the owner's ``data_collection: "deny"`` from every pinned call — the one place a privacy
-    preference must not depend on the caller remembering it. A key the caller names still wins.
+    The OpenRouter ``provider`` object is NOT merged key by key: a caller that names it (every bench
+    pins its route that way) gets exactly its own route, as before — the owner's
+    ``CHIMERA_PROVIDER_ORDER`` (``order`` + ``allow_fallbacks: false``) leaking into a caller's
+    ``only`` pin produced a route outside the pin, "No endpoints found" or a different route than the
+    bench pre-registered, with no error anywhere. Only the privacy preference (:data:`PRIVACY_FIELDS`)
+    is carried under the caller's pin, because it must not depend on the caller remembering it; a
+    privacy key the caller names still wins.
     """
     merged = dict(provider, **caller)
     ours, theirs = provider.get("extra_body"), caller.get("extra_body")
@@ -236,7 +239,8 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
         body = {**ours, **theirs}
         route_ours, route_theirs = ours.get("provider"), theirs.get("provider")
         if isinstance(route_ours, dict) and isinstance(route_theirs, dict):
-            body["provider"] = {**route_ours, **route_theirs}
+            kept = {key: route_ours[key] for key in PRIVACY_FIELDS if key in route_ours}
+            body["provider"] = {**kept, **route_theirs}
         merged["extra_body"] = body
     return merged
 

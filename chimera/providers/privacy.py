@@ -18,6 +18,10 @@ from typing import Any
 from chimera.config import Settings
 from chimera.providers.discovery import is_local_model
 
+#: The keys of OpenRouter's ``provider`` object that carry the privacy preference — and the ONLY ones
+#: the gateway carries over into a caller's own route pin (``gateway._call_kwargs``).
+PRIVACY_FIELDS: tuple[str, ...] = ("data_collection", "zdr")
+
 
 def openrouter_privacy(settings: Settings) -> dict[str, Any]:
     """The fields to merge into an OpenRouter request's ``provider`` object; ``{}`` by default.
