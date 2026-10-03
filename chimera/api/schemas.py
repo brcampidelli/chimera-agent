@@ -682,6 +682,10 @@ class BrowserCfgOut(BaseModel):
     """
 
     headless: bool = True
+    #: ``CHIMERA_BROWSER_SITES``, parsed: hosts and ``*.domain`` entries. Empty = any public site.
+    sites: list[str] = Field(default_factory=list)
+    #: ``CHIMERA_BROWSER_LOCAL_PORTS``, parsed. Empty = no loopback at all, as before study 29 P5.2.
+    local_ports: list[int] = Field(default_factory=list)
 
 
 class ExperimentalCfgOut(BaseModel):

@@ -1480,6 +1480,20 @@
             "default": true,
             "title": "Headless",
             "type": "boolean"
+          },
+          "local_ports": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Local Ports",
+            "type": "array"
+          },
+          "sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sites",
+            "type": "array"
           }
         },
         "title": "BrowserCfgOut",

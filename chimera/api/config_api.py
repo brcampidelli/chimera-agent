@@ -116,6 +116,12 @@ _EDITABLE_SETTINGS = {
     # and `PATCH /api/config` has always refused the key. So the one way to see what the agent is
     # doing on a web page was a file the app never mentions.
     "CHIMERA_BROWSER_HEADLESS",
+    # Where the browser may go (study 29, P5.2). The site list only narrows; the local ports open
+    # loopback on the ports named, never Chimera's own. Both values are checked before they are
+    # written (`_VALUE_CHECKS`), so a typo is a refusal on the screen rather than a browser that
+    # silently reads the list as matching nothing.
+    "CHIMERA_BROWSER_SITES",
+    "CHIMERA_BROWSER_LOCAL_PORTS",
     "CHIMERA_MCP_AUTOLOAD",
     # The learn-to-use wire. Off by default, which means the agent writes skills and never reads one
     # back — the promise of the product with the switch missing from the product.
@@ -215,6 +221,10 @@ APPLIES_WHEN: dict[str, str] = {
     # onto the screen of a browser that is already running headless, so the honest answer is the
     # next conversation, which is when a fresh registry (and a fresh browser) is built.
     "CHIMERA_BROWSER_HEADLESS": NEXT_CONVERSATION,
+    # Read at the same point as the headless switch: `default_registry` hands the browser its reach
+    # when it builds the tool, and the reach then holds for that browser's life.
+    "CHIMERA_BROWSER_SITES": NEXT_CONVERSATION,
+    "CHIMERA_BROWSER_LOCAL_PORTS": NEXT_CONVERSATION,
     # Same read point: `default_registry` hands the browser its situation when it builds the tool, and
     # the loop's config takes the flag when the agent is built. A chat keeps both for its lifetime;
     # a Code turn builds both afresh, so there it is the next turn. The research agent and the
@@ -237,6 +247,20 @@ APPLIES_WHEN: dict[str, str] = {
     "CHIMERA_SIGNAL_ALLOWED_USERS": NEXT_LAUNCH,
     "CHIMERA_WHATSAPP_ALLOWED_NUMBERS": NEXT_LAUNCH,
 }
+
+
+def _browser_reach_lists(settings: Settings) -> dict[str, Any]:
+    from chimera.tools.browser_reach import parse_ports, parse_sites
+
+    try:
+        sites = list(parse_sites(settings.browser_sites))
+    except ValueError:
+        sites = []
+    try:
+        ports = sorted(parse_ports(settings.browser_local_ports))
+    except ValueError:
+        ports = []
+    return {"sites": sites, "local_ports": ports}
 
 
 def _fusion_kinship(panel: list[str], judge: str) -> dict[str, Any]:
@@ -424,7 +448,13 @@ def read_config(settings: Settings) -> dict[str, Any]:
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
-        "browser": {"headless": settings.browser_headless},
+        # The site list and the declared ports as written, not a mask: statements the owner made and
+        # has to be able to read back. A value `.env` holds that does not parse is reported empty
+        # here, which is also what the browser does with it (it is left out; `default_registry`).
+        "browser": {
+            "headless": settings.browser_headless,
+            **_browser_reach_lists(settings),
+        },
         "experimental": {
             "browser_situation": settings.browser_situation,
             "research_agent": settings.research_agent,
@@ -637,6 +667,18 @@ def _check_keep_awake(value: str) -> None:
         raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
 
 
+def _check_browser_sites(value: str) -> None:
+    from chimera.tools.browser_reach import parse_sites
+
+    parse_sites(value)
+
+
+def _check_browser_ports(value: str) -> None:
+    from chimera.tools.browser_reach import parse_ports
+
+    parse_ports(value)
+
+
 def _check_boolean(key: str) -> Callable[[str], None]:
     def check(value: str) -> None:
         if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
@@ -650,6 +692,8 @@ def _check_boolean(key: str) -> Callable[[str], None]:
 _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
+    "CHIMERA_BROWSER_SITES": _check_browser_sites,
+    "CHIMERA_BROWSER_LOCAL_PORTS": _check_browser_ports,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
 }
 

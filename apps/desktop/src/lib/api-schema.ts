@@ -3990,6 +3990,10 @@ export interface components {
              * @default true
              */
             headless: boolean;
+            /** Local Ports */
+            local_ports?: number[];
+            /** Sites */
+            sites?: string[];
         };
         /** BundleOut */
         BundleOut: {

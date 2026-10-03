@@ -229,4 +229,9 @@ def make_server(
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002 — overrides stdlib
             pass  # silence default stderr access logging
 
-    return ThreadingHTTPServer((host, port), Handler)
+    server = ThreadingHTTPServer((host, port), Handler)
+    # Known to the browser's loopback check, so a declared local port can never be this one.
+    from chimera.core.listeners import claim
+
+    claim(int(server.server_address[1]))
+    return server

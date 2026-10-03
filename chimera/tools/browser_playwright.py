@@ -25,11 +25,14 @@ from __future__ import annotations
 
 import contextlib
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from chimera.scrape.ssrf import is_safe_url
 from chimera.tools.browser import BrowserFrame, Element
+
+if TYPE_CHECKING:
+    from chimera.tools.browser_reach import BrowserReach
 
 # JS run in-page: clear the previous snapshot's refs, then tag each visible interactive element
 # with a fresh ref and return its role/name.
@@ -89,24 +92,50 @@ class RequestGuard:
     judged — ``data:``/``blob:`` never leave the page. ``blocked_navigations`` holds the document
     requests refused since the last :meth:`take`, which is how a driver action learns that the page
     it asked for was not loaded.
+
+    ``listed`` (study 29, P5.2) is the browser's site list, judged on TOP-LEVEL navigations only: a
+    document request in the page's main frame (``main_frame``, the id the driver read when it attached
+    to the page) whose host the list does not name is refused like an internal one, and remembered in
+    ``offsite`` so the error can say which rule refused it. When the main frame is not known every
+    document request is judged, the narrower reading. ``cache=False`` hands caching to the predicate:
+    `BrowserReach` caches the DNS-heavy floor itself and must re-decide a loopback port on every
+    request, because Chimera's own listeners bind after the browser starts.
     """
 
-    def __init__(self, allowed: Callable[[str], bool] | None = None) -> None:
+    def __init__(
+        self,
+        allowed: Callable[[str], bool] | None = None,
+        *,
+        listed: Callable[[str], bool] | None = None,
+        cache: bool = True,
+    ) -> None:
         self._allowed = allowed or is_safe_url
+        self._listed = listed
+        self._cache = cache
         self._hosts: dict[str, bool] = {}
         self.blocked_navigations: list[str] = []
+        self.offsite: set[str] = set()
         self.blocked_requests = 0
 
     def permits(self, url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
             return True
+        if not self._cache:
+            return self._allowed(url)
         key = f"{parsed.scheme}://{parsed.netloc}"
         if key not in self._hosts:
             self._hosts[key] = self._allowed(url)
         return self._hosts[key]
 
-    def on_paused(self, session: Any, params: dict[str, Any]) -> None:
+    def _off_the_list(self, url: str, params: dict[str, Any], main_frame: str | None) -> bool:
+        if self._listed is None or params.get("resourceType") != "Document":
+            return False
+        if main_frame is not None and params.get("frameId") not in (None, main_frame):
+            return False  # a frame inside a listed page: the floor judged it, the list does not
+        return not self._listed(url)
+
+    def on_paused(self, session: Any, params: dict[str, Any], main_frame: str | None = None) -> None:
         """One paused request: continue it or fail it. Any error while DECIDING fails it — a request
         left paused hangs the page, and a guard that cannot decide must not wave it through.
 
@@ -118,11 +147,16 @@ class RequestGuard:
         so a failed command is dropped, never retried as the opposite verdict."""
         request_id = params.get("requestId")
         url = ""
+        offsite = False
         try:
             url = str((params.get("request") or {}).get("url", ""))
             allow = self.permits(url)
+            if allow and self._off_the_list(url, params, main_frame):
+                allow, offsite = False, True
         except Exception:  # noqa: BLE001 — cannot decide: fail closed
             allow = False
+        if offsite:
+            self.offsite.add(url)
         if not allow:
             self.blocked_requests += 1
             if params.get("resourceType") == "Document":
@@ -139,11 +173,26 @@ class RequestGuard:
         out, self.blocked_navigations = self.blocked_navigations, []
         return out
 
+    def refusal(self, url: str) -> str:
+        """The error a refused navigation becomes, naming the rule that refused it."""
+        if url in self.offsite:
+            return (
+                f"blocked navigation outside the browser's site list: {url} (navigate to it "
+                "directly; a site off the list needs a person's yes)"
+            )
+        return f"blocked navigation to an internal address: {url}"
+
 
 class PlaywrightDriver:
     """A persistent Chromium page driven through the accessibility tree."""
 
-    def __init__(self, *, headless: bool = True, allowed: Callable[[str], bool] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        headless: bool = True,
+        allowed: Callable[[str], bool] | None = None,
+        reach: BrowserReach | None = None,
+    ) -> None:
         from playwright.sync_api import sync_playwright  # lazy: only when actually browsing
 
         self._pw = sync_playwright().start()
@@ -156,7 +205,13 @@ class PlaywrightDriver:
             self._pw.stop()
             raise
         self._context = self._browser.new_context()
-        self.guard = RequestGuard(allowed)
+        # With a reach (study 29, P5.2) every request goes through ITS predicate, the same object the
+        # tool checks a navigate target with, and top-level navigations through its site list.
+        self.guard = (
+            RequestGuard(reach.permits, listed=reach.listed if reach.sites else None, cache=False)
+            if reach is not None
+            else RequestGuard(allowed)
+        )
         self._sessions: list[Any] = []
         # Every page of the context gets the guard: the driver's own page before its first request;
         # a popup the page opens as soon as the context reports it (its first request may race it,
@@ -169,7 +224,14 @@ class PlaywrightDriver:
         if any(owner is page for owner, _ in self._sessions):
             return
         session = self._context.new_cdp_session(page)
-        session.on("Fetch.requestPaused", lambda params: self.guard.on_paused(session, params))
+        # The main frame's id, so the site list judges top-level navigations and not a listed page's
+        # own frames. Unknown (None) makes the guard judge every document, the narrower reading.
+        main: str | None = None
+        with contextlib.suppress(Exception):
+            main = str(session.send("Page.getFrameTree")["frameTree"]["frame"]["id"])
+        session.on(
+            "Fetch.requestPaused", lambda params: self.guard.on_paused(session, params, main_frame=main)
+        )
         session.send("Fetch.enable", {"patterns": [{"urlPattern": "*", "requestStage": "Request"}]})
         self._sessions.append((page, session))
 
@@ -186,21 +248,30 @@ class PlaywrightDriver:
             blocked = self.guard.take()
             if blocked:
                 self._blank()
-                raise ValueError(f"blocked navigation to an internal address: {blocked[0]}") from None
+                raise ValueError(self.guard.refusal(blocked[0])) from None
             raise
         blocked = self.guard.take()
         if blocked:
             self._blank()
-            raise ValueError(f"blocked navigation to an internal address: {blocked[0]}")
+            raise ValueError(self.guard.refusal(blocked[0]))
         return self._snapshot()
 
     def _blank(self) -> None:
         """After a refused navigation the page is mid-way to Chromium's error page, and the next read
-        fails with "the page is navigating". A blank page is a settled state with nothing to read."""
+        fails with "the page is navigating". A blank page is a settled state with nothing to read.
+
+        Asked until the page IS blank, not once. Measured (study 29, P5.2, 5/5 on a real Chromium):
+        the first ``goto`` is interrupted by Chromium's own move to ``chrome-error://``, and the blank
+        navigation it queued then landed in the middle of the agent's NEXT ``navigate``, which failed
+        with "interrupted by another navigation to about:blank". So every refusal cost the next page
+        too. The second ``goto`` absorbs the queued one; three is a bound, never reached."""
         from contextlib import suppress
 
-        with suppress(Exception):
-            self._page.goto("about:blank", wait_until="domcontentloaded")
+        for _ in range(3):
+            with suppress(Exception):
+                self._page.goto("about:blank", wait_until="domcontentloaded")
+            if str(getattr(self._page, "url", "about:blank")) == "about:blank":
+                return
 
     def _by_ref(self, ref: str) -> Any:
         """The one element carrying ``ref``. Unknown is a KeyError (the tool reports it); more than

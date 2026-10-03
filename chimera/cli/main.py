@@ -2763,6 +2763,11 @@ def _bind_app_socket(host: str, port: int) -> tuple[Any, int]:
             raise
         sock.bind((host, 0))  # requested port busy → OS picks a free one
     sock.listen(128)
+    # The desktop sidecar binds port 0, so only the OS knows this number until now. The browser's
+    # loopback check reads it from here: no declared local port may ever be the app's own API.
+    from chimera.core.listeners import claim
+
+    claim(int(sock.getsockname()[1]))
     return sock, sock.getsockname()[1]
 
 

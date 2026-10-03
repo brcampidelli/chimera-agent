@@ -10,6 +10,7 @@ also re-check every redirect hop (a public URL can 302 to ``http://169.254.169.2
 from __future__ import annotations
 
 import ipaddress
+import re
 import socket
 from urllib.parse import urlparse
 
@@ -41,6 +42,30 @@ def _is_blocked(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     )
 
 
+#: A host whose last label is a number, in the WHATWG URL standard's sense ("ends in a number"):
+#: decimal digits, or ``0x`` and hex digits. No real top-level domain is numeric, so such a host is
+#: an IPv4 address in some spelling — and the spelling is where the check used to diverge from the
+#: browser. ``ipaddress`` reads only the canonical dotted quad, so ``2130706433``, ``0177.0.0.1``,
+#: ``0x7f.1`` and ``127.1`` fell through to ``getaddrinfo``, whose reading is the platform's: on
+#: Windows each one fails to resolve (refused, by luck, as "could not resolve"), on glibc each one
+#: is ``127.0.0.1`` (refused), and an ``inet_aton`` that read ``0177`` as decimal would have made
+#: it ``177.0.0.1`` (public). Chromium reads all four as ``127.0.0.1``.
+_NUMERIC_LAST_LABEL = re.compile(r"^(?:0[xX][0-9a-fA-F]*|[0-9]+)$")
+
+
+def is_numeric_host(host: str) -> bool:
+    """Whether ``host`` is an IPv4 address in a spelling other than the canonical dotted quad."""
+    try:
+        ipaddress.ip_address(host)
+        return False  # canonical (or IPv6): `ipaddress` decides it like everyone else
+    except ValueError:
+        pass
+    labels = host.split(".")
+    if len(labels) > 1 and labels[-1] == "":
+        labels.pop()  # one trailing dot is the root, as the standard says: `127.0.0.1.` is numeric
+    return bool(_NUMERIC_LAST_LABEL.match(labels[-1]))
+
+
 def check_url(url: str) -> None:
     """Raise ``ValueError`` if ``url`` is not a safe public http(s) URL (SSRF guard)."""
     parsed = urlparse(url)
@@ -49,6 +74,10 @@ def check_url(url: str) -> None:
     host = parsed.hostname
     if not host:
         raise ValueError("blocked URL with no host")
+    if is_numeric_host(host):
+        # Refused rather than decoded: no page needs an address spelled in octal or as one integer,
+        # and decoding it here would be a second parser to keep in step with the browser's.
+        raise ValueError(f"blocked IP address in a non-canonical spelling: {host!r}")
     try:
         candidates = [ipaddress.ip_address(host)]  # a literal IP in the URL
     except ValueError:

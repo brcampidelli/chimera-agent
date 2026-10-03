@@ -28,8 +28,14 @@ def test_the_screen_may_write_it() -> None:
 def test_the_screen_can_read_its_current_state(tmp_path: Path) -> None:
     headful = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_BROWSER_HEADLESS="false")  # type: ignore[arg-type]
 
-    assert read_config(headful)["browser"] == {"headless": False}
-    assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["browser"] == {"headless": True}  # type: ignore[arg-type]
+    # The block also carries the browser's site list and local ports (study 29, P5.2), both empty
+    # unless the owner wrote them; the whole block is compared so neither can appear by default.
+    assert read_config(headful)["browser"] == {"headless": False, "sites": [], "local_ports": []}
+    assert read_config(Settings(CHIMERA_HOME=str(tmp_path)))["browser"] == {  # type: ignore[arg-type]
+        "headless": True,
+        "sites": [],
+        "local_ports": [],
+    }
 
 
 def test_it_declares_that_it_waits_for_the_next_conversation() -> None:

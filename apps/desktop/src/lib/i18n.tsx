@@ -526,6 +526,14 @@ const en: Dict = {
   "settings.row.showBrowser": "Show the browser window",
   "settings.hint.showBrowser":
     "Chromium opens where you can see it, on the machine running the agent, so you can watch the page it is on. Off, it browses invisibly.",
+  "settings.row.browserSites":
+    "Sites the browser opens without asking",
+  "settings.hint.browserSites":
+    "Hosts, and *.domain for its subdomains. Empty: any public site. A page off the list asks you first; where nobody can be asked, it is not opened.",
+  "settings.row.browserLocalPorts":
+    "Local ports the browser may open",
+  "settings.hint.browserLocalPorts":
+    "Opens localhost on these ports only, so the agent can look at the app it is changing. Never Chimera's own ports, a private network or cloud metadata. Empty: no local address at all.",
   "settings.pinned":
     "Fixed in this server's environment. Saving here writes .env, which that environment overrides the next time the server starts.",
   "settings.row.fallbackModels": "Fallback models",
@@ -2313,6 +2321,14 @@ const pt: Dict = {
   "settings.row.showBrowser": "Mostrar a janela do navegador",
   "settings.hint.showBrowser":
     "O Chromium abre à vista, na máquina que roda o agente, para você acompanhar a página em que ele está. Desligado, ele navega invisível.",
+  "settings.row.browserSites":
+    "Sites que o navegador abre sem perguntar",
+  "settings.hint.browserSites":
+    "Hosts, e *.domínio para os subdomínios. Vazio: qualquer site público. Uma página fora da lista pergunta antes; onde ninguém pode responder, é recusada.",
+  "settings.row.browserLocalPorts":
+    "Portas locais que o navegador pode abrir",
+  "settings.hint.browserLocalPorts":
+    "Abre o localhost só nestas portas, para o agente ver o app que está alterando. Nunca as portas do próprio Chimera, rede privada ou metadados de nuvem. Vazio: nenhum endereço local.",
   "settings.pinned":
     "Fixado no ambiente deste servidor. Salvar aqui grava no .env, que esse ambiente sobrescreve na próxima vez que o servidor subir.",
   "settings.row.fallbackModels": "Modelos de fallback",
@@ -4149,6 +4165,14 @@ const es: Dict = {
   "settings.row.showBrowser": "Mostrar la ventana del navegador",
   "settings.hint.showBrowser":
     "Chromium se abre a la vista, en la máquina que ejecuta el agente, para que veas la página en la que está. Apagado, navega de forma invisible.",
+  "settings.row.browserSites":
+    "Sitios que el navegador abre sin preguntar",
+  "settings.hint.browserSites":
+    "Hosts, y *.dominio para sus subdominios. Vacío: cualquier sitio público. Una página fuera de la lista pregunta antes; donde nadie puede responder, se rechaza.",
+  "settings.row.browserLocalPorts":
+    "Puertos locales que el navegador puede abrir",
+  "settings.hint.browserLocalPorts":
+    "Abre localhost solo en estos puertos, para que el agente vea la app que está cambiando. Nunca los puertos del propio Chimera, una red privada ni los metadatos de la nube. Vacío: ninguna dirección local.",
   "settings.pinned":
     "Fijado en el entorno de este servidor. Guardar aquí escribe en .env, que ese entorno sobrescribe la próxima vez que el servidor arranque.",
   "settings.row.fallbackModels": "Modelos de respaldo",
@@ -5962,6 +5986,14 @@ const fr: Dict = {
   "settings.row.showBrowser": "Afficher la fenêtre du navigateur",
   "settings.hint.showBrowser":
     "Chromium s'ouvre en visible, sur la machine qui exécute l'agent, pour que vous voyiez la page où il se trouve. Désactivé, il navigue sans fenêtre.",
+  "settings.row.browserSites":
+    "Sites que le navigateur ouvre sans demander",
+  "settings.hint.browserSites":
+    "Hôtes, et *.domaine pour ses sous-domaines. Vide : n'importe quel site public. Une page hors de la liste demande d'abord ; là où personne ne peut répondre, elle est refusée.",
+  "settings.row.browserLocalPorts":
+    "Ports locaux que le navigateur peut ouvrir",
+  "settings.hint.browserLocalPorts":
+    "Ouvre localhost sur ces ports seulement, pour que l'agent voie l'application qu'il modifie. Jamais les ports de Chimera lui-même, un réseau privé ni les métadonnées du cloud. Vide : aucune adresse locale.",
   "settings.pinned":
     "Fixé dans l'environnement de ce serveur. Enregistrer ici écrit dans .env, que cet environnement écrase au prochain démarrage du serveur.",
   "settings.row.fallbackModels": "Modèles de repli",
@@ -7784,6 +7816,14 @@ const de: Dict = {
   "settings.row.showBrowser": "Browserfenster anzeigen",
   "settings.hint.showBrowser":
     "Chromium öffnet sich sichtbar, auf der Maschine, die den Agenten ausführt, damit du die Seite siehst, auf der er ist. Aus surft er unsichtbar.",
+  "settings.row.browserSites":
+    "Websites, die der Browser ohne Nachfrage öffnet",
+  "settings.hint.browserSites":
+    "Hosts, und *.domain für deren Subdomains. Leer: jede öffentliche Website. Eine Seite außerhalb der Liste fragt zuerst; wo niemand antworten kann, wird sie abgelehnt.",
+  "settings.row.browserLocalPorts":
+    "Lokale Ports, die der Browser öffnen darf",
+  "settings.hint.browserLocalPorts":
+    "Öffnet localhost nur auf diesen Ports, damit der Agent die App sieht, die er ändert. Nie die eigenen Ports von Chimera, ein privates Netz oder Cloud-Metadaten. Leer: keine lokale Adresse.",
   "settings.pinned":
     "Im Environment dieses Servers festgelegt. Speichern schreibt in die .env, die dieses Environment beim nächsten Start wieder überschreibt.",
   "settings.row.fallbackModels": "Ausweichmodelle",
@@ -9573,6 +9613,14 @@ const zh: Dict = {
   "settings.row.showBrowser": "显示浏览器窗口",
   "settings.hint.showBrowser":
     "Chromium 会在运行智能体的那台机器上开出可见窗口，你能看见它正在浏览哪一页。关闭时它则不显示窗口。",
+  "settings.row.browserSites":
+    "浏览器无需询问即可打开的网站",
+  "settings.hint.browserSites":
+    "主机名，*.域名 表示其子域名。留空：任何公共网站。列表之外的页面会先询问你；无人可问时则拒绝。",
+  "settings.row.browserLocalPorts":
+    "浏览器可以打开的本地端口",
+  "settings.hint.browserLocalPorts":
+    "仅在这些端口上打开 localhost，让智能体查看它正在修改的应用。绝不包括 Chimera 自身的端口、私有网络或云元数据。留空：不打开任何本地地址。",
   "settings.pinned":
     "由这台服务器的环境变量固定。在这里保存只会写入 .env，服务器下次启动时又会被环境变量盖掉。",
   "settings.row.fallbackModels": "备用模型",
@@ -11330,6 +11378,14 @@ const ja: Dict = {
   "settings.row.showBrowser": "ブラウザーのウィンドウを表示する",
   "settings.hint.showBrowser":
     "エージェントを動かしているマシンで Chromium が見える形で開き、いま見ているページを確認できます。オフだと画面に出ずに閲覧します。",
+  "settings.row.browserSites":
+    "ブラウザーが確認なしで開けるサイト",
+  "settings.hint.browserSites":
+    "ホスト名。*.ドメイン でそのサブドメイン。空欄：公開サイトならどこでも。リスト外のページは先に確認し、確認できる人がいない場所では拒否します。",
+  "settings.row.browserLocalPorts":
+    "ブラウザーが開けるローカルポート",
+  "settings.hint.browserLocalPorts":
+    "これらのポートでのみ localhost を開き、エージェントが変更中のアプリを確認できるようにします。Chimera 自身のポート、プライベートネットワーク、クラウドのメタデータは決して開きません。空欄：ローカルアドレスは一切開きません。",
   "settings.pinned":
     "このサーバーの環境変数で固定されています。ここで保存しても .env に書くだけで、次の起動時に環境変数が上書きします。",
   "settings.row.fallbackModels": "フォールバック",
@@ -13098,6 +13154,14 @@ const it: Dict = {
   "settings.row.showBrowser": "Mostra la finestra del browser",
   "settings.hint.showBrowser":
     "Chromium si apre in modo visibile, sulla macchina che esegue l'agente, così puoi vedere la pagina su cui si trova. Spento, naviga invisibile.",
+  "settings.row.browserSites":
+    "Siti che il browser apre senza chiedere",
+  "settings.hint.browserSites":
+    "Host, e *.dominio per i suoi sottodomini. Vuoto: qualsiasi sito pubblico. Una pagina fuori dalla lista chiede prima; dove nessuno può rispondere, viene rifiutata.",
+  "settings.row.browserLocalPorts":
+    "Porte locali che il browser può aprire",
+  "settings.hint.browserLocalPorts":
+    "Apre localhost solo su queste porte, perché l'agente veda l'app che sta modificando. Mai le porte di Chimera stesso, una rete privata o i metadati del cloud. Vuoto: nessun indirizzo locale.",
   "settings.pinned":
     "Fissato nell'ambiente di questo server. Salvare qui scrive nel .env, che quell'ambiente sovrascrive al prossimo avvio.",
   "settings.row.fallbackModels": "Modelli di riserva",
@@ -14910,6 +14974,14 @@ const pl: Dict = {
   "settings.row.showBrowser": "Pokaż okno przeglądarki",
   "settings.hint.showBrowser":
     "Chromium otwiera się widocznie, na maszynie, na której działa agent, więc widzisz stronę, na której jest. Wyłączone — przegląda niewidocznie.",
+  "settings.row.browserSites":
+    "Strony, które przeglądarka otwiera bez pytania",
+  "settings.hint.browserSites":
+    "Hosty oraz *.domena dla jej subdomen. Puste: dowolna strona publiczna. Strona spoza listy najpierw pyta; tam, gdzie nikt nie może odpowiedzieć, jest odrzucana.",
+  "settings.row.browserLocalPorts":
+    "Porty lokalne, które przeglądarka może otwierać",
+  "settings.hint.browserLocalPorts":
+    "Otwiera localhost tylko na tych portach, aby agent widział aplikację, którą zmienia. Nigdy porty samego Chimery, sieć prywatna ani metadane chmury. Puste: żaden adres lokalny.",
   "settings.pinned":
     "Ustalone w środowisku tego serwera. Zapis tutaj trafia do .env, które to środowisko nadpisze przy następnym starcie.",
   "settings.row.fallbackModels": "Modele zapasowe",
@@ -16718,6 +16790,14 @@ const ru: Dict = {
   "settings.row.showBrowser": "Показывать окно браузера",
   "settings.hint.showBrowser":
     "Chromium открывается видимым окном на машине, где работает агент, — видно, на какой он странице. Выключено — браузер работает незаметно.",
+  "settings.row.browserSites":
+    "Сайты, которые браузер открывает без вопроса",
+  "settings.hint.browserSites":
+    "Хосты и *.домен для его поддоменов. Пусто: любой публичный сайт. Страница вне списка сначала спрашивает; там, где спросить некого, она отклоняется.",
+  "settings.row.browserLocalPorts":
+    "Локальные порты, которые может открывать браузер",
+  "settings.hint.browserLocalPorts":
+    "Открывает localhost только на этих портах, чтобы агент видел приложение, которое он меняет. Никогда — собственные порты Chimera, частную сеть или метаданные облака. Пусто: никаких локальных адресов.",
   "settings.pinned":
     "Задано в окружении этого сервера. Сохранение здесь пишет в .env, а окружение перезапишет его при следующем запуске.",
   "settings.row.fallbackModels": "Запасные модели",
