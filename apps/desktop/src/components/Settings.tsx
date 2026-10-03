@@ -1064,7 +1064,9 @@ export function Settings({
           <TabPanel tabsId={tabsId} value={tab}>
             {tab === "connections" && <Connections />}
             {tab === "usage" && <Usage embedded />}
-            {tab === "security" && <Governance embedded />}
+            {tab === "security" && (
+              <Governance embedded onOpenSettings={() => setTab("general")} />
+            )}
             {tab === "decisions" && <Decisions embedded />}
             {tab === "general" && (
               <div className="mx-auto max-w-2xl space-y-6 px-6 py-6">
@@ -1682,6 +1684,34 @@ export function Settings({
                         keys_url: "",
                       }}
                       onSave={(v) => save({ CHIMERA_SERVER_TOKEN: v })}
+                    />
+                  </Row>
+                </Card>
+
+                {/* The two settings that narrow sharing (`chimera/api/sharing.py`). On and empty are
+              what sharing did before they existed. Which links exist, and revoking them, is the
+              access card on the Security tab. Neither row is writable through the bridge: their
+              other direction widens. */}
+                <Card title={t("settings.card.sharing")}>
+                  <Row
+                    label={t("settings.row.sharing")}
+                    hint={t("settings.hint.sharing")}
+                    env="CHIMERA_SHARING"
+                  >
+                    <Toggle
+                      on={c.sharing?.enabled ?? true}
+                      onChange={(v) => save({ CHIMERA_SHARING: String(v) })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.shareExpiry")}
+                    hint={t("settings.hint.shareExpiry")}
+                    env="CHIMERA_SHARE_EXPIRY_HOURS"
+                  >
+                    <TextField
+                      value={c.sharing?.expiry_hours ? String(c.sharing.expiry_hours) : ""}
+                      placeholder={t("settings.placeholder.shareExpiry")}
+                      onSave={(v) => save({ CHIMERA_SHARE_EXPIRY_HOURS: v.trim() })}
                     />
                   </Row>
                 </Card>

@@ -676,6 +676,11 @@ def build_api_app(
         # status bar does not go on describing the old setting for up to fifteen seconds.
         if {"CHIMERA_KEEP_AWAKE", "CHIMERA_KEEP_AWAKE_ON_BATTERY"} & set(updates):
             keep_awake.nudge()
+        # Sharing switched off closes the LAN door now. Decided from the value saved rather than
+        # from a settings read, so it holds for an app built with injected settings too; the guest
+        # routes refuse every link while the switch is off whether or not the door is open.
+        if str(updates.get("CHIMERA_SHARING", "")).strip().lower() in _OFF_WORDS:
+            app.state.guest_server.stop()
         return result
 
     # Pools are edited by OPERATION, not by value. `PATCH /api/config` writes a string, and a string
@@ -2342,6 +2347,20 @@ def build_api_app(
     register_openai_compat(app, guard, openai_manager)
     # /api/bridge/* — the only routes that take the bridge token instead of the server's guard.
     register_bridge_api(app, desktop_bridge, live_settings=live_settings, workspace=workspace)
+    # /api/security/access — every way into this machine on one card, and the controls that only
+    # narrow (`chimera/api/access_api.py`). After the code API, which builds the share store and the
+    # LAN door it reads.
+    from chimera.api.access_api import register_access_api
+
+    register_access_api(
+        app,
+        guard,
+        bridge=desktop_bridge,
+        store=app.state.share_store,
+        door=app.state.guest_server,
+        live_settings=live_settings,
+        session_titles=app.state.code_session_titles,
+    )
 
     if static_dir is not None:
         _mount_spa(app, static_dir)
@@ -2350,6 +2369,8 @@ def build_api_app(
 
 
 _LOOPBACK = {"127.0.0.1", "::1", "localhost"}
+#: How a boolean setting is written when it is off — the words pydantic reads as False.
+_OFF_WORDS = {"false", "0", "no", "off", "f", "n"}
 
 
 def _index_html(index: Path, request: Request) -> Any:

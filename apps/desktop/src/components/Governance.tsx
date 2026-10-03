@@ -6,6 +6,7 @@ import {
   getGovernanceInjection,
   getSandboxState,
 } from "@/lib/api";
+import { AccessCard } from "@/components/AccessCard";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
@@ -303,7 +304,16 @@ function SandboxPanel({ data, t }: { data: SandboxState; t: TFunc }) {
 }
 
 
-export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
+export function Governance({
+  embedded = false,
+  onOpenSettings,
+}: {
+  embedded?: boolean;
+  /** Where the bearer token and the sharing settings are changed — the General tab, when this
+   *  screen is the Settings screen's Security tab. Without it the access card offers no button for
+   *  them rather than one that goes nowhere. */
+  onOpenSettings?: () => void;
+} = {}) {
   const t = useT();
   const injection = useQuery({ queryKey: ["governance-injection"], queryFn: getGovernanceInjection });
   // The questions a turn is parked on right now. Polled, because the turn that asked may be in
@@ -349,6 +359,11 @@ export function Governance({ embedded = false }: { embedded?: boolean } = {}) {
       ) : (
         <SandboxPanel data={sandbox.data} t={t} />
       )}
+
+      {/* Right after the execution boundary: that one says what a command can reach; this one says
+          who can reach the app at all — every token, link and open door, with the controls that
+          only close them. */}
+      <AccessCard onOpenSettings={onOpenSettings} />
 
       {injection.isError ? (
         <Panel title={t("governance.injection.title")}>

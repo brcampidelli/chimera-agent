@@ -25,6 +25,15 @@ vi.mock("@/lib/api", () => ({
   getApprovals: vi.fn(async () => []),
   getGovernanceAudit: vi.fn(),
   getSandboxState: vi.fn(),
+  // The screen also mounts the access card (`AccessCard.tsx`, tested on its own); an empty
+  // machine keeps it out of the way of the panels this file is about.
+  getAccess: vi.fn(async () => ({
+    server_token: { set: false },
+    bridge: { enabled: false, active: false, tier: null, hint: "" },
+    sharing: { enabled: true, expiry_hours: null },
+    guest_door: { open: false, port: null, urls: [] },
+    links: [],
+  })),
 }));
 
 const mockSandbox = vi.mocked(getSandboxState);

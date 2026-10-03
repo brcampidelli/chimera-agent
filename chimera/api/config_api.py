@@ -99,6 +99,11 @@ _EDITABLE_SETTINGS = {
     # whether that still holds on battery. Read on the keeper's every tick, so no APPLIES_WHEN entry.
     "CHIMERA_KEEP_AWAKE",
     "CHIMERA_KEEP_AWAKE_ON_BATTERY",
+    # Whether a conversation may be shared at all, and how long a new link opens it. Both only
+    # narrow, and both are read per request, so neither needs an APPLIES_WHEN entry. The bridge may
+    # write neither (`bridge_routes.OWNER_ONLY_SETTINGS`): their other direction widens.
+    "CHIMERA_SHARING",
+    "CHIMERA_SHARE_EXPIRY_HOURS",
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
     # Who may talk to each bot. Not secrets — platform ids — so they are read back in full, like the
     # egress list: a list the owner cannot read is a list they cannot correct, and the failure it
@@ -437,6 +442,11 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "mode": settings.keep_awake,
             "on_battery": settings.keep_awake_on_battery,
         },
+        # The two settings that narrow sharing. Which links exist is `GET /api/security/access`.
+        "sharing": {
+            "enabled": settings.sharing,
+            "expiry_hours": settings.share_expiry_hours,
+        },
         # Which backend answers a typed decision, and which model; empty = the backend's default.
         "decisions": {
             "backend": (settings.decision_backend or "local_logprob").strip(),
@@ -632,6 +642,23 @@ def _check_daily_cap(value: str) -> None:
         )
 
 
+def _check_share_expiry(value: str) -> None:
+    """Empty (never) or a positive number of hours. Zero and negatives are refused rather than read
+    as "never", for the reason `_check_daily_cap` gives: saved, they would look like a choice and
+    mean its opposite."""
+    text = value.strip()
+    if not text:
+        return
+    try:
+        hours = float(text)
+    except ValueError as exc:
+        raise ValueError(f"CHIMERA_SHARE_EXPIRY_HOURS must be a number of hours, not {text!r}") from exc
+    if not math.isfinite(hours) or hours <= 0:
+        raise ValueError(
+            "CHIMERA_SHARE_EXPIRY_HOURS must be more than zero; leave it empty for links that never expire"
+        )
+
+
 def _check_keep_awake(value: str) -> None:
     if value.strip().lower() not in ("off", "working", "always"):
         raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
@@ -651,6 +678,8 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
+    "CHIMERA_SHARING": _check_boolean("CHIMERA_SHARING"),
+    "CHIMERA_SHARE_EXPIRY_HOURS": _check_share_expiry,
 }
 
 

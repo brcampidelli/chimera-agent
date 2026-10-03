@@ -59,7 +59,7 @@ from chimera.api.bridge_discovery import (
     write_discovery,
 )
 from chimera.api.bridge_routes import (
-    BRIDGE_SETTINGS,
+    OWNER_ONLY_SETTINGS,
     ROUTES,
     BridgeRoute,
     Tier,
@@ -135,9 +135,12 @@ class DesktopBridge:
         full = bool(settings.desktop_bridge_full)
         if self.token is not None and full == self.full and self.path.exists():
             return
+        self._publish(self.token or secrets.token_urlsafe(32), full)
+
+    def _publish(self, token: str, full: bool) -> None:
         from chimera import __version__
 
-        self.token = self.token or secrets.token_urlsafe(32)
+        self.token = token
         self.full = full
         write_discovery(
             self.path,
@@ -149,6 +152,27 @@ class DesktopBridge:
                 "full": full,
             },
         )
+
+    def rotate(self) -> bool:
+        """A new token, written over the old one; False while the bridge is off (nothing to rotate).
+
+        Until this existed the token changed only when the switch went off and on again, which also
+        drops the full-control choice for a moment. The old token stops working the moment this
+        returns: :meth:`authorize` compares against the new one, and the discovery file a client
+        reads next holds only the new one.
+        """
+        if self.token is None:
+            return False
+        settings = self._settings()
+        if not settings.desktop_bridge or self.url is None:
+            self.close()  # switched off since the last sync: there is no token to hand out
+            return False
+        self._publish(secrets.token_urlsafe(32), bool(settings.desktop_bridge_full))
+        return True
+
+    def hint(self) -> str:
+        """The last four characters of the live token, or "" while off — never more of it."""
+        return f"…{self.token[-4:]}" if self.token else ""
 
     def close(self) -> None:
         """Forget the token and delete the file — only if it is ours, never another app's."""
@@ -565,7 +589,9 @@ def register_bridge_api(
         if route_id == "settings.edit":
             if not isinstance(body, dict) or not body:
                 raise HTTPException(status_code=400, detail="body must be {ENV_NAME: value}")
-            refused = sorted(k for k in body if is_secret_setting(str(k)) or k in BRIDGE_SETTINGS)
+            refused = sorted(
+                k for k in body if is_secret_setting(str(k)) or k in OWNER_ONLY_SETTINGS
+            )
             if refused:
                 raise HTTPException(
                     status_code=403,

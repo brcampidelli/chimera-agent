@@ -8,6 +8,7 @@ the providers it actually calls (see :mod:`chimera.providers.gateway`).
 from __future__ import annotations
 
 import logging
+import math
 import os
 from collections.abc import Iterable
 from functools import lru_cache
@@ -931,6 +932,21 @@ class Settings(BaseSettings):
         default=None, validation_alias="CHIMERA_ARCHIVE_AFTER_DAYS"
     )
 
+    # Whether a conversation can be shared with a second person at all (`chimera/api/sharing.py`).
+    # ON by default because that is what the app did before the switch existed: a share link is made
+    # only when the owner presses Share, and the network door opens only when they open it. Off
+    # refuses a new link, closes the network door and stops every existing link from opening — the
+    # links stay on disk, listed on the Security card, so turning it back on does not lose them.
+    # Read on every request, so a change applies at once.
+    sharing: bool = Field(default=True, validation_alias="CHIMERA_SHARING")
+    # How long a NEW share link opens its conversation, in hours. Empty (the default), zero or
+    # negative means never — what every link did before this existed. Stamped on the link when it is
+    # made (`Share.expires_at`), so changing it does not reach back to links already handed out; the
+    # Security card lists those with their own expiry and revokes them one by one or all at once.
+    share_expiry_hours: float | None = Field(
+        default=None, validation_alias="CHIMERA_SHARE_EXPIRY_HOURS"
+    )
+
     # Base URL for a local Ollama server. A model like `ollama_chat/llama3` runs on your machine
     # with no API key — set this only if Ollama listens somewhere other than the default. Reinforces
     # the fully-local, self-hostable path: `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`, no key needed.
@@ -1316,6 +1332,31 @@ class Settings(BaseSettings):
                 text,
             )
             return None
+
+    @field_validator("share_expiry_hours", mode="before")
+    @classmethod
+    def _share_expiry_hours_or_never(cls, value: object) -> object:
+        """Empty, zero or negative is "never", and an unreadable value falls back to it with a
+        warning, for the reason `_archive_after_days_or_never` gives: a typo must not stop the app.
+        The Settings row refuses a bad value before writing it (`config_api`), and the Security
+        card shows "never" beside the links, so a hand-edited typo is visible rather than silent."""
+        if value is None:
+            return None
+        if isinstance(value, (int, float)):
+            return float(value) if value > 0 else None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            hours = float(text)
+        except ValueError:
+            _log.warning(
+                "CHIMERA_SHARE_EXPIRY_HOURS=%r is not a number of hours; new share links never "
+                "expire.",
+                text,
+            )
+            return None
+        return hours if math.isfinite(hours) and hours > 0 else None
 
     @field_validator("taint_authority", mode="before")
     @classmethod

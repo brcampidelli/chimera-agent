@@ -39,6 +39,9 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("api.guest")
 
+#: What the owner's routes answer while ``CHIMERA_SHARING`` is off: the setting and where it lives.
+SHARING_OFF = "sharing is off (Settings › Sharing)"
+
 #: The name a subscriber who gave none is listed under. Presence is for people, and "someone" is
 #: what an unnamed window honestly is.
 ANONYMOUS = "someone"
@@ -59,6 +62,8 @@ class ShareOut(BaseModel):
     session_id: str
     created_at: float
     label: str = ""
+    #: When the link stops opening the conversation (Unix time); None is never.
+    expires_at: float | None = None
     #: A link a guest can open, when the network door is open; otherwise None — a link that goes
     #: nowhere would be worse than no link.
     url: str | None = None
@@ -163,6 +168,23 @@ class GuestServer:
 # --- the guest app ----------------------------------------------------------------------------
 
 
+#: Read on every request: whether the owner allows sharing right now (``CHIMERA_SHARING``).
+SharingOn = Callable[[], bool]
+
+#: Raised, word for word, for every way a share token fails to open a conversation — unknown,
+#: revoked, expired, or sharing switched off. One answer, so a guest probing the door learns nothing
+#: about which of the four it hit.
+CLOSED = "this link no longer opens a conversation"
+
+
+def _always_on() -> bool:
+    return True
+
+
+def _no_expiry() -> float | None:
+    return None
+
+
 def build_guest_app(
     *,
     store: ShareStore,
@@ -171,6 +193,7 @@ def build_guest_app(
     session_workspace: Callable[[str], str],
     start_turn: Callable[..., Any],
     static_dir: Path | None = None,
+    sharing_on: SharingOn = _always_on,
 ) -> FastAPI:
     """The four routes a share token opens, and the page that uses them.
 
@@ -188,9 +211,12 @@ def build_guest_app(
         token = header[len("Bearer ") :] if header.startswith("Bearer ") else ""
         # `EventSource` cannot set a header, so the live stream takes the token in the query.
         token = token or str(request.query_params.get("t") or "")
-        share = store.resolve(token)
+        # The switch first: with sharing off no link opens, whatever it is. The links are not
+        # deleted — the owner may turn sharing back on — but until then they are inert, which is
+        # what "off" has to mean for a door that is also mounted on the owner's own server.
+        share = store.resolve(token) if sharing_on() else None
         if share is None:
-            raise HTTPException(status_code=401, detail="this link no longer opens a conversation")
+            raise HTTPException(status_code=401, detail=CLOSED)
         return share
 
     # One dependency object, built once — the shape ruff asks for (B008) and the one `guard` has.
@@ -328,9 +354,16 @@ def register_sharing_api(
     guest: FastAPI,
     session_exists: Callable[[str], bool],
     server: GuestServer | None = None,
+    sharing_on: SharingOn = _always_on,
+    expires_in: Callable[[], float | None] = _no_expiry,
 ) -> GuestServer:
     """Mount the owner's sharing routes and the guest app under ``/guest``; return the network
-    listener so the app can close it on shutdown."""
+    listener so the app can close it on shutdown.
+
+    ``sharing_on`` and ``expires_in`` are read on every request, from the settings the Settings
+    screen writes: whether a link may be made or the door opened at all, and how many seconds a new
+    link opens its conversation for (None = never). Both only narrow; their defaults are what this
+    did before either existed."""
     door = server or GuestServer(guest)
     app.mount("/guest", guest)
 
@@ -341,15 +374,19 @@ def register_sharing_api(
             "session_id": share.session_id,
             "created_at": share.created_at,
             "label": share.label,
+            "expires_at": share.expires_at,
             "url": urls[0] if urls else None,
         }
 
     @app.post("/api/code/sessions/{session_id}/share", dependencies=[guard], response_model=ShareOut)
     def share_session(session_id: str, body: ShareIn | None = None) -> dict[str, Any]:
         """A new token for this conversation. One per person, so one can be revoked alone."""
+        if not sharing_on():
+            raise HTTPException(status_code=403, detail=SHARING_OFF)
         if not session_exists(session_id):
             raise HTTPException(status_code=404, detail="no such conversation")
-        return _out(store.mint(session_id, label=(body.label if body else "")))
+        share = store.mint(session_id, label=(body.label if body else ""), expires_in=expires_in())
+        return _out(share)
 
     @app.get("/api/code/sessions/{session_id}/shares", dependencies=[guard], response_model=SharesOut)
     def list_shares(session_id: str) -> dict[str, Any]:
@@ -357,8 +394,13 @@ def register_sharing_api(
 
     @app.delete("/api/code/sessions/{session_id}/shares/{token}", dependencies=[guard])
     def revoke_share(session_id: str, token: str) -> dict[str, bool]:
-        share = store.resolve(token)
-        if share is None or share.session_id != session_id:
+        # Any link of this conversation, expired included — revoking one that already stopped
+        # opening is how the owner clears it from the list, and `resolve` would refuse to find it.
+        share = next(
+            (s for s in store.for_session(session_id, include_expired=True) if s.token == token),
+            None,
+        )
+        if share is None:
             return {"ok": False}
         return {"ok": store.revoke(token)}
 
@@ -380,6 +422,8 @@ def register_sharing_api(
     @app.post("/api/code/share/network", dependencies=[guard], response_model=NetworkShareOut)
     def network_open(body: NetworkShareIn | None = None) -> dict[str, Any]:
         """Open the LAN door: the guest app, and only it, on every interface."""
+        if not sharing_on():
+            raise HTTPException(status_code=403, detail=SHARING_OFF)
         try:
             door.start(body.port if body else 0)
         except OSError as exc:

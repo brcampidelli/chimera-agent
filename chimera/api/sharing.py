@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import hashlib
 import hmac
 import itertools
 import json
@@ -72,6 +73,28 @@ class Share:
     session_id: str
     created_at: float
     label: str = ""
+    #: When the token stops opening anything, as a Unix time; None is never — every link made
+    #: before expiry existed, and every link made while ``CHIMERA_SHARE_EXPIRY_HOURS`` is empty.
+    expires_at: float | None = None
+
+    def expired(self, now: float | None = None) -> bool:
+        return self.expires_at is not None and (time.time() if now is None else now) >= self.expires_at
+
+    @property
+    def id(self) -> str:
+        """A name for the link that is not the link.
+
+        The Security card lists every link and revokes one by this, so the token never has to
+        travel back to the screen to be revoked — the per-conversation Share dialog shows the link
+        itself, which is its job; a list of every way into this machine is not the place to print
+        them all. A digest, not a slice: a prefix of the token would be part of the token.
+        """
+        return hashlib.sha256(self.token.encode("utf-8")).hexdigest()[:16]
+
+    @property
+    def hint(self) -> str:
+        """The last four characters, the most the app ever shows of a secret (`config_api._hint`)."""
+        return f"…{self.token[-4:]}" if len(self.token) > 8 else ""
 
 
 class ShareStore:
@@ -95,6 +118,7 @@ class ShareStore:
                 session_id=str(item.get("session_id") or ""),
                 created_at=float(item.get("created_at") or 0.0),
                 label=str(item.get("label") or ""),
+                expires_at=_expiry(item.get("expires_at")),
             )
             for item in (raw if isinstance(raw, list) else [])
             if isinstance(item, dict) and item.get("token") and item.get("session_id")
@@ -107,32 +131,62 @@ class ShareStore:
             json.dumps([share.__dict__ for share in self._shares], indent=2),
         )
 
-    def mint(self, session_id: str, *, label: str = "") -> Share:
+    def mint(
+        self, session_id: str, *, label: str = "", expires_in: float | None = None
+    ) -> Share:
         """A new token for ``session_id``. Several may exist for one conversation — one per person
-        the owner shared it with — so revoking one does not throw the others out."""
+        the owner shared it with — so revoking one does not throw the others out.
+
+        ``expires_in`` is seconds from now; None (or not positive) is a link that never expires."""
+        now = time.time()
         share = Share(
-            token=secrets.token_urlsafe(24), session_id=session_id, created_at=time.time(),
+            token=secrets.token_urlsafe(24), session_id=session_id, created_at=now,
             label=label.strip()[:80],
+            expires_at=now + expires_in if expires_in is not None and expires_in > 0 else None,
         )
         with self._lock:
             self._shares.append(share)
             self._write()
         return share
 
-    def resolve(self, token: str) -> Share | None:
-        """The share a token opens, or None. Every stored token is compared, in constant time."""
-        if not token:
-            return None
+    def _find(self, token: str) -> Share | None:
+        """The share a token names, expired or not. Every stored token is compared, in constant
+        time; the caller holds the lock."""
         found: Share | None = None
-        with self._lock:
-            for share in self._shares:
-                if hmac.compare_digest(share.token, token):
-                    found = share
+        for share in self._shares:
+            if hmac.compare_digest(share.token, token):
+                found = share
         return found
 
-    def for_session(self, session_id: str) -> list[Share]:
+    def resolve(self, token: str) -> Share | None:
+        """The share a token OPENS, or None — and an expired link opens nothing.
+
+        Checked here, at the one place a token turns into a conversation, rather than by a sweep
+        that deletes old links: a sweep runs at some moment, and between its runs an expired link
+        would still open. The expired link stays on disk so the owner sees on the Security card
+        that it expired, instead of watching it vanish."""
+        if not token:
+            return None
         with self._lock:
-            return [s for s in self._shares if s.session_id == session_id]
+            found = self._find(token)
+        if found is None or found.expired():
+            return None
+        return found
+
+    def for_session(self, session_id: str, *, include_expired: bool = False) -> list[Share]:
+        """A conversation's links. Expired ones are left out unless asked for: a link that opens
+        nothing is not a way in, so it must not hold a conversation out of the archive or be offered
+        again as a link to copy."""
+        with self._lock:
+            return [
+                s for s in self._shares
+                if s.session_id == session_id and (include_expired or not s.expired())
+            ]
+
+    def all(self) -> list[Share]:
+        """Every link this home holds, expired ones included, oldest first."""
+        with self._lock:
+            return list(self._shares)
 
     def revoke(self, token: str) -> bool:
         with self._lock:
@@ -143,6 +197,16 @@ class ShareStore:
                 return True
         return False
 
+    def revoke_id(self, share_id: str) -> Share | None:
+        """Revoke the link whose :attr:`Share.id` this is; the share removed, or None."""
+        with self._lock:
+            gone = next((s for s in self._shares if hmac.compare_digest(s.id, share_id)), None)
+            if gone is None:
+                return None
+            self._shares = [s for s in self._shares if s is not gone]
+            self._write()
+        return gone
+
     def revoke_session(self, session_id: str) -> int:
         """Every token of one conversation — what deleting the conversation must also do."""
         with self._lock:
@@ -152,6 +216,26 @@ class ShareStore:
             if gone:
                 self._write()
         return gone
+
+    def revoke_all(self) -> int:
+        """Every link of every conversation."""
+        with self._lock:
+            gone = len(self._shares)
+            if gone:
+                self._shares = []
+                self._write()
+        return gone
+
+
+def _expiry(value: Any) -> float | None:
+    """A stored ``expires_at``, or None for a link that never expires (or a value nobody can read
+    as a time — the file is the owner's own, and a hand-edit must not stop the app)."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @dataclass

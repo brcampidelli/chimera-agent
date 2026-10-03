@@ -2822,6 +2822,83 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/security/access": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Access
+         * @description Every way into this machine right now, with no secret in the answer.
+         */
+        get: operations["access_api_security_access_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/access/bridge/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Bridge
+         * @description A new bridge token; the old one stops working now. 409 while the bridge is off.
+         */
+        post: operations["rotate_bridge_api_security_access_bridge_rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/access/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Links
+         * @description Every link, or every link of one conversation when ``session_id`` names it.
+         */
+        delete: operations["revoke_links_api_security_access_links_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/security/access/links/{link_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke Link */
+        delete: operations["revoke_link_api_security_access_links__link_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/sessions": {
         parameters: {
             query?: never;
@@ -3308,6 +3385,122 @@ export interface components {
             rate: number | null;
             /** Shown */
             shown: number;
+        };
+        /**
+         * AccessBridgeOut
+         * @description The desktop bridge (``chimera/api/desktop_bridge.py``).
+         */
+        AccessBridgeOut: {
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Hint
+             * @default
+             */
+            hint: string;
+            /** Tier */
+            tier?: string | null;
+        };
+        /**
+         * AccessGuestDoorOut
+         * @description The LAN listener that serves only the guest app (``guest_api.GuestServer``).
+         */
+        AccessGuestDoorOut: {
+            /**
+             * Open
+             * @default false
+             */
+            open: boolean;
+            /** Port */
+            port?: number | null;
+            /** Urls */
+            urls?: string[];
+        };
+        /**
+         * AccessLinkOut
+         * @description One share link, named by everything except itself.
+         */
+        AccessLinkOut: {
+            /** Created At */
+            created_at: number;
+            /**
+             * Expired
+             * @default false
+             */
+            expired: boolean;
+            /** Expires At */
+            expires_at?: number | null;
+            /**
+             * Hint
+             * @default
+             */
+            hint: string;
+            /** Id */
+            id: string;
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /** Session Id */
+            session_id: string;
+            /**
+             * Session Title
+             * @default
+             */
+            session_title: string;
+        };
+        /** AccessOut */
+        AccessOut: {
+            bridge: components["schemas"]["AccessBridgeOut"];
+            guest_door: components["schemas"]["AccessGuestDoorOut"];
+            /** Links */
+            links: components["schemas"]["AccessLinkOut"][];
+            server_token: components["schemas"]["AccessServerTokenOut"];
+            sharing: components["schemas"]["AccessSharingOut"];
+        };
+        /** AccessRevokeOneOut */
+        AccessRevokeOneOut: {
+            /** Ok */
+            ok: boolean;
+        };
+        /** AccessRevokedOut */
+        AccessRevokedOut: {
+            /** Revoked */
+            revoked: number;
+        };
+        /**
+         * AccessServerTokenOut
+         * @description The bearer every guarded route asks for. Whether it is set, and nothing of its value — the
+         *     Settings row it is changed on reports it the same way (``ServerCfgOut.token_set``).
+         */
+        AccessServerTokenOut: {
+            /**
+             * Set
+             * @default false
+             */
+            set: boolean;
+        };
+        /**
+         * AccessSharingOut
+         * @description The two settings that narrow sharing (``CHIMERA_SHARING``, ``CHIMERA_SHARE_EXPIRY_HOURS``).
+         */
+        AccessSharingOut: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Expiry Hours */
+            expiry_hours?: number | null;
         };
         /**
          * AgentDefOut
@@ -4609,6 +4802,7 @@ export interface components {
             providers: components["schemas"]["ProviderOut"][];
             sandbox: components["schemas"]["SandboxCfgOut"];
             server: components["schemas"]["ServerCfgOut"];
+            sharing?: components["schemas"]["SharingCfgOut"];
             spend?: components["schemas"]["SpendCfgOut"];
         };
         /** ConfigTestOut */
@@ -7781,6 +7975,8 @@ export interface components {
         ShareOut: {
             /** Created At */
             created_at: number;
+            /** Expires At */
+            expires_at?: number | null;
             /**
              * Label
              * @default
@@ -7797,6 +7993,21 @@ export interface components {
         SharesOut: {
             /** Shares */
             shares: components["schemas"]["ShareOut"][];
+        };
+        /**
+         * SharingCfgOut
+         * @description Whether conversations may be shared and how long a new link opens one (``CHIMERA_SHARING``,
+         *     ``CHIMERA_SHARE_EXPIRY_HOURS``). A server without the block is on the shipped default: sharing
+         *     on, links that never expire — what sharing did before either setting existed.
+         */
+        SharingCfgOut: {
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /** Expiry Hours */
+            expiry_hours?: number | null;
         };
         /** SkillStatOut */
         SkillStatOut: {
@@ -12733,6 +12944,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HitlOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    access_api_security_access_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessOut"];
+                };
+            };
+        };
+    };
+    rotate_bridge_api_security_access_bridge_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessBridgeOut"];
+                };
+            };
+        };
+    };
+    revoke_links_api_security_access_links_delete: {
+        parameters: {
+            query?: {
+                session_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRevokedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_link_api_security_access_links__link_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                link_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccessRevokeOneOut"];
                 };
             };
             /** @description Validation Error */

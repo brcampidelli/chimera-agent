@@ -43,6 +43,7 @@ import type {
   KeepAwakeState,
   LocalRuntimes,
   NetworkShare,
+  AccessState,
   ShareInfo,
   WorkInfo,
   OllamaModels,
@@ -1812,6 +1813,21 @@ export const openNetworkShare = (port = 0) =>
   json<NetworkShare>("/api/code/share/network", { method: "POST", body: JSON.stringify({ port }) });
 export const closeNetworkShare = () =>
   json<NetworkShare>("/api/code/share/network", { method: "DELETE" });
+
+// Every way into this machine, on the Security tab's access card (`chimera/api/access_api.py`). No
+// token travels in either direction: a link is revoked by its id, a digest of the token.
+export const getAccess = () => json<AccessState>("/api/security/access");
+export const rotateBridgeToken = () =>
+  json<AccessState["bridge"]>("/api/security/access/bridge/rotate", { method: "POST" });
+export const revokeAccessLink = (linkId: string) =>
+  json<{ ok: boolean }>(`/api/security/access/links/${encodeURIComponent(linkId)}`, {
+    method: "DELETE",
+  });
+export const revokeAllAccessLinks = (sessionId = "") =>
+  json<{ revoked: number }>(
+    `/api/security/access/links${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
+    { method: "DELETE" },
+  );
 
 // Background works (`chimera.api.works`): the conversation's list, and the two things a person
 // (or the voice, through the talking model's tools) does to one. State changes arrive on the

@@ -13,6 +13,10 @@ export type SessionMeta = Schemas["SessionMetaOut"];
 // Sharing a conversation with a second person: the token, and the state of the network door.
 export type ShareInfo = Schemas["ShareOut"];
 export type NetworkShare = Schemas["NetworkShareOut"];
+/** Every way into this machine, for the Security tab's access card. Never a token: at most its last
+ *  four characters (`chimera/api/access_api.py`). */
+export type AccessState = Schemas["AccessOut"];
+export type AccessLink = Schemas["AccessLinkOut"];
 /** A background work of a conversation: a coding turn on the strong model, running while the
  *  conversation goes on (`chimera.api.works`). */
 export type WorkInfo = Schemas["WorkOut"];

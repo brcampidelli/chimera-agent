@@ -3385,6 +3385,14 @@ def register_code_api(
         except ValueError:
             return False
 
+    # Both read per request from the live settings, so the Settings screen's switch applies at once.
+    def _sharing_on() -> bool:
+        return bool(live().sharing)
+
+    def _share_expires_in() -> float | None:
+        hours = live().share_expiry_hours
+        return hours * 3600.0 if hours else None
+
     guest_app = build_guest_app(
         store=shares,
         bus=bus,
@@ -3392,10 +3400,23 @@ def register_code_api(
         session_workspace=_session_workspace,
         start_turn=_start_turn,
         static_dir=static_dir,
+        sharing_on=_sharing_on,
     )
     app.state.guest_server = register_sharing_api(
-        app, guard, store=shares, bus=bus, guest=guest_app, session_exists=_session_exists
+        app,
+        guard,
+        store=shares,
+        bus=bus,
+        guest=guest_app,
+        session_exists=_session_exists,
+        sharing_on=_sharing_on,
+        expires_in=_share_expires_in,
     )
+    # The access card (`chimera/api/access_api.py`) names each link's conversation by the title the
+    # sidebar shows, read from the same listing rather than from a second reader of the files.
+    app.state.code_session_titles = lambda: {
+        str(row["id"]): str(row.get("title") or "") for row in store.list_meta()
+    }
     app.state.session_bus = bus
     app.state.share_store = shares
 

@@ -739,6 +739,15 @@ class KeepAwakeCfgOut(BaseModel):
     on_battery: bool = False
 
 
+class SharingCfgOut(BaseModel):
+    """Whether conversations may be shared and how long a new link opens one (``CHIMERA_SHARING``,
+    ``CHIMERA_SHARE_EXPIRY_HOURS``). A server without the block is on the shipped default: sharing
+    on, links that never expire — what sharing did before either setting existed."""
+
+    enabled: bool = True
+    expiry_hours: float | None = None
+
+
 class KeepAwakeOut(BaseModel):
     """Whether this process is holding the machine awake right now, and why.
 
@@ -769,6 +778,7 @@ class ConfigOut(BaseModel):
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
     spend: SpendCfgOut = Field(default_factory=SpendCfgOut)
     keep_awake: KeepAwakeCfgOut = Field(default_factory=KeepAwakeCfgOut)
+    sharing: SharingCfgOut = Field(default_factory=SharingCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
