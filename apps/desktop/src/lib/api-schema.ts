@@ -1351,6 +1351,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Diagnostics Endpoint */
+        get: operations["diagnostics_endpoint_api_diagnostics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/dictation": {
         parameters: {
             query?: never;
@@ -3083,6 +3100,67 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/storage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storage Endpoint
+         * @description What this install keeps on disk, by kind. A category that could not be counted is null.
+         */
+        get: operations["storage_endpoint_api_storage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage/logs/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rotate Logs Endpoint
+         * @description Rotate the diagnostic traces now — the rename their writers make at the size cap.
+         */
+        post: operations["rotate_logs_endpoint_api_storage_logs_rotate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/storage/worktrees/prune": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prune Worktrees Endpoint
+         * @description Collect orphaned worktrees. A live run's worktree, or one whose maker cannot be
+         *     identified, is never touched — see `chimera.core.worktree.classify_worktree_dir`.
+         */
+        post: operations["prune_worktrees_endpoint_api_storage_worktrees_prune_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tools": {
         parameters: {
             query?: never;
@@ -3532,6 +3610,27 @@ export interface components {
             workspace?: string | null;
             /** Write Region */
             write_region?: string[] | null;
+        };
+        /**
+         * AppDiagnosticsOut
+         * @description What a bug report needs, in one place (study 29, P5.3).
+         */
+        AppDiagnosticsOut: {
+            /** Backend Version */
+            backend_version: string;
+            crash: components["schemas"]["CrashReportOut"] | null;
+            /** Home */
+            home: string;
+            /** Platform */
+            platform: string;
+            /** Python */
+            python: string;
+            /** Report */
+            report: string;
+            /** Workspace */
+            workspace: string;
+            /** Worktree Dir */
+            worktree_dir: string;
         };
         /** ApproachOut */
         ApproachOut: {
@@ -4610,6 +4709,7 @@ export interface components {
             sandbox: components["schemas"]["SandboxCfgOut"];
             server: components["schemas"]["ServerCfgOut"];
             spend?: components["schemas"]["SpendCfgOut"];
+            storage?: components["schemas"]["StorageCfgOut"];
         };
         /** ConfigTestOut */
         ConfigTestOut: {
@@ -4633,6 +4733,18 @@ export interface components {
              * @default
              */
             path: string;
+        };
+        /**
+         * CrashReportOut
+         * @description The desktop's last ``backend-crash.txt``, with credentials scrubbed before it left disk.
+         */
+        CrashReportOut: {
+            /** Modified */
+            modified: string;
+            /** Path */
+            path: string;
+            /** Text */
+            text: string;
         };
         /** CrewDoneOut */
         CrewDoneOut: {
@@ -5464,6 +5576,15 @@ export interface components {
             how: string;
             /** Support */
             support: string;
+        };
+        /** DiskOut */
+        DiskOut: {
+            /** Free */
+            free: number | null;
+            /** Path */
+            path: string;
+            /** Total */
+            total: number | null;
         };
         /** DoctorOut */
         DoctorOut: {
@@ -6547,6 +6668,15 @@ export interface components {
         LocalRuntimesOut: {
             /** Runtimes */
             runtimes?: components["schemas"]["LocalRuntimeOut"][];
+        };
+        /** LogRotateOut */
+        LogRotateOut: {
+            /** Bytes Freed */
+            bytes_freed: number;
+            /** Failed */
+            failed: number;
+            /** Rotated */
+            rotated: number;
         };
         /** MaturityOut */
         MaturityOut: {
@@ -7915,6 +8045,80 @@ export interface components {
             /** Daily Usd Cap */
             daily_usd_cap?: number | null;
         };
+        /**
+         * StorageCategoryOut
+         * @description One kind of thing this install keeps on disk. ``bytes`` null = not measured, never zero.
+         */
+        StorageCategoryOut: {
+            /** Bytes */
+            bytes: number | null;
+            /** Files */
+            files: number | null;
+            /** Key */
+            key: string;
+            /** Note */
+            note: string;
+            /** Paths */
+            paths: string[];
+        };
+        /**
+         * StorageCfgOut
+         * @description ``CHIMERA_WORKTREE_DIR`` as set; empty is the system temp folder (the default).
+         */
+        StorageCfgOut: {
+            /**
+             * Worktree Dir
+             * @default
+             */
+            worktree_dir: string;
+        };
+        /**
+         * StorageConfirmIn
+         * @description The two storage actions remove files; each must be asked for in so many words.
+         */
+        StorageConfirmIn: {
+            /**
+             * Confirm
+             * @default false
+             */
+            confirm: boolean;
+        };
+        /**
+         * StorageOut
+         * @description What this install keeps on disk, by kind (study 29, P5.3). Nullable like `ResourcesOut`.
+         */
+        StorageOut: {
+            /** Categories */
+            categories: components["schemas"]["StorageCategoryOut"][];
+            /** Disks */
+            disks: components["schemas"]["DiskOut"][];
+            /** Home */
+            home: string;
+            /** Rotatable Logs */
+            rotatable_logs: string[];
+            /** Worktree Dir */
+            worktree_dir: string;
+            /** Worktrees */
+            worktrees: components["schemas"]["StorageWorktreeOut"][];
+        };
+        /**
+         * StorageWorktreeOut
+         * @description One isolated worktree folder, and whether the prune would collect it.
+         *
+         *     ``state`` is ``live`` (a run is using it, or it is too new to judge), ``orphan`` (the prune
+         *     removes it) or ``kept`` (its maker cannot be identified, so it is not called dead on a guess).
+         *     ``reason`` is a fixed word a screen translates.
+         */
+        StorageWorktreeOut: {
+            /** Bytes */
+            bytes: number | null;
+            /** Path */
+            path: string;
+            /** Reason */
+            reason: string;
+            /** State */
+            state: string;
+        };
         /** SubtaskOut */
         SubtaskOut: {
             /**
@@ -8469,6 +8673,19 @@ export interface components {
         WorksOut: {
             /** Works */
             works: components["schemas"]["WorkOut"][];
+        };
+        /** WorktreePruneOut */
+        WorktreePruneOut: {
+            /** Bytes Freed */
+            bytes_freed: number;
+            /** Failed */
+            failed: number;
+            /** Kept */
+            kept: number;
+            /** Live */
+            live: number;
+            /** Removed */
+            removed: number;
         };
         /**
          * WorthReport
@@ -10574,6 +10791,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    diagnostics_endpoint_api_diagnostics_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppDiagnosticsOut"];
                 };
             };
         };
@@ -13138,6 +13375,92 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RetiredOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    storage_endpoint_api_storage_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageOut"];
+                };
+            };
+        };
+    };
+    rotate_logs_endpoint_api_storage_logs_rotate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogRotateOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prune_worktrees_endpoint_api_storage_worktrees_prune_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageConfirmIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorktreePruneOut"];
                 };
             };
             /** @description Validation Error */

@@ -2336,6 +2336,11 @@ def build_api_app(
     from chimera.api.lifecycle_api import register_lifecycle_api
 
     register_lifecycle_api(app, guard, workspace, settings, live_settings=live_settings)
+    # /api/storage and /api/diagnostics — the Storage and Diagnostics cards (study 29, P5.3).
+    # Unconditional, for the schema-dump reason above.
+    from chimera.api.storage_api import register_storage_api
+
+    register_storage_api(app, guard, workspace, settings, live_settings=live_settings)
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
     # stops to ask would be an assembly that refuses, and the app's screen must not be held to that.

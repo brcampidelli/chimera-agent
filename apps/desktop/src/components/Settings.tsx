@@ -42,6 +42,8 @@ import { KeepAwakeCard } from "@/components/KeepAwakeCard";
 import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
 import { NotificationsCard } from "@/components/NotificationsCard";
+import { StorageCard } from "@/components/StorageCard";
+import { DiagnosticsCard } from "@/components/DiagnosticsCard";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type {
@@ -1011,6 +1013,8 @@ export function Settings({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["config"] });
       qc.invalidateQueries({ queryKey: ["doctor"] });
+      // The Storage card says where the next worktree goes, which a saved folder changes.
+      qc.invalidateQueries({ queryKey: ["storage"] });
     },
   });
   const save = (updates: Record<string, string>) => mutation.mutate(updates);
@@ -1659,6 +1663,15 @@ export function Settings({
                       : t("settings.note.desktopBridgeNeedsFirst")}
                   </p>
                 </Card>
+
+                {/* What this install keeps on disk, and where a run's worktree goes (study 29,
+              P5.3). Measured, never guessed: a row the server could not count says so. */}
+                <StorageCard
+                  worktreeDir={c.storage?.worktree_dir ?? ""}
+                  onSave={save}
+                />
+
+                <DiagnosticsCard />
 
                 <Card title={t("settings.card.server")}>
                   <Row

@@ -574,6 +574,16 @@ def doctor(
         )
     console.print(caps)
 
+    # What this install keeps on disk — the same rows the app's Storage card and its Copy button
+    # show (`chimera.core.storage.summary_rows`), so the terminal and the screen cannot disagree.
+    # Here because the VPS has no screen, and the drive that fills there is the same kind of drive.
+    from chimera.core.storage import measure, summary_rows
+
+    disk = Table(title="Storage", show_header=False, title_style="bold")
+    for label, value in summary_rows(measure(settings.home)):
+        disk.add_row(label, value)
+    console.print(disk)
+
     if providers and probe:
         # One token, on the default model, through the same gateway a real run uses — including its
         # failover, so "the primary is down and a fallback answered" reads as ready, which it is.

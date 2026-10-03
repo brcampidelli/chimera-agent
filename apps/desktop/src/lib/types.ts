@@ -72,6 +72,12 @@ export type PoolWrite = Schemas["PoolWriteOut"];
 export type AppConfig = Schemas["ConfigOut"];
 /** Whether the app holds the machine awake right now, and for what (`chimera/core/keep_awake.py`). */
 export type KeepAwakeState = Schemas["KeepAwakeOut"];
+// What this install keeps on disk, by kind; `bytes: null` is "not measured", never zero (P5.3).
+export type StorageReport = Schemas["StorageOut"];
+export type StorageCategory = Schemas["StorageCategoryOut"];
+export type WorktreePrune = Schemas["WorktreePruneOut"];
+export type LogRotate = Schemas["LogRotateOut"];
+export type AppDiagnostics = Schemas["AppDiagnosticsOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];

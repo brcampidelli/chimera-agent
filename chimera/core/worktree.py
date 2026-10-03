@@ -10,6 +10,8 @@ directly), so callers can always opt in safely.
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -17,8 +19,9 @@ import time
 import uuid
 from collections.abc import Callable
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from chimera.core.checkpoint import _IGNORE_DIRS
 from chimera.telemetry import get_logger
@@ -84,6 +87,237 @@ def live_worktree_paths(repo_root: Path) -> set[Path]:
     return paths
 
 
+#: Every isolated worktree's directory name starts with this, wherever it lives. It is what makes a
+#: directory ours to count and to collect; nothing without it is ever touched.
+WORKTREE_PREFIX = "chimera-wt-"
+
+#: Written into the worktree's own git admin directory (`.git/worktrees/<name>/`), never into the
+#: checkout: a file in the checkout would be one of the run's "changes" and be copied back into the
+#: person's project. It says which process made the worktree, which is the only way a different
+#: process — the storage card, a later run — can tell a killed run's leftover from a run that is
+#: still working.
+OWNER_FILE = "chimera-owner.json"
+
+#: Worktrees this process made and has not removed yet. Checked before anything else, so a run in
+#: this process is never collected, whatever its age and whatever the owner file says.
+_live_here: set[Path] = set()
+
+
+def worktree_parent(repo_root: Path | None = None) -> Path:
+    """Where a new worktree is made: ``CHIMERA_WORKTREE_DIR``, or the system temp folder.
+
+    The configured folder is refused — with a warning, and temp used instead — when it is not an
+    absolute path, when it lies inside the repository the worktree is made from (that repository's
+    status, search and checkpoints would all start reading the run's checkout), or when it cannot
+    be created. Refusing loudly would fail the run over a setting; ignoring silently would leave
+    the owner believing their disk was being spared. The warning is the middle.
+    """
+    from chimera.config import get_settings
+
+    temp = Path(tempfile.gettempdir())
+    configured = (get_settings().worktree_dir or "").strip()
+    if not configured:
+        return temp
+    folder = Path(configured).expanduser()
+    if not folder.is_absolute():
+        _log.warning("CHIMERA_WORKTREE_DIR=%r is not an absolute path; using %s", configured, temp)
+        return temp
+    if repo_root is not None:
+        with suppress(OSError, ValueError):
+            if folder.resolve().is_relative_to(Path(repo_root).resolve()):
+                _log.warning(
+                    "CHIMERA_WORKTREE_DIR=%s is inside the project %s; using %s",
+                    folder, repo_root, temp,
+                )
+                return temp
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        _log.warning("CHIMERA_WORKTREE_DIR=%s cannot be created (%s); using %s", folder, exc, temp)
+        return temp
+    return folder
+
+
+def worktree_parents() -> list[Path]:
+    """Every folder a worktree may have been made in: temp, and the configured one if any.
+
+    Both, always: changing the setting does not move the worktrees already made, and a leftover in
+    the old place is still a leftover.
+    """
+    parents = [Path(tempfile.gettempdir())]
+    configured = worktree_parent()
+    if configured not in parents:
+        parents.append(configured)
+    return parents
+
+
+def find_worktree_dirs() -> list[Path]:
+    """Every ``chimera-wt-*`` directory in the folders a worktree may have been made in."""
+    found: list[Path] = []
+    for parent in worktree_parents():
+        with suppress(OSError):
+            found.extend(p for p in parent.glob(f"{WORKTREE_PREFIX}*") if p.is_dir())
+    return sorted(set(found))
+
+
+def _admin_dir(path: Path) -> Path | None:
+    """The worktree's git admin directory, read from its ``.git`` file; None when it has none.
+
+    A linked worktree's ``.git`` is a FILE holding ``gitdir: <repo>/.git/worktrees/<name>``. A
+    directory without one is not a worktree at all — what is left when git forgot it, or when
+    `create` died between making the folder and registering it.
+    """
+    marker = path / ".git"
+    try:
+        if not marker.is_file():
+            return None
+        line = marker.read_text(encoding="utf-8", errors="replace").strip()
+    except OSError:
+        return None
+    if not line.startswith("gitdir:"):
+        return None
+    admin = Path(line[len("gitdir:") :].strip())
+    if not admin.is_absolute():
+        admin = (path / admin).resolve()
+    return admin
+
+
+def _write_owner(path: Path) -> None:
+    """Record which process made this worktree. Best-effort: a run is not refused for this, and a
+    worktree without the record is simply never collected by anything but its own `remove`."""
+    admin = _admin_dir(path)
+    if admin is None:
+        return
+    with suppress(OSError):
+        (admin / OWNER_FILE).write_text(
+            json.dumps({"pid": os.getpid(), "created": time.time()}), encoding="utf-8"
+        )
+
+
+def _process_alive(pid: int, created: float) -> bool | None:
+    """Whether the process that made a worktree at ``created`` is still running; None if unknown.
+
+    Not ``os.kill(pid, 0)``: on Windows signal 0 is CTRL_C_EVENT, and that call would interrupt the
+    process it was asking about. A pid whose process started AFTER the worktree was made has been
+    reused by somebody else — the maker is gone. A process we may not inspect is counted as alive:
+    the cost of keeping a dead run's checkout is disk, the cost of the opposite is someone's work.
+    """
+    try:
+        import psutil
+    except ImportError:
+        return None
+    try:
+        started = float(psutil.Process(pid).create_time())
+    except psutil.NoSuchProcess:
+        return False
+    except (psutil.Error, OSError):
+        return True
+    return started <= created + 1.0
+
+
+WorktreeState = Literal["live", "orphan", "kept"]
+
+
+@dataclass(frozen=True)
+class WorktreeDir:
+    """What is known about one ``chimera-wt-*`` directory, and whether it may be collected.
+
+    ``live`` and ``kept`` are never touched; only ``orphan`` is. ``kept`` is the honest third
+    answer — a worktree whose maker cannot be identified (made by a version that recorded no
+    owner, or on a machine where processes cannot be inspected) is not called dead on a guess.
+    ``reason`` is a fixed word, so a screen can translate it.
+    """
+
+    path: Path
+    state: WorktreeState
+    reason: str
+    registered: bool
+
+
+def classify_worktree_dir(path: Path, *, now: float | None = None) -> WorktreeDir:
+    """Decide whether a worktree directory belongs to a run that is still working."""
+    path = Path(path)
+    with suppress(OSError):
+        if path.resolve() in _live_here:
+            return WorktreeDir(path, "live", "this_process", True)
+    try:
+        age = (time.time() if now is None else now) - path.stat().st_mtime
+    except OSError:
+        return WorktreeDir(path, "kept", "unreadable", False)
+    if age < _ORPHAN_MIN_AGE_SECONDS:
+        return WorktreeDir(path, "live", "too_new", False)
+    admin = _admin_dir(path)
+    if admin is None or not admin.is_dir():
+        return WorktreeDir(path, "orphan", "unregistered", False)
+    try:
+        owner = json.loads((admin / OWNER_FILE).read_text(encoding="utf-8"))
+        pid, created = int(owner["pid"]), float(owner["created"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return WorktreeDir(path, "kept", "no_owner", True)
+    alive = _process_alive(pid, created)
+    if alive is None:
+        return WorktreeDir(path, "kept", "owner_unknown", True)
+    if alive:
+        return WorktreeDir(path, "live", "owner_running", True)
+    return WorktreeDir(path, "orphan", "owner_gone", True)
+
+
+def _remove_registered(path: Path, admin: Path) -> None:
+    """Unregister a dead run's worktree from its repository, and delete its attempt branch.
+
+    Through the repository's own git directory rather than its checkout, which this code does not
+    otherwise know: the admin directory names its common directory, and that is all git needs.
+    Only a branch named like ours is deleted — the HEAD of a worktree someone repurposed by hand is
+    not ours to remove.
+    """
+    common = admin.parent.parent
+    with suppress(OSError):
+        pointer = (admin / "commondir").read_text(encoding="utf-8").strip()
+        if pointer:
+            common = (admin / pointer).resolve()
+    branch = ""
+    with suppress(OSError):
+        head = (admin / "HEAD").read_text(encoding="utf-8").strip()
+        if head.startswith("ref: refs/heads/"):
+            branch = head[len("ref: refs/heads/") :]
+    git_dir = [f"--git-dir={common}"]
+    _git([*git_dir, "worktree", "remove", "--force", str(path)], common)
+    if "/attempt-" in branch:
+        _git([*git_dir, "branch", "-D", branch], common)
+    _git([*git_dir, "worktree", "prune"], common)
+
+
+def prune_worktree_dirs() -> dict[str, int]:
+    """Collect every orphaned worktree directory, in every repository. The storage card's action.
+
+    Each directory is classified again immediately before it is touched, so the answer acted on is
+    never older than the action. Live and kept directories are counted and left; the result says
+    how many of each, and how many bytes the removed ones held.
+    """
+    from chimera.core.storage import tree_size
+
+    result = {"removed": 0, "bytes_freed": 0, "kept": 0, "live": 0, "failed": 0}
+    for candidate in find_worktree_dirs():
+        state = classify_worktree_dir(candidate)
+        if state.state != "orphan":
+            result["live" if state.state == "live" else "kept"] += 1
+            continue
+        size = tree_size(candidate)
+        admin = _admin_dir(candidate)
+        if state.registered and admin is not None:
+            _remove_registered(candidate, admin)
+        if candidate.exists():
+            shutil.rmtree(candidate, ignore_errors=True)
+        if candidate.exists():
+            result["failed"] += 1
+            continue
+        result["removed"] += 1
+        result["bytes_freed"] += size.bytes or 0
+    if result["removed"]:
+        _log.info("pruned orphaned worktree directories: %s", result)
+    return result
+
+
 def prune_orphans(repo_root: Path, *, prefix: str = "chimera") -> dict[str, int]:
     """Clean up what a killed run leaves behind. Returns what was removed, by kind.
 
@@ -127,19 +361,22 @@ def prune_orphans(repo_root: Path, *, prefix: str = "chimera") -> dict[str, int]
         if _git(["branch", "-D", branch], repo_root).returncode == 0:
             removed["branches"] += 1
 
-    # 3. Temp directories git no longer knows about. Age-gated: `create` makes the directory and
-    #    registers it a moment later, and pruning inside that window would delete a live worktree
-    #    belonging to another process.
-    now = time.time()
-    with suppress(OSError):
-        for candidate in Path(tempfile.gettempdir()).glob("chimera-wt-*"):
-            if not candidate.is_dir() or candidate.resolve() in live:
-                continue
-            with suppress(OSError):
-                if now - candidate.stat().st_mtime < _ORPHAN_MIN_AGE_SECONDS:
-                    continue
-                shutil.rmtree(candidate, ignore_errors=True)
-                removed["directories"] += 1
+    # 3. Worktree directories NO repository knows about. Age-gated: `create` makes the directory
+    #    and registers it a moment later, and pruning inside that window would delete a live
+    #    worktree belonging to another process.
+    #
+    #    "No repository", not "not this one". This step used to keep only the directories in THIS
+    #    repository's worktree list, and every `chimera-wt-*` lives in one shared temp folder — so
+    #    the first run in repository A deleted, from under it, the worktree of a run that had been
+    #    working in repository B for more than an hour. A directory registered with any repository
+    #    is left to `prune_worktree_dirs`, which asks whether the process that made it is alive.
+    for candidate in find_worktree_dirs():
+        state = classify_worktree_dir(candidate)
+        if state.state != "orphan" or state.registered:
+            continue
+        shutil.rmtree(candidate, ignore_errors=True)
+        if not candidate.exists():
+            removed["directories"] += 1
 
     if any(removed.values()):
         _log.info("pruned orphaned worktrees: %s", removed)
@@ -169,11 +406,16 @@ class GitWorktree:
                 # reason to refuse to start this run.
                 prune_orphans(repo_root, prefix=prefix)
         branch = f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
-        path = Path(tempfile.mkdtemp(prefix="chimera-wt-"))
+        path = Path(tempfile.mkdtemp(prefix=WORKTREE_PREFIX, dir=worktree_parent(repo_root)))
+        # Counted as live from before git knows it: the age gate covers other processes in that
+        # window, and this covers this one for as long as the run lasts, however long that is.
+        _live_here.add(path.resolve())
         path.rmdir()  # `git worktree add` needs the target not to exist yet
         result = _git(["worktree", "add", "-b", branch, str(path), "HEAD"], repo_root)
         if result.returncode != 0:
+            _live_here.discard(path.resolve())
             raise RuntimeError(f"git worktree add failed: {result.stderr.strip()}")
+        _write_owner(path)
         _log.debug("created worktree %s on %s", path, branch)
         return cls(path, branch, repo_root)
 
@@ -252,6 +494,7 @@ class GitWorktree:
         _git(["branch", "-D", self.branch], self.repo_root)
         if self.path.exists():
             shutil.rmtree(self.path, ignore_errors=True)
+        _live_here.discard(self.path.resolve())
 
 
 def run_in_worktree(

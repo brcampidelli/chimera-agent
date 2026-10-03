@@ -41,6 +41,10 @@ import type {
   MemoryProfile,
   ModelListing,
   KeepAwakeState,
+  StorageReport,
+  WorktreePrune,
+  LogRotate,
+  AppDiagnostics,
   LocalRuntimes,
   NetworkShare,
   ShareInfo,
@@ -164,6 +168,21 @@ export const getConfig = () => json<AppConfig>("/api/config");
 // What the keeper is DOING, as opposed to what the owner chose (that is `getConfig().keep_awake`):
 // `active` is true only while the operating system is actually being asked to stay up.
 export const getKeepAwake = () => json<KeepAwakeState>("/api/keep-awake");
+// The Storage card (study 29, P5.3). The two actions remove files, so the server refuses either one
+// without `confirm: true`; the card sends it only from its own confirmation step.
+export const getStorage = () => json<StorageReport>("/api/storage");
+export const pruneWorktrees = () =>
+  json<WorktreePrune>("/api/storage/worktrees/prune", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+export const rotateLogs = () =>
+  json<LogRotate>("/api/storage/logs/rotate", {
+    method: "POST",
+    body: JSON.stringify({ confirm: true }),
+  });
+// Versions, paths, the last crash report and the text to copy — credentials scrubbed server-side.
+export const getAppDiagnostics = () => json<AppDiagnostics>("/api/diagnostics");
 export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 // The agents you send work to. Every call returns the WHOLE registry, so a screen never has
 // to guess what the list looks like after a change it just made.

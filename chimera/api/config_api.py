@@ -99,6 +99,9 @@ _EDITABLE_SETTINGS = {
     # whether that still holds on battery. Read on the keeper's every tick, so no APPLIES_WHEN entry.
     "CHIMERA_KEEP_AWAKE",
     "CHIMERA_KEEP_AWAKE_ON_BATTERY",
+    # Where isolated runs check their worktrees out (`chimera/core/worktree.py`). Read at every
+    # worktree creation, so no APPLIES_WHEN entry: it applies from the next isolated run.
+    "CHIMERA_WORKTREE_DIR",
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
     # Who may talk to each bot. Not secrets — platform ids — so they are read back in full, like the
     # egress list: a list the owner cannot read is a list they cannot correct, and the failure it
@@ -437,6 +440,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "mode": settings.keep_awake,
             "on_battery": settings.keep_awake_on_battery,
         },
+        # As set; empty is the system temp folder. Where the next worktree actually goes (after the
+        # rules that can refuse a value) is `GET /api/storage`'s `worktree_dir`.
+        "storage": {"worktree_dir": settings.worktree_dir},
         # Which backend answers a typed decision, and which model; empty = the backend's default.
         "decisions": {
             "backend": (settings.decision_backend or "local_logprob").strip(),
@@ -637,6 +643,15 @@ def _check_keep_awake(value: str) -> None:
         raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
 
 
+def _check_worktree_dir(value: str) -> None:
+    """Empty (temp) or an absolute path. A relative one would resolve against wherever the backend
+    happened to start, which for a packaged app is the install folder — so it is refused here, at
+    the save, rather than ignored with a warning in a log the owner never reads."""
+    text = value.strip()
+    if text and not Path(text).expanduser().is_absolute():
+        raise ValueError("CHIMERA_WORKTREE_DIR must be an absolute path, or empty for the temp folder")
+
+
 def _check_boolean(key: str) -> Callable[[str], None]:
     def check(value: str) -> None:
         if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
@@ -651,6 +666,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
+    "CHIMERA_WORKTREE_DIR": _check_worktree_dir,
 }
 
 

@@ -739,6 +739,12 @@ class KeepAwakeCfgOut(BaseModel):
     on_battery: bool = False
 
 
+class StorageCfgOut(BaseModel):
+    """``CHIMERA_WORKTREE_DIR`` as set; empty is the system temp folder (the default)."""
+
+    worktree_dir: str = ""
+
+
 class KeepAwakeOut(BaseModel):
     """Whether this process is holding the machine awake right now, and why.
 
@@ -769,6 +775,7 @@ class ConfigOut(BaseModel):
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
     spend: SpendCfgOut = Field(default_factory=SpendCfgOut)
     keep_awake: KeepAwakeCfgOut = Field(default_factory=KeepAwakeCfgOut)
+    storage: StorageCfgOut = Field(default_factory=StorageCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut
@@ -1078,6 +1085,88 @@ class ResourcesOut(BaseModel):
     process_mb: int | None  # this process, not the machine: two different sentences
     gpus: list[GpuOut]
     notes: list[str]
+
+
+class StorageCategoryOut(BaseModel):
+    """One kind of thing this install keeps on disk. ``bytes`` null = not measured, never zero."""
+
+    key: str
+    bytes: int | None
+    files: int | None
+    paths: list[str]  # the existing places counted, so the owner can go and look
+    note: str  # why `bytes` is null, in a few words; empty when it is a measurement
+
+
+class StorageWorktreeOut(BaseModel):
+    """One isolated worktree folder, and whether the prune would collect it.
+
+    ``state`` is ``live`` (a run is using it, or it is too new to judge), ``orphan`` (the prune
+    removes it) or ``kept`` (its maker cannot be identified, so it is not called dead on a guess).
+    ``reason`` is a fixed word a screen translates.
+    """
+
+    path: str
+    bytes: int | None
+    state: str
+    reason: str
+
+
+class DiskOut(BaseModel):
+    path: str
+    total: int | None
+    free: int | None
+
+
+class StorageOut(BaseModel):
+    """What this install keeps on disk, by kind (study 29, P5.3). Nullable like `ResourcesOut`."""
+
+    home: str
+    worktree_dir: str  # where the NEXT worktree goes: the configured folder, or temp
+    categories: list[StorageCategoryOut]
+    worktrees: list[StorageWorktreeOut]
+    disks: list[DiskOut]
+    rotatable_logs: list[str]  # the only logs the rotate action moves — named, not implied
+
+
+class StorageConfirmIn(BaseModel):
+    """The two storage actions remove files; each must be asked for in so many words."""
+
+    confirm: bool = False
+
+
+class WorktreePruneOut(BaseModel):
+    removed: int
+    bytes_freed: int
+    kept: int  # maker unknown — left alone
+    live: int  # a run is using it — left alone
+    failed: int  # could not be deleted (a file held open)
+
+
+class LogRotateOut(BaseModel):
+    rotated: int
+    bytes_freed: int  # only the dropped previous generations; a first rotation frees nothing
+    failed: int
+
+
+class CrashReportOut(BaseModel):
+    """The desktop's last ``backend-crash.txt``, with credentials scrubbed before it left disk."""
+
+    path: str
+    modified: str
+    text: str
+
+
+class AppDiagnosticsOut(BaseModel):
+    """What a bug report needs, in one place (study 29, P5.3)."""
+
+    backend_version: str
+    python: str
+    platform: str
+    home: str
+    workspace: str
+    worktree_dir: str
+    crash: CrashReportOut | None  # null when there is none, or outside the desktop's layout
+    report: str  # the plain-text summary the Copy button puts on the clipboard, scrubbed
 
 
 class ExternalAgentOut(BaseModel):
