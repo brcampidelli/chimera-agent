@@ -151,6 +151,12 @@ class WorkStore:
         with self._lock:
             return sorted((w for w in self._works.values() if w.parent == parent), key=lambda w: w.created_at)
 
+    def active_parents(self) -> set[str]:
+        """The conversations with a work queued, running or waiting — what the list reads as running
+        and the automatic archive leaves alone."""
+        with self._lock:
+            return {w.parent for w in self._works.values() if w.active}
+
     def put(self, work: Work) -> None:
         with self._lock:
             self._works[work.id] = work

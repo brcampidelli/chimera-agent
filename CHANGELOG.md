@@ -44,6 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **`deepseek-v4-flash` keeps its price row honest on a third route.** On 2026-10-03 the live index quoted 0.028/0.056, a third figure after 0.0886/0.1772 and 0.04844/0.09688. The row keeps the highest, so a fallback never reads low, and accepts the new one as seen.
+
 - **A "safety" or "flagged" in a server error no longer aborts the turn** (#748). Such an error was classified as a
   content-policy refusal, which aborts, instead of falling back to `CHIMERA_FALLBACK_MODELS`.
 - **The interface stops sending people to fields and importers that do not exist** (#749): reserved keys are labelled

@@ -129,8 +129,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     # --- weak: near-free probes. Cheap first drafts, k-sample agreement. ---
     CatalogEntry(
         "openrouter/deepseek/deepseek-v4-flash", "weak", "DeepSeek",
-        0.0886, 0.1772, tools=True, context_k=1024, also_seen=((0.04844, 0.09688),),
-        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row); the live check accepts either",
+        0.0886, 0.1772, tools=True, context_k=1024, also_seen=((0.04844, 0.09688), (0.028, 0.056)),
+        notes="cheapest capable probe here, with a frontier-sized window; unmeasured in this repo. The index read 0.04844/0.09688 on 2026-09-19 (a second route, as with the -0731 row) and 0.028/0.056 on 2026-10-03 (a third). The row keeps the highest figure, because a fallback that reads low tells a user they spent less than they did; the live check accepts any of them",
     ),
     CatalogEntry(
         "openrouter/mistralai/mistral-small-3.2-24b-instruct", "weak", "Mistral",

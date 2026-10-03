@@ -32,6 +32,7 @@ import { Usage } from "@/components/Usage";
 import { SystemOneCard } from "@/components/SystemOneCard";
 import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
+import { NotificationsCard } from "@/components/NotificationsCard";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type {
@@ -1107,6 +1108,8 @@ export function Settings({
                     />
                   </Row>
                 </VoiceCard>
+
+                <NotificationsCard />
 
                 <IdentityCard />
 

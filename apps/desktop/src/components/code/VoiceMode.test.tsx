@@ -6,7 +6,7 @@ import { MAX_SPOKEN_SENTENCES, VoiceMode, type SpokenAnswer, type VoiceModeDeps 
 import { getDictationSupport, type Transcript } from "@/lib/api";
 import { DEFAULT_SEGMENTER, Segmenter } from "@/lib/voice/segmenter";
 import type { FrameSink, MicrophoneLike } from "@/lib/voice/microphone";
-import type { SpeakerLike } from "@/lib/voice/speaker";
+import { VOICE_LANG_KEY, type SpeakerLike } from "@/lib/voice/speaker";
 import { renderWithProviders } from "@/test/utils";
 
 /**
@@ -58,6 +58,7 @@ class FakeMic implements MicrophoneLike {
  *  being read, `cancel` drops them all. */
 class FakeSpeaker implements SpeakerLike {
   spoken: string[] = [];
+  locales: string[] = [];
   cancels = 0;
   present = true;
   private queue: Array<() => void> = [];
@@ -72,8 +73,9 @@ class FakeSpeaker implements SpeakerLike {
     if (!this.queue.length) return Promise.resolve();
     return new Promise((resolve) => this.idlers.push(resolve));
   }
-  speak(text: string): Promise<void> {
+  speak(text: string, locale: string): Promise<void> {
     this.spoken.push(text);
+    this.locales.push(locale);
     return new Promise((resolve) => {
       this.queue.push(() => {
         resolve();
@@ -225,6 +227,54 @@ describe("hands-free voice", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(speaker.spoken).toHaveLength(2);
     expect(speaker.spoken.join(" ")).not.toContain("a.py");
+  });
+
+  it("listens and reads in the voice language chosen in Settings, not the interface's", async () => {
+    // The app in English, the voice in Portuguese.
+    localStorage.setItem(VOICE_LANG_KEY, "pt");
+    try {
+      const { mic, speaker, transcribe, deps } = harness();
+      const user = userEvent.setup();
+      const { rerender } = renderWithProviders(<VoiceMode onUtterance={vi.fn()} answer={null} deps={deps} />);
+      await user.click(screen.getByTestId("voice-mode"));
+      await waitFor(() => expect(mic.started).toBe(1));
+
+      speakUtterance(mic);
+      await waitFor(() => expect(transcribe).toHaveBeenCalledTimes(1));
+      expect(transcribe.mock.calls[0][2]).toBe("pt");
+
+      const text = "Três arquivos mudam.\n\n---\n\n1. `a.py`";
+      rerender(<VoiceMode onUtterance={vi.fn()} answer={{ seq: 0, text, done: true }} deps={deps} />);
+      await waitFor(() => expect(speaker.spoken).toHaveLength(2));
+      expect(speaker.locales).toEqual(["pt-BR", "pt-BR"]);
+      // What the voice says on its own is in the voice's language too; the screen stays English.
+      expect(speaker.spoken[1]).toBe("O resto está na tela.");
+      expect(screen.getByTestId("voice-status")).toHaveTextContent(/reading the answer aloud/i);
+    } finally {
+      localStorage.removeItem(VOICE_LANG_KEY);
+    }
+  });
+
+  it("follows a voice language changed while it stays mounted, as a conversation window does", async () => {
+    // A separate conversation window keeps this mounted while Settings changes in the main one.
+    try {
+      const { mic, speaker, transcribe, deps } = harness();
+      const user = userEvent.setup();
+      const { rerender } = renderWithProviders(<VoiceMode onUtterance={vi.fn()} answer={null} deps={deps} />);
+      await user.click(screen.getByTestId("voice-mode"));
+      await waitFor(() => expect(mic.started).toBe(1));
+
+      localStorage.setItem(VOICE_LANG_KEY, "pt");
+      speakUtterance(mic);
+      await waitFor(() => expect(transcribe).toHaveBeenCalledTimes(1));
+      expect(transcribe.mock.calls[0][2]).toBe("pt");
+
+      rerender(<VoiceMode onUtterance={vi.fn()} answer={{ seq: 0, text: "Pronto.", done: true }} deps={deps} />);
+      await waitFor(() => expect(speaker.spoken).toHaveLength(1));
+      expect(speaker.locales).toEqual(["pt-BR"]);
+    } finally {
+      localStorage.removeItem(VOICE_LANG_KEY);
+    }
   });
 
   it("stops after the sentence cap, as a net under a model that ignores the instruction", async () => {

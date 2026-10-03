@@ -37,3 +37,14 @@ open = "5.4.4"
 # error dialog. With the plugin the second launch never gets that far: it hands over to the running
 # app, which brings its window forward.
 tauri-plugin-single-instance = "2"
+# Start at sign-in (study 29, P2.3, OFF by default). Driven from Rust only, from a checkable tray
+# item: the window grants no IPC, and this adds no permission to `capabilities/default.json`, so
+# the plugin's own webview commands stay unreachable from the page.
+#
+# Both are held below the releases that require Tauri 2.12 (autostart 2.6, global-shortcut 2.4): this
+# tree is on Tauri 2.11.5, and moving Tauri is a desktop-build change with its own installer smoke
+# test (see the glib note in ci.yml), not something to ride in on a tray feature.
+tauri-plugin-autostart = "~2.5.1"
+# The quick-entry shortcut (study 29, P2.6, OFF by default): a system-wide chord that brings the
+# window forward on the Code screen. Registered from Rust for the same reason as above.
+tauri-plugin-global-shortcut = "~2.3.2"

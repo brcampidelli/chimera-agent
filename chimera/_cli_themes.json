@@ -18,6 +18,7 @@
       "chat",
       "sessions",
       "tui",
+      "code",
       "assist",
       "run",
       "agent",
@@ -81,6 +82,7 @@
     "key": "cli.themeAutomation",
     "commands": [
       "cron",
+      "report",
       "kanban",
       "project",
       "agents"

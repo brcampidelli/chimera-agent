@@ -79,7 +79,9 @@ ROUTES: dict[str, BridgeRoute] = {
     ),
     # --- conversations (Code screen) ---
     "conversations.list": _r(
-        "GET", "/api/code/sessions", "Past coding conversations, newest first."
+        "GET",
+        "/api/code/sessions",
+        "Past coding conversations, newest first, each with its state. params: {archived?}",
     ),
     "conversations.read": _r(
         "GET",
@@ -91,6 +93,18 @@ ROUTES: dict[str, BridgeRoute] = {
     ),
     "conversations.fork": _r(
         "POST", "/api/code/sessions/{session_id}/fork", "Copy a conversation. params: {session_id}"
+    ),
+    # Moves a conversation out of the list and back; touches no file. Not `seen`: an agent reading
+    # a conversation is not the owner looking at its diff.
+    "conversations.archive": _r(
+        "POST",
+        "/api/code/sessions/{session_id}/archive",
+        "Archive a conversation. params: {session_id}",
+    ),
+    "conversations.unarchive": _r(
+        "POST",
+        "/api/code/sessions/{session_id}/unarchive",
+        "Bring an archived conversation back. params: {session_id}",
     ),
     "conversations.delete": _r(
         "DELETE", "/api/code/sessions/{session_id}", "Delete a conversation. params: {session_id}"

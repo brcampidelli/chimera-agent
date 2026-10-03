@@ -69,9 +69,11 @@ from chimera.api.schemas import (
     CodeProjectGrantIn,
     CodeProjectIn,
     CodeProjectOut,
+    CodeSessionArchiveOut,
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionRawOut,
+    CodeSessionSeenOut,
     CodeTurnFramesOut,
     CodeTurnStopOut,
     DeletedCountOut,
@@ -1388,6 +1390,29 @@ def register_code_api(
     # conversation came back.
     deleted_mid_turn: set[str] = set()
 
+    def _bring_back_if_archived(session_id: str) -> None:
+        import time
+
+        try:
+            if store.marks.get(session_id).archived_at is not None:
+                store.marks.unarchive(session_id, at=time.time())
+        except OSError as exc:  # a list badge must not stop a turn
+            _log.debug("could not bring %s back from the archive: %s", session_id, exc)
+
+    def _turn_ended(
+        session_id: str, *, failed: bool, edited: bool, only_if_stored: bool = False
+    ) -> None:
+        """Record how a conversation's turn ended (`chimera/core/code_session_marks.py`). Never
+        raises: the turn is over and paid for, and a badge is not worth failing it."""
+        import time
+
+        try:
+            if only_if_stored and not store._path(session_id).is_file():
+                return
+            store.marks.turn_ended(session_id, failed=failed, edited=edited, at=time.time())
+        except (OSError, ValueError) as exc:
+            _log.debug("could not record how the turn of %s ended: %s", session_id, exc)
+
     def forget_running(session_ids: list[str]) -> None:
         wanted = set(session_ids)
         for turn in live_turns.running():
@@ -1994,6 +2019,9 @@ def register_code_api(
                 turn_id=turn_id, session_id=session_id, workspace=session.workspace,
                 message=req.message, live_since=int(opening["session_seq"]) - 1,
             )
+            # A turn in an archived conversation brings it back to the list: the archive is a
+            # collapsed section, and a conversation working in there would be work nobody sees.
+            _bring_back_if_archived(session_id)
 
         # What the panel draws: the viewport as base64 JPEG, the page's address and title, and
         # which action produced it. `n` counts frames of this turn so the screen can say "frame 7".
@@ -2234,6 +2262,14 @@ def register_code_api(
                                     store_for.save(session)
                     except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
+                    # How it ended, for the list's state: the verifier's own verdict and the
+                    # agent's own edit list, never a model's reading of the answer.
+                    if background is None and turn_id not in deleted_mid_turn:
+                        _turn_ended(
+                            session_id,
+                            failed=verdict is not None and verdict.get("state") == "failed",
+                            edited=bool(edited),
+                        )
                     # The turn joins the conversation history index — the record that outlives the
                     # session's own trimming, so "what did we do about the login page two weeks
                     # ago?" has somewhere to look. Written by this code and not by the model, after
@@ -2538,6 +2574,11 @@ def register_code_api(
                 emit("error", {"message": message_out})
                 if background is not None:
                     works.fail(background.id, message_out)
+                # A turn the person stopped while it waited for the folder did not fail; every
+                # other way here did. Only for a conversation with a file: a first turn that died
+                # left nothing in the list to mark.
+                elif turn_id not in deleted_mid_turn and not isinstance(exc, _StoppedWhileWaiting):
+                    _turn_ended(session_id, failed=True, edited=bool(edited), only_if_stored=True)
             finally:
                 if holds_folder:
                     folder.release()
@@ -2848,8 +2889,21 @@ def register_code_api(
         warmed = await run_in_threadpool(warm_transcriber)
         return TranscriberWarmOut(warmed=warmed, seconds=round(time.perf_counter() - began, 2))
 
+    def _waiting_sessions() -> set[str]:
+        """The conversations a waiting question belongs to: the join `GET /api/approvals` makes,
+        so the list's "waiting" and the approvals card can never count two different things."""
+        from chimera.governance.pending import pending
+
+        waiting: set[str] = set()
+        for question in pending(live().home):
+            if question.run_id:
+                sid = approval_origin(question.run_id).get("session_id", "")
+                if sid:
+                    waiting.add(sid)
+        return waiting
+
     @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
-    def list_code_sessions() -> list[dict[str, Any]]:
+    def list_code_sessions(archived: bool = False) -> list[dict[str, Any]]:
         """Past coding conversations, newest first, each carrying the project it belongs to.
 
         The list is what makes a sidebar possible: without the project on each row, past
@@ -2861,13 +2915,49 @@ def register_code_api(
         listed although its file does not exist yet: the file is written when the agent finishes,
         so without this a task started in a new conversation was invisible for exactly as long as it
         took to do.
+
+        Each row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.
+        ``archived=true`` lists the archived conversations instead of the others. This is also where
+        ``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied — on the look, so no thread has to run for it, and
+        never to a conversation working, waiting, with a background work or with a share link open.
         """
+        import time
+
+        from chimera.api.conversation_state import (
+            archive_refusal,
+            conversation_state,
+            due_for_archive,
+        )
         from chimera.core.code_session import _title_of
+        from chimera.core.code_session_marks import ConversationMark
 
         rows = store.list_meta()
         running = {t.session_id: t for t in live_turns.running()}
+        waiting = _waiting_sessions()
+        with_work = work_store.active_parents()
+        marks = store.marks.all()
+        after_days = live().archive_after_days
+        now = time.time()
         for row in rows:
-            row["running"] = row["id"] in running
+            sid = str(row["id"])
+            mark = marks.get(sid) or ConversationMark()
+            row["running"] = sid in running
+            row["state"] = conversation_state(
+                running=sid in running or sid in with_work,
+                waiting=sid in waiting,
+                mark=mark,
+                last_verdict=str(row.get("last_verdict") or ""),
+            )
+            if due_for_archive(
+                updated_at=float(row["updated_at"]), mark=mark, now=now, after_days=after_days
+            ) and not archive_refusal(
+                running=sid in running,
+                waiting=sid in waiting,
+                background=sid in with_work,
+                shared=bool(shares.for_session(sid)),
+            ):
+                mark = store.marks.archive(sid, at=now)
+            row["archived_at"] = mark.archived_at
         stored = {row["id"] for row in rows}
         unsaved = [
             {
@@ -2877,11 +2967,74 @@ def register_code_api(
                 "turns": 0,
                 "updated_at": t.started_at,
                 "running": True,
+                "state": "waiting" if sid in waiting else "running",
+                "archived_at": None,
             }
             for sid, t in running.items()
             if sid not in stored
         ]
-        return sorted([*unsaved, *rows], key=lambda r: float(r["updated_at"]), reverse=True)
+        listed = [r for r in (*unsaved, *rows) if (r["archived_at"] is not None) == archived]
+        return sorted(listed, key=lambda r: float(r["updated_at"]), reverse=True)
+
+    def _stored_or_404(session_id: str) -> None:
+        try:
+            exists = store._path(session_id).is_file()
+        except ValueError as exc:  # an id with no usable characters — a client error, not a 500
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not exists:
+            raise HTTPException(status_code=404, detail="no such conversation")
+
+    @app.post(
+        "/api/code/sessions/{session_id}/archive",
+        dependencies=[guard],
+        response_model=CodeSessionArchiveOut,
+    )
+    def archive_code_session(session_id: str) -> dict[str, Any]:
+        """Move a conversation out of the list. **Nothing is touched**: no transcript, folder or
+        worktree, and a share link keeps working — it is a timestamp beside the transcripts.
+
+        Refused (409) while a turn or background work of it runs or a question of it waits: the
+        archive is a collapsed section, and an agent's state must not be hidden by tidying a list.
+        """
+        import time
+
+        _stored_or_404(session_id)
+        if session_id in _waiting_sessions():
+            raise HTTPException(status_code=409, detail="a question in it is waiting for you")
+        if live_turns.of_session(session_id) is not None:
+            raise HTTPException(status_code=409, detail="a turn is running in it")
+        if session_id in work_store.active_parents():
+            raise HTTPException(status_code=409, detail="a background work of it has not finished")
+        mark = store.marks.archive(session_id, at=time.time())
+        return {"id": session_id, "archived_at": mark.archived_at}
+
+    @app.post(
+        "/api/code/sessions/{session_id}/unarchive",
+        dependencies=[guard],
+        response_model=CodeSessionArchiveOut,
+    )
+    def unarchive_code_session(session_id: str) -> dict[str, Any]:
+        """Bring a conversation back into the list. Idempotent: one already there stays there."""
+        import time
+
+        _stored_or_404(session_id)
+        if store.marks.get(session_id).archived_at is not None:
+            store.marks.unarchive(session_id, at=time.time())
+        return {"id": session_id, "archived_at": None}
+
+    @app.post(
+        "/api/code/sessions/{session_id}/seen",
+        dependencies=[guard],
+        response_model=CodeSessionSeenOut,
+    )
+    def seen_code_session(session_id: str) -> dict[str, bool]:
+        """The owner's screen drew this conversation, so its last edits are no longer unseen.
+
+        Its own route rather than a side effect of reading the conversation: the desktop bridge
+        reads conversations too, and an agent reading one is not the owner looking at its diff.
+        Not in the bridge's table for the same reason.
+        """
+        return {"changed": store.marks.seen(session_id)}
 
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:
