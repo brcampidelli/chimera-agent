@@ -62,6 +62,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
 | [`project`](#project) | Run a project start-to-finish against a Spec (drift = acceptance authority). |
 | [`redteam`](#redteam) | Red-team the injection defenses: attack success rate with vs without them. |
+| [`report`](#report) | Reports counted by code from this home's own logs — no model call. |
 | [`review`](#review) | [experimental] Review a change: findings first, P0 to P3, from a model of another family. |
 | [`rubric-grade`](#rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
 | [`run`](#run) | Run a single-shot Tier-1 completion (no fusion). Requires a provider key. |
@@ -960,6 +961,14 @@ once a run is tainted (defense-in-depth coverage), not model susceptibility.
 
 ```bash
 chimera redteam
+```
+
+## report
+
+Reports counted by code from this home's own logs — no model call.
+
+```bash
+chimera report
 ```
 
 ## review

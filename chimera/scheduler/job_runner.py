@@ -86,6 +86,16 @@ def make_run_job(
         did not: the log was written only by the chat turn, so a daily cap read from it would have
         been blind to exactly the spend it exists to bound.
         """
+        # A job dispatched by CODE, not by an agent (the weekly review, study 29 P3.4). Before the
+        # cap, because it spends nothing: refusing a free report because the day's money is gone
+        # would silence the one message that says where the money went. No model, no tools, no
+        # receipt — its answer is numbers counted in `weekly_review`, and handing them to a model
+        # to "write up" is the corruption the owner's rule exists to prevent.
+        from chimera.scheduler.weekly_review import builtin_of, run_builtin
+
+        if builtin_of(job):
+            return JobOutcome(run_builtin(job, settings.home))
+
         cap = settings.daily_usd_cap
         if cap and not job.critical:
             today = datetime.now(UTC).strftime("%Y-%m-%d")

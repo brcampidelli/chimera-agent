@@ -106,7 +106,7 @@ THEMES: tuple[Theme, ...] = (
             "evolve",
         ),
     ),
-    Theme("cli.themeAutomation", ("cron", "kanban", "project", "agents")),
+    Theme("cli.themeAutomation", ("cron", "report", "kanban", "project", "agents")),
     Theme(
         "cli.themeServe",
         # `acp` is the agent side of the Agent Client Protocol — the mirror of the client half the
