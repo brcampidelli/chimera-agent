@@ -7,6 +7,8 @@ import { forkCodeSession, getCodeSessionRaw, listCodeSessions } from "@/lib/api"
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  // The sidebar reads the waiting questions from the cache the status bar polls; none here.
+  getApprovals: vi.fn(async () => []),
   listCodeSessions: vi.fn(),
   // Asked by the sidebar every few seconds since it marks the conversations that are working.
   listRunningTurns: vi.fn(async () => []),

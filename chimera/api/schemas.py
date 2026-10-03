@@ -190,6 +190,29 @@ class CodeSessionMetaOut(BaseModel):
     updated_at: float
     #: A turn of this conversation is running now. Absent for a conversation nobody is working in.
     running: bool = False
+    #: What the conversation needs, derived from facts the server holds and never by a model
+    #: (`chimera/api/conversation_state.py`): a question waiting for you, a turn or background work
+    #: running, a last turn that failed, edits you have not looked at, or nothing.
+    state: Literal["running", "waiting", "failed", "review", "idle"] = "idle"
+    #: When it was archived; None for a conversation in the list.
+    archived_at: float | None = None
+
+
+class CodeSessionArchiveOut(BaseModel):
+    """A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.
+
+    Archiving touches no file, folder or worktree — it is a timestamp beside the transcripts. A
+    refusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.
+    """
+
+    id: str
+    archived_at: float | None = None
+
+
+class CodeSessionSeenOut(BaseModel):
+    """Whether marking a conversation seen changed anything: false when there was nothing unseen."""
+
+    changed: bool
 
 
 class CodeProjectOut(BaseModel):

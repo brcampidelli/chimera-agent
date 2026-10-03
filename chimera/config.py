@@ -900,6 +900,16 @@ class Settings(BaseSettings):
     # reading untrusted content.
     guard_chat: bool = Field(default=True, validation_alias="CHIMERA_GUARD_CHAT")
 
+    # Archive a coding conversation nobody has touched for this many days. Empty (the default), zero
+    # or negative means never. Archiving is a timestamp beside the transcripts and nothing else — no
+    # file, folder or worktree is touched — and the rule never archives a conversation with a turn
+    # running, a question waiting, a background work unfinished or a share link open
+    # (`chimera/api/conversation_state.py`). Read on every look at the list, so a change applies at
+    # once.
+    archive_after_days: float | None = Field(
+        default=None, validation_alias="CHIMERA_ARCHIVE_AFTER_DAYS"
+    )
+
     # Base URL for a local Ollama server. A model like `ollama_chat/llama3` runs on your machine
     # with no API key — set this only if Ollama listens somewhere other than the default. Reinforces
     # the fully-local, self-hostable path: `CHIMERA_DEFAULT_MODEL=ollama_chat/llama3`, no key needed.
@@ -1233,6 +1243,30 @@ class Settings(BaseSettings):
             )
             return "ask"
         return word
+
+    @field_validator("archive_after_days", mode="before")
+    @classmethod
+    def _archive_after_days_or_never(cls, value: object) -> object:
+        """Empty is the documented "never", and an unreadable value falls back to it too.
+
+        Falling back to never rather than refusing to start, because the cost of the two mistakes is
+        not the same: a typo that switched archiving off hides nothing, while one that stopped the
+        app over a convenience setting takes every conversation with it.
+        """
+        if value is None or isinstance(value, (int, float)):
+            return value
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return float(text)
+        except ValueError:
+            _log.warning(
+                "CHIMERA_ARCHIVE_AFTER_DAYS=%r is not a number of days; conversations are never "
+                "archived automatically.",
+                text,
+            )
+            return None
 
     @field_validator("taint_authority", mode="before")
     @classmethod
