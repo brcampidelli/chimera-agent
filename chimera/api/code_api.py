@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
 # this file uses `from __future__ import annotations`, so a `-> EventSourceResponse` return
@@ -63,11 +63,17 @@ from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
     AttachmentOut,
+    CodeGrantMigrationIn,
+    CodeGrantMigrationOut,
+    CodeProjectFlagsIn,
+    CodeProjectGrantIn,
     CodeProjectIn,
     CodeProjectOut,
+    CodeSessionArchiveOut,
     CodeSessionMetaOut,
     CodeSessionOut,
     CodeSessionRawOut,
+    CodeSessionSeenOut,
     CodeTurnFramesOut,
     CodeTurnStopOut,
     DeletedCountOut,
@@ -146,6 +152,20 @@ class CodeSeams(BaseModel):
     Per REQUEST, which is what makes it per project: enabling commands for one folder does not
     enable them for the next folder someone opens. `CHIMERA_HOST_EXEC=deny` still refuses — an
     owner who turned host execution off system-wide is not overridden by a field on a request.
+
+    **And it is only a request.** Since the grant moved to the server's project registry, this
+    opens nothing unless the server ALSO records a grant for the folder (or the owner set
+    ``CHIMERA_REACH=workspace_shell`` for every folder) — see :func:`server_grants_shell`. It used to
+    be the grant itself: whatever a client sent, the server believed.
+    """
+
+    _grant_root: Path | None = PrivateAttr(default=None)
+    """The folder whose recorded grant applies when the run happens in a COPY of it.
+
+    A batch task runs in its own git worktree, a temporary directory no grant names, so the grant is
+    looked up on the project the worktree was cut from. Private on purpose: set by the server when
+    it cuts the worktree, never by a request — a field a client could fill in would be a way to
+    borrow another folder's grant.
     """
 
     max_steps: int | None = None
@@ -456,6 +476,42 @@ def resolve_posture(posture: Posture | None) -> ResolvedPosture:
     return _resolve_posture(posture) if posture is not None else ResolvedPosture([], False, False, False)
 
 
+def server_grants_shell(settings: Settings, folder: Path) -> bool:
+    """Whether the SERVER's own records let the agent run commands in ``folder``.
+
+    Two records say yes, and nothing a request carries is one of them:
+
+    * ``CHIMERA_REACH=workspace_shell`` — the owner granted commands in every folder at once;
+    * a grant on the folder in the project registry (``code_projects.json``), set from the Folders
+      card, the Code screen's switch, the one-time migration of the old browser-side grants, or the
+      bridge at its Full tier.
+
+    The desktop used to keep the per-folder grant in its own ``localStorage`` and tell the server
+    about it on every request, as ``posture.reach = workspace_shell`` and ``allow_host_exec``. The
+    server had nothing to check that against, so the claim WAS the grant — for the desktop, for the
+    bridge's Full tier, and for any local process that could reach the API.
+    """
+    if settings.reach.strip() == "workspace_shell":
+        return True
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    return CodeProjectRegistry(Path(settings.home) / "code_projects.json").shell_granted_for(folder)
+
+
+def granted_posture(posture: Posture | None, granted: bool) -> Posture | None:
+    """The request's posture, held to what the server granted.
+
+    A ``workspace_shell`` reach on a folder with no grant is answered with ``workspace`` — the reach
+    the desktop sends for a folder nobody granted — rather than refused: the turn still runs, it just
+    runs without commands, which is what the owner's record says. Nothing else is touched. A posture
+    can only get NARROWER here, so ``read_only`` stays ``read_only``, and an absent posture stays
+    absent (its host execution is still held by ``allow_host_exec`` needing the grant, below).
+    """
+    if posture is None or granted or posture.reach != "workspace_shell":
+        return posture
+    return posture.model_copy(update={"reach": "workspace"})
+
+
 def resolve_role_plan(seams: CodeSeams, settings: Settings) -> RolePlan:
     """The roles this request runs with. No profile and no overrides = no role routing at all."""
     return resolve_roles(seams.profile, settings, seams.roles)
@@ -539,6 +595,7 @@ def assemble_registry(
     extra_tools: Sequence[Tool] | None = None,
     run_id: str | None = None,
     notice_sink: Any = None,
+    grant_root: Path | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -558,6 +615,9 @@ def assemble_registry(
     ``instruction`` is the person's own words for this run — the task, or the turn's message — so a
     fetch of a page or a file it names is recorded as the user's request. A caller with no single
     task (the hierarchy's fixed seams) passes nothing, and every fetch there reads ``unknown``.
+
+    ``grant_root`` is the folder whose recorded shell grant applies when ``ws`` is a copy of it — a
+    crew worker's worktree. None = ``ws`` itself (or the root the server stamped on the seams).
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -582,9 +642,19 @@ def assemble_registry(
     from chimera.sandbox.confirm import resolve_host_exec_confirm
     from chimera.tools import default_registry
 
-    reach_mounts_shell = not (EXEC_TOOLS & set(resolve_posture(seams.posture).deny_tools))
+    #
+    # And a THIRD condition since the grant moved to the server: the server's own record for this
+    # folder (`server_grants_shell`). The request's `workspace_shell` and `allow_host_exec` are
+    # still read, but as a request — a folder the owner did not grant gets the reach below it and a
+    # gated tool, whatever was asked. Narrowing only: the record cannot lift `read_only` (the posture
+    # keeps it) nor `deny` (`owner_refuses`), because neither consults it.
+    granted = server_grants_shell(settings, grant_root or seams._grant_root or ws)
+    posture_in = granted_posture(seams.posture, granted)
+    if posture_in is not seams.posture:
+        _log.info("no shell grant recorded for %s: the request's workspace_shell runs as workspace", ws)
+    reach_mounts_shell = not (EXEC_TOOLS & set(resolve_posture(posture_in).deny_tools))
     owner_refuses = (settings.host_exec or "ask").lower() == "deny"
-    ungated = seams.allow_host_exec and reach_mounts_shell and not owner_refuses
+    ungated = seams.allow_host_exec and granted and reach_mounts_shell and not owner_refuses
 
     registry = default_registry(
         ws,
@@ -647,7 +717,7 @@ def assemble_registry(
     # every request runs unfenced, and it fails in the direction nobody checks.
     denied = sorted({
         *(seams.deny_tools or ()),
-        *resolve_posture(seams.posture).deny_tools,
+        *resolve_posture(posture_in).deny_tools,
         *deployment_posture(settings).deny_tools,
         *settings.tool_denylist,
     })
@@ -738,7 +808,7 @@ def assemble_registry(
     # Governance screen reports `"armed": bool(settings.taint_narrow)`, which stayed true: the app
     # said the defence was on while requests were turning it off.
     narrow = (
-        (resolve_posture(seams.posture).narrow_on_taint if seams.posture is not None else False)
+        (resolve_posture(posture_in).narrow_on_taint if posture_in is not None else False)
         or settings.taint_narrow
         or deployment_posture(settings).narrow_on_taint
     )
@@ -1326,6 +1396,29 @@ def register_code_api(
     # conversation came back.
     deleted_mid_turn: set[str] = set()
 
+    def _bring_back_if_archived(session_id: str) -> None:
+        import time
+
+        try:
+            if store.marks.get(session_id).archived_at is not None:
+                store.marks.unarchive(session_id, at=time.time())
+        except OSError as exc:  # a list badge must not stop a turn
+            _log.debug("could not bring %s back from the archive: %s", session_id, exc)
+
+    def _turn_ended(
+        session_id: str, *, failed: bool, edited: bool, only_if_stored: bool = False
+    ) -> None:
+        """Record how a conversation's turn ended (`chimera/core/code_session_marks.py`). Never
+        raises: the turn is over and paid for, and a badge is not worth failing it."""
+        import time
+
+        try:
+            if only_if_stored and not store._path(session_id).is_file():
+                return
+            store.marks.turn_ended(session_id, failed=failed, edited=edited, at=time.time())
+        except (OSError, ValueError) as exc:
+            _log.debug("could not record how the turn of %s ended: %s", session_id, exc)
+
     def forget_running(session_ids: list[str]) -> None:
         wanted = set(session_ids)
         for turn in live_turns.running():
@@ -1517,6 +1610,9 @@ def register_code_api(
             ws = Path(req.workspace).expanduser().resolve()
             if not ws.is_dir():
                 raise HTTPException(status_code=400, detail="workspace not found")
+            # "Recent" in the sidebar's order means a turn started here, not that the row was
+            # looked at. Only a registered folder is stamped; see `CodeProjectRegistry.touch`.
+            projects.touch(req.workspace)
         else:
             ws = workspace
         if req.spoken and not (req.provider or "").strip():
@@ -1929,6 +2025,9 @@ def register_code_api(
                 turn_id=turn_id, session_id=session_id, workspace=session.workspace,
                 message=req.message, live_since=int(opening["session_seq"]) - 1,
             )
+            # A turn in an archived conversation brings it back to the list: the archive is a
+            # collapsed section, and a conversation working in there would be work nobody sees.
+            _bring_back_if_archived(session_id)
 
         # What the panel draws: the viewport as base64 JPEG, the page's address and title, and
         # which action produced it. `n` counts frames of this turn so the screen can say "frame 7".
@@ -2174,6 +2273,14 @@ def register_code_api(
                                     store_for.save(session)
                     except OSError as exc:  # noqa: BLE001 — a failed record must not fail the turn
                         _log.debug("could not store the turn receipt: %s", exc)
+                    # How it ended, for the list's state: the verifier's own verdict and the
+                    # agent's own edit list, never a model's reading of the answer.
+                    if background is None and turn_id not in deleted_mid_turn:
+                        _turn_ended(
+                            session_id,
+                            failed=verdict is not None and verdict.get("state") == "failed",
+                            edited=bool(edited),
+                        )
                     # The turn joins the conversation history index — the record that outlives the
                     # session's own trimming, so "what did we do about the login page two weeks
                     # ago?" has somewhere to look. Written by this code and not by the model, after
@@ -2478,6 +2585,11 @@ def register_code_api(
                 emit("error", {"message": message_out})
                 if background is not None:
                     works.fail(background.id, message_out)
+                # A turn the person stopped while it waited for the folder did not fail; every
+                # other way here did. Only for a conversation with a file: a first turn that died
+                # left nothing in the list to mark.
+                elif turn_id not in deleted_mid_turn and not isinstance(exc, _StoppedWhileWaiting):
+                    _turn_ended(session_id, failed=True, edited=bool(edited), only_if_stored=True)
             finally:
                 if holds_folder:
                     folder.release()
@@ -2648,8 +2760,12 @@ def register_code_api(
         # user turned the guard off — and when they have, the sentence has to say so, because the
         # whole product rests on stating what is true on this machine rather than what reads better.
         chat_guarded = live().guard_chat
+        # Held to the folder's recorded grant exactly as the turn will be (`assemble_registry`), so
+        # the sentence on screen describes the run that happens rather than the one asked for.
+        asked = Posture(reach=req.reach, approval=req.approval)
+        held = granted_posture(asked, server_grants_shell(live(), ws)) or asked
         return describe(
-            Posture(reach=req.reach, approval=req.approval),
+            held,
             ws,
             settings,
             # A guarded chat CAN now stop and ask: its ledger narrows on taint and its approver
@@ -2785,8 +2901,21 @@ def register_code_api(
         warmed = await run_in_threadpool(warm_transcriber)
         return TranscriberWarmOut(warmed=warmed, seconds=round(time.perf_counter() - began, 2))
 
+    def _waiting_sessions() -> set[str]:
+        """The conversations a waiting question belongs to: the join `GET /api/approvals` makes,
+        so the list's "waiting" and the approvals card can never count two different things."""
+        from chimera.governance.pending import pending
+
+        waiting: set[str] = set()
+        for question in pending(live().home):
+            if question.run_id:
+                sid = approval_origin(question.run_id).get("session_id", "")
+                if sid:
+                    waiting.add(sid)
+        return waiting
+
     @app.get("/api/code/sessions", dependencies=[guard], response_model=list[CodeSessionMetaOut])
-    def list_code_sessions() -> list[dict[str, Any]]:
+    def list_code_sessions(archived: bool = False) -> list[dict[str, Any]]:
         """Past coding conversations, newest first, each carrying the project it belongs to.
 
         The list is what makes a sidebar possible: without the project on each row, past
@@ -2798,13 +2927,49 @@ def register_code_api(
         listed although its file does not exist yet: the file is written when the agent finishes,
         so without this a task started in a new conversation was invisible for exactly as long as it
         took to do.
+
+        Each row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.
+        ``archived=true`` lists the archived conversations instead of the others. This is also where
+        ``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied — on the look, so no thread has to run for it, and
+        never to a conversation working, waiting, with a background work or with a share link open.
         """
+        import time
+
+        from chimera.api.conversation_state import (
+            archive_refusal,
+            conversation_state,
+            due_for_archive,
+        )
         from chimera.core.code_session import _title_of
+        from chimera.core.code_session_marks import ConversationMark
 
         rows = store.list_meta()
         running = {t.session_id: t for t in live_turns.running()}
+        waiting = _waiting_sessions()
+        with_work = work_store.active_parents()
+        marks = store.marks.all()
+        after_days = live().archive_after_days
+        now = time.time()
         for row in rows:
-            row["running"] = row["id"] in running
+            sid = str(row["id"])
+            mark = marks.get(sid) or ConversationMark()
+            row["running"] = sid in running
+            row["state"] = conversation_state(
+                running=sid in running or sid in with_work,
+                waiting=sid in waiting,
+                mark=mark,
+                last_verdict=str(row.get("last_verdict") or ""),
+            )
+            if due_for_archive(
+                updated_at=float(row["updated_at"]), mark=mark, now=now, after_days=after_days
+            ) and not archive_refusal(
+                running=sid in running,
+                waiting=sid in waiting,
+                background=sid in with_work,
+                shared=bool(shares.for_session(sid)),
+            ):
+                mark = store.marks.archive(sid, at=now)
+            row["archived_at"] = mark.archived_at
         stored = {row["id"] for row in rows}
         unsaved = [
             {
@@ -2814,11 +2979,74 @@ def register_code_api(
                 "turns": 0,
                 "updated_at": t.started_at,
                 "running": True,
+                "state": "waiting" if sid in waiting else "running",
+                "archived_at": None,
             }
             for sid, t in running.items()
             if sid not in stored
         ]
-        return sorted([*unsaved, *rows], key=lambda r: float(r["updated_at"]), reverse=True)
+        listed = [r for r in (*unsaved, *rows) if (r["archived_at"] is not None) == archived]
+        return sorted(listed, key=lambda r: float(r["updated_at"]), reverse=True)
+
+    def _stored_or_404(session_id: str) -> None:
+        try:
+            exists = store._path(session_id).is_file()
+        except ValueError as exc:  # an id with no usable characters — a client error, not a 500
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not exists:
+            raise HTTPException(status_code=404, detail="no such conversation")
+
+    @app.post(
+        "/api/code/sessions/{session_id}/archive",
+        dependencies=[guard],
+        response_model=CodeSessionArchiveOut,
+    )
+    def archive_code_session(session_id: str) -> dict[str, Any]:
+        """Move a conversation out of the list. **Nothing is touched**: no transcript, folder or
+        worktree, and a share link keeps working — it is a timestamp beside the transcripts.
+
+        Refused (409) while a turn or background work of it runs or a question of it waits: the
+        archive is a collapsed section, and an agent's state must not be hidden by tidying a list.
+        """
+        import time
+
+        _stored_or_404(session_id)
+        if session_id in _waiting_sessions():
+            raise HTTPException(status_code=409, detail="a question in it is waiting for you")
+        if live_turns.of_session(session_id) is not None:
+            raise HTTPException(status_code=409, detail="a turn is running in it")
+        if session_id in work_store.active_parents():
+            raise HTTPException(status_code=409, detail="a background work of it has not finished")
+        mark = store.marks.archive(session_id, at=time.time())
+        return {"id": session_id, "archived_at": mark.archived_at}
+
+    @app.post(
+        "/api/code/sessions/{session_id}/unarchive",
+        dependencies=[guard],
+        response_model=CodeSessionArchiveOut,
+    )
+    def unarchive_code_session(session_id: str) -> dict[str, Any]:
+        """Bring a conversation back into the list. Idempotent: one already there stays there."""
+        import time
+
+        _stored_or_404(session_id)
+        if store.marks.get(session_id).archived_at is not None:
+            store.marks.unarchive(session_id, at=time.time())
+        return {"id": session_id, "archived_at": None}
+
+    @app.post(
+        "/api/code/sessions/{session_id}/seen",
+        dependencies=[guard],
+        response_model=CodeSessionSeenOut,
+    )
+    def seen_code_session(session_id: str) -> dict[str, bool]:
+        """The owner's screen drew this conversation, so its last edits are no longer unseen.
+
+        Its own route rather than a side effect of reading the conversation: the desktop bridge
+        reads conversations too, and an agent reading one is not the owner looking at its diff.
+        Not in the bridge's table for the same reason.
+        """
+        return {"changed": store.marks.seen(session_id)}
 
     @app.get("/api/code/sessions/{session_id}", dependencies=[guard], response_model=CodeSessionOut)
     def get_code_session(session_id: str) -> dict[str, Any]:
@@ -3030,18 +3258,78 @@ def register_code_api(
     # under this project" — a second DELETE on that path meaning "forget the bookmark" would read
     # identically at the call site and destroy transcripts when a user tidied their list. Two verbs
     # that differ only in what they erase do not share a noun.
+    def _project_rows(rows: Sequence[Any]) -> list[dict[str, Any]]:
+        return [
+            {
+                "path": row.path,
+                "alias": row.alias,
+                "shell_granted": row.shell_granted,
+                "granted_at": row.granted_at,
+                "pinned": row.pinned,
+                "last_used_at": row.last_used_at,
+                "hidden": row.hidden,
+            }
+            for row in rows
+        ]
+
     @app.get("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
-    def list_code_workspaces() -> list[dict[str, str]]:
-        """The projects you have added, in the order you added them.
+    def list_code_workspaces() -> list[dict[str, Any]]:
+        """The projects you have added, in the order you added them — hidden ones included.
 
         The sidebar unions these with the projects it derives from conversations, so a project you
         have worked in stays listed whether or not it was ever registered — nothing disappears
-        because it was not on this list.
+        because it was not on this list. Hidden rows are sent rather than filtered, because hiding a
+        folder you have talked about is exactly the case the sidebar must know about to leave out.
         """
-        return [{"path": row.path, "alias": row.alias} for row in projects.entries()]
+        return _project_rows(projects.entries())
+
+    @app.patch("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
+    def flag_code_workspace(body: CodeProjectFlagsIn) -> list[dict[str, Any]]:
+        """Pin or hide a project, registering it if it was not. Hiding revokes its grant and pin.
+
+        Only ever narrows what the agent may do, so the bridge serves it at its operate tier.
+        """
+        try:
+            rows = projects.set_flags(body.path, pinned=body.pinned, hidden=body.hidden)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _project_rows(rows)
+
+    @app.put(
+        "/api/code/workspaces/grant", dependencies=[guard], response_model=list[CodeProjectOut]
+    )
+    def grant_code_workspace(body: CodeProjectGrantIn) -> list[dict[str, Any]]:
+        """Grant or revoke commands in one folder — the record every coding turn is held to.
+
+        Its own route rather than a field on the PATCH above, so the bridge can hold granting to its
+        Full tier while pinning and hiding stay at operate. Behind the same guard as the rest of the
+        API: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach
+        every other route. What moving the grant here changes is that a REQUEST no longer carries
+        it; recording one is a separate act, listed in the Folders card where it can be revoked.
+        """
+        try:
+            rows = projects.set_grant(body.path, body.shell_granted)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _project_rows(rows)
+
+    @app.post(
+        "/api/code/workspaces/grant/migrate",
+        dependencies=[guard],
+        response_model=CodeGrantMigrationOut,
+    )
+    def migrate_code_workspace_grants(body: CodeGrantMigrationIn) -> dict[str, Any]:
+        """Record the folders the desktop had granted in its own storage — ONCE per installation.
+
+        The first call closes the window whatever it carries, an empty list included; every later
+        one changes nothing and answers ``migrated: false``. Not on the bridge: it exists for one
+        client's one-time upgrade, not as a second way to grant.
+        """
+        migrated, recorded, rows = projects.migrate_grants(body.paths)
+        return {"migrated": migrated, "recorded": recorded, "projects": _project_rows(rows)}
 
     @app.post("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
-    def register_code_workspace(body: CodeProjectIn) -> list[dict[str, str]]:
+    def register_code_workspace(body: CodeProjectIn) -> list[dict[str, Any]]:
         """Add a project, or name one you already added. Idempotent on the path.
 
         Registering says nothing about whether the folder exists — a bookmark to a moved checkout
@@ -3053,13 +3341,14 @@ def register_code_api(
             rows = projects.register(body.path, body.alias)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return [{"path": row.path, "alias": row.alias} for row in rows]
+        return _project_rows(rows)
 
     @app.delete("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
-    def forget_code_workspace(path: str) -> list[dict[str, str]]:
+    def forget_code_workspace(path: str) -> list[dict[str, Any]]:
         """Forget a bookmark. **Conversations are not touched**, so a project you have worked in
-        reappears in the sidebar as one you have talked about rather than one you registered."""
-        return [{"path": row.path, "alias": row.alias} for row in projects.remove(path)]
+        reappears in the sidebar as one you have talked about rather than one you registered. Its
+        grant goes with it; to keep a folder out of the lists for good, hide it (PATCH)."""
+        return _project_rows(projects.remove(path))
 
     @app.get("/api/ui/layout", dependencies=[guard], response_model=UiLayoutOut)
     def get_ui_layout() -> dict[str, Any]:

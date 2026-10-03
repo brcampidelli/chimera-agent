@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, type RenderOptions, type RenderResult } from "@testing-library/react";
+import { AppearanceProvider } from "@/lib/appearance";
 import { I18nProvider } from "@/lib/i18n";
 import { LayoutProvider } from "@/lib/layout/context";
 import { RunSessionProvider } from "@/lib/run-session";
@@ -33,7 +34,11 @@ export function renderWithProviders(ui: ReactElement, options?: Omit<RenderOptio
             {/* The layout (`main.tsx`): loud when absent, like the tooltip one — `useLayout` throws
                 outside it, so the status bar would break every suite that mounts it. */}
             <LayoutProvider>
-              <RunSessionProvider>{children}</RunSessionProvider>
+              {/* The appearance (`App.tsx`): loud when absent, like the layout — Settings' rows
+                  read it, and so does the rail's theme button. */}
+              <AppearanceProvider>
+                <RunSessionProvider>{children}</RunSessionProvider>
+              </AppearanceProvider>
             </LayoutProvider>
           </TooltipProvider>
         </I18nProvider>

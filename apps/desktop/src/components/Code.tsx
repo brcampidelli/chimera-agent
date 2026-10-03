@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import hljs from "highlight.js";
 import {
   FileCode2,
@@ -16,6 +16,7 @@ import {
   getConfig,
   getFsFile,
   getFsImage,
+  grantCodeProjectShell,
   saveFile,
   type Approval,
   type Profile,
@@ -47,7 +48,8 @@ import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
 import { cn } from "@/lib/utils";
-import { shellAllowed, setShellAllowed } from "@/lib/project-shell";
+import { shellGranted } from "@/lib/project-shell";
+import { loadProjects } from "@/lib/projects";
 import { readLastSession, readWorkspace, writeLastSession, writeWorkspace } from "@/lib/workspace";
 import { CONVERSATION_WINDOW_FEATURES, conversationUrl, conversationWindowName } from "@/lib/float/protocol";
 
@@ -377,8 +379,16 @@ export function Code() {
   // the tests and `npm install` is what separates writing files from building something that works,
   // and granting that for the folder you are in is a different decision from granting it for every
   // folder you open next.
-  const [shellHere, setShellHere] = useState(() => shellAllowed(workspace));
-  useEffect(() => setShellHere(shellAllowed(workspace)), [workspace]);
+  //
+  // READ from the server's record, never asserted: the server holds every turn to that record, so a
+  // copy kept here could only ever disagree with it. Same query key as the sidebar and the Folders
+  // card, so a switch flipped in one place is the state in all three.
+  const projectRows = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
+  const shellHere = shellGranted(projectRows.data, workspace);
+  const grantShell = useMutation({
+    mutationFn: (granted: boolean) => grantCodeProjectShell(workspace, granted),
+    onSuccess: (rows) => qc.setQueryData(["code-projects"], rows),
+  });
 
   const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
   // The project's grant RAISES the reach; it never lowers what the owner configured. Somebody who
@@ -520,7 +530,8 @@ export function Code() {
               type="button"
               variant={shellHere ? "outline" : "ghost"}
               aria-pressed={shellHere}
-              onClick={() => setShellHere(setShellAllowed(workspace, !shellHere))}
+              disabled={grantShell.isPending}
+              onClick={() => grantShell.mutate(!shellHere)}
             >
               <Terminal className="h-4 w-4" />
               {t(shellHere ? "code.shell.on" : "code.shell.off")}

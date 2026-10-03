@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Ear, Loader2, Mic, Volume2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getDictationSupport, transcribe as transcribeAudio, warmTranscriber, type Transcript } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
+import { DICTS, useI18n } from "@/lib/i18n";
 import { BrowserMicrophone, FRAME_MS, type MicrophoneLike } from "@/lib/voice/microphone";
 import { Segmenter, rmsOf } from "@/lib/voice/segmenter";
-import { BrowserSpeaker, type SpeakerLike } from "@/lib/voice/speaker";
+import { BrowserSpeaker, preferredVoiceLang, type SpeakerLike } from "@/lib/voice/speaker";
 import { countSentences, firstSentences, plainForSpeech, readyCut, screenPartStart, speechLocale } from "@/lib/voice/speech-text";
 import { encodeWav } from "@/lib/voice/wav";
 
@@ -123,7 +123,16 @@ export function VoiceMode({
   const announcedSeq = useRef<number>(announce?.seq ?? -1);
   const onUtteranceRef = useRef(onUtterance);
   onUtteranceRef.current = onUtterance;
-  const locale = useMemo(() => speechLocale(lang), [lang]);
+  // The voice's language, chosen in Settings, else the interface's — read at each use, not once
+  // per mount. A conversation window stays mounted while the language is changed in the main
+  // window's Settings, and dictation there already reads it per recording; reading it once here
+  // left the voice mode of that window speaking and listening in the old one until it remounted.
+  // The pace is read by the speaker itself on every piece, so it needs nothing here.
+  const voiceLang = useCallback(() => preferredVoiceLang(lang), [lang]);
+  const locale = useCallback(() => speechLocale(preferredVoiceLang(lang)), [lang]);
+  /** The two sentences the voice itself says, in the language it speaks — "the rest is on the
+   *  screen" in Portuguese read by an English voice is noise. The screen keeps the interface's. */
+  const say = useCallback((key: string) => DICTS[voiceLang()][key] ?? t(key), [voiceLang, t]);
 
   const setPhaseBoth = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
@@ -154,7 +163,7 @@ export function VoiceMode({
       setPhaseBoth("transcribing");
       const began = performance.now();
       try {
-        const result = await deps.transcribe(encodeWav(samples, sampleRate), "speech.wav", lang);
+        const result = await deps.transcribe(encodeWav(samples, sampleRate), "speech.wav", voiceLang());
         const seconds = Math.round((performance.now() - began) / 100) / 10;
         if (result.text) {
           setHeard({ text: result.text, seconds });
@@ -168,7 +177,7 @@ export function VoiceMode({
       }
       if (phaseRef.current === "transcribing") setPhaseBoth("listening");
     },
-    [deps, lang, setPhaseBoth, t],
+    [deps, voiceLang, setPhaseBoth, t],
   );
 
   const start = useCallback(async () => {
@@ -221,7 +230,7 @@ export function VoiceMode({
     const seg = segmenter.current;
     if (seg) seg.agentSpeaking = true;
     setPhaseBoth("speaking");
-    void deps.speaker.speak(announce.text, locale);
+    void deps.speaker.speak(announce.text, locale());
     void deps.speaker.idle().then(() => {
       // Nothing else is being read: back to listening. (An answer mid-read keeps the phase.)
       if (phaseRef.current !== "speaking" || reading.current?.closed === false) return;
@@ -253,17 +262,17 @@ export function VoiceMode({
     const queue = (text: string) => {
       if (seg) seg.agentSpeaking = true;
       setPhaseBoth("speaking");
-      void deps.speaker.speak(text, locale);
+      void deps.speaker.speak(text, locale());
     };
     const close = (rest: boolean) => {
       piece.closed = true;
       if (rest && !piece.restSaid) {
         piece.restSaid = true;
-        queue(t("code.voice.restOnScreen"));
+        queue(say("code.voice.restOnScreen"));
       }
     };
     if (cut > piece.queued) {
-      const text = plainForSpeech(raw.slice(piece.queued, cut), t("code.voice.codeMarker"));
+      const text = plainForSpeech(raw.slice(piece.queued, cut), say("code.voice.codeMarker"));
       piece.queued = cut;
       if (text) {
         const { kept, truncated } = firstSentences(text, MAX_SPOKEN_SENTENCES - piece.sentences);
@@ -286,7 +295,7 @@ export function VoiceMode({
         setPhaseBoth("listening");
       });
     }
-  }, [answer, deps.speaker, locale, setPhaseBoth, t]);
+  }, [answer, deps.speaker, locale, say, setPhaseBoth]);
 
   const on = phase !== "off";
   const status =

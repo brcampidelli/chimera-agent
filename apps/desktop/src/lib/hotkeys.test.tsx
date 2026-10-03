@@ -1,8 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { useHotkeys, type Hotkeys } from "@/lib/hotkeys";
+import { useDictateKey, useHotkeys, type Hotkeys } from "@/lib/hotkeys";
 
 function Harness(handlers: Hotkeys) {
   useHotkeys(handlers);
@@ -126,5 +126,96 @@ describe("useHotkeys", () => {
     expect(onApproval).not.toHaveBeenCalled();
     expect(onFocusMode).not.toHaveBeenCalled();
     expect(onMaximize).not.toHaveBeenCalled();
+  });
+});
+
+function DictateHarness({ onPress, onRelease }: { onPress: () => void; onRelease: () => void }) {
+  useDictateKey(onPress, onRelease);
+  return <textarea aria-label="composer" />;
+}
+
+function setupDictate() {
+  const onPress = vi.fn();
+  const onRelease = vi.fn();
+  const view = render(<DictateHarness onPress={onPress} onRelease={onRelease} />);
+  return { user: userEvent.setup(), onPress, onRelease, view };
+}
+
+function key(type: "keydown" | "keyup", init: KeyboardEventInit) {
+  const e = new KeyboardEvent(type, { cancelable: true, ...init });
+  act(() => void window.dispatchEvent(e));
+  return e;
+}
+
+describe("useDictateKey", () => {
+  it("presses on the chord with Space and releases when Space comes up", async () => {
+    const { user, onPress, onRelease } = setupDictate();
+
+    await user.keyboard("{Control>}{Shift>}[Space>]");
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(onRelease).not.toHaveBeenCalled();
+    await user.keyboard("[/Space]");
+    expect(onRelease).toHaveBeenCalledOnce();
+    // The modifiers coming up after are the same release, not a second one.
+    await user.keyboard("{/Shift}{/Control}");
+    expect(onRelease).toHaveBeenCalledOnce();
+  });
+
+  it("is one press however long the key is held, and the default action is taken away", () => {
+    const { onPress } = setupDictate();
+    const first = key("keydown", { code: "Space", key: " ", ctrlKey: true, shiftKey: true });
+    key("keydown", { code: "Space", key: " ", ctrlKey: true, shiftKey: true, repeat: true });
+    key("keydown", { code: "Space", key: " ", ctrlKey: true, shiftKey: true, repeat: true });
+    expect(onPress).toHaveBeenCalledOnce();
+    expect(first.defaultPrevented).toBe(true);
+  });
+
+  it("releases when the Mac's ⌘ comes up first, which is the only keyup macOS sends", () => {
+    const { onPress, onRelease } = setupDictate();
+    key("keydown", { code: "Space", key: " ", metaKey: true, shiftKey: true });
+    expect(onPress).toHaveBeenCalledOnce();
+    key("keyup", { code: "MetaLeft", key: "Meta", shiftKey: true });
+    expect(onRelease).toHaveBeenCalledOnce();
+  });
+
+  it("releases when the window loses focus mid-hold, where the keyup never arrives", () => {
+    const { onRelease } = setupDictate();
+    key("keydown", { code: "Space", key: " ", ctrlKey: true, shiftKey: true });
+    act(() => void window.dispatchEvent(new Event("blur")));
+    expect(onRelease).toHaveBeenCalledOnce();
+    // A second blur is not a second release.
+    act(() => void window.dispatchEvent(new Event("blur")));
+    expect(onRelease).toHaveBeenCalledOnce();
+  });
+
+  it("works while typing in the composer, which is where someone is when they dictate", async () => {
+    const { user, onPress } = setupDictate();
+    await user.click(screen.getByLabelText("composer"));
+    await user.keyboard("{Control>}{Shift>}[Space]{/Shift}{/Control}");
+    expect(onPress).toHaveBeenCalledOnce();
+    // and typed nothing into it
+    expect(screen.getByLabelText("composer")).toHaveValue("");
+  });
+
+  it("is not Ctrl+D, Ctrl+Space, Shift+Space or a bare Space, and a keyup with no press releases nothing", async () => {
+    const { user, onPress, onRelease } = setupDictate();
+    await user.keyboard("{Control>}d{/Control}");
+    await user.keyboard("{Control>}[Space]{/Control}");
+    await user.keyboard("{Shift>}[Space]{/Shift}");
+    await user.keyboard("[Space]");
+    // AltGr on a Brazilian keyboard is Ctrl+Alt: not the chord either.
+    key("keydown", { code: "Space", key: " ", ctrlKey: true, altKey: true, shiftKey: true });
+    expect(onPress).not.toHaveBeenCalled();
+    expect(onRelease).not.toHaveBeenCalled();
+  });
+
+  it("keeps a hold across a re-render with new handlers, so the release is not lost", () => {
+    const { onPress, view } = setupDictate();
+    key("keydown", { code: "Space", key: " ", ctrlKey: true, shiftKey: true });
+    expect(onPress).toHaveBeenCalledOnce();
+    const nextRelease = vi.fn();
+    view.rerender(<DictateHarness onPress={vi.fn()} onRelease={nextRelease} />);
+    key("keyup", { code: "Space", key: " ", ctrlKey: true, shiftKey: true });
+    expect(nextRelease).toHaveBeenCalledOnce();
   });
 });

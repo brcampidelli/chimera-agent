@@ -8,6 +8,8 @@ import { readLastSession, writeLastSession } from "@/lib/workspace";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
+  // The sidebar reads the waiting questions from the cache the status bar polls; none here.
+  getApprovals: vi.fn(async () => []),
   deleteCodeProject: vi.fn(),
   deleteCodeSession: vi.fn(),
   forkCodeSession: vi.fn(),

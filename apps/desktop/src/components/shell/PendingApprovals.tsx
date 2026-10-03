@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldQuestion } from "lucide-react";
 
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Dialog } from "@/components/ui/dialog";
 import { focusRing } from "@/components/ui/focus";
-import { listCodeSessions } from "@/lib/api";
-import { useT } from "@/lib/i18n";
+import { listCodeSessions, type CodeSessionMeta } from "@/lib/api";
+import { useT, type TFunc } from "@/lib/i18n";
+import { NOTIFY_APPROVALS_KEY, notifyIfAway, useNotifyFlag } from "@/lib/notify";
 import type { ApprovalQuestion } from "@/lib/types";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import { cn } from "@/lib/utils";
@@ -69,7 +70,12 @@ export function PendingApprovals() {
   const [open, setOpen] = useState(false);
   // The one caller that owns the timer. This component is mounted on every screen — including the
   // one Governance renders inside — so its poll is the only one the app needs.
-  const { data, refetch } = usePendingApprovals({ poll: true });
+  const [notify] = useNotifyFlag(NOTIFY_APPROVALS_KEY);
+  // The one caller that owns the timer — so it is also the one that keeps it running in a
+  // minimised window, while the person has asked to be told about a new question. Without that the
+  // poll paused exactly when they walked away, and on restore the question was filed as known with
+  // the window focused: the notification it existed for never went out.
+  const { data, refetch } = usePendingApprovals({ poll: true, background: notify });
   const questions = data ?? [];
   const n = questions.length;
 
@@ -80,6 +86,8 @@ export function PendingApprovals() {
   useEffect(() => {
     if (n === 0) setOpen(false);
   }, [n]);
+
+  useApprovalNotice(data);
 
   if (n === 0) return null;
 
@@ -119,6 +127,81 @@ export function PendingApprovals() {
       </Dialog>
     </>
   );
+}
+
+/**
+ * A desktop notification when a new question arrives while the window has no focus — opt-in, in
+ * Settings › General › Notifications.
+ *
+ * The chip above is only seen by someone looking at the app, and the question it carries is refused
+ * by silence after `WAIT_SECONDS`. So the one case worth an OS notification is exactly the one the
+ * chip cannot cover: the person is in another window.
+ *
+ * "New" is a question id this poll returns that the previous one did not, rather than the count
+ * going up: an answer and a new question landing between two polls leave the count where it was
+ * and are still a new question. The first answer of the poll is the baseline, so opening the app
+ * never announces what was already waiting.
+ *
+ * The notification names WHERE the question comes from and nothing else. Never the command: the
+ * action is the tool call governance stopped, possibly written by a model that read a web page, and
+ * an OS notification is outside every boundary this app draws. The project is a folder name and the
+ * conversation's title is the person's own first message. Never actionable — answering happens in
+ * the card, where the reason and the ledger are.
+ */
+function useApprovalNotice(questions: ApprovalQuestion[] | undefined) {
+  const t = useT();
+  const [on] = useNotifyFlag(NOTIFY_APPROVALS_KEY);
+  // Only fetched when the option is on. The arrow is deliberate: it reads `listCodeSessions` when
+  // the query runs, not when this renders.
+  const sessions = useQuery({
+    queryKey: ["code-sessions"],
+    queryFn: () => listCodeSessions(),
+    staleTime: 30_000,
+    enabled: on,
+  });
+  const queryClient = useQueryClient();
+  const known = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!questions) return;
+    const before = known.current;
+    known.current = new Set(questions.map((q) => q.id));
+    if (before === null || !on) return;
+    const fresh = questions.find((q) => !before.has(q.id));
+    if (!fresh) return;
+    void (async () => {
+      let list = sessions.data;
+      // The list is kept for 30 s, and a question often comes from the conversation started in
+      // that window — which the cached list does not have yet, so the notice named an 8-character
+      // id instead of the person's own words. One read of the list, only for an id it lacks.
+      if (fresh.session_id && !fresh.work && !list?.some((s) => s.id === fresh.session_id)) {
+        try {
+          list = await queryClient.fetchQuery({
+            queryKey: ["code-sessions"],
+            queryFn: () => listCodeSessions(),
+            staleTime: 0,
+          });
+        } catch {
+          // The id it is, then; a notification is not worth failing over a title.
+        }
+      }
+      await notifyIfAway(t("notify.approval.title"), approvalNoticeBody(fresh, list, t), { appWide: true });
+    })();
+  }, [questions, on, sessions.data, queryClient, t]);
+}
+
+/** Where a question comes from, for a notification: the same fields `ApprovalOrigin` reads, minus
+ *  the background work's title, which is not the person's own words. */
+function approvalNoticeBody(
+  question: ApprovalQuestion,
+  sessions: CodeSessionMeta[] | undefined,
+  t: TFunc,
+): string {
+  if (!question.session_id && !question.workspace) return t("notify.approval.body");
+  const project = question.workspace ? projectName(question.workspace) : t("approvals.defaultProject");
+  if (question.work) return t("notify.approval.fromWork", { project });
+  const title = sessions?.find((s) => s.id === question.session_id)?.title;
+  const conversation = (title || question.session_id.slice(0, 8)).slice(0, 60);
+  return t("approvals.from", { project, conversation });
 }
 
 /** The last part of a folder path, which is how the sidebar names a project. */

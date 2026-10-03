@@ -1683,6 +1683,10 @@ def build_api_app(
                 repo_map=req.repo_map,
                 explorer=req.explorer,
             )
+            # Each task runs in a worktree cut from `ws`, a temporary folder no grant names. The
+            # shell grant is the project's, so it is looked up there — set here, server-side,
+            # because a field a request could fill in would let it borrow any folder's grant.
+            sub._grant_root = ws
 
             def run(ws_i: Path) -> AutonomousResult:
                 # Tag EVERY event with this task's index so the board can route it to the right card.

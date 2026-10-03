@@ -27,6 +27,7 @@
  */
 
 import { listCodeProjects, registerCodeProject, type CodeProject } from "@/lib/api";
+import { migrateShellGrantsOnce } from "@/lib/project-shell";
 
 /** Where the list used to live. Read for migration; never written again. */
 export const PROJECTS_KEY = "chimera:code:projects";
@@ -67,6 +68,9 @@ export function legacyAliases(): Record<string, string> {
  */
 export async function loadProjects(): Promise<CodeProject[]> {
   await migrateOnce();
+  // The command grants ride the same load, after the projects: a grant registers its folder on the
+  // server, and running second keeps the old list's order (and names) as the list's order.
+  await migrateShellGrantsOnce();
   return listCodeProjects();
 }
 
@@ -78,6 +82,41 @@ async function migrateOnce(): Promise<void> {
   // every load is a request per load that can never do anything.
   for (const path of paths) await registerCodeProject(path, names[path]);
   writeFlag();
+}
+
+/** The order the sidebar lists projects in: pinned first, then the most recently used.
+ *
+ * `sessions` arrive newest-first from the server, so the first time a workspace appears is its
+ * newest conversation. Recency is that, or the row's `last_used_at` (stamped when a turn starts),
+ * whichever is later — a turn still running has no saved conversation yet. A project nobody has used
+ * sorts after every used one, in the order it was registered. The sort is stable, so with no pins and
+ * no stamps this is exactly the order the list had before either existed.
+ *
+ * Hidden rows are left out — "remove to never list" means the conversations of that folder too,
+ * which is the only reason a hidden row is kept rather than deleted. Except the project that is OPEN:
+ * hiding the folder you are in must not make the screen lose track of where you are.
+ */
+export function sidebarOrder(
+  sessions: readonly { workspace: string; updated_at: number }[],
+  rows: readonly CodeProject[],
+  current: string,
+): string[] {
+  const byPath = new Map(rows.map((row) => [row.path, row] as const));
+  const newest = new Map<string, number>();
+  for (const session of sessions) {
+    if (!newest.has(session.workspace)) newest.set(session.workspace, session.updated_at);
+  }
+  for (const row of rows) if (!newest.has(row.path)) newest.set(row.path, 0);
+  const recency = (path: string) => {
+    const stamped = Date.parse(byPath.get(path)?.last_used_at ?? "");
+    return Math.max(newest.get(path) ?? 0, Number.isNaN(stamped) ? 0 : stamped / 1000);
+  };
+  return [...newest.keys()]
+    .filter((path) => path === current || byPath.get(path)?.hidden !== true)
+    .sort((a, b) => {
+      const pinned = Number(byPath.get(b)?.pinned === true) - Number(byPath.get(a)?.pinned === true);
+      return pinned || recency(b) - recency(a);
+    });
 }
 
 /** The names, as the sidebar wants them: keyed by workspace, absent when unnamed. */

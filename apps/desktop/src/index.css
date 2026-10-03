@@ -336,6 +336,45 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.5);
   }
 
+  /* ── Text size and fonts (Settings › Appearance). Each is stamped on <html> by the inline script in
+     index.html, and the default stamps nothing — so none of these rules matches for someone who never
+     chose, and their page is the one they had before the rows existed.
+
+     Text size moves the rem root and nothing else. Every type size, space and radius is in rem, so the
+     whole interface scales together and the scale stays five sizes rather than gaining a sixth. */
+  :root[data-text-size='small'] {
+    font-size: 93.75%;
+  }
+  :root[data-text-size='large'] {
+    font-size: 112.5%;
+  }
+
+  /* Fonts swap the VALUE of the tokens, never the places that read them. The code fonts are not
+     shipped: they are used when this computer has them, and the stack falls back to the default when
+     it does not (the row marks one it cannot find). OpenDyslexic is declared to load from the app's
+     own files, never a CDN — the app is local-first and must look the same offline. The file itself
+     (and its OFL licence) is pending: it is not in public/fonts yet, so this face loads nothing and
+     the Interface font row, which checks, offers no OpenDyslexic until it does. */
+  @font-face {
+    font-family: 'OpenDyslexic';
+    src: url('/fonts/OpenDyslexic-Regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+  }
+  :root[data-font='serif'] {
+    --font-sans: ui-serif, Georgia, Cambria, 'Times New Roman', serif;
+  }
+  :root[data-font='dyslexic'] {
+    --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+  }
+  :root[data-font-code='cascadia'] {
+    --font-mono: 'Cascadia Code', 'Cascadia Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  :root[data-font-code='jetbrains'] {
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
   html,
   body,
   #root {

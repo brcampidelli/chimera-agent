@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.agent import AgentResult, ToolActivity
+from chimera.core.code_session_marks import CodeSessionMarks
 from chimera.core.redact import redact
 from chimera.providers.gateway import MessageLike
 from chimera.telemetry import get_logger
@@ -318,6 +319,9 @@ class CodeSessionStore:
 
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
+        # Beside the folder, not in it: `list_meta` reads every `*.json` in the folder as a
+        # conversation. What the list derives a conversation's state from, and its archive.
+        self.marks = CodeSessionMarks(self.root.with_name(f"{self.root.name}.marks.json"))
 
     def _path(self, session_id: str) -> Path:
         # The id is generated here (a uuid hex), but this is also reachable from an API parameter,
@@ -438,6 +442,12 @@ class CodeSessionStore:
                 if message.get("role") == "user":
                     title = _title_of(str(message.get("content") or ""))
                     break
+            # The last stored receipt's verdict: the one fact about how the last turn ended that a
+            # conversation older than the marks file (`code_session_marks`) carries on its own.
+            receipts = data.get("receipts")
+            last = receipts[-1] if isinstance(receipts, list) and receipts else None
+            verified = last.get("verified") if isinstance(last, dict) else None
+            last_verdict = str(verified.get("state") or "") if isinstance(verified, dict) else ""
             out.append(
                 {
                     "id": str(data.get("session_id") or path.stem),
@@ -448,6 +458,7 @@ class CodeSessionStore:
                     # number that grows with the agent's verbosity rather than with the conversation.
                     "turns": sum(1 for m in messages if m.get("role") == "user"),
                     "updated_at": path.stat().st_mtime,
+                    "last_verdict": last_verdict,
                 }
             )
         out.sort(key=lambda m: float(m["updated_at"]), reverse=True)
@@ -458,6 +469,7 @@ class CodeSessionStore:
         if not path.is_file():
             return False
         path.unlink()
+        self.marks.forget(session_id)
         return True
 
     def delete_project(self, workspace: str) -> int:

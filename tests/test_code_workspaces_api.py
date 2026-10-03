@@ -56,6 +56,13 @@ def _paths(response: Any) -> list[str]:
     return [row["path"] for row in response.json()]
 
 
+def _names(response: Any) -> list[dict[str, str]]:
+    """Path and alias only. The rows also carry the grant, the pin, the recency and the hidden
+    flag since study 29 (P4.3); the tests in this block are about the bookmark and its name, and
+    `test_a_new_row_decides_nothing` below pins the rest of the shape on its own."""
+    return [{"path": row["path"], "alias": row["alias"]} for row in response.json()]
+
+
 def test_a_fresh_install_has_no_projects(client: TestClient) -> None:
     response = client.get("/api/code/workspaces")
     assert response.status_code == 200
@@ -65,8 +72,8 @@ def test_a_fresh_install_has_no_projects(client: TestClient) -> None:
 def test_registering_a_project_lists_it(client: TestClient) -> None:
     response = client.post("/api/code/workspaces", json={"path": LOJA, "alias": "a loja"})
     assert response.status_code == 200
-    assert response.json() == [{"path": LOJA, "alias": "a loja"}]
-    assert client.get("/api/code/workspaces").json() == [{"path": LOJA, "alias": "a loja"}]
+    assert _names(response) == [{"path": LOJA, "alias": "a loja"}]
+    assert _names(client.get("/api/code/workspaces")) == [{"path": LOJA, "alias": "a loja"}]
 
 
 def test_a_project_survives_without_ever_being_worked_in(client: TestClient) -> None:
@@ -80,13 +87,13 @@ def test_a_project_survives_without_ever_being_worked_in(client: TestClient) -> 
 def test_re_registering_without_an_alias_field_keeps_the_name(client: TestClient) -> None:
     client.post("/api/code/workspaces", json={"path": LOJA, "alias": "a loja"})
     again = client.post("/api/code/workspaces", json={"path": LOJA})
-    assert again.json() == [{"path": LOJA, "alias": "a loja"}]
+    assert _names(again) == [{"path": LOJA, "alias": "a loja"}]
 
 
 def test_an_empty_alias_clears_the_name(client: TestClient) -> None:
     client.post("/api/code/workspaces", json={"path": LOJA, "alias": "a loja"})
     cleared = client.post("/api/code/workspaces", json={"path": LOJA, "alias": ""})
-    assert cleared.json() == [{"path": LOJA, "alias": ""}]
+    assert _names(cleared) == [{"path": LOJA, "alias": ""}]
 
 
 def test_a_blank_path_is_refused_rather_than_stored(client: TestClient) -> None:
@@ -129,7 +136,7 @@ def test_deleting_the_conversations_leaves_the_bookmark(client: TestClient, tmp_
     removed = client.request("DELETE", "/api/code/projects", params={"workspace": LOJA})
 
     assert removed.json() == {"deleted": 1}
-    assert client.get("/api/code/workspaces").json() == [{"path": LOJA, "alias": "a loja"}]
+    assert _names(client.get("/api/code/workspaces")) == [{"path": LOJA, "alias": "a loja"}]
 
 
 def test_the_list_survives_a_restart(client: TestClient, tmp_path: Path) -> None:
@@ -146,4 +153,107 @@ def test_the_list_survives_a_restart(client: TestClient, tmp_path: Path) -> None
             settings=Settings(CHIMERA_HOME=str(tmp_path / "home")),
         )
     )
-    assert again.get("/api/code/workspaces").json() == [{"path": BLOG, "alias": "o blog"}]
+    assert _names(again.get("/api/code/workspaces")) == [{"path": BLOG, "alias": "o blog"}]
+
+
+# ------------------------------------------------- folders: the grant, the pin, hiding (P4.3)
+
+
+def test_a_new_row_decides_nothing(client: TestClient) -> None:
+    """Registering is a bookmark and nothing more: no grant, no pin, not hidden, never used."""
+    response = client.post("/api/code/workspaces", json={"path": LOJA})
+    assert response.json() == [
+        {
+            "path": LOJA,
+            "alias": "",
+            "shell_granted": False,
+            "granted_at": "",
+            "pinned": False,
+            "last_used_at": "",
+            "hidden": False,
+        }
+    ]
+
+
+def test_granting_records_when_and_revoking_forgets_it(client: TestClient) -> None:
+    granted = client.put("/api/code/workspaces/grant", json={"path": LOJA, "shell_granted": True})
+    assert granted.status_code == 200
+    row = granted.json()[0]
+    assert row["path"] == LOJA and row["shell_granted"] is True and row["granted_at"]
+
+    revoked = client.put("/api/code/workspaces/grant", json={"path": LOJA, "shell_granted": False})
+    assert revoked.json()[0]["shell_granted"] is False and revoked.json()[0]["granted_at"] == ""
+
+
+def test_naming_a_granted_project_keeps_the_grant(client: TestClient) -> None:
+    """The register route predates the grant. Re-registering to rename must not quietly revoke."""
+    client.put("/api/code/workspaces/grant", json={"path": LOJA, "shell_granted": True})
+    renamed = client.post("/api/code/workspaces", json={"path": LOJA, "alias": "a loja"})
+    assert renamed.json()[0]["alias"] == "a loja" and renamed.json()[0]["shell_granted"] is True
+
+
+def test_hiding_keeps_the_row_and_revokes_the_grant(client: TestClient) -> None:
+    """"Remove to never list": kept as a row, so the sidebar can leave out a folder it would
+    otherwise bring back from its conversations — and the grant goes, because a permission nobody
+    can see in a list is one nobody takes back."""
+    client.put("/api/code/workspaces/grant", json={"path": LOJA, "shell_granted": True})
+    client.patch("/api/code/workspaces", json={"path": LOJA, "pinned": True})
+    hidden = client.patch("/api/code/workspaces", json={"path": LOJA, "hidden": True})
+    row = hidden.json()[0]
+    assert (row["hidden"], row["shell_granted"], row["pinned"]) == (True, False, False)
+    assert _paths(client.get("/api/code/workspaces")) == [LOJA]
+
+
+def test_pinning_a_folder_nobody_registered_registers_it(client: TestClient) -> None:
+    """The sidebar lists folders from conversations too; pinning one of those must just work."""
+    pinned = client.patch("/api/code/workspaces", json={"path": BLOG, "pinned": True})
+    assert pinned.json()[0]["path"] == BLOG and pinned.json()[0]["pinned"] is True
+
+
+def test_the_migration_records_the_old_grants_once(client: TestClient) -> None:
+    """The desktop's grants lived in its own storage. They cross once; after that the client's word
+    is not a grant, so a second call — with anything in it — changes nothing."""
+    first = client.post("/api/code/workspaces/grant/migrate", json={"paths": [LOJA, BLOG]})
+    assert first.status_code == 200
+    body = first.json()
+    assert body["migrated"] is True and body["recorded"] == 2
+    assert {r["path"] for r in body["projects"] if r["shell_granted"]} == {LOJA, BLOG}
+
+    second = client.post("/api/code/workspaces/grant/migrate", json={"paths": ["C:\\outra"]})
+    assert second.json()["migrated"] is False and second.json()["recorded"] == 0
+    assert "C:\\outra" not in _paths(client.get("/api/code/workspaces"))
+
+
+def test_an_empty_migration_still_closes_the_window(client: TestClient) -> None:
+    """A fresh install has nothing to move, and must not leave the door open for a later claim."""
+    assert client.post("/api/code/workspaces/grant/migrate", json={"paths": []}).json()["migrated"]
+    late = client.post("/api/code/workspaces/grant/migrate", json={"paths": [LOJA]}).json()
+    assert late["migrated"] is False
+    assert client.get("/api/code/workspaces").json() == []
+
+
+def test_the_posture_sentence_is_held_to_the_grant(client: TestClient, tmp_path: Path) -> None:
+    """The screen's posture line describes the run that happens. A `workspace_shell` asked for in
+    a folder nobody granted is described as the run it will be: no shell."""
+    pasta = tmp_path / "ws"
+    asked = {"reach": "workspace_shell", "approval": "never", "workspace": str(pasta)}
+    before = client.post("/api/code/posture", json=asked).json()
+    client.put("/api/code/workspaces/grant", json={"path": str(pasta), "shell_granted": True})
+    after = client.post("/api/code/posture", json=asked).json()
+    assert before["shell"] == "none"
+    assert after["shell"] != "none"
+
+
+def test_a_turn_stamps_the_last_use_of_a_registered_folder(tmp_path: Path) -> None:
+    """Only a registered folder, and only when a turn actually starts there."""
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    registry = CodeProjectRegistry(tmp_path / "home" / "code_projects.json")
+    pasta = tmp_path / "loja"
+    pasta.mkdir()
+    registry.register(str(pasta))
+    registry.touch(str(pasta))
+    registry.touch(str(tmp_path / "nunca-registrada"))
+    rows = registry.entries()
+    assert [r.path for r in rows] == [str(pasta)]
+    assert rows[0].last_used_at

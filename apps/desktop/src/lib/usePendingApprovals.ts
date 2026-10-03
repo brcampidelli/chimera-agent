@@ -29,16 +29,23 @@ export const APPROVALS_POLL_MS = 2000;
  * `poll` has no default on purpose. A default would let a third caller quietly become a second
  * timer, which is the exact defect this parameter exists to make impossible to introduce by
  * accident.
+ *
+ * `background` keeps that timer running while the window is hidden (minimised), which React Query
+ * otherwise skips. Only the notification needs it — a chip nobody can see does not need refreshing —
+ * so the timer's owner turns it on exactly while the person has asked to be told.
  */
 export function usePendingApprovals({
   poll,
+  background = false,
 }: {
   poll: boolean;
+  background?: boolean;
 }): UseQueryResult<ApprovalQuestion[]> {
   return useQuery({
     queryKey: ["approvals"],
     queryFn: getApprovals,
     refetchInterval: poll ? APPROVALS_POLL_MS : false,
+    refetchIntervalInBackground: poll && background,
     // A question that resolved elsewhere has to disappear on the next read, never be served from a
     // cache — the same rule the sandbox probe follows on the Security screen.
     staleTime: 0,

@@ -190,6 +190,29 @@ class CodeSessionMetaOut(BaseModel):
     updated_at: float
     #: A turn of this conversation is running now. Absent for a conversation nobody is working in.
     running: bool = False
+    #: What the conversation needs, derived from facts the server holds and never by a model
+    #: (`chimera/api/conversation_state.py`): a question waiting for you, a turn or background work
+    #: running, a last turn that failed, edits you have not looked at, or nothing.
+    state: Literal["running", "waiting", "failed", "review", "idle"] = "idle"
+    #: When it was archived; None for a conversation in the list.
+    archived_at: float | None = None
+
+
+class CodeSessionArchiveOut(BaseModel):
+    """A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.
+
+    Archiving touches no file, folder or worktree — it is a timestamp beside the transcripts. A
+    refusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.
+    """
+
+    id: str
+    archived_at: float | None = None
+
+
+class CodeSessionSeenOut(BaseModel):
+    """Whether marking a conversation seen changed anything: false when there was nothing unseen."""
+
+    changed: bool
 
 
 class CodeProjectOut(BaseModel):
@@ -202,6 +225,50 @@ class CodeProjectOut(BaseModel):
 
     path: str
     alias: str = ""
+    shell_granted: bool = False
+    """The owner let the agent run commands in this folder — the record the server enforces.
+
+    A request that asks for the shell in a folder without this is answered with the reach below it
+    (see ``assemble_registry``). It never beats a ``read_only`` reach nor ``CHIMERA_HOST_EXEC=deny``.
+    """
+    granted_at: str = ""
+    """When it was granted, ISO-8601 UTC. Empty when not granted."""
+    pinned: bool = False
+    """Listed first, above the projects ordered by recency."""
+    last_used_at: str = ""
+    """When a coding turn last started here, ISO-8601 UTC. Empty = never."""
+    hidden: bool = False
+    """Removed from the lists by the owner. Kept as a row so a folder with conversations does not
+    reappear the moment it is removed; hiding also revoked any grant and pin it had."""
+
+
+class CodeProjectFlagsIn(BaseModel):
+    """Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide."""
+
+    path: str
+    pinned: bool | None = None
+    hidden: bool | None = None
+
+
+class CodeProjectGrantIn(BaseModel):
+    """Grant or revoke commands in one folder. Its own route, so the bridge can hold it to Full."""
+
+    path: str
+    shell_granted: bool
+
+
+class CodeGrantMigrationIn(BaseModel):
+    """The folders the desktop had granted in its own browser storage, sent once."""
+
+    paths: list[str] = Field(default_factory=list, max_length=500)
+
+
+class CodeGrantMigrationOut(BaseModel):
+    """What the one-time migration did. ``migrated=False`` = it had already happened; nothing changed."""
+
+    migrated: bool
+    recorded: int
+    projects: list[CodeProjectOut]
 
 
 class CodeProjectIn(BaseModel):
@@ -1177,6 +1244,9 @@ class CronJobOut(BaseModel):
     last_error: str | None = None
     consecutive_failures: int = 0
     """Since the last success. One failure is weather; forty is a broken job."""
+    disabled_by: str = ""
+    """Who switched a disabled job off: `human`, `brake` (the engine, after repeated failures), or
+    `""` while the job is enabled or for a job stored before the field existed."""
     created_by: str
     workspace: str | None = None
     """The folder this job works in. None means the root the process was started with — which on a

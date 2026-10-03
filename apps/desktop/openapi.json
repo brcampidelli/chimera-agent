@@ -1805,6 +1805,103 @@
         "title": "CodeExchangeOut",
         "type": "object"
       },
+      "CodeGrantMigrationIn": {
+        "description": "The folders the desktop had granted in its own browser storage, sent once.",
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "title": "CodeGrantMigrationIn",
+        "type": "object"
+      },
+      "CodeGrantMigrationOut": {
+        "description": "What the one-time migration did. ``migrated=False`` = it had already happened; nothing changed.",
+        "properties": {
+          "migrated": {
+            "title": "Migrated",
+            "type": "boolean"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/CodeProjectOut"
+            },
+            "title": "Projects",
+            "type": "array"
+          },
+          "recorded": {
+            "title": "Recorded",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "migrated",
+          "recorded",
+          "projects"
+        ],
+        "title": "CodeGrantMigrationOut",
+        "type": "object"
+      },
+      "CodeProjectFlagsIn": {
+        "description": "Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide.",
+        "properties": {
+          "hidden": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hidden"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "pinned": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "CodeProjectFlagsIn",
+        "type": "object"
+      },
+      "CodeProjectGrantIn": {
+        "description": "Grant or revoke commands in one folder. Its own route, so the bridge can hold it to Full.",
+        "properties": {
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "shell_granted": {
+            "title": "Shell Granted",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "shell_granted"
+        ],
+        "title": "CodeProjectGrantIn",
+        "type": "object"
+      },
       "CodeProjectIn": {
         "description": "A project as a client registers it.\n\n``alias`` absent means *say nothing about the name*, and an empty string CLEARS it. The two read\nidentically in JSON unless the distinction is kept on purpose, and without it re-registering a\nproject you have already named would wipe the name \u2014 so the default is ``None``, never ``\"\"``.",
         "properties": {
@@ -1838,9 +1935,34 @@
             "title": "Alias",
             "type": "string"
           },
+          "granted_at": {
+            "default": "",
+            "title": "Granted At",
+            "type": "string"
+          },
+          "hidden": {
+            "default": false,
+            "title": "Hidden",
+            "type": "boolean"
+          },
+          "last_used_at": {
+            "default": "",
+            "title": "Last Used At",
+            "type": "string"
+          },
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "pinned": {
+            "default": false,
+            "title": "Pinned",
+            "type": "boolean"
+          },
+          "shell_granted": {
+            "default": false,
+            "title": "Shell Granted",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1849,9 +1971,45 @@
         "title": "CodeProjectOut",
         "type": "object"
       },
+      "CodeSessionArchiveOut": {
+        "description": "A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.\n\nArchiving touches no file, folder or worktree \u2014 it is a timestamp beside the transcripts. A\nrefusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.",
+        "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "CodeSessionArchiveOut",
+        "type": "object"
+      },
       "CodeSessionMetaOut": {
         "description": "One row of the coding-conversation list.\n\nSeparate from ``SessionMetaOut`` because it carries ``workspace`` \u2014 the field that lets the list\nbe grouped by project instead of being a flat pile of past questions with no owner.",
         "properties": {
+          "archived_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archived At"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1860,6 +2018,18 @@
             "default": false,
             "title": "Running",
             "type": "boolean"
+          },
+          "state": {
+            "default": "idle",
+            "enum": [
+              "running",
+              "waiting",
+              "failed",
+              "review",
+              "idle"
+            ],
+            "title": "State",
+            "type": "string"
           },
           "title": {
             "title": "Title",
@@ -1946,6 +2116,20 @@
           "bytes"
         ],
         "title": "CodeSessionRawOut",
+        "type": "object"
+      },
+      "CodeSessionSeenOut": {
+        "description": "Whether marking a conversation seen changed anything: false when there was nothing unseen.",
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "title": "CodeSessionSeenOut",
         "type": "object"
       },
       "CodeToolOut": {
@@ -3214,6 +3398,11 @@
               }
             ],
             "title": "Deliver To"
+          },
+          "disabled_by": {
+            "default": "",
+            "title": "Disabled By",
+            "type": "string"
           },
           "enabled": {
             "title": "Enabled",
@@ -11465,8 +11654,20 @@
     },
     "/api/code/sessions": {
       "get": {
-        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.",
+        "description": "Past coding conversations, newest first, each carrying the project it belongs to.\n\nThe list is what makes a sidebar possible: without the project on each row, past\nconversations are a flat pile you cannot file. Titles are the first thing the user asked,\nderived on read \u2014 never generated, so a row is never a paraphrase of the conversation it\npoints at.\n\nA conversation with a turn running is marked, and one whose first turn is still running is\nlisted although its file does not exist yet: the file is written when the agent finishes,\nso without this a task started in a new conversation was invisible for exactly as long as it\ntook to do.\n\nEach row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.\n``archived=true`` lists the archived conversations instead of the others. This is also where\n``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied \u2014 on the look, so no thread has to run for it, and\nnever to a conversation working, waiting, with a background work or with a share link open.",
         "operationId": "list_code_sessions_api_code_sessions_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "archived",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Archived",
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -11481,6 +11682,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "List Code Sessions"
@@ -11566,6 +11777,46 @@
           }
         },
         "summary": "Get Code Session"
+      }
+    },
+    "/api/code/sessions/{session_id}/archive": {
+      "post": {
+        "description": "Move a conversation out of the list. **Nothing is touched**: no transcript, folder or\nworktree, and a share link keeps working \u2014 it is a timestamp beside the transcripts.\n\nRefused (409) while a turn or background work of it runs or a question of it waits: the\narchive is a collapsed section, and an agent's state must not be hidden by tidying a list.",
+        "operationId": "archive_code_session_api_code_sessions__session_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionArchiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Code Session"
       }
     },
     "/api/code/sessions/{session_id}/fork": {
@@ -11750,6 +12001,46 @@
         "summary": "Raw Code Session"
       }
     },
+    "/api/code/sessions/{session_id}/seen": {
+      "post": {
+        "description": "The owner's screen drew this conversation, so its last edits are no longer unseen.\n\nIts own route rather than a side effect of reading the conversation: the desktop bridge\nreads conversations too, and an agent reading one is not the owner looking at its diff.\nNot in the bridge's table for the same reason.",
+        "operationId": "seen_code_session_api_code_sessions__session_id__seen_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionSeenOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Seen Code Session"
+      }
+    },
     "/api/code/sessions/{session_id}/share": {
       "post": {
         "description": "A new token for this conversation. One per person, so one can be revoked alone.",
@@ -11896,6 +12187,46 @@
           }
         },
         "summary": "Revoke Share"
+      }
+    },
+    "/api/code/sessions/{session_id}/unarchive": {
+      "post": {
+        "description": "Bring a conversation back into the list. Idempotent: one already there stays there.",
+        "operationId": "unarchive_code_session_api_code_sessions__session_id__unarchive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeSessionArchiveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unarchive Code Session"
       }
     },
     "/api/code/sessions/{session_id}/works": {
@@ -12292,7 +12623,7 @@
     },
     "/api/code/workspaces": {
       "delete": {
-        "description": "Forget a bookmark. **Conversations are not touched**, so a project you have worked in\nreappears in the sidebar as one you have talked about rather than one you registered.",
+        "description": "Forget a bookmark. **Conversations are not touched**, so a project you have worked in\nreappears in the sidebar as one you have talked about rather than one you registered. Its\ngrant goes with it; to keep a folder out of the lists for good, hide it (PATCH).",
         "operationId": "forget_code_workspace_api_code_workspaces_delete",
         "parameters": [
           {
@@ -12334,7 +12665,7 @@
         "summary": "Forget Code Workspace"
       },
       "get": {
-        "description": "The projects you have added, in the order you added them.\n\nThe sidebar unions these with the projects it derives from conversations, so a project you\nhave worked in stays listed whether or not it was ever registered \u2014 nothing disappears\nbecause it was not on this list.",
+        "description": "The projects you have added, in the order you added them \u2014 hidden ones included.\n\nThe sidebar unions these with the projects it derives from conversations, so a project you\nhave worked in stays listed whether or not it was ever registered \u2014 nothing disappears\nbecause it was not on this list. Hidden rows are sent rather than filtered, because hiding a\nfolder you have talked about is exactly the case the sidebar must know about to leave out.",
         "operationId": "list_code_workspaces_api_code_workspaces_get",
         "responses": {
           "200": {
@@ -12353,6 +12684,47 @@
           }
         },
         "summary": "List Code Workspaces"
+      },
+      "patch": {
+        "description": "Pin or hide a project, registering it if it was not. Hiding revokes its grant and pin.\n\nOnly ever narrows what the agent may do, so the bridge serves it at its operate tier.",
+        "operationId": "flag_code_workspace_api_code_workspaces_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeProjectFlagsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeProjectOut"
+                  },
+                  "title": "Response Flag Code Workspace Api Code Workspaces Patch",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Flag Code Workspace"
       },
       "post": {
         "description": "Add a project, or name one you already added. Idempotent on the path.\n\nRegistering says nothing about whether the folder exists \u2014 a bookmark to a moved checkout\nshould stay visible so it can be corrected, rather than vanishing and taking its name with\nit \u2014 and nothing about where the agent may write, which the workspace guard decides from the\nrequest and never from here.",
@@ -12394,6 +12766,88 @@
           }
         },
         "summary": "Register Code Workspace"
+      }
+    },
+    "/api/code/workspaces/grant": {
+      "put": {
+        "description": "Grant or revoke commands in one folder \u2014 the record every coding turn is held to.\n\nIts own route rather than a field on the PATCH above, so the bridge can hold granting to its\nFull tier while pinning and hiding stay at operate. Behind the same guard as the rest of the\nAPI: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach\nevery other route. What moving the grant here changes is that a REQUEST no longer carries\nit; recording one is a separate act, listed in the Folders card where it can be revoked.",
+        "operationId": "grant_code_workspace_api_code_workspaces_grant_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeProjectGrantIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CodeProjectOut"
+                  },
+                  "title": "Response Grant Code Workspace Api Code Workspaces Grant Put",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Grant Code Workspace"
+      }
+    },
+    "/api/code/workspaces/grant/migrate": {
+      "post": {
+        "description": "Record the folders the desktop had granted in its own storage \u2014 ONCE per installation.\n\nThe first call closes the window whatever it carries, an empty list included; every later\none changes nothing and answers ``migrated: false``. Not on the bridge: it exists for one\nclient's one-time upgrade, not as a second way to grant.",
+        "operationId": "migrate_code_workspace_grants_api_code_workspaces_grant_migrate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeGrantMigrationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CodeGrantMigrationOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Migrate Code Workspace Grants"
       }
     },
     "/api/code/worth": {

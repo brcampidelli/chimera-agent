@@ -66,6 +66,10 @@ if (!Element.prototype.hasPointerCapture) {
   Element.prototype.setPointerCapture = () => {};
   Element.prototype.releasePointerCapture = () => {};
 }
+// jsdom has no canvas without the native `canvas` package, and its getContext prints a "not
+// implemented" error on every call. The font rows measure text on one to tell an installed font from
+// a missing one; answering null is the honest "cannot tell", which they already handle.
+HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => {};
 }
@@ -106,4 +110,7 @@ afterEach(() => {
   // The theme layer writes these to <html>; left behind they'd style the next test's DOM.
   delete document.documentElement.dataset.theme;
   delete document.documentElement.dataset.motion;
+  delete document.documentElement.dataset.textSize;
+  delete document.documentElement.dataset.font;
+  delete document.documentElement.dataset.fontCode;
 });

@@ -397,6 +397,11 @@ export interface paths {
          *     listed although its file does not exist yet: the file is written when the agent finishes,
          *     so without this a task started in a new conversation was invisible for exactly as long as it
          *     took to do.
+         *
+         *     Each row carries its ``state`` (`chimera/api/conversation_state.py`), from facts only.
+         *     ``archived=true`` lists the archived conversations instead of the others. This is also where
+         *     ``CHIMERA_ARCHIVE_AFTER_DAYS`` is applied — on the look, so no thread has to run for it, and
+         *     never to a conversation working, waiting, with a background work or with a share link open.
          */
         get: operations["list_code_sessions_api_code_sessions_get"];
         put?: never;
@@ -439,6 +444,30 @@ export interface paths {
          *     exactly the state a second click on Clear hits, and it is not an error.
          */
         delete: operations["delete_code_session_api_code_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive Code Session
+         * @description Move a conversation out of the list. **Nothing is touched**: no transcript, folder or
+         *     worktree, and a share link keeps working — it is a timestamp beside the transcripts.
+         *
+         *     Refused (409) while a turn or background work of it runs or a question of it waits: the
+         *     archive is a collapsed section, and an agent's state must not be hidden by tidying a list.
+         */
+        post: operations["archive_code_session_api_code_sessions__session_id__archive_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -531,6 +560,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/sessions/{session_id}/seen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seen Code Session
+         * @description The owner's screen drew this conversation, so its last edits are no longer unseen.
+         *
+         *     Its own route rather than a side effect of reading the conversation: the desktop bridge
+         *     reads conversations too, and an agent reading one is not the owner looking at its diff.
+         *     Not in the bridge's table for the same reason.
+         */
+        post: operations["seen_code_session_api_code_sessions__session_id__seen_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/sessions/{session_id}/share": {
         parameters: {
             query?: never;
@@ -580,6 +633,26 @@ export interface paths {
         post?: never;
         /** Revoke Share */
         delete: operations["revoke_share_api_code_sessions__session_id__shares__token__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/sessions/{session_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Unarchive Code Session
+         * @description Bring a conversation back into the list. Idempotent: one already there stays there.
+         */
+        post: operations["unarchive_code_session_api_code_sessions__session_id__unarchive_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -797,11 +870,12 @@ export interface paths {
         };
         /**
          * List Code Workspaces
-         * @description The projects you have added, in the order you added them.
+         * @description The projects you have added, in the order you added them — hidden ones included.
          *
          *     The sidebar unions these with the projects it derives from conversations, so a project you
          *     have worked in stays listed whether or not it was ever registered — nothing disappears
-         *     because it was not on this list.
+         *     because it was not on this list. Hidden rows are sent rather than filtered, because hiding a
+         *     folder you have talked about is exactly the case the sidebar must know about to leave out.
          */
         get: operations["list_code_workspaces_api_code_workspaces_get"];
         put?: never;
@@ -818,9 +892,66 @@ export interface paths {
         /**
          * Forget Code Workspace
          * @description Forget a bookmark. **Conversations are not touched**, so a project you have worked in
-         *     reappears in the sidebar as one you have talked about rather than one you registered.
+         *     reappears in the sidebar as one you have talked about rather than one you registered. Its
+         *     grant goes with it; to keep a folder out of the lists for good, hide it (PATCH).
          */
         delete: operations["forget_code_workspace_api_code_workspaces_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Flag Code Workspace
+         * @description Pin or hide a project, registering it if it was not. Hiding revokes its grant and pin.
+         *
+         *     Only ever narrows what the agent may do, so the bridge serves it at its operate tier.
+         */
+        patch: operations["flag_code_workspace_api_code_workspaces_patch"];
+        trace?: never;
+    };
+    "/api/code/workspaces/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Grant Code Workspace
+         * @description Grant or revoke commands in one folder — the record every coding turn is held to.
+         *
+         *     Its own route rather than a field on the PATCH above, so the bridge can hold granting to its
+         *     Full tier while pinning and hiding stay at operate. Behind the same guard as the rest of the
+         *     API: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach
+         *     every other route. What moving the grant here changes is that a REQUEST no longer carries
+         *     it; recording one is a separate act, listed in the Folders card where it can be revoked.
+         */
+        put: operations["grant_code_workspace_api_code_workspaces_grant_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/workspaces/grant/migrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Migrate Code Workspace Grants
+         * @description Record the folders the desktop had granted in its own storage — ONCE per installation.
+         *
+         *     The first call closes the window whatever it carries, an empty list included; every later
+         *     one changes nothing and answers ``migrated: false``. Not on the bridge: it exists for one
+         *     client's one-time upgrade, not as a second way to grant.
+         */
+        post: operations["migrate_code_workspace_grants_api_code_workspaces_grant_migrate_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4090,6 +4221,48 @@ export interface components {
             you: string;
         };
         /**
+         * CodeGrantMigrationIn
+         * @description The folders the desktop had granted in its own browser storage, sent once.
+         */
+        CodeGrantMigrationIn: {
+            /** Paths */
+            paths?: string[];
+        };
+        /**
+         * CodeGrantMigrationOut
+         * @description What the one-time migration did. ``migrated=False`` = it had already happened; nothing changed.
+         */
+        CodeGrantMigrationOut: {
+            /** Migrated */
+            migrated: boolean;
+            /** Projects */
+            projects: components["schemas"]["CodeProjectOut"][];
+            /** Recorded */
+            recorded: number;
+        };
+        /**
+         * CodeProjectFlagsIn
+         * @description Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide.
+         */
+        CodeProjectFlagsIn: {
+            /** Hidden */
+            hidden?: boolean | null;
+            /** Path */
+            path: string;
+            /** Pinned */
+            pinned?: boolean | null;
+        };
+        /**
+         * CodeProjectGrantIn
+         * @description Grant or revoke commands in one folder. Its own route, so the bridge can hold it to Full.
+         */
+        CodeProjectGrantIn: {
+            /** Path */
+            path: string;
+            /** Shell Granted */
+            shell_granted: boolean;
+        };
+        /**
          * CodeProjectIn
          * @description A project as a client registers it.
          *
@@ -4117,8 +4290,46 @@ export interface components {
              * @default
              */
             alias: string;
+            /**
+             * Granted At
+             * @default
+             */
+            granted_at: string;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * Last Used At
+             * @default
+             */
+            last_used_at: string;
             /** Path */
             path: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /**
+             * Shell Granted
+             * @default false
+             */
+            shell_granted: boolean;
+        };
+        /**
+         * CodeSessionArchiveOut
+         * @description A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.
+         *
+         *     Archiving touches no file, folder or worktree — it is a timestamp beside the transcripts. A
+         *     refusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.
+         */
+        CodeSessionArchiveOut: {
+            /** Archived At */
+            archived_at?: number | null;
+            /** Id */
+            id: string;
         };
         /**
          * CodeSessionMetaOut
@@ -4128,6 +4339,8 @@ export interface components {
          *     be grouped by project instead of being a flat pile of past questions with no owner.
          */
         CodeSessionMetaOut: {
+            /** Archived At */
+            archived_at?: number | null;
             /** Id */
             id: string;
             /**
@@ -4135,6 +4348,12 @@ export interface components {
              * @default false
              */
             running: boolean;
+            /**
+             * State
+             * @default idle
+             * @enum {string}
+             */
+            state: "running" | "waiting" | "failed" | "review" | "idle";
             /** Title */
             title: string;
             /** Turns */
@@ -4169,6 +4388,14 @@ export interface components {
             id: string;
             /** Text */
             text: string;
+        };
+        /**
+         * CodeSessionSeenOut
+         * @description Whether marking a conversation seen changed anything: false when there was nothing unseen.
+         */
+        CodeSessionSeenOut: {
+            /** Changed */
+            changed: boolean;
         };
         /** CodeToolOut */
         CodeToolOut: {
@@ -4737,6 +4964,11 @@ export interface components {
             created_by: string;
             /** Deliver To */
             deliver_to?: string | null;
+            /**
+             * Disabled By
+             * @default
+             */
+            disabled_by: string;
             /** Enabled */
             enabled: boolean;
             /** Id */
@@ -8834,7 +9066,9 @@ export interface operations {
     };
     list_code_sessions_api_code_sessions_get: {
         parameters: {
-            query?: never;
+            query?: {
+                archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8848,6 +9082,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeSessionMetaOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -8903,6 +9146,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_code_session_api_code_sessions__session_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionArchiveOut"];
                 };
             };
             /** @description Validation Error */
@@ -9044,6 +9318,37 @@ export interface operations {
             };
         };
     };
+    seen_code_session_api_code_sessions__session_id__seen_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionSeenOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     share_session_api_code_sessions__session_id__share_post: {
         parameters: {
             query?: never;
@@ -9131,6 +9436,37 @@ export interface operations {
                     "application/json": {
                         [key: string]: boolean;
                     };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unarchive_code_session_api_code_sessions__session_id__unarchive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeSessionArchiveOut"];
                 };
             };
             /** @description Validation Error */
@@ -9530,6 +9866,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flag_code_workspace_api_code_workspaces_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectFlagsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_code_workspace_api_code_workspaces_grant_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectGrantIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    migrate_code_workspace_grants_api_code_workspaces_grant_migrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeGrantMigrationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeGrantMigrationOut"];
                 };
             };
             /** @description Validation Error */

@@ -104,6 +104,42 @@ export const SIZE_LIMITS: Record<SizedRegion, { min: number; max: number; initia
   viewer: { min: 280, max: 900, initial: 448 },
 };
 
+/** How wide the conversation runs in the centre. Each is a Tailwind max-width token, never a value. */
+export type TranscriptWidth = "narrow" | "medium" | "wide";
+
+export const TRANSCRIPT_WIDTHS: readonly TranscriptWidth[] = ["narrow", "medium", "wide"];
+
+/** Written out in full so Tailwind finds the classes in the source. `medium` is the width the
+ *  conversation always had. */
+export const TRANSCRIPT_WIDTH_CLASS: Record<TranscriptWidth, string> = {
+  narrow: "max-w-2xl",
+  medium: "max-w-3xl",
+  wide: "max-w-5xl",
+};
+
+/**
+ * Card presets: every card kind's open-or-minimised preference set in one step.
+ *
+ * Compact minimises the cards that are a record of work already done (the tool list, the receipt, the
+ * browser) and opens everything else; Detailed opens every kind. Neither ever minimises the three kinds
+ * that never close (`NEVER_CLOSED`): an approval waiting, a spend warning and a failed turn's error stay
+ * open, because a preset someone picked for tidiness must not be what hides a decision or a failure.
+ * The check is made here, on every kind, rather than trusted to the list below staying short.
+ */
+export type CardPreset = "compact" | "detailed";
+
+const COMPACT_MINIMIZED: ReadonlySet<CardKind> = new Set<CardKind>(["tools", "receipt", "browser"]);
+
+/** The `card-pref` actions a preset is made of, one per card kind. */
+export function cardPresetActions(name: CardPreset): LayoutAction[] {
+  return CARD_KINDS.map((kind): LayoutAction => ({
+    type: "card-pref",
+    kind,
+    mode:
+      name === "compact" && COMPACT_MINIMIZED.has(kind) && !NEVER_CLOSED.has(kind) ? "minimized" : "open",
+  }));
+}
+
 export interface PanelState {
   zone: Zone;
   order: number;
@@ -122,6 +158,7 @@ export interface LayoutCore {
   panels: Record<PanelId, PanelState>;
   cards: Record<CardKind, "open" | "minimized">;
   maximized: PanelId | null;
+  transcriptWidth: TranscriptWidth;
 }
 
 export interface Layout extends LayoutCore {
@@ -139,6 +176,8 @@ export type LayoutAction =
   | { type: "card-pref"; kind: CardKind; mode: "open" | "minimized" }
   | { type: "show-all" }
   | { type: "preset"; name: LayoutPreset }
+  | { type: "card-preset"; name: CardPreset }
+  | { type: "transcript-width"; width: TranscriptWidth }
   /** Replace the whole layout, as read back from somewhere (the person's saved layout). The caller
    *  parses it first (`parseLayout`), so this never takes a value it has not checked. */
   | { type: "apply"; layout: Layout }
@@ -171,6 +210,7 @@ export function defaultLayout(): Layout {
     panels,
     cards,
     maximized: null,
+    transcriptWidth: "medium",
     beforeFocus: null,
   };
 }
@@ -223,6 +263,7 @@ function core(layout: Layout): LayoutCore {
     panels: layout.panels,
     cards: layout.cards,
     maximized: layout.maximized,
+    transcriptWidth: layout.transcriptWidth,
   };
 }
 
@@ -295,7 +336,11 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       return { ...layout, maximized: action.panel };
     }
     case "toggle-focus": {
-      if (layout.beforeFocus) return { ...layout.beforeFocus, beforeFocus: null };
+      // The width is a reading preference, not part of the arrangement focus mode takes away: one
+      // chosen while focused (Settings or the palette) is kept on the way out, not quietly undone.
+      if (layout.beforeFocus) {
+        return { ...layout.beforeFocus, transcriptWidth: layout.transcriptWidth, beforeFocus: null };
+      }
       const regions = {
         ...layout.regions,
         rail: { ...layout.regions.rail, visible: false },
@@ -311,6 +356,14 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
     case "card-pref": {
       if (layout.cards[action.kind] === action.mode) return layout;
       return { ...layout, cards: { ...layout.cards, [action.kind]: action.mode } };
+    }
+    case "card-preset": {
+      // One step to undo, made of the same actions the card corners send one at a time.
+      return cardPresetActions(action.name).reduce((acc, step) => applyLayout(acc, step), layout);
+    }
+    case "transcript-width": {
+      if (!TRANSCRIPT_WIDTHS.includes(action.width) || layout.transcriptWidth === action.width) return layout;
+      return { ...layout, transcriptWidth: action.width };
     }
     case "show-all": {
       const hidden = hiddenItems(layout);

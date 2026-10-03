@@ -304,6 +304,18 @@ describe("motion", () => {
     }
   });
 
+  it("lets the person reach the reduced-motion override from the app", () => {
+    // DESIGN.md promises `[data-motion="reduced"]` as "the user override in Settings › Appearance".
+    // For a long time `applyMotion` existed, was tested on its own, and had no caller anywhere in the
+    // app: the CSS answered an attribute nothing could set, and the contract above was inert while
+    // every test of it passed. Shipped sources only — `theme.test.ts` calls it too, and counting that
+    // would let this pass with the row gone again.
+    const callers = appSources()
+      .filter(([file, text]) => !file.endsWith("/lib/theme.ts") && /\bapplyMotion\(/.test(text))
+      .map(([file]) => file);
+    expect(callers, "applyMotion has no caller outside lib/theme.ts").not.toEqual([]);
+  });
+
   it("pairs every keyframe with a reduced-motion answer", () => {
     // The structural rule. A keyframe that nobody thought about under reduced motion is exactly the
     // one that will spin forever for the person who asked their OS for calm. If this fails, the fix

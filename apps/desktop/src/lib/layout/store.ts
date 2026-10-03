@@ -10,7 +10,9 @@ import {
   type Mode,
   type PanelId,
   type Region,
+  type TranscriptWidth,
   type Zone,
+  TRANSCRIPT_WIDTHS,
 } from "@/lib/layout/model";
 
 /**
@@ -79,7 +81,13 @@ function readCore(value: unknown): LayoutCore | null {
       ? (value.maximized as PanelId)
       : null;
 
-  return { version: 1, regions, panels, cards, maximized };
+  // Added after layouts were already stored: one without it, or with a width this build does not
+  // know, reads as the width the conversation always had.
+  const transcriptWidth = (TRANSCRIPT_WIDTHS as readonly unknown[]).includes(value.transcriptWidth)
+    ? (value.transcriptWidth as TranscriptWidth)
+    : base.transcriptWidth;
+
+  return { version: 1, regions, panels, cards, maximized, transcriptWidth };
 }
 
 /** A stored value as a layout, or the default for anything not recognised. Never throws. */

@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Archive,
+  ArchiveRestore,
   Braces,
   Check,
+  ChevronRight,
   CopyPlus,
   FolderGit2,
   FolderPlus,
@@ -13,23 +16,43 @@ import {
 } from "lucide-react";
 
 import {
+  ApiError,
+  archiveCodeSession,
   deleteCodeProject,
   deleteCodeSession,
   forgetCodeProject,
   forkCodeSession,
   getCodeSessionRaw,
+  listArchivedCodeSessions,
   listCodeSessions,
   listRunningTurns,
+  markCodeSessionSeen,
   registerCodeProject,
+  unarchiveCodeSession,
+  type CodeProject,
   type CodeSessionMeta,
+  type CodeSessionState,
 } from "@/lib/api";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
-import { aliasesOf, loadProjects, projectLabel } from "@/lib/projects";
+import { aliasesOf, loadProjects, projectLabel, sidebarOrder } from "@/lib/projects";
+import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
+
+/** How each state reads on a row: a dot, and the words a screen reader and a tooltip give it.
+ *
+ *  Idle draws nothing — an indicator at zero is noise, the rule `PendingApprovals` follows too. The
+ *  colours are the status tokens: a question waiting is a warning, a failed turn is bad, edits to
+ *  look at are the accent drawn hollow, so "something to see" never reads as "something wrong". */
+const STATE_DOT: Record<Exclude<CodeSessionState, "idle">, { label: string; dot: string }> = {
+  running: { label: "code.sessions.running", dot: "bg-accent" },
+  waiting: { label: "code.sessions.state.waiting", dot: "bg-warn" },
+  failed: { label: "code.sessions.state.failed", dot: "bg-bad" },
+  review: { label: "code.sessions.state.review", dot: "border border-accent" },
+};
 
 /** Past conversations, filed under the project they were about.
  *
@@ -44,7 +67,8 @@ import { readLastSession, writeLastSession } from "@/lib/workspace";
  */
 function groupByProject(
   sessions: CodeSessionMeta[],
-  registered: string[],
+  rows: CodeProject[],
+  current: string,
 ): [string, CodeSessionMeta[]][] {
   const groups = new Map<string, CodeSessionMeta[]>();
   for (const session of sessions) {
@@ -53,15 +77,10 @@ function groupByProject(
     if (list) list.push(session);
     else groups.set(key, [session]);
   }
-  // Registered projects come after, and only the ones no conversation already placed. Union, never
-  // replace: a project you have talked about must not vanish from the list because you never got
-  // round to registering it, and the ordering keeps the "most recently used" property below.
-  for (const project of registered) {
-    if (!groups.has(project)) groups.set(project, []);
-  }
-  // Insertion order = the order the server sent, which is newest-first. So the project you touched
-  // most recently is at the top without a second sort deciding what "most recent project" means.
-  return [...groups.entries()];
+  // Registered projects join the ones conversations placed — union, never replace: a project you
+  // have talked about must not vanish from the list because you never got round to registering it.
+  // The ORDER is `sidebarOrder`'s: pinned first, then most recently used, hidden ones left out.
+  return sidebarOrder(sessions, rows, current).map((key) => [key, groups.get(key) ?? []]);
 }
 
 export function SessionSidebar({
@@ -89,23 +108,41 @@ export function SessionSidebar({
     refetchInterval: 4000,
   });
   const runningIds = new Set((running.data ?? []).map((turn) => turn.session_id));
-  // When the set changes the list is stale: a task started in a new conversation has no file until
-  // the agent finishes, so it is not in the list yet, and one that ended has its final title and count.
-  const runningKey = [...runningIds].sort().join(",");
-  const lastRunningKey = useRef<string | null>(null);
+  // The questions waiting for the owner, read from the cache the status bar already polls — no
+  // second timer. A question arrives in the middle of a turn, when nothing else would refresh the
+  // list, so this is what makes "waiting" show while it is true rather than after the turn.
+  const approvals = usePendingApprovals({ poll: false });
+  const waitingIds = new Set(
+    (approvals.data ?? []).map((question) => question.session_id).filter(Boolean),
+  );
+  // When either set changes the list is stale: a task started in a new conversation has no file
+  // until the agent finishes, so it is not in the list yet; one that ended has its final title,
+  // count and state; one whose question was answered is no longer waiting.
+  const liveKey = `${[...runningIds].sort().join(",")}|${[...waitingIds].sort().join(",")}`;
+  const lastLiveKey = useRef<string | null>(null);
   useEffect(() => {
     if (running.data === undefined) return;
-    if (lastRunningKey.current !== null && lastRunningKey.current !== runningKey) {
+    if (lastLiveKey.current !== null && lastLiveKey.current !== liveKey) {
       void qc.invalidateQueries({ queryKey: ["code-sessions"] });
     }
-    lastRunningKey.current = runningKey;
-  }, [running.data, runningKey, qc]);
+    lastLiveKey.current = liveKey;
+  }, [running.data, liveKey, qc]);
+  /** The row's state: the server's, made current by the two polled sets. A question waiting
+   *  outranks the turn that asked it, or "waiting" could never show. */
+  function stateOf(session: CodeSessionMeta): CodeSessionState {
+    if (session.state === "waiting" || waitingIds.has(session.id)) return "waiting";
+    if (runningIds.has(session.id) || session.running || session.state === "running")
+      return "running";
+    return session.state ?? "idle";
+  }
+  const [onlyWaiting, setOnlyWaiting] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archiveNote, setArchiveNote] = useState("");
   // Server state since the list stopped being a property of this browser profile. `loadProjects`
   // carries the one-time migration of whatever this webview had stored, so a running install keeps
   // its projects instead of meeting an empty sidebar after an update.
   const projects = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const rows = projects.data ?? [];
-  const registered = rows.map((row) => row.path);
   const aliases = aliasesOf(rows);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -118,7 +155,56 @@ export function SessionSidebar({
   const [confirming, setConfirming] = useState<
     { kind: "session"; session: CodeSessionMeta } | { kind: "project"; project: string; n: number } | null
   >(null);
-  const groups = groupByProject(q.data ?? [], registered);
+  // One order for both views: the filter narrows the full list rather than building its own, so a
+  // pinned project stays where it was, recency is judged by all its conversations (not only the
+  // waiting ones), and a hidden folder stays hidden.
+  const allGroups = groupByProject(q.data ?? [], rows, workspace);
+  // The filter shows only conversations and leaves out the empty projects you registered: "what is
+  // waiting for me" has no answer in a project with no conversation.
+  const waitingGroups = allGroups
+    .map(([key, sessions]): [string, CodeSessionMeta[]] => [
+      key,
+      sessions.filter((s) => stateOf(s) === "waiting"),
+    ])
+    .filter(([, sessions]) => sessions.length > 0);
+  // Counted from what the filter can show, so the chip never promises a conversation that sits in
+  // a hidden folder and then answers "nothing waiting".
+  const waitingCount = waitingGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
+  const groups = onlyWaiting ? waitingGroups : allGroups;
+  const archived = useQuery({
+    queryKey: ["code-sessions", "archived"],
+    queryFn: () => listArchivedCodeSessions(),
+    enabled: showArchived,
+  });
+
+  // The conversation on screen is being looked at, so its last edits are no longer "to review". On
+  // opening it, and again when a turn of it ends while it is open (the list refreshes then and the
+  // row reads "review" for the turn the person just watched). Only while the row says so, so a
+  // conversation with nothing unseen costs no request.
+  const activeReview =
+    activeSession !== null &&
+    (q.data ?? []).some((s) => s.id === activeSession && stateOf(s) === "review");
+  useEffect(() => {
+    if (!activeSession || !activeReview) return;
+    markCodeSessionSeen(activeSession)
+      .then(() => qc.invalidateQueries({ queryKey: ["code-sessions"] }))
+      .catch(() => {
+        // A badge that stays one refresh longer is not worth an error on screen.
+      });
+  }, [activeSession, activeReview, qc]);
+
+  const archive = useMutation({
+    mutationFn: ({ id, back }: { id: string; back: boolean }) =>
+      back ? unarchiveCodeSession(id) : archiveCodeSession(id),
+    onMutate: () => setArchiveNote(""),
+    // A 409 is the server refusing to hide work in progress or a question waiting; the row stays,
+    // and says why rather than appearing to ignore the click.
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 409)
+        setArchiveNote(t("code.sessions.archiveRefused"));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["code-sessions"] }),
+  });
 
   const fork = useMutation({
     mutationFn: forkCodeSession,
@@ -235,8 +321,37 @@ export function SessionSidebar({
         </form>
       ) : null}
 
+      {/* Only while something is waiting, or while the filter is on so it can be turned off. */}
+      {waitingCount > 0 || onlyWaiting ? (
+        <div className="px-2 pb-2">
+          <button
+            type="button"
+            aria-pressed={onlyWaiting}
+            onClick={() => setOnlyWaiting((on) => !on)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs transition-colors duration-1 ease-out",
+              onlyWaiting
+                ? "border-warn/40 bg-warn/15 text-warn-foreground"
+                : "border-hairline text-muted-foreground hover:text-foreground",
+            )}
+          >
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-warn" aria-hidden />
+            {t("code.sessions.filterWaiting", { n: waitingCount })}
+          </button>
+        </div>
+      ) : null}
+      {archiveNote ? (
+        <p role="alert" className="px-3 pb-2 text-xs text-bad-foreground">
+          {archiveNote}
+        </p>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-y-auto pb-2">
-        {q.isLoading && groups.length === 0 ? null : groups.length === 0 ? (
+        {onlyWaiting && groups.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-muted-foreground">
+            {t("code.sessions.filterWaitingEmpty")}
+          </p>
+        ) : q.isLoading && groups.length === 0 ? null : groups.length === 0 ? (
           // An empty list says so. Rendering nothing would look identical to a list that failed to
           // load, and the two mean opposite things to someone wondering where their work went.
           <p className="px-3 py-2 text-xs text-muted-foreground">{t("code.sessions.empty")}</p>
@@ -325,15 +440,124 @@ export function SessionSidebar({
                   ) : null}
                 </div>
               )}
-              {sessions.map((session) => (
-                // A row, not one big button: the two actions below are buttons themselves, and a
-                // button inside a button is invalid markup that browsers resolve by dropping one of
-                // them — usually the inner one, silently.
+              {sessions.map((session) => {
+                const state = stateOf(session);
+                const dot = state === "idle" ? null : STATE_DOT[state];
+                const name = session.title || t("code.sessions.untitled");
+                return (
+                  // A row, not one big button: the two actions below are buttons themselves, and a
+                  // button inside a button is invalid markup that browsers resolve by dropping one of
+                  // them — usually the inner one, silently.
+                  <div key={session.id} className="group/session flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => onResume(session)}
+                      title={name}
+                      className={cn(
+                        "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
+                        session.id === activeSession
+                          ? "bg-accent/15 text-accent-ink"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {dot ? (
+                        <span
+                          role="status"
+                          aria-label={t(dot.label)}
+                          title={t(dot.label)}
+                          className={cn(
+                            "mr-1.5 inline-block h-1.5 w-1.5 rounded-full align-middle",
+                            dot.dot,
+                          )}
+                        />
+                      ) : null}
+                      {name}
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t("code.sessions.forkOne", {
+                        name: session.title || t("code.sessions.untitled"),
+                      })}
+                      disabled={fork.isPending}
+                      className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
+                      onClick={() => fork.mutate(session.id)}
+                    >
+                      <CopyPlus className="h-3 w-3" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={t("code.sessions.jsonOne", {
+                        name: session.title || t("code.sessions.untitled"),
+                      })}
+                      className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
+                      onClick={() => setInspecting(session)}
+                    >
+                      <Braces className="h-3 w-3" />
+                    </button>
+                    {/* Not offered while it works or waits: the server refuses those, and the
+                        archive is a collapsed section where that state would go unseen. */}
+                    {state === "running" || state === "waiting" ? null : (
+                      <button
+                        type="button"
+                        aria-label={t("code.sessions.archiveOne", { name })}
+                        disabled={archive.isPending}
+                        className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
+                        onClick={() => archive.mutate({ id: session.id, back: false })}
+                      >
+                        <Archive className="h-3 w-3" />
+                      </button>
+                    )}
+                    {/* Deleting a conversation has existed on the server since the list did, and
+                        reached the screen only as "Clear" — which acts on the conversation you have
+                        OPEN. Every other row was permanent. */}
+                    <button
+                      type="button"
+                      aria-label={t("code.sessions.deleteOne", {
+                        name: session.title || t("code.sessions.untitled"),
+                      })}
+                      className="px-2 text-muted-foreground opacity-0 hover:text-bad-foreground focus:opacity-100 group-hover/session:opacity-100"
+                      onClick={() => setConfirming({ kind: "session", session })}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ))
+        )}
+
+        {/* Collapsed by default and asked for only when opened: the archive is where conversations
+            go to be out of the way, and a list of them on every visit would undo that. */}
+        <button
+          type="button"
+          aria-expanded={showArchived}
+          onClick={() => setShowArchived((on) => !on)}
+          className="flex w-full items-center gap-1.5 px-3 py-1 text-left text-xs text-muted-foreground transition-colors duration-1 ease-out hover:text-foreground"
+        >
+          <ChevronRight
+            aria-hidden
+            className={cn(
+              "h-3.5 w-3.5 shrink-0 transition-transform duration-1 ease-out",
+              showArchived && "rotate-90",
+            )}
+          />
+          {t("code.sessions.archived")}
+        </button>
+        {showArchived ? (
+          archived.data && archived.data.length === 0 ? (
+            <p className="px-3 py-1 pl-8 text-xs text-muted-foreground">
+              {t("code.sessions.archivedEmpty")}
+            </p>
+          ) : (
+            (archived.data ?? []).map((session) => {
+              const name = session.title || t("code.sessions.untitled");
+              return (
                 <div key={session.id} className="group/session flex items-center">
                   <button
                     type="button"
                     onClick={() => onResume(session)}
-                    title={session.title || t("code.sessions.untitled")}
+                    title={name}
                     className={cn(
                       "min-w-0 flex-1 truncate px-3 py-1 pl-8 text-left text-xs transition-colors duration-1 ease-out",
                       session.id === activeSession
@@ -341,55 +565,22 @@ export function SessionSidebar({
                         : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {runningIds.has(session.id) || session.running ? (
-                      <span
-                        role="status"
-                        aria-label={t("code.sessions.running")}
-                        title={t("code.sessions.running")}
-                        className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-accent align-middle"
-                      />
-                    ) : null}
-                    {session.title || t("code.sessions.untitled")}
+                    {name}
                   </button>
                   <button
                     type="button"
-                    aria-label={t("code.sessions.forkOne", {
-                      name: session.title || t("code.sessions.untitled"),
-                    })}
-                    disabled={fork.isPending}
-                    className="px-1 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
-                    onClick={() => fork.mutate(session.id)}
-                  >
-                    <CopyPlus className="h-3 w-3" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t("code.sessions.jsonOne", {
-                      name: session.title || t("code.sessions.untitled"),
-                    })}
+                    aria-label={t("code.sessions.unarchiveOne", { name })}
+                    disabled={archive.isPending}
                     className="px-2 text-muted-foreground opacity-0 hover:text-foreground focus:opacity-100 group-hover/session:opacity-100"
-                    onClick={() => setInspecting(session)}
+                    onClick={() => archive.mutate({ id: session.id, back: true })}
                   >
-                    <Braces className="h-3 w-3" />
-                  </button>
-                  {/* Deleting a conversation has existed on the server since the list did, and
-                      reached the screen only as "Clear" — which acts on the conversation you have
-                      OPEN. Every other row was permanent. */}
-                  <button
-                    type="button"
-                    aria-label={t("code.sessions.deleteOne", {
-                      name: session.title || t("code.sessions.untitled"),
-                    })}
-                    className="px-2 text-muted-foreground opacity-0 hover:text-bad-foreground focus:opacity-100 group-hover/session:opacity-100"
-                    onClick={() => setConfirming({ kind: "session", session })}
-                  >
-                    <Trash2 className="h-3 w-3" />
+                    <ArchiveRestore className="h-3 w-3" />
                   </button>
                 </div>
-              ))}
-            </div>
-          ))
-        )}
+              );
+            })
+          )
+        ) : null}
       </div>
 
       <Dialog

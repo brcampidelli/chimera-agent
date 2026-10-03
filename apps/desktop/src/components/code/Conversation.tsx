@@ -67,6 +67,8 @@ import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
 import { CardChrome, cardId, useCardModes } from "@/components/code/CardChrome";
+import { useLayout } from "@/lib/layout/context";
+import { TRANSCRIPT_WIDTH_CLASS } from "@/lib/layout/model";
 import { NoticeList, type NoticeEntry } from "@/components/code/NoticeList";
 import { VoiceMode, type SpokenAnswer, type SpokenAnnouncement } from "@/components/code/VoiceMode";
 import {
@@ -88,6 +90,12 @@ import { useAgent, type AgentState } from "@/lib/agent-context";
 import { useStickToBottom } from "@/lib/useStickToBottom";
 import { cn } from "@/lib/utils";
 import { writeLastSession } from "@/lib/workspace";
+import {
+  NOTIFY_ON_FINISH_KEY,
+  notifyIfAway,
+  readMinSeconds,
+  useNotifyFlag,
+} from "@/lib/notify";
 
 /** Share of the model's window this screen spends on the prompt before compacting.
  *
@@ -538,38 +546,6 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   );
 }
 
-/** Tell the user their turn finished, when they are not looking at it.
- *
- *  A three-minute run is a reason to go and do something else, and coming back to find it finished
- *  four minutes ago is the whole complaint. No IPC and no plugin: the app is served from 127.0.0.1,
- *  which is a secure context by specification, so the Web Notification API is available on the page.
- *
- *  Only when the window is NOT focused. A notification for something the user is already watching
- *  is the fastest way to have every notification muted, including the one that mattered.
- *
- *  ⚠️ macOS IS UNVERIFIED. WKWebView has historically not implemented `Notification`, and there was
- *  no Mac to test on. Every call is guarded by a capability check and every failure is swallowed, so
- *  the worst case is silence rather than a crash — but "it works on macOS" is NOT a claim being made
- *  here. If it turns out not to, the fix is a native plugin, which is a bigger job than this item.
- */
-async function notifyTurnFinished(title: string, body: string): Promise<void> {
-  try {
-    if (typeof Notification === "undefined") return;
-    if (document.visibilityState === "visible" && document.hasFocus()) return;
-    // Asked at the moment it is first needed, not on load: a permission prompt that appears before
-    // the user has done anything is the one people deny reflexively.
-    const permission =
-      Notification.permission === "default"
-        ? await Notification.requestPermission()
-        : Notification.permission;
-    if (permission !== "granted") return;
-    new Notification(title, { body });
-  } catch {
-    // A denied permission, a webview without the API, a platform quirk — none of them are worth
-    // interrupting a finished turn over.
-  }
-}
-
 /** A coding conversation over one workspace: turns that read and edit, keeping their tool calls.
  *
  *  The composer has two buttons and they are not two modes of the same thing. **Send** is a turn:
@@ -642,6 +618,9 @@ export function Conversation({
   // Every card's minimise / close / per-kind preference (dynamic screen, phase 3). Closed cards are
   // this screen's only; a new conversation screen starts with all of them.
   const cards = useCardModes();
+  // How wide the conversation runs (Settings › Appearance and the palette); medium is the width it
+  // always had. Read from the layout so it travels with the rest of the screen, server included.
+  const transcriptWidth = TRANSCRIPT_WIDTH_CLASS[useLayout().layout.transcriptWidth];
   // Sharing. How many links this conversation has (the live stream is worth holding open only
   // when someone could be on the other end), whether the panel is open, and who is here now.
   const [shareCount, setShareCount] = useState(0);
@@ -927,9 +906,12 @@ export function Conversation({
   const [dragging, setDragging] = useState(false);
   /** Off by default: an app that starts sending desktop notifications without being asked is one
    *  people turn off entirely. Stored per browser profile, which is per install. */
-  const [notifyOnFinish, setNotifyOnFinish] = useState(
-    () => localStorage.getItem("chimera.notifyOnFinish") === "1",
-  );
+  //
+  // Read through the shared store in `lib/notify.ts`: the same switch is in Settings › General,
+  // and a copy read once at mount would keep notifying after it was switched off there.
+  const [notifyOnFinish, setNotifyOnFinish] = useNotifyFlag(NOTIFY_ON_FINISH_KEY);
+  /** When THIS screen's current turn was sent, for the "only for turns longer than" threshold. */
+  const turnStartedAtRef = useRef(0);
   /** Off by default, same reason as the notifications toggle: a chat that keeps sending turns on
    *  its own is a chat that keeps SPENDING on its own, and that is a decision the user makes, not
    *  the app. When on, a turn that stopped at the step ceiling is continued automatically — the
@@ -1162,11 +1144,17 @@ export function Conversation({
     setDraft("");
     setAttached([]);
     setBusy(true);
+    turnStartedAtRef.current = Date.now();
     setExchanges((prev) => [
       ...prev,
       { you: message, answer: "", tools: [], edits: [], todos: [], done: null },
     ]);
     let touchedFiles = false;
+    // Measured from the send, not from the first token: what the person walked away from is the
+    // whole wait. The threshold is read when the turn ENDS, so changing it mid-turn applies to the
+    // turn that is running. 0 (the default) is every turn, which is what the switch always did.
+    const longEnough = () =>
+      Date.now() - turnStartedAtRef.current >= readMinSeconds() * 1000;
     // Whether THIS turn's verifier failed. It decides what happens to a queued follow-up, and it
     // has to be a local rather than state: `onDone` fires in the same tick as the last `setState`,
     // so reading it from state there would read the previous turn's value.
@@ -1327,8 +1315,8 @@ export function Conversation({
             report: { ...done, max_usd: maxUsd },
           });
           setBusy(false);
-          if (notifyOnFinish) {
-            void notifyTurnFinished(
+          if (notifyOnFinish && longEnough()) {
+            void notifyIfAway(
               t("code.chat.notify.title"),
               message.slice(0, 120),
             );
@@ -1366,15 +1354,20 @@ export function Conversation({
         // (api.ts passes `payload.message`) and was discarded by the signature itself, while
         // Agents.tsx, Tasks.tsx and editor/Runner.tsx in this same app all show it. Not a design
         // choice about noise; an inconsistency nobody noticed.
-        onError: (message) => {
+        onError: (errorText) => {
           currentTurnRef.current = null;
-          patchLast((e) => ({ ...e, failed: true, error: message }));
+          patchLast((e) => ({ ...e, failed: true, error: errorText }));
           publish({ status: "idle", busy: false });
           setBusy(false);
           // A failure is MORE worth interrupting for than a success: the user walked away expecting
           // work to happen, and it stopped.
-          if (notifyOnFinish) {
-            void notifyTurnFinished(
+          //
+          // The body is what the person ASKED, as on success — not the error. This parameter used to
+          // be called `message` and shadowed the prompt, so the notification carried the error's
+          // text: a provider's or a tool's words, on an OS surface outside every boundary the app
+          // draws. The error is on the turn, one click away.
+          if (notifyOnFinish && longEnough()) {
+            void notifyIfAway(
               t("code.chat.notify.failed"),
               message.slice(0, 120),
             );
@@ -1532,12 +1525,7 @@ export function Conversation({
               aria-pressed={notifyOnFinish}
               title={t("code.chat.notify.hint")}
               onClick={() => {
-                const next = !notifyOnFinish;
-                setNotifyOnFinish(next);
-                localStorage.setItem(
-                  "chimera.notifyOnFinish",
-                  next ? "1" : "0",
-                );
+                setNotifyOnFinish(!notifyOnFinish);
               }}
             >
               {t("code.chat.notify.label")}
@@ -1618,7 +1606,7 @@ export function Conversation({
         <div
           role="log"
           aria-busy={busy}
-          className="mx-auto max-w-3xl space-y-3 p-3"
+          className={cn("mx-auto space-y-3 p-3", transcriptWidth)}
         >
           {exchanges.length === 0 && replayed ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
