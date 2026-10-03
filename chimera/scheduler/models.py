@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 
 def kill_flag_path(home: Path, job_id: str) -> Path:
@@ -179,9 +179,10 @@ class CronJob(BaseModel):
 
     A run that could not run or finish (``error``, ``timeout``, ``budget``, or the brake switching
     the job off) is not an answer and is not governed by this field: it reaches :attr:`deliver_to`
-    as a short failure notice under EVERY mode — once when the job's state changes into that
-    failure and once when it runs again (:attr:`failure_notice`), never with the error text, and
-    not at all when ``CHIMERA_CRON_NOTIFY_FAILURES`` is off.
+    as a short failure notice under EVERY mode — once per outage and per failure kind, and once
+    when it has run again for a while (:attr:`failure_notice`), never with the error text. With
+    ``CHIMERA_CRON_NOTIFY_FAILURES`` off nothing of it is posted, so a ``failures_only`` job then
+    hears only about rejected runs.
 
     Applies to cron and event jobs. A webhook job answers through the chat gateway, which does not
     read this field, so :meth:`~chimera.scheduler.engine.Scheduler.schedule_webhook` refuses
@@ -203,13 +204,26 @@ class CronJob(BaseModel):
     """Fingerprint of the last answer delivered for this job — what ``notify="on_change"`` compares
     against. Kept on the job because the job is the only state that survives a restart."""
     failure_notice: str = ""
-    """The failure the owner was last told about at :attr:`deliver_to` — ``error``, ``timeout``,
-    ``budget`` or ``brake`` — or ``""`` when they have not been told of one, or were told it ran
-    again. Written by :func:`~chimera.scheduler.delivery.make_failure_notifier`, never by the
-    engine.
+    """The outage the owner has been told about at :attr:`deliver_to`, by its latest kind —
+    ``error``, ``timeout``, ``budget`` or ``brake`` — or ``""`` when no outage is open: they were
+    never told of one, or were told it ended. Written by
+    :func:`~chimera.scheduler.delivery.make_failure_notifier`, never by the engine.
 
     The memory that makes a failure notice one post per change of state rather than one per tick:
     a job on ``*/5`` whose provider is down for an afternoon is one message when it breaks and one
     when it comes back, not fifty. On the job, like :attr:`last_delivered_hash`, because a restart
     in the middle of an outage must not announce the same outage again."""
+    failure_notice_told: list[str] = Field(default_factory=list)
+    """Every failure kind already announced in the open outage. A kind the owner has heard about
+    is not news the second time it comes round: a job alternating ``error`` and ``budget`` posted
+    on every tick while the notice only remembered the latest kind. Emptied when the outage ends."""
+    failure_notice_healthy: int = 0
+    """Runs in a row that finished (``ok`` or ``rejected``) since the open outage's last failure.
+    The outage ends — and "running again" is posted — only at
+    :data:`~chimera.scheduler.delivery.RECOVERY_RUNS`: one success between two errors is what a
+    flapping provider looks like, and announcing it as a recovery turned every flap into two posts."""
+    _answer_posted: bool = PrivateAttr(default=False)
+    """Set by the result sink when THIS run's answer reached :attr:`deliver_to`. Not persisted: it
+    describes one dispatch, read by the failure notifier in the same tick and cleared there. It is
+    how the notice knows the channel already saw the job run again and need not be told twice."""
     metadata: dict[str, Any] = Field(default_factory=dict)

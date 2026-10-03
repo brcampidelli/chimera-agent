@@ -27,12 +27,15 @@ from chimera.config import Settings
 from chimera.orchestration.budget import BudgetExceeded
 from chimera.scheduler import CronDaemon, CronStore, Scheduler, make_agent_dispatch
 from chimera.scheduler.delivery import (
+    RECOVERY_RUNS,
     Delivered,
+    NoticeState,
     failure_notice,
     make_deliver,
     make_failure_notifier,
 )
 from chimera.scheduler.models import CronJob, JobOutcome
+from chimera.scheduler.surface import NOTHING_NEW
 
 WEBHOOK = "https://discord.com/api/webhooks/123/segredo-do-canal"
 #: What a provider's exception can carry. None of it may reach the channel.
@@ -95,6 +98,25 @@ def _raises(exc: BaseException) -> Any:
     return run_job
 
 
+def _script(*respostas: Any) -> Any:
+    """A run_job that plays ``respostas`` in order: an exception is raised, anything else returned."""
+    fila = list(respostas)
+
+    def run_job(_job: CronJob) -> Any:
+        proxima = fila.pop(0)
+        if isinstance(proxima, BaseException):
+            raise proxima
+        return proxima
+
+    return run_job
+
+
+def _notices(wire: _Wire) -> list[str]:
+    """The failure notices among what was posted: the sink's answers carry a newline after the
+    name, and a notice is one line."""
+    return [linha for linha in wire.sent if "\n" not in linha]
+
+
 # --------------------------------------------------------------------------- one post, no error text
 
 
@@ -145,6 +167,9 @@ def test_a_budget_refusal_is_posted_once_without_its_message(tmp_path: Path) -> 
     (linha,) = wire.sent
     assert "`budget`" in linha and "spend cap" in linha
     assert "US$ 2.00" not in linha and "sk-or-v1" not in linha
+    # Two raises carry `budget`, and one of them stops a job that already ran and spent: the line
+    # may not claim the job never ran.
+    assert "did not run" not in linha and "own budget" in linha
 
 
 def test_the_brake_switching_a_job_off_is_its_own_post(tmp_path: Path) -> None:
@@ -193,22 +218,130 @@ def test_a_change_from_one_failure_to_another_is_news(tmp_path: Path) -> None:
 
 
 def test_recovery_is_posted_once(tmp_path: Path) -> None:
-    respostas: list[Any] = [RuntimeError("down"), RuntimeError("down"), "fine", "fine"]
-
-    def run_job(_job: CronJob) -> str:
-        proxima = respostas.pop(0)
-        if isinstance(proxima, Exception):
-            raise proxima
-        return str(proxima)
-
+    run_job = _script(RuntimeError("down"), RuntimeError("down"), "fine", "fine", "fine")
     sched, job, daemon, wire = _setup(tmp_path, run_job, notify="failures_only")
-    for _ in range(4):
+    for _ in range(5):
         _tick(sched, daemon, job.id)
 
     assert len(wire.sent) == 2
     assert "`error`" in wire.sent[0]
     assert "running again" in wire.sent[1] and "**portfolio watch**" in wire.sent[1]
+    assert f"{RECOVERY_RUNS} runs in a row" in wire.sent[1]
+    salvo = sched.store.get(job.id)
+    assert (salvo.failure_notice, salvo.failure_notice_told, salvo.failure_notice_healthy) == (
+        "", [], 0
+    )
+
+
+def test_one_success_between_two_failures_is_not_a_recovery(tmp_path: Path) -> None:
+    """One good run between two errors is what a flapping provider looks like. Announcing it as a
+    recovery and the next error as a new failure was two posts per flap."""
+    run_job = _script(RuntimeError("down"), "fine", RuntimeError("down"))
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify="failures_only")
+    for _ in range(3):
+        _tick(sched, daemon, job.id)
+
+    assert len(wire.sent) == 1 and "`error`" in wire.sent[0]
+    salvo = sched.store.get(job.id)
+    assert salvo.failure_notice == "error" and salvo.failure_notice_healthy == 0
+
+
+@pytest.mark.parametrize("notify", ["always", "on_change", "failures_only"])
+def test_a_job_that_flaps_between_ok_and_error_is_announced_once(
+    tmp_path: Path, notify: str
+) -> None:
+    """The reviewer's probe, reproduced: ok/error x6 gave 11 posts in 12 ticks, more than before
+    the notice existed, and the brake never fires on it because each `ok` resets the count."""
+    run_job = _script(*(["fine", RuntimeError("down")] * 6))
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify=notify, fail_limit=3)
+    for _ in range(12):
+        _tick(sched, daemon, job.id)
+
+    assert sched.store.get(job.id).enabled, "the premise: a flapping job never reaches the brake"
+    avisos = _notices(wire)
+    assert len(avisos) == 1 and "`error`" in avisos[0], avisos
+
+
+def test_a_job_that_alternates_error_and_budget_is_announced_once_per_kind(tmp_path: Path) -> None:
+    """The first `budget` after an `error` is news (a different fix); the tenth alternation is not.
+    Measured before the fix: 12 posts in 12 ticks."""
+    run_job = _script(*([RuntimeError("down"), BudgetExceeded("cap")] * 6))
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify="failures_only")
+    for _ in range(12):
+        _tick(sched, daemon, job.id)
+
+    assert len(wire.sent) == 2, wire.sent
+    assert "`error`" in wire.sent[0] and "`budget`" in wire.sent[1]
+    assert sched.store.get(job.id).failure_notice_told == ["error", "budget"]
+
+
+def test_a_sustained_outage_is_one_failure_post_and_one_recovery_post(tmp_path: Path) -> None:
+    run_job = _script(*([RuntimeError("down")] * 6), *(["fine"] * 4))
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify="on_change", fail_limit=10)
+    for _ in range(10):
+        _tick(sched, daemon, job.id)
+
+    avisos = _notices(wire)
+    assert len(avisos) == 2, avisos
+    assert "`error`" in avisos[0] and "running again" in avisos[1]
+
+
+def test_under_always_the_answer_is_the_recovery_and_no_line_repeats_it(tmp_path: Path) -> None:
+    """The run that ends the outage already posted its answer: that answer is the news that the job
+    runs again. A "running again" line under it would say the same thing twice."""
+    run_job = _script(RuntimeError("down"), "first", "second")
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify="always")
+    for _ in range(3):
+        _tick(sched, daemon, job.id)
+
+    assert len(_notices(wire)) == 1
+    assert wire.sent[1:] == ["**portfolio watch**\nfirst", "**portfolio watch**\nsecond"]
     assert sched.store.get(job.id).failure_notice == ""
+
+
+def test_under_always_a_quiet_recovery_is_still_announced(tmp_path: Path) -> None:
+    """A "nothing new" answer is not posted even under `always`, so the channel did NOT see the job
+    run again, and an owner told it broke must not be left believing it still is."""
+    run_job = _script(RuntimeError("down"), NOTHING_NEW, NOTHING_NEW)
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify="always")
+    for _ in range(3):
+        _tick(sched, daemon, job.id)
+
+    avisos = _notices(wire)
+    assert len(avisos) == 2 and "running again" in avisos[1]
+
+
+def test_the_mark_that_the_answer_was_posted_speaks_for_one_run_only() -> None:
+    """The notifier reads the sink's mark and clears it. A sink that does not set it — one that is
+    not ``make_deliver``, or a run that never reached it — must not inherit an earlier run's mark
+    and close the next outage in silence."""
+    wire = _Wire()
+    notify = make_failure_notifier(send=wire, post=_inline)
+    job = CronJob(id="j1", name="w", schedule="* * * * *", action="a", deliver_to=WEBHOOK)
+
+    for status in ["error", "ok", "ok"]:  # the first outage: its closing answer was posted
+        job.last_status = status
+        job._answer_posted = status == "ok"
+        notify(job, 60.0)
+    for status in ["error", "ok", "ok"]:  # the second: nothing set the mark this time
+        job.last_status = status
+        notify(job, 60.0)
+
+    assert [("running again" in a) for a in wire.sent] == [False, False, True], wire.sent
+
+
+def test_a_failure_after_the_brake_was_lifted_is_announced(tmp_path: Path) -> None:
+    """Re-enabling is a person saying "try again". A failure after it is the answer they are
+    waiting for, even when it is the same kind they were told about before the brake."""
+    sched, job, daemon, wire = _setup(tmp_path, _raises(RuntimeError("down")), fail_limit=2)
+    _tick(sched, daemon, job.id)
+    _tick(sched, daemon, job.id)
+    assert len(wire.sent) == 2 and "switched off" in wire.sent[1]
+
+    sched.enable(job.id, now=sched.store.get(job.id).next_run or 0.0)
+    _tick(sched, daemon, job.id)
+
+    assert len(wire.sent) == 3 and "`error`" in wire.sent[2]
 
 
 def test_a_restart_in_the_middle_of_an_outage_does_not_announce_it_again(tmp_path: Path) -> None:
@@ -229,17 +362,10 @@ def test_a_restart_in_the_middle_of_an_outage_does_not_announce_it_again(tmp_pat
 def test_a_rejected_run_ends_the_outage_without_a_notice_of_its_own(tmp_path: Path) -> None:
     """A rejected run finished, and its answer went to the channel through the sink — that answer
     is the owner's evidence the job runs again. A notice on top would say it twice."""
-    respostas: list[Any] = [RuntimeError("down"), JobOutcome("the gate said no", ok=False)]
-
-    def run_job(_job: CronJob) -> Any:
-        proxima = respostas.pop(0)
-        if isinstance(proxima, Exception):
-            raise proxima
-        return proxima
-
-    sched, job, daemon, wire = _setup(tmp_path, run_job)
-    _tick(sched, daemon, job.id)
-    _tick(sched, daemon, job.id)
+    run_job = _script(RuntimeError("down"), "fine", JobOutcome("the gate said no", ok=False))
+    sched, job, daemon, wire = _setup(tmp_path, run_job, notify="failures_only")
+    for _ in range(3):
+        _tick(sched, daemon, job.id)
 
     assert wire.sent[1:] == ["**portfolio watch**\nthe gate said no"]
     assert sched.store.get(job.id).failure_notice == ""
@@ -250,18 +376,20 @@ def test_the_decision_itself_says_nothing_for_a_failure_already_told() -> None:
     job = CronJob(
         id="j1", name="w", schedule="* * * * *", action="a", deliver_to=WEBHOOK,
         last_status="error", consecutive_failures=3, failure_notice="error",
+        failure_notice_told=["error"],
     )
 
-    assert failure_notice(job, 60.0) == ("error", None)
+    assert failure_notice(job, 60.0) == (NoticeState("error", ("error",), 0), None)
 
 
 def test_a_killed_run_changes_nothing() -> None:
     job = CronJob(
         id="j1", name="w", schedule="* * * * *", action="a", deliver_to=WEBHOOK,
-        last_status="cancelled", failure_notice="error",
+        last_status="cancelled", failure_notice="error", failure_notice_told=["error"],
+        failure_notice_healthy=1,
     )
 
-    assert failure_notice(job, 60.0) == ("error", None)
+    assert failure_notice(job, 60.0) == (NoticeState("error", ("error",), 1), None)
 
 
 # --------------------------------------------------------------------------- the switches

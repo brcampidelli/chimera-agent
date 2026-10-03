@@ -55,8 +55,22 @@ UNFINISHED: tuple[str, ...] = ("error", "timeout", "budget")
 _REASON = {
     "error": "The run stopped with an error.",
     "timeout": "The run went past its time limit and was abandoned.",
-    "budget": "The spend cap refused it, so it did not run.",
+    # Two raises carry this status and the line has to be true of both: the daily cap is checked
+    # before the job starts (`job_runner`), and the job's own token budget, in hard mode, stops it
+    # mid-run after it has already spent (`orchestration.budget`). "It did not run" was false for
+    # the second. Telling them apart would mean reading the exception, which this module refuses.
+    "budget": "A spend cap stopped it: the daily cap before it started, or the job's own budget "
+    "during the run.",
 }
+
+#: Finished runs in a row (``ok`` or ``rejected``) that end an outage. Two, not one: a provider
+#: that fails every other call gives exactly one success between two errors, and with one the
+#: notice announced "running again" on every such success and the failure again on the next tick —
+#: a job alternating ok/error posted 11 times in 12 ticks, more than before the notice existed,
+#: and the brake never fires on it because each success resets the failure count. With two, a
+#: sustained outage still costs one post when it starts and one when it ends; the price is that the
+#: recovery line waits for the second good run, which for a daily job is a day.
+RECOVERY_RUNS = 2
 
 #: Where the detail is. Named rather than quoted: `cron doctor` prints `last_error` on the machine,
 #: which is the right place for text this module refuses to post.
@@ -88,7 +102,7 @@ def skip_reason(job: CronJob, answer: str, status: str = "ok") -> str:
     its text can carry a provider's response body, a path, a value the job was handling, or a
     sentence some page planted for a model to repeat — and a chat channel is read by people who
     were never meant to see any of that. It is recorded here and announced by
-    :func:`make_failure_notifier`, which posts the job, the status and the time, once per change.
+    :func:`make_failure_notifier`, which posts the job, the status and the time, once per outage.
     """
     if status in UNFINISHED:
         return "a run that did not finish is announced by a short failure notice, never by its error"
@@ -135,6 +149,9 @@ def make_deliver(
                 # Said out loud rather than swallowed: a delivery that fails silently is
                 # indistinguishable from a job that never ran.
                 warn(f"cron '{job.name}': delivery failed — {entrega.detail}")
+        # Assigned on every call, true or false, so it never carries over from an earlier run: the
+        # failure notice reads it to know whether the channel already saw this run's answer.
+        job._answer_posted = entrega is not None and entrega.ok
         # The fingerprint moves only when the answer actually reached its destination (or there is
         # no destination, and the record IS the delivery). A post that failed was not seen, so the
         # same answer next time is still news to the person it was for. And only for a successful
@@ -183,54 +200,89 @@ def _when(at: float) -> str:
     return datetime.fromtimestamp(at, tz=UTC).astimezone().isoformat(timespec="minutes")
 
 
-def failure_notice(job: CronJob, at: float) -> tuple[str, str | None]:
-    """The failure state this run leaves the job in, and the line to post — None for nothing.
+@dataclass(frozen=True)
+class NoticeState:
+    """What the owner's channel has been told about a job's failures — the three fields on the job.
+
+    ``told`` is the open outage by its latest kind (``""`` for none), ``kinds`` every kind already
+    announced in it, ``healthy`` the finished runs since its last failure. Persisted on the job by
+    the notifier, so a restart in the middle of an outage resumes it instead of announcing it again.
+    """
+
+    told: str = ""
+    kinds: tuple[str, ...] = ()
+    healthy: int = 0
+
+    @classmethod
+    def of(cls, job: CronJob) -> NoticeState:
+        return cls(job.failure_notice, tuple(job.failure_notice_told), job.failure_notice_healthy)
+
+
+def failure_notice(job: CronJob, at: float) -> tuple[NoticeState, str | None]:
+    """The notice state this run leaves the job in, and the line to post — None for nothing.
 
     Read from what the engine already recorded on the job (``last_status``, ``enabled``,
-    ``disabled_by``, ``consecutive_failures``) and compared with :attr:`CronJob.failure_notice`,
-    the failure the owner was last told about. A notice goes out when that changes, and only then:
+    ``disabled_by``, ``consecutive_failures``) against :class:`NoticeState`, what the owner has
+    been told. An outage is announced, and the line is posted, only:
 
-    * into a failure from health, or from one failure kind to another — ``error`` and ``budget``
-      need opposite responses (a code fix, a number in the configuration), so the change between
-      them is news;
+    * when it opens — a failure while none is open;
+    * when a failure kind not yet announced in it arrives — ``error`` and ``budget`` need opposite
+      responses (a code fix, a number in the configuration), so the first ``budget`` after an
+      ``error`` is news; the tenth alternation between them is not;
     * into ``brake``, the run on which the engine switched the job off: it will not run again until
       a person says so, which is a different fact from "it is failing";
-    * out of a failure, on a run that succeeded — the one message that says the earlier one can be
-      put down.
+    * on the first failure after the brake — a person turned the job back on, and it still fails;
+    * when it ends, after :data:`RECOVERY_RUNS` finished runs in a row — once, and only if the
+      channel did not just see the closing run's own answer (``notify="always"``, or a
+      ``rejected`` run, whose answer the sink posts under every mode). That answer IS the news that
+      the job runs again; a line on top of it would say it twice.
 
-    A ``rejected`` run clears the state without a notice: it finished, and its own answer went to
-    the destination through the sink, which is the owner's evidence that the job runs. A
-    ``cancelled`` run changes nothing: a person stopped it.
+    A finished run inside an open outage only counts towards its end; a failure inside it resets
+    that count. A ``cancelled`` run changes nothing: a person stopped it.
 
     Never reads ``last_error``. That is the point: the line is assembled from fields this code
     wrote, so nothing a provider, a tool or a web page said can reach the channel through it.
     """
-    antes = job.failure_notice
+    antes = NoticeState.of(job)
     status = job.last_status
     if not job.enabled and job.disabled_by == "brake":
-        depois = "brake"
+        tipo = "brake"
     elif status in UNFINISHED:
-        depois = str(status)
+        tipo = str(status)
     elif status in ("ok", "rejected"):
-        depois = ""
+        tipo = ""
     else:
         return antes, None
-    if depois == antes:
-        return antes, None
     quando = _when(at)
-    if depois == "":
-        if status != "ok":
-            return "", None
-        return "", f"**{job.name}** is running again: the run at {quando} finished."
-    if depois == "brake":
+
+    if tipo == "":
+        if not antes.told:
+            return antes, None
+        saudavel = antes.healthy + 1
+        if saudavel < RECOVERY_RUNS:
+            return NoticeState(antes.told, antes.kinds, saudavel), None
+        if job._answer_posted:
+            return NoticeState(), None
+        return NoticeState(), (
+            f"**{job.name}** is running again: {saudavel} runs in a row have finished, the last at "
+            f"{quando}."
+        )
+
+    kinds = antes.kinds if tipo in antes.kinds else (*antes.kinds, tipo)
+    depois = NoticeState(tipo, kinds, 0)
+    if tipo == "brake":
+        if antes.told == "brake":
+            return depois, None
         return depois, (
             f"**{job.name}** was switched off at {quando} (`brake`): it failed "
             f"{job.consecutive_failures} times in a row. `chimera cron enable {job.id}` turns it "
             "back on." + _WHERE
         )
-    onde = "" if depois == "budget" else _WHERE
+    if tipo in antes.kinds and antes.told != "brake":
+        return depois, None
+    onde = "" if tipo == "budget" else _WHERE
     return depois, (
-        f"**{job.name}** could not finish: `{depois}` at {quando}. {_REASON[depois]}{onde}"
+        f"**{job.name}** could not finish: `{tipo}` at {quando}. {_REASON[tipo]}{onde}"
     )
 
 
@@ -248,7 +300,7 @@ def make_failure_notifier(
     enabled: Callable[[], bool] = lambda: True,
     post: Callable[[Callable[[], None]], None] | None = None,
 ) -> Callable[[CronJob, float], bool]:
-    """The daemon's ``on_outcome``: tell the job's destination that it could not run, once per change.
+    """The daemon's ``on_outcome``: tell the job's destination that it could not run, once per outage.
 
     Here and not in the engine. ``Scheduler._brake`` says it in writing — the engine takes no clock
     and no I/O — and two of the four outcomes this reports (a timeout, the brake) are decided by
@@ -274,11 +326,16 @@ def make_failure_notifier(
 
     def notify(job: CronJob, at: float) -> bool:
         if not job.deliver_to or not enabled():
+            job._answer_posted = False
             return False
         depois, texto = failure_notice(job, at)
-        if depois == job.failure_notice:
+        # Read once, for this run: the mark describes one dispatch and must not speak for the next.
+        job._answer_posted = False
+        if depois == NoticeState.of(job):
             return False
-        job.failure_notice = depois
+        job.failure_notice = depois.told
+        job.failure_notice_told = list(depois.kinds)
+        job.failure_notice_healthy = depois.healthy
         if texto is not None:
             url, nome = job.deliver_to, job.name
 

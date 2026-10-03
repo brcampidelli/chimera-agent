@@ -796,13 +796,18 @@ class Settings(BaseSettings):
     app_cron: bool = Field(default=True, validation_alias="CHIMERA_APP_CRON")
 
     # Tell a scheduled job's `deliver_to` channel when it could not run or finish (error, timeout,
-    # spend cap, switched off by the failure brake) — one short line when its state changes into a
-    # failure and one when it runs again, never the error text. ON by default (study 29, P3.1,
-    # approved by the owner): it changes nothing any job does, only makes visible a failure that was
-    # already recorded in `cron_results.jsonl` and the logs and reached nobody. It does change what
-    # arrives in the channel of anyone who already has a `deliver_to`; set
-    # CHIMERA_CRON_NOTIFY_FAILURES=0 to silence it. Read on every tick, so it applies from the next.
-    # Covers Chimera's own scheduler only — not scripts run by a separate dispatcher beside it.
+    # spend cap, switched off by the failure brake) — one short line when an outage starts (and per
+    # new failure kind in it) and one when the job has run again twice in a row, never the error
+    # text. ON by default (study 29, P3.1, approved by the owner): it changes nothing any job does,
+    # only makes visible a failure that was already recorded in `cron_results.jsonl` and the logs
+    # and reached nobody. It does change what arrives in the channel of anyone who already has a
+    # `deliver_to`; set CHIMERA_CRON_NOTIFY_FAILURES=0 to silence it. Read on every tick, so it
+    # applies from the next. Covers Chimera's own scheduler only — not scripts run by a separate
+    # dispatcher beside it.
+    # Off is not "as before this flag existed": the result sink no longer posts a run that raised
+    # (its text is not fit for a channel), so with this off a run that errored, timed out or hit a
+    # spend cap reaches NO channel under any `notify` — a `failures_only` job then reports only the
+    # runs its own verify gate rejected. The failures stay in `cron_results.jsonl` and `cron doctor`.
     cron_notify_failures: bool = Field(
         default=True, validation_alias="CHIMERA_CRON_NOTIFY_FAILURES"
     )

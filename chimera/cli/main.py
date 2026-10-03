@@ -3243,9 +3243,9 @@ def _start_cron_daemon(
         results_path, warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]")
     )
 
-    # A run that could not run or finish is announced at the job's webhook, once per change of
-    # state. The flag is asked per tick (`get_settings()`, which `PATCH /api/config` refreshes), so
-    # switching it off silences the next tick rather than the next launch.
+    # A run that could not run or finish is announced at the job's webhook, once per outage and
+    # per failure kind in it. The flag is asked per tick (`get_settings()`, which `PATCH
+    # /api/config` refreshes), so switching it off silences the next tick rather than the next launch.
     notices = make_failure_notifier(
         warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
         enabled=lambda: get_settings().cron_notify_failures,
