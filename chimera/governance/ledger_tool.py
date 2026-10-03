@@ -32,6 +32,7 @@ from chimera.governance.ledger import (
     assess_action,
 )
 from chimera.governance.policy import Decision
+from chimera.governance.proxy import see_through
 from chimera.governance.sanitize import sanitize_untrusted
 from chimera.telemetry import get_logger
 from chimera.tools.base import Refusal, Tool, is_untrusted_output, refusal, tool_raised
@@ -224,10 +225,16 @@ class LedgeredTool(Tool):
         self.parameters = inner.parameters
 
     def run(self, **kwargs: Any) -> str:
+        # Every check below judges the tool that will RUN. Through the deferral proxy the name is
+        # `tool_call`, which is in none of the sets these checks read, and the call's own arguments
+        # sit one level down: judged as written, a tainted run's deferred `execute_code` was never
+        # narrowed and its `http_get` with a query string was never asked about. The proxy itself
+        # is still what runs (`self.inner.run(**kwargs)`), with the arguments it was given.
+        name, args = see_through(self.name, kwargs)
         # Recipients this run was never shown (M2). Worked out first so a card asked for another
         # reason below can carry the note: one question with two reasons, never two questions.
         unseen = (
-            self.ledger.unseen_addresses(recipient_values(kwargs)) if sends_to_someone(self.name) else []
+            self.ledger.unseen_addresses(recipient_values(args)) if sends_to_someone(name) else []
         )
         note = (
             f"; the recipient {', '.join(unseen)} never appeared in the conversation or in "
@@ -240,25 +247,25 @@ class LedgeredTool(Tool):
         #    (a fetch the user named does not count there); under the default it is the same bit.
         narrowing = (
             self.narrow_on_taint
-            and self.name in DANGEROUS_WHEN_TAINTED
-            and not (self.free_browser_reads and browser_reads_loaded_page(self.name, kwargs))
+            and name in DANGEROUS_WHEN_TAINTED
+            and not (self.free_browser_reads and browser_reads_loaded_page(name, args))
             and self.ledger.run_tainted(for_narrowing=True)
         )
-        if narrowing and self.warn_workspace_writes and self.name in WORKSPACE_WRITE_TOOLS:
+        if narrowing and self.warn_workspace_writes and name in WORKSPACE_WRITE_TOOLS:
             # The write goes ahead and the person is told. The per-action check in step 1 still runs.
             sources = self.ledger.taint_sources(for_narrowing=True)
-            target = _first(kwargs, _PATH_KEYS)
+            target = _first(args, _PATH_KEYS)
             where = f" from {'; '.join(sources[:3])}" if sources else ""
             if self.audit is not None:
                 self.audit.record(
                     "taint_write_warned",
-                    {"tool": self.name, "path": _excerpt(target, 300), "sources": sources},
+                    {"tool": name, "path": _excerpt(target, 300), "sources": sources},
                 )
             if self.notify is not None:
                 self.notify(
                     "tainted_write",
-                    f"{self.name} ran after this turn read untrusted content{where}",
-                    {"tool": self.name, "path": _excerpt(target, 300), "sources": sources[:3]},
+                    f"{name} ran after this turn read untrusted content{where}",
+                    {"tool": name, "path": _excerpt(target, 300), "sources": sources[:3]},
                 )
             narrowing = False
         if narrowing:
@@ -267,19 +274,19 @@ class LedgeredTool(Tool):
             # authority rule as the gate itself, so it names exactly the reads that armed it.
             sources = self.ledger.taint_sources(for_narrowing=True)
             reason = (
-                f"{self.name} is restricted after this run consumed untrusted content"
+                f"{name} is restricted after this run consumed untrusted content"
                 + (f" from {'; '.join(sources[:3])}" if sources else "")
                 + note
             )
             target = (
-                _first(kwargs, _COMMAND_KEYS) or _first(kwargs, _PATH_KEYS)
-                or _first(kwargs, _URL_KEYS) or _first(kwargs, ("to", "recipient", "channel", "chat_id"))
+                _first(args, _COMMAND_KEYS) or _first(args, _PATH_KEYS)
+                or _first(args, _URL_KEYS) or _first(args, ("to", "recipient", "channel", "chat_id"))
             )
-            action = f"{self.name}: {_excerpt(target, 300)}" if target else self.name
+            action = f"{name}: {_excerpt(target, 300)}" if target else name
             if self.audit is not None:
                 self.audit.record(
                     "taint_narrowed",
-                    {"tool": self.name, "reason": reason, "action": action, "sources": sources},
+                    {"tool": name, "reason": reason, "action": action, "sources": sources},
                 )
             assessment = SequenceAssessment(
                 True, Decision.REVIEW, reason, action=action, sources=sources
@@ -292,15 +299,15 @@ class LedgeredTool(Tool):
             asked = True
 
         # 1. Sequence-aware pre-check: does this action consume tainted input?
-        assessment = assess_action(self.name, kwargs, self.ledger)
+        assessment = assess_action(name, args, self.ledger)
         if assessment.escalate:
             assessment.reason += note
-            self.ledger.record_escalation(self.name, assessment)
+            self.ledger.record_escalation(name, assessment)
             if self.audit is not None:
                 self.audit.record(
                     "taint_review",
                     {
-                        "tool": self.name,
+                        "tool": name,
                         "decision": assessment.decision.value,
                         "reason": assessment.reason,
                         "tainted_refs": assessment.tainted_refs,
@@ -315,7 +322,7 @@ class LedgeredTool(Tool):
 
         # 1a. A recipient nobody mentioned (M2), when no card above already carried the note.
         if unseen:
-            refused = self._ask_about_recipients(unseen, asked=asked)
+            refused = self._ask_about_recipients(name, unseen, asked=asked)
             if refused is not None:
                 return refused
 
@@ -323,12 +330,12 @@ class LedgeredTool(Tool):
         #     at most once per identical (name, args). A retry re-issuing the same call gets the
         #     cached result instead of firing a duplicate email / message / payment.
         idem_key: str | None = None
-        if self.name in SIDE_EFFECT_TOOLS:
-            idem_key = _idempotency_key(self.name, kwargs)
+        if name in SIDE_EFFECT_TOOLS:
+            idem_key = _idempotency_key(name, args)
             if idem_key in self._idempotency_cache:
                 if self.audit is not None:
-                    self.audit.record("idempotent_skip", {"tool": self.name})
-                return f"[idempotent: {self.name} already executed with these args; not repeated]"
+                    self.audit.record("idempotent_skip", {"tool": name})
+                return f"[idempotent: {name} already executed with these args; not repeated]"
 
         # 2. Run the real tool, then record its effect for later steps to reason about.
         try:
@@ -340,20 +347,20 @@ class LedgeredTool(Tool):
             # ledger, so the run was not tainted. Caught here it is the error the loop would have
             # written, and it goes through the same path as a returned one: recorded, then fenced.
             # Another tool's exception goes on to the loop, which reports it as it always has.
-            if not self._is_fetch():
+            if not self._is_fetch(name):
                 raise
-            _log.warning("tool %s failed: %s", self.name, exc)
-            result = tool_raised(self.name, exc)
+            _log.warning("tool %s failed: %s", name, exc)
+            result = tool_raised(name, exc)
         else:
             # Only an answer is remembered. A raise never reached this cache before it was caught
             # here, so a send that raised is still tried again rather than reported as done.
             if idem_key is not None:
                 self._idempotency_cache[idem_key] = result
-        self._record_effect(kwargs, result)  # ledger sees the RAW content (taint snippets)
+        self._record_effect(name, args, result)  # ledger sees the RAW content (taint snippets)
         # Every result, whatever the tool: a contact looked up by `run_shell` or an MCP server is
         # an address the run was shown, and so is the one in a sent message's own confirmation.
         self.ledger.note_seen(result)
-        if self._is_fetch() and result.strip():
+        if self._is_fetch(name) and result.strip():
             # The ledger above saw the raw result whatever it was, a refusal and an error included,
             # so taint is recorded as it always was. Only what the model reads is decided here.
             return fence_observation(result)
@@ -386,7 +393,7 @@ class LedgeredTool(Tool):
             "of refusing), or, on a deployment that must act on its own, CHIMERA_TAINT_NARROW=0."
         )
 
-    def _ask_about_recipients(self, unseen: list[str], *, asked: bool) -> str | None:
+    def _ask_about_recipients(self, name: str, unseen: list[str], *, asked: bool) -> str | None:
         """Record a send to an address the run was never shown, and ask when this surface can.
 
         Returns the refusal when a person said no, else None. ``asked`` means a card for this same
@@ -396,23 +403,23 @@ class LedgeredTool(Tool):
         if self.audit is not None:
             self.audit.record(
                 "recipient_unseen",
-                {"tool": self.name, "recipients": unseen, "card": asked or ask},
+                {"tool": name, "recipients": unseen, "card": asked or ask},
             )
         if not ask or self.approve is None:
             return None
         reason = (
-            f"{self.name} to {', '.join(unseen)}: this address never appeared in the conversation "
+            f"{name} to {', '.join(unseen)}: this address never appeared in the conversation "
             "or in anything this run read"
         )
         assessment = SequenceAssessment(
-            True, Decision.REVIEW, reason, action=f"{self.name}: {', '.join(unseen)}"
+            True, Decision.REVIEW, reason, action=f"{name}: {', '.join(unseen)}"
         )
         if self.approve(assessment):
             return None
         return refusal(f"[recipient: needs review — {reason}] "
                        f"The tool did NOT run. Do not report this as done.")
 
-    def _is_fetch(self) -> bool:
+    def _is_fetch(self, name: str) -> bool:
         """A tool whose output is untrusted external content — by builtin name OR by an
         ``untrusted_output`` marker on the wrapped tool (MCP / OpenAPI connectors, whose names come
         from a remote server and so can't be listed statically in FETCH_TOOLS).
@@ -420,11 +427,10 @@ class LedgeredTool(Tool):
         Resolved through the whole wrapper chain, not just ``self.inner``: under ``--guard --taint``
         the inner tool is a :class:`GovernedTool`, and reading one level deep lost the marker.
         """
-        return self.name in FETCH_TOOLS or is_untrusted_output(self.inner)
+        return name in FETCH_TOOLS or is_untrusted_output(self.inner)
 
-    def _record_effect(self, args: Mapping[str, Any], result: str) -> None:
-        name = self.name
-        if self._is_fetch():
+    def _record_effect(self, name: str, args: Mapping[str, Any], result: str) -> None:
+        if self._is_fetch(name):
             # The URL or the path the tool fetched is the source: the ref a later command can name,
             # and the target the user's instruction can have named. An untrusted `read_file` used to
             # be recorded as a fetch of "read_file", which is neither.

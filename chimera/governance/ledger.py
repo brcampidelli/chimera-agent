@@ -43,6 +43,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from chimera.governance.policy import Decision
+from chimera.governance.proxy import see_through
 from chimera.governance.recipient import addresses_in
 from chimera.telemetry import get_logger
 
@@ -629,7 +630,12 @@ def assess_action(
     Precise by design (low false-positive): only escalates when a tainted ref or a verbatim
     tainted-content flow is actually present in the action — not merely because *some* untrusted
     content was fetched earlier this run. Returns an ALLOW assessment when nothing is tainted.
+
+    A call through the deferral proxy is assessed as the tool it runs
+    (:func:`~chimera.governance.proxy.see_through`); judged as ``tool_call`` it matched none of the
+    three branches below, and a tainted run's ``http_get`` with a query string was ALLOW.
     """
+    tool_name, args = see_through(tool_name, args)
     if tool_name in exec_tools:
         command = _first(args, _COMMAND_KEYS)
         tainted, refs, span = ledger._tainted_span(command)
