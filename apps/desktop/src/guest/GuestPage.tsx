@@ -1,9 +1,9 @@
 import { Loader2, Send, Users } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Markdown from "react-markdown";
 
 import { BrandMark } from "@/components/BrandMark";
 import { Button } from "@/components/ui/button";
+import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { useT } from "@/lib/i18n";
 import {
   getGuestSession,
@@ -235,7 +235,7 @@ export function GuestPage() {
             ) : null}
             {row.answer ? (
               <div className="prose-chimera px-1">
-                <Markdown>{row.answer}</Markdown>
+                <SafeMarkdown>{row.answer}</SafeMarkdown>
               </div>
             ) : row.done || row.failed ? null : (
               <p className="flex items-center gap-1 text-xs text-muted-foreground">

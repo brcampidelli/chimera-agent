@@ -2335,10 +2335,17 @@ def _index_html(index: Path, request: Request) -> Any:
     connected local client (127.0.0.1): a remotely-exposed instance serves the page WITHOUT the token,
     so remote clients can't read it back. (Behind a reverse proxy the client host is the proxy; expose
     the UI remotely only behind your own auth layer — see docs.)
+
+    Every copy of the page carries `APP_PAGE_CSP` (see `page_csp.py` for each directive's reason):
+    the window had no policy at all, so a Markdown image in an answer was a GET to any host. The
+    header is on the response rather than a `<meta>` in index.html because a meta only governs what
+    follows it, and this function inserts the token tag at the end of `<head>`.
     """
     from html import escape
 
     from fastapi.responses import HTMLResponse
+
+    from chimera.api.page_csp import APP_PAGE_CSP
 
     html = index.read_text(encoding="utf-8")
     token = get_settings().server_token
@@ -2346,7 +2353,7 @@ def _index_html(index: Path, request: Request) -> Any:
     if token and client in _LOOPBACK:
         tag = f'<meta name="chimera-token" content="{escape(token, quote=True)}">'
         html = html.replace("</head>", tag + "</head>", 1)
-    return HTMLResponse(html)
+    return HTMLResponse(html, headers={"Content-Security-Policy": APP_PAGE_CSP})
 
 
 def _event_dict(event: AgentEvent) -> dict[str, Any]:
@@ -2879,6 +2886,12 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
         try:
             candidate = (static_dir / full_path).resolve()
             if candidate.is_file() and static_dir.resolve() in candidate.parents:
+                # A page reached by its file name (`/index.html`, `/guest.html`) is still a page of
+                # this origin: without the policy it would be the one way around it.
+                if candidate.suffix.lower() == ".html":
+                    from chimera.api.page_csp import APP_PAGE_CSP
+
+                    return FileResponse(candidate, headers={"Content-Security-Policy": APP_PAGE_CSP})
                 return FileResponse(candidate)
         except (OSError, ValueError):
             pass

@@ -6,7 +6,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -63,6 +62,7 @@ import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { GroundedBadge } from "@/components/code/GroundedBadge";
 import { BrowserView } from "@/components/code/BrowserView";
+import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
@@ -1727,9 +1727,9 @@ export function Conversation({
                 // matters here.
                 <div className="group relative">
                   <div className="md min-w-0 text-sm leading-relaxed text-foreground/90">
-                    <Markdown rehypePlugins={[rehypeHighlight]}>
+                    <SafeMarkdown rehypePlugins={[rehypeHighlight]}>
                       {e.answer}
-                    </Markdown>
+                    </SafeMarkdown>
                   </div>
                   {/* Copies the exchange as MARKDOWN, not the rendered text: what the reader wants to
                     paste into an issue is the fenced code that made it worth reading, and the

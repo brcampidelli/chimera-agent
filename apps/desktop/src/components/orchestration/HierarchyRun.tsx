@@ -1,6 +1,6 @@
 import { useEffect, useReducer } from "react";
-import Markdown from "react-markdown";
 
+import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { streamHierarchy, type HierarchyRunInput, type OrchFrame } from "@/lib/api";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
 import {
@@ -167,7 +167,7 @@ export function HierarchyRun({
             </p>
           ) : null}
           <div className="prose-chimera text-sm">
-            <Markdown>{state.answer}</Markdown>
+            <SafeMarkdown>{state.answer}</SafeMarkdown>
           </div>
           <Totals totals={state.totals} t={t} />
         </section>

