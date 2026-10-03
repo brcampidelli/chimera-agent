@@ -257,6 +257,11 @@ SECTIONS: tuple[PromptSection, ...] = (
        note="composed in _launch_turn"),
     _c("voice.spoken", "chimera.api.code_api:SPOKEN_NOTE", "surface", ("S4",), "unmeasured",
        note="live tests of 2026-09-17/18 are cited in the comment; no bench"),
+    _c("style.concise", "chimera.core.output_style:CONCISE_NOTE", "surface", ("S2",), "unmeasured",
+       note="per-conversation output style on the Code screen (study 29 P4.5); typed native turns "
+            "only, recorded on the receipt with OUTPUT_STYLE_VERSION; the default adds nothing"),
+    _c("style.explanatory", "chimera.core.output_style:EXPLANATORY_NOTE", "surface", ("S2",),
+       "unmeasured", note="as style.concise"),
     _i("voice.works_note", "chimera.api.works:WorkManager.note", "volatile", ("S4",)),
     _i("voice.work_tools", "chimera.api.works:WorkStatusTool", "tool", ("S4",)),
     _c("plan.gate", "chimera.api.plan_gate:_PLAN_GATE_SYSTEM", "call", ("S2", "S14"), "unmeasured"),

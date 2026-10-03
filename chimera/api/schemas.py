@@ -906,6 +906,39 @@ class AcceptanceOut(BaseModel):
     note: str
 
 
+class SuggestionEventIn(BaseModel):
+    """One event of a next-step suggestion under a Code-screen answer (:mod:`chimera.api.suggestion_log`).
+
+    The kind and the event, never the suggestion's text: an acceptance rate does not need to know
+    which files a "commit" suggestion named."""
+
+    event: Literal["shown", "picked", "sent"]
+    kind: Literal["fix", "commit", "continue"]
+    #: For ``sent``: the picked text was changed before it went. Ignored for the other two.
+    edited: bool = False
+
+
+class SuggestionCountsOut(BaseModel):
+    """Shown, picked and sent, and the two rates between them — each null with no denominator."""
+
+    shown: int
+    picked: int
+    sent: int
+    #: Of ``sent``, how many were changed in the box first.
+    edited: int
+    #: picked / shown. Null until something was shown.
+    pick_rate: float | None
+    #: sent / picked. Null until something was picked.
+    send_rate: float | None
+
+
+class SuggestionStatsOut(SuggestionCountsOut):
+    """How often the suggestions under an answer are taken, on this machine, in total and per kind."""
+
+    by_kind: dict[str, SuggestionCountsOut]
+    note: str
+
+
 class LocalRuntimeOut(BaseModel):
     """One local, keyless model runtime and what it has right now — Ollama or LM Studio.
 

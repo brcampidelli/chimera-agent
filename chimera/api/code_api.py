@@ -92,6 +92,7 @@ from chimera.api.sse import SSE_RESPONSE
 from chimera.api.undo_offers import UndoOffers
 from chimera.api.worth import WorthReport, summarize_worth
 from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEFUL_TOKENS
+from chimera.core.output_style import OUTPUT_STYLE_VERSION, OutputStyle, with_output_style
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
@@ -1037,6 +1038,24 @@ class CodeTurnRequest(CodeSeams):
     because the thinking is where the wait before the first spoken word was measured to go
     (``LLMGateway._provider_kwargs``). ``None`` leaves the model as configured; a typed turn sends
     nothing."""
+    style: OutputStyle = "default"
+    """How this conversation's answers are written (:mod:`chimera.core.output_style`). The default
+    adds nothing to the prompt, so a client that never heard of styles sends what it sent before.
+    Wording only: it reaches the system prompt and the receipt, and nothing that decides what the
+    turn may do."""
+
+
+def _applied_style(req: CodeTurnRequest) -> str | None:
+    """The style this turn's prompt actually carries, or None when it carries none.
+
+    None for the default, for a spoken turn — the voice note is the contract of that surface, and a
+    "be explanatory" under "two to four sentences, for the ear" would be two instructions fighting —
+    and for an external agent, whose prompt is not ours to suffix. The receipt names a style only
+    when the turn ran under it, so the badge never claims words the model was not given.
+    """
+    if req.style == "default" or req.spoken or (req.provider or "").strip():
+        return None
+    return req.style
 
 
 def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:
@@ -1530,6 +1549,10 @@ def register_code_api(
         # turn of a spoken conversation, not something that is true of one turn.
         if req.spoken:
             system_prompt += f"\n\n{SPOKEN_NOTE}"
+        # The conversation's output style, after the base and only on the turns `_applied_style`
+        # names: the default returns the same string, so a turn nobody chose a style for sends the
+        # system message it always sent.
+        system_prompt = with_output_style(system_prompt, _applied_style(req))
         turn_notes = "\n\n".join(part for part in (facts_block(facts), note) if part)
         model, thinking = _model_for(req, live())
         agent = Agent(
@@ -2532,6 +2555,13 @@ def register_code_api(
                         # This turn could not use tools, and a reader cannot tell that from a zero
                         # tool count alone — the same count a turn that needed none reports.
                         "fused": fused,
+                        # The style this turn's prompt carried and the version of its words — only
+                        # when it carried one, so a default turn's receipt is the one it always was.
+                        **(
+                            {"style": style, "style_version": OUTPUT_STYLE_VERSION}
+                            if (style := _applied_style(req))
+                            else {}
+                        ),
                     },
                 )
 

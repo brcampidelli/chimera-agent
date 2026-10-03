@@ -181,7 +181,17 @@ export function makeCodeApiMock() {
     streamCrew: vi.fn(),
     cancelOrchestration: vi.fn(),
     getApproaches: vi.fn(async () => ({ approaches: [], default: [] })),
+    // The next-step suggestions under an answer post their events here (fire-and-forget) and the
+    // settings row reads the rate back. Resolved with an empty ledger, which is a fresh install.
+    postSuggestionEvent: vi.fn(async () => emptySuggestionStats()),
+    getSuggestionStats: vi.fn(async () => emptySuggestionStats()),
   };
+}
+
+/** The suggestion ledger of an install that has shown nothing yet: every rate null, not zero. */
+export function emptySuggestionStats() {
+  const none = { shown: 0, picked: 0, sent: 0, edited: 0, pick_rate: null, send_rate: null };
+  return { ...none, by_kind: { fix: none, commit: none, continue: none }, note: "no suggestion shown yet" };
 }
 
 /** The posture facts the server would report for an ordinary local setup. */

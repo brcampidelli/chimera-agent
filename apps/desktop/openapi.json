@@ -2427,6 +2427,16 @@
             "title": "Stream",
             "type": "boolean"
           },
+          "style": {
+            "default": "default",
+            "enum": [
+              "default",
+              "concise",
+              "explanatory"
+            ],
+            "title": "Style",
+            "type": "string"
+          },
           "summarise_compaction": {
             "default": false,
             "title": "Summarise Compaction",
@@ -9825,6 +9835,159 @@
         "title": "SubtaskOut",
         "type": "object"
       },
+      "SuggestionCountsOut": {
+        "description": "Shown, picked and sent, and the two rates between them \u2014 each null with no denominator.",
+        "properties": {
+          "edited": {
+            "title": "Edited",
+            "type": "integer"
+          },
+          "pick_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pick Rate"
+          },
+          "picked": {
+            "title": "Picked",
+            "type": "integer"
+          },
+          "send_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Send Rate"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "shown": {
+            "title": "Shown",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shown",
+          "picked",
+          "sent",
+          "edited",
+          "pick_rate",
+          "send_rate"
+        ],
+        "title": "SuggestionCountsOut",
+        "type": "object"
+      },
+      "SuggestionEventIn": {
+        "description": "One event of a next-step suggestion under a Code-screen answer (:mod:`chimera.api.suggestion_log`).\n\nThe kind and the event, never the suggestion's text: an acceptance rate does not need to know\nwhich files a \"commit\" suggestion named.",
+        "properties": {
+          "edited": {
+            "default": false,
+            "title": "Edited",
+            "type": "boolean"
+          },
+          "event": {
+            "enum": [
+              "shown",
+              "picked",
+              "sent"
+            ],
+            "title": "Event",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "fix",
+              "commit",
+              "continue"
+            ],
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event",
+          "kind"
+        ],
+        "title": "SuggestionEventIn",
+        "type": "object"
+      },
+      "SuggestionStatsOut": {
+        "description": "How often the suggestions under an answer are taken, on this machine, in total and per kind.",
+        "properties": {
+          "by_kind": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SuggestionCountsOut"
+            },
+            "title": "By Kind",
+            "type": "object"
+          },
+          "edited": {
+            "title": "Edited",
+            "type": "integer"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "pick_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pick Rate"
+          },
+          "picked": {
+            "title": "Picked",
+            "type": "integer"
+          },
+          "send_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Send Rate"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "integer"
+          },
+          "shown": {
+            "title": "Shown",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "shown",
+          "picked",
+          "sent",
+          "edited",
+          "pick_rate",
+          "send_rate",
+          "by_kind",
+          "note"
+        ],
+        "title": "SuggestionStatsOut",
+        "type": "object"
+      },
       "SystemOneModelOut": {
         "description": "One model OpenRouter lists with ``output_modalities: decisions`` (``chimera/decisions/system_one.py``).",
         "properties": {
@@ -16775,6 +16938,64 @@
           }
         },
         "summary": "Retire Skill"
+      }
+    },
+    "/api/suggestions/event": {
+      "post": {
+        "description": "Record that a next-step suggestion was shown, picked or sent, and answer with the rates.\n\nThe suggestions themselves are computed on the screen from facts of the turn and cost\nnothing; this is the only part of them the server sees, and it sees the kind, not the text.",
+        "operationId": "suggestion_event_endpoint_api_suggestions_event_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestionEventIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Suggestion Event Endpoint"
+      }
+    },
+    "/api/suggestions/stats": {
+      "get": {
+        "description": "How often the suggestions under an answer are taken on THIS machine \u2014 the measure the plan\nset for them. Each rate is null until it has a denominator.",
+        "operationId": "suggestion_stats_endpoint_api_suggestions_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestionStatsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Suggestion Stats Endpoint"
       }
     },
     "/api/tools": {

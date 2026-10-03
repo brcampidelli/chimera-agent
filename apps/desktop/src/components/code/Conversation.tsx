@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import rehypeHighlight from "rehype-highlight";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AppWindow,
   ArrowDown,
@@ -29,6 +29,7 @@ import {
 import {
   deleteCodeSession,
   getCodeSession,
+  getGitStatus,
   listShares,
   listWorks,
   revertCodeTurn,
@@ -47,7 +48,7 @@ import {
   type Reach,
 } from "@/lib/api";
 import type { CodeApprovalEvent, SessionLiveFrame } from "@/lib/api";
-import type { WorkInfo } from "@/lib/types";
+import type { OutputStyle, WorkInfo } from "@/lib/types";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/panel";
@@ -77,6 +78,9 @@ import {
   type Cast,
 } from "@/components/code/FusionCast";
 import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeiling";
+import { styleLabel } from "@/components/code/StylePicker";
+import { TurnSuggestions } from "@/components/code/TurnSuggestions";
+import { recordSuggestion, turnSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
 import {
   exchangeToMarkdown,
@@ -496,6 +500,12 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
       {done.system_sha && !done.external ? (
         <Badge>{t("code.chat.prompt", { sha: done.system_sha })}</Badge>
       ) : null}
+      {/* Beside the prompt it changed: a style is a suffix of that prompt, so two turns with different
+          fingerprints and different styles differ for a reason the receipt names. Absent on a turn
+          that carried none, which is every turn before styles existed. */}
+      {done.style && !done.external ? (
+        <Badge>{t("code.chat.style", { style: styleLabel(t, done.style) })}</Badge>
+      ) : null}
       {/* Every permission we answered on the user's behalf, and every write the region refused.
           Both are the receipt's half of the bargain the posture note describes. */}
       {done.auto_approved?.length ? (
@@ -565,6 +575,7 @@ export function Conversation({
   posture,
   provider = "",
   model = "",
+  style = "default",
   profile,
   controls,
   onOpenFile,
@@ -583,6 +594,9 @@ export function Conversation({
    *  Claude Code and Gemini choose their own, and sending one would describe a routing that did not
    *  happen. */
   model?: string;
+  /** How THIS conversation's answers are written (`chimera/core/output_style.py`). The default is
+   *  never sent, so a conversation nobody chose a style for sends the request it always sent. */
+  style?: OutputStyle;
   /** Which tier each role draws from — the same profile the verified run uses. */
   profile: Profile;
   /** Start a verified run with this text, in the panel that owns the run machinery. */
@@ -612,6 +626,9 @@ export function Conversation({
   const [exchanges, setExchanges] = useState<Exchange[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // The suggestion whose text is in the box, until it is sent or the box is emptied — so a send can
+  // be counted as the suggestion's. A ref: it is read inside `send`, never drawn.
+  const pickedRef = useRef<Suggestion | null>(null);
   // The question the turn is parked on, if any. One at a time by construction: the tool call
   // that raised it is blocked until it is answered, so a second cannot arrive first.
   const [pendingApproval, setPendingApproval] = useState<CodeApprovalEvent | null>(null);
@@ -1104,6 +1121,55 @@ export function Conversation({
     [lastAt, lastText, lastDone],
   );
 
+  // Suggested next steps under the last answer (study 29, P4.5), read off facts of that turn. Only for
+  // a turn that finished — a failed one already offers Retry, a stopped one was a decision — and only
+  // while nothing else is asking for the person's next move: a turn running, an approval or a batch
+  // proposal waiting, a message queued, or text already in the box, which a click would replace.
+  const lastExchange = lastAt >= 0 ? exchanges[lastAt] : null;
+  const settled = lastExchange !== null && lastExchange.done !== null && !lastExchange.failed && !lastExchange.abandoned;
+  const quiet = !busy && !busyElsewhere && !following && !pendingApproval && !proposal && !queued;
+  // Files this turn wrote and did not undo. Whether they are still uncommitted is git's to say, so
+  // it is asked only when there is something to ask about, and refreshed by the same invalidation a
+  // finished turn already sends.
+  // Joined into one string so the memo below depends on the paths, not on a new array each render.
+  const editedNow = settled && quiet && !lastExchange.undone ? lastExchange.edits.map((e) => e.path).join("\n") : "";
+  const gitNow = useQuery({
+    queryKey: ["git-status", workspace],
+    queryFn: async () => (await getGitStatus(workspace || null)) ?? null,
+    enabled: editedNow !== "",
+  });
+  const suggestions = useMemo<Suggestion[]>(() => {
+    if (!settled || !quiet || draft.trim() || !lastExchange) return [];
+    const v = lastExchange.verified;
+    return turnSuggestions(
+      {
+        fixText: v?.state === "failed" && !lastExchange.undone ? fixBrief(lastExchange.you, v, t) : undefined,
+        todos: lastExchange.todos,
+        edited: editedNow ? editedNow.split("\n") : [],
+        dirty: gitNow.data?.is_repo ? gitNow.data.files.map((f) => f.path) : null,
+      },
+      t,
+    );
+  }, [settled, quiet, draft, lastExchange, gitNow.data, t, editedNow]);
+  // "Shown", once per suggestion per turn on this screen: the denominator of the rate. Keyed by the
+  // turn's position and the suggestion's kind, so a re-render, or the box being emptied and the chips
+  // coming back, does not count the same offer twice.
+  const shownRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const item of suggestions) {
+      const key = `${sessionId ?? ""}:${lastAt}:${item.kind}`;
+      if (shownRef.current.has(key)) continue;
+      shownRef.current.add(key);
+      recordSuggestion({ event: "shown", kind: item.kind, edited: false });
+    }
+  }, [suggestions, sessionId, lastAt]);
+  /** A suggestion was clicked: its text goes in the box, and nothing is sent. */
+  const pickSuggestion = useCallback((item: Suggestion) => {
+    pickedRef.current = item;
+    setDraft(item.text);
+    recordSuggestion({ event: "picked", kind: item.kind, edited: false });
+  }, []);
+
   function send(force = false, override?: string, spoken = false, auto = false) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
@@ -1141,6 +1207,14 @@ export function Conversation({
       return;
     }
     setProposal(null);
+    // The box held a suggestion the person picked, and it is going out now: the "sent" half of the
+    // rate. Only for a message the person sent — an automatic continuation is not one — and with
+    // whether they changed it first, because "taken as offered" and "used as a start" differ.
+    const picked = pickedRef.current;
+    pickedRef.current = null;
+    if (picked && !auto && !spoken) {
+      recordSuggestion({ event: "sent", kind: picked.kind, edited: message !== picked.text.trim() });
+    }
     setDraft("");
     setAttached([]);
     setBusy(true);
@@ -1202,6 +1276,10 @@ export function Conversation({
         // person waiting to hear an answer is the one caller for whom that trade is right. Omitted
         // when typed — the fields are new, and a typed turn must send exactly what it sent before.
         ...(spoken ? { spoken: true, thinking: false } : {}),
+        // The conversation's output style — omitted for the default, so a turn nobody chose a style
+        // for sends byte for byte what it sent before, and omitted on a spoken turn and for an
+        // external agent, where the server would not apply it and the receipt would not name it.
+        ...(spoken || provider || style === "default" ? {} : { style }),
         // Only with `fuse`: a cast on a turn that is not fused would be a second, invisible way to
         // pick a model. Omitted rather than sent empty, so an unchosen role stays the install's.
         ...(fuse && cast.panel.length ? { fusion_panel: cast.panel } : {}),
@@ -1804,6 +1882,7 @@ export function Conversation({
                   <TurnReceipt done={e.done} t={t} />
                 </CardChrome>
               ) : null}
+              {i === lastAt ? <TurnSuggestions items={suggestions} onPick={pickSuggestion} /> : null}
               {/* What was closed in this turn, and the way back to it, where it was. */}
               {cards.closedInTurn(i) > 0 ? (
                 <button
@@ -1897,7 +1976,11 @@ export function Conversation({
           // eslint-disable-next-line jsx-a11y/no-autofocus
           autoFocus
           value={draft}
-          onChange={(ev) => setDraft(ev.target.value)}
+          onChange={(ev) => {
+            // An emptied box no longer holds the suggestion: what is typed next is the person's own.
+            if (!ev.target.value.trim()) pickedRef.current = null;
+            setDraft(ev.target.value);
+          }}
           // Paste is the point. Taking a screenshot and pressing Ctrl+V is how people show a
           // program what is wrong with it; without this the clipboard image was dropped on the
           // floor and the only route was Save As, then the file dialog. `items` is where a pasted

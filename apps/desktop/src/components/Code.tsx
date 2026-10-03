@@ -29,6 +29,7 @@ import { Conversation } from "@/components/code/Conversation";
 import { PostureNote } from "@/components/code/PostureNote";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
+import { StylePicker, styleLabel } from "@/components/code/StylePicker";
 import { Tooltip } from "@/components/ui/tooltip";
 import {
   NO_OVERRIDE,
@@ -47,6 +48,7 @@ import { ProjectPicker } from "@/components/code/ProjectPicker";
 import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
+import type { OutputStyle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
@@ -407,6 +409,10 @@ export function Code() {
   // thirty times what the person expected. "" means the install's default, and the picker offers to
   // make a pick the standing default — which is the same intent, stated rather than accumulated.
   const [model, setModel] = useState("");
+  // How this conversation's answers are written (study 29, P4.5). Per conversation and reset with the
+  // model below, for the model's reason: a style carried over from last week is a choice nobody
+  // remembers making. "default" is never sent, so until someone picks one nothing changes.
+  const [style, setStyle] = useState<OutputStyle>("default");
   // Which model does which job. Session-local, like `provider` and `model` above and for the same
   // reason: routing that quietly carried over from last week is how a turn costs what nobody
   // expected.
@@ -468,6 +474,7 @@ export function Code() {
     setConversationKey((n) => n + 1);
     setOpenFile(null);
     setModel("");
+    setStyle("default");
   }, []);
 
   const refreshOpenFile = useCallback(() => {
@@ -668,6 +675,7 @@ export function Code() {
             posture={posture}
             provider={provider}
             model={model}
+            style={style}
             profile={profile}
             /* No selectors. What they expressed is now a server default the app SENDS (never omits
                — an absent posture means no tool denials and no pause at all, which is more permissive
@@ -682,6 +690,9 @@ export function Code() {
                     provider === "" ? t("code.provider.native") : provider,
                     ...(provider === "" ? [t(`code.roles.profile.${profile}`)] : []),
                     ...(provider === "" ? [model ? (model.split("/").pop() ?? model) : t("model.pick.default")] : []),
+                    // The style only once one is picked: a chip for the default would be a line
+                    // describing nothing, on the strip that exists to be glanced past.
+                    ...(provider === "" && style !== "default" ? [styleLabel(t, style)] : []),
                   ]}
                 >
                 {/* The picker sits ABOVE the sentence, because the sentence is about the choice.
@@ -714,6 +725,11 @@ export function Code() {
                     would run on something other than what the row says. */}
                 {provider === "" ? (
                   <ModelPicker value={model} onChange={setModel} disabled={runBusy} />
+                ) : null}
+                {/* Only for Chimera's own loop, like the model: an external agent's prompt is not ours
+                    to suffix, and the server would not apply the style there. */}
+                {provider === "" ? (
+                  <StylePicker value={style} onChange={setStyle} disabled={runBusy} />
                 ) : null}
                 </ComposerSettings>
                 <PostureNote

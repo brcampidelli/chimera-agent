@@ -14,6 +14,7 @@ import {
   getInstructions,
   getMessaging,
   getCompletionStats,
+  getSuggestionStats,
   getOllamaModels,
   patchConfig,
   putInstructions,
@@ -521,6 +522,24 @@ function CompletionAcceptanceRow() {
   );
 }
 
+
+/** How often the next-step suggestions under a Code-screen answer are taken (study 29, P4.5): picked
+ *  out of shown, and sent out of picked. The same rule as the row above — no rate is drawn until one
+ *  has been shown, because "0 of 0" read as a verdict would be one nobody gave. */
+function SuggestionAcceptanceRow() {
+  const t = useT();
+  // An arrow, not the bare reference: a screen that cannot read the rate must still open.
+  const stats = useQuery({ queryKey: ["suggestion-stats"], queryFn: () => getSuggestionStats() });
+  const data = stats.data;
+  const shown = !data || !data.shown
+    ? t("settings.value.suggestionAcceptanceNone")
+    : t("settings.value.suggestionAcceptance", { picked: data.picked, shown: data.shown, sent: data.sent });
+  return (
+    <Row label={t("settings.row.suggestionAcceptance")}>
+      <span className="text-xs text-muted-foreground">{shown}</span>
+    </Row>
+  );
+}
 
 function OllamaModelPicker({
   baseUrl,
@@ -1292,6 +1311,7 @@ export function Settings({
                       it back — had no caller in the app at all. So the product collected an
                       answer to "are these suggestions any good" and showed it to nobody. */}
                   <CompletionAcceptanceRow />
+                  <SuggestionAcceptanceRow />
                   <Row
                     label={t("settings.row.fallbackModels")}
                     hint={t("settings.hint.fallbackModels")}

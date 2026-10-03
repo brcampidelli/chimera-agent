@@ -114,6 +114,8 @@ from chimera.api.schemas import (
     SearchOut,
     SessionDetailOut,
     SessionMetaOut,
+    SuggestionEventIn,
+    SuggestionStatsOut,
     SystemOneModelsOut,
     ToolsOut,
     UpdatedOut,
@@ -2019,6 +2021,27 @@ def build_api_app(
         from chimera.complete.outcomes import acceptance
 
         return acceptance(Path(settings.home))
+
+    @app.post("/api/suggestions/event", dependencies=[guard], response_model=SuggestionStatsOut)
+    def suggestion_event_endpoint(req: SuggestionEventIn) -> dict[str, Any]:
+        """Record that a next-step suggestion was shown, picked or sent, and answer with the rates.
+
+        The suggestions themselves are computed on the screen from facts of the turn and cost
+        nothing; this is the only part of them the server sees, and it sees the kind, not the text.
+        """
+        from chimera.api import suggestion_log
+
+        home = Path(settings.home)
+        suggestion_log.record(home, event=req.event, kind=req.kind, edited=req.edited)
+        return suggestion_log.stats(home)
+
+    @app.get("/api/suggestions/stats", dependencies=[guard], response_model=SuggestionStatsOut)
+    def suggestion_stats_endpoint() -> dict[str, Any]:
+        """How often the suggestions under an answer are taken on THIS machine — the measure the plan
+        set for them. Each rate is null until it has a denominator."""
+        from chimera.api import suggestion_log
+
+        return suggestion_log.stats(Path(settings.home))
 
     @app.get("/api/resources", dependencies=[guard], response_model=ResourcesOut)
     def resources_endpoint() -> dict[str, Any]:

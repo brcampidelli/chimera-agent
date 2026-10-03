@@ -98,6 +98,12 @@ export type DiagnosticsResult = Schemas["DiagnosticsOut"];
 export type LspDiagnostic = Schemas["DiagnosticOut"];
 export type InlineCompletion = Schemas["CompletionOut"];
 export type CompletionAcceptance = Schemas["AcceptanceOut"];
+/** How often the next-step suggestions under an answer are shown, picked and sent (`/api/suggestions/stats`). */
+export type SuggestionStats = Schemas["SuggestionStatsOut"];
+/** One event of a next-step suggestion: the kind and what happened, never its text. */
+export type SuggestionEvent = Schemas["SuggestionEventIn"];
+/** How a conversation's answers are written (`chimera/core/output_style.py`). */
+export type OutputStyle = Schemas["CodeTurnRequest"]["style"];
 /** What the configured Ollama has pulled. `reachable` and an empty `models` are different answers. */
 export type OllamaModels = Schemas["OllamaModelsOut"];
 /** Every local, keyless runtime this install knows how to ask, asked — Ollama and LM Studio. The
