@@ -39,7 +39,7 @@ function failing(block?: PolicyBlockInfo) {
   };
 }
 
-async function ask(text: string) {
+async function ask(text: string, opts: { fuse?: boolean; provider?: string } = {}) {
   renderWithProviders(
     <Conversation
       workspace="/proj"
@@ -47,6 +47,7 @@ async function ask(text: string) {
       posture={{ reach: "workspace" as never, approval: "ask" as never }}
       profile={"balanced" as never}
       model="openrouter/openai/gpt-4o"
+      provider={opts.provider}
       onHandOff={() => {}}
       onBatch={() => {}}
       onEdited={() => {}}
@@ -56,8 +57,17 @@ async function ask(text: string) {
     />,
   );
   const user = userEvent.setup();
+  if (opts.fuse) await user.click(await screen.findByRole("button", { name: /^fuse$/i }));
   await user.type(await screen.findByRole("textbox"), `${text}{Enter}`);
   return user;
+}
+
+/** Open the refusal's model list and pick the one other model the mock catalogue offers. */
+async function retryOnMid(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(await screen.findByRole("button", { name: /try with another model/i }));
+  await user.click(await screen.findByText("Vendor: Mid"));
+  await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(2));
+  return vi.mocked(streamCodeTurn).mock.calls[1]?.[0] as CodeTurnInput;
 }
 
 describe("a turn the provider refused on content policy", () => {
@@ -97,6 +107,34 @@ describe("a turn the provider refused on content policy", () => {
       blocked_model: "openrouter/openai/gpt-4o",
       request_id: "req_9f2c41",
     });
+  });
+
+  it("redoes a fused turn on the one model picked, not on the panel that refused", async () => {
+    // With Fusion on, the server hands the turn to the fusion engine, which ignores `model`: the
+    // "retry on another model" went back to the same panel and judge, and the receipt named it.
+    vi.mocked(streamCodeTurn).mockImplementation(failing(BLOCK));
+    const user = await ask("escreve o conto", { fuse: true });
+    expect((vi.mocked(streamCodeTurn).mock.calls[0]?.[0] as CodeTurnInput).fuse).toBe(true);
+
+    const retry = await retryOnMid(user);
+
+    expect(retry.fuse).toBe(false);
+    expect(retry.fusion_panel).toBeUndefined();
+    expect(retry.fusion_judge).toBeUndefined();
+    expect(retry.fusion_synthesizer).toBeUndefined();
+    expect(retry.model).toBe("openrouter/vendor/mid");
+  });
+
+  it("redoes the turn natively even when the composer has moved to an external agent", async () => {
+    // An external agent picks its own model, so a retry sent with `provider` would not run on the
+    // model the owner picked — while its receipt still said it had.
+    vi.mocked(streamCodeTurn).mockImplementation(failing(BLOCK));
+    const user = await ask("escreve o conto", { provider: "claude" });
+
+    const retry = await retryOnMid(user);
+
+    expect(retry.provider).toBeUndefined();
+    expect(retry.model).toBe("openrouter/vendor/mid");
   });
 
   it("keeps the ordinary card and its Try again for any other failure", async () => {

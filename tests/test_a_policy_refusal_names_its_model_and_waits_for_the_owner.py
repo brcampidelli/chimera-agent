@@ -284,6 +284,30 @@ def test_a_retry_naming_no_model_is_refused(tmp_path: Path, monkeypatch: pytest.
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [{"fuse": True}, {"provider": "claude"}],
+    ids=["fused", "external"],
+)
+def test_a_retry_that_would_not_run_on_its_model_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, extra: dict[str, Any]
+) -> None:
+    # A fused turn answers with its panel and judge whatever `model` says, and an external agent
+    # picks its own model: the receipt would read "redone on Y by the owner's choice" over an
+    # answer Y never wrote. Before, the desktop sent `fuse` with the retry and this was a 200.
+    client = _client(tmp_path, monkeypatch)
+    body = {
+        "message": "answer it",
+        "model": "prov/other",
+        "retry_of": {"blocked_model": "openrouter/openai/gpt-4o"},
+        **extra,
+    }
+
+    response = client.post("/api/code/turn", json=body)
+
+    assert response.status_code == 422
+
+
 # --- the bot: only the sentence ------------------------------------------------------------------
 
 

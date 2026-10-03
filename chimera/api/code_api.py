@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, model_validator
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
 # this file uses `from __future__ import annotations`, so a `-> EventSourceResponse` return
@@ -1059,6 +1059,21 @@ class CodeTurnRequest(CodeSeams):
     """This turn redoes one the provider refused on content policy, on a model the owner picked.
     Only the receipt reads it (:class:`PolicyRetry`); a guest's turn drops it, since the line it
     writes says the choice was the owner's."""
+
+    @model_validator(mode="after")
+    def _a_retry_runs_on_the_model_it_names(self) -> CodeTurnRequest:
+        """Refuse a retry line on a turn that would not run on ``model``.
+
+        The receipt says "blocked on X, redone on Y by the owner's choice", and Y is ``model``. A
+        fused turn ignores ``model`` (``FusionEngine.complete`` answers with its panel and judge,
+        the very ones that may have refused), and an external agent picks its own; either way the
+        line would name a model that never answered. Refused rather than quietly un-fused: the
+        desktop sends neither with a retry, so a request that does is not one this endpoint can
+        honour as written, and saying so beats running something else under the owner's name.
+        """
+        if self.retry_of is not None and (self.fuse or (self.provider or "").strip()):
+            raise ValueError("a retry of a refused turn runs on one native model: no fuse, no provider")
+        return self
 
 
 def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:

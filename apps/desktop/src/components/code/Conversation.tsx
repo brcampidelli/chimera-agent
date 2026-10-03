@@ -184,6 +184,8 @@ interface Exchange {
   blocked?: PolicyBlockInfo;
   /** The attachment ids this turn was sent with, so a retry of it sends the same files. */
   attachments?: string[];
+  /** The owner's retry of a refusal: one native model, never fused, whatever the composer says. */
+  policyRetry?: boolean;
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
@@ -1185,11 +1187,28 @@ export function Conversation({
       setAttached([]);
     }
     const files = retry ? retry.attachments : attached.map((a) => a.id);
+    // A retry of a refusal runs on the ONE model the owner picked, whatever the composer is set to.
+    // With Fusion on, the server swaps the backend for the fusion engine, whose `complete` ignores
+    // `model` by design: the retry went to the same panel and judge that refused, and its receipt
+    // said "redone on fusion by the owner's choice". An external agent picks its own model the same
+    // way. So the retry is a plain native turn, and the composer's switches stay as they were for
+    // the next message.
+    const turnFuse = retry ? false : fuse;
+    const turnProvider = retry ? "" : provider;
     setBusy(true);
     turnStartedAtRef.current = Date.now();
     setExchanges((prev) => [
       ...prev,
-      { you: message, answer: "", tools: [], edits: [], todos: [], done: null, attachments: files },
+      {
+        you: message,
+        answer: "",
+        tools: [],
+        edits: [],
+        todos: [],
+        done: null,
+        attachments: files,
+        ...(retry ? { policyRetry: true } : {}),
+      },
     ]);
     let touchedFiles = false;
     // Measured from the send, not from the first token: what the person walked away from is the
@@ -1236,7 +1255,7 @@ export function Conversation({
         // one place — a request carrying the reach without this asks for tools it cannot use.
         allow_host_exec: posture.reach === "workspace_shell",
         profile,
-        fuse,
+        fuse: turnFuse,
         plan_gate: planGate,
         // The message was heard, not read, and the answer will be read back: the model is told to
         // answer for the ear, and asked not to think before it does — measured, the thinking is
@@ -1246,15 +1265,15 @@ export function Conversation({
         ...(spoken ? { spoken: true, thinking: false } : {}),
         // Only with `fuse`: a cast on a turn that is not fused would be a second, invisible way to
         // pick a model. Omitted rather than sent empty, so an unchosen role stays the install's.
-        ...(fuse && cast.panel.length ? { fusion_panel: cast.panel } : {}),
-        ...(fuse && cast.judge ? { fusion_judge: cast.judge } : {}),
-        ...(fuse && cast.synthesizer
+        ...(turnFuse && cast.panel.length ? { fusion_panel: cast.panel } : {}),
+        ...(turnFuse && cast.judge ? { fusion_judge: cast.judge } : {}),
+        ...(turnFuse && cast.synthesizer
           ? { fusion_synthesizer: cast.synthesizer }
           : {}),
         // "" means Chimera's own loop, and the field is omitted rather than sent empty — an empty
         // string is a value the server would have to special-case, and a caller that never heard of
         // providers must send exactly what it sent before.
-        ...(provider ? { provider } : {}),
+        ...(turnProvider ? { provider: turnProvider } : {}),
         // Same rule, one line later: no model chosen is the field ABSENT, which is what makes the
         // server fall back to `CHIMERA_DEFAULT_MODEL`. Sent per turn because the agent is rebuilt
         // from this request each time — and because the picker is allowed to change mid-conversation,
@@ -1758,7 +1777,7 @@ export function Conversation({
               {busy && i === exchanges.length - 1 && !e.answer && !e.done && !e.failed ? (
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {fuse ? t("code.chat.workingFused") : t("code.chat.working")}
+                  {fuse && !e.policyRetry ? t("code.chat.workingFused") : t("code.chat.working")}
                 </p>
               ) : null}
               {e.answer ? (
