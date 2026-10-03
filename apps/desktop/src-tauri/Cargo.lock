@@ -464,7 +464,7 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "chimera-desktop"
-version = "0.64.1"
+version = "0.64.2"
 dependencies = [
  "open",
  "serde",
