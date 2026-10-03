@@ -1,6 +1,10 @@
 {
   "_why": "Translated DISPLAY text for the skill cards: the description, the five body sections, and the trigger chips.\n\nNone of it is the payload. SKILL.md stays byte-identical, so the SHA-256 published on the page still attests to the exact bytes the CLI imports and the agent reads at runtime. The agent always reads the English; a translation lives beside the card and never in place of it. What the page owes the reader in exchange is to say so, which it does.\n\nEvery block declares the source_sha256 of the English it was made from, so a translation of text that has since changed falls back to English instead of being shown as current. The unit of that hash is deliberate: a description hashes alone, the five sections hash as one joined body, and the triggers hash as one joined list — a card that gains a section or a trigger retires all of its siblings together, because a page mixing a current Trigger with a stale Avoid gives the reader no way to tell which is which.\n\nAn earlier version of this note read \"descriptions, and only the descriptions\" and argued the body could never be translated. That was true of the mechanism at the time, not of the rule it appealed to.",
   "descriptions": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "1332545277d5c614ca3ed747ec5f6132abb43778aba651e91d1a9e466a0b6c1c",
+      "text": "Verifica la documentazione attuale del fornitore prima di registrare identificatore, prezzo, limite o capacità del modello."
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2",
       "text": "Un generatore che va in crash ti dice che ha fallito; uno che produce output plausibile non ti dice nulla. Verifica ciò che ha trovato, mai che è stato eseguito."
@@ -99,6 +103,14 @@
     }
   },
   "sections": {
+    "check-the-provider-before-you-catalog": {
+      "Trigger": "Stai modificando un catalogo di modelli. Identificatori, prezzi, limiti, modalità e strumenti possono cambiare indipendentemente.",
+      "Do": "Leggi la documentazione ufficiale dei modelli e dei prezzi; registra URL e data di verifica. Usa l’identificatore esatto. Mantieni prezzi o limiti sconosciuti come `None`. Controlla duplicati e invarianti. Se la fonte è ambigua, lascia la voce invariata e chiedi.",
+      "Avoid": "Non sostituire i dati verificati del fornitore con nomi commerciali, prezzi di terzi o capacità di un altro modello.",
+      "Check": "Esegui i test del catalogo e ispeziona la voce tramite CLI. I campi non vuoti, da soli, non ne provano la correttezza.",
+      "Risk": "La documentazione può cambiare dopo il merge. URL e date rendono tracciabili gli aggiornamenti, senza garantire la precisione futura.",
+      "source_sha256": "959c8c82b7809afd2a5b4e0e67d326f60fb1c34008fd2424d7ca0ec6073cfb78"
+    },
     "assert-what-the-generator-found": {
       "Avoid": "`assert build()` — passa anche quando il generatore restituisce una lista vuota, una lista\nparziale, o una lista in cui ogni elemento è del tipo sbagliato in modo subdolo.\n\nEvita anche di fidarti di `isinstance` quando attraversi una struttura di terze parti. Le librerie\nvendorizzano le proprie dipendenze: un `TyperGroup` non è un'istanza del `click.Group` importato dal\ntuo file, perché Typer distribuisce una propria copia di Click. Chiediti se l'oggetto *ha* ciò di cui\nhai bisogno — una mappa `commands`, un metodo `items` — piuttosto che quale classe dichiara di\nessere. Il duck-typing sopravvive a una dipendenza vendorizzata e a un major version bump; un\ncontrollo di classe non sopravvive a nessuno dei due, e fallisce classificando male anziché\nsollevando un errore.",
       "Check": "Rompi il generatore di proposito e osserva il test fallire. Commenta la ricorsione nei\nsottocomandi, oppure fai in modo che il controllo di tipo rifiuti tutto, e lancia la suite.\n\nSe la suite passa comunque, il test verifica solo che il generatore sia stato eseguito, e hai\nscritto esattamente il test che questa skill esiste per evitare.",
@@ -293,6 +305,15 @@
     }
   },
   "triggers": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "f5f410f476ccf8d5b990159cd6a72ab1cfdfee486b9176c83c6f7031d078980e",
+      "text": [
+        "aggiunta di un modello al catalogo del fornitore",
+        "aggiornamento dei prezzi o delle finestre di contesto",
+        "il fornitore ha rinominato un modello",
+        "una voce del catalogo sembra obsoleta"
+      ]
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "f1c6556d0db88b15fe341dd2a55b5b8e029159c35107063139b91ae998d52259",
       "text": [

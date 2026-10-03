@@ -1,6 +1,10 @@
 {
   "_why": "Translated DISPLAY text for the skill cards: the description, the five body sections, and the trigger chips.\n\nNone of it is the payload. SKILL.md stays byte-identical, so the SHA-256 published on the page still attests to the exact bytes the CLI imports and the agent reads at runtime. The agent always reads the English; a translation lives beside the card and never in place of it. What the page owes the reader in exchange is to say so, which it does.\n\nEvery block declares the source_sha256 of the English it was made from, so a translation of text that has since changed falls back to English instead of being shown as current. The unit of that hash is deliberate: a description hashes alone, the five sections hash as one joined body, and the triggers hash as one joined list — a card that gains a section or a trigger retires all of its siblings together, because a page mixing a current Trigger with a stale Avoid gives the reader no way to tell which is which.\n\nAn earlier version of this note read \"descriptions, and only the descriptions\" and argued the body could never be translated. That was true of the mechanism at the time, not of the rule it appealed to.",
   "descriptions": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "1332545277d5c614ca3ed747ec5f6132abb43778aba651e91d1a9e466a0b6c1c",
+      "text": "记录模型标识符、价格、限制或能力前，先核实提供方的最新文档。"
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2",
       "text": "会崩溃的生成器告诉你它失败了；输出看似合理的生成器什么也没告诉你。测试它找到了什么，而不是它跑过了。"
@@ -99,6 +103,14 @@
     }
   },
   "sections": {
+    "check-the-provider-before-you-catalog": {
+      "Trigger": "你正在修改模型目录。标识符、价格、限制、模态和工具支持可能各自独立变化。",
+      "Do": "阅读模型和价格的官方文档，记录网址及核查日期。使用精确的标识符。未知价格或限制保留为 `None`。检查重复项并运行不变量测试。来源含糊时不要修改条目，应先提问。",
+      "Avoid": "不要用营销名称、第三方价格或其他模型的能力替代已核实的提供方事实。",
+      "Check": "运行目录测试并通过 CLI 检查条目。字段非空本身不能证明正确性。",
+      "Risk": "合并后提供方文档仍可能变化。网址和核查日期让后续更新可追溯，但不保证未来的准确性。",
+      "source_sha256": "959c8c82b7809afd2a5b4e0e67d326f60fb1c34008fd2424d7ca0ec6073cfb78"
+    },
     "assert-what-the-generator-found": {
       "Avoid": "`assert build()`——当生成器（generator）返回空列表、部分列表，或者列表中每一项都是某种微妙的错误类型时，它照样会通过。\n\n在遍历第三方结构时，也要避免信任 `isinstance`。库会内置（vendor）自己的依赖：`TyperGroup` 并不是你文件里导入的那个 `click.Group` 的实例，因为 Typer 自带了一份 Click 的副本。应该问对象是否*拥有*你需要的东西——一个 `commands` 映射、一个 `items` 方法——而不是它声称自己是什么类。duck-typing 能扛得住内置依赖和大版本升级；类型检查两样都扛不住，而且失败的方式是误分类，而不是抛出异常。",
       "Check": "故意弄坏生成器（generator），看测试是否会失败。把递归进入子命令的部分注释掉，或者让类型检查拒绝一切，然后跑一遍测试套件。\n\n如果测试套件依然通过，那这个测试断言的只是\"生成器跑过了\"，而你写出的正是这条技能要防止的那种测试。",
@@ -293,6 +305,15 @@
     }
   },
   "triggers": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "f5f410f476ccf8d5b990159cd6a72ab1cfdfee486b9176c83c6f7031d078980e",
+      "text": [
+        "向提供方目录添加模型",
+        "更新模型价格或上下文窗口",
+        "提供方重命名了模型",
+        "目录条目似乎已过时"
+      ]
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "f1c6556d0db88b15fe341dd2a55b5b8e029159c35107063139b91ae998d52259",
       "text": [

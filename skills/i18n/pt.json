@@ -1,6 +1,10 @@
 {
   "_why": "Translated DISPLAY text for the skill cards: the description, the five body sections, and the trigger chips.\n\nNone of it is the payload. SKILL.md stays byte-identical, so the SHA-256 published on the page still attests to the exact bytes the CLI imports and the agent reads at runtime. The agent always reads the English; a translation lives beside the card and never in place of it. What the page owes the reader in exchange is to say so, which it does.\n\nEvery block declares the source_sha256 of the English it was made from, so a translation of text that has since changed falls back to English instead of being shown as current. The unit of that hash is deliberate: a description hashes alone, the five sections hash as one joined body, and the triggers hash as one joined list — a card that gains a section or a trigger retires all of its siblings together, because a page mixing a current Trigger with a stale Avoid gives the reader no way to tell which is which.\n\nAn earlier version of this note read \"descriptions, and only the descriptions\" and argued the body could never be translated. That was true of the mechanism at the time, not of the rule it appealed to.",
   "descriptions": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "1332545277d5c614ca3ed747ec5f6132abb43778aba651e91d1a9e466a0b6c1c",
+      "text": "Verifique a documentação atual do provedor antes de registrar identificador, preço, limite ou capacidade do modelo."
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2",
       "text": "Um gerador que quebra avisa que falhou; um que emite saída plausível não avisa nada. Teste o que ele encontrou, nunca que ele rodou."
@@ -99,6 +103,14 @@
     }
   },
   "sections": {
+    "check-the-provider-before-you-catalog": {
+      "Trigger": "Você está alterando um catálogo de modelos. Identificadores, preços, limites, modalidades e ferramentas podem mudar independentemente.",
+      "Do": "Leia a documentação oficial de modelos e preços; registre a URL e a data da verificação. Use o identificador exato. Mantenha preços ou limites desconhecidos como `None`. Verifique duplicatas e invariantes. Se a fonte for ambígua, deixe a entrada intacta e pergunte.",
+      "Avoid": "Não substitua dados verificados do provedor por nomes comerciais, preços de terceiros ou capacidades de outro modelo.",
+      "Check": "Execute os testes do catálogo e inspecione a entrada pela CLI. Campos não vazios, sozinhos, não comprovam a correção.",
+      "Risk": "A documentação pode mudar após o merge. URLs e datas permitem rastrear atualizações, mas não garantem a precisão futura.",
+      "source_sha256": "959c8c82b7809afd2a5b4e0e67d326f60fb1c34008fd2424d7ca0ec6073cfb78"
+    },
     "assert-what-the-generator-found": {
       "Avoid": "`assert build()` — passa quando o gerador retorna uma lista vazia, uma lista parcial, ou uma lista\nem que cada item é sutilmente do tipo errado.\n\nEvite também confiar em `isinstance` ao percorrer uma estrutura de terceiros. Bibliotecas\nempacotam suas próprias dependências (vendoring): um `TyperGroup` não é uma instância do\n`click.Group` que seu arquivo importou, porque o Typer distribui sua própria cópia do Click.\nPergunte se o objeto *tem* o que você precisa — um mapeamento `commands`, um método `items` — em\nvez de qual classe ele afirma ser. Duck-typing sobrevive a uma dependência vendorizada e a um bump\nde versão major; uma checagem de classe não sobrevive a nenhum dos dois, e falha classificando\nerrado em vez de levantar um erro.",
       "Check": "Quebre o gerador de propósito e observe o teste falhar. Comente a recursão nos subcomandos, ou\nfaça a checagem de tipo rejeitar tudo, e rode a suíte.\n\nSe a suíte ainda passar, o teste está apenas afirmando que o gerador rodou, e você escreveu\nexatamente o teste que esta skill existe para prevenir.",
@@ -293,6 +305,15 @@
     }
   },
   "triggers": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "f5f410f476ccf8d5b990159cd6a72ab1cfdfee486b9176c83c6f7031d078980e",
+      "text": [
+        "adicionar um modelo ao catálogo do provedor",
+        "atualizar preços ou janelas de contexto",
+        "o provedor renomeou um modelo",
+        "uma entrada do catálogo parece desatualizada"
+      ]
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "f1c6556d0db88b15fe341dd2a55b5b8e029159c35107063139b91ae998d52259",
       "text": [

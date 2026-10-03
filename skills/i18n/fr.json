@@ -1,6 +1,10 @@
 {
   "_why": "Translated DISPLAY text for the skill cards: the description, the five body sections, and the trigger chips.\n\nNone of it is the payload. SKILL.md stays byte-identical, so the SHA-256 published on the page still attests to the exact bytes the CLI imports and the agent reads at runtime. The agent always reads the English; a translation lives beside the card and never in place of it. What the page owes the reader in exchange is to say so, which it does.\n\nEvery block declares the source_sha256 of the English it was made from, so a translation of text that has since changed falls back to English instead of being shown as current. The unit of that hash is deliberate: a description hashes alone, the five sections hash as one joined body, and the triggers hash as one joined list — a card that gains a section or a trigger retires all of its siblings together, because a page mixing a current Trigger with a stale Avoid gives the reader no way to tell which is which.\n\nAn earlier version of this note read \"descriptions, and only the descriptions\" and argued the body could never be translated. That was true of the mechanism at the time, not of the rule it appealed to.",
   "descriptions": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "1332545277d5c614ca3ed747ec5f6132abb43778aba651e91d1a9e466a0b6c1c",
+      "text": "Vérifiez la documentation actuelle du fournisseur avant de saisir un identifiant, un prix, une limite ou une capacité du modèle."
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2",
       "text": "Un générateur qui plante vous dit qu'il a échoué ; un qui produit une sortie plausible ne vous dit rien. Testez ce qu'il a trouvé, jamais qu'il s'est exécuté."
@@ -99,6 +103,14 @@
     }
   },
   "sections": {
+    "check-the-provider-before-you-catalog": {
+      "Trigger": "Vous modifiez un catalogue de modèles. Identifiants, prix, limites, modalités et outils peuvent évoluer indépendamment.",
+      "Do": "Lisez la documentation officielle des modèles et des tarifs ; notez son URL et la date de vérification. Utilisez l’identifiant exact. Gardez les prix ou limites inconnus à `None`. Vérifiez les doublons et les invariants. Si la source est ambiguë, laissez l’entrée inchangée et posez la question.",
+      "Avoid": "Ne remplacez pas les faits vérifiés par des noms commerciaux, des prix tiers ou les capacités d’un autre modèle.",
+      "Check": "Exécutez les tests du catalogue et inspectez l’entrée via la CLI. Des champs non vides ne prouvent pas à eux seuls son exactitude.",
+      "Risk": "La documentation peut changer après fusion. Les URL et dates rendent les mises à jour traçables, sans garantir l’exactitude future.",
+      "source_sha256": "959c8c82b7809afd2a5b4e0e67d326f60fb1c34008fd2424d7ca0ec6073cfb78"
+    },
     "assert-what-the-generator-found": {
       "Avoid": "`assert build()` — cela passe même si le générateur renvoie une liste vide, une liste partielle, ou une liste\ndont chaque élément est subtilement du mauvais type.\n\nMéfiez-vous aussi de `isinstance` lorsque vous parcourez une structure tierce. Les bibliothèques embarquent leurs\npropres dépendances : un `TyperGroup` n'est pas une instance du `click.Group` que votre fichier a importé, parce que\nTyper embarque sa propre copie de Click. Demandez-vous si l'objet *possède* ce dont vous avez besoin — un mapping\n`commands`, une méthode `items` — plutôt que de quelle classe il prétend relever. Le duck-typing survit à une\ndépendance embarquée et à un changement de version majeure ; une vérification de classe ne survit à aucun des deux, et échoue en\nmisclassifiant plutôt qu'en levant une exception.",
       "Check": "Cassez le générateur exprès et observez l'échec du test. Commentez la récursion dans les\nsous-commandes, ou faites en sorte que la vérification de type rejette tout, puis lancez la suite.\n\nSi la suite passe quand même, le test se contente de vérifier que le générateur s'est exécuté, et vous avez écrit le test\nque cette skill existe précisément pour empêcher.",
@@ -293,6 +305,15 @@
     }
   },
   "triggers": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "f5f410f476ccf8d5b990159cd6a72ab1cfdfee486b9176c83c6f7031d078980e",
+      "text": [
+        "ajout d’un modèle au catalogue du fournisseur",
+        "mise à jour des prix ou fenêtres de contexte",
+        "le fournisseur a renommé un modèle",
+        "une entrée du catalogue semble périmée"
+      ]
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "f1c6556d0db88b15fe341dd2a55b5b8e029159c35107063139b91ae998d52259",
       "text": [

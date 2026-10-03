@@ -1,6 +1,10 @@
 {
   "_why": "Translated DISPLAY text for the skill cards: the description, the five body sections, and the trigger chips.\n\nNone of it is the payload. SKILL.md stays byte-identical, so the SHA-256 published on the page still attests to the exact bytes the CLI imports and the agent reads at runtime. The agent always reads the English; a translation lives beside the card and never in place of it. What the page owes the reader in exchange is to say so, which it does.\n\nEvery block declares the source_sha256 of the English it was made from, so a translation of text that has since changed falls back to English instead of being shown as current. The unit of that hash is deliberate: a description hashes alone, the five sections hash as one joined body, and the triggers hash as one joined list — a card that gains a section or a trigger retires all of its siblings together, because a page mixing a current Trigger with a stale Avoid gives the reader no way to tell which is which.\n\nAn earlier version of this note read \"descriptions, and only the descriptions\" and argued the body could never be translated. That was true of the mechanism at the time, not of the rule it appealed to.",
   "descriptions": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "1332545277d5c614ca3ed747ec5f6132abb43778aba651e91d1a9e466a0b6c1c",
+      "text": "モデルの識別子、価格、制限、機能を記録する前に、提供元の最新ドキュメントを確認します。"
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "059b66d7e09a1aa6ce2b31647672f3c724dbafb4d8b75c1b599d79c0762823f2",
       "text": "クラッシュするジェネレーターは失敗したと教えてくれますが、もっともらしい出力を返すものは何も教えてくれません。実行されたことではなく、何を見つけたかをテストしてください。"
@@ -99,6 +103,14 @@
     }
   },
   "sections": {
+    "check-the-provider-before-you-catalog": {
+      "Trigger": "モデルカタログを変更しています。識別子、価格、制限、モダリティ、ツール対応はそれぞれ独立して変わる可能性があります。",
+      "Do": "モデルと価格の公式ドキュメントを読み、URLと確認日を記録します。正確な識別子を使います。不明な価格や制限は `None` のままにします。重複と不変条件をテストします。情報が曖昧なら項目を変更せず質問します。",
+      "Avoid": "検証済みの提供元の情報を、宣伝上の名前、第三者の価格、別モデルの機能で置き換えないでください。",
+      "Check": "カタログのテストを実行し、CLIで項目を確認します。フィールドが空でないだけでは正確さを証明できません。",
+      "Risk": "マージ後に公式情報が変わる可能性があります。URLと確認日で更新を追跡できますが、将来の正確さを保証するものではありません。",
+      "source_sha256": "959c8c82b7809afd2a5b4e0e67d326f60fb1c34008fd2424d7ca0ec6073cfb78"
+    },
     "assert-what-the-generator-found": {
       "Avoid": "`assert build()` ——これはジェネレーターが空のリスト、一部だけのリスト、あるいは項目ごとに微妙に間違った種類が混ざったリストを返しても通ってしまう。\n\nサードパーティの構造をたどる際に `isinstance` を信頼するのも避けること。ライブラリは依存関係を自前にバンドルすることがある。`TyperGroup` はファイルがインポートした `click.Group` のインスタンスではない、なぜなら Typer は Click の独自コピーを同梱しているからだ。オブジェクトが名乗っているクラスが何かではなく、必要なもの——`commands` マッピング、`items` メソッド——を*持っているか*を問うこと。duck-typing はバンドルされた依存関係やメジャーバージョンアップを乗り越えるが、クラスチェックはどちらも乗り越えられず、例外を出すのではなく誤分類という形で失敗する。",
       "Check": "意図的にジェネレーターを壊し、テストが失敗するのを確認する。サブコマンドへの再帰処理をコメントアウトするか、型チェックがすべてを拒否するようにして、スイートを実行する。\n\nそれでもスイートが通ってしまうなら、そのテストは「ジェネレーターが実行された」ことしか検証していない——このスキルが防ごうとしているまさにそのテストを書いてしまったということだ。",
@@ -293,6 +305,15 @@
     }
   },
   "triggers": {
+    "check-the-provider-before-you-catalog": {
+      "source_sha256": "f5f410f476ccf8d5b990159cd6a72ab1cfdfee486b9176c83c6f7031d078980e",
+      "text": [
+        "提供元のカタログにモデルを追加する",
+        "モデルの価格やコンテキスト長を更新する",
+        "提供元がモデル名を変更した",
+        "カタログの項目が古く見える"
+      ]
+    },
     "assert-what-the-generator-found": {
       "source_sha256": "f1c6556d0db88b15fe341dd2a55b5b8e029159c35107063139b91ae998d52259",
       "text": [
