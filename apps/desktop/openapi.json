@@ -904,6 +904,11 @@
           "cron": {
             "title": "Cron",
             "type": "boolean"
+          },
+          "notify_failures": {
+            "default": true,
+            "title": "Notify Failures",
+            "type": "boolean"
           }
         },
         "required": [
@@ -2612,6 +2617,9 @@
           "cache": {
             "$ref": "#/components/schemas/CacheCfgOut"
           },
+          "conversations": {
+            "$ref": "#/components/schemas/ConversationsCfgOut"
+          },
           "decisions": {
             "$ref": "#/components/schemas/DecisionsCfgOut"
           },
@@ -2742,6 +2750,24 @@
           }
         },
         "title": "ConflictOut",
+        "type": "object"
+      },
+      "ConversationsCfgOut": {
+        "description": "``CHIMERA_ARCHIVE_AFTER_DAYS``: archive a coding conversation left alone this many days.\n\n``None`` is never, the shipped state. Archiving is a timestamp beside the transcripts; the rule\nnever archives one with a turn running, a question waiting, unfinished background work or an\nopen share link (``chimera/api/conversation_state.py``).",
+        "properties": {
+          "archive_after_days": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Archive After Days"
+          }
+        },
+        "title": "ConversationsCfgOut",
         "type": "object"
       },
       "CrewDoneOut": {
@@ -9559,6 +9585,124 @@
         "title": "SharesOut",
         "type": "object"
       },
+      "ShellPrefsIn": {
+        "additionalProperties": false,
+        "description": "The switches to change. An absent field is left as it is; the chord is not writable here.",
+        "properties": {
+          "call_attention": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Call Attention"
+          },
+          "keep_in_tray": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keep In Tray"
+          },
+          "quick_entry": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quick Entry"
+          },
+          "start_at_sign_in": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At Sign In"
+          }
+        },
+        "title": "ShellPrefsIn",
+        "type": "object"
+      },
+      "ShellPrefsOut": {
+        "description": "The desktop shell's own switches, as the shell reads them (``chimera/api/shell_prefs.py``).\n\n``available`` is false on a server the desktop app did not start: there is no tray to change.\n``start_at_sign_in`` is the operating system's answer as the shell last reported it, ``None``\nwhile unknown; ``sign_in_requested`` is a change asked for and not yet carried out.",
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "call_attention": {
+            "default": true,
+            "title": "Call Attention",
+            "type": "boolean"
+          },
+          "keep_in_tray": {
+            "default": false,
+            "title": "Keep In Tray",
+            "type": "boolean"
+          },
+          "problem": {
+            "default": "",
+            "title": "Problem",
+            "type": "string"
+          },
+          "quick_entry": {
+            "default": false,
+            "title": "Quick Entry",
+            "type": "boolean"
+          },
+          "quick_entry_chord": {
+            "default": "",
+            "title": "Quick Entry Chord",
+            "type": "string"
+          },
+          "sign_in_requested": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sign In Requested"
+          },
+          "start_at_sign_in": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start At Sign In"
+          },
+          "unreadable": {
+            "default": false,
+            "title": "Unreadable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available"
+        ],
+        "title": "ShellPrefsOut",
+        "type": "object"
+      },
       "SkillStatOut": {
         "properties": {
           "kind": {
@@ -10607,6 +10751,48 @@
           "support"
         ],
         "title": "VisionOut",
+        "type": "object"
+      },
+      "WeeklyReviewIn": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "WeeklyReviewIn",
+        "type": "object"
+      },
+      "WeeklyReviewOut": {
+        "description": "The weekly-review job (``chimera/scheduler/weekly_review.py``) as the Settings row shows it.\n\n``proposed`` is false until the job exists. ``posts_to`` is the destination's host only \u2014 the\nURL is a credential \u2014 and empty while the result goes to the results log alone.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "job_id": {
+            "default": "",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "posts_to": {
+            "default": "",
+            "title": "Posts To",
+            "type": "string"
+          },
+          "proposed": {
+            "title": "Proposed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "proposed"
+        ],
+        "title": "WeeklyReviewOut",
         "type": "object"
       },
       "WorkActionOut": {
@@ -13346,6 +13532,60 @@
           }
         },
         "summary": "Cron Silence"
+      }
+    },
+    "/api/cron/weekly-review": {
+      "get": {
+        "operationId": "get_weekly_review_api_cron_weekly_review_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Weekly Review"
+      },
+      "put": {
+        "operationId": "put_weekly_review_api_cron_weekly_review_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WeeklyReviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyReviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Weekly Review"
       }
     },
     "/api/cron/{job_id}": {
@@ -16390,6 +16630,60 @@
           }
         },
         "summary": "Get Session"
+      }
+    },
+    "/api/shell/prefs": {
+      "get": {
+        "operationId": "read_shell_prefs_endpoint_api_shell_prefs_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellPrefsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Read Shell Prefs Endpoint"
+      },
+      "patch": {
+        "operationId": "patch_shell_prefs_endpoint_api_shell_prefs_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShellPrefsIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShellPrefsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Shell Prefs Endpoint"
       }
     },
     "/api/skills": {

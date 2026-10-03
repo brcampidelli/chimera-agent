@@ -463,6 +463,12 @@ fn start_sidecar(paths: &Paths, wanted: u16, budget: Budget) -> Result<Backend, 
         .arg(&port_file)
         .env("CHIMERA_HOME", data_dir.join("data"))
         .env("CHIMERA_WORKSPACE", &workspace_dir)
+        // The tray's switches, so the Settings screen can change them too. The window has no IPC
+        // and keeps none (`capabilities/default.json`), so the screen asks the backend, and the
+        // backend needs to be told where this process keeps them — it cannot guess: the data dir
+        // is a Tauri path, and a backend started by anything else has no shell to talk to.
+        .env("CHIMERA_SHELL_PREFS", prefs::prefs_path(&data_dir))
+        .env("CHIMERA_SHELL_STATE", prefs::state_path(&data_dir))
         // The backend inherits no stdin, because there is nobody on the other end of it. Inherited,
         // and combined with the CREATE_NO_WINDOW below, Windows hands the child a console with no
         // window: `isatty()` reports a terminal, the host-exec gate believes it, and the first
@@ -1877,6 +1883,45 @@ mod tests {
         assert!(dir.join("workspace").is_dir(), "and it has to exist before the backend looks");
     }
 
+    /// The Settings screen reaches the tray's switches through the backend, so the backend has to
+    /// be handed the two files by name: the preferences this process reads, and the report it
+    /// writes. Without them the screen's rows say "only in the desktop app" — inside the app.
+    #[test]
+    fn the_backend_is_told_where_the_shell_keeps_its_switches() {
+        let dir = scratch("shell-prefs-env");
+        let listener = TcpListener::bind("127.0.0.1:0").expect("a port to pretend on");
+        let url = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let seen = dir.join("seen.txt");
+        let exe = dir.join(if cfg!(windows) { "backend.cmd" } else { "backend.sh" });
+        let body = if cfg!(windows) {
+            format!(
+                ">\"{}\" echo %CHIMERA_SHELL_PREFS%^|%CHIMERA_SHELL_STATE%\r\n>\"%~5\" echo {url}\r\nexit /b 0\r\n",
+                seen.display()
+            )
+        } else {
+            format!(
+                "#!/bin/sh\necho \"$CHIMERA_SHELL_PREFS|$CHIMERA_SHELL_STATE\" > \"{}\"\necho '{url}' > \"$5\"\nexit 0\n",
+                seen.display()
+            )
+        };
+        std::fs::write(&exe, body).expect("write the stand-in backend");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let paths = Paths { exe, data_dir: dir.clone(), port_file: dir.join("port.txt") };
+
+        let mut backend =
+            start_sidecar(&paths, 0, quick(Tuning::default()).budget).expect("it came up");
+        let _ = backend.child.wait();
+
+        let got = std::fs::read_to_string(&seen).expect("the stand-in recorded its environment");
+        let (prefs_file, state_file) = got.trim().split_once('|').expect("two paths");
+        assert_eq!(Path::new(prefs_file.trim()), crate::prefs::prefs_path(&dir), "the preferences file");
+        assert_eq!(Path::new(state_file.trim()), crate::prefs::state_path(&dir), "the report file");
+    }
+
     #[test]
     fn a_process_that_exited_reads_as_gone() {
         let mut backend = backend_of(dead_process(), "http://127.0.0.1:1");
@@ -2593,6 +2638,9 @@ struct Shell {
     /// the session: the save after it succeeds, and clearing the line then would hide where the
     /// person's edit went one click after saying it.
     prefs_set_aside: Mutex<Option<String>>,
+    /// The preferences file's modification time when it was last taken in, so the watcher parses
+    /// it only when something — the Settings screen, a hand edit — changed it.
+    prefs_seen: Mutex<Option<std::time::SystemTime>>,
 }
 
 impl Shell {
@@ -2613,14 +2661,24 @@ struct Tray {
     status_shown: AtomicBool,
     autostart: CheckMenuItem<tauri::Wry>,
     quick_entry: CheckMenuItem<tauri::Wry>,
+    /// Set again when the Settings screen changes the file: a tick left on a switch the screen
+    /// turned off would be the tray contradicting the screen.
+    keep_in_tray: CheckMenuItem<tauri::Wry>,
+    attention: CheckMenuItem<tauri::Wry>,
 }
 
-/// Put the current problems in the menu, or take the line out when there are none.
+/// Put the current problems in the menu, or take the line out when there are none — and tell the
+/// Settings screen the same thing, with the operating system's answer for sign-in beside it.
 fn show_problems(app: &tauri::AppHandle) {
     let (Some(shell), Some(tray)) = (app.try_state::<Arc<Shell>>(), app.try_state::<Tray>()) else {
         return;
     };
     let line = shell.problems.lock().ok().and_then(|p| p.line());
+    // Every change of the line passes here, and so does every sign-in change (`apply_autostart`
+    // reports through `set_problem`), so this is the one place the report can be kept current. A
+    // report that does not write is not said in the tray: the tray is the place it would be said
+    // in, and the screen's own row falls back to "unknown" without it.
+    let _ = prefs::save_state(&shell.data_dir, app.autolaunch().is_enabled().ok(), line.as_deref());
     match line {
         Some(text) => {
             let _ = tray.status.set_text(&text);
@@ -2649,6 +2707,9 @@ fn set_problem(app: &tauri::AppHandle, pick: impl FnOnce(&mut Problems) -> &mut 
 /// still takes effect for this session, and the person learns it will not survive a restart. A
 /// broken file that the write had to move aside is said too, with where it went.
 fn change_prefs(app: &tauri::AppHandle, edit: impl FnOnce(&mut Prefs)) {
+    // What the Settings screen wrote since the last tick first: this save writes the whole file,
+    // and from a copy that predates the screen's change it would put the old switch back.
+    sync_prefs_from_file(app);
     let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
     let saved = match shell.prefs.lock() {
         Ok(mut prefs) => {
@@ -2670,6 +2731,57 @@ fn change_prefs(app: &tauri::AppHandle, edit: impl FnOnce(&mut Prefs)) {
         Ok(None) => shell.prefs_set_aside.lock().ok().and_then(|kept| kept.clone()),
     };
     set_problem(app, |p| &mut p.prefs, problem);
+}
+
+/// Take in what the preferences file says when it changed since the last look, and act on it.
+///
+/// The file has a second writer now: the Settings screen, through the backend. Without this the
+/// shell would read the file once at startup and the screen's switches would wait for a relaunch
+/// — or worse, be overwritten by the next tray click, which saves the whole file from memory.
+/// Called on the main thread (the watcher posts it there; the tray's own events already run there),
+/// because it re-registers the global chord and sets menu items.
+///
+/// A file that does not parse is reported in the tray and changes nothing in force; it is set aside
+/// only by the next save, as before, so a hand edit is never thrown away by a look.
+fn sync_prefs_from_file(app: &tauri::AppHandle) {
+    let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
+    let stamp = prefs::modified(&shell.data_dir);
+    match shell.prefs_seen.lock() {
+        Ok(mut seen) if *seen != stamp => *seen = stamp,
+        _ => return,
+    }
+    let (disk, problem) = prefs::load(&shell.data_dir);
+    if let Some(why) = problem {
+        set_problem(app, |p| &mut p.prefs, Some(prefs_problem(dialogo(), &shell.data_dir, &why)));
+        return;
+    }
+    // It reads now, so a "does not parse" said about an earlier version of it is no longer true.
+    // The set-aside line stays, for the reason `change_prefs` keeps it.
+    let kept = shell.prefs_set_aside.lock().ok().and_then(|kept| kept.clone());
+    set_problem(app, |p| &mut p.prefs, kept);
+    let adopted = match shell.prefs.lock() {
+        Ok(mut prefs) => prefs::adopt(&mut prefs, disk),
+        Err(_) => return,
+    };
+    if adopted.changed {
+        let now = shell.prefs();
+        if let Some(tray) = app.try_state::<Tray>() {
+            let _ = tray.keep_in_tray.set_checked(now.keep_in_tray);
+            let _ = tray.attention.set_checked(now.call_attention);
+        }
+    }
+    if adopted.quick_changed {
+        apply_quick_entry(app);
+    }
+    if let Some(wanted) = adopted.sign_in {
+        apply_autostart(app, wanted);
+        // The request is carried out; the file loses it, so it is not carried out again. What the
+        // OS answered is in the report `apply_autostart` just wrote, not in this file.
+        let _ = prefs::save(&shell.data_dir, &shell.prefs());
+        if let Ok(mut seen) = shell.prefs_seen.lock() {
+            *seen = prefs::modified(&shell.data_dir);
+        }
+    }
 }
 
 fn prefs_problem(d: &Dialogo, data_dir: &Path, why: &str) -> String {
@@ -2859,6 +2971,11 @@ fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<
         if sidecar.stopping.load(Ordering::SeqCst) {
             return;
         }
+        // A switch the Settings screen flipped, taken in on the main thread — it may re-register
+        // the global chord. Posted rather than waited for: this tick reads what is in force now,
+        // and the next one reads the change.
+        let syncing = app.clone();
+        let _ = app.run_on_main_thread(move || sync_prefs_from_file(&syncing));
         let prefs = shell.prefs();
         let origin = origin.lock().map(|o| o.clone()).unwrap_or_default();
         let token = sidecar_http::token_now();
@@ -3012,6 +3129,9 @@ fn main() {
                     ..Problems::default()
                 }),
                 prefs_set_aside: Mutex::new(None),
+                // Unset, so the watcher's first look takes the file in once more: a sign-in request
+                // the screen wrote just before the app last closed is carried out then.
+                prefs_seen: Mutex::new(None),
             });
             app.manage(Arc::clone(&shell));
 
@@ -3124,6 +3244,8 @@ fn main() {
                 status_shown: AtomicBool::new(false),
                 autostart: iniciar.clone(),
                 quick_entry: atalho.clone(),
+                keep_in_tray: manter.clone(),
+                attention: chamar.clone(),
             });
             // muda ticks a check item before the event arrives, so `is_checked` IS the new wish.
             let keep = manter.clone();
@@ -3562,6 +3684,29 @@ mod tray_tests {
         ] {
             assert!(watch.contains(needle), "the watcher no longer does {needle}");
         }
+    }
+
+    /// The file has two writers — the tray and the Settings screen — so the shell takes it in while
+    /// it runs, not once at startup: the watcher posts the look every tick, a tray click looks
+    /// before it saves the whole file (or it would put back a switch the screen just changed), and
+    /// the report the screen reads is written wherever the tray's line changes.
+    #[test]
+    fn a_switch_saved_from_the_settings_screen_is_taken_in_while_the_app_runs() {
+        let source = production_only();
+        let watch = body_of(&source, concat!("fn watch_for_the_", "tray("));
+        assert!(
+            watch.contains(concat!("run_on_main_thread(move || sync_prefs_from_", "file(&syncing))")),
+            "the watcher no longer looks at the preferences file"
+        );
+        let change = body_of(&source, concat!("fn change_", "prefs("));
+        let look = change.find(concat!("sync_prefs_from_", "file(app);")).expect("change_prefs looks first");
+        let save = change.find(concat!("prefs::", "save(")).expect("change_prefs saves");
+        assert!(look < save, "a tray click saves before taking in the screen's change");
+        let shown = body_of(&source, concat!("fn show_", "problems("));
+        assert!(shown.contains(concat!("prefs::save_", "state(")), "the screen's report is no longer written");
+        let sync = body_of(&source, concat!("fn sync_prefs_from_", "file("));
+        assert!(sync.contains(concat!("apply_auto", "start(app, wanted)")), "a sign-in request is not carried out");
+        assert!(sync.contains(concat!("apply_quick_", "entry(app)")), "a changed chord is not registered again");
     }
 
     /// The rule behind one read of the approval list. In tray mode the window is hidden and the

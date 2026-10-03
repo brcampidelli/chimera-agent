@@ -59,7 +59,7 @@ function config() {
     sandbox: { mode: "local", image: "python:3.12-slim" },
     server: { token_set: false },
     mcp: { autoload: false },
-    automation: { cron: true },
+    automation: { cron: true, notify_failures: true },
     guard: { chat: false },
     providers: PROVIDERS,
     applies: {},

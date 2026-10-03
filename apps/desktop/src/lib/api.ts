@@ -41,6 +41,9 @@ import type {
   MemoryProfile,
   ModelListing,
   KeepAwakeState,
+  ShellPrefs,
+  ShellPrefsChange,
+  WeeklyReview,
   LocalRuntimes,
   NetworkShare,
   ShareInfo,
@@ -164,6 +167,15 @@ export const getConfig = () => json<AppConfig>("/api/config");
 // What the keeper is DOING, as opposed to what the owner chose (that is `getConfig().keep_awake`):
 // `active` is true only while the operating system is actually being asked to stay up.
 export const getKeepAwake = () => json<KeepAwakeState>("/api/keep-awake");
+// The tray's switches. Written by the backend into the file the desktop shell reads, because the
+// window has no IPC to the shell; the shell takes a change in within a few seconds.
+export const getShellPrefs = () => json<ShellPrefs>("/api/shell/prefs");
+export const patchShellPrefs = (change: ShellPrefsChange) =>
+  json<ShellPrefs>("/api/shell/prefs", { method: "PATCH", body: JSON.stringify(change) });
+// The weekly review's switch: on proposes the job if it is not there yet and enables it.
+export const getWeeklyReview = () => json<WeeklyReview>("/api/cron/weekly-review");
+export const putWeeklyReview = (enabled: boolean) =>
+  json<WeeklyReview>("/api/cron/weekly-review", { method: "PUT", body: JSON.stringify({ enabled }) });
 export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 // The agents you send work to. Every call returns the WHOLE registry, so a screen never has
 // to guess what the list looks like after a change it just made.
