@@ -421,8 +421,9 @@ class BrowserTool(Tool):
 
         Without a reach this is ``check_url``, as it always was. With one, the reach's own check (the
         floor, plus a declared local port), and then its site list: a host the list does not name is
-        a question for the person when this surface can ask one (``ask_outside``, the approver the
-        assembly hands every tool with a workspace when a screen is bound), and a refusal when not.
+        a question for the person when this surface can ask one (``ask_outside``: the approver the
+        Code turn hands every tool with a workspace when a screen is bound, and the one the app's
+        guarded chat hands the browser), and a refusal when not.
         """
         from chimera.scrape.ssrf import check_url
 

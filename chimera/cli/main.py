@@ -3045,6 +3045,15 @@ def desktop_app(
             # it — `chat_stream` binds its `emit` per TURN and puts it back, which is the same
             # mismatch `on_turn_start` closes for the ledger below.
             announcer = ApprovalAnnouncer()
+            approver = _owner_allows(live, announcer)
+            # The browser's site list (study 29, P5.2) asks the same person on the same card, as the
+            # Code screen does: a page off the list is a question here, not a refusal. Set on the
+            # BrowserTool itself, before the ledger wraps it — a wrapper would hold the attribute
+            # and the tool would never see it. Only the browser: the file tools' `ask_outside` is a
+            # widening of the project folder this surface was never given.
+            for tool in registry.tools():
+                if getattr(tool, "name", "") == "browser" and getattr(tool, "reach", None) is not None:
+                    tool.ask_outside = approver  # type: ignore[attr-defined]  # BrowserTool reads it by getattr
             # The same file the coding turn writes and the Governance screen reads. One log, or the
             # screen shows a partial history while claiming to show the whole one.
             registry, chat_ledger = guard_chat_registry(
@@ -3055,7 +3064,7 @@ def desktop_app(
                 # `ask` reaches the same durable question. Under `ask` with no screen bound, the
                 # wait resolves to 0 and the question is refused at once, which is what every
                 # non-desktop caller of this session wants.
-                approve=_owner_allows(live, announcer),
+                approve=approver,
             )
         runner = Agent(
             session_backend(),

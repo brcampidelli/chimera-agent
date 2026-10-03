@@ -325,7 +325,8 @@ class Settings(BaseSettings):
     # Where the browser may go (study 29, P5.2; `chimera/tools/browser_reach.py`). Both EMPTY by
     # default, and empty is exactly the browser that shipped before them: any public site, no loopback.
     # `CHIMERA_BROWSER_SITES` (hosts and `*.domain`, comma-separated) only narrows: a top-level page
-    # off the list asks a person, and is refused where nobody can be asked.
+    # off the list asks a person on the Code screen and in the app's chat (the card both already
+    # draw), and is refused where nobody can be asked: the CLI, the TUI, the bots, an unguarded chat.
     # `CHIMERA_BROWSER_LOCAL_PORTS` widens by one thing: localhost / 127.0.0.1 / [::1] on a port
     # listed here, so the agent can look at the dev server it is changing — never a port Chimera
     # itself serves on (the app's API answers approvals), never a private network or metadata.
