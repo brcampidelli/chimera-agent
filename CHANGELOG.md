@@ -6,8 +6,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **Every chat bot answers only the ids its owner listed** (#746). The Discord, Telegram, Slack and Signal adapters
+  accepted an allowlist and nothing filled it, so a bot answered anyone who could write in a channel it read, with the
+  owner's tools and spend. `CHIMERA_DISCORD_ALLOWED_USERS`, `_TELEGRAM_`, `_SLACK_`, `_SIGNAL_` and
+  `CHIMERA_WHATSAPP_ALLOWED_NUMBERS` now reach every bot, from `chimera serve` and from the app's Messaging card. An
+  empty list keeps today's behaviour and says so loudly at start and in the card.
+- **A page policy so an answer cannot make the window fetch another host** (#750). The desktop window had no Content
+  Security Policy, so an image in an answer (`![x](https://host/?d=…)`) was fetched by the window, outside the taint
+  ledger and the egress allowlist. The app page, the guest page and the HTML preview now carry policies, and answers
+  render remote images as a link naming the host. Measured in Edge 154 (the WebView2 engine): an outside host received
+  every probe before and none after. WebRTC still escapes a CSP; the preview note says so.
+- **A SKILL.md imported by path cannot vouch for itself** (#747). Its own frontmatter decided whether it was trusted;
+  now an import by path or URL always lands tainted and pending, and only the packaged cards keep what they declare.
+
 ### Added
 
+- **A scheduled job that could not run says so where its answers go** (#751). Chimera's own scheduler posts one short line when a job with a destination enters failure (error, timeout, spend cap, brake) and one when it recovers, never the raw error text. A job that flaps is one notice, not one per tick. `CHIMERA_CRON_NOTIFY_FAILURES=0` silences it; `chimera cron add --deliver-to URL` records the destination. This covers Chimera's scheduler only, not the VPS sidecar scripts.
 - **Cron jobs post only what is worth posting, and hold only their tools** (#736).
   - A scheduled run is told it is unattended, where its answer goes, and to assume rather than ask. It may answer
     with a fixed "nothing new" sentinel, which is never delivered.
@@ -26,6 +42,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- **A "safety" or "flagged" in a server error no longer aborts the turn** (#748). Such an error was classified as a
+  content-policy refusal, which aborts, instead of falling back to `CHIMERA_FALLBACK_MODELS`.
+- **The interface stops sending people to fields and importers that do not exist** (#749): reserved keys are labelled
+  as such, the SMTP/IMAP hint names the `.env`, and the cost chip opens the Usage tab.
 - **The chat bot knows who it works for and where it is talking** (#735). The Discord, Telegram, Slack and Signal
   bots, and the app's messaging bot, now get the owner's profile, recalled facts with the "possibly stale" header, and
   `remember_from_chat` as set. Each turn names the platform, chat and sender as quoted data that grants no authority,
