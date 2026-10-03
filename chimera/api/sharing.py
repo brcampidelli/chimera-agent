@@ -256,6 +256,9 @@ class Subscriber:
     #: The :attr:`Share.id` of the link a guest came in with; empty for the owner's own window.
     #: What lets a revoke end exactly the streams that link opened, and nobody else's.
     share_id: str = ""
+    #: The door a guest came through: ``"lan"`` for the network listener, empty for the owner's own
+    #: ``/guest`` mount. Closing the network door ends the streams filed under it.
+    door: str = ""
 
 
 @dataclass
@@ -424,9 +427,15 @@ class SessionBus:
         name: str,
         loop: asyncio.AbstractEventLoop,
         share_id: str = "",
+        door: str = "",
     ) -> Subscriber:
         sub = Subscriber(
-            id=next(self._ids), name=name, loop=loop, queue=asyncio.Queue(), share_id=share_id
+            id=next(self._ids),
+            name=name,
+            loop=loop,
+            queue=asyncio.Queue(),
+            share_id=share_id,
+            door=door,
         )
         with self._lock:
             self._channel(session_id).subscribers[sub.id] = sub
@@ -441,9 +450,12 @@ class SessionBus:
             del channel.subscribers[sub_id]
         self._announce_presence(session_id)
 
-    def end_guests(self, share_ids: Collection[str] | None = None) -> int:
-        """End the open streams of guests: those that came in with one of ``share_ids``, or every
-        guest when it is None. The owner's own windows are never ended here.
+    def end_guests(
+        self, share_ids: Collection[str] | None = None, *, door: str | None = None
+    ) -> int:
+        """End the open streams of guests: those that came in with one of ``share_ids`` (every link
+        when None) and through ``door`` (every door when None). The owner's own windows are never
+        ended here.
 
         A stream checks its link before every frame it sends, so a revoked link already delivers
         nothing more; this is what makes it stop NOW — the connection closes instead of idling on
@@ -454,7 +466,9 @@ class SessionBus:
                 sub
                 for channel in self._channels.values()
                 for sub in channel.subscribers.values()
-                if sub.share_id and (share_ids is None or sub.share_id in share_ids)
+                if sub.share_id
+                and (share_ids is None or sub.share_id in share_ids)
+                and (door is None or sub.door == door)
             ]
         for sub in targets:
             with contextlib.suppress(RuntimeError):  # a closed loop: that stream is already gone

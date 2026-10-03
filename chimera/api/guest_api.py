@@ -101,40 +101,81 @@ class GuestTurnIn(BaseModel):
 # --- the network door -----------------------------------------------------------------------
 
 
+#: The key the LAN door puts in every request's scope, holding the :class:`GuestServer` itself, so
+#: a guest route can tell which door a request came through — and a stream that came through this
+#: one can stop the moment it closes. Absent on the owner's ``/guest`` mount.
+DOOR_SCOPE_KEY = "chimera.guest_door"
+
+#: The ``door`` a subscriber that came in through the LAN listener is filed under on the bus.
+LAN_DOOR = "lan"
+
+#: How long a closing door waits for a connection to finish before cancelling it. A live stream never
+#: finishes on its own, and uvicorn's default is to wait forever — which is how "Close" held the
+#: Settings save for five seconds and then reported a door shut that was still streaming.
+GRACE_SECONDS = 1
+
+#: How long ``stop`` waits for the listener's thread. Past the grace above; the door is reported
+#: open for as long as the thread lives, so a slow close is shown as open, never as shut.
+STOP_WAIT_SECONDS = 3.0
+
+
 class GuestServer:
     """The LAN listener: one uvicorn server on its own thread, serving only the guest app.
 
     Bound and LISTENING before the thread starts, for the reason the app's own socket is
     (`_bind_app_socket`): a link handed out the moment this returns must connect on the first try.
+
+    ``open`` is true for as long as a guest can be connected through it — listening, or closed to
+    new connections and still finishing one — so the card never calls a door shut that is still
+    carrying a conversation. ``listening`` is whether a new connection would be accepted.
     """
 
-    def __init__(self, app: FastAPI) -> None:
+    def __init__(self, app: FastAPI, *, before_close: Callable[[], object] | None = None) -> None:
         self._app = app
+        self._before_close = before_close
         self._lock = threading.Lock()
         self._server: Any = None
         self._thread: threading.Thread | None = None
         self._port: int | None = None
+        self._closing = False
 
     @property
     def open(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
+        thread = self._thread
+        return thread is not None and thread.is_alive()
+
+    @property
+    def listening(self) -> bool:
+        return self.open and not self._closing
 
     @property
     def port(self) -> int | None:
         return self._port if self.open else None
 
     def urls(self, token: str | None = None) -> list[str]:
-        if not self.open or self._port is None:
+        if not self.listening or self._port is None:
             return []
         query = f"?t={token}" if token else ""
         return [f"http://{address}:{self._port}/{query}" for address in lan_addresses()]
+
+    async def _through_door(self, scope: Any, receive: Any, send: Any) -> None:
+        """The guest app, with this door named in the scope of every request it serves."""
+        if scope.get("type") in ("http", "websocket"):
+            scope = {**scope, DOOR_SCOPE_KEY: self}
+        await self._app(scope, receive, send)
 
     def start(self, port: int = 0, *, host: str = "0.0.0.0") -> int:
         """Open the door. Idempotent: an open listener stays as it is and reports its port."""
         import uvicorn
 
         with self._lock:
-            if self.open and self._port is not None:
+            if self.open and self._closing and self._thread is not None:
+                # The last close is still finishing a connection; a second listener beside it
+                # would be two doors reported as one.
+                self._thread.join(timeout=STOP_WAIT_SECONDS)
+                if self._thread.is_alive():
+                    raise OSError("the previous listener is still closing")
+            if self.listening and self._port is not None:
                 return self._port
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -146,23 +187,48 @@ class GuestServer:
                 sock.bind((host, 0))  # the asked-for port is taken: any free one, reported back
             sock.listen(128)
             bound = int(sock.getsockname()[1])
-            server = uvicorn.Server(uvicorn.Config(self._app, log_level="warning"))
+            # `interface` named: uvicorn guesses ASGI2 for a bound method and calls it with the
+            # scope alone, which answered every request through the door with a 500.
+            config = uvicorn.Config(
+                self._through_door,
+                interface="asgi3",
+                log_level="warning",
+                timeout_graceful_shutdown=GRACE_SECONDS,
+            )
+            server = uvicorn.Server(config)
             thread = threading.Thread(
                 target=server.run, kwargs={"sockets": [sock]}, name="chimera-guest", daemon=True
             )
             thread.start()
             self._server, self._thread, self._port = server, thread, bound
+            self._closing = False
             return bound
 
     def stop(self) -> None:
+        """Close the door, and every connection through it.
+
+        The streams that came through this door are ended first (``before_close``), so their
+        connections finish on their own; uvicorn's grace is the backstop for anything that does
+        not, and each stream also checks ``listening`` before every frame. The state is cleared only
+        once the thread has gone: until then the door is ``open``, because it is."""
         with self._lock:
             server, thread = self._server, self._thread
-            self._server = self._thread = None
-            self._port = None
+            if thread is None:
+                return
+            self._closing = True
+        if self._before_close is not None:
+            try:
+                self._before_close()
+            except Exception as exc:  # noqa: BLE001 -- closing the listener matters more
+                _log.warning("could not end the guest streams before closing the door: %s", exc)
         if server is not None:
             server.should_exit = True
-        if thread is not None:
-            thread.join(timeout=5)
+        thread.join(timeout=STOP_WAIT_SECONDS)
+        with self._lock:
+            if self._thread is thread and not thread.is_alive():
+                self._server = self._thread = None
+                self._port = None
+                self._closing = False
 
 
 # --- the guest app ----------------------------------------------------------------------------
@@ -250,12 +316,16 @@ def build_guest_app(
         request: Request, since: int = 0, name: str = "", share: Share = opened
     ) -> EventSourceResponse:
         token = share.token
+        # Which door: the LAN listener names itself in the scope; the owner's /guest mount does not.
+        door: GuestServer | None = request.scope.get(DOOR_SCOPE_KEY)
 
         # `opened` admitted this stream once, when it connected. A stream lives for as long as the
         # guest keeps the tab open — hours — and every one of the owner's controls (revoke, sharing
-        # off, an expiry) is a promise about what the link opens from that moment on. So the same
-        # question `share_of` asks is asked again before every frame and every heartbeat.
+        # off, an expiry, closing the door it came through) is a promise about what the link opens
+        # from that moment on. So the question is asked again before every frame and heartbeat.
         def still_open() -> bool:
+            if door is not None and not door.listening:
+                return False
             return sharing_on() and store.resolve(token) is not None
 
         return live_stream(
@@ -266,6 +336,7 @@ def build_guest_app(
             request=request,
             still_open=still_open,
             share_id=share.id,
+            door=LAN_DOOR if door is not None else "",
         )
 
     @guest.post("/api/turn", responses=SSE_RESPONSE)
@@ -333,6 +404,7 @@ async def live_frames(
     heartbeat_seconds: float = 15,
     still_open: Callable[[], bool] = _open_always,
     share_id: str = "",
+    door: str = "",
 ) -> AsyncIterator[dict[str, str]]:
     """Replay what the viewer missed, then everything as it happens, until they leave.
 
@@ -347,7 +419,7 @@ async def live_frames(
     the link a guest came in with, so a revoke can end exactly its streams (`SessionBus.end_guests`).
     """
     loop = asyncio.get_running_loop()
-    sub = bus.subscribe(session_id, name=name, loop=loop, share_id=share_id)
+    sub = bus.subscribe(session_id, name=name, loop=loop, share_id=share_id, door=door)
     try:
         for frame in bus.replay(session_id, since):
             if not still_open():
@@ -382,6 +454,7 @@ def live_stream(
     request: Request,
     still_open: Callable[[], bool] = _open_always,
     share_id: str = "",
+    door: str = "",
 ) -> EventSourceResponse:
     return EventSourceResponse(
         live_frames(
@@ -392,6 +465,7 @@ def live_stream(
             disconnected=request.is_disconnected,
             still_open=still_open,
             share_id=share_id,
+            door=door,
         )
     )
 
@@ -418,7 +492,9 @@ def register_sharing_api(
     screen writes: whether a link may be made or the door opened at all, and how many seconds a new
     link opens its conversation for (None = never). Both only narrow; their defaults are what this
     did before either existed."""
-    door = server or GuestServer(guest)
+    # Closing the door ends the streams that came through it before the listener is told to stop,
+    # so their connections finish instead of waiting out the listener's grace.
+    door = server or GuestServer(guest, before_close=lambda: bus.end_guests(door=LAN_DOOR))
     app.mount("/guest", guest)
 
     def _out(share: Share) -> dict[str, Any]:
@@ -488,6 +564,8 @@ def register_sharing_api(
     @app.delete("/api/code/share/network", dependencies=[guard], response_model=NetworkShareOut)
     def network_close() -> dict[str, Any]:
         door.stop()
-        return {"open": False, "port": None, "urls": []}
+        # What the door IS after the close, not what was asked: a connection that outlived the
+        # wait keeps it reported open (`GuestServer.open`), and the screen says so.
+        return {"open": door.open, "port": door.port, "urls": door.urls()}
 
     return door
