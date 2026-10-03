@@ -95,6 +95,7 @@ from chimera.core.context_budget import DEFAULT_BUDGET_FRACTION, UNMEASURED_USEF
 from chimera.governance.approval import ApprovalAnnouncer
 from chimera.orchestration import runlog
 from chimera.orchestration.budget import DEFAULT_SPEND_WARN_USD
+from chimera.providers.failover import policy_block
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.browser import FrameAnnouncer
@@ -1010,6 +1011,23 @@ class RolesQuery(BaseModel):
     profile: Profile = "balanced"
 
 
+class PolicyRetry(BaseModel):
+    """The refusal a turn is the owner's retry of (study 29 P5.7).
+
+    Sent by the error card's "Try with another model" and by nothing else. It changes nothing about
+    how the turn runs — the model is the request's ``model`` like any turn's — and exists for one
+    line of the receipt: "blocked on X, redone on Y by the owner's choice", so the conversation
+    keeps the fact that the answer under it came from a model the person CHOSE after a refusal,
+    not from the one the conversation was on.
+
+    It is the client's own account of the previous turn, recorded as that. Bounded because it is
+    stored and drawn; nothing reads it as a fact about the provider.
+    """
+
+    blocked_model: str = Field(min_length=1, max_length=200)
+    request_id: str | None = Field(default=None, max_length=120)
+
+
 class CodeTurnRequest(CodeSeams):
     """One turn of a coding conversation."""
 
@@ -1037,6 +1055,10 @@ class CodeTurnRequest(CodeSeams):
     because the thinking is where the wait before the first spoken word was measured to go
     (``LLMGateway._provider_kwargs``). ``None`` leaves the model as configured; a typed turn sends
     nothing."""
+    retry_of: PolicyRetry | None = None
+    """This turn redoes one the provider refused on content policy, on a model the owner picked.
+    Only the receipt reads it (:class:`PolicyRetry`); a guest's turn drops it, since the line it
+    writes says the choice was the owner's."""
 
 
 def _model_for(req: CodeTurnRequest, settings: Settings) -> tuple[str | None, bool | None]:
@@ -2194,6 +2216,14 @@ def register_code_api(
                     plan_meter = None
                     payload["memory_saved"] = saved
                     payload["memory_consolidated"] = tidied
+                    # The owner redid a refused turn on a model they picked (study 29 P5.7). On the
+                    # receipt, so a reopened conversation still says the answer is not from the
+                    # model the conversation was on, and why.
+                    if req.retry_of is not None and not author:
+                        payload["policy_retry"] = {
+                            "blocked_model": req.retry_of.blocked_model,
+                            "request_id": req.retry_of.request_id,
+                        }
                     _log_usage(payload, session_id, live())
                     if edited:
                         from chimera.api.app import resolve_verify, verifier_source
@@ -2582,7 +2612,33 @@ def register_code_api(
                     if (req.provider or "").strip()
                     else _native_failure(exc)
                 )
-                emit("error", {"message": message_out})
+                frame: dict[str, Any] = {"message": message_out}
+                # A refusal on content policy is said as one, with what identifies it, so the
+                # screen can offer the owner another model (study 29 P5.7). Native turns only: an
+                # external agent's failure is in its own words, and it picks its own model.
+                block = (
+                    None
+                    if (req.provider or "").strip() or isinstance(exc, _StoppedWhileWaiting)
+                    else policy_block(exc)
+                )
+                if block is not None:
+                    from dataclasses import replace
+
+                    # The gateway names the model that refused; a backend that is not the gateway
+                    # (a fused panel, a test double) does not, and then the turn's own model is the
+                    # best account there is.
+                    if block.model is None:
+                        turn_model = _model_for(req, live())[0] or live().default_model
+                        block = replace(block, model=turn_model or None)
+                    # Before this the sentence was "the coding turn failed": none of the markers
+                    # `_native_failure` forwards reads a policy refusal, so a refusal looked like a
+                    # crash in this repository.
+                    frame["message"] = message_out = block.sentence()
+                    frame["reason"] = "content_policy"
+                    frame["model"] = block.model
+                    frame["provider"] = block.provider
+                    frame["request_id"] = block.request_id
+                emit("error", frame)
                 if background is not None:
                     works.fail(background.id, message_out)
                 # A turn the person stopped while it waited for the folder did not fail; every

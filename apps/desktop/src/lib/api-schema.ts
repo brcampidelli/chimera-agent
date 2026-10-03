@@ -4490,6 +4490,7 @@ export interface components {
              * @default false
              */
             repo_map: boolean;
+            retry_of?: components["schemas"]["PolicyRetry"] | null;
             roles?: components["schemas"]["RoleModels"] | null;
             /** Session Id */
             session_id?: string | null;
@@ -7107,6 +7108,25 @@ export interface components {
             task: string;
             /** Workspace */
             workspace?: string | null;
+        };
+        /**
+         * PolicyRetry
+         * @description The refusal a turn is the owner's retry of (study 29 P5.7).
+         *
+         *     Sent by the error card's "Try with another model" and by nothing else. It changes nothing about
+         *     how the turn runs — the model is the request's ``model`` like any turn's — and exists for one
+         *     line of the receipt: "blocked on X, redone on Y by the owner's choice", so the conversation
+         *     keeps the fact that the answer under it came from a model the person CHOSE after a refusal,
+         *     not from the one the conversation was on.
+         *
+         *     It is the client's own account of the previous turn, recorded as that. Bounded because it is
+         *     stored and drawn; nothing reads it as a fact about the provider.
+         */
+        PolicyRetry: {
+            /** Blocked Model */
+            blocked_model: string;
+            /** Request Id */
+            request_id?: string | null;
         };
         /** PoolAddIn */
         PoolAddIn: {

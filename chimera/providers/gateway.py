@@ -32,6 +32,7 @@ from chimera.providers.failover import (
     RecoveryAction,
     action_for,
     classify,
+    mark_model,
     rate_limit_origin,
     trace_of,
 )
@@ -756,6 +757,9 @@ class LLMGateway:
                         exc,
                     )
                     if action is RecoveryAction.ABORT:
+                        # Which model refused, said on the way out: past a fallback it is not the
+                        # one the caller asked for, and the screen offering another model needs it.
+                        mark_model(exc, candidate)
                         raise  # context-overflow / content-policy: another key/model won't help
                     if action is RecoveryAction.FALLBACK_MODEL:
                         next_model = True
@@ -976,6 +980,7 @@ class LLMGateway:
             # Before the first delta nothing was shown and a retry is invisible. Once only, because
             # `complete` has its own chain and a fallback that can fall back is a loop in disguise.
             if content or tool_acc or action_for(classify(exc)) is RecoveryAction.ABORT:
+                mark_model(exc, resolved)  # as in `complete`: the refusal names its model
                 raise
             _log.warning("stream failed before any output (%s); falling back to a batch call", exc)
             return self.complete(

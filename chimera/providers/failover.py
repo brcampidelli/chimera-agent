@@ -15,6 +15,7 @@ model, then give up).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import re
 import time
@@ -323,6 +324,74 @@ def rate_limit_origin(exc: BaseException) -> RateLimitOrigin:
     if provider is None and source is None and (limiter_headers or limiter_words):
         return RateLimitOrigin("key")
     return RateLimitOrigin("unknown", provider, source)
+
+
+#: Where the gateway writes which model a failed call went to. On the exception and not in a new
+#: wrapper class, because every caller already matches the provider's own classes; replacing them
+#: would change what twenty ``except`` sites catch to say one more thing.
+_MODEL_ATTR = "_chimera_failed_model"
+
+
+def mark_model(exc: BaseException, model: str) -> None:
+    """Write on ``exc`` the model the call that raised it went to. Never raises.
+
+    A fallback chain means the model that failed is not always the one asked for: the primary can
+    be overloaded and the fallback the one that refuses. Only the gateway knows which it was, at the
+    moment it re-raises, so it says so there.
+    """
+    # An exception that refuses attributes (``__slots__``) is still an exception to re-raise.
+    with contextlib.suppress(Exception):
+        setattr(exc, _MODEL_ATTR, model)
+
+
+def failed_model(exc: BaseException) -> str | None:
+    """The model the gateway recorded on ``exc`` (:func:`mark_model`), or None."""
+    value = getattr(exc, _MODEL_ATTR, None)
+    return value if isinstance(value, str) and value else None
+
+
+@dataclass(frozen=True)
+class PolicyBlock:
+    """A turn the provider refused on content policy, and what identifies the refusal.
+
+    Study 29 P5.7. CONTENT_POLICY is ABORT on purpose — another key of the same provider will refuse
+    the same text — so the turn ends there and nothing is retried. What was missing is everything
+    after that: the person read "the coding turn failed" and could not tell a refusal from a crash,
+    nor which model refused, nor quote the refusal to the provider. Trying another model is THEIR
+    decision (study 29 rules out doing it automatically: the models that let more through are the
+    ones with the weaker safeguards), and this is what they need to make it.
+    """
+
+    model: str | None
+    """The model the refused call went to, when the gateway recorded it."""
+    provider: str | None = None
+    """The route a router names in its reply (OpenRouter's ``provider_name``), verbatim, or None."""
+    request_id: str | None = None
+    """The provider's id for the refused call (:class:`ProviderTrace`) — minted by them, never a
+    secret, and what a support desk asks for."""
+
+    def sentence(self) -> str:
+        """One sentence a chat surface can send as it is: what refused, and that nothing retried."""
+        where = self.model or "this model"
+        route = f" (served by {self.provider})" if self.provider else ""
+        ident = f" Request id: {self.request_id}." if self.request_id else ""
+        return (
+            f"Blocked by the provider's content policy on {where}{route}. Nothing was retried on"
+            f" another model: that is a choice for you to make.{ident}"
+        )
+
+
+def policy_block(exc: BaseException) -> PolicyBlock | None:
+    """The refusal behind ``exc`` when :func:`classify` reads it as CONTENT_POLICY, else None."""
+    if classify(exc) is not FailoverReason.CONTENT_POLICY:
+        return None
+    meta = _router_error(exc).get("metadata")
+    named = meta.get("provider_name") if isinstance(meta, dict) else None
+    return PolicyBlock(
+        model=failed_model(exc),
+        provider=named[:80] if isinstance(named, str) and named else None,
+        request_id=trace_of(exc).request_id,
+    )
 
 
 class CredentialPool:

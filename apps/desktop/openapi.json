@@ -2396,6 +2396,16 @@
             "title": "Repo Map",
             "type": "boolean"
           },
+          "retry_of": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PolicyRetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "roles": {
             "anyOf": [
               {
@@ -8051,6 +8061,34 @@
           "task"
         ],
         "title": "PlanRequest",
+        "type": "object"
+      },
+      "PolicyRetry": {
+        "description": "The refusal a turn is the owner's retry of (study 29 P5.7).\n\nSent by the error card's \"Try with another model\" and by nothing else. It changes nothing about\nhow the turn runs \u2014 the model is the request's ``model`` like any turn's \u2014 and exists for one\nline of the receipt: \"blocked on X, redone on Y by the owner's choice\", so the conversation\nkeeps the fact that the answer under it came from a model the person CHOSE after a refusal,\nnot from the one the conversation was on.\n\nIt is the client's own account of the previous turn, recorded as that. Bounded because it is\nstored and drawn; nothing reads it as a fact about the provider.",
+        "properties": {
+          "blocked_model": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Blocked Model",
+            "type": "string"
+          },
+          "request_id": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          }
+        },
+        "required": [
+          "blocked_model"
+        ],
+        "title": "PolicyRetry",
         "type": "object"
       },
       "PoolAddIn": {

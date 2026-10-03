@@ -61,6 +61,8 @@ import {
 import { BatchProposal } from "@/components/code/BatchProposal";
 import { DiffView } from "@/components/code/DiffView";
 import { GroundedBadge } from "@/components/code/GroundedBadge";
+import { PolicyBlocked } from "@/components/code/PolicyBlocked";
+import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
 import { BrowserView } from "@/components/code/BrowserView";
 import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { SharePanel } from "@/components/code/SharePanel";
@@ -177,6 +179,11 @@ interface Exchange {
   /** What the server actually said when the turn failed. A wrong API key, a rate limit, a model
    *  that does not exist and a provider outage all look identical without it. */
   error?: string;
+  /** The provider refused this turn on content policy: what refused it, for the card that offers
+   *  the owner another model (study 29 P5.7). Absent for every other failure. */
+  blocked?: PolicyBlockInfo;
+  /** The attachment ids this turn was sent with, so a retry of it sends the same files. */
+  attachments?: string[];
   /** The verdict on what this turn WROTE. Absent when the turn wrote nothing. */
   verified?: CodeVerified;
   /** Set once the offered undo was taken (or refused by the server) — the offer is single-use. */
@@ -186,6 +193,15 @@ interface Exchange {
   /** Stopped by the Stop button. Distinct from `failed`: nothing went wrong, the user changed
    *  their mind — and distinct from a finished turn, which has a `done`. */
   abandoned?: boolean;
+}
+
+/** The owner's retry of a turn the provider refused: the model they picked ("" = the install
+ *  default), the refusal it answers, and the files the refused turn carried. */
+interface PolicyRetry {
+  model: string;
+  /** Absent only when the refusal named no model: the server refuses a retry line naming none. */
+  of?: { blocked_model: string; request_id: string | null };
+  attachments: string[];
 }
 
 /** What "let the agent try to fix it" actually sends.
@@ -449,6 +465,16 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
     <div className="flex flex-wrap items-center gap-1.5">
       {/* First, ahead of every measurement, because it is what decides how to read them. */}
       {stopped ? <Badge tone="warn">{t(stopped)}</Badge> : null}
+      {/* Before the model badge, which it qualifies: the model that answered is not the one the
+          conversation was on — the provider refused that one, and the owner picked this. */}
+      {done.policy_retry ? (
+        <Badge tone="warn" title={done.policy_retry.request_id ?? undefined}>
+          {t("code.chat.policy.redone", {
+            blocked: done.policy_retry.blocked_model,
+            model: done.model || "?",
+          })}
+        </Badge>
+      ) : null}
       {/* Next, because it qualifies the answer itself: checked against the attached documents,
           declined because they do not cover it, or unchecked — and never one looking like another. */}
       <GroundedBadge grounded={done.grounded} t={t} />
@@ -852,7 +878,12 @@ export function Conversation({
         break;
       }
       case "error":
-        patch((e) => ({ ...e, failed: true, error: String(data.message ?? "") }));
+        patch((e) => ({
+          ...e,
+          failed: true,
+          error: String(data.message ?? ""),
+          blocked: policyBlockOf(data),
+        }));
         endFollowing(id);
         break;
       default:
@@ -1104,7 +1135,13 @@ export function Conversation({
     [lastAt, lastText, lastDone],
   );
 
-  function send(force = false, override?: string, spoken = false, auto = false) {
+  function send(
+    force = false,
+    override?: string,
+    spoken = false,
+    auto = false,
+    retry?: PolicyRetry,
+  ) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
     // of it, so by now `draft` holds whatever was typed AFTER it and reading state here would send
     // the wrong text.
@@ -1141,13 +1178,18 @@ export function Conversation({
       return;
     }
     setProposal(null);
-    setDraft("");
-    setAttached([]);
+    // A retry is pressed on a card, not sent from the box: whatever is being typed there meanwhile
+    // is the next message, and stays.
+    if (!retry) {
+      setDraft("");
+      setAttached([]);
+    }
+    const files = retry ? retry.attachments : attached.map((a) => a.id);
     setBusy(true);
     turnStartedAtRef.current = Date.now();
     setExchanges((prev) => [
       ...prev,
-      { you: message, answer: "", tools: [], edits: [], todos: [], done: null },
+      { you: message, answer: "", tools: [], edits: [], todos: [], done: null, attachments: files },
     ]);
     let touchedFiles = false;
     // Measured from the send, not from the first token: what the person walked away from is the
@@ -1217,8 +1259,18 @@ export function Conversation({
         // server fall back to `CHIMERA_DEFAULT_MODEL`. Sent per turn because the agent is rebuilt
         // from this request each time — and because the picker is allowed to change mid-conversation,
         // so the receipt under each answer names the model that answered THAT one.
-        ...(provider || !model ? {} : { model }),
-        attachments: attached.map((a) => a.id),
+        //
+        // A retry of a refused turn is the exception: the owner picked its model on the refusal's
+        // card, for that turn only ("" = the install default, which is the field absent again).
+        ...(retry
+          ? retry.model
+            ? { model: retry.model }
+            : {}
+          : provider || !model
+            ? {}
+            : { model }),
+        ...(retry?.of ? { retry_of: retry.of } : {}),
+        attachments: files,
       },
       {
         // Sent on every turn, not just the first: a client that drops it silently restarts the
@@ -1354,9 +1406,9 @@ export function Conversation({
         // (api.ts passes `payload.message`) and was discarded by the signature itself, while
         // Agents.tsx, Tasks.tsx and editor/Runner.tsx in this same app all show it. Not a design
         // choice about noise; an inconsistency nobody noticed.
-        onError: (errorText) => {
+        onError: (errorText, block) => {
           currentTurnRef.current = null;
-          patchLast((e) => ({ ...e, failed: true, error: errorText }));
+          patchLast((e) => ({ ...e, failed: true, error: errorText, blocked: block }));
           publish({ status: "idle", busy: false });
           setBusy(false);
           // A failure is MORE worth interrupting for than a success: the user walked away expecting
@@ -1747,7 +1799,30 @@ export function Conversation({
                 // turn that finished.
                 <CardChrome id={cardId(i, "error")} kind="error" cards={cards} summary={t("code.chat.error")}>
                 <div className="space-y-1">
-                  <p className="text-xs text-bad-foreground">{t("code.chat.error")}</p>
+                  {/* A refusal on content policy is said as one, with what refused it, and its way
+                      forward is the owner's pick of another model — not "Try again" on the model
+                      that just refused (study 29 P5.7). */}
+                  {e.blocked ? (
+                    <PolicyBlocked
+                      block={e.blocked}
+                      current={model}
+                      canRetry={i === exchanges.length - 1 && !busy && !busyElsewhere}
+                      onRetry={(picked) => {
+                        const blocked = e.blocked;
+                        if (!blocked) return;
+                        send(true, e.you, false, false, {
+                          model: picked,
+                          of: blocked.model
+                            ? { blocked_model: blocked.model, request_id: blocked.request_id }
+                            : undefined,
+                          attachments: e.attachments ?? [],
+                        });
+                      }}
+                      t={t}
+                    />
+                  ) : (
+                    <p className="text-xs text-bad-foreground">{t("code.chat.error")}</p>
+                  )}
                   {/* Folded, not hidden: the headline stays one line for the common case where the
                     user only wants to retry, and the raw provider message is one click away for
                     the case where it says `invalid_api_key` and settles the whole question. */}
@@ -1768,7 +1843,7 @@ export function Conversation({
                       to be retyped, and on a long prompt it is simply lost.
                       Only on the LAST exchange: re-sending a message from the middle of a
                       conversation would append it at the end, in a context that has moved on. */}
-                  {i === exchanges.length - 1 && !busy && !busyElsewhere ? (
+                  {i === exchanges.length - 1 && !busy && !busyElsewhere && !e.blocked ? (
                     <Button size="sm" variant="ghost" onClick={() => send(true, e.you)}>
                       <RotateCcw className="h-3.5 w-3.5" /> {t("common.retry")}
                     </Button>

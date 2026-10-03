@@ -59,6 +59,7 @@ import type {
 } from "@/lib/types";
 import { apiUrl, token } from "@/lib/server";
 import { parseSseFrame, readSseFrames } from "@/lib/sse";
+import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
 
 // Where the request goes and which token it carries both come from `server.ts`: the local sidecar
 // keeps the shipped behaviour exactly (relative path, token from the meta tag the backend injects
@@ -1089,6 +1090,9 @@ export interface CodeTurnInput {
   provider?: string | null;
   /** The command for `provider: "custom"`. Split shell-style and run WITHOUT a shell. */
   provider_command?: string | null;
+  /** This turn redoes one the provider refused on content policy, on a model the owner picked
+   *  from the refusal's card. Only the receipt reads it — see {@link CodeTurnDone.policy_retry}. */
+  retry_of?: { blocked_model: string; request_id?: string | null } | null;
 }
 
 /** One tool call, as it happens. `arguments` and `observation` arrive already clipped server-side
@@ -1191,6 +1195,10 @@ export interface CodeTurnDone {
    *  documents was not checked, or absent/null for a turn that attached none. Its own key: `verified`
    *  on the stored receipt already means the workspace's test command. */
   grounded?: GroundedCheck | null;
+  /** This turn redid one the provider refused on content policy, on a model the owner picked from
+   *  the refusal's card: the refusing model and its request id. `model` above is the one that
+   *  answered. Absent on every other turn. */
+  policy_retry?: { blocked_model: string; request_id: string | null } | null;
 }
 
 /** What the grounded-answer check did. `outcome` decides the badge; the rest is its tooltip and the
@@ -1283,7 +1291,8 @@ export interface CodeTurnHandlers {
    *  ends right after with a `done` whose `stopped_reason` is `work_started`. */
   onWorkStarted?: (w: WorkInfo) => void;
   onDone?: (d: CodeTurnDone) => void;
-  onError?: (msg: string) => void;
+  /** `block` is set when the provider refused the turn on content policy, and only then. */
+  onError?: (msg: string, block?: PolicyBlockInfo) => void;
 }
 
 /** One file handed to the agent: an image to look at, or a document converted to text on arrival.
@@ -1493,7 +1502,7 @@ function applyCodeTurnFrame(
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
   else if (event === "work_started") h.onWorkStarted?.(payload.work as WorkInfo);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
-  else if (event === "error") h.onError?.(payload.message as string);
+  else if (event === "error") h.onError?.(payload.message as string, policyBlockOf(payload));
   return { turnId, seq };
 }
 
