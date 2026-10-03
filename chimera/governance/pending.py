@@ -217,6 +217,13 @@ def _code_hash(request_id: str, code: str) -> str:
     Hashed so the question file, a backup of it, or a route that ever serialised it raw does not
     hand out the code. Not a defence against whoever can READ `<home>/approvals/`: a six-digit space
     falls to a loop — and whoever can read that directory can write an answer file there anyway.
+
+    That reader includes the local agent itself when it has ``run_shell``: the code is a secret
+    from the strangers who can message the bot, not from the model. What keeps the model from
+    approving is the sender check — only a listed person, never a bot, can answer from the chat —
+    and an agent that asks the owner to "paste this line" is still asking the owner to decide, so
+    the delivered text says what the line does. An HMAC would not change this: its key would have
+    to live where the asker and the bot (two processes) can both read it, i.e. on the same disk.
     """
     return hashlib.sha256(f"{request_id}:{code}".encode()).hexdigest()
 
@@ -381,7 +388,13 @@ def ask_durably(
                     **(
                         {
                             "code_hash": _code_hash(request_id, code),
-                            "expires_at": asked_at + float(wait_seconds),
+                            # One poll interval BEFORE the wait ends. `expires_at` is wall time and
+                            # the wait below is monotonic; a code accepted in the last poll interval
+                            # was answered "Approved" in the chat while this call recorded a
+                            # timeout. Ending the code early leaves the wait a full interval to
+                            # read every answer the code could have written.
+                            "expires_at": asked_at
+                            + max(0.0, float(wait_seconds) - float(poll_seconds)),
                         }
                         if code
                         else {}
@@ -432,7 +445,11 @@ def ask_durably(
 
     resposta = directory / f"{request_id}.answer.json"
     limite = clock() + wait_seconds
-    while clock() < limite:
+    # Looked at once more AFTER the wait ends, before a timeout is recorded: an answer written
+    # during the last sleep — by `chimera approve` or by the chat — was already acknowledged to the
+    # person who gave it, and recording "timeout" over it would make that acknowledgement a lie.
+    # Silence still refuses: with no answer file at this last look, nothing below changes.
+    while True:
         if resposta.exists():
             answered_at: float | None = None
             via = ""
@@ -452,6 +469,8 @@ def ask_durably(
             )
             _cleanup(directory, request_id)
             return decidido
+        if clock() >= limite:
+            break
         sleep(poll_seconds)
 
     _log.warning(

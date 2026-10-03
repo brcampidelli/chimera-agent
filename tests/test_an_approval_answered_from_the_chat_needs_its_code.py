@@ -551,6 +551,12 @@ def test_an_ordinary_message_is_still_a_turn(tmp_path: Path) -> None:
         "RECUSAR 0123456789AB 123456",
         "deny 0123456789a 12345",  # a typo'd id and a short code are still somebody pasting a code
         "`approve 0123456789ab 123456`",
+        # Compatibility forms read as the answer they look like (NFKC), so they are held back too:
+        # the long s once matched the pattern, missed the verb table and stopped the bot.
+        "recuſar 0123456789ab 123456",
+        "aprovar 0123456789ab １２３４５６",
+        "ａｐｐｒｏｖｅ 0123456789ab 123456",
+        "deny abcdefabcdef 123456",  # a real id may, rarely, have no digit
     ],
 )
 def test_anything_shaped_like_an_answer_is_held_back_from_the_model(text: str) -> None:
@@ -558,7 +564,17 @@ def test_anything_shaped_like_an_answer_is_held_back_from_the_model(text: str) -
 
 
 @pytest.mark.parametrize(
-    "text", ["approve PR 123456", "aprovar", "aprovar 0123456789ab", "aprovar o deploy agora"]
+    "text",
+    [
+        "approve PR 123456",
+        "aprovar",
+        "aprovar 0123456789ab",
+        "aprovar o deploy agora",
+        # English words spelled in a-f are not ids: no digit, and not twelve characters.
+        "deny decade 2024",
+        "approve facade 1234",
+        "deny the decade 2024",
+    ],
 )
 def test_ordinary_sentences_are_not_answers(text: str) -> None:
     assert parse(text) is None
@@ -619,3 +635,120 @@ def test_every_answer_says_which_surface_gave_it(tmp_path: Path) -> None:
 
     assert _ask(tmp_path, from_the_terminal) is True
     assert history(tmp_path)[-1]["answered_via"] == "cli"
+
+
+# ------------------------------------------------------------------ the interceptor never stops the bot
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "recuſar 0123456789ab 123456",
+        "aprovar 0123456789ab ١٢٣٤٥٦",  # Arabic-Indic digits
+        "İapprove 0123456789ab 123456",
+        "deny K0123456789a 123456",
+    ],
+)
+def test_no_message_makes_the_interceptor_raise(tmp_path: Path, text: str) -> None:
+    """The reviewer's case: setting OFF (the default), sender in no list. Before re.ASCII, the long
+    s matched the shape case-insensitively, then `VERBS["recuſar"]` raised KeyError on the
+    Telegram/Signal polling loop and the bot stopped. Whatever the text, intercept returns."""
+    for settings in (_settings(tmp_path, on=False, discord=""), _settings(tmp_path)):
+        approvals = ChatApprovals(settings, tmp_path)
+        for user in ("stranger", OWNER):
+            reply = approvals.intercept(_msg(text, user=user))
+            assert reply is None or reply == NEUTRAL
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["recuſar 0123456789ab 123456", "aprovar 0123456789ab ١٢٣٤٥٦"],
+)
+def test_the_patterns_themselves_match_only_ascii(text: str) -> None:
+    """Below the NFKC step: the patterns are ASCII, so no Unicode case-fold can carry a verb that is
+    not in the table to the lookup, and no other script's digits can pass for a code."""
+    import chimera.server.chat_approval as chat_approval
+
+    assert chat_approval._SHAPE.fullmatch(text) is None
+    assert chat_approval._INSIDE.search(text) is None
+
+
+def test_the_owner_may_type_the_verb_in_a_compatibility_form(tmp_path: Path) -> None:
+    gateway, sessions = _gateway(_settings(tmp_path), tmp_path)
+
+    def owner(text: str) -> None:
+        request_id, code = _id_code(text)
+        assert gateway.on_message(_msg(f"recuſar {request_id} {code}")).startswith("Refused")
+
+    assert _ask(tmp_path, owner) is False
+    assert history(tmp_path)[-1]["outcome"] == "refused"
+    assert sessions.created == 0
+
+
+def test_a_defect_in_the_interceptor_fails_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Nothing is approved, nothing becomes a turn, the bot keeps running, and the log names the
+    exception type without the text (which might carry the code)."""
+    import chimera.server.chat_approval as chat_approval
+
+    def broken(_text: str) -> None:
+        raise RuntimeError("boom")
+
+    gateway, sessions = _gateway(_settings(tmp_path), tmp_path)
+    monkeypatch.setattr(chat_approval, "parse", broken)
+    seen: list[str] = []
+    replies: list[str] = []
+
+    def owner(text: str) -> None:
+        request_id, code = _id_code(text)
+        seen.append(code)
+        replies.append(gateway.on_message(_msg(f"aprovar {request_id} {code}")))
+
+    with caplog.at_level(logging.DEBUG):
+        assert _ask(tmp_path, owner) is False
+    assert replies == [NEUTRAL]
+    assert sessions.created == 0
+    assert "RuntimeError" in caplog.text
+    assert seen[0] not in caplog.text
+
+
+# ------------------------------------------------------------------ the last poll interval
+
+
+def test_an_answer_written_during_the_last_sleep_is_read_not_timed_out(tmp_path: Path) -> None:
+    """`chimera approve` (or the chat) answered in the final poll interval and was told so; the wait
+    used to end without looking again and record a timeout over it."""
+    relogio = _Relogio()
+
+    def sleep(segundos: float) -> None:
+        relogio.sleep(segundos)
+        if relogio.agora >= 3.0:
+            for waiting in pending(tmp_path):
+                answer(tmp_path, waiting.id, True, via="cli")
+
+    assert ask_durably(
+        tmp_path, "x", "y", wait_seconds=3.0, poll_seconds=1.0, clock=relogio, sleep=sleep
+    ) is True
+    assert history(tmp_path)[-1]["outcome"] == "approved"
+
+
+def test_the_code_stops_working_a_poll_interval_before_the_wait_ends(tmp_path: Path) -> None:
+    """The code's expiry is wall time and the wait is monotonic; ending the code one interval early
+    means no code accepted in the chat can land after the asker has stopped reading."""
+    outcomes: list[str] = []
+
+    def owner(text: str) -> None:
+        request_id, code = _id_code(text)
+        data = json.loads((tmp_path / "approvals" / f"{request_id}.ask.json").read_text("utf-8"))
+        asked_at = float(data["asked_at"])
+        assert data["expires_at"] == pytest.approx(asked_at + 59.0)
+        outcomes.append(
+            answer_with_code(tmp_path, request_id, code, True, via="t", now=asked_at + 59.5)
+        )
+        outcomes.append(
+            answer_with_code(tmp_path, request_id, code, True, via="t", now=asked_at + 58.5)
+        )
+
+    assert _ask(tmp_path, owner, wait=60.0) is True
+    assert outcomes == ["expired", "applied"]

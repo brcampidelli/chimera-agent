@@ -49,9 +49,11 @@ waiting for it has timed out. Questions from cron, the board or another chat are
 
 from __future__ import annotations
 
+import contextlib
 import re
 import threading
 import time
+import unicodedata
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -74,19 +76,31 @@ PLATFORMS: tuple[str, ...] = ("discord", "telegram", "slack", "signal")
 #: the owner; the English pair is accepted because a phone keyboard in English autocorrects to it.
 VERBS: dict[str, bool] = {"aprovar": True, "approve": True, "recusar": False, "deny": False}
 
+#: An id as the owner might type it: exactly the twelve hex characters a request id has
+#: (`uuid4().hex[:12]`), or a near miss of 6-16 hex characters that carries at least one digit. The
+#: digit is what keeps "deny decade 2024" or "approve facade 1234" — an English word spelled in a-f —
+#: an ordinary message, where a mistyped id keeps the digits it was copied with. A real id with no
+#: digit at all (odds about 1 in 130 000) is still held back by the first branch, because letting it
+#: through would put its code in front of the model.
+_ID = r"(?:[0-9a-f]{12}|(?=[a-f]*[0-9])[0-9a-f]{6,16})"
+
+#: ``re.ASCII`` is load-bearing, not tidiness. Without it ``IGNORECASE`` folds Unicode: "ſ" (U+017F,
+#: long s) matches "s", so "recuſar <id> <code>" matched the shape and then raised ``KeyError`` on
+#: the verb lookup — on the bot's polling thread, with the setting off, from any sender, and one
+#: such message stopped `chimera serve --telegram`. Without it ``\d`` also takes every script's
+#: digits, which no code is ever written in.
+_FLAGS = re.IGNORECASE | re.ASCII
+
 #: What counts as an attempt to answer. Deliberately WIDER than a valid answer: an id one character
 #: short, or a five-digit code, is still somebody pasting a code, and letting it through as a turn
 #: would put the code in front of the model — the one thing this module exists to prevent. Narrow
 #: enough that "approve PR 123456" (not hex) stays an ordinary message to the agent.
 _SHAPE = re.compile(
-    r"^(?P<verb>aprovar|recusar|approve|deny)\s+(?P<id>[0-9a-f]{6,16})\s+(?P<code>\d{4,8})$",
-    re.IGNORECASE,
+    rf"^(?P<verb>aprovar|recusar|approve|deny)\s+(?P<id>{_ID})\s+(?P<code>\d{{4,8}})$", _FLAGS
 )
 
 #: The same shape found anywhere in a longer message — see :func:`carries_an_answer`.
-_INSIDE = re.compile(
-    r"\b(?:aprovar|recusar|approve|deny)\s+[0-9a-f]{6,16}\s+\d{4,8}\b", re.IGNORECASE
-)
+_INSIDE = re.compile(rf"\b(?:aprovar|recusar|approve|deny)\s+{_ID}\s+\d{{4,8}}\b", _FLAGS)
 
 #: Failed attempts a sender may make inside :data:`FAILURE_WINDOW` before every attempt is refused
 #: unchecked. Five covers a person fixing a typo twice; it leaves a guesser five tries in a
@@ -111,17 +125,34 @@ class ChatAnswer:
     code: str
 
 
+def _normal(text: str) -> str:
+    """The text as the patterns read it: NFKC-normalised, so the patterns can stay ASCII.
+
+    NFKC folds the compatibility forms a phone or a paste can produce — "ſ" (long s) to "s",
+    full-width digits to 0-9 — into what they read as. With the patterns ASCII-only, a message that
+    LOOKS like an answer is still held back from the model, and nothing outside ASCII ever reaches
+    the verb lookup.
+    """
+    return unicodedata.normalize("NFKC", str(text or ""))
+
+
 def parse(text: str) -> ChatAnswer | None:
     """The answer this text is shaped like, or ``None`` for an ordinary message.
 
     Surrounding whitespace and backticks are ignored, because a line copied from a chat client
     often keeps the code formatting it was shown in.
     """
-    match = _SHAPE.fullmatch(" ".join(str(text or "").strip().strip("`").split()))
+    match = _SHAPE.fullmatch(" ".join(_normal(text).strip().strip("`").split()))
     if match is None:
         return None
+    approved = VERBS.get(match["verb"].casefold())
+    if approved is None:
+        # Unreachable while the pattern is ASCII-only. Should the pattern and the table drift apart
+        # again, this raises into `ChatApprovals.intercept`, which holds the message back — the
+        # subscript that stood here raised too, but nothing caught it and the bot stopped.
+        raise ValueError("approval verb outside the table")
     return ChatAnswer(
-        approved=VERBS[match["verb"].lower()],
+        approved=approved,
         request_id=match["id"].lower(),
         code=match["code"],
     )
@@ -134,7 +165,7 @@ def carries_an_answer(text: str) -> bool:
     carries the code. It is not applied — an answer is a message that says only that — but it is
     not a turn either, because the turn would put the code in front of the model.
     """
-    return _INSIDE.search(str(text or "")) is not None
+    return _INSIDE.search(_normal(text)) is not None
 
 
 def _allowed_ids(settings: Settings, platform: str) -> list[str]:
@@ -232,7 +263,27 @@ class ChatApprovals:
         """The reply to an approval-shaped message, or ``None`` to route it as an ordinary turn.
 
         Anything shaped like an answer is consumed here — answered or not — and never becomes a turn.
+
+        Never raises. It runs before every message on every bot, with the setting off too, and the
+        Telegram and Signal adapters call it on their polling loop, where an exception stops the bot
+        for everyone. So a defect in here fails CLOSED: nothing is approved, the message is not a
+        turn (it might carry a code), the sender gets the neutral line and one failed attempt, and
+        the log gets the exception's type — never the text, which might be the code.
         """
+        try:
+            return self._intercept(message)
+        except Exception as exc:  # noqa: BLE001 — see the docstring: fail closed, never stop the bot
+            sender = f"{getattr(message, 'platform', '?')}:{getattr(message, 'user', '?')}"
+            _log.error(
+                "chat approval check failed (%s); message from %s held back",
+                type(exc).__name__, sender,
+            )
+            # Counting the attempt is best effort; the refusal below is not.
+            with contextlib.suppress(Exception):
+                self._failed(sender)
+            return NEUTRAL
+
+    def _intercept(self, message: InboundMessage) -> str | None:
         parsed = parse(message.text)
         sender = f"{message.platform}:{message.user}"
         if parsed is None:
