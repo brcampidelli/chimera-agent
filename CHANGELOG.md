@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.64.2] - 2026-10-03
 ### Security
 
 - **Every chat bot answers only the ids its owner listed** (#746). The Discord, Telegram, Slack and Signal adapters
