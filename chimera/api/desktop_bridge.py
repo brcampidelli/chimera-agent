@@ -596,6 +596,15 @@ def register_bridge_api(
                 if settings.approval in {"always", "suspicious", "never"}
                 else "suspicious"
             )
+            # The folder's own grant, read from the same record the turn is held to — what the
+            # Code screen does with its switch. It RAISES `workspace` and nothing else: an owner
+            # who set `read_only` meant it, and the server applies that floor regardless.
+            folder = body.get("workspace")
+            if reach == "workspace" and isinstance(folder, str) and folder.strip():
+                from chimera.api.code_api import server_grants_shell
+
+                if server_grants_shell(settings, Path(folder).expanduser()):
+                    reach = "workspace_shell"
             body = {**body, "posture": {"reach": reach, "approval": approval}}
             body.setdefault("allow_host_exec", reach == "workspace_shell")
         return body

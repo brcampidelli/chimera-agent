@@ -11,7 +11,8 @@ import { AgentProvider } from "@/lib/agent-context";
 import { getCodeSession, getConfig, type Approval, type Profile, type Reach } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import { LayoutProvider } from "@/lib/layout/context";
-import { shellAllowed } from "@/lib/project-shell";
+import { shellGranted } from "@/lib/project-shell";
+import { loadProjects } from "@/lib/projects";
 import { RunSessionProvider, useRunSession } from "@/lib/run-session";
 
 /**
@@ -42,6 +43,8 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
   const t = useT();
   const session = useQuery({ queryKey: ["code-session", sessionId], queryFn: () => getCodeSession(sessionId) });
   const cfg = useQuery({ queryKey: ["config"], queryFn: getConfig });
+  // The server's record of which folders may run commands — the one the turn is held to.
+  const projects = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const run = useRunSession();
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
@@ -67,7 +70,8 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
   // The same posture the Code screen sends for this project, read the same way: the owner's standing
   // choice, raised to shell for a project granted it and never lowered.
   const configured = (cfg.data?.autonomy.reach || "workspace") as Reach;
-  const reach: Reach = shellAllowed(workspace) && configured === "workspace" ? "workspace_shell" : configured;
+  const reach: Reach =
+    shellGranted(projects.data, workspace) && configured === "workspace" ? "workspace_shell" : configured;
   const approval = (cfg.data?.autonomy.approval || "suspicious") as Approval;
   const profile: Profile = "balanced";
   const runBusy = run.running && (run.workspace === null || run.workspace === workspace);

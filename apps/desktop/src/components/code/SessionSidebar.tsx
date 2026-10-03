@@ -29,6 +29,7 @@ import {
   markCodeSessionSeen,
   registerCodeProject,
   unarchiveCodeSession,
+  type CodeProject,
   type CodeSessionMeta,
   type CodeSessionState,
 } from "@/lib/api";
@@ -36,7 +37,7 @@ import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
-import { aliasesOf, loadProjects, projectLabel } from "@/lib/projects";
+import { aliasesOf, loadProjects, projectLabel, sidebarOrder } from "@/lib/projects";
 import { usePendingApprovals } from "@/lib/usePendingApprovals";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
@@ -66,7 +67,8 @@ const STATE_DOT: Record<Exclude<CodeSessionState, "idle">, { label: string; dot:
  */
 function groupByProject(
   sessions: CodeSessionMeta[],
-  registered: string[],
+  rows: CodeProject[],
+  current: string,
 ): [string, CodeSessionMeta[]][] {
   const groups = new Map<string, CodeSessionMeta[]>();
   for (const session of sessions) {
@@ -75,15 +77,10 @@ function groupByProject(
     if (list) list.push(session);
     else groups.set(key, [session]);
   }
-  // Registered projects come after, and only the ones no conversation already placed. Union, never
-  // replace: a project you have talked about must not vanish from the list because you never got
-  // round to registering it, and the ordering keeps the "most recently used" property below.
-  for (const project of registered) {
-    if (!groups.has(project)) groups.set(project, []);
-  }
-  // Insertion order = the order the server sent, which is newest-first. So the project you touched
-  // most recently is at the top without a second sort deciding what "most recent project" means.
-  return [...groups.entries()];
+  // Registered projects join the ones conversations placed — union, never replace: a project you
+  // have talked about must not vanish from the list because you never got round to registering it.
+  // The ORDER is `sidebarOrder`'s: pinned first, then most recently used, hidden ones left out.
+  return sidebarOrder(sessions, rows, current).map((key) => [key, groups.get(key) ?? []]);
 }
 
 export function SessionSidebar({
@@ -146,7 +143,6 @@ export function SessionSidebar({
   // its projects instead of meeting an empty sidebar after an update.
   const projects = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const rows = projects.data ?? [];
-  const registered = rows.map((row) => row.path);
   const aliases = aliasesOf(rows);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -159,12 +155,22 @@ export function SessionSidebar({
   const [confirming, setConfirming] = useState<
     { kind: "session"; session: CodeSessionMeta } | { kind: "project"; project: string; n: number } | null
   >(null);
-  const waitingCount = (q.data ?? []).filter((s) => stateOf(s) === "waiting").length;
+  // One order for both views: the filter narrows the full list rather than building its own, so a
+  // pinned project stays where it was, recency is judged by all its conversations (not only the
+  // waiting ones), and a hidden folder stays hidden.
+  const allGroups = groupByProject(q.data ?? [], rows, workspace);
   // The filter shows only conversations and leaves out the empty projects you registered: "what is
   // waiting for me" has no answer in a project with no conversation.
-  const groups = onlyWaiting
-    ? groupByProject((q.data ?? []).filter((s) => stateOf(s) === "waiting"), [])
-    : groupByProject(q.data ?? [], registered);
+  const waitingGroups = allGroups
+    .map(([key, sessions]): [string, CodeSessionMeta[]] => [
+      key,
+      sessions.filter((s) => stateOf(s) === "waiting"),
+    ])
+    .filter(([, sessions]) => sessions.length > 0);
+  // Counted from what the filter can show, so the chip never promises a conversation that sits in
+  // a hidden folder and then answers "nothing waiting".
+  const waitingCount = waitingGroups.reduce((n, [, sessions]) => n + sessions.length, 0);
+  const groups = onlyWaiting ? waitingGroups : allGroups;
   const archived = useQuery({
     queryKey: ["code-sessions", "archived"],
     queryFn: () => listArchivedCodeSessions(),

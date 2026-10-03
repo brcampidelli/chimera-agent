@@ -870,11 +870,12 @@ export interface paths {
         };
         /**
          * List Code Workspaces
-         * @description The projects you have added, in the order you added them.
+         * @description The projects you have added, in the order you added them — hidden ones included.
          *
          *     The sidebar unions these with the projects it derives from conversations, so a project you
          *     have worked in stays listed whether or not it was ever registered — nothing disappears
-         *     because it was not on this list.
+         *     because it was not on this list. Hidden rows are sent rather than filtered, because hiding a
+         *     folder you have talked about is exactly the case the sidebar must know about to leave out.
          */
         get: operations["list_code_workspaces_api_code_workspaces_get"];
         put?: never;
@@ -891,9 +892,66 @@ export interface paths {
         /**
          * Forget Code Workspace
          * @description Forget a bookmark. **Conversations are not touched**, so a project you have worked in
-         *     reappears in the sidebar as one you have talked about rather than one you registered.
+         *     reappears in the sidebar as one you have talked about rather than one you registered. Its
+         *     grant goes with it; to keep a folder out of the lists for good, hide it (PATCH).
          */
         delete: operations["forget_code_workspace_api_code_workspaces_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Flag Code Workspace
+         * @description Pin or hide a project, registering it if it was not. Hiding revokes its grant and pin.
+         *
+         *     Only ever narrows what the agent may do, so the bridge serves it at its operate tier.
+         */
+        patch: operations["flag_code_workspace_api_code_workspaces_patch"];
+        trace?: never;
+    };
+    "/api/code/workspaces/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Grant Code Workspace
+         * @description Grant or revoke commands in one folder — the record every coding turn is held to.
+         *
+         *     Its own route rather than a field on the PATCH above, so the bridge can hold granting to its
+         *     Full tier while pinning and hiding stay at operate. Behind the same guard as the rest of the
+         *     API: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach
+         *     every other route. What moving the grant here changes is that a REQUEST no longer carries
+         *     it; recording one is a separate act, listed in the Folders card where it can be revoked.
+         */
+        put: operations["grant_code_workspace_api_code_workspaces_grant_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/workspaces/grant/migrate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Migrate Code Workspace Grants
+         * @description Record the folders the desktop had granted in its own storage — ONCE per installation.
+         *
+         *     The first call closes the window whatever it carries, an empty list included; every later
+         *     one changes nothing and answers ``migrated: false``. Not on the bridge: it exists for one
+         *     client's one-time upgrade, not as a second way to grant.
+         */
+        post: operations["migrate_code_workspace_grants_api_code_workspaces_grant_migrate_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4140,6 +4198,48 @@ export interface components {
             you: string;
         };
         /**
+         * CodeGrantMigrationIn
+         * @description The folders the desktop had granted in its own browser storage, sent once.
+         */
+        CodeGrantMigrationIn: {
+            /** Paths */
+            paths?: string[];
+        };
+        /**
+         * CodeGrantMigrationOut
+         * @description What the one-time migration did. ``migrated=False`` = it had already happened; nothing changed.
+         */
+        CodeGrantMigrationOut: {
+            /** Migrated */
+            migrated: boolean;
+            /** Projects */
+            projects: components["schemas"]["CodeProjectOut"][];
+            /** Recorded */
+            recorded: number;
+        };
+        /**
+         * CodeProjectFlagsIn
+         * @description Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide.
+         */
+        CodeProjectFlagsIn: {
+            /** Hidden */
+            hidden?: boolean | null;
+            /** Path */
+            path: string;
+            /** Pinned */
+            pinned?: boolean | null;
+        };
+        /**
+         * CodeProjectGrantIn
+         * @description Grant or revoke commands in one folder. Its own route, so the bridge can hold it to Full.
+         */
+        CodeProjectGrantIn: {
+            /** Path */
+            path: string;
+            /** Shell Granted */
+            shell_granted: boolean;
+        };
+        /**
          * CodeProjectIn
          * @description A project as a client registers it.
          *
@@ -4167,8 +4267,33 @@ export interface components {
              * @default
              */
             alias: string;
+            /**
+             * Granted At
+             * @default
+             */
+            granted_at: string;
+            /**
+             * Hidden
+             * @default false
+             */
+            hidden: boolean;
+            /**
+             * Last Used At
+             * @default
+             */
+            last_used_at: string;
             /** Path */
             path: string;
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /**
+             * Shell Granted
+             * @default false
+             */
+            shell_granted: boolean;
         };
         /**
          * CodeSessionArchiveOut
@@ -9650,6 +9775,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    flag_code_workspace_api_code_workspaces_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectFlagsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    grant_code_workspace_api_code_workspaces_grant_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeProjectGrantIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeProjectOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    migrate_code_workspace_grants_api_code_workspaces_grant_migrate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeGrantMigrationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CodeGrantMigrationOut"];
                 };
             };
             /** @description Validation Error */

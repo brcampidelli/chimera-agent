@@ -36,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, params
 from fastapi.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PrivateAttr
 
 # Module level, not inside the registration function, and that is load-bearing rather than tidiness:
 # this file uses `from __future__ import annotations`, so a `-> EventSourceResponse` return
@@ -63,6 +63,10 @@ from chimera.api.roles import Profile, RoleModels, RolePlan
 from chimera.api.roles import resolve as resolve_roles
 from chimera.api.schemas import (
     AttachmentOut,
+    CodeGrantMigrationIn,
+    CodeGrantMigrationOut,
+    CodeProjectFlagsIn,
+    CodeProjectGrantIn,
     CodeProjectIn,
     CodeProjectOut,
     CodeSessionArchiveOut,
@@ -148,6 +152,20 @@ class CodeSeams(BaseModel):
     Per REQUEST, which is what makes it per project: enabling commands for one folder does not
     enable them for the next folder someone opens. `CHIMERA_HOST_EXEC=deny` still refuses — an
     owner who turned host execution off system-wide is not overridden by a field on a request.
+
+    **And it is only a request.** Since the grant moved to the server's project registry, this
+    opens nothing unless the server ALSO records a grant for the folder (or the owner set
+    ``CHIMERA_REACH=workspace_shell`` for every folder) — see :func:`server_grants_shell`. It used to
+    be the grant itself: whatever a client sent, the server believed.
+    """
+
+    _grant_root: Path | None = PrivateAttr(default=None)
+    """The folder whose recorded grant applies when the run happens in a COPY of it.
+
+    A batch task runs in its own git worktree, a temporary directory no grant names, so the grant is
+    looked up on the project the worktree was cut from. Private on purpose: set by the server when
+    it cuts the worktree, never by a request — a field a client could fill in would be a way to
+    borrow another folder's grant.
     """
 
     max_steps: int | None = None
@@ -458,6 +476,42 @@ def resolve_posture(posture: Posture | None) -> ResolvedPosture:
     return _resolve_posture(posture) if posture is not None else ResolvedPosture([], False, False, False)
 
 
+def server_grants_shell(settings: Settings, folder: Path) -> bool:
+    """Whether the SERVER's own records let the agent run commands in ``folder``.
+
+    Two records say yes, and nothing a request carries is one of them:
+
+    * ``CHIMERA_REACH=workspace_shell`` — the owner granted commands in every folder at once;
+    * a grant on the folder in the project registry (``code_projects.json``), set from the Folders
+      card, the Code screen's switch, the one-time migration of the old browser-side grants, or the
+      bridge at its Full tier.
+
+    The desktop used to keep the per-folder grant in its own ``localStorage`` and tell the server
+    about it on every request, as ``posture.reach = workspace_shell`` and ``allow_host_exec``. The
+    server had nothing to check that against, so the claim WAS the grant — for the desktop, for the
+    bridge's Full tier, and for any local process that could reach the API.
+    """
+    if settings.reach.strip() == "workspace_shell":
+        return True
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    return CodeProjectRegistry(Path(settings.home) / "code_projects.json").shell_granted_for(folder)
+
+
+def granted_posture(posture: Posture | None, granted: bool) -> Posture | None:
+    """The request's posture, held to what the server granted.
+
+    A ``workspace_shell`` reach on a folder with no grant is answered with ``workspace`` — the reach
+    the desktop sends for a folder nobody granted — rather than refused: the turn still runs, it just
+    runs without commands, which is what the owner's record says. Nothing else is touched. A posture
+    can only get NARROWER here, so ``read_only`` stays ``read_only``, and an absent posture stays
+    absent (its host execution is still held by ``allow_host_exec`` needing the grant, below).
+    """
+    if posture is None or granted or posture.reach != "workspace_shell":
+        return posture
+    return posture.model_copy(update={"reach": "workspace"})
+
+
 def resolve_role_plan(seams: CodeSeams, settings: Settings) -> RolePlan:
     """The roles this request runs with. No profile and no overrides = no role routing at all."""
     return resolve_roles(seams.profile, settings, seams.roles)
@@ -541,6 +595,7 @@ def assemble_registry(
     extra_tools: Sequence[Tool] | None = None,
     run_id: str | None = None,
     notice_sink: Any = None,
+    grant_root: Path | None = None,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -560,6 +615,9 @@ def assemble_registry(
     ``instruction`` is the person's own words for this run — the task, or the turn's message — so a
     fetch of a page or a file it names is recorded as the user's request. A caller with no single
     task (the hierarchy's fixed seams) passes nothing, and every fetch there reads ``unknown``.
+
+    ``grant_root`` is the folder whose recorded shell grant applies when ``ws`` is a copy of it — a
+    crew worker's worktree. None = ``ws`` itself (or the root the server stamped on the seams).
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -584,9 +642,19 @@ def assemble_registry(
     from chimera.sandbox.confirm import resolve_host_exec_confirm
     from chimera.tools import default_registry
 
-    reach_mounts_shell = not (EXEC_TOOLS & set(resolve_posture(seams.posture).deny_tools))
+    #
+    # And a THIRD condition since the grant moved to the server: the server's own record for this
+    # folder (`server_grants_shell`). The request's `workspace_shell` and `allow_host_exec` are
+    # still read, but as a request — a folder the owner did not grant gets the reach below it and a
+    # gated tool, whatever was asked. Narrowing only: the record cannot lift `read_only` (the posture
+    # keeps it) nor `deny` (`owner_refuses`), because neither consults it.
+    granted = server_grants_shell(settings, grant_root or seams._grant_root or ws)
+    posture_in = granted_posture(seams.posture, granted)
+    if posture_in is not seams.posture:
+        _log.info("no shell grant recorded for %s: the request's workspace_shell runs as workspace", ws)
+    reach_mounts_shell = not (EXEC_TOOLS & set(resolve_posture(posture_in).deny_tools))
     owner_refuses = (settings.host_exec or "ask").lower() == "deny"
-    ungated = seams.allow_host_exec and reach_mounts_shell and not owner_refuses
+    ungated = seams.allow_host_exec and granted and reach_mounts_shell and not owner_refuses
 
     registry = default_registry(
         ws,
@@ -649,7 +717,7 @@ def assemble_registry(
     # every request runs unfenced, and it fails in the direction nobody checks.
     denied = sorted({
         *(seams.deny_tools or ()),
-        *resolve_posture(seams.posture).deny_tools,
+        *resolve_posture(posture_in).deny_tools,
         *deployment_posture(settings).deny_tools,
         *settings.tool_denylist,
     })
@@ -740,7 +808,7 @@ def assemble_registry(
     # Governance screen reports `"armed": bool(settings.taint_narrow)`, which stayed true: the app
     # said the defence was on while requests were turning it off.
     narrow = (
-        (resolve_posture(seams.posture).narrow_on_taint if seams.posture is not None else False)
+        (resolve_posture(posture_in).narrow_on_taint if posture_in is not None else False)
         or settings.taint_narrow
         or deployment_posture(settings).narrow_on_taint
     )
@@ -1536,6 +1604,9 @@ def register_code_api(
             ws = Path(req.workspace).expanduser().resolve()
             if not ws.is_dir():
                 raise HTTPException(status_code=400, detail="workspace not found")
+            # "Recent" in the sidebar's order means a turn started here, not that the row was
+            # looked at. Only a registered folder is stamped; see `CodeProjectRegistry.touch`.
+            projects.touch(req.workspace)
         else:
             ws = workspace
         if req.spoken and not (req.provider or "").strip():
@@ -2677,8 +2748,12 @@ def register_code_api(
         # user turned the guard off — and when they have, the sentence has to say so, because the
         # whole product rests on stating what is true on this machine rather than what reads better.
         chat_guarded = live().guard_chat
+        # Held to the folder's recorded grant exactly as the turn will be (`assemble_registry`), so
+        # the sentence on screen describes the run that happens rather than the one asked for.
+        asked = Posture(reach=req.reach, approval=req.approval)
+        held = granted_posture(asked, server_grants_shell(live(), ws)) or asked
         return describe(
-            Posture(reach=req.reach, approval=req.approval),
+            held,
             ws,
             settings,
             # A guarded chat CAN now stop and ask: its ledger narrows on taint and its approver
@@ -3171,18 +3246,78 @@ def register_code_api(
     # under this project" — a second DELETE on that path meaning "forget the bookmark" would read
     # identically at the call site and destroy transcripts when a user tidied their list. Two verbs
     # that differ only in what they erase do not share a noun.
+    def _project_rows(rows: Sequence[Any]) -> list[dict[str, Any]]:
+        return [
+            {
+                "path": row.path,
+                "alias": row.alias,
+                "shell_granted": row.shell_granted,
+                "granted_at": row.granted_at,
+                "pinned": row.pinned,
+                "last_used_at": row.last_used_at,
+                "hidden": row.hidden,
+            }
+            for row in rows
+        ]
+
     @app.get("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
-    def list_code_workspaces() -> list[dict[str, str]]:
-        """The projects you have added, in the order you added them.
+    def list_code_workspaces() -> list[dict[str, Any]]:
+        """The projects you have added, in the order you added them — hidden ones included.
 
         The sidebar unions these with the projects it derives from conversations, so a project you
         have worked in stays listed whether or not it was ever registered — nothing disappears
-        because it was not on this list.
+        because it was not on this list. Hidden rows are sent rather than filtered, because hiding a
+        folder you have talked about is exactly the case the sidebar must know about to leave out.
         """
-        return [{"path": row.path, "alias": row.alias} for row in projects.entries()]
+        return _project_rows(projects.entries())
+
+    @app.patch("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
+    def flag_code_workspace(body: CodeProjectFlagsIn) -> list[dict[str, Any]]:
+        """Pin or hide a project, registering it if it was not. Hiding revokes its grant and pin.
+
+        Only ever narrows what the agent may do, so the bridge serves it at its operate tier.
+        """
+        try:
+            rows = projects.set_flags(body.path, pinned=body.pinned, hidden=body.hidden)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _project_rows(rows)
+
+    @app.put(
+        "/api/code/workspaces/grant", dependencies=[guard], response_model=list[CodeProjectOut]
+    )
+    def grant_code_workspace(body: CodeProjectGrantIn) -> list[dict[str, Any]]:
+        """Grant or revoke commands in one folder — the record every coding turn is held to.
+
+        Its own route rather than a field on the PATCH above, so the bridge can hold granting to its
+        Full tier while pinning and hiding stay at operate. Behind the same guard as the rest of the
+        API: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach
+        every other route. What moving the grant here changes is that a REQUEST no longer carries
+        it; recording one is a separate act, listed in the Folders card where it can be revoked.
+        """
+        try:
+            rows = projects.set_grant(body.path, body.shell_granted)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _project_rows(rows)
+
+    @app.post(
+        "/api/code/workspaces/grant/migrate",
+        dependencies=[guard],
+        response_model=CodeGrantMigrationOut,
+    )
+    def migrate_code_workspace_grants(body: CodeGrantMigrationIn) -> dict[str, Any]:
+        """Record the folders the desktop had granted in its own storage — ONCE per installation.
+
+        The first call closes the window whatever it carries, an empty list included; every later
+        one changes nothing and answers ``migrated: false``. Not on the bridge: it exists for one
+        client's one-time upgrade, not as a second way to grant.
+        """
+        migrated, recorded, rows = projects.migrate_grants(body.paths)
+        return {"migrated": migrated, "recorded": recorded, "projects": _project_rows(rows)}
 
     @app.post("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
-    def register_code_workspace(body: CodeProjectIn) -> list[dict[str, str]]:
+    def register_code_workspace(body: CodeProjectIn) -> list[dict[str, Any]]:
         """Add a project, or name one you already added. Idempotent on the path.
 
         Registering says nothing about whether the folder exists — a bookmark to a moved checkout
@@ -3194,13 +3329,14 @@ def register_code_api(
             rows = projects.register(body.path, body.alias)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return [{"path": row.path, "alias": row.alias} for row in rows]
+        return _project_rows(rows)
 
     @app.delete("/api/code/workspaces", dependencies=[guard], response_model=list[CodeProjectOut])
-    def forget_code_workspace(path: str) -> list[dict[str, str]]:
+    def forget_code_workspace(path: str) -> list[dict[str, Any]]:
         """Forget a bookmark. **Conversations are not touched**, so a project you have worked in
-        reappears in the sidebar as one you have talked about rather than one you registered."""
-        return [{"path": row.path, "alias": row.alias} for row in projects.remove(path)]
+        reappears in the sidebar as one you have talked about rather than one you registered. Its
+        grant goes with it; to keep a folder out of the lists for good, hide it (PATCH)."""
+        return _project_rows(projects.remove(path))
 
     @app.get("/api/ui/layout", dependencies=[guard], response_model=UiLayoutOut)
     def get_ui_layout() -> dict[str, Any]:

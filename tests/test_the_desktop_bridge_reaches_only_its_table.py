@@ -163,7 +163,11 @@ def test_an_operate_route_is_served_by_the_apps_own_handler(
         added = _call(client, app, "projects.add", body={"path": str(project), "alias": "demo"})
         listed = _call(client, app, "projects.list")
     assert added.status_code == 200 and added.json()["status"] == 200
-    assert listed.json()["data"] == [{"path": str(project), "alias": "demo"}]
+    # Path and name: the row also carries the folder's grant, pin and recency (study 29, P4.3),
+    # which the tests under "folder grants" below hold on their own.
+    row = listed.json()["data"][0]
+    assert len(listed.json()["data"]) == 1
+    assert (row["path"], row["alias"], row["shell_granted"]) == (str(project), "demo", False)
 
 
 def test_approving_is_refused_server_side_without_full_control(
@@ -290,6 +294,75 @@ def test_with_full_control_the_client_may_set_the_posture(
             client, app, "test.seams", body={"task": "x", "posture": wide, "allow_host_exec": True}
         )
     assert seen[0]["posture"] == wide and seen[0]["allow_host_exec"] is True
+
+
+# ---- folder grants (study 29, P4.3) ---------------------------------------------------------------
+
+
+def _grant(home: Path, folder: Path) -> None:
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    CodeProjectRegistry(home / "code_projects.json").set_grant(str(folder), True)
+
+
+def test_an_operate_run_in_a_granted_folder_gets_its_commands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bridge sees the same grant the Code screen does — and reads it from the same record,
+    so a grant made in the app is honoured here without the bridge being told anything."""
+    app = _app(tmp_path, monkeypatch)
+    seen = _capture_route(app, monkeypatch)
+    granted, other = tmp_path / "granted", tmp_path / "other"
+    granted.mkdir()
+    other.mkdir()
+    _grant(tmp_path / "home", granted)
+
+    with TestClient(app) as client:
+        _call(client, app, "test.seams", body={"task": "x", "workspace": str(granted)})
+        _call(client, app, "test.seams", body={"task": "x", "workspace": str(other)})
+    assert seen[0]["posture"]["reach"] == "workspace_shell" and seen[0]["allow_host_exec"] is True
+    assert seen[1]["posture"]["reach"] == "workspace" and seen[1]["allow_host_exec"] is False
+
+
+def test_a_folder_grant_does_not_lift_the_owners_read_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app(tmp_path, monkeypatch, CHIMERA_REACH="read_only")
+    seen = _capture_route(app, monkeypatch)
+    granted = tmp_path / "granted"
+    granted.mkdir()
+    _grant(tmp_path / "home", granted)
+
+    with TestClient(app) as client:
+        _call(client, app, "test.seams", body={"task": "x", "workspace": str(granted)})
+    assert seen[0]["posture"]["reach"] == "read_only" and seen[0]["allow_host_exec"] is False
+
+
+def test_pinning_is_operate_and_granting_needs_full_control(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pinning and hiding only narrow (hiding revokes); granting widens, so it is Full."""
+    folder = tmp_path / "proj"
+    folder.mkdir()
+    operate = _app(tmp_path, monkeypatch)
+    with TestClient(operate) as client:
+        pinned = _call(client, operate, "projects.flag", body={"path": str(folder), "pinned": True})
+        refused = _call(
+            client, operate, "settings.folder_grant",
+            body={"path": str(folder), "shell_granted": True},
+        )
+    assert pinned.status_code == 200 and pinned.json()["data"][0]["pinned"] is True
+    assert refused.status_code == 403
+
+    full = _app(tmp_path, monkeypatch, full=True)
+    with TestClient(full) as client:
+        granted = _call(
+            client, full, "settings.folder_grant",
+            body={"path": str(folder), "shell_granted": True},
+        )
+        listed = _call(client, full, "projects.list")
+    assert granted.status_code == 200
+    assert listed.json()["data"][0]["shell_granted"] is True
 
 
 def test_the_widening_scan_reads_nested_bodies_and_ignores_empty_values() -> None:

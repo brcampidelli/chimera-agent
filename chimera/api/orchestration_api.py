@@ -988,6 +988,8 @@ def register_orchestration_api(
                         req, worker_ws, live, gateway,
                         steps=req.max_steps or 6, surface="api:crew", shared=shared,
                         instruction=req.task,
+                        # The worker's folder is a copy; the shell grant is the project's.
+                        grant_root=ws,
                     )
                     return registry
 

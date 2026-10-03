@@ -30,6 +30,7 @@ import { Governance } from "@/components/Governance";
 import { Decisions } from "@/components/Decisions";
 import { Usage } from "@/components/Usage";
 import { SystemOneCard } from "@/components/SystemOneCard";
+import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
 import { NotificationsCard } from "@/components/NotificationsCard";
 import { ModelPicker } from "@/components/code/ModelPicker";
@@ -1113,6 +1114,9 @@ export function Settings({
                 <IdentityCard />
 
                 <AutonomyCard c={c} save={save} />
+
+                {/* Where commands may run, folder by folder — the server's record (study 29, P4.3). */}
+                <FoldersCard reach={c.autonomy.reach} />
 
                 {d && (
                   <Card title={t("settings.card.status")}>

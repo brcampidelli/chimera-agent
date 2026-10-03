@@ -14,10 +14,13 @@ import {
 
 const listCodeProjects = vi.fn();
 const registerCodeProject = vi.fn();
+const migrateShellGrants = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   listCodeProjects: (...args: unknown[]) => listCodeProjects(...args),
   registerCodeProject: (...args: unknown[]) => registerCodeProject(...args),
+  // The command grants ride the same load (`project-shell.ts`); its own test file covers them.
+  migrateShellGrants: (...args: unknown[]) => migrateShellGrants(...args),
 }));
 
 /**
@@ -31,6 +34,7 @@ describe("projects", () => {
     localStorage.clear();
     listCodeProjects.mockReset().mockResolvedValue([]);
     registerCodeProject.mockReset().mockResolvedValue([]);
+    migrateShellGrants.mockReset().mockResolvedValue({ migrated: true, recorded: 0, projects: [] });
   });
 
   it("asks the server, not this browser", async () => {
