@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -279,5 +280,32 @@ describe("Settings — the network a command can reach", () => {
 
     expect(await within(region).findByText("python3 in the container")).toBeInTheDocument();
     expect(within(region).queryByText(INTERPRETER.path)).not.toBeInTheDocument();
+  });
+  it("never keeps the sandbox probe cached, so the Security screen cannot be served a stale one", async () => {
+    // The app's own defaults (`main.tsx`): fresh for 30 s, kept 5 min. Security reads the same key
+    // with `staleTime: 0, gcTime: 0` so a Docker daemon that died since the last look changes the
+    // answer; TanStack keeps the LONGEST gcTime any observer asked for, so one observer here with the
+    // defaults kept the old "isolated / container" around and Security showed it while re-probing.
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 30_000, refetchOnWindowFocus: false } },
+    });
+    const app = (
+      <QueryClientProvider client={qc}>
+        <Settings />
+      </QueryClientProvider>
+    );
+    const first = renderWithProviders(app);
+    await card();
+    await waitFor(() => expect(getSandboxState).toHaveBeenCalledTimes(1));
+
+    first.unmount();
+    await waitFor(() =>
+      expect(qc.getQueryCache().find({ queryKey: ["governance-sandbox"] })).toBeUndefined(),
+    );
+
+    // And coming back within the 30 s the rest of the app treats as fresh probes again.
+    renderWithProviders(app);
+    await card();
+    await waitFor(() => expect(getSandboxState).toHaveBeenCalledTimes(2));
   });
 });

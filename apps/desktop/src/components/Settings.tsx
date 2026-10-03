@@ -554,7 +554,16 @@ function SandboxReachRows({
   save: (updates: Record<string, string>) => void;
 }) {
   const t = useT();
-  const state = useQuery({ queryKey: ["governance-sandbox"], queryFn: () => getSandboxState() });
+  // The Security screen's rule, and it has to be the same here: probed on every open, never kept.
+  // TanStack keeps the LONGEST gcTime any observer of a key asked for, so this observer with the app
+  // defaults (fresh 30 s, kept 5 min) would hand Security a dead daemon's "isolated" while it
+  // re-probed — and this card would offer the container switch on a cached answer.
+  const state = useQuery({
+    queryKey: ["governance-sandbox"],
+    queryFn: () => getSandboxState(),
+    staleTime: 0,
+    gcTime: 0,
+  });
   const s: SandboxState | undefined = state.data;
   if (!s) return null;
   const inContainer = s.backend === "docker";
