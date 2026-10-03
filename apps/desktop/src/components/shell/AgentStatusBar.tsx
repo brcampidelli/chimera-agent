@@ -1,6 +1,7 @@
 import { Square } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
+import { CronFailureNotifier } from "@/components/shell/CronFailureNotifier";
 import { FocusButton, HiddenTray } from "@/components/shell/HiddenTray";
 import { PendingApprovals } from "@/components/shell/PendingApprovals";
 import { RunningElsewhere } from "@/components/shell/RunningElsewhere";
@@ -122,6 +123,10 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
           agent is waiting on YOU, from whichever screen you happen to be on. Renders nothing at
           all while no question is parked — see PendingApprovals. */}
       <PendingApprovals />
+      {/* Draws nothing: it watches the schedules for a new failure while the window is in the
+          background, when the person asked for that in Settings. Here because this bar is mounted
+          under every screen. */}
+      <CronFailureNotifier />
 
       {/* The coding turns running in OTHER conversations, each with its own Stop. The bar describes
           one turn; with several working at once the others were invisible from here and could only

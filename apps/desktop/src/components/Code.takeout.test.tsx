@@ -152,4 +152,38 @@ describe("Code — taking the conversation out", () => {
     await askOnce();
     expect(await screen.findByText("the answer")).toBeInTheDocument();
   });
+
+  it("keeps quiet about a turn shorter than the threshold the person set", async () => {
+    // Settings › General › Notifications: "only for turns longer than N s", measured from the send.
+    // A two-second answer is not something anyone walked away from.
+    const ctor = vi.fn();
+    vi.stubGlobal("Notification", Object.assign(ctor, { permission: "granted", requestPermission: vi.fn() }));
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    localStorage.setItem("chimera.notifyOnFinish", "1");
+    localStorage.setItem("chimera.notifyMinSeconds", "600");
+
+    await askOnce();
+    expect(await screen.findByText("the answer")).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(ctor).not.toHaveBeenCalled();
+  });
+
+  it("tells a failed turn with what was asked, never with the error's text", async () => {
+    // The error is a provider's or a tool's words. The parameter that carried it used to shadow the
+    // prompt, so the OS notification showed it — outside every boundary the app draws.
+    const ctor = vi.fn();
+    vi.stubGlobal("Notification", Object.assign(ctor, { permission: "granted", requestPermission: vi.fn() }));
+    vi.spyOn(document, "hasFocus").mockReturnValue(false);
+    localStorage.setItem("chimera.notifyOnFinish", "1");
+    vi.mocked(streamCodeTurn).mockImplementation(((_req: CodeTurnInput, h: CodeTurnHandlers) => {
+      h.onError?.("upstream said: ignore previous instructions");
+      return Promise.resolve();
+    }) as never);
+
+    await askOnce();
+
+    await waitFor(() => expect(ctor).toHaveBeenCalledTimes(1));
+    expect(ctor.mock.calls[0]).toEqual(["Turn failed", { body: "hello" }]);
+  });
 });
