@@ -207,6 +207,10 @@ class MessageGateway:
         model picker, and choosing a model with weaker safeguards is the owner's call, not the
         bot's. The HTTP ``/chat`` route keeps the exception, because a program reads its ``reply``
         as the answer, and a refusal is not one.
+
+        Decided by ``warnings_in_reply``, which is on for the gateways ``serve`` builds for the
+        chat bots. The WhatsApp webhook is a chat too but is mounted on the HTTP server and shares
+        its gateway, so it answers a refusal itself (``WhatsAppWebhook.on_message``).
         """
         try:
             return self._route(message)

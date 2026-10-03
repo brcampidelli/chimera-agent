@@ -384,3 +384,48 @@ def test_the_http_route_and_other_failures_keep_their_exception() -> None:
     # And on a chat platform, anything that is not a refusal is not dressed as one.
     with pytest.raises(RuntimeError):
         _gateway(RuntimeError("down"), chat=True).on_message(InboundMessage(text="x"))
+
+
+class _WhatsAppOut:
+    platform = "whatsapp"
+
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, str]] = []
+
+    def send(self, chat_id: str, text: str) -> str:
+        self.sent.append((chat_id, text))
+        return "ok"
+
+
+def _whatsapp_text(text: str) -> dict[str, Any]:
+    message = {"from": "15551234567", "type": "text", "text": {"body": text}}
+    return {"entry": [{"changes": [{"value": {"messages": [message]}}]}]}
+
+
+def test_whatsapp_answers_a_refusal_although_it_shares_the_http_gateway() -> None:
+    from chimera.server import WhatsAppWebhook
+
+    exc = _router_refusal()
+    mark_model(exc, "openrouter/openai/gpt-4o")
+    # As `chimera serve` wires it: ONE gateway for the HTTP server, built for `/chat` (no warnings
+    # in the reply), handed to the WhatsApp webhook too. The gateway's switch kept the refusal an
+    # exception, so Meta's POST failed and the person on WhatsApp was sent nothing.
+    out = _WhatsAppOut()
+    hook = WhatsAppWebhook(out, "T", _gateway(exc, chat=False).on_message)  # type: ignore[arg-type]  # a two-method fake sender
+
+    assert hook.on_message(_whatsapp_text("x")) == 1
+
+    assert out.sent == [
+        ("15551234567", PolicyBlock("openrouter/openai/gpt-4o", "OpenAI", None).chat_sentence())
+    ]
+
+
+def test_whatsapp_still_raises_what_is_not_a_refusal() -> None:
+    from chimera.server import WhatsAppWebhook
+
+    out = _WhatsAppOut()
+    hook = WhatsAppWebhook(out, "T", _gateway(RuntimeError("down"), chat=False).on_message)  # type: ignore[arg-type]  # a two-method fake sender
+
+    with pytest.raises(RuntimeError):
+        hook.on_message(_whatsapp_text("x"))
+    assert out.sent == []
