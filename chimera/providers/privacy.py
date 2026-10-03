@@ -82,12 +82,20 @@ def prompt_routes(settings: Settings) -> list[dict[str, Any]]:
         entry = routes.setdefault(name, {"provider": name, "local": is_local_model(slug), "roles": []})
         if role not in entry["roles"]:
             entry["roles"].append(role)
-    if (settings.decision_backend or "").strip() == "openrouter_decisions":
+    if _decisions_api_use(settings):
         entry = routes.setdefault(
             "openrouter", {"provider": "openrouter", "local": False, "roles": []}
         )
         entry["roles"].append("decisions")
     return list(routes.values())
+
+
+def _decisions_api_use(settings: Settings) -> str:
+    """The verifier's own predicate (`chimera/fusion/verified.py`), imported late: that module pulls
+    in the decision stack, which the gateway importing this one must not pay for."""
+    from chimera.fusion.verified import decisions_api_use
+
+    return decisions_api_use(settings)
 
 
 def privacy_snapshot(settings: Settings) -> dict[str, Any]:
@@ -104,10 +112,17 @@ def privacy_snapshot(settings: Settings) -> dict[str, Any]:
         # reports the effective state, not the setting alone.
         "telemetry": bool(settings.otel) or bool(os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")),
         # A surface that reaches OpenRouter WITHOUT the preference above. Named rather than hidden:
-        # an owner who set `deny` and runs this backend would otherwise believe every call carries it.
-        "unscoped": (
-            ["decisions"]
-            if (settings.decision_backend or "").strip() == "openrouter_decisions"
-            else []
-        ),
+        # an owner who set `deny` would otherwise believe every call carries it. `decisions` when the
+        # Decisions API is the chosen backend; `decisions_fallback` when it only stands behind the
+        # local verifier — the default install with an OpenRouter key, so the common case.
+        "unscoped": _unscoped(settings),
     }
+
+
+def _unscoped(settings: Settings) -> list[str]:
+    use = _decisions_api_use(settings)
+    if use == "chosen":
+        return ["decisions"]
+    if use == "fallback":
+        return ["decisions_fallback"]
+    return []

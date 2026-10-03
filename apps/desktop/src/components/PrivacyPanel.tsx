@@ -42,6 +42,7 @@ export function PrivacyPanel({
 }) {
   const deny = privacy.openrouter_data_collection === "deny";
   const routes = privacy.routes ?? [];
+  const unscoped = privacy.unscoped ?? [];
   const egress = config.autonomy.egress_allow ?? [];
   const bots = Object.entries(config.messaging?.allowed_users ?? {}).sort(([a], [b]) =>
     a.localeCompare(b),
@@ -75,9 +76,16 @@ export function PrivacyPanel({
           {deny ? t("governance.privacy.retentionDeny") : t("governance.privacy.retentionAllow")}
         </Line>
         {privacy.openrouter_zdr ? <Line>{t("governance.privacy.zdr")}</Line> : null}
-        {/* Only matters once a preference is set: without one there is nothing this surface skips. */}
-        {(deny || privacy.openrouter_zdr) && (privacy.unscoped ?? []).includes("decisions") ? (
+        {/* Only matters once a preference is set: without one there is nothing this surface skips.
+            `decisions_fallback` is the default install with an OpenRouter key — the common case,
+            and the one the card used to miss. */}
+        {(deny || privacy.openrouter_zdr) && unscoped.includes("decisions") ? (
           <span className="text-xs text-warn-foreground">{t("governance.privacy.unscoped")}</span>
+        ) : null}
+        {(deny || privacy.openrouter_zdr) && unscoped.includes("decisions_fallback") ? (
+          <span className="text-xs text-warn-foreground">
+            {t("governance.privacy.unscopedFallback")}
+          </span>
         ) : null}
       </Section>
 

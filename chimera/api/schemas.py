@@ -779,8 +779,10 @@ class PrivacyCfgOut(BaseModel):
     telemetry: bool = False
     """Whether the OpenTelemetry exporter is on (``CHIMERA_OTEL`` or ``OTEL_EXPORTER_OTLP_ENDPOINT``)."""
     unscoped: list[str] = Field(default_factory=list)
-    """Surfaces that reach OpenRouter WITHOUT the preference above (``decisions``), so the card can
-    say so instead of letting ``deny`` read as covering every call."""
+    """Surfaces that reach OpenRouter WITHOUT the preference above, so the card can say so instead of
+    letting ``deny`` read as covering every call: ``decisions`` (the Decisions API is the chosen
+    backend) or ``decisions_fallback`` (it stands behind the local verifier — verified answers on,
+    ``local_logprob``, an OpenRouter key)."""
 
 
 class ConfigOut(BaseModel):

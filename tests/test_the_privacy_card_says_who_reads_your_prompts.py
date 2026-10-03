@@ -75,6 +75,50 @@ def test_the_decisions_backend_is_named_as_reaching_openrouter_without_the_prefe
     assert privacy_snapshot(_settings())["unscoped"] == []
 
 
+def test_the_default_install_with_an_openrouter_key_names_the_verifiers_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The VPS's shape: verified answers on and `local_logprob` (both defaults), an OpenRouter key,
+    no Ollama. `build_verifier` puts the Decisions API behind the local verifier, so every grounded
+    turn's sources can go there without the routing preference — and the card said nothing reached it."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    snapshot = privacy_snapshot(_settings(CHIMERA_OPENROUTER_DATA_COLLECTION="deny"))
+    assert snapshot["unscoped"] == ["decisions_fallback"]
+    assert "decisions" in {r["provider"]: r for r in snapshot["routes"]}["openrouter"]["roles"]
+
+
+@pytest.mark.parametrize(
+    ("env", "key"),
+    [
+        ({}, True),
+        ({}, False),
+        ({"CHIMERA_VERIFIED_ANSWERS": "false"}, True),
+        ({"CHIMERA_DECISION_BACKEND": "hosted_verbalized"}, True),
+        ({"CHIMERA_DECISION_BACKEND": "openrouter_decisions"}, True),
+    ],
+)
+def test_the_card_and_the_verifier_agree_on_whether_the_decisions_api_is_reached(
+    monkeypatch: pytest.MonkeyPatch, env: dict[str, str], key: bool
+) -> None:
+    """Read against `build_verifier` itself, not against a restatement of its rule: the card names
+    the Decisions API exactly when the chain the verifier builds holds an OpenRouter Decisions slot."""
+    from chimera.fusion.verified import build_verifier
+
+    if key:
+        monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    settings = _settings(**env)
+    verifier = build_verifier(settings)
+    in_chain = verifier is not None and any(
+        getattr(slot, "backend", "") == "openrouter_decisions" for slot in verifier.chain
+    )
+    named = bool(privacy_snapshot(settings)["unscoped"])
+    if env.get("CHIMERA_DECISION_BACKEND") == "openrouter_decisions":
+        # Chosen: every decision surface posts there (the `decide` tool, the band), verifier or not.
+        assert named
+    else:
+        assert named == in_chain
+
+
 def test_the_card_reports_what_was_set() -> None:
     snapshot = privacy_snapshot(
         _settings(CHIMERA_OPENROUTER_DATA_COLLECTION="deny", CHIMERA_OPENROUTER_ZDR="true")

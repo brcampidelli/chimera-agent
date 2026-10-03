@@ -113,6 +113,19 @@ describe("Governance — the privacy card", () => {
     expect(panel.getByText(/Decisions API backend .* without this preference/i)).toBeInTheDocument();
   });
 
+  it("says the verifier's fallback reaches OpenRouter without deny on the default install", async () => {
+    // Verified answers on, `local_logprob`, an OpenRouter key: the Decisions API stands behind the
+    // local verifier, so `deny` must not read as covering a grounded turn's sources.
+    vi.mocked(getConfig).mockResolvedValue(
+      config({ ...PRIVACY, openrouter_data_collection: "deny", unscoped: ["decisions_fallback"] }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.getByText(/falls back to OpenRouter's Decisions API .* does not carry this preference/i))
+      .toBeInTheDocument();
+    expect(panel.queryByText(/The Decisions API backend \(System One\)/)).toBeNull();
+  });
+
   it("names the custom endpoint every call goes to", async () => {
     vi.mocked(getConfig).mockResolvedValue(
       config(PRIVACY, { models: { api_base: "http://10.0.0.5:8000/v1" } }),
