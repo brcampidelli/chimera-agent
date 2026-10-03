@@ -283,7 +283,7 @@ const en: Dict = {
   "settings.hint.appCron":
     "Fires the jobs on the Automation screen, but only while this app is open. For jobs that run 24/7, run `chimera serve --cron` on a machine that stays on.",
   "settings.card.shell": "Window and tray",
-  "settings.shell.intro": "The desktop app's own switches, the same ones as its tray menu. The app takes a change in within a few seconds.",
+  "settings.shell.intro": "The desktop app's own switches, the same ones as its tray menu. The app usually takes a change in within about three seconds, longer while the backend is slow to answer; this card re-reads them every few seconds, so a change made in the tray shows up here too.",
   "settings.shell.unavailable": "These belong to the desktop app's window, and this server was not started by it, so there is nothing here to change.",
   "settings.shell.unreadable": "The file that holds these (shell-prefs.json) does not parse, so the app is on its defaults and nothing can be saved from here. The tray menu says what is wrong.",
   "settings.shell.keepInTray": "Keep running in the tray",
@@ -2094,7 +2094,7 @@ const pt: Dict = {
   "settings.hint.appCron":
     "Dispara os jobs da tela Automação, mas só enquanto este app estiver aberto. Para jobs 24/7, rode `chimera serve --cron` numa máquina que fique ligada.",
   "settings.card.shell": "Janela e bandeja",
-  "settings.shell.intro": "Os interruptores do próprio app de desktop, os mesmos do menu da bandeja. O app aplica uma mudança em poucos segundos.",
+  "settings.shell.intro": "Os interruptores do próprio app de desktop, os mesmos do menu da bandeja. O app costuma aplicar uma mudança em uns três segundos, mais quando o backend demora a responder; este cartão relê os valores a cada poucos segundos, então uma mudança feita na bandeja também aparece aqui.",
   "settings.shell.unavailable": "Estes pertencem à janela do app de desktop, e este servidor não foi iniciado por ele; não há nada a mudar aqui.",
   "settings.shell.unreadable": "O arquivo que guarda estas opções (shell-prefs.json) não é um JSON válido, então o app está nos padrões e nada pode ser salvo daqui. O menu da bandeja diz o que está errado.",
   "settings.shell.keepInTray": "Continuar rodando na bandeja",
@@ -3956,7 +3956,7 @@ const es: Dict = {
   "settings.hint.appCron":
     "Dispara las tareas de la pantalla Automatización, pero solo mientras esta app está abierta. Para tareas 24/7, ejecuta `chimera serve --cron` en una máquina que quede encendida.",
   "settings.card.shell": "Ventana y bandeja",
-  "settings.shell.intro": "Los interruptores propios de la app de escritorio, los mismos de su menú de bandeja. La app aplica un cambio en pocos segundos.",
+  "settings.shell.intro": "Los interruptores propios de la app de escritorio, los mismos de su menú de bandeja. La app suele aplicar un cambio en unos tres segundos, más si el backend tarda en responder; esta tarjeta los vuelve a leer cada pocos segundos, así que un cambio hecho en la bandeja también aparece aquí.",
   "settings.shell.unavailable": "Estos pertenecen a la ventana de la app de escritorio, y este servidor no lo inició ella, así que aquí no hay nada que cambiar.",
   "settings.shell.unreadable": "El archivo que los guarda (shell-prefs.json) no es JSON válido, así que la app usa sus valores por defecto y no se puede guardar nada desde aquí. El menú de la bandeja dice qué está mal.",
   "settings.shell.keepInTray": "Seguir ejecutándose en la bandeja",
@@ -5793,7 +5793,7 @@ const fr: Dict = {
   "settings.hint.appCron":
     "Déclenche les tâches de l'écran Automatisation, mais seulement tant que cette app est ouverte. Pour des tâches 24 h/24, lancez `chimera serve --cron` sur une machine qui reste allumée.",
   "settings.card.shell": "Fenêtre et zone de notification",
-  "settings.shell.intro": "Les interrupteurs propres à l'application de bureau, les mêmes que ceux de son menu de la zone de notification. L'application prend un changement en compte en quelques secondes.",
+  "settings.shell.intro": "Les interrupteurs propres à l'application de bureau, les mêmes que ceux de son menu de la zone de notification. L'application prend d'ordinaire un changement en compte en trois secondes environ, davantage quand le backend tarde à répondre ; cette carte les relit toutes les quelques secondes, donc un changement fait depuis la zone de notification apparaît ici aussi.",
   "settings.shell.unavailable": "Ils appartiennent à la fenêtre de l'application de bureau, et ce serveur n'a pas été démarré par elle : il n'y a rien à changer ici.",
   "settings.shell.unreadable": "Le fichier qui les contient (shell-prefs.json) n'est pas un JSON valide : l'application utilise ses valeurs par défaut et rien ne peut être enregistré d'ici. Le menu de la zone de notification dit ce qui ne va pas.",
   "settings.shell.keepInTray": "Continuer dans la zone de notification",
@@ -7641,7 +7641,7 @@ const de: Dict = {
   "settings.hint.appCron":
     "Löst die Jobs im Automatisierungs-Screen aus, aber nur, solange diese App offen ist. Für Jobs rund um die Uhr `chimera serve --cron` auf einem Rechner starten, der eingeschaltet bleibt.",
   "settings.card.shell": "Fenster und Infobereich",
-  "settings.shell.intro": "Die eigenen Schalter der Desktop-App, dieselben wie im Menü des Infobereichs. Die App übernimmt eine Änderung innerhalb weniger Sekunden.",
+  "settings.shell.intro": "Die eigenen Schalter der Desktop-App, dieselben wie im Menü des Infobereichs. Die App übernimmt eine Änderung meist in etwa drei Sekunden, länger, wenn das Backend langsam antwortet; diese Karte liest sie alle paar Sekunden neu, sodass eine Änderung im Infobereich auch hier erscheint.",
   "settings.shell.unavailable": "Diese gehören zum Fenster der Desktop-App, und dieser Server wurde nicht von ihr gestartet, hier gibt es also nichts zu ändern.",
   "settings.shell.unreadable": "Die Datei mit diesen Einstellungen (shell-prefs.json) ist kein gültiges JSON, daher nutzt die App ihre Standardwerte und hier kann nichts gespeichert werden. Das Menü im Infobereich sagt, was nicht stimmt.",
   "settings.shell.keepInTray": "Im Infobereich weiterlaufen",
@@ -9475,7 +9475,7 @@ const zh: Dict = {
   "settings.hint.appCron":
     "触发“自动化”页面中的任务，但仅在本应用打开时运行。如需 24/7 运行，请在一台保持开机的机器上运行 `chimera serve --cron`。",
   "settings.card.shell": "窗口与托盘",
-  "settings.shell.intro": "桌面应用自身的开关，与托盘菜单中的相同。应用会在几秒内采用更改。",
+  "settings.shell.intro": "桌面应用自身的开关，与托盘菜单中的相同。应用通常在约三秒内采用更改，后端响应慢时会更久；此卡片每隔几秒重新读取一次，因此在托盘中做的更改也会显示在这里。",
   "settings.shell.unavailable": "这些属于桌面应用的窗口，而此服务器不是由它启动的，因此这里没有可更改的内容。",
   "settings.shell.unreadable": "保存这些设置的文件（shell-prefs.json）无法解析，因此应用正在使用默认值，无法从这里保存。托盘菜单会说明问题所在。",
   "settings.shell.keepInTray": "在托盘中继续运行",
@@ -11248,7 +11248,7 @@ const ja: Dict = {
   "settings.hint.appCron":
     "「自動化」画面のジョブを実行しますが、このアプリが開いている間だけです。24時間動かすには、電源を入れたままのマシンで `chimera serve --cron` を実行してください。",
   "settings.card.shell": "ウィンドウとトレイ",
-  "settings.shell.intro": "デスクトップアプリ自身のスイッチで、トレイメニューと同じものです。変更は数秒以内にアプリに反映されます。",
+  "settings.shell.intro": "デスクトップアプリ自身のスイッチで、トレイメニューと同じものです。変更は通常 3 秒ほどでアプリに反映されますが、バックエンドの応答が遅いときはもっとかかります。このカードは数秒ごとに読み直すので、トレイで行った変更もここに表示されます。",
   "settings.shell.unavailable": "これらはデスクトップアプリのウィンドウのもので、このサーバーはアプリから起動されていないため、ここで変更できるものはありません。",
   "settings.shell.unreadable": "これらを保存しているファイル（shell-prefs.json）を解析できないため、アプリは既定値で動作しており、ここからは保存できません。問題の内容はトレイメニューに表示されます。",
   "settings.shell.keepInTray": "トレイで実行を続ける",
@@ -13033,7 +13033,7 @@ const it: Dict = {
   "settings.hint.appCron":
     "Fa scattare i lavori della schermata Automazione, ma solo finché questa app è aperta. Per lavori 24/7, esegui `chimera serve --cron` su una macchina che resta accesa.",
   "settings.card.shell": "Finestra e area di notifica",
-  "settings.shell.intro": "Gli interruttori propri dell'app desktop, gli stessi del suo menu nell'area di notifica. L'app recepisce una modifica in pochi secondi.",
+  "settings.shell.intro": "Gli interruttori propri dell'app desktop, gli stessi del suo menu nell'area di notifica. Di solito l'app recepisce una modifica in circa tre secondi, di più se il backend tarda a rispondere; questa scheda li rilegge ogni pochi secondi, quindi anche una modifica fatta dall'area di notifica compare qui.",
   "settings.shell.unavailable": "Appartengono alla finestra dell'app desktop, e questo server non è stato avviato da lei: qui non c'è niente da cambiare.",
   "settings.shell.unreadable": "Il file che li contiene (shell-prefs.json) non è un JSON valido, quindi l'app usa i valori predefiniti e da qui non si può salvare nulla. Il menu nell'area di notifica dice cosa non va.",
   "settings.shell.keepInTray": "Continua nell'area di notifica",
@@ -14873,7 +14873,7 @@ const pl: Dict = {
   "settings.hint.appCron":
     "Odpala zadania z ekranu Automatyzacja, ale tylko gdy ta aplikacja jest otwarta. Aby działały 24/7, uruchom `chimera serve --cron` na maszynie, która pozostaje włączona.",
   "settings.card.shell": "Okno i zasobnik",
-  "settings.shell.intro": "Własne przełączniki aplikacji desktopowej, te same co w menu zasobnika. Aplikacja przyjmuje zmianę w ciągu kilku sekund.",
+  "settings.shell.intro": "Własne przełączniki aplikacji desktopowej, te same co w menu zasobnika. Aplikacja zwykle przyjmuje zmianę w około trzy sekundy, dłużej, gdy backend wolno odpowiada; ta karta odczytuje je ponownie co kilka sekund, więc zmiana zrobiona w zasobniku też się tu pojawi.",
   "settings.shell.unavailable": "Należą one do okna aplikacji desktopowej, a ten serwer nie został przez nią uruchomiony, więc nie ma tu czego zmieniać.",
   "settings.shell.unreadable": "Plik z tymi ustawieniami (shell-prefs.json) nie jest poprawnym JSON-em, więc aplikacja używa wartości domyślnych i stąd nie da się nic zapisać. Menu zasobnika mówi, co jest nie tak.",
   "settings.shell.keepInTray": "Działaj dalej w zasobniku",
@@ -16706,7 +16706,7 @@ const ru: Dict = {
   "settings.hint.appCron":
     "Запускает задания с экрана «Автоматизация», но только пока это приложение открыто. Чтобы они работали 24/7, запустите `chimera serve --cron` на машине, которая не выключается.",
   "settings.card.shell": "Окно и трей",
-  "settings.shell.intro": "Собственные переключатели настольного приложения, те же, что в меню трея. Приложение применяет изменение за несколько секунд.",
+  "settings.shell.intro": "Собственные переключатели настольного приложения, те же, что в меню трея. Обычно приложение применяет изменение секунды за три, дольше, если бэкенд медленно отвечает; эта карточка перечитывает их каждые несколько секунд, так что изменение, сделанное в трее, тоже появится здесь.",
   "settings.shell.unavailable": "Они относятся к окну настольного приложения, а этот сервер запущен не им, поэтому здесь нечего менять.",
   "settings.shell.unreadable": "Файл с этими настройками (shell-prefs.json) не является корректным JSON, поэтому приложение работает со значениями по умолчанию и отсюда ничего нельзя сохранить. Меню трея сообщает, в чём проблема.",
   "settings.shell.keepInTray": "Продолжать работу в трее",

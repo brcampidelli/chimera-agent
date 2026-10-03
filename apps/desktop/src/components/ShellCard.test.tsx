@@ -37,7 +37,15 @@ function prefs(over: Partial<ShellPrefs> = {}): ShellPrefs {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getShellPrefs).mockResolvedValue(prefs());
-  vi.mocked(api.patchShellPrefs).mockImplementation(async (change) => prefs(change as Partial<ShellPrefs>));
+  // What the real route answers: the switches as saved, and a sign-in change as a REQUEST the shell
+  // has not carried out yet — the system's answer is still the old one.
+  vi.mocked(api.patchShellPrefs).mockImplementation(async (change) => {
+    const { start_at_sign_in: asked, ...switches } = change;
+    const saved = Object.fromEntries(
+      Object.entries(switches).filter(([, value]) => typeof value === "boolean"),
+    ) as Partial<ShellPrefs>;
+    return prefs({ ...saved, ...(asked == null ? {} : { sign_in_requested: asked }) });
+  });
 });
 
 describe("the tray's switches on the Settings screen", () => {
@@ -76,6 +84,44 @@ describe("the tray's switches on the Settings screen", () => {
     render(<ShellCard />);
 
     expect(await screen.findByText("Asked; waiting for the app to apply it.")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Start when you sign in" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("does not show a sign-in click as done before the system has answered", async () => {
+    render(<ShellCard />);
+
+    await userEvent.click(await screen.findByRole("switch", { name: "Start when you sign in" }));
+
+    expect(await screen.findByText("Asked; waiting for the app to apply it.")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "Start when you sign in" })).toHaveAttribute(
+      "aria-checked",
+      "false",
+    );
+  });
+
+  it("re-reads the file while on screen, so a switch flipped in the tray shows up", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<ShellCard />);
+      const tray = await screen.findByRole("switch", { name: "Keep running in the tray" });
+      expect(tray).toHaveAttribute("aria-checked", "false");
+
+      // The owner ticks "Keep in tray" in the tray menu; the shell rewrites its file.
+      vi.mocked(api.getShellPrefs).mockResolvedValue(prefs({ keep_in_tray: true }));
+      await vi.advanceTimersByTimeAsync(5000);
+
+      await vi.waitFor(() =>
+        expect(screen.getByRole("switch", { name: "Keep running in the tray" })).toHaveAttribute(
+          "aria-checked",
+          "true",
+        ),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("reads a refused sign-in entry as off, with the tray's own line", async () => {

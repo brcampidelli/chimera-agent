@@ -662,19 +662,31 @@ def build_api_app(
     # Deliberately absent from the desktop bridge's table: these are the owner's window settings.
     @app.get("/api/shell/prefs", dependencies=[guard], response_model=ShellPrefsOut)
     def read_shell_prefs_endpoint() -> dict[str, Any]:
-        from chimera.api.shell_prefs import read_shell_prefs
+        from chimera.api.shell_prefs import ShellPrefsBusy, read_shell_prefs
 
-        return read_shell_prefs()
+        try:
+            return read_shell_prefs()
+        except ShellPrefsBusy as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.patch("/api/shell/prefs", dependencies=[guard], response_model=ShellPrefsOut)
     def patch_shell_prefs_endpoint(body: ShellPrefsIn) -> dict[str, Any]:
-        from chimera.api.shell_prefs import ShellUnavailable, write_shell_prefs
+        from chimera.api.shell_prefs import (
+            ShellPrefsBusy,
+            ShellPrefsUnreadable,
+            ShellUnavailable,
+            write_shell_prefs,
+        )
 
         changes = {k: v for k, v in body.model_dump().items() if v is not None}
         try:
             return write_shell_prefs(changes)
-        except ShellUnavailable as exc:
+        # 409: the request is fine and the state is not — no shell, or a file the shell refuses.
+        except (ShellUnavailable, ShellPrefsUnreadable) as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # 503: a lock another program held through every retry; the same request works in a moment.
+        except ShellPrefsBusy as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

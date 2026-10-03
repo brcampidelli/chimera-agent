@@ -6,6 +6,11 @@ import { getShellPrefs, patchShellPrefs } from "@/lib/api";
 import { useT } from "@/lib/i18n";
 import type { ShellPrefs, ShellPrefsChange } from "@/lib/types";
 
+/** How often the card re-reads the shell's file while it is on screen, and while a sign-in request
+ *  waits for the shell. Each read is one small local file through the backend. */
+const POLL_MS = 5000;
+const PENDING_POLL_MS = 2000;
+
 /** The chord as a person reads it: `CommandOrControl` is Cmd on a Mac and Ctrl everywhere else —
  *  the same reading the tray menu gives it (`chord_label` in main.rs). */
 export function chordLabel(chord: string): string {
@@ -46,9 +51,11 @@ export function ShellCard() {
     // query, not the render.
     queryFn: () => getShellPrefs(),
     retry: false,
-    // While a sign-in request is out, ask until the shell has carried it out and reported back.
+    // Asked again while the card is on screen: the tray changes the same file, and a card that only
+    // read it on mount would go on showing a switch the tray has since flipped. Faster while a
+    // sign-in request is out, until the shell has carried it out and reported the OS's answer.
     refetchInterval: (query) =>
-      query.state.data?.sign_in_requested != null ? 2000 : false,
+      query.state.data?.sign_in_requested != null ? PENDING_POLL_MS : POLL_MS,
   });
   const mutation = useMutation({
     mutationFn: (change: ShellPrefsChange) => patchShellPrefs(change),
@@ -60,7 +67,9 @@ export function ShellCard() {
 
   const save = (change: ShellPrefsChange) => mutation.mutate(change);
   const locked = !p.available || p.unreadable || mutation.isPending;
-  const signInShown = p.sign_in_requested ?? p.start_at_sign_in ?? false;
+  // The OS's answer as the shell reported it, never the request: until the shell has asked the
+  // system, the switch stays where the system is, and the note below says a request is out.
+  const signInShown = p.start_at_sign_in ?? false;
   const chord = chordLabel(p.quick_entry_chord || "CommandOrControl+Shift+Space");
 
   return (

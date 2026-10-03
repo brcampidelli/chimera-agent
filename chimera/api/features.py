@@ -640,9 +640,16 @@ def register_features(
         if job is None and not body.enabled:
             return _weekly_review_dict(None)
         if job is None:
-            job, _created = propose(sched, now=time.time())
-        job = sched.enable(job.id, now=time.time()) if body.enabled else sched.disable(job.id)
-        return _weekly_review_dict(job)
+            # The owner switched it on from the screen: a human-created job, not an agent proposal.
+            job, _created = propose(sched, now=time.time(), created_by="human")
+        if not body.enabled:
+            return _weekly_review_dict(sched.disable(job.id))
+        if job.created_by != "human":
+            # An agent proposal the owner just adopted from the screen becomes theirs — the same
+            # record the job would carry had they created it, so "who scheduled this" stays true.
+            job.created_by = "human"
+            sched.store.add(job)
+        return _weekly_review_dict(sched.enable(job.id, now=time.time()))
 
     @app.post("/api/cron", dependencies=[guard], response_model=CronJobOut)
     def create_cron(body: CronCreateIn) -> dict[str, Any]:

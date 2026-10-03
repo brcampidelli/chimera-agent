@@ -25,7 +25,10 @@ from chimera.api.config_api import APPLIES_WHEN, is_editable, patch_config, read
 from chimera.api.shell_prefs import (
     PREFS_ENV,
     STATE_ENV,
+    ShellPrefsBusy,
+    ShellPrefsUnreadable,
     ShellUnavailable,
+    parse_prefs,
     read_shell_prefs,
     write_shell_prefs,
 )
@@ -217,7 +220,7 @@ def test_a_hand_edit_that_does_not_parse_is_never_overwritten_from_here(
     assert got["unreadable"] is True
     assert got["keep_in_tray"] is False and got["call_attention"] is True
 
-    with pytest.raises(ValueError, match="does not parse"):
+    with pytest.raises(ShellPrefsUnreadable, match="cannot read"):
         write_shell_prefs({"keep_in_tray": True})
     assert prefs.read_text(encoding="utf-8") == edit
 
@@ -292,7 +295,37 @@ def test_switching_the_weekly_review_on_proposes_it_once_and_enables_it(
     (job,) = jobs
     assert job.metadata.get(BUILTIN_KEY) == WEEKLY_REVIEW, "it is not the code-counted review"
     assert job.enabled
+    assert job.created_by == "human", "the owner's switch recorded the job as an agent proposal"
     assert on == again == {"proposed": True, "job_id": job.id, "enabled": True, "posts_to": ""}
+
+
+def test_a_review_the_owner_asks_for_is_created_as_theirs(tmp_path: Path) -> None:
+    """`propose(created_by="human")` is what the screen's route calls when no job exists yet: the
+    job is the owner's from the start (and, like every human-created job, enabled)."""
+    from chimera.scheduler import Scheduler
+    from chimera.scheduler.weekly_review import propose
+
+    store = CronStore(tmp_path / "jobs.json")
+    job, created = propose(Scheduler(store), now=0.0, created_by="human")
+    assert created and job.created_by == "human" and job.enabled
+
+
+def test_adopting_an_agent_proposal_from_the_screen_makes_it_the_owners(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """`chimera report weekly` proposes the job as the agent's, disabled. Switching it on from
+    Settings is the owner taking it: the record says human, as `cron add` would have."""
+    from chimera.scheduler import Scheduler
+    from chimera.scheduler.weekly_review import propose
+
+    store = CronStore(tmp_path / "home" / "scheduler" / "jobs.json")
+    proposal, _ = propose(Scheduler(store), now=0.0)
+    assert proposal.created_by == "agent" and not proposal.enabled
+
+    client.put("/api/cron/weekly-review", json={"enabled": True})
+
+    (job,) = _jobs(tmp_path)
+    assert job.id == proposal.id and job.enabled and job.created_by == "human"
 
 
 def test_switching_it_off_never_creates_one_and_pauses_one_that_exists(
@@ -323,3 +356,202 @@ def test_the_destination_is_shown_by_host_only(client: TestClient, tmp_path: Pat
     assert got["posts_to"] == "https://discord.com/…"
     assert "s3cr3t" not in json.dumps(got)
 
+
+
+# --- the backend reads the shell's file the way the shell does --------------------------------
+
+
+_CASES = json.loads(
+    (Path(__file__).parent / "fixtures" / "shell_prefs_cases.json").read_text(encoding="utf-8")
+)
+
+
+@pytest.mark.parametrize("case", _CASES, ids=[c["name"] for c in _CASES])
+def test_the_shared_cases_get_the_verdicts_serde_gives_them(
+    case: dict[str, object], shell: tuple[Path, Path]
+) -> None:
+    """The shell's serde rejects the WHOLE file on one wrong-typed known key and runs on its
+    defaults. Reading key by key here showed values as in force that the shell was ignoring. The
+    same cases are asserted against serde in prefs.rs, so the two readers cannot drift apart."""
+    prefs, _state = shell
+    body = str(case["body"])
+    assert (parse_prefs(body) is not None) is case["valid"]
+
+    prefs.write_text(body, encoding="utf-8")
+    got = read_shell_prefs()
+    assert got["unreadable"] is (not case["valid"])
+    expect = case.get("expect")
+    if isinstance(expect, dict):
+        switches = ("keep_in_tray", "call_attention", "quick_entry")
+        assert {k: got[k] for k in switches} == {k: expect[k] for k in switches}
+        assert got["quick_entry_chord"] == expect["quick_entry_chord"]
+        assert got["sign_in_requested"] == expect["start_at_sign_in"]
+    else:
+        # What the shell is actually running on.
+        assert (got["keep_in_tray"], got["call_attention"], got["quick_entry"]) == (False, True, False)
+
+
+@pytest.mark.parametrize(
+    "body", ['{"keep_in_tray": "yes"}', '{"quick_entry_chord": null}', '{"start_at_sign_in": "true"}']
+)
+def test_a_save_over_a_file_the_shell_refuses_is_a_409_and_writes_nothing(
+    client: TestClient, shell: tuple[Path, Path], body: str
+) -> None:
+    prefs, _state = shell
+    prefs.write_text(body, encoding="utf-8")
+
+    refused = client.patch("/api/shell/prefs", json={"quick_entry": True})
+
+    assert refused.status_code == 409
+    assert "cannot read" in refused.json()["detail"]
+    assert prefs.read_text(encoding="utf-8") == body
+
+
+def test_two_saves_at_once_both_land(shell: tuple[Path, Path]) -> None:
+    """Each save reads, changes one key and replaces the file. Interleaved without a lock, the
+    second would write back the first one's old value; with one shared temporary name, one would
+    replace the other's half-written file."""
+    import threading
+
+    prefs, _state = shell
+    keys = ["keep_in_tray", "quick_entry"] * 10
+    barrier = threading.Barrier(len(keys))
+    errors: list[BaseException] = []
+
+    def save(i: int, key: str) -> None:
+        barrier.wait()
+        try:
+            write_shell_prefs({key: i % 4 < 2})
+        except BaseException as exc:  # collected: a thread's exception does not fail the test
+            errors.append(exc)
+
+    threads = [threading.Thread(target=save, args=(i, k)) for i, k in enumerate(keys)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    on_disk = json.loads(prefs.read_text(encoding="utf-8"))
+    assert set(on_disk) == {"keep_in_tray", "quick_entry"}, "a save lost the other's key"
+    assert [p.name for p in prefs.parent.iterdir() if p.name.endswith(".tmp")] == []
+
+
+def test_a_replace_windows_refuses_for_a_moment_is_retried(
+    shell: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import os as real_os
+
+    import chimera.api.shell_prefs as module
+
+    monkeypatch.setattr(module, "_DENIED_PAUSE", 0.0)
+    real_replace = real_os.replace
+    refusals = iter([True, True, False])
+
+    def flaky(src: str, dst: str) -> None:
+        if next(refusals):
+            raise PermissionError(13, "Access is denied")
+        real_replace(src, dst)
+
+    monkeypatch.setattr(module.os, "replace", flaky)
+    assert write_shell_prefs({"keep_in_tray": True})["keep_in_tray"] is True
+
+
+def test_a_replace_that_stays_refused_is_a_503_and_leaves_no_temporary_file(
+    client: TestClient, shell: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import chimera.api.shell_prefs as module
+
+    prefs, _state = shell
+    monkeypatch.setattr(module, "_DENIED_PAUSE", 0.0)
+
+    def locked(_src: str, _dst: str) -> None:
+        raise PermissionError(13, "Access is denied")
+
+    monkeypatch.setattr(module.os, "replace", locked)
+    busy = client.patch("/api/shell/prefs", json={"keep_in_tray": True})
+
+    assert busy.status_code == 503
+    assert "in use" in busy.json()["detail"]
+    leftovers = [p.name for p in prefs.parent.iterdir() if p.name.startswith(prefs.name)]
+    assert leftovers == [], "the temporary file was left behind"
+
+
+def test_a_read_windows_refuses_for_a_moment_is_retried_and_one_that_stays_is_busy(
+    shell: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A locked file is not a broken one: reading it as unreadable would show the shell's defaults
+    for settings that are in force."""
+    import chimera.api.shell_prefs as module
+
+    prefs, _state = shell
+    prefs.write_text('{"keep_in_tray": true}', encoding="utf-8")
+    monkeypatch.setattr(module, "_DENIED_PAUSE", 0.0)
+    real_read = Path.read_text
+    refusals = iter([True, False])
+
+    def flaky(self: Path, *a: object, **k: object) -> str:
+        if self == prefs and next(refusals, False):
+            raise PermissionError(13, "Access is denied")
+        return real_read(self, *a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", flaky)
+    assert read_shell_prefs()["keep_in_tray"] is True
+
+    def locked(self: Path, *a: object, **k: object) -> str:
+        if self == prefs:
+            raise PermissionError(13, "Access is denied")
+        return real_read(self, *a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(Path, "read_text", locked)
+    with pytest.raises(ShellPrefsBusy):
+        read_shell_prefs()
+
+
+# --- no tool writes the shell's files -----------------------------------------------------------
+
+
+class _Tool:
+    name = "write_file"
+
+    def __init__(self, workspace: Path, says_yes: bool) -> None:
+        self.workspace = workspace
+        self.asked: list[object] = []
+        self.says_yes = says_yes
+
+    def ask_outside(self, question: object) -> bool:
+        self.asked.append(question)
+        return self.says_yes
+
+
+def test_no_file_tool_writes_the_shells_switches_even_with_a_yes(
+    shell: tuple[Path, Path], tmp_path: Path
+) -> None:
+    """One key in that file asks the OS to start the app at sign-in. An approval card naming the
+    file is not a question a person can be expected to read that way, so the file tools refuse it
+    before asking, and also inside a workspace that happens to contain it."""
+    from chimera.tools.workspace import PathEscapesWorkspaceError, resolve_for
+
+    prefs, state = shell
+    project = tmp_path / "project"
+    project.mkdir()
+    outside = _Tool(project, says_yes=True)
+    for target in (prefs, state):
+        for verb in ("write", "edit"):
+            with pytest.raises(PathEscapesWorkspaceError, match="belongs to the desktop app"):
+                resolve_for(outside, str(target), verb=verb)
+    assert outside.asked == [], "the person was asked a question whose yes would be refused anyway"
+
+    inside = _Tool(tmp_path, says_yes=True)
+    with pytest.raises(PathEscapesWorkspaceError, match="belongs to the desktop app"):
+        resolve_for(inside, "shell-prefs.json", verb="write")
+
+    # Reading stays allowed, and a neighbouring file is untouched by the rule.
+    assert resolve_for(inside, "shell-prefs.json", verb="read") == prefs.resolve()
+    assert resolve_for(inside, "notes.txt", verb="write") == (tmp_path / "notes.txt").resolve()
+
+
+def test_the_tool_guard_names_the_variables_the_shell_sets() -> None:
+    from chimera.tools.workspace import SHELL_OWNED_ENV
+
+    assert SHELL_OWNED_ENV == (PREFS_ENV, STATE_ENV)

@@ -33,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from chimera.scheduler.models import CronJob
+from chimera.scheduler.models import CreatedBy, CronJob
 
 #: How far back the review looks. A week, because it is delivered once a week: a longer window
 #: would count the same run in two consecutive reviews.
@@ -490,6 +490,7 @@ def propose(
     now: float,
     deliver_to: str | None = None,
     lang: Lang | None = None,
+    created_by: CreatedBy = "agent",
 ) -> tuple[CronJob, bool]:
     """Register the weekly review as a DISABLED job, once. Returns ``(job, created)``.
 
@@ -498,6 +499,10 @@ def propose(
     unless the owner passes one — where it is posted is theirs to choose, and the URL is a credential.
     Calling it again does not add a second job: it updates the destination or the language when
     one is given, and otherwise returns the existing proposal untouched.
+
+    ``created_by`` is ``"human"`` when the owner asked for it from the Settings screen: the job is
+    then theirs, not a proposal, and the provenance says so (it also starts enabled, as every
+    human-created job does).
     """
     existing = find_proposal(scheduler.store.list())
     if existing is not None:
@@ -512,7 +517,7 @@ def propose(
             scheduler.store.add(existing)
         return existing, False
     job = scheduler.schedule_cron(
-        JOB_NAME, JOB_SCHEDULE, JOB_ACTION, now=now, created_by="agent", deliver_to=deliver_to,
+        JOB_NAME, JOB_SCHEDULE, JOB_ACTION, now=now, created_by=created_by, deliver_to=deliver_to,
     )
     job.metadata = {BUILTIN_KEY: WEEKLY_REVIEW, "proposed": True, **({"lang": lang} if lang else {})}
     scheduler.store.add(job)

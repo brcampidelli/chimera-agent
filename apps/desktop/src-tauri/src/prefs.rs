@@ -137,7 +137,96 @@ pub fn save_state(
     let tmp = data_dir.join(format!("{STATE_FILE}.tmp"));
     std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
     std::fs::write(&tmp, state_body(start_at_sign_in, problem)).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    retry_denied(|| std::fs::rename(&tmp, &path)).map_err(|e| e.to_string())
+}
+
+/// How many times a replace that Windows refused is tried again, and the pause before each try.
+///
+/// The backend reads these files (the Settings card asks every few seconds, every two while a
+/// request is out), and Python opens a file without `FILE_SHARE_DELETE`: a rename over it during
+/// that read fails with `ERROR_ACCESS_DENIED` (os error 5). The read lasts microseconds, so a short
+/// wait clears it; eight tries spread over about half a second is far past any read and still short
+/// enough to sit on the main thread.
+const DENIED_TRIES: u32 = 8;
+const DENIED_PAUSE: std::time::Duration = std::time::Duration::from_millis(15);
+
+/// Run `op` again while it fails with "access denied", up to `DENIED_TRIES` times. Any other error
+/// is returned at once: a missing directory does not get better by waiting.
+pub fn retry_denied(mut op: impl FnMut() -> std::io::Result<()>) -> std::io::Result<()> {
+    let mut tries = 0;
+    loop {
+        match op() {
+            Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied && tries + 1 < DENIED_TRIES => {
+                tries += 1;
+                std::thread::sleep(DENIED_PAUSE * tries);
+            }
+            other => return other,
+        }
+    }
+}
+
+/// Take a pending sign-in request out of the file, leaving every other key exactly as it is on disk.
+///
+/// Two callers. The shell, after carrying a request out: it re-reads the file rather than saving
+/// its memory, because the Settings screen may have changed another switch since the look that
+/// found the request, and a whole-struct save would put the old value back. And the tray's own
+/// sign-in item: a click there is the owner's latest word, and a request left in the file would be
+/// carried out at the next look and undo it.
+///
+/// `Ok(true)` when a request was removed, `Ok(false)` when there was none (the file is not touched).
+/// A file that does not parse is an error and is left alone: it is someone's hand edit.
+pub fn remove_request(data_dir: &Path) -> Result<bool, String> {
+    let path = prefs_path(data_dir);
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e.to_string()),
+    };
+    let mut value: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    let Some(object) = value.as_object_mut() else {
+        return Err("the preferences file is not a JSON object".to_string());
+    };
+    if object.remove("start_at_sign_in").is_none() {
+        return Ok(false);
+    }
+    let body = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
+    let tmp = data_dir.join(format!("{PREFS_FILE}.tmp"));
+    std::fs::write(&tmp, body).map_err(|e| e.to_string())?;
+    retry_denied(|| std::fs::rename(&tmp, &path)).map_err(|e| e.to_string())?;
+    Ok(true)
+}
+
+/// After a sign-in request was carried out: remove it from the file, and say what the watcher's
+/// "last seen" stamp becomes.
+///
+/// The stamp moves on ONLY when the request is gone. When the removal fails — a rename Windows kept
+/// refusing, a hand edit that broke the file — the stamp stays where it was before the look, so the
+/// next tick reads the file again, carries the request out again (asking the OS for what it already
+/// has is harmless) and retries the removal. Advancing it anyway would leave the request in the file
+/// with nothing looking at it, to be carried out again at the next launch, after the owner may have
+/// changed their mind from the tray.
+pub fn finish_request(
+    data_dir: &Path,
+    seen_before: Option<std::time::SystemTime>,
+) -> (Option<std::time::SystemTime>, Result<bool, String>) {
+    let removed = remove_request(data_dir);
+    let seen = if removed.is_ok() { modified(data_dir) } else { seen_before };
+    (seen, removed)
+}
+
+/// The file's text as preferences, or why it is not.
+///
+/// An object only. serde's derived `Deserialize` also accepts a JSON ARRAY for a struct, read by
+/// position (`[true]` would turn the tray on) — found when the backend's reader was pinned to this
+/// one by shared cases. Nobody writes this file as an array, and a second reader cannot be expected
+/// to reproduce positional field order, so an array is refused here like any other shape that is
+/// not the file's.
+pub fn parse(text: &str) -> Result<Prefs, String> {
+    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| e.to_string())?;
+    if !value.is_object() {
+        return Err("the preferences file is not a JSON object".to_string());
+    }
+    serde_json::from_str::<Prefs>(text).map_err(|e| e.to_string())
 }
 
 /// The preferences, and what went wrong reading them if anything did.
@@ -152,7 +241,7 @@ pub fn load(data_dir: &Path) -> (Prefs, Option<String>) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return (Prefs::default(), None),
         Err(e) => return (Prefs::default(), Some(e.to_string())),
     };
-    match serde_json::from_str::<Prefs>(&text) {
+    match parse(&text) {
         Ok(prefs) => (prefs, None),
         Err(e) => (Prefs::default(), Some(e.to_string())),
     }
@@ -173,14 +262,14 @@ pub fn save(data_dir: &Path, prefs: &Prefs) -> Result<Option<PathBuf>, String> {
     std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
     let set_aside = set_aside_if_broken(data_dir, &path)?;
     std::fs::write(&tmp, body).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    retry_denied(|| std::fs::rename(&tmp, &path)).map_err(|e| e.to_string())?;
     Ok(set_aside)
 }
 
 /// Move the file out of the way when it exists and does not parse; say where it went.
 fn set_aside_if_broken(data_dir: &Path, path: &Path) -> Result<Option<PathBuf>, String> {
     let broken = match std::fs::read_to_string(path) {
-        Ok(text) => serde_json::from_str::<Prefs>(&text).is_err(),
+        Ok(text) => parse(&text).is_err(),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
         // Unreadable (a lock, a permission): not provably ours to replace, so not replaced.
         Err(e) => return Err(e.to_string()),
@@ -223,8 +312,8 @@ pub fn on_close(prefs: &Prefs) -> OnClose {
 #[cfg(test)]
 mod tests {
     use super::{
-        adopt, load, on_close, prefs_path, save, save_state, state_path, Adopted, OnClose, Prefs,
-        DEFAULT_CHORD,
+        adopt, finish_request, load, modified, on_close, prefs_path, remove_request, retry_denied,
+        save, save_state, state_path, Adopted, OnClose, Prefs, DEFAULT_CHORD,
     };
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -367,5 +456,110 @@ mod tests {
             serde_json::from_str(&std::fs::read_to_string(state_path(&d)).unwrap()).unwrap();
         assert!(v["start_at_sign_in"].is_null(), "an unread answer was reported as an answer");
         assert_eq!(v["problem"], "");
+    }
+    /// Windows refuses a rename over a file another process is reading; the replace waits and tries
+    /// again, and gives up only after its tries, with the refusal. Other errors are not retried.
+    #[test]
+    fn a_refused_replace_is_tried_again_and_other_errors_are_not() {
+        use std::io::{Error, ErrorKind};
+        let mut calls = 0;
+        let ok = retry_denied(|| {
+            calls += 1;
+            if calls < 3 { Err(Error::from(ErrorKind::PermissionDenied)) } else { Ok(()) }
+        });
+        assert!(ok.is_ok() && calls == 3, "a refusal that cleared was not waited out ({calls} calls)");
+
+        let mut calls = 0;
+        let stuck = retry_denied(|| {
+            calls += 1;
+            Err(Error::from(ErrorKind::PermissionDenied))
+        });
+        assert_eq!(stuck.unwrap_err().kind(), ErrorKind::PermissionDenied);
+        assert_eq!(calls, 8, "a refusal that never clears must still end");
+
+        let mut calls = 0;
+        let missing = retry_denied(|| {
+            calls += 1;
+            Err(Error::from(ErrorKind::NotFound))
+        });
+        assert!(missing.is_err() && calls == 1, "a missing file was waited on");
+    }
+
+    /// The request is removed from what is on disk NOW, not from the shell's memory: a switch the
+    /// screen saved after the look that found the request survives, and so does a key this shell
+    /// does not know.
+    #[test]
+    fn carrying_out_a_request_removes_that_key_and_nothing_else() {
+        let d = dir("consume");
+        std::fs::write(prefs_path(&d), r#"{"start_at_sign_in": true}"#).unwrap();
+        let mut memory = Prefs::default();
+        assert_eq!(adopt(&mut memory, load(&d).0).sign_in, Some(true));
+        // Between the look and the removal, the screen turns the tray on.
+        std::fs::write(
+            prefs_path(&d),
+            r#"{"start_at_sign_in": true, "keep_in_tray": true, "from_a_newer_shell": 7}"#,
+        )
+        .unwrap();
+
+        let (seen, removed) = finish_request(&d, None);
+        assert_eq!(removed, Ok(true));
+        assert_eq!(seen, modified(&d), "the stamp did not move on to the rewritten file");
+        let on_disk: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(prefs_path(&d)).unwrap()).unwrap();
+        assert_eq!(on_disk, serde_json::json!({"keep_in_tray": true, "from_a_newer_shell": 7}));
+    }
+
+    /// A removal that fails leaves the stamp where it was, so the next look tries again — instead
+    /// of leaving the request in the file for the next launch to carry out.
+    #[test]
+    fn a_request_that_could_not_be_removed_is_looked_at_again() {
+        let d = dir("stuck");
+        let before = Some(std::time::SystemTime::UNIX_EPOCH);
+        std::fs::write(prefs_path(&d), r#"{ "start_at_sign_in": true, "#).unwrap();
+
+        let (seen, removed) = finish_request(&d, before);
+        assert!(removed.is_err(), "a file that does not parse was rewritten");
+        assert_eq!(seen, before, "the stamp moved on and the request will not be retried");
+        assert_eq!(std::fs::read_to_string(prefs_path(&d)).unwrap(), r#"{ "start_at_sign_in": true, "#);
+    }
+
+    /// A click on the tray's own sign-in item clears a request the screen left pending; with none
+    /// pending, the file is not rewritten at all.
+    #[test]
+    fn a_tray_click_clears_a_pending_request_and_touches_nothing_otherwise() {
+        let d = dir("trayclick");
+        assert_eq!(remove_request(&d), Ok(false), "no file is no request");
+        std::fs::write(prefs_path(&d), r#"{"quick_entry_chord": "Alt+Q", "start_at_sign_in": false}"#).unwrap();
+        assert_eq!(remove_request(&d), Ok(true));
+        assert_eq!(load(&d).0.start_at_sign_in, None);
+        assert_eq!(load(&d).0.quick_entry_chord, "Alt+Q");
+
+        let body = std::fs::read_to_string(prefs_path(&d)).unwrap();
+        assert_eq!(remove_request(&d), Ok(false));
+        assert_eq!(std::fs::read_to_string(prefs_path(&d)).unwrap(), body, "a file with no request was rewritten");
+    }
+
+    /// The backend reads this file too (`chimera/api/shell_prefs.py`), and must call "readable" exactly
+    /// what serde calls readable: a file the shell rejects whole is on its defaults, and a screen that
+    /// showed it as set would describe settings nobody is using. Both sides read the SAME cases.
+    #[test]
+    fn the_shared_cases_get_the_verdicts_the_backend_gives_them() {
+        let cases: serde_json::Value =
+            serde_json::from_str(include_str!("../../../../tests/fixtures/shell_prefs_cases.json")).unwrap();
+        let cases = cases.as_array().expect("a list of cases");
+        assert!(cases.len() >= 10, "the shared cases went missing");
+        for case in cases {
+            let name = case["name"].as_str().unwrap();
+            let body = case["body"].as_str().unwrap();
+            let parsed = super::parse(body);
+            assert_eq!(parsed.is_ok(), case["valid"].as_bool().unwrap(), "{name}: {parsed:?}");
+            if let (Ok(prefs), Some(expect)) = (parsed, case.get("expect")) {
+                assert_eq!(serde_json::json!(prefs.keep_in_tray), expect["keep_in_tray"], "{name}");
+                assert_eq!(serde_json::json!(prefs.call_attention), expect["call_attention"], "{name}");
+                assert_eq!(serde_json::json!(prefs.quick_entry), expect["quick_entry"], "{name}");
+                assert_eq!(serde_json::json!(prefs.quick_entry_chord), expect["quick_entry_chord"], "{name}");
+                assert_eq!(serde_json::json!(prefs.start_at_sign_in), expect["start_at_sign_in"], "{name}");
+            }
+        }
     }
 }

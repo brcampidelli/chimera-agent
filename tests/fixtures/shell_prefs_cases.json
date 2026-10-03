@@ -1,0 +1,137 @@
+[
+  {
+    "name": "an empty object is every default",
+    "body": "{}",
+    "valid": true,
+    "expect": {
+      "keep_in_tray": false,
+      "call_attention": true,
+      "quick_entry": false,
+      "quick_entry_chord": "CommandOrControl+Shift+Space",
+      "start_at_sign_in": null
+    }
+  },
+  {
+    "name": "every key set",
+    "body": "{\"keep_in_tray\": true, \"call_attention\": false, \"quick_entry\": true, \"quick_entry_chord\": \"Alt+Q\", \"start_at_sign_in\": true}",
+    "valid": true,
+    "expect": {
+      "keep_in_tray": true,
+      "call_attention": false,
+      "quick_entry": true,
+      "quick_entry_chord": "Alt+Q",
+      "start_at_sign_in": true
+    }
+  },
+  {
+    "name": "an unknown key is ignored, whatever it holds",
+    "body": "{\"from_a_newer_shell\": [1, {\"a\": null}], \"keep_in_tray\": true}",
+    "valid": true,
+    "expect": {
+      "keep_in_tray": true,
+      "call_attention": true,
+      "quick_entry": false,
+      "quick_entry_chord": "CommandOrControl+Shift+Space",
+      "start_at_sign_in": null
+    }
+  },
+  {
+    "name": "a null request is no request",
+    "body": "{\"start_at_sign_in\": null}",
+    "valid": true,
+    "expect": {
+      "keep_in_tray": false,
+      "call_attention": true,
+      "quick_entry": false,
+      "quick_entry_chord": "CommandOrControl+Shift+Space",
+      "start_at_sign_in": null
+    }
+  },
+  {
+    "name": "an empty chord is a chord",
+    "body": "{\"quick_entry_chord\": \"\"}",
+    "valid": true,
+    "expect": {
+      "keep_in_tray": false,
+      "call_attention": true,
+      "quick_entry": false,
+      "quick_entry_chord": "",
+      "start_at_sign_in": null
+    }
+  },
+  {
+    "name": "a word where a switch belongs",
+    "body": "{\"keep_in_tray\": \"yes\"}",
+    "valid": false
+  },
+  {
+    "name": "a number where a switch belongs",
+    "body": "{\"call_attention\": 0}",
+    "valid": false
+  },
+  {
+    "name": "a null switch",
+    "body": "{\"quick_entry\": null}",
+    "valid": false
+  },
+  {
+    "name": "a null chord",
+    "body": "{\"quick_entry_chord\": null}",
+    "valid": false
+  },
+  {
+    "name": "a number for a chord",
+    "body": "{\"quick_entry_chord\": 5}",
+    "valid": false
+  },
+  {
+    "name": "a quoted request",
+    "body": "{\"start_at_sign_in\": \"true\"}",
+    "valid": false
+  },
+  {
+    "name": "a known key twice",
+    "body": "{\"keep_in_tray\": true, \"keep_in_tray\": false}",
+    "valid": false
+  },
+  {
+    "name": "an array",
+    "body": "[]",
+    "valid": false
+  },
+  {
+    "name": "null",
+    "body": "null",
+    "valid": false
+  },
+  {
+    "name": "a bare boolean",
+    "body": "true",
+    "valid": false
+  },
+  {
+    "name": "a trailing comma",
+    "body": "{\"keep_in_tray\": true,}",
+    "valid": false
+  },
+  {
+    "name": "NaN in an unknown key",
+    "body": "{\"x\": NaN}",
+    "valid": false
+  },
+  {
+    "name": "not JSON at all",
+    "body": "keep_in_tray = true",
+    "valid": false
+  },
+  {
+    "name": "an empty file",
+    "body": "",
+    "valid": false
+  },
+  {
+    "name": "a byte-order mark",
+    "body": "\ufeff{}",
+    "valid": false
+  }
+]

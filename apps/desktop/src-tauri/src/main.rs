@@ -2746,13 +2746,19 @@ fn change_prefs(app: &tauri::AppHandle, edit: impl FnOnce(&mut Prefs)) {
 fn sync_prefs_from_file(app: &tauri::AppHandle) {
     let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
     let stamp = prefs::modified(&shell.data_dir);
-    match shell.prefs_seen.lock() {
-        Ok(mut seen) if *seen != stamp => *seen = stamp,
+    let before = match shell.prefs_seen.lock() {
+        Ok(seen) if *seen != stamp => *seen,
         _ => return,
-    }
+    };
+    let mark = |seen: Option<std::time::SystemTime>| {
+        if let Ok(mut last) = shell.prefs_seen.lock() {
+            *last = seen;
+        }
+    };
     let (disk, problem) = prefs::load(&shell.data_dir);
     if let Some(why) = problem {
         set_problem(app, |p| &mut p.prefs, Some(prefs_problem(dialogo(), &shell.data_dir, &why)));
+        mark(stamp);
         return;
     }
     // It reads now, so a "does not parse" said about an earlier version of it is no longer true.
@@ -2773,14 +2779,32 @@ fn sync_prefs_from_file(app: &tauri::AppHandle) {
     if adopted.quick_changed {
         apply_quick_entry(app);
     }
-    if let Some(wanted) = adopted.sign_in {
-        apply_autostart(app, wanted);
-        // The request is carried out; the file loses it, so it is not carried out again. What the
-        // OS answered is in the report `apply_autostart` just wrote, not in this file.
-        let _ = prefs::save(&shell.data_dir, &shell.prefs());
-        if let Ok(mut seen) = shell.prefs_seen.lock() {
-            *seen = prefs::modified(&shell.data_dir);
-        }
+    let Some(wanted) = adopted.sign_in else {
+        mark(stamp);
+        return;
+    };
+    apply_autostart(app, wanted);
+    // The request is carried out; the file loses it — that key only, read from disk now, so a
+    // switch the screen saved since this look survives. What the OS answered is in the report
+    // `apply_autostart` just wrote, not in this file. A removal that fails keeps the stamp from
+    // before this look (`finish_request`), so the next tick tries again rather than leaving the
+    // request for the next launch to carry out; and it is said in the tray meanwhile.
+    let (seen, removed) = prefs::finish_request(&shell.data_dir, before);
+    mark(seen);
+    if let Err(why) = removed {
+        set_problem(app, |p| &mut p.prefs, Some(prefs_problem(dialogo(), &shell.data_dir, &why)));
+    }
+}
+
+/// Drop a pending sign-in request from the file and from memory — the tray's sign-in item calls this
+/// before it acts. A file that cannot be rewritten is said in the tray; the click still applies.
+fn clear_sign_in_request(app: &tauri::AppHandle) {
+    let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
+    if let Ok(mut prefs) = shell.prefs.lock() {
+        prefs.start_at_sign_in = None;
+    }
+    if let Err(why) = prefs::remove_request(&shell.data_dir) {
+        set_problem(app, |p| &mut p.prefs, Some(prefs_problem(dialogo(), &shell.data_dir, &why)));
     }
 }
 
@@ -3263,7 +3287,12 @@ fn main() {
                     let on = attention.is_checked().unwrap_or(true);
                     change_prefs(app, |p| p.call_attention = on);
                 }
-                "autostart" => apply_autostart(app, wish.is_checked().unwrap_or(false)),
+                "autostart" => {
+                    // The owner's latest word. A request the Settings screen left pending would be
+                    // carried out at the next look and undo this click, so it goes first.
+                    clear_sign_in_request(app);
+                    apply_autostart(app, wish.is_checked().unwrap_or(false));
+                }
                 "quick_entry" => {
                     let on = quick.is_checked().unwrap_or(false);
                     change_prefs(app, |p| p.quick_entry = on);
@@ -3706,6 +3735,15 @@ mod tray_tests {
         assert!(shown.contains(concat!("prefs::save_", "state(")), "the screen's report is no longer written");
         let sync = body_of(&source, concat!("fn sync_prefs_from_", "file("));
         assert!(sync.contains(concat!("apply_auto", "start(app, wanted)")), "a sign-in request is not carried out");
+        assert!(
+            sync.contains(concat!("prefs::finish_", "request(&shell.data_dir, before)")),
+            "the request is no longer removed from disk with the stamp kept on failure"
+        );
+        assert!(!sync.contains(concat!("prefs::", "save(")), "a whole-struct save is back in the consume path");
+        let tray = body_of(&source, concat!("fn ", "main() {"));
+        let click = tray.find(concat!("clear_sign_in_", "request(app);")).expect("the tray click clears the request");
+        let apply = tray[click..].find(concat!("apply_auto", "start(app, wish")).expect("and then applies the click");
+        assert!(apply > 0);
         assert!(sync.contains(concat!("apply_quick_", "entry(app)")), "a changed chord is not registered again");
     }
 
