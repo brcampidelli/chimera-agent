@@ -111,6 +111,22 @@ def test_the_guest_page_sends_its_own_policy_pinned_to_its_inline_script(tmp_pat
     assert "'unsafe-inline'" not in csp["script-src"] and "'unsafe-eval'" not in csp["script-src"]
 
 
+@pytest.mark.parametrize("prefix", ["", "/guest"])
+def test_an_html_file_under_assets_is_served_with_no_rights(tmp_path: Path, prefix: str) -> None:
+    # The build puts no HTML under assets/, and dist/ is not the agent's to write — so this is
+    # defense in depth. But the page handlers were the only routes setting a policy: a stray
+    # assets/x.html came back 200 text/html, same origin, with none.
+    client = _client(tmp_path)
+    (tmp_path / "dist" / "assets" / "stray.html").write_text("<script>steal()</script>", encoding="utf-8")
+    r = client.get(f"{prefix}/assets/stray.html")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("text/html")
+    csp = _directives(r.headers["content-security-policy"])
+    assert csp["default-src"] == ["'none'"]
+    assert "sandbox" in csp
+    # The bundle itself is untouched: a script asset is not a page and carries no page policy.
+    assert "content-security-policy" not in client.get(f"{prefix}/assets/app.js").headers
+
+
 def test_a_script_hash_survives_windows_line_endings() -> None:
     # The browser normalises CRLF to LF before hashing a script. A checkout with Windows line
     # endings hashing the raw bytes would block the theme script on one OS and nowhere else.

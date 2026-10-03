@@ -25,9 +25,23 @@ document *inherits the parent's policy*: both policies must allow a script for i
 compiler uses `new Function`. Measured in headless Edge 154 (the engine WebView2 ships): without
 `'unsafe-eval'` on the PARENT the chart draws nothing even when the frame's own policy allows it,
 and without the CDN and `'unsafe-inline'` it never starts. So the parent carries those three, and
-the frame's own `<meta>` policy (`HtmlPreview.tsx`) is what narrows the preview back down. The
-exfiltration channels — images, connections, frames, forms, plugins — are the ones held tight
-here, and they are the ones a Markdown answer can reach without running any code.
+the frame's own `<meta>` policy (`HtmlPreview.tsx`) is what narrows the preview back down. What
+is held tight here — images, connections, frames, forms, plugins — covers every channel a
+Markdown answer can reach WITHOUT running code.
+
+**What this policy does not close.** A page that runs script — only the HTML preview does — still
+has ways out that CSP does not govern. Measured in headless Edge 154 with this header on the page
+and the preview's meta in the frame: the frame's `fetch` to an outside host was blocked, but
+`new RTCPeerConnection({iceServers: [{urls: "stun:…"}]})` sent STUN binding requests over UDP and
+a `turn:…?transport=tcp` server received a TCP Allocate — CSP has no WebRTC directive in Chromium.
+So a previewed page can still send data out: in a STUN/TURN hostname (through DNS) or to a TURN
+server it names. `--webrtc-ip-handling-policy=disable_non_proxied_udp` on the browser stopped every
+UDP packet in the same probe (the `--force-` spelling of that switch changed nothing) and did
+NOT stop the TCP TURN connection, so it would narrow the channel, not close it; it is not set
+(the window is built in `main.rs`, and the real WebView2 is unmeasured). Smaller ones: `<link rel=dns-prefetch>` is outside CSP (unmeasured here), and
+`https://cdn.jsdelivr.net` in `script-src` admits any package or GitHub repository the page names,
+with whatever the page puts in the path. The preview's note says this rather than claiming the
+frame is sealed.
 
 **`frame-src 'none'`** does not block the preview (a srcdoc frame is not a fetch), and it is what
 stops the previewed page from navigating *its own frame* to `https://host/?d=…` — measured: with no
@@ -38,7 +52,15 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import os
 import re
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from starlette.responses import Response
+    from starlette.staticfiles import StaticFiles
+    from starlette.types import Scope
 
 # Sources a remote Chimera can live at: the Servers screen refuses anything else.
 _REMOTE_SERVER_SOURCES = ("https:", "http://127.0.0.1:*", "http://localhost:*")
@@ -109,3 +131,36 @@ def guest_page_csp(html: str) -> str:
             "form-action 'self'",
         )
     )
+
+
+# An HTML file served from `/assets` is nothing the app ships: Vite puts only scripts, styles and
+# images there. If one ever appears it gets no rights at all — `sandbox` gives it an opaque origin
+# (no token, no storage, no API) and `default-src 'none'` lets it fetch nothing.
+ASSET_HTML_CSP = "default-src 'none'; sandbox"
+
+_HTML_SUFFIXES = (".html", ".htm", ".xhtml")
+
+
+def static_files_with_policy(directory: Path) -> StaticFiles:
+    """`StaticFiles` for `/assets`, with a policy on anything in it a browser would render as a page.
+
+    Defense in depth, not a hole being closed: `dist/` is not writable by the agent and the build
+    puts no HTML under `assets/`. But the page handlers are the only routes that set a policy, so a
+    stray `assets/x.html` was served same-origin with none — measured: 200, `text/html`, no header.
+    """
+    from starlette.staticfiles import StaticFiles
+
+    class _PolicedStaticFiles(StaticFiles):
+        def file_response(
+            self,
+            full_path: str | os.PathLike[str],
+            stat_result: os.stat_result,
+            scope: Scope,
+            status_code: int = 200,
+        ) -> Response:
+            response = super().file_response(full_path, stat_result, scope, status_code)
+            if str(full_path).lower().endswith(_HTML_SUFFIXES):
+                response.headers["Content-Security-Policy"] = ASSET_HTML_CSP
+            return response
+
+    return _PolicedStaticFiles(directory=directory)

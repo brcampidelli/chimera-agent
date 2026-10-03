@@ -42,10 +42,19 @@ export function inlineStyles(html: string, css: Map<string, string>): string {
  * request for it to happen — so this one only has to be the narrow half. What it permits is what
  * `render_chart` needs and nothing more: inline scripts and styles, Vega from jsDelivr, and the
  * `new Function` Vega compiles expressions with (measured in Edge: without it the chart is blank).
- * What it refuses is every way a page sends something out on its own — `fetch`/XHR/WebSocket
- * (`connect-src`), images and fonts from a host (`img-src`/`font-src` take only embedded bytes),
- * frames, workers, plugins and forms. A self-navigation to another host is refused by the PARENT's
- * `frame-src`, which this meta cannot express.
+ * What it refuses is every way CSP can govern for a page to send something out on its own —
+ * `fetch`/XHR/WebSocket (`connect-src`), images and fonts from a host (`img-src`/`font-src` take
+ * only embedded bytes), frames, workers, plugins and forms. A self-navigation to another host is
+ * refused by the PARENT's `frame-src`, which this meta cannot express.
+ *
+ * It is NOT every way out, and the note under the frame says so. CSP does not govern WebRTC:
+ * measured in headless Edge with both policies in place, the frame's `fetch` was blocked while an
+ * `RTCPeerConnection` reached a STUN server over UDP and a TURN server over TCP — so a page can
+ * still put data in a hostname (DNS) or hand it to a TURN server. Deleting `RTCPeerConnection`
+ * from this frame would not close it either: a child `about:blank` frame gets a fresh realm with a
+ * fresh constructor. `dns-prefetch` is outside CSP too, and jsDelivr serves any package a page
+ * names. See `chimera/api/page_csp.py` for the measurement and the browser flag that would narrow
+ * (not close) the WebRTC half.
  */
 export const PREVIEW_CSP = [
   "default-src 'none'",
@@ -62,9 +71,41 @@ export const PREVIEW_CSP = [
   "base-uri 'none'",
 ].join("; ");
 
-// A doctype, with any comments and whitespace before it. Only a doctype at the very start counts —
-// one further down is already ignored by the parser — and keeping it first keeps standards mode.
-const LEADING_DOCTYPE = /^(\s*(?:<!--[\s\S]*?-->\s*)*<!doctype[^>]*>)/i;
+// Whitespace the HTML parser skips before a doctype — ASCII only; any other character is text.
+const HTML_SPACE = /[\t\n\f\r ]/;
+// A doctype at a given offset (sticky). `[^>]*` cannot backtrack against anything after it.
+const DOCTYPE_AT = /<!doctype[^>]*>/iy;
+
+/** End offset of a leading doctype (with the whitespace and comments before it), or 0 if none.
+ *
+ * Only a doctype at the very start counts — one further down is already ignored by the parser —
+ * and keeping it first keeps standards mode.
+ *
+ * A scan, not a regex. The regex this replaced, `^(\s*(?:<!--[\s\S]*?-->\s*)*<!doctype…)`,
+ * backtracked exponentially: the lazy body could swallow a `-->`, so N leading comments with no
+ * doctype split 2^(N-1) ways — 28 of them (about 230 bytes, a file the agent can write) froze the
+ * window's main thread for 13 s. Here every character is looked at a bounded number of times.
+ *
+ * A comment ends where the PARSER ends it: at the first `-->` or `--!>` after `<!--` (searching
+ * from the `<!--`'s own dashes also catches the abrupt `<!-->` and `<!--->`). The old regex knew
+ * only `-->`, so `<!-- a --!><script>…</script>--><!doctype html>` read as one comment followed by
+ * a doctype, and the policy went in AFTER a script the parser runs. Taking the earliest terminator
+ * can only end a comment sooner than the parser does, and the cost of that is finding no doctype
+ * and putting the policy at offset zero — the safe side.
+ */
+export function leadingDoctypeEnd(html: string): number {
+  let i = 0;
+  for (;;) {
+    while (i < html.length && HTML_SPACE.test(html[i])) i++;
+    if (!html.startsWith("<!--", i)) break;
+    const ends = [html.indexOf("-->", i + 2), html.indexOf("--!>", i + 2)].filter((n) => n >= 0);
+    if (ends.length === 0) return 0; // an unclosed comment runs to the end: there is no doctype
+    const end = Math.min(...ends);
+    i = end + (html.startsWith("-->", end) ? 3 : 4);
+  }
+  DOCTYPE_AT.lastIndex = i;
+  return DOCTYPE_AT.test(html) ? DOCTYPE_AT.lastIndex : 0;
+}
 
 /** Put the policy `<meta>` at the very top of the document, before anything the page wrote.
  *
@@ -75,8 +116,8 @@ const LEADING_DOCTYPE = /^(\s*(?:<!--[\s\S]*?-->\s*)*<!doctype[^>]*>)/i;
  */
 export function withPreviewPolicy(html: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`;
-  const m = LEADING_DOCTYPE.exec(html);
-  return m ? m[1] + meta + html.slice(m[1].length) : meta + html;
+  const end = leadingDoctypeEnd(html);
+  return html.slice(0, end) + meta + html.slice(end);
 }
 
 /** Path of a sibling file, for a href relative to the page being previewed. */
@@ -106,8 +147,11 @@ export function siblingOf(pagePath: string, href: string): string {
  *
  * The note used to say scripts and other sites' resources did not load. Neither was true: with no
  * policy anywhere, the frame ran scripts (it has `allow-scripts`) and fetched whatever the page
- * named — which is also how `render_chart` charts drew at all. The policy makes the sentence true,
- * and the sentence (same key, corrected in all ten languages) names the one exception charts need.
+ * named — which is also how `render_chart` charts drew at all. The policy makes most of it true;
+ * the sentence (same key, corrected in all ten languages) names the one exception charts need and
+ * the channel no policy here governs (WebRTC and its DNS lookups), instead of promising a sealed
+ * frame. An earlier draft of this change said "requests to other sites are blocked" outright,
+ * which is the guard that affirms what the code does not do.
  */
 export function HtmlPreview({ workspace, path, source }: {
   workspace: string;

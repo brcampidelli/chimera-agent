@@ -240,12 +240,13 @@ def build_guest_app(
 def _mount_guest_page(guest: FastAPI, static_dir: Path | None) -> None:
     """``/`` and ``/assets`` from the built bundle — the two things the guest page needs."""
     from fastapi.responses import FileResponse
-    from fastapi.staticfiles import StaticFiles
+
+    from chimera.api.page_csp import static_files_with_policy
 
     page = static_dir / "guest.html" if static_dir is not None else None
     assets = static_dir / "assets" if static_dir is not None else None
     if assets is not None and assets.is_dir():
-        guest.mount("/assets", StaticFiles(directory=assets), name="guest-assets")
+        guest.mount("/assets", static_files_with_policy(assets), name="guest-assets")
 
     @guest.get("/", include_in_schema=False)
     def _page() -> Any:

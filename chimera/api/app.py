@@ -2845,7 +2845,7 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
     """Serve the built SPA at ``/`` with a fallback so client-side routes resolve to index.html."""
     import mimetypes
 
-    from fastapi.staticfiles import StaticFiles
+    from chimera.api.page_csp import static_files_with_policy
 
     # Serve the PWA manifest with its proper type (mimetypes doesn't know .webmanifest by default);
     # the service worker (.js) already gets text/javascript, which the browser requires to register it.
@@ -2854,7 +2854,7 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
     index = static_dir / "index.html"
     assets = static_dir / "assets"
     if assets.is_dir():
-        app.mount("/assets", StaticFiles(directory=assets), name="assets")
+        app.mount("/assets", static_files_with_policy(assets), name="assets")
 
     @app.get("/")
     def _root(request: Request) -> Any:

