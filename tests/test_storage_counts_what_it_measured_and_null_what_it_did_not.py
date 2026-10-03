@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import time
+from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -155,3 +156,68 @@ def test_rotating_moves_only_the_traces_and_keeps_one_generation(tmp_path: Path)
 def test_a_first_rotation_frees_nothing_and_says_so(tmp_path: Path) -> None:
     write(tmp_path / "traces.jsonl", 100)
     assert rotate_logs(tmp_path) == {"rotated": 1, "bytes_freed": 0, "failed": 0}
+
+
+def test_the_whole_report_keeps_one_time_limit_and_says_what_it_did_not_reach(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: the 5 s budget was per COUNT — per category and per worktree — so one report
+    could take (categories + worktrees + 2) x 5 s, and the Settings screen asked for two at once.
+
+    Every walk here takes 0.3 s unless its deadline comes first. Twenty worktrees and the named
+    categories are well past a 1 s report limit: the report must come back near that limit, with the
+    rows it did not reach null and noted — never a size for a walk that was cut short."""
+    import tempfile
+
+    for _ in range(20):
+        write(Path(tempfile.mkdtemp(prefix="chimera-wt-")) / "f.bin", 10)
+    real = storage.tree_size
+
+    def slow(path: Path, *, exclude: Iterable[Path] = (), deadline: float | None = None) -> storage.Size:
+        assert deadline is not None, "every count in a report carries a deadline"
+        time.sleep(max(0.0, min(0.3, deadline - time.monotonic())))
+        return real(path, exclude=exclude, deadline=deadline)
+
+    monkeypatch.setattr(storage, "tree_size", slow)
+    monkeypatch.setattr(storage, "REPORT_BUDGET_SECONDS", 1.0)
+
+    started = time.monotonic()
+    report = measure(tmp_path / "home")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 3.0, f"the report took {elapsed:.1f} s against a 1 s limit"
+    worktrees = category(report, "worktrees")
+    assert worktrees["bytes"] is None and "stopped counting" in str(worktrees["note"])
+    assert any(w["bytes"] is None for w in report["worktrees"])
+
+
+def test_two_screens_asking_at_once_share_one_walk_of_the_disk(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The Storage and Diagnostics cards mount together and each asks for the report. One walk."""
+    import threading
+
+    calls: list[Path] = []
+    real = storage.measure
+
+    def counted(home: Path, workspace: Path | None = None) -> dict[str, object]:
+        calls.append(home)
+        time.sleep(0.3)
+        return real(home, workspace)
+
+    monkeypatch.setattr(storage, "measure", counted)
+    storage.forget_shared_reports()
+    home = tmp_path / "home"
+    results: list[dict[str, object]] = []
+    threads = [
+        threading.Thread(target=lambda: results.append(storage.measure_shared(home))) for _ in range(2)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(30)
+
+    assert len(calls) == 1 and len(results) == 2 and results[0] == results[1]
+    storage.forget_shared_reports()
+    storage.measure_shared(home)
+    assert len(calls) == 2, "an action that changes the disk must drop the shared report"

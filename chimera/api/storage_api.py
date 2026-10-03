@@ -171,9 +171,9 @@ def register_storage_api(
     @app.get("/api/storage", dependencies=[guard], response_model=StorageOut)
     def storage_endpoint() -> dict[str, Any]:
         """What this install keeps on disk, by kind. A category that could not be counted is null."""
-        from chimera.core.storage import measure
+        from chimera.core.storage import measure_shared
 
-        return measure(home, workspace)
+        return measure_shared(home, workspace)
 
     @app.post(
         "/api/storage/worktrees/prune", dependencies=[guard], response_model=WorktreePruneOut
@@ -182,19 +182,30 @@ def register_storage_api(
         """Collect orphaned worktrees. A live run's worktree, or one whose maker cannot be
         identified, is never touched — see `chimera.core.worktree.classify_worktree_dir`."""
         _confirmed(body)
+        from chimera.core.storage import forget_shared_reports
         from chimera.core.worktree import prune_worktree_dirs
 
-        return prune_worktree_dirs()
+        try:
+            return prune_worktree_dirs()
+        finally:
+            forget_shared_reports()
 
     @app.post("/api/storage/logs/rotate", dependencies=[guard], response_model=LogRotateOut)
     def rotate_logs_endpoint(body: StorageConfirmIn) -> dict[str, int]:
         """Rotate the diagnostic traces now — the rename their writers make at the size cap."""
         _confirmed(body)
-        from chimera.core.storage import rotate_logs
+        from chimera.core.storage import forget_shared_reports, rotate_logs
 
-        return rotate_logs(home)
+        try:
+            return rotate_logs(home)
+        finally:
+            forget_shared_reports()
 
     @app.get("/api/diagnostics", dependencies=[guard], response_model=AppDiagnosticsOut)
     def diagnostics_endpoint() -> dict[str, Any]:
+        from chimera.core.storage import measure_shared
+
         current = read_settings()
-        return diagnostics(current.model_copy(update={"home": home}), workspace)
+        # The same shared report the Storage card asked for a moment ago, not a second walk.
+        storage = measure_shared(home, workspace)
+        return diagnostics(current.model_copy(update={"home": home}), workspace, storage=storage)

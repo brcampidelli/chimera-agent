@@ -261,3 +261,31 @@ def test_the_scrub_leaves_the_numbers_that_diagnose_a_provider_error() -> None:
 
     line = "max_tokens=4096 prompt_tokens: 123 tokenizer: gpt2 api_key=[redacted]"
     assert scrub(line) == line
+
+
+def test_the_storage_and_diagnostics_cards_cost_one_measurement_and_an_action_a_fresh_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: `/api/diagnostics` measured the whole disk again right after `/api/storage`
+    had. They share one now — and a prune or a rotation drops it, so the card that just freed space
+    does not go on showing the size from before."""
+    import chimera.core.storage as storage
+
+    calls: list[Path] = []
+    real = storage.measure
+
+    def counted(home: Path, workspace: Path | None = None) -> dict[str, object]:
+        calls.append(home)
+        return real(home, workspace)
+
+    monkeypatch.setattr(storage, "measure", counted)
+    home = tmp_path / "home"
+    home.mkdir()
+    client = client_for(home, tmp_path)
+
+    assert client.get("/api/storage").status_code == 200
+    assert client.get("/api/diagnostics").status_code == 200
+    assert len(calls) == 1
+    client.post("/api/storage/logs/rotate", json={"confirm": True})
+    client.get("/api/storage")
+    assert len(calls) == 2

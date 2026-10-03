@@ -19,9 +19,11 @@ discover that.
 
 from __future__ import annotations
 
+import copy
 import os
 import shutil
 import sys
+import threading
 import time
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -35,6 +37,17 @@ _log = get_logger("core.storage")
 #: Seconds one category may spend being counted. A storage screen that hangs for a minute on a
 #: worktree full of `node_modules` is worse than one that says "not measured" for that row.
 CATEGORY_BUDGET_SECONDS = 5.0
+
+#: Seconds the WHOLE report may spend; each count stops at the earlier of its own budget and this.
+#: A budget per count alone let one report take (named categories + worktrees + 2) x 5 s — a minute
+#: or more with a few worktrees full of `node_modules` — and the Settings screen asked for two.
+REPORT_BUDGET_SECONDS = 20.0
+
+#: How long a finished report answers a repeat request for the same home, workspace and worktree
+#: setting. The Storage and Diagnostics cards mount together and each asks for the report; they get
+#: one walk of the disk between them, not two at once. Short, and dropped by every action that
+#: changes what it counts, so a screen never shows a size a button just changed.
+SHARED_REPORT_SECONDS = 5.0
 
 #: The traces `rotate_logs` may move aside. Only files whose writers ALREADY rotate them at a cap
 #: (`chimera/core/steplog.py`, renamed to `.1` keeping one generation): rotating them earlier is a
@@ -120,7 +133,7 @@ def tree_size(
     stack = [str(path)]
     while stack:
         if deadline is not None and time.monotonic() > deadline:
-            return Size(None, None, f"stopped counting after {CATEGORY_BUDGET_SECONDS:g} s")
+            return Size(None, None, "stopped counting at the time limit")
         current = stack.pop()
         try:
             with os.scandir(current) as entries:
@@ -213,11 +226,14 @@ def _disk(path: Path) -> tuple[int | None, dict[str, Any]]:
     return device, {"path": str(path), "total": int(usage.total), "free": int(usage.free)}
 
 
-def _budget() -> float:
-    return time.monotonic() + CATEGORY_BUDGET_SECONDS
+def _budget(report_deadline: float) -> float:
+    """One count's deadline: its own budget, cut short by what is left of the report's."""
+    return min(time.monotonic() + CATEGORY_BUDGET_SECONDS, report_deadline)
 
 
-def _home_categories(home: Path, worktree_parent: Path) -> tuple[list[Category], Size]:
+def _home_categories(
+    home: Path, worktree_parent: Path, report_deadline: float
+) -> tuple[list[Category], Size]:
     """The named categories under the home, and the home's total.
 
     Each file is counted once: a category walks its folders without the paths an earlier one
@@ -228,10 +244,12 @@ def _home_categories(home: Path, worktree_parent: Path) -> tuple[list[Category],
     categories: list[Category] = []
     for key, patterns in _HOME_CATEGORIES.items():
         paths = _matches(home, patterns)
-        size = _sum(tree_size(p, exclude=claimed, deadline=_budget()) for p in paths)
+        size = _sum(tree_size(p, exclude=claimed, deadline=_budget(report_deadline)) for p in paths)
         categories.append(Category(key, size, [str(p) for p in paths if p.exists()]))
         claimed.extend(paths)
-    return categories, tree_size(home, exclude=[worktree_parent], deadline=_budget())
+    return categories, tree_size(
+        home, exclude=[worktree_parent], deadline=_budget(report_deadline)
+    )
 
 
 def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
@@ -243,9 +261,10 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
     """
     from chimera.core.worktree import classify_worktree_dir, find_worktree_dirs, worktree_parent
 
+    report_deadline = time.monotonic() + REPORT_BUDGET_SECONDS
     home = Path(home).resolve()
     parent = worktree_parent(workspace)
-    named, home_total = _home_categories(home, parent)
+    named, home_total = _home_categories(home, parent, report_deadline)
     by_key = {c.key: c for c in named}
 
     measured = [c.size for c in named]
@@ -261,7 +280,7 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
     sizes: list[Size] = []
     for path in find_worktree_dirs():
         state = classify_worktree_dir(path)
-        size = tree_size(path, deadline=_budget())
+        size = tree_size(path, deadline=_budget(report_deadline))
         sizes.append(size)
         worktrees.append(
             {"path": str(path), "bytes": size.bytes, "state": state.state, "reason": state.reason}
@@ -271,7 +290,7 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
     browsers, why = playwright_dir()
     by_key["browsers"] = Category(
         "browsers",
-        tree_size(browsers, deadline=_budget()) if browsers else Size(None, None, why),
+        tree_size(browsers, deadline=_budget(report_deadline)) if browsers else Size(None, None, why),
         [str(browsers)] if browsers else [],
     )
 
@@ -292,6 +311,45 @@ def measure(home: Path, workspace: Path | None = None) -> dict[str, Any]:
         "disks": drives,
         "rotatable_logs": list(ROTATABLE_LOGS),
     }
+
+
+_shared_lock = threading.Lock()
+_shared: dict[tuple[str, str, str], tuple[float, dict[str, Any]]] = {}
+_flights: dict[tuple[str, str, str], threading.Lock] = {}
+
+
+def measure_shared(home: Path, workspace: Path | None = None) -> dict[str, Any]:
+    """:func:`measure`, with one walk serving every caller that asks at about the same time.
+
+    A request that arrives while a measurement of the same thing is running waits for it instead of
+    starting a second walk of the same disk; one that arrives within ``SHARED_REPORT_SECONDS`` after
+    it gets its result. Keyed by the worktree setting too, so saving a new folder is seen at once.
+    Callers get a copy — nothing they do to it reaches the next caller.
+    """
+    from chimera.config import get_settings
+
+    key = (
+        os.path.normcase(str(Path(home).resolve())),
+        str(workspace or ""),
+        (get_settings().worktree_dir or "").strip(),
+    )
+    with _shared_lock:
+        flight = _flights.setdefault(key, threading.Lock())
+    with flight:
+        with _shared_lock:
+            cached = _shared.get(key)
+        if cached is not None and time.monotonic() - cached[0] < SHARED_REPORT_SECONDS:
+            return copy.deepcopy(cached[1])
+        report = measure(home, workspace)
+        with _shared_lock:
+            _shared[key] = (time.monotonic(), report)
+        return copy.deepcopy(report)
+
+
+def forget_shared_reports() -> None:
+    """Drop every shared report: called by the actions that change what one counts."""
+    with _shared_lock:
+        _shared.clear()
 
 
 def rotate_logs(home: Path) -> dict[str, int]:
