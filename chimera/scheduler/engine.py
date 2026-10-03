@@ -146,7 +146,9 @@ class Scheduler:
 
         Called after the outcome is recorded, on every dispatch path. No delivery from here: the
         engine takes no clock and no I/O, and the decision is visible everywhere the counter already
-        is — ``cron list``, ``cron doctor`` and ``/api/features`` all read this job.
+        is — ``cron list``, ``cron doctor`` and ``/api/features`` all read this job. The job's chat
+        destination is told by the daemon, which reads ``disabled_by`` after the tick
+        (:func:`~chimera.scheduler.delivery.make_failure_notifier`).
         """
         if not job.enabled or job.consecutive_failures < self.fail_limit:
             return
@@ -219,12 +221,17 @@ class Scheduler:
         action: str,
         *,
         created_by: CreatedBy = "human",
+        deliver_to: str | None = None,
         verify: str = "",
         max_attempts: int = 1,
         notify: Notify = "always",
         tools: list[str] | None = None,
     ) -> CronJob:
         """Register a job fired by a named event.
+
+        deliver_to: Chat webhook the answer is posted to. Accepted here because `cron fire`
+            dispatches through the same sink as the daemon, so an event job can deliver; a field
+            only a hand-edited jobs.json could set is a field nobody has.
 
         verify: Shell command that decides whether this job's dispatch KEPT its work; empty means
             no gate, which is today's behaviour. Accepted here rather than only on the model
@@ -245,6 +252,7 @@ class Scheduler:
             action=action,
             created_by=created_by,
             enabled=created_by != "agent",  # agent-created triggers start disabled (same invariant)
+            deliver_to=deliver_to,
             verify=verify,
             max_attempts=max(1, max_attempts),
             notify=notify,
@@ -473,11 +481,11 @@ class Scheduler:
                 else:
                     self._record(job, veredito or "ok", None)
             except TimeoutError:
-                # Known gap: raised here, outside the dispatch, so the delivery sink never hears
-                # of it — a `notify=failures_only` or `on_change` job is NOT told its run timed
-                # out (the record and `last_status` are). And the abandoned thread may still call
-                # the sink later and move `last_delivered_hash` on a job this tick already saved,
-                # so that move can be lost. Left for a follow-up that posts the timeout from here.
+                # Raised here, outside the dispatch, so the result sink never hears of it. The
+                # owner is told by the daemon's failure notice, which reads `last_status` after
+                # this tick — not from here: this module takes no clock and no I/O. Still open: the
+                # abandoned thread may call the sink later and move `last_delivered_hash` on a job
+                # this tick already saved, so that move can be lost.
                 _log.warning(
                     "cron job %s (%s) exceeded %ss and was abandoned; the schedule continues",
                     job.name, job.id, job_timeout,

@@ -18,12 +18,14 @@ full — :func:`webhook_host_only` is used on every path that reports a failure.
 from __future__ import annotations
 
 import json
+import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from chimera.scheduler.models import CronJob
@@ -42,6 +44,24 @@ MAX_CHARS = 1900
 #: has no business reintroducing.
 TIMEOUT_S = 10.0
 
+#: The dispatch statuses that mean the job could not run or could not finish. Not ``rejected``: a
+#: rejected run finished and has an answer, which the sink posts as it always has. Not
+#: ``cancelled``: the person who ran ``cron kill`` knows.
+UNFINISHED: tuple[str, ...] = ("error", "timeout", "budget")
+
+#: One line per failure kind, written here and never derived from the error. The category is what
+#: the reader acts on — a code fix, a slower provider, a number in the configuration — and the
+#: detail lives where the owner already looks for it, behind their own login.
+_REASON = {
+    "error": "The run stopped with an error.",
+    "timeout": "The run went past its time limit and was abandoned.",
+    "budget": "The spend cap refused it, so it did not run.",
+}
+
+#: Where the detail is. Named rather than quoted: `cron doctor` prints `last_error` on the machine,
+#: which is the right place for text this module refuses to post.
+_WHERE = " The error is not posted here; `chimera cron doctor` on the host shows it."
+
 
 @dataclass(frozen=True)
 class Delivered:
@@ -59,11 +79,19 @@ class Delivered:
 def skip_reason(job: CronJob, answer: str, status: str = "ok") -> str:
     """Why this answer is NOT posted to the job's destination, or "" when it is.
 
-    ``status`` is how the dispatch went: ``ok``, or one of the failures (``rejected`` by the job's
-    own gate, ``error``, ``budget``). A failure is never skipped, under any ``notify``: the owner
-    who chose quiet chose to hear only when something is wrong, and a job that fails the same way
-    twice is still failing. Everything else follows :attr:`CronJob.notify`.
+    ``status`` is how the dispatch went: ``ok``, ``rejected`` by the job's own gate, or a run that
+    did not finish (``error``, ``budget``, ``timeout``). A rejection is never skipped, under any
+    ``notify``: the owner who chose quiet chose to hear only when something is wrong, and a job
+    that fails the same way twice is still failing. Everything else follows :attr:`CronJob.notify`.
+
+    A run that did not finish has no answer, only an exception, and the exception is never posted:
+    its text can carry a provider's response body, a path, a value the job was handling, or a
+    sentence some page planted for a model to repeat — and a chat channel is read by people who
+    were never meant to see any of that. It is recorded here and announced by
+    :func:`make_failure_notifier`, which posts the job, the status and the time, once per change.
     """
+    if status in UNFINISHED:
+        return "a run that did not finish is announced by a short failure notice, never by its error"
     if status != "ok":
         return ""
     if job.notify == "failures_only":
@@ -144,6 +172,125 @@ def make_deliver(
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     return deliver
+
+
+def _when(at: float) -> str:
+    """The tick's time in the machine's own zone, with the offset, to the minute.
+
+    Through UTC rather than a naive ``fromtimestamp`` for the reason the engine's ``_next_after``
+    gives: Windows raises on the local offset of a small epoch, and the tests pass small epochs.
+    """
+    return datetime.fromtimestamp(at, tz=UTC).astimezone().isoformat(timespec="minutes")
+
+
+def failure_notice(job: CronJob, at: float) -> tuple[str, str | None]:
+    """The failure state this run leaves the job in, and the line to post — None for nothing.
+
+    Read from what the engine already recorded on the job (``last_status``, ``enabled``,
+    ``disabled_by``, ``consecutive_failures``) and compared with :attr:`CronJob.failure_notice`,
+    the failure the owner was last told about. A notice goes out when that changes, and only then:
+
+    * into a failure from health, or from one failure kind to another — ``error`` and ``budget``
+      need opposite responses (a code fix, a number in the configuration), so the change between
+      them is news;
+    * into ``brake``, the run on which the engine switched the job off: it will not run again until
+      a person says so, which is a different fact from "it is failing";
+    * out of a failure, on a run that succeeded — the one message that says the earlier one can be
+      put down.
+
+    A ``rejected`` run clears the state without a notice: it finished, and its own answer went to
+    the destination through the sink, which is the owner's evidence that the job runs. A
+    ``cancelled`` run changes nothing: a person stopped it.
+
+    Never reads ``last_error``. That is the point: the line is assembled from fields this code
+    wrote, so nothing a provider, a tool or a web page said can reach the channel through it.
+    """
+    antes = job.failure_notice
+    status = job.last_status
+    if not job.enabled and job.disabled_by == "brake":
+        depois = "brake"
+    elif status in UNFINISHED:
+        depois = str(status)
+    elif status in ("ok", "rejected"):
+        depois = ""
+    else:
+        return antes, None
+    if depois == antes:
+        return antes, None
+    quando = _when(at)
+    if depois == "":
+        if status != "ok":
+            return "", None
+        return "", f"**{job.name}** is running again: the run at {quando} finished."
+    if depois == "brake":
+        return depois, (
+            f"**{job.name}** was switched off at {quando} (`brake`): it failed "
+            f"{job.consecutive_failures} times in a row. `chimera cron enable {job.id}` turns it "
+            "back on." + _WHERE
+        )
+    onde = "" if depois == "budget" else _WHERE
+    return depois, (
+        f"**{job.name}** could not finish: `{depois}` at {quando}. {_REASON[depois]}{onde}"
+    )
+
+
+def _off_the_tick(fn: Callable[[], None]) -> None:
+    """Run ``fn`` on a daemon thread. A notice that waited on the network inside the tick would hold
+    every job due after it, for up to :data:`TIMEOUT_S` each — the stall ``job_timeout`` exists to
+    prevent, reintroduced by the code that reports on it."""
+    threading.Thread(target=fn, daemon=True, name="chimera-cron-notice").start()
+
+
+def make_failure_notifier(
+    *,
+    send: Callable[[str, str], Delivered] | None = None,
+    warn: Callable[[str], None] | None = None,
+    enabled: Callable[[], bool] = lambda: True,
+    post: Callable[[Callable[[], None]], None] | None = None,
+) -> Callable[[CronJob, float], bool]:
+    """The daemon's ``on_outcome``: tell the job's destination that it could not run, once per change.
+
+    Here and not in the engine. ``Scheduler._brake`` says it in writing — the engine takes no clock
+    and no I/O — and two of the four outcomes this reports (a timeout, the brake) are decided by
+    the engine OUTSIDE the dispatch, so the result sink never hears of them, while the other two
+    (``error``, ``budget``) reach the sink only for a job whose ``notify`` is not ``always``. The
+    daemon has the clock and the list of jobs it just ran, with their outcome already recorded;
+    that is the one place all four are visible for every job.
+
+    ``enabled`` is asked on every call (``CHIMERA_CRON_NOTIFY_FAILURES``), so switching it off
+    applies from the next tick. Off posts nothing and moves no state, so switching it back on
+    announces a failure still in progress rather than staying quiet about it.
+
+    The state moves BEFORE the post, on the tick, and the post runs off it (``post``; a daemon
+    thread by default). So a post that fails is not retried on the next tick: retrying until it
+    lands is what a dead webhook would turn into one message per tick, the exact noise this
+    replaces. The failure stays in ``jobs.json`` and ``cron doctor``, and the post failure is said
+    out loud through ``warn``.
+
+    Returns whether the job's state changed, so the caller can persist it.
+    """
+    enviar = send or deliver_to_webhook
+    correr = post or _off_the_tick
+
+    def notify(job: CronJob, at: float) -> bool:
+        if not job.deliver_to or not enabled():
+            return False
+        depois, texto = failure_notice(job, at)
+        if depois == job.failure_notice:
+            return False
+        job.failure_notice = depois
+        if texto is not None:
+            url, nome = job.deliver_to, job.name
+
+            def _enviar() -> None:
+                entrega = enviar(url, texto)
+                if not entrega.ok and warn is not None:
+                    warn(f"cron '{nome}': failure notice not delivered — {entrega.detail}")
+
+            correr(_enviar)
+        return True
+
+    return notify
 
 
 def webhook_host_only(url: str) -> str:

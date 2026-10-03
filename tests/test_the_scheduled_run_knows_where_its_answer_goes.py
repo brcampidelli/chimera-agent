@@ -331,7 +331,15 @@ def test_failures_only_posts_a_failure_and_nothing_else(tmp_path: Path) -> None:
 
 def test_failures_only_hears_about_a_run_that_raised(tmp_path: Path) -> None:
     """An exception never reached the sink at all, so without this "only failures" would have meant
-    "only what a verify gate rejected". The engine still records the error: it is re-raised."""
+    "only what a verify gate rejected". The engine still records the error: it is re-raised.
+
+    This asserted, until study 29 (P3.1), that the exception's TEXT was posted to the channel. That
+    was the defect, not the contract: an exception can carry a provider's response body, a key, or a
+    sentence a page planted for the model to repeat. The run is now heard as a failure notice from
+    the daemon — the job, the status, the time — and the text stays in the result file."""
+    from chimera.scheduler import CronDaemon
+    from chimera.scheduler.delivery import make_failure_notifier
+
     sched = Scheduler(CronStore(tmp_path / "jobs.json"), jitter=False)
     job = sched.schedule_cron(
         "watch", "* * * * *", "check", now=0.0, deliver_to=WEBHOOK, notify="failures_only"
@@ -344,10 +352,16 @@ def test_failures_only_hears_about_a_run_that_raised(tmp_path: Path) -> None:
     dispatch = make_agent_dispatch(
         lambda _t: "", make_deliver(tmp_path / "r.jsonl", send=sink), run_job=_quebra
     )
-    (ran,) = sched.run_due(now=(job.next_run or 0) + 1, dispatch=dispatch)
+    daemon = CronDaemon(
+        sched, dispatch, heartbeat_path=tmp_path / "beat.json",
+        on_outcome=make_failure_notifier(send=sink, post=lambda enviar: enviar()),
+    )
+    (ran,) = daemon.tick(now=(job.next_run or 0) + 1)
 
     assert ran.last_status == "error" and ran.consecutive_failures == 1
-    assert len(sink.sent) == 1 and "RuntimeError: provider down" in sink.sent[0]
+    assert len(sink.sent) == 1 and "**watch**" in sink.sent[0] and "`error`" in sink.sent[0]
+    assert "provider down" not in sink.sent[0]
+    assert "RuntimeError: provider down" in _records(tmp_path / "r.jsonl")[0]["answer"]
 
 
 def test_always_keeps_its_old_contract_for_a_run_that_raised(tmp_path: Path) -> None:

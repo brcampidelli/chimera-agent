@@ -3191,7 +3191,7 @@ def _start_cron_daemon(
 
     from chimera.core import Agent, AgentConfig
     from chimera.scheduler import CronDaemon, Scheduler, make_agent_dispatch
-    from chimera.scheduler.delivery import make_deliver
+    from chimera.scheduler.delivery import make_deliver, make_failure_notifier
     from chimera.scheduler.job_runner import make_run_job
     from chimera.tools import default_registry
 
@@ -3243,8 +3243,19 @@ def _start_cron_daemon(
         results_path, warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]")
     )
 
+    # A run that could not run or finish is announced at the job's webhook, once per change of
+    # state. The flag is asked per tick (`get_settings()`, which `PATCH /api/config` refreshes), so
+    # switching it off silences the next tick rather than the next launch.
+    notices = make_failure_notifier(
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+        enabled=lambda: get_settings().cron_notify_failures,
+    )
+
     daemon = CronDaemon(
-        scheduler, make_agent_dispatch(run_task, deliver, run_job=run_job), tick_seconds=tick
+        scheduler,
+        make_agent_dispatch(run_task, deliver, run_job=run_job),
+        tick_seconds=tick,
+        on_outcome=notices,
     )
     _thread, stop = daemon.start()
     jobs = len(scheduler.store.list())
@@ -6390,6 +6401,8 @@ def _cron_store() -> CronStore:
 @cron_app.command("list")
 def cron_list() -> None:
     """List scheduled jobs."""
+    from chimera.scheduler.delivery import webhook_host_only
+
     store = _cron_store()
     if len(store) == 0:
         console.print("[dim]no scheduled jobs[/dim]")
@@ -6411,6 +6424,9 @@ def cron_list() -> None:
             extras.append(f"notify={job.notify}")
         if job.tools is not None:
             extras.append(f"tools={','.join(job.tools) or '(none)'}")
+        if job.deliver_to:
+            # The host only: the rest of a webhook URL is the credential to post into the channel.
+            extras.append(f"deliver_to={webhook_host_only(job.deliver_to)}")
         if extras:
             console.print(f"  [cyan]{job.id}[/cyan] [dim]{' · '.join(extras)}[/dim]")
 
@@ -6577,6 +6593,13 @@ def cron_add(
              "Omit for every tool (the previous behaviour). Refused with --webhook: a webhook "
              "job runs through the chat gateway, which does not apply the list.",
     ),
+    deliver_to: str | None = typer.Option(
+        None, "--deliver-to",
+        help="Chat webhook URL (Discord or Slack) the job's answers are posted to, per --notify; "
+             "a run that could not run or finish is announced there too. The URL is a credential "
+             "and is never printed in full. Refused with --webhook: that job answers through "
+             "the chat gateway.",
+    ),
 ) -> None:
     """Add a cron, event- or webhook-triggered job.
 
@@ -6585,6 +6608,7 @@ def cron_add(
     route — so for every user the gate was permanently unarmed.
     """
     import time
+    import urllib.parse
 
     from chimera.scheduler import Scheduler
     from chimera.scheduler.models import Notify
@@ -6597,6 +6621,20 @@ def cron_add(
         raise typer.Exit(code=1)
     modo = modos[notify]
     lista = None if tools is None else [t.strip() for t in tools.split(",") if t.strip()]
+    destino = (deliver_to or "").strip() or None
+    if destino is not None:
+        # Checked here, at the keyboard, rather than discovered at 07:00 by a delivery that refuses
+        # the scheme. Nothing of the URL is echoed back: its path is the channel's secret.
+        partes = urllib.parse.urlparse(destino)
+        if partes.scheme not in ("http", "https") or not partes.hostname:
+            console.print("[red]--deliver-to must be an http(s) webhook URL with a host[/red]")
+            raise typer.Exit(code=1)
+        if webhook:
+            console.print(
+                "[red]--deliver-to is not taken with --webhook: that job answers through the chat "
+                "gateway, which does not read it[/red]"
+            )
+            raise typer.Exit(code=1)
 
     sched = Scheduler(_cron_store())
     # Passed by name rather than unpacked from a dict: a `**kwargs` here type-erases both fields,
@@ -6612,13 +6650,13 @@ def cron_add(
             raise typer.Exit(code=1) from exc
     elif event:
         job = sched.schedule_event(
-            name, schedule, action, verify=verify, max_attempts=max_attempts,
-            notify=modo, tools=lista,
+            name, schedule, action, deliver_to=destino, verify=verify,
+            max_attempts=max_attempts, notify=modo, tools=lista,
         )
     else:
         try:
             job = sched.schedule_cron(
-                name, schedule, action, now=time.time(),
+                name, schedule, action, now=time.time(), deliver_to=destino,
                 verify=verify, max_attempts=max_attempts, notify=modo, tools=lista,
             )
         except ValueError as exc:
@@ -6715,7 +6753,7 @@ def cron_fire(
 
     from chimera.providers import LLMGateway
     from chimera.scheduler import Scheduler, make_agent_dispatch
-    from chimera.scheduler.delivery import make_deliver
+    from chimera.scheduler.delivery import make_deliver, make_failure_notifier
     from chimera.scheduler.job_runner import make_run_job
 
     scheduler = Scheduler(_cron_store())
@@ -6747,9 +6785,21 @@ def cron_fire(
         settings.home / "scheduler" / "cron_results.jsonl",
         warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
     )
+    agora = time.time()
     ran = scheduler.fire_event(
-        event, time.time(), make_agent_dispatch(_sem_job, deliver, run_job=run_job)
+        event, agora, make_agent_dispatch(_sem_job, deliver, run_job=run_job)
     )
+    # The same failure notice the daemon gives a scheduled job, posted inline: this is a one-shot
+    # command, and a notice handed to a background thread would die with the process before it
+    # reached the network. There is no tick here to hold up.
+    notices = make_failure_notifier(
+        warn=lambda linha: console.print(f"[yellow]{linha}[/yellow]"),
+        enabled=lambda: settings.cron_notify_failures,
+        post=lambda enviar: enviar(),
+    )
+    for job in ran:
+        if notices(job, agora):
+            scheduler.store.add(job)
     for job in ran:
         cor = "green" if job.last_status == "ok" else "red"
         console.print(f"[{cor}]{job.last_status}[/{cor}] {job.name} ({job.id})")

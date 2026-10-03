@@ -140,10 +140,11 @@ def make_agent_dispatch(
 
     A sink that accepts ``status=`` (as :func:`~chimera.scheduler.delivery.make_deliver` does) is
     also told how the dispatch went — ``ok``, ``rejected``, and, for a job whose ``notify`` is not
-    ``always``, ``error`` or ``budget`` with the exception as the answer. That last part is what
-    makes ``notify="failures_only"`` mean anything: an exception never reached the sink at all, so
-    "only failures" would have been "only what a verify gate rejected". ``always`` keeps the old
-    contract — a raised dispatch delivers nothing — because that is what it promises.
+    ``always``, ``error`` or ``budget`` with the exception as the answer, which the sink RECORDS
+    and does not post. Posting a run that did not finish is the daemon's job
+    (:func:`~chimera.scheduler.delivery.make_failure_notifier`): it is the only layer that also
+    sees a timeout and the brake, which the engine decides outside this function, and it posts a
+    fixed line rather than the exception — whose text this function cannot vouch for.
     """
     takes_status = on_result is not None and _takes_status(on_result)
 
@@ -174,7 +175,8 @@ def make_agent_dispatch(
             bruto = run_job(job) if run_job is not None else run_task(job.action)
         except Exception as exc:
             # Re-raised untouched: the engine records the failure and drives the brake from it.
-            # This only tells the sink first, and only where the owner asked for failures.
+            # This only puts it in the result file first, where the owner asked for failures; the
+            # post to the channel is the failure notice's, without this text.
             if takes_status and job.notify != "always":
                 falha = "budget" if isinstance(exc, BudgetExceeded) else "error"
                 _send(job, f"The scheduled run did not finish: {type(exc).__name__}: {exc}", falha)
@@ -219,6 +221,7 @@ class CronDaemon:
         sleep: Callable[[float], None] = time.sleep,
         job_timeout: float | None = 1800.0,
         heartbeat_path: Path | None = None,
+        on_outcome: Callable[[CronJob, float], bool] | None = None,
     ) -> None:
         self.scheduler = scheduler
         self.dispatch = dispatch
@@ -240,6 +243,11 @@ class CronDaemon:
             if heartbeat_path is not None
             else scheduler.store.path.parent / "heartbeat.json"
         )
+        # Told about every job this tick ran, after the engine recorded how it ended — including a
+        # timeout and the brake, which the engine decides outside the dispatch and the result sink
+        # never hears of. Returns whether it changed the job, which is persisted here: the engine
+        # stays without I/O and the notifier without a store. None = no notices, as before.
+        self.on_outcome = on_outcome
 
     def tick(self, now: float | None = None) -> list[CronJob]:
         """One scheduler tick: dispatch every job due at ``now`` (defaults to the real clock).
@@ -257,6 +265,13 @@ class CronDaemon:
             _log.warning("cron store reload failed: %s", exc)
         at = self._clock() if now is None else now
         ran = self.scheduler.run_due(at, self.dispatch, job_timeout=self.job_timeout)
+        if self.on_outcome is not None:
+            for job in ran:
+                try:
+                    if self.on_outcome(job, at):
+                        self.scheduler.store.add(job)
+                except Exception as exc:  # noqa: BLE001 — a notice must never cost a tick
+                    _log.warning("cron '%s': failure notice skipped: %s", job.name, exc)
         if self.heartbeat_path is not None:
             try:
                 write_heartbeat(

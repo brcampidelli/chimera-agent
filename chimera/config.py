@@ -795,6 +795,18 @@ class Settings(BaseSettings):
     # running 24/7. Set CHIMERA_APP_CRON=0 (or `chimera app --no-cron`) for a purely reactive app.
     app_cron: bool = Field(default=True, validation_alias="CHIMERA_APP_CRON")
 
+    # Tell a scheduled job's `deliver_to` channel when it could not run or finish (error, timeout,
+    # spend cap, switched off by the failure brake) — one short line when its state changes into a
+    # failure and one when it runs again, never the error text. ON by default (study 29, P3.1,
+    # approved by the owner): it changes nothing any job does, only makes visible a failure that was
+    # already recorded in `cron_results.jsonl` and the logs and reached nobody. It does change what
+    # arrives in the channel of anyone who already has a `deliver_to`; set
+    # CHIMERA_CRON_NOTIFY_FAILURES=0 to silence it. Read on every tick, so it applies from the next.
+    # Covers Chimera's own scheduler only — not scripts run by a separate dispatcher beside it.
+    cron_notify_failures: bool = Field(
+        default=True, validation_alias="CHIMERA_CRON_NOTIFY_FAILURES"
+    )
+
     # Auto-start the messaging adapters (Discord/Telegram) inside `chimera app` at boot, so the agent
     # can reach you on chat without a separate `chimera serve --discord` terminal. OFF by default: it
     # opens a network bot, so it's a deliberate opt-in. The desktop UI's Messaging toggle sets this

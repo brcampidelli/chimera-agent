@@ -172,10 +172,16 @@ class CronJob(BaseModel):
       after whitespace is normalised. "One ping per state, not per tick": a monitor that finds the
       same thing every five minutes was posting it every five minutes.
     * ``failures_only``: only a dispatch that did not succeed — its gate rejected the work, or it
-      raised.
+      could not run or finish.
 
-    A failure is never suppressed by ``on_change`` either: a job that breaks the same way twice is
-    still broken, and silence is how a broken monitor reads as a quiet day.
+    A rejected run's answer is never suppressed by ``on_change`` either: a job that breaks the same
+    way twice is still broken, and silence is how a broken monitor reads as a quiet day.
+
+    A run that could not run or finish (``error``, ``timeout``, ``budget``, or the brake switching
+    the job off) is not an answer and is not governed by this field: it reaches :attr:`deliver_to`
+    as a short failure notice under EVERY mode — once when the job's state changes into that
+    failure and once when it runs again (:attr:`failure_notice`), never with the error text, and
+    not at all when ``CHIMERA_CRON_NOTIFY_FAILURES`` is off.
 
     Applies to cron and event jobs. A webhook job answers through the chat gateway, which does not
     read this field, so :meth:`~chimera.scheduler.engine.Scheduler.schedule_webhook` refuses
@@ -196,4 +202,14 @@ class CronJob(BaseModel):
     last_delivered_hash: str | None = None
     """Fingerprint of the last answer delivered for this job — what ``notify="on_change"`` compares
     against. Kept on the job because the job is the only state that survives a restart."""
+    failure_notice: str = ""
+    """The failure the owner was last told about at :attr:`deliver_to` — ``error``, ``timeout``,
+    ``budget`` or ``brake`` — or ``""`` when they have not been told of one, or were told it ran
+    again. Written by :func:`~chimera.scheduler.delivery.make_failure_notifier`, never by the
+    engine.
+
+    The memory that makes a failure notice one post per change of state rather than one per tick:
+    a job on ``*/5`` whose provider is down for an afternoon is one message when it breaks and one
+    when it comes back, not fifty. On the job, like :attr:`last_delivered_hash`, because a restart
+    in the middle of an outage must not announce the same outage again."""
     metadata: dict[str, Any] = Field(default_factory=dict)

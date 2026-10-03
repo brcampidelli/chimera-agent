@@ -81,6 +81,9 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_AUTO_CONSOLIDATE",
     "CHIMERA_CHAT_MEMORY",  # the "Remember from chat" toggle (opt-in durable memory from chat)
     "CHIMERA_APP_CRON",  # run the cron daemon inside the desktop app (proactivity)
+    # Whether a scheduled job's channel hears that it could not run. Beside the cron switch for the
+    # same reason that one is here; read per tick, so it needs no APPLIES_WHEN entry.
+    "CHIMERA_CRON_NOTIFY_FAILURES",
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
     "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",

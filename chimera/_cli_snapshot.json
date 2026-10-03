@@ -1123,6 +1123,16 @@
               ],
               "required": false,
               "type": "str"
+            },
+            {
+              "help": "Chat webhook URL (Discord or Slack) the job's answers are posted to, per --notify; a run that could not run or finish is announced there too. The URL is a credential and is never printed in full. Refused with --webhook: that job answers through the chat gateway.",
+              "kind": "option",
+              "name": "deliver_to",
+              "opts": [
+                "--deliver-to"
+              ],
+              "required": false,
+              "type": "str"
             }
           ],
           "path": "cron add"
