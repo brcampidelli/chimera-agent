@@ -456,8 +456,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
         "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
         # The site list and the declared ports as written, not a mask: statements the owner made and
-        # has to be able to read back. A value `.env` holds that does not parse is reported empty
-        # here, which is also what the browser does with it (it is left out; `default_registry`).
+        # has to be able to read back. A value `.env` holds that does not parse leaves the lists
+        # empty AND says why in `invalid`: empty alone would read "any public site" for a browser
+        # that is left out of every conversation (`default_registry`).
         "browser": {
             "headless": settings.browser_headless,
             **_browser_reach_lists(settings),
