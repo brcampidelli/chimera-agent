@@ -54,6 +54,9 @@ THEMES: tuple[Theme, ...] = (
             # described a CLI with one fewer command than the CLI has.
             "sessions",
             "tui",
+            # A desktop Code conversation continued from the terminal, through the running app's
+            # bridge (study 29, P4.4).
+            "code",
             "assist",
             "run",
             "agent",

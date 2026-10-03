@@ -22,7 +22,7 @@
     },
     {
       "deprecated": false,
-      "help": "Serve Chimera to an editor over the Agent Client Protocol (stdio).\n\nThe mirror of what `chimera code --provider claude` does: there we drive somebody else's agent,\nhere somebody else's editor drives ours. Point Zed, JetBrains or Neovim at `chimera acp` and the\nloop, the verifier and the receipt are available without installing a second tool.\n\nNothing on this path may write to stdout \u2014 it IS the protocol. A stray print corrupts the frame\nthe editor is parsing, and the symptom is an editor that hangs rather than output in the wrong\nplace. The banner goes to stderr for the same reason the MCP server's does.",
+      "help": "Serve Chimera to an editor over the Agent Client Protocol (stdio).\n\nThe mirror of what a Code-screen turn with `provider: claude` does: there we drive somebody\nelse's agent, here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at\n`chimera acp` and the loop, the verifier and the receipt are available without installing a\nsecond tool.\n\nNothing on this path may write to stdout \u2014 it IS the protocol. A stray print corrupts the frame\nthe editor is parsing, and the symptom is an editor that hangs rather than output in the wrong\nplace. The banner goes to stderr for the same reason the MCP server's does.",
       "hidden": false,
       "name": "acp",
       "params": [
@@ -807,6 +807,77 @@
         }
       ],
       "path": "chat"
+    },
+    {
+      "commands": [
+        {
+          "deprecated": false,
+          "help": "The desktop app's Code conversations, newest first, with the id `resume` takes.",
+          "hidden": false,
+          "name": "list",
+          "params": [
+            {
+              "default": "20",
+              "help": "How many conversations, newest first.",
+              "kind": "option",
+              "name": "limit",
+              "opts": [
+                "--limit",
+                "-n"
+              ],
+              "required": false,
+              "type": "int"
+            }
+          ],
+          "path": "code list"
+        },
+        {
+          "deprecated": false,
+          "help": "Continue a desktop Code conversation here; the app runs the turn and shows it too.\n\nNeeds the app open with Settings > \"Allow Claude to operate this app\" on. Approval questions are\nprinted; answering them here also needs \"Full control\", otherwise answer them in the app.",
+          "hidden": false,
+          "name": "resume",
+          "params": [
+            {
+              "help": "The conversation's id (or a prefix only it has).",
+              "kind": "argument",
+              "name": "session_id",
+              "opts": [
+                "session_id"
+              ],
+              "required": true,
+              "type": "str"
+            },
+            {
+              "help": "Send this one message and exit. Omit to keep talking.",
+              "kind": "option",
+              "name": "message",
+              "opts": [
+                "--message",
+                "-m"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Model for these turns; omit for the default.",
+              "kind": "option",
+              "name": "model",
+              "opts": [
+                "--model"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "code resume"
+        }
+      ],
+      "deprecated": false,
+      "help": "Continue a desktop Code conversation from this terminal, through the running app.",
+      "hidden": false,
+      "name": "code",
+      "params": [],
+      "path": "code"
     },
     {
       "deprecated": false,

@@ -23,6 +23,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`brief`](#brief) | Morning brief: parallel topic research through the hierarchy, one synthesized digest. |
 | [`cascade-bench`](#cascade-bench) | Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models. |
 | [`chat`](#chat) | Interactive multi-turn chat — your terminal right-hand. Requires a key. |
+| [`code`](#code) | Continue a desktop Code conversation from this terminal, through the running app. |
 | [`context-curve`](#context-curve) | Did runs carrying more context do worse? Measured on THIS machine's own logs. |
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated. |
@@ -113,9 +114,10 @@ chimera a2a-card
 
 Serve Chimera to an editor over the Agent Client Protocol (stdio).
 
-The mirror of what `chimera code --provider claude` does: there we drive somebody else's agent,
-here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at `chimera acp` and the
-loop, the verifier and the receipt are available without installing a second tool.
+The mirror of what a Code-screen turn with `provider: claude` does: there we drive somebody
+else's agent, here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at
+`chimera acp` and the loop, the verifier and the receipt are available without installing a
+second tool.
 
 Nothing on this path may write to stdout — it IS the protocol. A stray print corrupts the frame
 the editor is parsing, and the symptom is an editor that hangs rather than output in the wrong
@@ -356,6 +358,14 @@ chimera chat
 | `--new` | Start a fresh session instead of resuming. |  |
 | `--max-usd` | Stop once this conversation has spent this much (the whole thread, not one turn). |  |
 | `--write-region` | Comma-separated globs the file-writers may touch (e.g. 'src/**,*.py'). A write outside is refused — blocks an injected instruction from rewriting an unrelated file. |  |
+
+## code
+
+Continue a desktop Code conversation from this terminal, through the running app.
+
+```bash
+chimera code
+```
 
 ## context-curve
 

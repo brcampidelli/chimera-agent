@@ -3338,9 +3338,10 @@ def acp_server(
 ) -> None:
     """Serve Chimera to an editor over the Agent Client Protocol (stdio).
 
-    The mirror of what `chimera code --provider claude` does: there we drive somebody else's agent,
-    here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at `chimera acp` and the
-    loop, the verifier and the receipt are available without installing a second tool.
+    The mirror of what a Code-screen turn with `provider: claude` does: there we drive somebody
+    else's agent, here somebody else's editor drives ours. Point Zed, JetBrains or Neovim at
+    `chimera acp` and the loop, the verifier and the receipt are available without installing a
+    second tool.
 
     Nothing on this path may write to stdout — it IS the protocol. A stray print corrupts the frame
     the editor is parsing, and the symptom is an editor that hangs rather than output in the wrong
@@ -6324,6 +6325,9 @@ app.command("decide")(_decide)
 from chimera.cli.review_cmd import review as _review  # noqa: E402
 
 app.command("review")(_review)
+from chimera.cli.code_cmd import code_app  # noqa: E402
+
+app.add_typer(code_app, name="code")
 
 
 # --- cron subcommands ---------------------------------------------------------
