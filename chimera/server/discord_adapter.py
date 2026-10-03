@@ -58,6 +58,10 @@ class DiscordAdapter:
         if author_is_bot and not self.respond_to_bots:
             return None
         if self.allowed_users is not None and str(author_id) not in self.allowed_users:
+            # Dropped without a reply: answering "you are not allowed" would confirm to a stranger
+            # that a bot is listening here. Debug, with the id, so the owner can find their own id
+            # when they lock themselves out.
+            _log.debug("discord: ignored a message from %s (not in the allowlist)", author_id)
             return None
         text = content.strip()
         if not text:

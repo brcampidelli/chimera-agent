@@ -57,6 +57,8 @@ class SlackAdapter:
             return None  # a bot's message (incl. our own) — loop guard
         user_id = str(event.get("user", ""))
         if self.allowed_users is not None and user_id not in self.allowed_users:
+            # No reply, for the reason in the Discord adapter; the id is logged for the owner.
+            _log.debug("slack: ignored a message from %s (not in the allowlist)", user_id)
             return None
         text = str(event.get("text") or "").strip()
         channel = str(event.get("channel", ""))

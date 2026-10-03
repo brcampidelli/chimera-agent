@@ -582,6 +582,17 @@ class AutomationCfgOut(BaseModel):
     cron: bool
 
 
+class MessagingCfgOut(BaseModel):
+    """Who may talk to each chat bot, as the owner saved it (``chimera/server/allowlist.py``).
+
+    ``allowed_users`` maps a platform (discord, telegram, slack, signal, whatsapp) to its ids. An
+    empty list means ANYONE who can reach the bot — the behaviour every bot had before the setting
+    existed — and the Messaging card warns about it instead of showing a blank field.
+    """
+
+    allowed_users: dict[str, list[str]] = Field(default_factory=dict)
+
+
 class GuardCfgOut(BaseModel):
     """Whether the CHAT agent is assembled with the coding turn's protections.
 
@@ -657,6 +668,7 @@ class ConfigOut(BaseModel):
     server: ServerCfgOut
     mcp: McpCfgOut
     automation: AutomationCfgOut
+    messaging: MessagingCfgOut = Field(default_factory=MessagingCfgOut)
     guard: GuardCfgOut
     providers: list[ProviderOut]
     pools: list[PoolOut] = Field(default_factory=list)

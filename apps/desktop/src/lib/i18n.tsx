@@ -483,6 +483,10 @@ const en: Dict = {
   "settings.hint.rememberChat":
     "an explicit \"remember that…\" in a conversation saves a durable fact",
   "settings.card.messaging": "Messaging",
+  "settings.row.botAllowed": "Who can talk to the bot",
+  "settings.hint.botAllowed": "{platform} user ids, comma-separated. Empty = anyone who can message the bot",
+  "settings.botAllowed.placeholder": "ids, comma-separated",
+  "settings.messaging.open": "Anyone who can message the {platform} bot gets a turn, with your tools and your spend. List the ids allowed to talk to it.",
   "settings.row.botToken": "{platform} bot token",
   "settings.hint.botToken": "so the agent can reach you on {platform}",
   "settings.row.botRun": "Run the {platform} bot",
@@ -2143,6 +2147,10 @@ const pt: Dict = {
   "settings.hint.rememberChat":
     "um \"lembre que…\" explícito numa conversa guarda um fato durável",
   "settings.card.messaging": "Mensageria",
+  "settings.row.botAllowed": "Quem pode falar com o bot",
+  "settings.hint.botAllowed": "ids de usuário do {platform}, separados por vírgula. Vazio = qualquer pessoa que consiga mandar mensagem ao bot",
+  "settings.botAllowed.placeholder": "ids, separados por vírgula",
+  "settings.messaging.open": "Qualquer pessoa que consiga mandar mensagem ao bot do {platform} ganha um turno, com as suas ferramentas e o seu gasto. Liste os ids que podem falar com ele.",
   "settings.row.botToken": "Token do bot do {platform}",
   "settings.hint.botToken": "para o agente te alcançar no {platform}",
   "settings.row.botRun": "Rodar o bot do {platform}",
@@ -3397,6 +3405,10 @@ const es: Dict = {
   "settings.hint.rememberChat":
     "un \"recuerda que…\" explícito en una conversación guarda un dato duradero",
   "settings.card.messaging": "Mensajería",
+  "settings.row.botAllowed": "Quién puede hablar con el bot",
+  "settings.hint.botAllowed": "ids de usuario de {platform}, separados por comas. Vacío = cualquiera que pueda escribir al bot",
+  "settings.botAllowed.placeholder": "ids, separados por comas",
+  "settings.messaging.open": "Cualquiera que pueda escribir al bot de {platform} obtiene un turno, con tus herramientas y tu gasto. Indica los ids que pueden hablar con él.",
   "settings.row.botToken": "Token del bot de {platform}",
   "settings.hint.botToken":
     "para que el agente pueda contactarte en {platform}",
@@ -5079,6 +5091,10 @@ const fr: Dict = {
   "settings.hint.rememberChat":
     "un « retiens que… » explicite dans une conversation enregistre un fait durable",
   "settings.card.messaging": "Messagerie",
+  "settings.row.botAllowed": "Qui peut parler au bot",
+  "settings.hint.botAllowed": "identifiants d'utilisateur {platform}, séparés par des virgules. Vide = toute personne pouvant écrire au bot",
+  "settings.botAllowed.placeholder": "identifiants, séparés par des virgules",
+  "settings.messaging.open": "Toute personne pouvant écrire au bot {platform} obtient un tour, avec vos outils et vos dépenses. Indiquez les identifiants autorisés à lui parler.",
   "settings.row.botToken": "Jeton du bot {platform}",
   "settings.hint.botToken":
     "pour que l'agent puisse vous joindre sur {platform}",
@@ -6774,6 +6790,10 @@ const de: Dict = {
   "settings.hint.rememberChat":
     "ein ausdrückliches „merke dir, dass …“ im Gespräch speichert einen dauerhaften Fakt",
   "settings.card.messaging": "Messaging",
+  "settings.row.botAllowed": "Wer mit dem Bot sprechen darf",
+  "settings.hint.botAllowed": "{platform}-Nutzer-IDs, durch Kommas getrennt. Leer = jeder, der dem Bot schreiben kann",
+  "settings.botAllowed.placeholder": "IDs, durch Kommas getrennt",
+  "settings.messaging.open": "Jeder, der dem {platform}-Bot schreiben kann, bekommt einen Durchlauf, mit deinen Werkzeugen und auf deine Kosten. Trage die IDs ein, die mit ihm sprechen dürfen.",
   "settings.row.botToken": "{platform}-Bot-Token",
   "settings.hint.botToken":
     "damit dich der Agent auf {platform} erreichen kann",
@@ -8464,6 +8484,10 @@ const zh: Dict = {
   "settings.hint.rememberChat":
     "在对话里明确说“记住……”会保存一条长期记忆",
   "settings.card.messaging": "消息平台",
+  "settings.row.botAllowed": "谁可以和机器人对话",
+  "settings.hint.botAllowed": "{platform} 用户 ID，用逗号分隔。留空 = 任何能给机器人发消息的人",
+  "settings.botAllowed.placeholder": "ID，用逗号分隔",
+  "settings.messaging.open": "任何能给 {platform} 机器人发消息的人都会获得一个回合，使用你的工具、花你的钱。请列出允许与它对话的 ID。",
   "settings.row.botToken": "{platform} 机器人令牌",
   "settings.hint.botToken": "这样智能体就能在 {platform} 上找到你",
   "settings.row.botRun": "运行 {platform} 机器人",
@@ -10081,6 +10105,10 @@ const ja: Dict = {
   "settings.hint.rememberChat":
     "会話のなかで明示的に「覚えておいて…」と言うと永続的な事実として保存します",
   "settings.card.messaging": "メッセージング",
+  "settings.row.botAllowed": "ボットと話せる人",
+  "settings.hint.botAllowed": "{platform} のユーザー ID（カンマ区切り）。空欄 = ボットにメッセージを送れる人なら誰でも",
+  "settings.botAllowed.placeholder": "ID（カンマ区切り）",
+  "settings.messaging.open": "{platform} ボットにメッセージを送れる人なら誰でも、あなたのツールと費用でターンを実行できます。話せる ID を指定してください。",
   "settings.row.botToken": "{platform} ボットトークン",
   "settings.hint.botToken":
     "エージェントが {platform} であなたに連絡できるようにします",
@@ -12175,6 +12203,10 @@ const it: Dict = {
   "settings.hint.rememberChat":
     "un \"ricorda che…\" esplicito in una conversazione salva un fatto duraturo",
   "settings.card.messaging": "Messaggistica",
+  "settings.row.botAllowed": "Chi può parlare con il bot",
+  "settings.hint.botAllowed": "id utente {platform}, separati da virgole. Vuoto = chiunque possa scrivere al bot",
+  "settings.botAllowed.placeholder": "id, separati da virgole",
+  "settings.messaging.open": "Chiunque possa scrivere al bot {platform} ottiene un turno, con i tuoi strumenti e a tue spese. Elenca gli id autorizzati a parlargli.",
   "settings.row.botToken": "Token del bot {platform}",
   "settings.hint.botToken": "così l'agente può raggiungerti su {platform}",
   "settings.row.botRun": "Avvia il bot {platform}",
@@ -13860,6 +13892,10 @@ const pl: Dict = {
   "settings.hint.rememberChat":
     "wyraźne „zapamiętaj, że…” w rozmowie zapisuje trwały fakt",
   "settings.card.messaging": "Komunikatory",
+  "settings.row.botAllowed": "Kto może rozmawiać z botem",
+  "settings.hint.botAllowed": "identyfikatory użytkowników {platform}, oddzielone przecinkami. Puste = każdy, kto może napisać do bota",
+  "settings.botAllowed.placeholder": "identyfikatory, oddzielone przecinkami",
+  "settings.messaging.open": "Każdy, kto może napisać do bota {platform}, dostaje turę, z twoimi narzędziami i na twój koszt. Wpisz identyfikatory, które mogą z nim rozmawiać.",
   "settings.row.botToken": "Token bota {platform}",
   "settings.hint.botToken":
     "żeby agent mógł się z tobą skontaktować przez {platform}",
@@ -15542,6 +15578,10 @@ const ru: Dict = {
   "settings.hint.rememberChat":
     "явное «запомни, что…» в разговоре сохраняет долговременный факт",
   "settings.card.messaging": "Мессенджеры",
+  "settings.row.botAllowed": "Кто может говорить с ботом",
+  "settings.hint.botAllowed": "id пользователей {platform} через запятую. Пусто = любой, кто может написать боту",
+  "settings.botAllowed.placeholder": "id через запятую",
+  "settings.messaging.open": "Любой, кто может написать боту {platform}, получает ход — с вашими инструментами и за ваш счёт. Укажите id, которым можно с ним говорить.",
   "settings.row.botToken": "Токен бота {platform}",
   "settings.hint.botToken": "чтобы агент мог связаться с вами в {platform}",
   "settings.row.botRun": "Запускать бота {platform}",

@@ -101,14 +101,23 @@ class MessagingManager:
         token = getattr(self._settings, attr, None) if attr else None
         if not token:
             raise ValueError(f"{platform} is not configured (no token set)")
+        from chimera.server.allowlist import allowed_users_for, open_bot_warning
+
+        # The owner's allowlist, read from the settings this manager was built with — so a list
+        # saved on the Settings screen applies at the next launch, which is what the screen says.
+        # Built from the token alone before, the app's bot answered anyone, exactly as `chimera
+        # serve` did; the two paths share one helper now so they cannot disagree about who.
+        allowed = allowed_users_for(self._settings, platform)
+        if allowed is None:
+            _log.warning(open_bot_warning(platform))
         if platform == "discord":
             from chimera.server import DiscordAdapter
 
-            return DiscordAdapter(token)
+            return DiscordAdapter(token, allowed_users=allowed)
         if platform == "telegram":
             from chimera.server import TelegramAdapter
 
-            return TelegramAdapter(token)
+            return TelegramAdapter(token, allowed_users=allowed)
         raise ValueError(f"unknown messaging platform: {platform!r}")
 
     def _gateway_on_message(self, adapter: Any) -> Callable[[Any], str]:

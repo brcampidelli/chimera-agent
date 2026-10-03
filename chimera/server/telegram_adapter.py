@@ -56,6 +56,8 @@ class TelegramAdapter:
             return None
         user_id = str(sender.get("id", ""))
         if self.allowed_users is not None and user_id not in self.allowed_users:
+            # No reply, for the reason in the Discord adapter; the id is logged for the owner.
+            _log.debug("telegram: ignored a message from %s (not in the allowlist)", user_id)
             return None
         text = str(message.get("text") or "").strip()
         chat_id = str((message.get("chat") or {}).get("id", ""))

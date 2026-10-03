@@ -82,6 +82,14 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_CHAT_MEMORY",  # the "Remember from chat" toggle (opt-in durable memory from chat)
     "CHIMERA_APP_CRON",  # run the cron daemon inside the desktop app (proactivity)
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
+    # Who may talk to each bot. Not secrets — platform ids — so they are read back in full, like the
+    # egress list: a list the owner cannot read is a list they cannot correct, and the failure it
+    # guards against (a bot answering strangers) was invisible precisely because nothing showed it.
+    "CHIMERA_DISCORD_ALLOWED_USERS",
+    "CHIMERA_TELEGRAM_ALLOWED_USERS",
+    "CHIMERA_SLACK_ALLOWED_USERS",
+    "CHIMERA_SIGNAL_ALLOWED_USERS",
+    "CHIMERA_WHATSAPP_ALLOWED_NUMBERS",
     "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
@@ -203,6 +211,13 @@ APPLIES_WHEN: dict[str, str] = {
     # value would not undo that, so the honest answer is the relaunch, not a re-read.
     "CHIMERA_APP_CRON": NEXT_LAUNCH,
     "CHIMERA_MCP_AUTOLOAD": NEXT_LAUNCH,
+    # Read when the bot is built — at `chimera serve` start, or by the app's messaging manager from
+    # the settings it was launched with — and the running adapter keeps the set it was handed.
+    "CHIMERA_DISCORD_ALLOWED_USERS": NEXT_LAUNCH,
+    "CHIMERA_TELEGRAM_ALLOWED_USERS": NEXT_LAUNCH,
+    "CHIMERA_SLACK_ALLOWED_USERS": NEXT_LAUNCH,
+    "CHIMERA_SIGNAL_ALLOWED_USERS": NEXT_LAUNCH,
+    "CHIMERA_WHATSAPP_ALLOWED_NUMBERS": NEXT_LAUNCH,
 }
 
 
@@ -346,6 +361,10 @@ def read_config(settings: Settings) -> dict[str, Any]:
         )
     ladder = settings.tier_ladder()
     pools = read_pools(settings)
+    # Imported here: `chimera.server` pulls in every adapter and the HTTP server, which a settings
+    # read has no other reason to load.
+    from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_ids
+
     return {
         "models": {
             "default": settings.default_model,
@@ -433,6 +452,13 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "server": {"token_set": bool(settings.server_token)},
         "mcp": {"autoload": settings.mcp_autoload},
         "automation": {"cron": settings.app_cron},
+        # Per platform, the ids allowed to talk to its bot; an empty list is "anyone", and the
+        # Messaging card says so in those words rather than showing a blank field.
+        "messaging": {
+            "allowed_users": {
+                platform: allowed_ids(settings, platform) for platform in ALLOWLIST_FIELDS
+            },
+        },
         "providers": providers,
         "pools": pools,
         # Keys absent here apply to the next call; see APPLIES_WHEN.

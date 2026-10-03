@@ -87,6 +87,7 @@ class WhatsAppWebhook:
         route: Callable[[InboundMessage], str],
         *,
         app_secret: str | None = None,
+        allowed_numbers: set[str] | None = None,
     ) -> None:
         self.sender = sender
         self.verify_token = verify_token
@@ -95,6 +96,13 @@ class WhatsAppWebhook:
         # is rejected — otherwise anyone who knows the URL could forge a message and make the agent
         # send an outbound reply to an attacker-chosen number. Opt-in (None = unverified, as before).
         self.app_secret = app_secret
+        # Who may talk to the agent here, as the other adapters' ``allowed_users``: None = anyone,
+        # which is what this webhook did before it had the parameter. Compared as digits because
+        # Meta sends ``from`` as bare digits ("5511987654321") and an owner writes their own number
+        # the way a phone shows it ("+55 11 98765-4321"); a literal comparison would lock them out.
+        self.allowed_numbers = (
+            None if allowed_numbers is None else {_digits(n) for n in allowed_numbers if _digits(n)}
+        )
 
     def verify_signature(self, raw_body: bytes, signature: str | None) -> bool:
         """True if ``X-Hub-Signature-256`` is a valid HMAC-SHA256(app_secret, raw_body).
@@ -122,7 +130,17 @@ class WhatsAppWebhook:
         message = WhatsAppSender.parse_inbound(payload)
         if message is None:
             return 0
+        if self.allowed_numbers is not None and _digits(message.user) not in self.allowed_numbers:
+            # No turn and no reply: a reply would both confirm the number reaches a bot and spend the
+            # owner's money answering a stranger. The number is logged so the owner can add it.
+            _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
+            return 0
         reply = self.route(message)
         if reply:
             self.sender.send(message.chat_id, reply)
         return 1
+
+
+def _digits(number: str | None) -> str:
+    """A phone number reduced to its digits — the form Meta's webhook uses for ``from``."""
+    return "".join(ch for ch in str(number or "") if ch.isdigit())

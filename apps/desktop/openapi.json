@@ -2446,6 +2446,9 @@
           "memory": {
             "$ref": "#/components/schemas/MemoryCfgOut"
           },
+          "messaging": {
+            "$ref": "#/components/schemas/MessagingCfgOut"
+          },
           "models": {
             "$ref": "#/components/schemas/ModelsCfgOut"
           },
@@ -7198,6 +7201,23 @@
           "count"
         ],
         "title": "MemorySourceOut",
+        "type": "object"
+      },
+      "MessagingCfgOut": {
+        "description": "Who may talk to each chat bot, as the owner saved it (``chimera/server/allowlist.py``).\n\n``allowed_users`` maps a platform (discord, telegram, slack, signal, whatsapp) to its ids. An\nempty list means ANYONE who can reach the bot \u2014 the behaviour every bot had before the setting\nexisted \u2014 and the Messaging card warns about it instead of showing a blank field.",
+        "properties": {
+          "allowed_users": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Allowed Users",
+            "type": "object"
+          }
+        },
+        "title": "MessagingCfgOut",
         "type": "object"
       },
       "MessagingPlatformOut": {

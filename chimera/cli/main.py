@@ -3253,34 +3253,56 @@ def _start_cron_daemon(
 
 
 def _messaging_adapter(settings: Settings, platform: str) -> Any:
-    """Build the requested platform adapter (Discord/Telegram/Slack) or exit with guidance."""
+    """Build the requested platform adapter (Discord/Telegram/Slack/Signal) or exit with guidance.
+
+    Each one gets the owner's allowlist for its platform. The adapters have accepted one since they
+    shipped and this function never passed it, so `chimera serve --discord` answered anyone who
+    could reach the bot. An empty list still means "anyone" (the owner's decision — see
+    `chimera/server/allowlist.py`), but no longer silently.
+    """
+    adapter = _build_messaging_adapter(settings, platform)
+    if adapter.allowed_users is None:
+        _warn_open_bot(platform)
+    return adapter
+
+
+def _warn_open_bot(platform: str) -> None:
+    from chimera.server.allowlist import open_bot_warning
+
+    console.print(f"[bold red]WARNING:[/bold red] [yellow]{open_bot_warning(platform)}[/yellow]")
+
+
+def _build_messaging_adapter(settings: Settings, platform: str) -> Any:
+    from chimera.server.allowlist import allowed_users_for
+
+    allowed = allowed_users_for(settings, platform)
     if platform == "discord":
         if not settings.discord_bot_token:
             console.print("[red]Set CHIMERA_DISCORD_BOT_TOKEN to run the Discord adapter.[/red]")
             raise typer.Exit(code=1)
         from chimera.server import DiscordAdapter
 
-        return DiscordAdapter(settings.discord_bot_token)
+        return DiscordAdapter(settings.discord_bot_token, allowed_users=allowed)
     if platform == "telegram":
         if not settings.telegram_bot_token:
             console.print("[red]Set CHIMERA_TELEGRAM_BOT_TOKEN to run the Telegram adapter.[/red]")
             raise typer.Exit(code=1)
         from chimera.server import TelegramAdapter
 
-        return TelegramAdapter(settings.telegram_bot_token)
+        return TelegramAdapter(settings.telegram_bot_token, allowed_users=allowed)
     if platform == "slack":
         if not (settings.slack_bot_token and settings.slack_app_token):
             console.print("[red]Set CHIMERA_SLACK_BOT_TOKEN and CHIMERA_SLACK_APP_TOKEN to run the Slack adapter.[/red]")
             raise typer.Exit(code=1)
         from chimera.server import SlackAdapter
 
-        return SlackAdapter(settings.slack_bot_token, settings.slack_app_token)
+        return SlackAdapter(settings.slack_bot_token, settings.slack_app_token, allowed_users=allowed)
     if not (settings.signal_api_url and settings.signal_number):
         console.print("[red]Set CHIMERA_SIGNAL_API_URL and CHIMERA_SIGNAL_NUMBER (run a signal-cli-rest-api bridge).[/red]")
         raise typer.Exit(code=1)
     from chimera.server import SignalAdapter
 
-    return SignalAdapter(settings.signal_api_url, settings.signal_number)
+    return SignalAdapter(settings.signal_api_url, settings.signal_number, allowed_users=allowed)
 
 
 def _sender_registry(settings: Settings, primary: Any = None) -> Any:
@@ -3594,11 +3616,21 @@ def _whatsapp_webhook(settings: Settings, gateway: MessageGateway) -> Any:
     ):
         return None
     from chimera.server import WhatsAppSender, WhatsAppWebhook
+    from chimera.server.allowlist import WHATSAPP_UNSIGNED_WARNING, allowed_users_for
 
+    # The same two holes as the platform bots, plus one of its own: with no app secret the POST is
+    # not even known to come from Meta, so an allowlist alone would be a filter on a field the caller
+    # writes. Both are warned about rather than refused, for the reason the bots are.
+    allowed = allowed_users_for(settings, "whatsapp")
+    if allowed is None:
+        _warn_open_bot("whatsapp")
+    if not settings.whatsapp_app_secret:
+        console.print(f"[bold red]WARNING:[/bold red] [yellow]{WHATSAPP_UNSIGNED_WARNING}[/yellow]")
     sender = WhatsAppSender(settings.whatsapp_access_token, settings.whatsapp_phone_number_id)
     return WhatsAppWebhook(
         sender, settings.whatsapp_verify_token, gateway.on_message,
         app_secret=settings.whatsapp_app_secret,
+        allowed_numbers=allowed,
     )
 
 

@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MessagingCard } from "@/components/Settings";
@@ -31,8 +31,12 @@ describe("MessagingCard", () => {
     renderWithProviders(<MessagingCard save={save} />);
 
     await user.click(await screen.findByRole("button", { name: /^Set$/i }));
-    await user.type(screen.getByPlaceholderText(/paste/i), "discord-token-123");
-    await user.click(screen.getByRole("button", { name: /^Save$/i }));
+    const tokenField = screen.getByPlaceholderText(/paste/i);
+    await user.type(tokenField, "discord-token-123");
+    // Scoped to the token's own row: the card has a second Save now, for who may talk to the bot.
+    await user.click(
+      within(tokenField.parentElement as HTMLElement).getByRole("button", { name: /^Save$/i }),
+    );
 
     expect(save).toHaveBeenCalledWith({ CHIMERA_DISCORD_BOT_TOKEN: "discord-token-123" });
   });
@@ -86,5 +90,50 @@ describe("MessagingCard", () => {
     expect(await screen.findByText("Telegram bot token")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Run the Telegram bot" })).toBeInTheDocument();
     expect(screen.queryByText(/Discord/)).not.toBeInTheDocument();
+  });
+
+  it("warns that a configured bot with no allowlist answers anyone", async () => {
+    // The adapters always took an allowlist and nothing filled it, so the bot answered whoever
+    // reached it. Empty still means anyone — the owner's decision — but the card has to say so.
+    setup({ configured: true, running: true, error: null });
+    renderWithProviders(<MessagingCard save={vi.fn()} allowed={[]} />);
+
+    expect(
+      await screen.findByText(/Anyone who can message the Discord bot gets a turn/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not warn once the owner listed who may talk to it", async () => {
+    setup({ configured: true, running: true, error: null });
+    renderWithProviders(<MessagingCard save={vi.fn()} allowed={["42"]} />);
+
+    expect(await screen.findByRole("switch")).toBeInTheDocument();
+    expect(screen.queryByText(/Anyone who can message/)).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Who can talk to the bot" })).toHaveValue("42");
+  });
+
+  it("saves the list to the platform's own variable and says it applies at the next launch", async () => {
+    const user = userEvent.setup();
+    const save = vi.fn();
+    vi.mocked(getMessaging).mockResolvedValue({
+      telegram: { configured: true, running: false, error: null },
+    } as never);
+    renderWithProviders(
+      <MessagingCard
+        save={save}
+        platform="telegram"
+        tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
+        allowedApplies="next_launch"
+      />,
+    );
+
+    const field = await screen.findByRole("textbox", { name: "Who can talk to the bot" });
+    await user.type(field, "111, 222");
+    await user.click(
+      within(field.parentElement as HTMLElement).getByRole("button", { name: /^Save$/i }),
+    );
+
+    expect(save).toHaveBeenCalledWith({ CHIMERA_TELEGRAM_ALLOWED_USERS: "111, 222" });
+    expect(screen.getByText(/next time you start the app/i)).toBeInTheDocument();
   });
 });

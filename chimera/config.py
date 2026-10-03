@@ -591,6 +591,29 @@ class Settings(BaseSettings):
     whatsapp_app_secret: str | None = Field(
         default=None, validation_alias="CHIMERA_WHATSAPP_APP_SECRET"
     )  # set to verify the inbound webhook's X-Hub-Signature-256 HMAC
+    # Who may talk to each bot — comma-separated platform ids (Discord/Telegram/Slack user ids, a
+    # Signal number or uuid, a WhatsApp number). Empty = anyone, which is what every bot did before
+    # these existed: the adapters have taken an allowlist since they shipped and no construction
+    # path ever filled it, so a bot answered whoever reached it, with the owner's tools and the
+    # owner's spend. Empty stays "anyone" rather than "nobody" because the owner's production bot
+    # runs on exactly that default, and refusing everyone would silence it on upgrade; `chimera
+    # serve` and the Settings card say so loudly instead. Read when a bot is built, so a change
+    # applies at the next launch.
+    discord_allowed_users: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_DISCORD_ALLOWED_USERS"
+    )
+    telegram_allowed_users: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_TELEGRAM_ALLOWED_USERS"
+    )
+    slack_allowed_users: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_SLACK_ALLOWED_USERS"
+    )
+    signal_allowed_users: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_SIGNAL_ALLOWED_USERS"
+    )
+    whatsapp_allowed_numbers: Annotated[list[str], NoDecode] = Field(
+        default_factory=list, validation_alias="CHIMERA_WHATSAPP_ALLOWED_NUMBERS"
+    )
     # Optional bearer token guarding the state-changing HTTP endpoints (/a2a, /chat, /webhook/*).
     # Unset = no auth (fine for localhost); set it before exposing the server to a network.
     server_token: str | None = Field(default=None, validation_alias="CHIMERA_SERVER_TOKEN")
@@ -1211,6 +1234,11 @@ class Settings(BaseSettings):
         "deepseek_keys",
         "tool_allowlist",
         "tool_denylist",
+        "discord_allowed_users",
+        "telegram_allowed_users",
+        "slack_allowed_users",
+        "signal_allowed_users",
+        "whatsapp_allowed_numbers",
         mode="before",
     )
     @classmethod

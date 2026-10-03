@@ -54,6 +54,8 @@ class SignalAdapter:
         if not text or not source:
             return None
         if self.allowed_users is not None and source not in self.allowed_users:
+            # No reply, for the reason in the Discord adapter; the id is logged for the owner.
+            _log.debug("signal: ignored a message from %s (not in the allowlist)", source)
             return None
         return InboundMessage(text=text, chat_id=source, platform=self.platform, user=source)
 

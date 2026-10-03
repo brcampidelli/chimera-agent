@@ -819,10 +819,16 @@ export function MessagingCard({
   save,
   platform = "discord",
   tokenEnv = "CHIMERA_DISCORD_BOT_TOKEN",
+  allowed = [],
+  allowedApplies,
 }: {
   save: (u: Record<string, string>) => void;
   platform?: "discord" | "telegram";
   tokenEnv?: string;
+  /** The ids allowed to talk to this bot, as saved (`config.messaging.allowed_users`). Empty = anyone. */
+  allowed?: readonly string[];
+  /** When a saved list starts applying — the server's answer (`config.applies`), never a guess here. */
+  allowedApplies?: string;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -840,6 +846,12 @@ export function MessagingCard({
   const running = !!d?.running;
   const configured = !!d?.configured;
   const label = platform === "discord" ? "Discord" : "Telegram";
+  // Derived from the platform rather than passed, so the field can never write one platform's list
+  // into the other's variable.
+  const allowedEnv =
+    platform === "discord"
+      ? "CHIMERA_DISCORD_ALLOWED_USERS"
+      : "CHIMERA_TELEGRAM_ALLOWED_USERS";
 
   return (
     <Card title={`${t("settings.card.messaging")} · ${label}`}>
@@ -918,6 +930,27 @@ export function MessagingCard({
           />
         </div>
       </Row>
+      {/* Who may talk to it. The adapters always took this list and nothing ever filled it, so a
+          configured bot answered whoever could reach it — with the owner's tools and spend. An empty
+          list still means anyone (the owner's call: refusing everyone would silence a bot already
+          in use), but it is said here in words instead of being a blank field. */}
+      <Row
+        label={t("settings.row.botAllowed")}
+        hint={t("settings.hint.botAllowed", { platform: label })}
+        applies={allowedApplies}
+        env={allowedEnv}
+      >
+        <TextField
+          value={allowed.join(", ")}
+          placeholder={t("settings.botAllowed.placeholder")}
+          onSave={(v) => save({ [allowedEnv]: v })}
+        />
+      </Row>
+      {configured && allowed.length === 0 && (
+        <div className="px-4 pb-3 text-xs text-warn-foreground">
+          {t("settings.messaging.open", { platform: label })}
+        </div>
+      )}
       {!configured && (
         <div className="px-4 pb-3 text-xs text-muted-foreground">
           {t("settings.messaging.note")}
@@ -1327,11 +1360,17 @@ export function Settings() {
                   </Row>
                 </Card>
 
-                <MessagingCard save={save} />
+                <MessagingCard
+                  save={save}
+                  allowed={c.messaging?.allowed_users?.discord ?? []}
+                  allowedApplies={c.applies?.CHIMERA_DISCORD_ALLOWED_USERS}
+                />
                 <MessagingCard
                   save={save}
                   platform="telegram"
                   tokenEnv="CHIMERA_TELEGRAM_BOT_TOKEN"
+                  allowed={c.messaging?.allowed_users?.telegram ?? []}
+                  allowedApplies={c.applies?.CHIMERA_TELEGRAM_ALLOWED_USERS}
                 />
 
                 <Card title={t("settings.card.cacheSandbox")}>

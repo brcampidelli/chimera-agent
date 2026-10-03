@@ -4348,6 +4348,7 @@ export interface components {
             guard: components["schemas"]["GuardCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];
+            messaging?: components["schemas"]["MessagingCfgOut"];
             models: components["schemas"]["ModelsCfgOut"];
             /** Pinned */
             pinned?: string[];
@@ -6514,6 +6515,20 @@ export interface components {
             count: number;
             /** Source */
             source: string;
+        };
+        /**
+         * MessagingCfgOut
+         * @description Who may talk to each chat bot, as the owner saved it (``chimera/server/allowlist.py``).
+         *
+         *     ``allowed_users`` maps a platform (discord, telegram, slack, signal, whatsapp) to its ids. An
+         *     empty list means ANYONE who can reach the bot — the behaviour every bot had before the setting
+         *     existed — and the Messaging card warns about it instead of showing a blank field.
+         */
+        MessagingCfgOut: {
+            /** Allowed Users */
+            allowed_users?: {
+                [key: string]: string[];
+            };
         };
         /**
          * MessagingPlatformOut
