@@ -7469,6 +7469,13 @@
             },
             "title": "Allowed Users",
             "type": "object"
+          },
+          "configured": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Configured",
+            "type": "array"
           }
         },
         "title": "MessagingCfgOut",

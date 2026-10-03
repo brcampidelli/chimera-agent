@@ -658,6 +658,9 @@ class MessagingCfgOut(BaseModel):
     """
 
     allowed_users: dict[str, list[str]] = Field(default_factory=dict)
+    configured: list[str] = Field(default_factory=list)
+    """The platforms whose bot has what it needs to start (``allowlist.bot_configured``). A server
+    that predates the field omits it, and the card then treats every platform as connected."""
 
 
 class GuardCfgOut(BaseModel):

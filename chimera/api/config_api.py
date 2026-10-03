@@ -387,7 +387,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
     pools = read_pools(settings)
     # Imported here: `chimera.server` pulls in every adapter and the HTTP server, which a settings
     # read has no other reason to load.
-    from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_ids
+    from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_ids, bot_configured
 
     return {
         "models": {
@@ -489,6 +489,11 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "allowed_users": {
                 platform: allowed_ids(settings, platform) for platform in ALLOWLIST_FIELDS
             },
+            # The platforms whose bot has what it needs to start, so an empty list can be read as
+            # "anyone" only where a bot exists. Booleans, never the tokens.
+            "configured": [
+                platform for platform in ALLOWLIST_FIELDS if bot_configured(settings, platform)
+            ],
         },
         # Who receives a prompt and what the OpenRouter route may keep — the Security screen's
         # privacy card. See `chimera/providers/privacy.py`.

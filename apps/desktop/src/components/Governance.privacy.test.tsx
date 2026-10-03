@@ -181,6 +181,23 @@ describe("Governance — the privacy card", () => {
     expect(panel.queryByText(/OpenTelemetry export is on/)).toBeNull();
   });
 
+  it("warns only about a bot that can start; one never set up reads as not connected", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config(PRIVACY, {
+        messaging: {
+          allowed_users: { discord: [], slack: [], telegram: [] },
+          configured: ["discord"],
+        },
+      }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.getByText("discord: anyone")).toBeInTheDocument();
+    expect(panel.getByText("slack: not connected")).toBeInTheDocument();
+    expect(panel.getByText("telegram: not connected")).toBeInTheDocument();
+    expect(panel.queryByText("slack: anyone")).toBeNull();
+  });
+
   it("never shows a credential, not even the hint the API-keys card uses", async () => {
     vi.mocked(getConfig).mockResolvedValue(config(PRIVACY));
     renderWithProviders(<Governance />);

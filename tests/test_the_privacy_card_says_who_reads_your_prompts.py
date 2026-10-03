@@ -294,3 +294,29 @@ def test_an_exported_ollama_base_wins_over_the_setting_as_it_does_in_litellm(
     routes = {r["provider"]: r for r in prompt_routes(_settings(CHIMERA_WEAK_MODEL="ollama_chat/x"))}
     assert routes["ollama_chat"]["local"] is False
     assert routes["ollama_chat"]["host"] == "gpu.example.net"
+
+
+def test_only_bots_that_can_start_are_reported_as_connected() -> None:
+    """An install with only Discord showed `slack: anyone` and `telegram: anyone` for bots that do not
+    exist, diluting the warning about the one that runs open."""
+    token = "discord-token-THIS-MUST-NEVER-LEAVE-0123456789"
+    snapshot = read_config(_settings(CHIMERA_DISCORD_BOT_TOKEN=token))
+    ConfigOut.model_validate(snapshot)
+    assert snapshot["messaging"]["configured"] == ["discord"]
+    assert set(snapshot["messaging"]["allowed_users"]) >= {"discord", "slack", "telegram"}
+    assert token not in repr(snapshot["messaging"])
+
+
+def test_a_platform_counts_as_connected_only_with_everything_its_constructor_requires() -> None:
+    from chimera.server.allowlist import bot_configured
+
+    assert not bot_configured(_settings(CHIMERA_SLACK_BOT_TOKEN="x"), "slack")
+    assert bot_configured(_settings(CHIMERA_SLACK_BOT_TOKEN="x", CHIMERA_SLACK_APP_TOKEN="y"), "slack")
+    half = _settings(CHIMERA_WHATSAPP_ACCESS_TOKEN="a", CHIMERA_WHATSAPP_PHONE_NUMBER_ID="1")
+    assert not bot_configured(half, "whatsapp"), "the inbound webhook also needs the verify token"
+    full = _settings(
+        CHIMERA_WHATSAPP_ACCESS_TOKEN="a", CHIMERA_WHATSAPP_PHONE_NUMBER_ID="1",
+        CHIMERA_WHATSAPP_VERIFY_TOKEN="v",
+    )
+    assert bot_configured(full, "whatsapp")
+    assert read_config(_settings())["messaging"]["configured"] == []

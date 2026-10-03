@@ -6841,6 +6841,8 @@ export interface components {
             allowed_users?: {
                 [key: string]: string[];
             };
+            /** Configured */
+            configured?: string[];
         };
         /**
          * MessagingPlatformOut

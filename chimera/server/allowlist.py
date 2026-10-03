@@ -30,6 +30,27 @@ ALLOWLIST_FIELDS: dict[str, tuple[str, str]] = {
 }
 
 
+#: Platform -> the settings that must ALL be set for its bot to start — the same conditions the
+#: constructors check (`cli/main.py: _build_messaging_adapter`, `_whatsapp_webhook`; the app's
+#: `MessagingManager` reads the first token of discord and telegram).
+CONNECTION_FIELDS: dict[str, tuple[str, ...]] = {
+    "discord": ("discord_bot_token",),
+    "telegram": ("telegram_bot_token",),
+    "slack": ("slack_bot_token", "slack_app_token"),
+    "signal": ("signal_api_url", "signal_number"),
+    "whatsapp": ("whatsapp_access_token", "whatsapp_phone_number_id", "whatsapp_verify_token"),
+}
+
+
+def bot_configured(settings: Settings, platform: str) -> bool:
+    """Whether ``platform``'s bot has what it needs to start — a yes/no, never a token.
+
+    The privacy card warned "anyone" for every platform with an empty allowlist, including bots that
+    were never set up; an install with only Discord showed `slack: anyone` and `telegram: anyone`,
+    which diluted the one warning that mattered."""
+    return all(bool(getattr(settings, attr, None)) for attr in CONNECTION_FIELDS[platform])
+
+
 def allowed_ids(settings: Settings, platform: str) -> list[str]:
     """The ids the owner listed for ``platform``, as written (stripped, blanks dropped)."""
     attr, _env = ALLOWLIST_FIELDS[platform]

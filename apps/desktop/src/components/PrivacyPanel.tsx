@@ -47,6 +47,7 @@ export function PrivacyPanel({
   const bots = Object.entries(config.messaging?.allowed_users ?? {}).sort(([a], [b]) =>
     a.localeCompare(b),
   );
+  const connected = config.messaging?.configured;
   const semantic = config.memory.semantic ?? false;
   return (
     <Panel title={t("governance.privacy.title")}>
@@ -132,14 +133,23 @@ export function PrivacyPanel({
 
       <Section title={t("governance.privacy.bots")}>
         <div className="flex flex-wrap items-center gap-2">
-          {bots.map(([platform, ids]) => (
-            <Badge key={platform} tone={ids.length ? "muted" : "warn"}>
-              {platform}:{" "}
-              {ids.length
-                ? t("governance.privacy.botListed", { n: ids.length })
-                : t("governance.privacy.botOpen")}
-            </Badge>
-          ))}
+          {/* Only a bot that can start can be open to anyone; a platform never set up reads as not
+              connected, in a neutral tone, so the warning lands on the bot that actually runs open.
+              A server without `configured` predates the field: every platform counts as connected. */}
+          {bots.map(([platform, ids]) =>
+            connected && !connected.includes(platform) ? (
+              <Badge key={platform} tone="muted">
+                {platform}: {t("governance.privacy.botNotConnected")}
+              </Badge>
+            ) : (
+              <Badge key={platform} tone={ids.length ? "muted" : "warn"}>
+                {platform}:{" "}
+                {ids.length
+                  ? t("governance.privacy.botListed", { n: ids.length })
+                  : t("governance.privacy.botOpen")}
+              </Badge>
+            ),
+          )}
         </div>
       </Section>
     </Panel>
