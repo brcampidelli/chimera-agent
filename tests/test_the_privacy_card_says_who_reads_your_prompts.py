@@ -143,3 +143,75 @@ def test_the_block_never_carries_a_credential(monkeypatch: pytest.MonkeyPatch) -
     text = repr(privacy_snapshot(_settings(CHIMERA_SEMANTIC_MEMORY="true")))
     assert secret not in text
     assert secret[-4:] not in text
+
+
+# Each model setting: the env that puts it in effect, the env var that sets it, the value, and the
+# provider the card must then list with the role. A setting missing from BOTH this table and
+# `EXCLUDED_MODEL_SETTINGS` fails `test_every_model_setting_is_listed_or_excluded_with_a_reason`.
+_MODEL_CASES: dict[str, tuple[dict[str, str], str, str, str, str]] = {
+    "default_model": ({}, "CHIMERA_DEFAULT_MODEL", "sentinel/m", "sentinel", "default"),
+    "weak_model": ({}, "CHIMERA_WEAK_MODEL", "sentinel/m", "sentinel", "weak"),
+    "mid_model": ({}, "CHIMERA_MID_MODEL", "sentinel/m", "sentinel", "mid"),
+    "orchestrator_model": ({}, "CHIMERA_ORCHESTRATOR_MODEL", "sentinel/m", "sentinel", "orchestrator"),
+    "fallback_models": ({}, "CHIMERA_FALLBACK_MODELS", "sentinel/m", "sentinel", "fallback"),
+    "fusion_panel": ({}, "CHIMERA_FUSION_PANEL", "sentinel/m", "sentinel", "fusion_panel"),
+    "transfer_panel": ({}, "CHIMERA_TRANSFER_PANEL", "groq/llama-3.3-70b", "groq", "transfer_panel"),
+    "fusion_judge": ({}, "CHIMERA_FUSION_JUDGE", "sentinel/m", "sentinel", "fusion_judge"),
+    "fusion_synthesizer": ({}, "CHIMERA_FUSION_SYNTHESIZER", "sentinel/m", "sentinel", "fusion_synthesizer"),
+    "embed_model": (
+        {"CHIMERA_SEMANTIC_MEMORY": "true"}, "CHIMERA_EMBED_MODEL", "sentinel/e", "sentinel", "embeddings"
+    ),
+    "review_model": ({}, "CHIMERA_REVIEW_MODEL", "sentinel/m", "sentinel", "review"),
+    "complete_model": ({}, "CHIMERA_COMPLETE_MODEL", "qwen2.5-coder:7b-base", "ollama", "completion"),
+    "voice_model": ({}, "CHIMERA_VOICE_MODEL", "sentinel/m", "sentinel", "voice"),
+    "voice_work_model": ({}, "CHIMERA_VOICE_WORK_MODEL", "sentinel/m", "sentinel", "voice_work"),
+    "decision_model": (
+        {"CHIMERA_DECISION_BACKEND": "hosted_verbalized"},
+        "CHIMERA_DECISION_MODEL", "anthropic/claude-haiku-4-5", "anthropic", "decisions",
+    ),
+    "verified_answers_escalate_model": (
+        {}, "CHIMERA_VERIFIED_ANSWERS_ESCALATE_MODEL", "gemini/gemini-2.5-pro", "gemini", "verify_escalation"
+    ),
+}
+
+
+def test_every_model_setting_is_listed_or_excluded_with_a_reason() -> None:
+    from chimera.providers.privacy import EXCLUDED_MODEL_SETTINGS
+
+    model_shaped = {
+        name for name in Settings.model_fields
+        if "model" in name or "panel" in name or name in ("fusion_judge", "fusion_synthesizer")
+    }
+    assert model_shaped == set(_MODEL_CASES) | set(EXCLUDED_MODEL_SETTINGS)
+    assert all(reason.strip() for reason in EXCLUDED_MODEL_SETTINGS.values())
+
+
+@pytest.mark.parametrize("field", sorted(_MODEL_CASES))
+def test_each_model_setting_puts_its_provider_on_the_card(field: str) -> None:
+    extra, env, value, provider, role = _MODEL_CASES[field]
+    by_name = {r["provider"]: r for r in prompt_routes(_settings(**extra, **{env: value}))}
+    assert provider in by_name, f"{field}={value} sends prompts to {provider}, and the card omits it"
+    assert role in by_name[provider]["roles"]
+
+
+def test_the_default_decision_backend_asks_the_local_ollama() -> None:
+    by_name = {r["provider"]: r for r in prompt_routes(_settings())}
+    assert "decisions" in by_name["ollama"]["roles"]
+
+
+def test_hosted_image_and_dictation_are_listed_under_openai_only_when_the_key_makes_them_hosted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import importlib.util
+
+    real = importlib.util.find_spec
+    # Dictation prefers a local faster-whisper when installed; hide it so the hosted route is the one.
+    monkeypatch.setattr(
+        importlib.util, "find_spec", lambda name, *a: None if name == "faster_whisper" else real(name, *a)
+    )
+    assert "openai" not in {r["provider"] for r in prompt_routes(_settings())}
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
+    openai = {r["provider"]: r for r in prompt_routes(_settings())}["openai"]
+    assert {"image", "dictation"} <= set(openai["roles"])
+    local_images = {r["provider"]: r for r in prompt_routes(_settings(CHIMERA_IMAGE_BACKEND="local"))}
+    assert "image" not in local_images["openai"]["roles"]

@@ -53,9 +53,40 @@ def prompt_routes(settings: Settings) -> list[dict[str, Any]]:
     Read from configuration, not from traffic: a role nobody exercises still lists its provider,
     because a setting that WOULD send a prompt there is the thing an owner can change. The embedder
     counts only while semantic memory is on — it is the one role whose input is the owner's stored
-    memory rather than a turn — and the decision model only for the backend that sends it somewhere.
-    Ordered by first appearance, so the default model's provider comes first.
+    memory rather than a turn. Ordered by first appearance, so the default model's provider comes
+    first. Every model setting is either here or in ``EXCLUDED_MODEL_SETTINGS`` with its reason
+    (a test holds that), because a card titled "who receives prompts" that silently skips one says
+    the provider behind it receives nothing.
     """
+    roles = _model_roles(settings) + _surface_roles(settings)
+    routes: dict[str, dict[str, Any]] = {}
+    for role, model in roles:
+        slug = (model or "").strip()
+        if slug:
+            _add(routes, _provider_of(slug), is_local_model(slug), role)
+    if _decisions_api_use(settings):
+        _add(routes, "openrouter", False, "decisions")
+    return list(routes.values())
+
+
+#: Model-shaped settings the card deliberately does not list, and why.
+EXCLUDED_MODEL_SETTINGS: dict[str, str] = {
+    "image_model_local": "runs in-process through diffusers; the prompt never leaves the machine",
+    "fusion_blind_panel": "a switch, not a model",
+    "fusion_panel_temperatures": "sampling temperatures, not models",
+}
+
+
+def _add(routes: dict[str, dict[str, Any]], name: str, local: bool, role: str) -> None:
+    entry = routes.setdefault(name, {"provider": name, "local": local, "roles": []})
+    # One remote slug makes the provider remote: "local" must hold for every role listed under it.
+    entry["local"] = bool(entry["local"]) and local
+    if role not in entry["roles"]:
+        entry["roles"].append(role)
+
+
+def _model_roles(settings: Settings) -> list[tuple[str, str]]:
+    """The chat-model settings: the tier ladder, the casts, the voice and review models."""
     ladder = settings.tier_ladder()
     roles: list[tuple[str, str]] = [
         ("default", settings.default_model),
@@ -67,27 +98,51 @@ def prompt_routes(settings: Settings) -> list[dict[str, Any]]:
         *(("fusion_panel", m) for m in settings.fusion_panel),
         ("fusion_judge", settings.fusion_judge),
         ("fusion_synthesizer", settings.fusion_synthesizer),
+        # Skill transfer asks each of these models in turn (`chimera/evolution/context.py`).
+        *(("transfer_panel", m) for m in settings.transfer_panel),
         ("voice", settings.voice_model),
         ("voice_work", settings.voice_work_model),
         ("review", settings.review_model),
     ]
     if settings.semantic_memory:
         roles.append(("embeddings", settings.embed_model))
-    routes: dict[str, dict[str, Any]] = {}
-    for role, model in roles:
-        slug = (model or "").strip()
-        if not slug:
-            continue
-        name = _provider_of(slug)
-        entry = routes.setdefault(name, {"provider": name, "local": is_local_model(slug), "roles": []})
-        if role not in entry["roles"]:
-            entry["roles"].append(role)
-    if _decisions_api_use(settings):
-        entry = routes.setdefault(
-            "openrouter", {"provider": "openrouter", "local": False, "roles": []}
-        )
-        entry["roles"].append("decisions")
-    return list(routes.values())
+    return roles
+
+
+def _surface_roles(settings: Settings) -> list[tuple[str, str]]:
+    """The roles outside the chat ladder that still carry a turn's text somewhere.
+
+    Each mirrors the code that builds the call, so the card names the provider that code would use:
+    the decision backend's model (`chimera/decisions/factory.py: build_backend`), the verified-answer
+    escalation (`verified.escalation_model`, fed the turn's sources and question), the editor's inline
+    completion (Ollama, bare tag), hosted image generation and hosted dictation (OpenAI, by key).
+    """
+    from chimera.decisions.factory import default_model_for
+
+    roles: list[tuple[str, str]] = []
+    backend = (settings.decision_backend or "local_logprob").strip()
+    model = (settings.decision_model or "").strip()
+    if backend == "local_logprob":
+        # A bare Ollama tag, asked at `ollama_base_url`.
+        roles.append(("decisions", f"ollama/{model or default_model_for(settings, backend)}"))
+    elif backend == "hosted_verbalized":
+        # Through the gateway, so an `openrouter/` slug here DOES carry the preference.
+        roles.append(("decisions", model or default_model_for(settings, backend)))
+    if settings.verified_answers:
+        from chimera.fusion.verified import escalation_model
+
+        roles.append(("verify_escalation", escalation_model(settings)))
+    if (settings.complete_model or "").strip():
+        roles.append(("completion", f"ollama/{settings.complete_model.strip()}"))
+    image = (settings.image_backend or "auto").strip().lower()
+    if image == "hosted" or (image == "auto" and settings.key_pool("openai")):
+        # `chimera/tools/media.py`: the prompt goes to OpenAI's images endpoint.
+        roles.append(("image", "openai/gpt-image-1"))
+    from chimera.api.attachments import dictation_support
+
+    if dictation_support(settings) == ("yes", "openai"):
+        roles.append(("dictation", "openai/whisper-1"))
+    return roles
 
 
 def _decisions_api_use(settings: Settings) -> str:
