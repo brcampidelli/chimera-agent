@@ -125,9 +125,9 @@ describe("a turn the provider refused on content policy", () => {
     const retry = await retryOnMid(user);
 
     expect(retry.fuse).toBe(false);
-    expect(retry.fusion_panel).toBeUndefined();
-    expect(retry.fusion_judge).toBeUndefined();
-    expect(retry.fusion_synthesizer).toBeUndefined();
+    expect(retry).not.toHaveProperty("fusion_panel");
+    expect(retry).not.toHaveProperty("fusion_judge");
+    expect(retry).not.toHaveProperty("fusion_synthesizer");
     expect(retry.model).toBe("openrouter/vendor/mid");
   });
 
