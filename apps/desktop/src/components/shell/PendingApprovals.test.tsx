@@ -4,7 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Governance } from "@/components/Governance";
 import { PendingApprovals } from "@/components/shell/PendingApprovals";
-import { answerApproval, getApprovals } from "@/lib/api";
+import { answerApproval, getApprovals, listCodeSessions } from "@/lib/api";
+import { APP_FOCUS_KEY } from "@/lib/notify";
 import { APPROVALS_POLL_MS } from "@/lib/usePendingApprovals";
 import { renderWithProviders } from "@/test/utils";
 
@@ -298,6 +299,47 @@ describe("PendingApprovals — the notification when the window is in the backgr
   it("says nothing unless the person asked for it", async () => {
     await aQuestionArrives();
     expect(ctor).not.toHaveBeenCalled();
+  });
+
+  it("says nothing while another Chimera window has focus", async () => {
+    // The conversation popped out into a window of its own, its card on the screen being read.
+    localStorage.setItem("chimera.notifyApprovals", "1");
+    localStorage.setItem(APP_FOCUS_KEY, `pop-out:${Date.now()}`);
+    await aQuestionArrives();
+    expect(ctor).not.toHaveBeenCalled();
+  });
+
+  it("keeps polling while the window is minimised, and tells the question that arrived meanwhile", async () => {
+    localStorage.setItem("chimera.notifyApprovals", "1");
+    // What a minimised WebView2 window reports, and what React Query reads to skip an interval.
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    try {
+      await aQuestionArrives();
+      expect(getApprovals).toHaveBeenCalledTimes(2);
+      expect(ctor).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (document as { visibilityState?: unknown }).visibilityState;
+    }
+  });
+
+  it("names a conversation started after the list was read, instead of its id", async () => {
+    localStorage.setItem("chimera.notifyApprovals", "1");
+    const shop = { id: "s-shop", title: "Clean the build", workspace: "/p/shop", turns: 1, updated_at: 0 };
+    const sessions = [shop];
+    vi.mocked(listCodeSessions).mockImplementation(async () => [...sessions]);
+    vi.mocked(getApprovals)
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ ...question("q-new"), session_id: "s-brand-new", workspace: "/p/shop" }]);
+    renderWithProviders(<PendingApprovals />);
+    await vi.waitFor(() => expect(getApprovals).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(listCodeSessions).toHaveBeenCalled());
+    // The conversation is created after the list was cached.
+    sessions.push({ ...shop, id: "s-brand-new", title: "Ship the release" });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(APPROVALS_POLL_MS + 50);
+    });
+    await vi.waitFor(() => expect(ctor).toHaveBeenCalledTimes(1));
+    expect((ctor.mock.calls[0] as [string, { body: string }])[1].body).toBe("From shop · Ship the release");
   });
 
   it("does not announce what was already waiting when the app opened", async () => {

@@ -4712,6 +4712,11 @@ export interface components {
             created_by: string;
             /** Deliver To */
             deliver_to?: string | null;
+            /**
+             * Disabled By
+             * @default
+             */
+            disabled_by: string;
             /** Enabled */
             enabled: boolean;
             /** Id */

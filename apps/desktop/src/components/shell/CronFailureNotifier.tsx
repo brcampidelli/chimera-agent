@@ -5,13 +5,13 @@ import { getCron } from "@/lib/api";
 import { useT, type TFunc } from "@/lib/i18n";
 import {
   NOTIFY_CRON_KEY,
+  appIsWatched,
   clearCronNoticeState,
   loadCronNoticeState,
   nextCronNotices,
   notifyIfAway,
   saveCronNoticeState,
   useNotifyFlag,
-  windowIsWatched,
   type CronNotice,
 } from "@/lib/notify";
 
@@ -46,6 +46,10 @@ export function CronFailureNotifier() {
     queryFn: () => getCron(),
     enabled: on,
     refetchInterval: on ? CRON_NOTICE_POLL_MS : false,
+    // React Query skips an interval fetch while the page is hidden, and a minimised window IS
+    // hidden — so without this the watcher stopped exactly when the person walked away, and on
+    // restore the next poll ran with the window focused, filed the failure as seen and told no one.
+    refetchIntervalInBackground: on,
   });
 
   // Off forgets what was seen, so switching it back on takes a new baseline instead of reciting
@@ -56,12 +60,12 @@ export function CronFailureNotifier() {
 
   useEffect(() => {
     if (!on || !jobs.data) return;
-    const { state, notices } = nextCronNotices(loadCronNoticeState(), jobs.data, windowIsWatched());
+    const { state, notices } = nextCronNotices(loadCronNoticeState(), jobs.data, appIsWatched());
     // Saved BEFORE anything is shown: a reload between the two must not show it twice.
     saveCronNoticeState(state);
     for (const notice of notices) {
       const { title, body } = cronNoticeText(notice, t);
-      void notifyIfAway(title, body);
+      void notifyIfAway(title, body, { appWide: true });
     }
   }, [on, jobs.data, t]);
 

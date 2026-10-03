@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ShieldQuestion } from "lucide-react";
 
 import { ApprovalCard } from "@/components/code/ApprovalCard";
@@ -70,7 +70,12 @@ export function PendingApprovals() {
   const [open, setOpen] = useState(false);
   // The one caller that owns the timer. This component is mounted on every screen — including the
   // one Governance renders inside — so its poll is the only one the app needs.
-  const { data, refetch } = usePendingApprovals({ poll: true });
+  const [notify] = useNotifyFlag(NOTIFY_APPROVALS_KEY);
+  // The one caller that owns the timer — so it is also the one that keeps it running in a
+  // minimised window, while the person has asked to be told about a new question. Without that the
+  // poll paused exactly when they walked away, and on restore the question was filed as known with
+  // the window focused: the notification it existed for never went out.
+  const { data, refetch } = usePendingApprovals({ poll: true, background: notify });
   const questions = data ?? [];
   const n = questions.length;
 
@@ -154,6 +159,7 @@ function useApprovalNotice(questions: ApprovalQuestion[] | undefined) {
     staleTime: 30_000,
     enabled: on,
   });
+  const queryClient = useQueryClient();
   const known = useRef<Set<string> | null>(null);
   useEffect(() => {
     if (!questions) return;
@@ -162,8 +168,25 @@ function useApprovalNotice(questions: ApprovalQuestion[] | undefined) {
     if (before === null || !on) return;
     const fresh = questions.find((q) => !before.has(q.id));
     if (!fresh) return;
-    void notifyIfAway(t("notify.approval.title"), approvalNoticeBody(fresh, sessions.data, t));
-  }, [questions, on, sessions.data, t]);
+    void (async () => {
+      let list = sessions.data;
+      // The list is kept for 30 s, and a question often comes from the conversation started in
+      // that window — which the cached list does not have yet, so the notice named an 8-character
+      // id instead of the person's own words. One read of the list, only for an id it lacks.
+      if (fresh.session_id && !fresh.work && !list?.some((s) => s.id === fresh.session_id)) {
+        try {
+          list = await queryClient.fetchQuery({
+            queryKey: ["code-sessions"],
+            queryFn: () => listCodeSessions(),
+            staleTime: 0,
+          });
+        } catch {
+          // The id it is, then; a notification is not worth failing over a title.
+        }
+      }
+      await notifyIfAway(t("notify.approval.title"), approvalNoticeBody(fresh, list, t), { appWide: true });
+    })();
+  }, [questions, on, sessions.data, queryClient, t]);
 }
 
 /** Where a question comes from, for a notification: the same fields `ApprovalOrigin` reads, minus

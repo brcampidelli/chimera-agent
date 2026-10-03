@@ -86,9 +86,87 @@ export function useNotifyMinSeconds(): [number, (seconds: number) => void] {
   return [n, writeMinSeconds];
 }
 
-/** Whether the person is looking at the window right now. */
+/** Where the focused Chimera window says so, for the others: `<window id>:<epoch ms>`. */
+export const APP_FOCUS_KEY = "chimera.appFocus";
+/** How often a focused window repeats it, and how old a beat may be before it no longer counts.
+ *  Three beats of slack: a window that closed or crashed while focused stops vouching within
+ *  seconds, instead of keeping every notification quiet until the next restart. */
+export const FOCUS_BEAT_MS = 5_000;
+export const FOCUS_FRESH_MS = 3 * FOCUS_BEAT_MS;
+
+/** This page's own name in the beacon. Only has to differ between the windows open at once. */
+const WINDOW_ID = Math.random().toString(36).slice(2, 10);
+
+/** Whether the person is looking at THIS window right now. */
 export function windowIsWatched(): boolean {
   return document.visibilityState === "visible" && document.hasFocus();
+}
+
+/** The beacon's holder, when its beat is fresh and it is not this window. */
+function focusedElsewhere(): boolean {
+  const raw = read(APP_FOCUS_KEY);
+  if (!raw) return false;
+  const [id, at] = raw.split(":");
+  const when = Number(at);
+  return id !== WINDOW_ID && Number.isFinite(when) && Date.now() - when < FOCUS_FRESH_MS;
+}
+
+/**
+ * Whether the person is looking at Chimera right now — at this window or at another of its windows.
+ *
+ * Per-webview focus alone was wrong for the app-wide notices (an approval waiting, a schedule
+ * failing) as soon as a conversation could be popped out (`?conversation=`): with the pop-out
+ * focused, the main window counted itself unwatched and raised an OS notification for a question
+ * whose card was on the screen being read. Every window runs `installFocusBeacon`, and the focused
+ * one keeps saying so in storage, which all of the app's windows share.
+ *
+ * The end-of-turn notice keeps asking only `windowIsWatched`, as it always has: a popped-out
+ * conversation finishing while the person works in the main window is news that window shows nowhere.
+ */
+export function appIsWatched(): boolean {
+  return windowIsWatched() || focusedElsewhere();
+}
+
+/**
+ * Keep the beacon while this window has focus; let go of it when focus leaves. Called once per page
+ * (`main.tsx`), whatever that page draws. Returns the uninstaller, for tests.
+ */
+export function installFocusBeacon(): () => void {
+  const beat = () => {
+    if (!windowIsWatched()) return;
+    // Raw, not through `write()`: a beat is not a preference, and the preference event every five
+    // seconds would wake every reader of one.
+    try {
+      localStorage.setItem(APP_FOCUS_KEY, `${WINDOW_ID}:${Date.now()}`);
+    } catch {
+      // Without storage each window only knows its own focus, which is what it knew before.
+    }
+  };
+  const leave = () => {
+    // Only our own beat. Focus moving between two Chimera windows can deliver the new window's
+    // `focus` before the old one's `blur`, and the old one must not erase the new one's claim.
+    if (read(APP_FOCUS_KEY)?.split(":")[0] !== WINDOW_ID) return;
+    try {
+      localStorage.removeItem(APP_FOCUS_KEY);
+    } catch {
+      // A stale beat expires by itself after FOCUS_FRESH_MS.
+    }
+  };
+  const onVisibility = () => (document.visibilityState === "visible" ? beat() : leave());
+  window.addEventListener("focus", beat);
+  window.addEventListener("blur", leave);
+  window.addEventListener("pagehide", leave);
+  document.addEventListener("visibilitychange", onVisibility);
+  const timer = window.setInterval(beat, FOCUS_BEAT_MS);
+  beat();
+  return () => {
+    window.clearInterval(timer);
+    window.removeEventListener("focus", beat);
+    window.removeEventListener("blur", leave);
+    window.removeEventListener("pagehide", leave);
+    document.removeEventListener("visibilitychange", onVisibility);
+    leave();
+  };
 }
 
 /** Ask the operating system, from a click. Says what it answered, or "unsupported". */
@@ -121,10 +199,16 @@ export async function requestNotifyPermission(): Promise<NotificationPermission 
  *  the worst case is silence rather than a crash — but "it works on macOS" is NOT a claim being made
  *  here. If it turns out not to, the fix is a native plugin, which is a bigger job than this item.
  */
-export async function notifyIfAway(title: string, body: string): Promise<void> {
+export async function notifyIfAway(
+  title: string,
+  body: string,
+  { appWide = false }: { appWide?: boolean } = {},
+): Promise<void> {
   try {
     if (typeof Notification === "undefined") return;
-    if (windowIsWatched()) return;
+    // `appWide`: held back while any Chimera window has focus (see `appIsWatched`), for notices
+    // about the app as a whole rather than about this window's own conversation.
+    if (appWide ? appIsWatched() : windowIsWatched()) return;
     // Asked at the moment it is first needed when nobody asked earlier (the header button never
     // did): a permission prompt that appears before the user has done anything is the one people
     // deny reflexively.

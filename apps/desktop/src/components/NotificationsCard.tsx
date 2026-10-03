@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { Switch } from "@/components/ui/switch";
 import { useT } from "@/lib/i18n";
@@ -43,6 +43,12 @@ export function NotificationsCard() {
   const [cron, setCron] = useNotifyFlag(NOTIFY_CRON_KEY);
   const [minSeconds, setMinSeconds] = useNotifyMinSeconds();
   const [seconds, setSeconds] = useState(String(minSeconds));
+  const editing = useRef(false);
+  // The field is a draft of the shared value, so it follows that value whenever nobody is typing
+  // in it: another window, or a reload of storage, can change the threshold under this card.
+  useEffect(() => {
+    if (!editing.current) setSeconds(String(minSeconds));
+  }, [minSeconds]);
   const [permission, setPermission] = useState(currentPermission);
 
   function enable(set: (on: boolean) => void) {
@@ -78,7 +84,14 @@ export function NotificationsCard() {
               // Written as it is typed when it is a number; anything else waits for one.
               if (e.target.value !== "" && Number.isFinite(n) && n >= 0) setMinSeconds(n);
             }}
-            onBlur={() => setSeconds(String(Math.max(0, Math.floor(Number(seconds) || 0))))}
+            onFocus={() => {
+              editing.current = true;
+            }}
+            onBlur={() => {
+              editing.current = false;
+              // What is stored is whole seconds; the field ends up saying exactly that.
+              setSeconds(String(minSeconds));
+            }}
           />
         </NoticeRow>
         <NoticeRow label={t("notify.row.approvals")} hint={t("notify.hint.approvals")}>

@@ -3209,6 +3209,11 @@
             ],
             "title": "Deliver To"
           },
+          "disabled_by": {
+            "default": "",
+            "title": "Disabled By",
+            "type": "string"
+          },
           "enabled": {
             "title": "Enabled",
             "type": "boolean"

@@ -79,6 +79,11 @@ def _job_dict(job: Any) -> dict[str, Any]:
         "last_status": job.last_status,
         "last_error": job.last_error,
         "consecutive_failures": job.consecutive_failures,
+        # Which switch turned a disabled job off: the person, or the failure brake. Without it a
+        # client can only show a braked job by its last error, which is the wrong fact — the brake
+        # is the one that needs someone to switch the job back on. Read with a default: the store
+        # holds jobs written before the field existed.
+        "disabled_by": getattr(job, "disabled_by", "") or "",
         "created_by": job.created_by,
         "workspace": job.workspace,
         "deliver_to": job.deliver_to,

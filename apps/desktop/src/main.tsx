@@ -10,6 +10,7 @@ import { LayoutServerSync } from "@/lib/layout/sync";
 import { FloatWindow } from "@/components/shell/FloatWindow";
 import { ConversationWindow } from "@/components/code/ConversationWindow";
 import { conversationFrom, floatPanelFrom } from "@/lib/float/protocol";
+import { installFocusBeacon } from "@/lib/notify";
 import "highlight.js/styles/github-dark.css";
 import "@/index.css";
 // After index.css: motion.css consumes the --dur-*/--ease-* tokens declared there, and its
@@ -37,6 +38,10 @@ const queryClient = new QueryClient({
 const floating = floatPanelFrom(window.location.search);
 // `?conversation=<id>` asks it to draw one conversation, so two can be worked at once.
 const conversation = conversationFrom(window.location.search);
+
+// Every window, whatever it draws: a notification is held back while ANY Chimera window has focus,
+// and each window learns that from the one that has it (see `windowIsWatched`).
+installFocusBeacon();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

@@ -1,16 +1,22 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  APP_FOCUS_KEY,
   CRON_NOTICE_STATE_KEY,
+  FOCUS_FRESH_MS,
   NOTIFY_MIN_SECONDS_KEY,
+  appIsWatched,
+  installFocusBeacon,
   loadCronNoticeState,
   nextCronNotices,
   readFlag,
   readMinSeconds,
   saveCronNoticeState,
+  windowIsWatched,
   type CronJobSeen,
   type CronNoticeState,
 } from "@/lib/notify";
+import type { CronJob } from "@/lib/types";
 
 function job(over: Partial<CronJobSeen> = {}): CronJobSeen {
   return { id: "j1", name: "nightly report", enabled: true, disabled_by: "", last_run: 100, last_status: "ok", ...over };
@@ -113,5 +119,82 @@ describe("notification preferences", () => {
     expect(loadCronNoticeState()).toEqual({ seen: { j1: 5 }, told: { j1: 0 } });
     localStorage.setItem(CRON_NOTICE_STATE_KEY, "{not json");
     expect(loadCronNoticeState()).toBeNull();
+  });
+});
+
+describe("the brake, as the API reports it", () => {
+  it("is a field GET /api/cron sends, so the brake branch is reachable from real data", () => {
+    // Compile-time as much as run-time: if `CronJobOut` stops carrying `disabled_by`, the
+    // generated type loses it and this file no longer builds.
+    const fromApi: Pick<CronJob, "id" | "name" | "enabled" | "disabled_by" | "last_run" | "last_status"> = {
+      id: "j1", name: "nightly report", enabled: false, disabled_by: "brake", last_run: 200, last_status: "error",
+    };
+    const base = look(null, [job()]).state;
+    expect(look(base, [fromApi]).notices).toEqual([{ kind: "failed", job: "nightly report", status: "brake" }]);
+  });
+});
+
+/**
+ * "Is anyone looking?" across the app's windows. A conversation can be popped out into a window of
+ * its own; with that one focused the main window is unfocused, and an app-wide notice raised there
+ * would interrupt a person who is reading Chimera.
+ */
+describe("the focus beacon", () => {
+  let focused: boolean;
+  beforeEach(() => {
+    localStorage.clear();
+    focused = false;
+    vi.spyOn(document, "hasFocus").mockImplementation(() => focused);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+    localStorage.clear();
+  });
+
+  it("counts another Chimera window's fresh focus as the app being watched, but not this window", () => {
+    localStorage.setItem(APP_FOCUS_KEY, `other-window:${Date.now()}`);
+    expect(windowIsWatched()).toBe(false);
+    expect(appIsWatched()).toBe(true);
+  });
+
+  it("stops counting a beat that went stale, so a window that crashed while focused stops vouching", () => {
+    localStorage.setItem(APP_FOCUS_KEY, `other-window:${Date.now() - FOCUS_FRESH_MS - 1}`);
+    expect(appIsWatched()).toBe(false);
+    localStorage.setItem(APP_FOCUS_KEY, "garbage");
+    expect(appIsWatched()).toBe(false);
+  });
+
+  it("is held by the focused window and let go on blur, and never vouches for its own window", () => {
+    vi.useFakeTimers();
+    const uninstall = installFocusBeacon();
+    expect(localStorage.getItem(APP_FOCUS_KEY)).toBeNull(); // not focused: nothing to say
+
+    focused = true;
+    window.dispatchEvent(new Event("focus"));
+    expect(localStorage.getItem(APP_FOCUS_KEY)).not.toBeNull();
+    // The beat is ours: after losing focus, this window does not count its own stale claim.
+    focused = false;
+    expect(appIsWatched()).toBe(false);
+
+    // Kept fresh while focused...
+    focused = true;
+    vi.advanceTimersByTime(FOCUS_FRESH_MS * 2);
+    const at = Number(localStorage.getItem(APP_FOCUS_KEY)?.split(":")[1]);
+    expect(Date.now() - at).toBeLessThan(FOCUS_FRESH_MS);
+
+    // ...and dropped when focus leaves.
+    focused = false;
+    window.dispatchEvent(new Event("blur"));
+    expect(localStorage.getItem(APP_FOCUS_KEY)).toBeNull();
+    uninstall();
+  });
+
+  it("does not erase another window's claim when this one blurs after it", () => {
+    const uninstall = installFocusBeacon();
+    localStorage.setItem(APP_FOCUS_KEY, `other-window:${Date.now()}`);
+    window.dispatchEvent(new Event("blur"));
+    expect(localStorage.getItem(APP_FOCUS_KEY)).toMatch(/^other-window:/);
+    uninstall();
   });
 });

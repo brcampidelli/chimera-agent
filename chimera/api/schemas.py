@@ -1139,6 +1139,9 @@ class CronJobOut(BaseModel):
     last_error: str | None = None
     consecutive_failures: int = 0
     """Since the last success. One failure is weather; forty is a broken job."""
+    disabled_by: str = ""
+    """Who switched a disabled job off: `human`, `brake` (the engine, after repeated failures), or
+    `""` while the job is enabled or for a job stored before the field existed."""
     created_by: str
     workspace: str | None = None
     """The folder this job works in. None means the root the process was started with — which on a

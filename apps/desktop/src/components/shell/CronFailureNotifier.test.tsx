@@ -1,9 +1,9 @@
-import { waitFor } from "@testing-library/react";
+import { act, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { CronFailureNotifier } from "@/components/shell/CronFailureNotifier";
+import { CRON_NOTICE_POLL_MS, CronFailureNotifier } from "@/components/shell/CronFailureNotifier";
 import { getCron } from "@/lib/api";
-import { CRON_NOTICE_STATE_KEY, NOTIFY_CRON_KEY } from "@/lib/notify";
+import { APP_FOCUS_KEY, CRON_NOTICE_STATE_KEY, NOTIFY_CRON_KEY } from "@/lib/notify";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({ getCron: vi.fn() }));
@@ -131,5 +131,63 @@ describe("CronFailureNotifier", () => {
       "A schedule is running again",
       { body: "nightly report finished its last runs normally." },
     ]);
+  });
+
+  it("says a job the brake switched off was switched off, not its last error", async () => {
+    seenBefore();
+    vi.mocked(getCron).mockResolvedValue([
+      job({ last_run: 200, last_status: "error", enabled: false, disabled_by: "brake", consecutive_failures: 5 }),
+    ] as never);
+    renderWithProviders(<CronFailureNotifier />);
+    await waitFor(() => expect(ctor).toHaveBeenCalledTimes(1));
+    const [, options] = ctor.mock.calls[0] as [string, { body: string }];
+    expect(options.body).toBe("nightly report: switched off after repeated failures");
+  });
+
+  it("notifies nothing while another Chimera window has focus, and still tells a later failure", async () => {
+    // A conversation popped out into its own window, and the person reading it.
+    seenBefore();
+    localStorage.setItem(APP_FOCUS_KEY, `pop-out:${Date.now()}`);
+    vi.mocked(getCron).mockResolvedValue([job({ last_run: 200, last_status: "error" })] as never);
+    const first = renderWithProviders(<CronFailureNotifier />);
+    await waitFor(() => expect(getCron).toHaveBeenCalled());
+    await settle();
+    expect(ctor).not.toHaveBeenCalled();
+    first.unmount();
+
+    // Seen while someone was looking is not an outage they were told about: the next failure,
+    // with nobody looking, is still news.
+    localStorage.removeItem(APP_FOCUS_KEY);
+    vi.mocked(getCron).mockResolvedValue([job({ last_run: 300, last_status: "error" })] as never);
+    renderWithProviders(<CronFailureNotifier />);
+    await waitFor(() => expect(ctor).toHaveBeenCalledTimes(1));
+  });
+
+  describe("with the window minimised", () => {
+    beforeEach(() => {
+      // What a minimised WebView2 window reports, and what React Query reads to skip an interval.
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      delete (document as { visibilityState?: unknown }).visibilityState;
+    });
+
+    it("keeps polling, and tells the failure that happened while it was down", async () => {
+      seenBefore();
+      vi.mocked(getCron)
+        .mockResolvedValueOnce([job({ last_run: 100, last_status: "ok" })] as never)
+        .mockResolvedValue([job({ last_run: 200, last_status: "error" })] as never);
+      renderWithProviders(<CronFailureNotifier />);
+      await vi.waitFor(() => expect(getCron).toHaveBeenCalledTimes(1));
+      expect(ctor).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(CRON_NOTICE_POLL_MS + 50);
+      });
+      expect(getCron).toHaveBeenCalledTimes(2);
+      await vi.waitFor(() => expect(ctor).toHaveBeenCalledTimes(1));
+    });
   });
 });

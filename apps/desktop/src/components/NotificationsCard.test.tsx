@@ -1,9 +1,9 @@
-import { screen } from "@testing-library/react";
+import { act, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { NotificationsCard } from "@/components/NotificationsCard";
-import { readFlag, readMinSeconds } from "@/lib/notify";
+import { readFlag, readMinSeconds, writeMinSeconds } from "@/lib/notify";
 import { renderWithProviders } from "@/test/utils";
 
 /**
@@ -70,5 +70,22 @@ describe("NotificationsCard", () => {
     await user.clear(threshold);
     await user.type(threshold, "45");
     expect(readMinSeconds()).toBe(45);
+  });
+
+  it("follows a threshold changed elsewhere, and settles a fraction on the whole seconds it stored", async () => {
+    localStorage.setItem("chimera.notifyOnFinish", "1");
+    const user = userEvent.setup();
+    renderWithProviders(<NotificationsCard />);
+    const threshold = screen.getByLabelText(/only for turns longer than/i);
+
+    // Another window (or the conversation's header) writes the shared value.
+    act(() => writeMinSeconds(30));
+    expect(threshold).toHaveValue(30);
+
+    await user.clear(threshold);
+    await user.type(threshold, "1.5");
+    await user.tab();
+    expect(readMinSeconds()).toBe(1);
+    expect(threshold).toHaveValue(1);
   });
 });
