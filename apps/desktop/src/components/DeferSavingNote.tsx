@@ -24,6 +24,9 @@ export function deferSavingText(
   if (!figure) {
     if (data.mcp_state === "autoload_off") return t("settings.defer.autoloadOff");
     if (data.mcp_state === "not_connected") return t("settings.defer.notConnected");
+    // A server that hung on its tool listing. The built-in note above still has its number: the
+    // server reports this half's failure instead of failing the whole request.
+    if (data.mcp_state === "unavailable") return t("settings.defer.mcpUnavailable");
     return t("settings.defer.noServers");
   }
   const params = {

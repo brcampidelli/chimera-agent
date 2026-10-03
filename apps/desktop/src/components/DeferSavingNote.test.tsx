@@ -67,6 +67,7 @@ describe("deferSavingText", () => {
     ["autoload_off", "settings.defer.autoloadOff"],
     ["not_connected", "settings.defer.notConnected"],
     ["no_servers", "settings.defer.noServers"],
+    ["unavailable", "settings.defer.mcpUnavailable"],
   ] as const)("says why there is no MCP figure when the state is %s", (state, key) => {
     expect(deferSavingText(measured({ mcp_state: state }), "mcp", t, num)).toBe(key);
   });
@@ -154,6 +155,29 @@ describe("Settings — the deferral switches", () => {
     await waitFor(() =>
       expect(within(card).getAllByText("Could not measure the saving on this machine.")).toHaveLength(2),
     );
+  });
+
+  it("keeps the built-in figure when only an MCP server failed to answer", async () => {
+    // The server reports a hung MCP listing as this state rather than failing the request, so the
+    // switch whose number has nothing to do with MCP still shows it.
+    vi.mocked(getDeferSaving).mockResolvedValue(measured({ mcp_state: "unavailable" }));
+    renderWithProviders(<Settings />);
+    const card = await screen.findByRole("region", { name: "Experimental" });
+
+    await waitFor(() =>
+      expect(card).toHaveTextContent("Measured here: 12,000 → 4,000 schema characters per step, 67% less."),
+    );
+    expect(card).toHaveTextContent(
+      "A connected MCP server did not answer its tool listing, so the MCP half could not be measured.",
+    );
+    expect(card).not.toHaveTextContent("Could not measure the saving on this machine.");
+  });
+
+  it("does not promise the shell where the conversation may not have one", async () => {
+    renderWithProviders(<Settings />);
+    const card = await screen.findByRole("region", { name: "Experimental" });
+
+    expect(card).toHaveTextContent("Only files and search, plus the shell where the conversation has one");
   });
 
   it.each(SWITCHES)("saves %s under its own key", async (label, env) => {

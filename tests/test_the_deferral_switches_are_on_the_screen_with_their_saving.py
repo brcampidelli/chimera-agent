@@ -168,9 +168,11 @@ def _client(tmp_path: Path, **env: str) -> TestClient:
 
 
 def test_the_route_reports_the_builtin_half_of_the_real_registry(tmp_path: Path) -> None:
+    # Guard off: with it on (the default) the chat declares less, and the route measures the chat —
+    # see the test after this one.
     from chimera.tools.builtin import default_registry
 
-    body = _client(tmp_path).get("/api/tools/defer-saving").json()
+    body = _client(tmp_path, CHIMERA_GUARD_CHAT="0").get("/api/tools/defer-saving").json()
 
     expected = builtin_saving(default_registry(tmp_path))
     assert body["builtin"]["declared_chars"] == expected["declared_chars"]
@@ -178,6 +180,23 @@ def test_the_route_reports_the_builtin_half_of_the_real_registry(tmp_path: Path)
     assert body["builtin"]["deferred"] == expected["deferred"]
     # On the stock registry the core is a small part of the schema, so this one is a saving.
     assert body["builtin"]["saving_pct"] > 0
+
+
+def test_with_the_chat_guard_on_the_route_measures_what_the_chat_declares(tmp_path: Path) -> None:
+    """The guard takes the execution tools from the app's chat. Counted anyway, the note promised
+    a saving on `run_shell`'s schema in a conversation that never has `run_shell`."""
+    from chimera.api.posture import chat_guard_denials
+    from chimera.governance.allowlist import restrict_registry
+    from chimera.tools.builtin import default_registry
+
+    body = _client(tmp_path).get("/api/tools/defer-saving").json()["builtin"]
+
+    chat = restrict_registry(default_registry(tmp_path), allow=None, deny=chat_guard_denials())
+    expected = builtin_saving(chat)
+    assert "run_shell" in chat_guard_denials()
+    assert body["tools"] == expected["tools"]
+    assert body["declared_chars"] == expected["declared_chars"]
+    assert body["deferred_chars"] == expected["deferred_chars"]
 
 
 def test_a_denied_tool_is_not_counted_as_a_saving(tmp_path: Path) -> None:
@@ -251,6 +270,45 @@ def test_a_pool_that_came_back_empty_is_not_reported_as_pending(
     body = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving").json()
 
     assert body["mcp_state"] == "no_servers"
+
+
+class _HungPool(_Pool):
+    """Connected, then stopped answering: `all_tools` is a live `list_tools` per server, and the
+    real one raises when its ten-second wait runs out."""
+
+    def all_tools(self) -> list[Tool]:
+        raise TimeoutError("list_tools timed out")
+
+
+def test_a_server_that_hangs_costs_the_mcp_figure_and_not_the_builtin_one(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(mcp_pool, "_build", lambda s: _HungPool("github_x"))
+    mcp_pool.connectors(_settings(tmp_path, CHIMERA_MCP_AUTOLOAD="1"))
+
+    resp = _client(tmp_path, CHIMERA_MCP_AUTOLOAD="1").get("/api/tools/defer-saving")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["mcp"] is None
+    assert body["mcp_state"] == "unavailable"
+    assert body["builtin"]["declared_chars"] > 0
+
+
+def test_the_command_says_a_hung_server_was_not_measured(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from chimera.cli.main import app
+
+    monkeypatch.setenv("CHIMERA_MCP_AUTOLOAD", "1")
+    monkeypatch.setattr(mcp_pool, "_build", lambda s: _HungPool("github_x"))
+    get_settings.cache_clear()
+
+    result = CliRunner().invoke(app, ["tools", "--defer-saving", "--workspace", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    assert "built-in:" in result.output
+    assert "did not answer its tool listing" in result.output
 
 
 def test_the_command_reports_the_saving_for_a_machine_with_no_screen(tmp_path: Path) -> None:

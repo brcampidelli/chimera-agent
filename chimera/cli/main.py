@@ -5660,7 +5660,8 @@ def _print_defer_saving(workspace: Path) -> None:
         why = {
             "autoload_off": "CHIMERA_MCP_AUTOLOAD is off, so no server is connected",
             "no_servers": "no MCP server connected",
-        }.get(state, state)
+            "unavailable": "a connected server did not answer its tool listing",
+        }.get(report["mcp_state"], report["mcp_state"])
         console.print(f"MCP: not measured — {why}")
     # The other half, said every time: the saving is tokens, the risk is a tool not being found.
     console.print(

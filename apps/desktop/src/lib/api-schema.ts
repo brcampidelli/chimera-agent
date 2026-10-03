@@ -5402,7 +5402,7 @@ export interface components {
              * Mcp State
              * @enum {string}
              */
-            mcp_state: "measured" | "autoload_off" | "not_connected" | "no_servers";
+            mcp_state: "measured" | "autoload_off" | "not_connected" | "no_servers" | "unavailable";
         };
         /**
          * DelegationSummaryOut

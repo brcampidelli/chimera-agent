@@ -2307,8 +2307,9 @@ class DeferSavingOut(BaseModel):
     builtin: DeferSavingHalfOut
     mcp: DeferSavingHalfOut | None = None
     #: Why ``mcp`` is null when it is: autoload off, servers not connected yet (they connect on the
-    #: first conversation, and this read never connects them), or no server connected.
-    mcp_state: Literal["measured", "autoload_off", "not_connected", "no_servers"]
+    #: first conversation, and this read never connects them), no server connected, or a connected
+    #: server failed to answer its tool listing (the built-in figure is still reported).
+    mcp_state: Literal["measured", "autoload_off", "not_connected", "no_servers", "unavailable"]
 
 
 class ToolsOut(BaseModel):

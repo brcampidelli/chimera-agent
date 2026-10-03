@@ -4327,7 +4327,8 @@
               "measured",
               "autoload_off",
               "not_connected",
-              "no_servers"
+              "no_servers",
+              "unavailable"
             ],
             "title": "Mcp State",
             "type": "string"
