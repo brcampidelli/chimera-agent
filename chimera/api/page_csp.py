@@ -17,7 +17,10 @@ app is the second layer, there so the person sees what was withheld instead of a
   `https://` or plain `http://` on loopback (`rejectReason` in `lib/server.ts`), so `connect-src`
   names exactly those; it is the reason the connect rule is not `'self'` alone;
 * images the app itself builds as `data:` (the browser pane's JPEG frames) and `blob:` (workspace
-  images, downloads); no web fonts at all.
+  images, downloads);
+* one self-hosted web font face: the stylesheet declares OpenDyslexic from `/fonts` (same origin,
+  `font-src 'self'`; never a CDN). The file is not bundled yet, so today the face loads nothing,
+  and the Appearance row that offers it checks that it loads first.
 
 **Why `script-src` is looser than the rest.** The HTML preview is an `iframe srcdoc`, and a srcdoc
 document *inherits the parent's policy*: both policies must allow a script for it to run. The

@@ -336,7 +336,11 @@ export function applyLayout(layout: Layout, action: LayoutAction): Layout {
       return { ...layout, maximized: action.panel };
     }
     case "toggle-focus": {
-      if (layout.beforeFocus) return { ...layout.beforeFocus, beforeFocus: null };
+      // The width is a reading preference, not part of the arrangement focus mode takes away: one
+      // chosen while focused (Settings or the palette) is kept on the way out, not quietly undone.
+      if (layout.beforeFocus) {
+        return { ...layout.beforeFocus, transcriptWidth: layout.transcriptWidth, beforeFocus: null };
+      }
       const regions = {
         ...layout.regions,
         rail: { ...layout.regions.rail, visible: false },

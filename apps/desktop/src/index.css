@@ -351,8 +351,10 @@
 
   /* Fonts swap the VALUE of the tokens, never the places that read them. The code fonts are not
      shipped: they are used when this computer has them, and the stack falls back to the default when
-     it does not (the row marks one it cannot find). OpenDyslexic is loaded from the app's own files,
-     never a CDN — the app is local-first and must look the same offline. */
+     it does not (the row marks one it cannot find). OpenDyslexic is declared to load from the app's
+     own files, never a CDN — the app is local-first and must look the same offline. The file itself
+     (and its OFL licence) is pending: it is not in public/fonts yet, so this face loads nothing and
+     the Interface font row, which checks, offers no OpenDyslexic until it does. */
   @font-face {
     font-family: 'OpenDyslexic';
     src: url('/fonts/OpenDyslexic-Regular.woff2') format('woff2');

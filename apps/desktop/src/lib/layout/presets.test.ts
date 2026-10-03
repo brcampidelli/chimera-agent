@@ -101,6 +101,16 @@ describe("the conversation's width", () => {
     expect(applyLayout(focused, { type: "toggle-focus" }).transcriptWidth).toBe("wide");
   });
 
+  it("keeps a width chosen during focus mode when focus mode is left", () => {
+    const focused = applyLayout(defaultLayout(), { type: "toggle-focus" });
+    const narrowed = applyLayout(focused, { type: "transcript-width", width: "narrow" });
+    const left = applyLayout(narrowed, { type: "toggle-focus" });
+    expect(left.transcriptWidth).toBe("narrow");
+    // Everything else focus mode changed still comes back exactly.
+    expect(left.regions).toEqual(defaultLayout().regions);
+    expect(left.beforeFocus).toBeNull();
+  });
+
   it("reads a stored layout from before the width existed as medium, and keeps a stored width", () => {
     const old: Record<string, unknown> = { ...defaultLayout() };
     delete old.transcriptWidth;

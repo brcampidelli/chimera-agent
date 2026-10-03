@@ -20,8 +20,19 @@ const selectCls = "field h-8 w-56 px-2.5 text-sm";
 interface Option<T extends string> {
   value: T;
   label: string;
-  /** Shown but not choosable: a font this computer does not have. */
-  missing?: boolean;
+  /**
+   * Shown but not choosable, and why. The two reasons read differently on purpose: a code font is the
+   * computer's own, so "not on this computer" is true and actionable; a font the app ships is not the
+   * computer's business, and blaming the computer for a file the build lacks would send someone off
+   * installing a font that would change nothing.
+   */
+  unavailable?: "missing" | "notInBuild";
+}
+
+function optionLabel(t: ReturnType<typeof useT>, o: Option<string>): string {
+  if (o.unavailable === "missing") return t("settings.font.missing", { name: o.label });
+  if (o.unavailable === "notInBuild") return t("settings.font.notInBuild", { name: o.label });
+  return o.label;
 }
 
 function Choice<T extends string>({
@@ -46,8 +57,8 @@ function Choice<T extends string>({
       {options.map((o) => (
         // The current choice stays choosable even when its font went missing: disabling the selected
         // option would leave the select showing a value it claims cannot be picked.
-        <option key={o.value} value={o.value} disabled={o.missing === true && o.value !== value}>
-          {o.missing ? t("settings.font.missing", { name: o.label }) : o.label}
+        <option key={o.value} value={o.value} disabled={o.unavailable !== undefined && o.value !== value}>
+          {optionLabel(t, o)}
         </option>
       ))}
     </select>
@@ -110,9 +121,10 @@ export function TranscriptWidthSelect({ name }: { name: string }) {
 export function UiFontSelect({ name }: { name: string }) {
   const t = useT();
   const { uiFont, setUiFont } = useAppearance();
-  // Ships with the app (public/fonts), so the question is whether the file loads, not whether the
-  // computer has it.
-  const [dyslexic, setDyslexic] = useState<boolean | null>(null);
+  // Declared by the app's own @font-face (public/fonts), so the question is whether the file loads,
+  // not whether the computer has it. "pending" until the check answers: an option that appears and
+  // then vanishes would be worse than one that appears a moment late.
+  const [dyslexic, setDyslexic] = useState<boolean | null | "pending">("pending");
   useEffect(() => {
     let live = true;
     void bundledFontLoads("OpenDyslexic").then((ok) => {
@@ -125,8 +137,19 @@ export function UiFontSelect({ name }: { name: string }) {
   const options: Option<UiFont>[] = [
     { value: "system", label: t("settings.uiFont.system") },
     { value: "serif", label: t("settings.uiFont.serif") },
-    { value: "dyslexic", label: "OpenDyslexic", missing: dyslexic === false },
   ];
+  // Offered only once the file is known to load (or the webview cannot tell, which fonts.ts treats as
+  // available). A build without the file shows no OpenDyslexic at all, rather than an option that is
+  // permanently disabled. The one exception is someone whose stored choice IS OpenDyslexic: the
+  // select must be able to show its own value, so it stays, saying the build lacks it.
+  const loads = dyslexic === true || dyslexic === null;
+  if (loads || uiFont === "dyslexic") {
+    options.push({
+      value: "dyslexic",
+      label: "OpenDyslexic",
+      unavailable: dyslexic === false ? "notInBuild" : undefined,
+    });
+  }
   return <Choice name={name} value={uiFont} options={options} onChange={setUiFont} />;
 }
 
@@ -142,8 +165,16 @@ export function CodeFontSelect({ name }: { name: string }) {
   }));
   const options: Option<CodeFont>[] = [
     { value: "default", label: t("settings.codeFont.default") },
-    { value: "cascadia", label: "Cascadia Code", missing: installed.cascadia === false },
-    { value: "jetbrains", label: "JetBrains Mono", missing: installed.jetbrains === false },
+    {
+      value: "cascadia",
+      label: "Cascadia Code",
+      unavailable: installed.cascadia === false ? "missing" : undefined,
+    },
+    {
+      value: "jetbrains",
+      label: "JetBrains Mono",
+      unavailable: installed.jetbrains === false ? "missing" : undefined,
+    },
   ];
   return <Choice name={name} value={codeFont} options={options} onChange={setCodeFont} />;
 }

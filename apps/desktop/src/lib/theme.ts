@@ -147,3 +147,40 @@ export function applyCodeFont(font: CodeFont): void {
   stamp("fontCode", font, "default");
   writePreference(CODE_FONT_KEY, font);
 }
+
+const APPEARANCE_KEYS: readonly string[] = [THEME_KEY, MOTION_KEY, TEXT_SIZE_KEY, UI_FONT_KEY, CODE_FONT_KEY];
+
+/**
+ * Paint every stored preference without writing any of them back.
+ *
+ * For a window that shows what the main window chose and chooses nothing itself: writing back would
+ * make that window a second author of a value it only reads.
+ */
+export function paintStoredAppearance(): void {
+  const root = document.documentElement;
+  root.dataset.theme = resolveTheme(readTheme());
+  const motion = readMotion();
+  if (motion === "system") delete root.dataset.motion;
+  else root.dataset.motion = motion;
+  stamp("textSize", readTextSize(), "medium");
+  stamp("font", readUiFont(), "system");
+  stamp("fontCode", readCodeFont(), "default");
+}
+
+/**
+ * Keep a secondary window (`?conversation=`, `?float=`) in step with the main one.
+ *
+ * Those windows mount no AppearanceProvider; the inline script paints them once, on load. Without
+ * this, a theme, text size or font changed in the main window reached a window already open only when
+ * it reloaded — the main window and the conversation beside it in two different sizes. The `storage`
+ * event fires in every OTHER window of the origin when a value changes, which is exactly the set that
+ * needs to repaint. `key === null` is `localStorage.clear()`: everything went back to its default.
+ * Returns the unsubscribe.
+ */
+export function followStoredAppearance(target: Window = window): () => void {
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === null || APPEARANCE_KEYS.includes(event.key)) paintStoredAppearance();
+  };
+  target.addEventListener("storage", onStorage);
+  return () => target.removeEventListener("storage", onStorage);
+}

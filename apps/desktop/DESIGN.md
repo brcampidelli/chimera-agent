@@ -75,9 +75,14 @@ The person can scale all five at once, and only that way: Settings › Appearanc
 `data-text-size` on `<html>`, which moves the rem root to 93.75% or 112.5%. Every size, space and
 radius is in rem, so the interface scales together and the scale stays five sizes. The fonts work the
 same way: Interface font and Code font stamp `data-font` / `data-font-code`, which swap the **value**
-of `--font-sans` / `--font-mono` and nothing else. OpenDyslexic is served from `public/fonts`, never a
-CDN; the code fonts are the computer's own and the row marks one it does not have. Each default stamps
-no attribute, so someone who never opens the card sees the page as it was.
+of `--font-sans` / `--font-mono` and nothing else. OpenDyslexic is declared by an `@font-face` that
+points at `public/fonts/OpenDyslexic-Regular.woff2` — the app's own files, never a CDN — but **the file
+is not in the repository yet** (bundling it, with its SIL OFL licence, waits on the owner's yes to
+download it). Until it is, the row checks that the file loads and offers no OpenDyslexic at all; a
+build that has it offers it with no code change. The code fonts are the computer's own and the row
+marks one it does not have ("not on this computer"); a shipped font that fails to load says "not
+available in this build", because the computer is not what lacks it. Each default stamps no
+attribute, so someone who never opens the card sees the page as it was.
 
 ### Motion
 

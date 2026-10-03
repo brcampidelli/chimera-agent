@@ -11,6 +11,7 @@ import {
   applyTheme,
   applyUiFont,
   CODE_FONT_KEY,
+  followStoredAppearance,
   CODE_FONTS,
   MOTION_KEY,
   readCodeFont,
@@ -185,5 +186,57 @@ describe("the inline script in index.html", () => {
 
   it("agrees with resolveTheme that dark is the fallback", () => {
     expect(html).toMatch(/prefers-color-scheme: light.*\?\s*"light"\s*:\s*"dark"/s);
+  });
+});
+
+describe("a secondary window following the main one", () => {
+  /** What the main window does: write storage. The event is what the browser sends every OTHER window. */
+  function changedElsewhere(key: string | null, value?: string): void {
+    if (key !== null && value !== undefined) localStorage.setItem(key, value);
+    window.dispatchEvent(new StorageEvent("storage", { key }));
+  }
+
+  it("repaints text size, fonts, motion and theme when the main window changes them", () => {
+    const stop = followStoredAppearance();
+    changedElsewhere(TEXT_SIZE_KEY, "large");
+    changedElsewhere(UI_FONT_KEY, "serif");
+    changedElsewhere(CODE_FONT_KEY, "jetbrains");
+    changedElsewhere(MOTION_KEY, "reduced");
+    changedElsewhere(THEME_KEY, "light");
+    const root = document.documentElement.dataset;
+    expect(root.textSize).toBe("large");
+    expect(root.font).toBe("serif");
+    expect(root.fontCode).toBe("jetbrains");
+    expect(root.motion).toBe("reduced");
+    expect(root.theme).toBe("light");
+
+    // Back to a default stamps nothing again, so the window is today's page.
+    changedElsewhere(TEXT_SIZE_KEY, "medium");
+    expect(root.textSize).toBeUndefined();
+    stop();
+  });
+
+  it("goes back to every default when storage is cleared, and stops after unsubscribing", () => {
+    const stop = followStoredAppearance();
+    changedElsewhere(TEXT_SIZE_KEY, "small");
+    expect(document.documentElement.dataset.textSize).toBe("small");
+    localStorage.clear();
+    changedElsewhere(null);
+    expect(document.documentElement.dataset.textSize).toBeUndefined();
+
+    stop();
+    changedElsewhere(TEXT_SIZE_KEY, "large");
+    expect(document.documentElement.dataset.textSize).toBeUndefined();
+  });
+
+  it("ignores keys that are not appearance and never writes back what it reads", () => {
+    const stop = followStoredAppearance();
+    localStorage.setItem(TEXT_SIZE_KEY, "large");
+    changedElsewhere("chimera.something-else", "x");
+    expect(document.documentElement.dataset.textSize).toBeUndefined();
+    changedElsewhere(TEXT_SIZE_KEY, "large");
+    // A reader only: the theme it painted was not written to storage on its behalf.
+    expect(localStorage.getItem(THEME_KEY)).toBeNull();
+    stop();
   });
 });

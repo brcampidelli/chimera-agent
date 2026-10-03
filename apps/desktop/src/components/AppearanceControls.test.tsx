@@ -13,7 +13,7 @@ import {
 import { IconRail } from "@/components/IconRail";
 import { useAppearance } from "@/lib/appearance";
 import { STORAGE_KEY } from "@/lib/layout/store";
-import { THEME_KEY } from "@/lib/theme";
+import { THEME_KEY, UI_FONT_KEY } from "@/lib/theme";
 import { renderWithProviders } from "@/test/utils";
 
 /**
@@ -124,19 +124,44 @@ describe("the conversation width row", () => {
 });
 
 describe("the font rows", () => {
-  it("swaps the interface font by attribute and marks OpenDyslexic when its file does not load", async () => {
+  it("swaps the interface font by attribute and offers no OpenDyslexic when this build lacks its file", async () => {
+    let answer: (() => void) | undefined;
+    Object.defineProperty(document, "fonts", {
+      configurable: true,
+      value: {
+        load: () =>
+          new Promise((_, reject) => {
+            answer = () => reject(new Error("NetworkError"));
+          }),
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<UiFontSelect name="Interface font" />);
+    // Wait for the check to have been asked, then let it fail, so the assertion below reads the row
+    // AFTER the answer and not the moment before it.
+    await waitFor(() => expect(answer).toBeDefined());
+    answer?.();
+    await waitFor(() => expect(screen.getAllByRole("option")).toHaveLength(2));
+
+    // Not a disabled option blaming the computer: the font ships with the app or not at all.
+    expect(screen.queryByRole("option", { name: /OpenDyslexic/ })).toBeNull();
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Interface font" }), "serif");
+    expect(document.documentElement.dataset.font).toBe("serif");
+  });
+
+  it("keeps a stored OpenDyslexic choice visible and says the build lacks the file, not the computer", async () => {
+    localStorage.setItem(UI_FONT_KEY, "dyslexic");
     Object.defineProperty(document, "fonts", {
       configurable: true,
       value: { load: () => Promise.reject(new Error("NetworkError")) },
     });
-    const user = userEvent.setup();
     renderWithProviders(<UiFontSelect name="Interface font" />);
 
-    const dyslexic = await screen.findByRole("option", { name: "OpenDyslexic (not on this computer)" });
-    expect(dyslexic).toBeDisabled();
-
-    await user.selectOptions(screen.getByRole("combobox", { name: "Interface font" }), "serif");
-    expect(document.documentElement.dataset.font).toBe("serif");
+    const option = await screen.findByRole("option", { name: "OpenDyslexic (not available in this build)" });
+    expect(option).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Interface font" })).toHaveValue("dyslexic");
+    expect(screen.queryByRole("option", { name: /not on this computer/ })).toBeNull();
   });
 
   it("offers OpenDyslexic when its file loads", async () => {
