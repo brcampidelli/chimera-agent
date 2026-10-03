@@ -70,7 +70,19 @@ SWITCHABLE_SETTINGS: frozenset[str] = frozenset(
 
 
 def unavailable(registered: set[str]) -> list[dict[str, object]]:
-    """One row per conditional tool that is NOT in the registry right now, with what would turn it on."""
+    """One row per conditional tool that is NOT in the registry right now, with what would turn it on.
+
+    ``in_settings`` answers where the variables are set, and it is computed from the config endpoint's
+    own allowlist rather than declared here. The screen used to tell every ``key`` row "add it in
+    Settings", and for ``send_email``, ``read_email`` and ``calendar_events`` that was false: the SMTP,
+    IMAP and ICS variables are not in ``ALLOWED_KEYS``, so Settings has no field for them and a PATCH
+    would be refused. Keeping them out is deliberate — saving SMTP credentials from the app is what
+    arms ``send_email``, and that is the owner's decision, not a side effect of a copy fix — so the row
+    has to name the ``.env`` instead.
+    """
+    # Imported here, not at the top: `config_api` imports SWITCHABLE_SETTINGS from this module.
+    from chimera.api.config_api import is_editable
+
     rows: list[dict[str, object]] = []
     for tool in CONDITIONAL_TOOLS:
         if tool.name in registered:
@@ -79,5 +91,6 @@ def unavailable(registered: set[str]) -> list[dict[str, object]]:
             "name": tool.name, "description": tool.description(), "kind": tool.kind,
             "variables": list(tool.variables), "requires": tool.requires, "switchable": tool.switchable,
             "default_on": tool.default_on,
+            "in_settings": bool(tool.variables) and all(is_editable(v) for v in tool.variables),
         })
     return rows

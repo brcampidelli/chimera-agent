@@ -155,10 +155,16 @@ function UnavailableRow({
           {describe(tool, t)}
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
+          {/* "add it in Settings" only where Settings has the field. The server decides that from the
+              config allowlist (`in_settings`); the SMTP, IMAP and ICS variables are not in it — on
+              purpose, since saving SMTP from the app would arm send_email — so those rows name the
+              .env instead of sending someone to look for a field that does not exist. */}
           {tool.kind === "setting"
             ? t("tools.unavailable.setting", { vars })
             : tool.kind === "key"
-              ? t("tools.unavailable.set", { vars })
+              ? tool.in_settings
+                ? t("tools.unavailable.set", { vars })
+                : t("tools.unavailable.setInEnv", { vars })
               : t("tools.unavailable.install", { pkg: tool.requires })}
         </p>
       </div>

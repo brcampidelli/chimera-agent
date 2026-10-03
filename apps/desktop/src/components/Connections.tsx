@@ -13,8 +13,10 @@ type Tab = "chimera" | "servers" | "capabilities";
  *
  * MCP servers and the tool registry answer the same question — what can this agent actually do
  * right now — and neither is a daily surface. MCP's own empty state says the CLI is the source of
- * truth and the app is a view over it; Tools is read-only introspection with no action available at
- * all. Honest framing for a settings tab, and a poor one for a top-level icon.
+ * truth and the app is a view over it. Tools is not read-only: each registered tool has a switch
+ * that writes CHIMERA_TOOL_DENYLIST, and a tool that is off behind a setting can be switched on —
+ * but it is configuration you set once, not something you visit every day. Honest framing for a
+ * settings tab, and a poor one for a top-level icon.
  */
 export function Connections() {
   const t = useT();

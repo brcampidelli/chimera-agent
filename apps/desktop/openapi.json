@@ -9945,6 +9945,11 @@
             "title": "Description",
             "type": "string"
           },
+          "in_settings": {
+            "default": false,
+            "title": "In Settings",
+            "type": "boolean"
+          },
           "kind": {
             "enum": [
               "setting",

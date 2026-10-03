@@ -2140,6 +2140,10 @@ class UnavailableToolOut(BaseModel):
     """Only a ``setting`` can be turned on from the screen; a key or a package cannot be invented."""
     default_on: bool = False
     """A setting that is on unless the owner switched it off — absent means someone turned it off."""
+    in_settings: bool = False
+    """Every variable in ``variables`` can be saved from the Settings screen (``is_editable``). False
+    for the SMTP/IMAP/ICS rows, which live in ``.env`` only — the screen must not send anyone to a
+    field that does not exist. Defaults False so an older server never earns a "Settings" claim."""
 
 
 class ToolsOut(BaseModel):

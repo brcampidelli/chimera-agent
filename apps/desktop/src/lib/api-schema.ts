@@ -7794,6 +7794,11 @@ export interface components {
             /** Description */
             description: string;
             /**
+             * In Settings
+             * @default false
+             */
+            in_settings: boolean;
+            /**
              * Kind
              * @enum {string}
              */

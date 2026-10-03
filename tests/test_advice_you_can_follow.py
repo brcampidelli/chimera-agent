@@ -11,10 +11,11 @@ Tavily and ElevenLabs. Tavily and ElevenLabs have tools that auto-register the m
 set. The other three have none: `chimera/tools/web.py` implements only Tavily, and grep finds no
 Brave, SerpAPI or Stability call anywhere. Setting one changes nothing at all.
 
-They are not removed — they are pluggable through the OpenAPI→tool importer, the same way `spotify`
-and `x_search` already are, and that is worth keeping. What was wrong is a label that reads like a
-built-in capability. The `.env.example` was already more honest than the product: it marks Stability
-"(reserved)" while the screen said "Stability (images)".
+The first fix relabelled them "no built-in tool; import its OpenAPI spec", and that was the same
+defect one level down: the OpenAPI→tool importer's only caller outside the tests is `chimera
+schema-bench`, which counts schema tokens and registers nothing, so no surface lets anyone import a
+spec — and nothing would hand an imported tool one of these keys if it did. They are reserved slots,
+which is what `.env.example` already called Stability while the screen said "Stability (images)".
 """
 
 from __future__ import annotations
@@ -74,8 +75,7 @@ def test_only_the_credentials_with_a_built_in_tool_claim_one() -> None:
 
     Tavily and ElevenLabs auto-register a tool. Brave, SerpAPI and Stability register nothing, and
     a label like "Brave (web search)" beside "Tavily (web search)" says they are the same kind of
-    thing. They are not: one works when you paste the key and the other needs you to import an
-    OpenAPI spec first.
+    thing. They are not: one works when you paste the key and the other does nothing at all.
     """
     built_in = {"TAVILY_API_KEY", "ELEVENLABS_API_KEY"}
 
@@ -111,3 +111,47 @@ def test_no_tool_module_secretly_reads_one_of_them() -> None:
 
     for field in ("brave_api_key", "serpapi_key", "stability_api_key"):
         assert field not in read, f"{field} is implemented now — fix its label"
+
+
+def test_no_label_sends_the_user_to_an_importer_they_cannot_reach() -> None:
+    """The second promise, the one the first fix introduced.
+
+    "import its OpenAPI spec" names an action, and there is nowhere to perform it: the importer's
+    only non-test caller is `schema-bench` (held by the test below). A reserved slot has to say it
+    is reserved, not describe a route.
+    """
+    for env in ("BRAVE_API_KEY", "SERPAPI_API_KEY", "STABILITY_API_KEY"):
+        label = _TOOL_CREDENTIALS[env]
+        assert "reserved" in label, f"{env} buys nothing and the label does not say so"
+        assert "openapi" not in label.lower(), f"{env} points at an import nobody can perform"
+
+
+def test_the_openapi_importer_still_has_no_caller_that_gives_the_agent_a_tool() -> None:
+    """The premise of the label above, checked rather than remembered.
+
+    Every call of `tools_from_openapi` under `chimera/` is found by parsing, and the one allowed
+    caller is `schema_bench`, which measures schema size. If someone wires an import into a screen
+    or a command, this fails — and the reserved labels may then honestly point at it again.
+    """
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "chimera"
+    callers: set[str] = set()
+    for path in root.rglob("*.py"):
+        if path.parts[-2] == "integrations" and path.name == "openapi.py":
+            continue  # the definition, not a use
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for func in ast.walk(tree):
+            if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for node in ast.walk(func):
+                if (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "tools_from_openapi"
+                ):
+                    callers.add(f"{path.relative_to(root).as_posix()}::{func.name}")
+
+    assert callers, "found no caller at all — the scan is inert, not the importer unused"
+    assert callers == {"cli/main.py::schema_bench"}, f"the importer is reachable now: {callers}"

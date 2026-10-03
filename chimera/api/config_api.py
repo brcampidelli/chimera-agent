@@ -33,14 +33,19 @@ from chimera.providers.catalog import PROVIDERS
 # Tavily and nothing else, and the `.env.example` was already more honest than this screen: it
 # marks Stability "(reserved)" while the label here said "Stability (images)".
 #
-# Kept rather than removed. They are reachable through the OpenAPI->tool importer, the same route
-# `spotify` and `x_search` already document — so the slot is real and the promise was the lie.
+# The first correction of those labels said "import its OpenAPI spec", and that was a second promise
+# of the same kind. `chimera/integrations/openapi.py` exists, but its only caller outside the tests
+# is `chimera schema-bench`, which counts schema tokens and registers nothing; no screen, command or
+# setting turns a spec into a tool the agent can call, and nothing would hand it one of these keys
+# if one did. So the three keys are what `.env.example` already called Stability: reserved. Setting
+# one stores it and changes nothing. Kept rather than removed so a key already saved stays visible
+# (and masked) instead of becoming an invisible line in `.env`.
 _TOOL_CREDENTIALS = {
     "TAVILY_API_KEY": "Tavily (web search)",
-    "BRAVE_API_KEY": "Brave — no built-in tool; import its OpenAPI spec",
-    "SERPAPI_API_KEY": "SerpAPI — no built-in tool; import its OpenAPI spec",
+    "BRAVE_API_KEY": "Brave — reserved; no built-in tool uses this key yet",
+    "SERPAPI_API_KEY": "SerpAPI — reserved; no built-in tool uses this key yet",
     "ELEVENLABS_API_KEY": "ElevenLabs (TTS)",
-    "STABILITY_API_KEY": "Stability — no built-in tool; import its OpenAPI spec",
+    "STABILITY_API_KEY": "Stability — reserved; no built-in tool uses this key yet",
 }
 # The model providers come from the catalog, which owns their slugs and their labels. Keeping a
 # second list here is how the CLI and the app end up disagreeing about what a provider is called.

@@ -72,6 +72,8 @@ const en: Dict = {
   "tools.unavailable.needsPackage": "needs a package",
   "tools.unavailable.setting": "Switch it on here — it sets {vars}.",
   "tools.unavailable.set": "Needs {vars} — add it in Settings.",
+  "tools.unavailable.setInEnv":
+    "Needs {vars} — Settings has no field for these. Set them in the .env file the server reads, then restart Chimera.",
   "tools.unavailable.install": "Needs {pkg} installed.",
   "tools.unavailable.nextTurn": "Switched on. It takes effect from the next message.",
   "tools.desc.echo": "Echo back the given text exactly.",
@@ -274,7 +276,7 @@ const en: Dict = {
     "saved — applies the next time you start the app",
   "settings.row.appCron": "Run scheduled jobs",
   "settings.hint.appCron":
-    "The daemon that fires the jobs on the Automation screen, inside this app",
+    "Fires the jobs on the Automation screen, but only while this app is open. For jobs that run 24/7, run `chimera serve --cron` on a machine that stays on.",
   "settings.tab.connections": "Connections",
   "settings.tab.capabilities": "Capabilities",
   "settings.tab.security": "Security",
@@ -1733,6 +1735,8 @@ const pt: Dict = {
   "tools.unavailable.needsPackage": "precisa de pacote",
   "tools.unavailable.setting": "Ligue aqui — isso define {vars}.",
   "tools.unavailable.set": "Precisa de {vars} — adicione em Configurações.",
+  "tools.unavailable.setInEnv":
+    "Precisa de {vars} — as Configurações não têm campo para isso. Defina no arquivo .env que o servidor lê e reinicie o Chimera.",
   "tools.unavailable.install": "Precisa de {pkg} instalado.",
   "tools.unavailable.nextTurn": "Ligada. Vale a partir da próxima mensagem.",
   "tools.desc.echo": "Devolve o texto dado exatamente como veio.",
@@ -1932,7 +1936,7 @@ const pt: Dict = {
   "settings.applies.nextLaunch": "salvo — vale no próximo início do aplicativo",
   "settings.row.appCron": "Executar agendamentos",
   "settings.hint.appCron":
-    "O daemon que dispara os jobs da tela Automação, dentro deste app",
+    "Dispara os jobs da tela Automação, mas só enquanto este app estiver aberto. Para jobs 24/7, rode `chimera serve --cron` numa máquina que fique ligada.",
   "settings.tab.connections": "Conexões",
   "settings.tab.capabilities": "Capacidades",
   "settings.tab.security": "Segurança",
@@ -3443,6 +3447,8 @@ const es: Dict = {
   "tools.unavailable.needsPackage": "necesita un paquete",
   "tools.unavailable.setting": "Actívala aquí — define {vars}.",
   "tools.unavailable.set": "Necesita {vars} — añádela en Ajustes.",
+  "tools.unavailable.setInEnv":
+    "Necesita {vars} — Ajustes no tiene un campo para esto. Defínelas en el archivo .env que lee el servidor y reinicia Chimera.",
   "tools.unavailable.install": "Necesita {pkg} instalado.",
   "tools.unavailable.nextTurn": "Activada. Surte efecto desde el próximo mensaje.",
   "tools.desc.echo": "Devuelve el texto dado exactamente como llegó.",
@@ -3637,7 +3643,7 @@ const es: Dict = {
     "guardado — se aplica al iniciar la app la próxima vez",
   "settings.row.appCron": "Ejecutar tareas programadas",
   "settings.hint.appCron":
-    "El daemon que dispara las tareas de la pantalla Automatización, dentro de esta app",
+    "Dispara las tareas de la pantalla Automatización, pero solo mientras esta app está abierta. Para tareas 24/7, ejecuta `chimera serve --cron` en una máquina que quede encendida.",
   "settings.tab.connections": "Conexiones",
   "settings.tab.capabilities": "Capacidades",
   "settings.tab.security": "Seguridad",
@@ -5127,6 +5133,8 @@ const fr: Dict = {
   "tools.unavailable.needsPackage": "nécessite un paquet",
   "tools.unavailable.setting": "Activez-le ici — cela définit {vars}.",
   "tools.unavailable.set": "Nécessite {vars} — ajoutez-la dans les Réglages.",
+  "tools.unavailable.setInEnv":
+    "Nécessite {vars} — les Réglages n'ont pas de champ pour cela. Définissez-les dans le fichier .env lu par le serveur, puis redémarrez Chimera.",
   "tools.unavailable.install": "Nécessite {pkg} installé.",
   "tools.unavailable.nextTurn": "Activé. Prend effet à partir du prochain message.",
   "tools.desc.echo": "Renvoie exactement le texte donné.",
@@ -5321,7 +5329,7 @@ const fr: Dict = {
     "enregistré — s'applique au prochain démarrage de l'app",
   "settings.row.appCron": "Exécuter les tâches planifiées",
   "settings.hint.appCron":
-    "Le démon qui déclenche les tâches de l'écran Automatisation, dans cette app",
+    "Déclenche les tâches de l'écran Automatisation, mais seulement tant que cette app est ouverte. Pour des tâches 24 h/24, lancez `chimera serve --cron` sur une machine qui reste allumée.",
   "settings.tab.connections": "Connexions",
   "settings.tab.capabilities": "Capacités",
   "settings.tab.security": "Sécurité",
@@ -6820,6 +6828,8 @@ const de: Dict = {
   "tools.unavailable.needsPackage": "braucht ein Paket",
   "tools.unavailable.setting": "Hier einschalten — setzt {vars}.",
   "tools.unavailable.set": "Braucht {vars} — in den Einstellungen hinzufügen.",
+  "tools.unavailable.setInEnv":
+    "Braucht {vars} — die Einstellungen haben dafür kein Feld. In der .env-Datei setzen, die der Server liest, und Chimera neu starten.",
   "tools.unavailable.install": "Braucht {pkg} installiert.",
   "tools.unavailable.nextTurn": "Eingeschaltet. Gilt ab der nächsten Nachricht.",
   "tools.desc.echo": "Gibt den übergebenen Text exakt zurück.",
@@ -7015,7 +7025,7 @@ const de: Dict = {
     "gespeichert — gilt beim nächsten Start der App",
   "settings.row.appCron": "Geplante Jobs ausführen",
   "settings.hint.appCron":
-    "Der Daemon, der die Jobs im Automatisierungs-Screen auslöst, in dieser App",
+    "Löst die Jobs im Automatisierungs-Screen aus, aber nur, solange diese App offen ist. Für Jobs rund um die Uhr `chimera serve --cron` auf einem Rechner starten, der eingeschaltet bleibt.",
   "settings.tab.connections": "Verbindungen",
   "settings.tab.capabilities": "Fähigkeiten",
   "settings.tab.security": "Sicherheit",
@@ -8507,6 +8517,8 @@ const zh: Dict = {
   "tools.unavailable.needsPackage": "需要安装包",
   "tools.unavailable.setting": "在这里开启——会设置 {vars}。",
   "tools.unavailable.set": "需要 {vars}——请在设置中添加。",
+  "tools.unavailable.setInEnv":
+    "需要 {vars}——设置中没有这些字段。请在服务器读取的 .env 文件中设置，然后重启 Chimera。",
   "tools.unavailable.install": "需要安装 {pkg}。",
   "tools.unavailable.nextTurn": "已开启。从下一条消息起生效。",
   "tools.desc.echo": "原样回显给定的文本。",
@@ -8694,7 +8706,8 @@ const zh: Dict = {
   "settings.applies.nextConversation": "已保存 — 从下一次对话开始生效",
   "settings.applies.nextLaunch": "已保存 — 下次启动应用时生效",
   "settings.row.appCron": "运行计划任务",
-  "settings.hint.appCron": "在本应用内触发“自动化”页面任务的守护进程",
+  "settings.hint.appCron":
+    "触发“自动化”页面中的任务，但仅在本应用打开时运行。如需 24/7 运行，请在一台保持开机的机器上运行 `chimera serve --cron`。",
   "settings.tab.connections": "连接",
   "settings.tab.capabilities": "能力",
   "settings.tab.security": "安全",
@@ -10127,6 +10140,8 @@ const ja: Dict = {
   "tools.unavailable.needsPackage": "パッケージが必要",
   "tools.unavailable.setting": "ここでオンにできます — {vars} を設定します。",
   "tools.unavailable.set": "{vars} が必要です — 設定で追加してください。",
+  "tools.unavailable.setInEnv":
+    "{vars} が必要です — 設定にはこの入力欄がありません。サーバーが読み込む .env ファイルで設定し、Chimera を再起動してください。",
   "tools.unavailable.install": "{pkg} のインストールが必要です。",
   "tools.unavailable.nextTurn": "オンにしました。次のメッセージから有効です。",
   "tools.desc.echo": "与えられたテキストをそのまま返します。",
@@ -10321,7 +10336,7 @@ const ja: Dict = {
     "保存しました — 次回アプリ起動時に適用されます",
   "settings.row.appCron": "スケジュール実行",
   "settings.hint.appCron":
-    "このアプリ内で「自動化」画面のジョブを発火するデーモン",
+    "「自動化」画面のジョブを実行しますが、このアプリが開いている間だけです。24時間動かすには、電源を入れたままのマシンで `chimera serve --cron` を実行してください。",
   "settings.tab.connections": "接続",
   "settings.tab.capabilities": "機能",
   "settings.tab.security": "セキュリティ",
@@ -11761,6 +11776,8 @@ const it: Dict = {
   "tools.unavailable.needsPackage": "serve un pacchetto",
   "tools.unavailable.setting": "Attivalo qui — imposta {vars}.",
   "tools.unavailable.set": "Serve {vars} — aggiungila nelle Impostazioni.",
+  "tools.unavailable.setInEnv":
+    "Serve {vars} — le Impostazioni non hanno un campo per questo. Impostale nel file .env letto dal server, poi riavvia Chimera.",
   "tools.unavailable.install": "Serve {pkg} installato.",
   "tools.unavailable.nextTurn": "Attivato. Vale dal prossimo messaggio.",
   "tools.desc.echo": "Restituisce esattamente il testo dato.",
@@ -11962,7 +11979,7 @@ const it: Dict = {
   "settings.applies.nextLaunch": "salvato — vale al prossimo avvio dell'app",
   "settings.row.appCron": "Esegui i lavori pianificati",
   "settings.hint.appCron":
-    "il demone che fa scattare i lavori della schermata Automazione, dentro questa app",
+    "Fa scattare i lavori della schermata Automazione, ma solo finché questa app è aperta. Per lavori 24/7, esegui `chimera serve --cron` su una macchina che resta accesa.",
   "settings.tab.connections": "Connessioni",
   "settings.tab.capabilities": "Capacità",
   "settings.tab.security": "Sicurezza",
@@ -13447,6 +13464,8 @@ const pl: Dict = {
   "tools.unavailable.needsPackage": "wymaga pakietu",
   "tools.unavailable.setting": "Włącz tutaj — ustawia {vars}.",
   "tools.unavailable.set": "Wymaga {vars} — dodaj w Ustawieniach.",
+  "tools.unavailable.setInEnv":
+    "Wymaga {vars} — Ustawienia nie mają na to pola. Ustaw je w pliku .env, który czyta serwer, i uruchom Chimerę ponownie.",
   "tools.unavailable.install": "Wymaga zainstalowanego {pkg}.",
   "tools.unavailable.nextTurn": "Włączone. Działa od następnej wiadomości.",
   "tools.desc.echo": "Zwraca podany tekst dokładnie takim, jaki jest.",
@@ -13648,7 +13667,7 @@ const pl: Dict = {
     "zapisano — zadziała przy następnym uruchomieniu aplikacji",
   "settings.row.appCron": "Uruchamiaj zaplanowane zadania",
   "settings.hint.appCron":
-    "demon, który odpala zadania z ekranu Automatyzacja, wewnątrz tej aplikacji",
+    "Odpala zadania z ekranu Automatyzacja, ale tylko gdy ta aplikacja jest otwarta. Aby działały 24/7, uruchom `chimera serve --cron` na maszynie, która pozostaje włączona.",
   "settings.tab.connections": "Połączenia",
   "settings.tab.capabilities": "Możliwości",
   "settings.tab.security": "Bezpieczeństwo",
@@ -15126,6 +15145,8 @@ const ru: Dict = {
   "tools.unavailable.needsPackage": "нужен пакет",
   "tools.unavailable.setting": "Включите здесь — это задаёт {vars}.",
   "tools.unavailable.set": "Нужно {vars} — добавьте в Настройках.",
+  "tools.unavailable.setInEnv":
+    "Нужно {vars} — в Настройках нет такого поля. Задайте их в файле .env, который читает сервер, и перезапустите Chimera.",
   "tools.unavailable.install": "Нужно установить {pkg}.",
   "tools.unavailable.nextTurn": "Включено. Действует со следующего сообщения.",
   "tools.desc.echo": "Возвращает переданный текст без изменений.",
@@ -15328,7 +15349,7 @@ const ru: Dict = {
     "сохранено — применится при следующем запуске приложения",
   "settings.row.appCron": "Выполнять задания по расписанию",
   "settings.hint.appCron":
-    "Демон, который запускает задания с экрана «Автоматизация», внутри этого приложения",
+    "Запускает задания с экрана «Автоматизация», но только пока это приложение открыто. Чтобы они работали 24/7, запустите `chimera serve --cron` на машине, которая не выключается.",
   "settings.tab.connections": "Подключения",
   "settings.tab.capabilities": "Возможности",
   "settings.tab.security": "Безопасность",
