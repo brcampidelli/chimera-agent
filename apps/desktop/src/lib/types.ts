@@ -72,6 +72,10 @@ export type PoolWrite = Schemas["PoolWriteOut"];
 export type AppConfig = Schemas["ConfigOut"];
 /** Whether the app holds the machine awake right now, and for what (`chimera/core/keep_awake.py`). */
 export type KeepAwakeState = Schemas["KeepAwakeOut"];
+/** What the two deferral switches would save on this install, measured by the server — and why the
+ *  MCP half is absent when it is. `saving_pct` is negative when deferral would cost more. */
+export type DeferSaving = Schemas["DeferSavingOut"];
+export type DeferSavingHalf = Schemas["DeferSavingHalfOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];

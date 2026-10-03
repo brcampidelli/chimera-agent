@@ -2615,6 +2615,9 @@
           "decisions": {
             "$ref": "#/components/schemas/DecisionsCfgOut"
           },
+          "defer": {
+            "$ref": "#/components/schemas/DeferCfgOut"
+          },
           "experimental": {
             "$ref": "#/components/schemas/ExperimentalCfgOut"
           },
@@ -4250,6 +4253,91 @@
           }
         },
         "title": "DecomposedOut",
+        "type": "object"
+      },
+      "DeferCfgOut": {
+        "description": "The two deferral switches \u2014 tools reached on demand instead of declared on every step.\n\nA block of their own rather than three more fields in ``experimental``: that one is the\nstudy-25 set and is asserted as exactly those three. Both OFF by default (``chimera/config.py``\nsays why beside each), and a server that predates this block reads as both off, which is what\nsuch a server does.",
+        "properties": {
+          "mcp": {
+            "default": false,
+            "title": "Mcp",
+            "type": "boolean"
+          },
+          "tools": {
+            "default": false,
+            "title": "Tools",
+            "type": "boolean"
+          }
+        },
+        "title": "DeferCfgOut",
+        "type": "object"
+      },
+      "DeferSavingHalfOut": {
+        "description": "What deferral would do to one half of the schema, measured on this install.\n\nCharacters of JSON schema, not tokens: the ratio is what matters, and the two modules that\nmeasure it chose characters to avoid a tokenizer dependency. ``saving_pct`` is NEGATIVE when the\nthree proxies cost more than the tools they replace, which below a handful of tools they do.",
+        "properties": {
+          "declared_chars": {
+            "title": "Declared Chars",
+            "type": "integer"
+          },
+          "deferred": {
+            "title": "Deferred",
+            "type": "integer"
+          },
+          "deferred_chars": {
+            "title": "Deferred Chars",
+            "type": "integer"
+          },
+          "saving_pct": {
+            "title": "Saving Pct",
+            "type": "number"
+          },
+          "tools": {
+            "title": "Tools",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "tools",
+          "deferred",
+          "declared_chars",
+          "deferred_chars",
+          "saving_pct"
+        ],
+        "title": "DeferSavingHalfOut",
+        "type": "object"
+      },
+      "DeferSavingOut": {
+        "description": "``GET /api/tools/defer-saving`` \u2014 the token half of the two deferral switches, measured here.\n\nOnly the token half. Whether a model still finds a deferred tool is the other half, and the\nbuilt-in bench was inconclusive on it (`bench/tool_defer/RESULT.md`).",
+        "properties": {
+          "builtin": {
+            "$ref": "#/components/schemas/DeferSavingHalfOut"
+          },
+          "mcp": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DeferSavingHalfOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "mcp_state": {
+            "enum": [
+              "measured",
+              "autoload_off",
+              "not_connected",
+              "no_servers"
+            ],
+            "title": "Mcp State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "builtin",
+          "mcp_state"
+        ],
+        "title": "DeferSavingOut",
         "type": "object"
       },
       "DelegationSummaryOut": {
@@ -16793,6 +16881,24 @@
           }
         },
         "summary": "Tools Endpoint"
+      }
+    },
+    "/api/tools/defer-saving": {
+      "get": {
+        "operationId": "tools_defer_saving_endpoint_api_tools_defer_saving_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeferSavingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Tools Defer Saving Endpoint"
       }
     },
     "/api/transcribe": {

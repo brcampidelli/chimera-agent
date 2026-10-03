@@ -155,6 +155,13 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_BROWSER_SITUATION",
     "CHIMERA_RESEARCH_AGENT",
     "CHIMERA_EXPLORER_CONTRACT",
+    # Tools reached on demand instead of declared on every step — the built-in half and the MCP
+    # half. `config.py` promised beside both that the saving is reported on your own installation,
+    # and the only way to switch either was `.env`. Off: the built-in bench was inconclusive
+    # (`bench/tool_defer/RESULT.md`, McNemar p = 0.125) and nothing has measured the MCP half. The
+    # screen shows that, and the saving measured here (`GET /api/tools/defer-saving`), on the row.
+    "CHIMERA_DEFER_TOOLS",
+    "CHIMERA_MCP_DEFER",
     # The desktop bridge's two switches (`chimera/api/desktop_bridge.py`). The owner's, and only the
     # owner's: the bridge refuses to write either one on Claude's behalf, even with full control on,
     # so a client can never widen its own access.
@@ -220,6 +227,11 @@ APPLIES_WHEN: dict[str, str] = {
     # a Code turn builds both afresh, so there it is the next turn. The research agent and the
     # explorer's contract are read only on the Code turn, per turn, so they are absent: next call.
     "CHIMERA_BROWSER_SITUATION": NEXT_CONVERSATION,
+    # Both read where the registry is assembled: per conversation in the chat (`_chat_session` reads
+    # `get_settings()` fresh) and per turn on the Code screen, which is sooner. "Next conversation"
+    # is the scope that is true on both; an open chat keeps the tool list it started with.
+    "CHIMERA_DEFER_TOOLS": NEXT_CONVERSATION,
+    "CHIMERA_MCP_DEFER": NEXT_CONVERSATION,
     # The governance band builds its decider once per assembly (`governance/band.py::build_band`), so
     # a chat already running keeps the instrument it started with; the next one reads the new pair.
     # `POST /api/decide` and the `decide` tool rebuild on the next call.
@@ -430,6 +442,8 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "research_agent": settings.research_agent,
             "explorer_contract": settings.explorer_contract,
         },
+        # Tools on demand, both halves. What they would save is `GET /api/tools/defer-saving`.
+        "defer": {"tools": settings.defer_tools, "mcp": settings.mcp_defer},
         # The day's dollar ceiling, as set; `None` is no cap. Scheduled jobs only — see SpendCfgOut.
         "spend": {"daily_usd_cap": settings.daily_usd_cap},
         # The owner's keep-awake choice. What the keeper is DOING is `GET /api/keep-awake`.
@@ -651,6 +665,10 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
+    # A value `Settings` cannot parse as a bool takes the whole app down at the next read, which is
+    # worse than a refusal here.
+    "CHIMERA_DEFER_TOOLS": _check_boolean("CHIMERA_DEFER_TOOLS"),
+    "CHIMERA_MCP_DEFER": _check_boolean("CHIMERA_MCP_DEFER"),
 }
 
 

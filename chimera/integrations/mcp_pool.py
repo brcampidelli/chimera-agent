@@ -127,6 +127,17 @@ def pool_state(settings: Settings) -> PoolState:
         return PoolState(autoload=bool(settings.mcp_autoload), built=_tried, connected=nomes)
 
 
+def built_pool() -> Any:
+    """The pool if a turn already built it, else ``None`` — and never builds it.
+
+    For a reader that wants to MEASURE the connected servers (`GET /api/tools/defer-saving`) and
+    must not be the thing that spawns them, for the reason :class:`PoolState` gives. ``None`` here
+    means "nothing to measure yet"; :func:`pool_state` says which of the reasons it is.
+    """
+    with _lock:
+        return _pool
+
+
 def reset_for_tests() -> None:
     """Forget the pool so a test can build a different one.
 

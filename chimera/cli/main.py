@@ -2997,15 +2997,14 @@ def desktop_app(
         live = get_settings()
         registry = default_registry(workspace_path)
         if mcp_connectors is not None:
-            if live.mcp_defer:
-                # Three access tools instead of every server's full schema on every step. Read from
-                # `live` rather than the boot snapshot for the same reason as everything else here:
-                # a toggle flipped since launch should reach the next conversation.
-                from chimera.integrations.mcp_defer import register_deferred_mcp
+            # Declared alongside the builtins, or — with `mcp_defer` — three access tools instead of
+            # every server's full schema on every step. Read from `live` rather than the boot
+            # snapshot: a toggle flipped since launch should reach the next conversation. Through
+            # `mount` because the deferred shape has to carry the deployment's lists itself; the
+            # fence below cannot see names that are no longer in the registry.
+            from chimera.integrations.mcp_defer import mount
 
-                register_deferred_mcp(mcp_connectors, registry)
-            else:
-                mcp_connectors.into_tool_registry(registry)  # MCP tools alongside the builtins
+            mount(mcp_connectors, registry, live)
         # AFTER the MCP tools, for the same reason the guard below is: a denylist that covers only
         # the tools we wrote is not a denylist. CHIMERA_TOOL_ALLOWLIST/_DENYLIST reached `chimera
         # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
@@ -5596,9 +5595,64 @@ def explore(
     )
 
 
+def _print_defer_saving(workspace: Path) -> None:
+    """``chimera tools --defer-saving``: the token half of the two deferral switches, measured here.
+
+    For the machine with no Settings screen. MCP servers are connected only when autoload is on —
+    the same gate a conversation uses, so this spawns nothing a chat would not — and the figure can
+    be a loss, which is printed as one.
+    """
+    from chimera.integrations import mcp_pool
+    from chimera.tools.defer_saving import McpState, saving_report
+
+    settings = get_settings()
+    pool = mcp_pool.connectors(settings) if settings.mcp_autoload else None
+    state: McpState = (
+        "autoload_off"
+        if not settings.mcp_autoload
+        else "measured" if pool is not None else "no_servers"
+    )
+    report = saving_report(settings, workspace, pool=pool, mcp_state=state)
+
+    def line(label: str, half: dict[str, Any], switch: str, on: bool) -> None:
+        pct = half["saving_pct"]
+        verdict = f"{pct:.1f}% less" if pct >= 0 else f"{-pct:.1f}% MORE (a loss)"
+        console.print(
+            f"{label}: {half['declared_chars']:,} → {half['deferred_chars']:,} schema chars per step "
+            f"({verdict}); {half['deferred']} of {half['tools']} tools deferred · "
+            f"{switch}={'on' if on else 'off'}"
+        )
+
+    line("built-in", report["builtin"], "CHIMERA_DEFER_TOOLS", settings.defer_tools)
+    if report["mcp"] is not None:
+        line("MCP", report["mcp"], "CHIMERA_MCP_DEFER", settings.mcp_defer)
+    else:
+        why = {
+            "autoload_off": "CHIMERA_MCP_AUTOLOAD is off, so no server is connected",
+            "no_servers": "no MCP server connected",
+        }.get(state, state)
+        console.print(f"MCP: not measured — {why}")
+    # The other half, said every time: the saving is tokens, the risk is a tool not being found.
+    console.print(
+        "[dim]Token half only. Whether a deferred tool is still found was inconclusive for the "
+        "built-in half (bench/tool_defer/RESULT.md: 18/30 vs 15/30 completed, McNemar p = 0.125) "
+        "and is unmeasured for MCP.[/dim]"
+    )
+
+
 @app.command()
-def tools(workspace: str = typer.Option(".", "--workspace", "-w")) -> None:
+def tools(
+    workspace: str = typer.Option(".", "--workspace", "-w"),
+    defer_saving: bool = typer.Option(
+        False,
+        "--defer-saving",
+        help="Report what CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save on this install.",
+    ),
+) -> None:
     """List the built-in native tools."""
+    if defer_saving:
+        _print_defer_saving(Path(workspace))
+        return
     from chimera.tools import default_registry
 
     registry = default_registry(Path(workspace))

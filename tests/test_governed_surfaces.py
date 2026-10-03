@@ -213,6 +213,10 @@ EXEMPT: dict[str, str] = {
         "reads tool NAMES for the design allowlist; no agent, nothing invoked"
     ),
     "chimera/cli/main.py:tools": "prints the tool table",
+    # Behind `GET /api/tools/defer-saving` and `chimera tools --defer-saving`: the registry is built
+    # to serialise each schema and count its characters, then discarded. No agent is handed it and
+    # nothing is invoked through it — the same shape as `tools_endpoint` above.
+    "chimera/tools/defer_saving.py:builtin_half": "measures schema sizes; nothing is invoked",
     "chimera/cli/main.py:schema_bench": "benchmark harness, no deployment",
     "chimera/cli/main.py:sandbox_bench.factory": "benchmark harness, no deployment",
     # `_right_hand_builder.build` was exempt here for one release, on the grounds that the ruler

@@ -133,6 +133,20 @@ def deployment_posture(settings: Settings) -> ResolvedPosture:
     )
 
 
+def deployment_fence(settings: Settings) -> tuple[frozenset[str], frozenset[str] | None]:
+    """``(denied, allowed)`` as this deployment states them, for a proxy to carry.
+
+    The denials are the union of ``CHIMERA_TOOL_DENYLIST`` and the reach floor; the allowlist is
+    ``CHIMERA_TOOL_ALLOWLIST``, ``None`` when it states none. One function, because the deferral
+    proxies are registered where the restriction filter cannot see the names behind them, and each
+    of them has to be handed these lists explicitly — the chat surfaces were assembling the MCP proxy
+    with no list at all, so a denied server tool stayed reachable through ``mcp_call``.
+    """
+    denied = frozenset({*settings.tool_denylist, *deployment_posture(settings).deny_tools})
+    allowed = frozenset(settings.tool_allowlist) if settings.tool_allowlist else None
+    return denied, allowed
+
+
 #: Where the agent's writes can land.
 Writes = Literal["nothing", "workspace"]
 #: Where a shell command would actually execute — the fact, not the configuration.
