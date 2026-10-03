@@ -260,3 +260,89 @@ def test_the_doctor_endpoint_carries_it(tmp_path: Path) -> None:
 
     assert body["code_python"]["source"] == "interpreter"
     assert body["code_python"]["path"] == sys.executable
+
+
+# --- a Windows App Execution Alias is not a Python until it runs one -------------------------------
+
+
+def _alias(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, real: Path | None) -> Path:
+    """A frozen build whose PATH holds a WindowsApps alias first and, optionally, a real Python later."""
+    apps = tmp_path / "Microsoft" / "WindowsApps"
+    apps.mkdir(parents=True)
+    alias = apps / "python.exe"
+    alias.write_bytes(b"")  # the aliases are zero-byte links
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(code_mod, "_alias_verdicts", {})
+    dirs = [str(apps)] + ([str(real.parent)] if real is not None else [])
+    monkeypatch.setenv("PATH", os.pathsep.join(dirs))
+
+    def which(name: str, path: str | None = None) -> str | None:
+        searched = (path if path is not None else os.environ["PATH"]).split(os.pathsep)
+        if name == "python" and str(apps) in searched:
+            return str(alias)
+        if name == "python" and real is not None and str(real.parent) in searched:
+            return str(real)
+        return None
+
+    monkeypatch.setattr(code_mod.shutil, "which", which)
+    return alias
+
+
+def _answers(monkeypatch: pytest.MonkeyPatch, code: int) -> list[list[str]]:
+    calls: list[list[str]] = []
+
+    def run(argv: list[str], **_kw: Any) -> Any:
+        import subprocess  # noqa: PLC0415
+
+        calls.append(list(argv))
+        return subprocess.CompletedProcess(argv, code, b"", b"Python was not found")
+
+    monkeypatch.setattr(code_mod.subprocess, "run", run)
+    return calls
+
+
+def test_the_app_installer_placeholder_is_not_reported_as_a_python(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clean Windows: `which("python")` finds the 0-byte alias, which exits 9009 without running.
+
+    The row exists for exactly this machine; naming the placeholder there said Python was present
+    while every `execute_code` failed to start.
+    """
+    _alias(tmp_path, monkeypatch, real=None)
+    _answers(monkeypatch, 9009)
+
+    assert host_python() == (None, "missing")
+    assert host_python_report()["source"] == "missing"
+
+
+def test_a_placeholder_first_on_path_does_not_hide_a_real_python_after_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = tmp_path / "Python312" / "python.exe"
+    real.parent.mkdir()
+    real.write_bytes(b"x")
+    _alias(tmp_path, monkeypatch, real=real)
+    _answers(monkeypatch, 9009)
+
+    assert host_python() == (str(real), "path")
+
+
+def test_an_alias_that_runs_python_is_kept(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Store's Python and the Python install manager live behind the same kind of alias."""
+    alias = _alias(tmp_path, monkeypatch, real=None)
+    _answers(monkeypatch, 0)
+
+    assert host_python() == (str(alias), "path")
+
+
+def test_the_alias_is_tried_once_not_on_every_doctor_tick(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alias = _alias(tmp_path, monkeypatch, real=None)
+    calls = _answers(monkeypatch, 9009)
+
+    for _ in range(3):
+        host_python_report()
+
+    assert calls == [[str(alias), "-c", "import sys"]]
