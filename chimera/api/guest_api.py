@@ -186,6 +186,11 @@ def build_guest_app(
     the page for a loopback client — and its ``assets/`` beside it.
     """
     guest = FastAPI(title="Chimera — shared conversation", docs_url=None, redoc_url=None)
+    # Tokenless on loopback by default, like the owner's API: marked so the agent's browser refuses
+    # it behind a declared port that relays to it (`chimera.core.listeners.INSTANCE_HEADER`).
+    from chimera.core.listeners import MarkResponses
+
+    guest.add_middleware(MarkResponses)
     _mount_guest_page(guest, static_dir)
 
     def share_of(request: Request) -> Share:

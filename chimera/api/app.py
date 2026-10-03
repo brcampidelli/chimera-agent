@@ -641,6 +641,12 @@ def build_api_app(
             allow_methods=["*"],
             allow_headers=["*"],
         )
+    # Added last, so it is the outermost of these and marks the CORS preflight too. Every response
+    # says it came from Chimera, which is how the agent's browser recognises this API behind a
+    # declared dev-server port that proxies to it (`chimera.core.listeners.INSTANCE_HEADER`).
+    from chimera.core.listeners import MarkResponses
+
+    app.add_middleware(MarkResponses)
 
     @app.get("/api/health", response_model=HealthOut)
     def health() -> dict[str, Any]:

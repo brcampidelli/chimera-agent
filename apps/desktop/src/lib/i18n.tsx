@@ -533,7 +533,7 @@ const en: Dict = {
   "settings.row.browserLocalPorts":
     "Local ports the browser may open",
   "settings.hint.browserLocalPorts":
-    "Opens localhost on these ports only, so the agent can look at the app it is changing. Never Chimera's own ports, a private network or cloud metadata. Empty: no local address at all.",
+    "Opens localhost on these ports only, so the agent can look at the app it is changing. Never Chimera's own ports or a server that relays to them (like the desktop's own dev server), a private network or cloud metadata. Empty: no local address at all.",
   "settings.pinned":
     "Fixed in this server's environment. Saving here writes .env, which that environment overrides the next time the server starts.",
   "settings.row.fallbackModels": "Fallback models",
@@ -2328,7 +2328,7 @@ const pt: Dict = {
   "settings.row.browserLocalPorts":
     "Portas locais que o navegador pode abrir",
   "settings.hint.browserLocalPorts":
-    "Abre o localhost só nestas portas, para o agente ver o app que está alterando. Nunca as portas do próprio Chimera, rede privada ou metadados de nuvem. Vazio: nenhum endereço local.",
+    "Abre o localhost só nestas portas, para o agente ver o app que está alterando. Nunca as portas do próprio Chimera ou um servidor que repassa para elas (como o dev server do próprio desktop), rede privada ou metadados de nuvem. Vazio: nenhum endereço local.",
   "settings.pinned":
     "Fixado no ambiente deste servidor. Salvar aqui grava no .env, que esse ambiente sobrescreve na próxima vez que o servidor subir.",
   "settings.row.fallbackModels": "Modelos de fallback",
@@ -4172,7 +4172,7 @@ const es: Dict = {
   "settings.row.browserLocalPorts":
     "Puertos locales que el navegador puede abrir",
   "settings.hint.browserLocalPorts":
-    "Abre localhost solo en estos puertos, para que el agente vea la app que está cambiando. Nunca los puertos del propio Chimera, una red privada ni los metadatos de la nube. Vacío: ninguna dirección local.",
+    "Abre localhost solo en estos puertos, para que el agente vea la app que está cambiando. Nunca los puertos del propio Chimera ni un servidor que reenvía a ellos (como el servidor de desarrollo del propio escritorio), una red privada ni los metadatos de la nube. Vacío: ninguna dirección local.",
   "settings.pinned":
     "Fijado en el entorno de este servidor. Guardar aquí escribe en .env, que ese entorno sobrescribe la próxima vez que el servidor arranque.",
   "settings.row.fallbackModels": "Modelos de respaldo",
@@ -5993,7 +5993,7 @@ const fr: Dict = {
   "settings.row.browserLocalPorts":
     "Ports locaux que le navigateur peut ouvrir",
   "settings.hint.browserLocalPorts":
-    "Ouvre localhost sur ces ports seulement, pour que l'agent voie l'application qu'il modifie. Jamais les ports de Chimera lui-même, un réseau privé ni les métadonnées du cloud. Vide : aucune adresse locale.",
+    "Ouvre localhost sur ces ports seulement, pour que l'agent voie l'application qu'il modifie. Jamais les ports de Chimera lui-même ni un serveur qui les relaie (comme le serveur de développement du bureau lui-même), un réseau privé ni les métadonnées du cloud. Vide : aucune adresse locale.",
   "settings.pinned":
     "Fixé dans l'environnement de ce serveur. Enregistrer ici écrit dans .env, que cet environnement écrase au prochain démarrage du serveur.",
   "settings.row.fallbackModels": "Modèles de repli",
@@ -7823,7 +7823,7 @@ const de: Dict = {
   "settings.row.browserLocalPorts":
     "Lokale Ports, die der Browser öffnen darf",
   "settings.hint.browserLocalPorts":
-    "Öffnet localhost nur auf diesen Ports, damit der Agent die App sieht, die er ändert. Nie die eigenen Ports von Chimera, ein privates Netz oder Cloud-Metadaten. Leer: keine lokale Adresse.",
+    "Öffnet localhost nur auf diesen Ports, damit der Agent die App sieht, die er ändert. Nie die eigenen Ports von Chimera oder ein Server, der an sie weiterleitet (wie der Dev-Server der Desktop-App selbst), ein privates Netz oder Cloud-Metadaten. Leer: keine lokale Adresse.",
   "settings.pinned":
     "Im Environment dieses Servers festgelegt. Speichern schreibt in die .env, die dieses Environment beim nächsten Start wieder überschreibt.",
   "settings.row.fallbackModels": "Ausweichmodelle",
@@ -9620,7 +9620,7 @@ const zh: Dict = {
   "settings.row.browserLocalPorts":
     "浏览器可以打开的本地端口",
   "settings.hint.browserLocalPorts":
-    "仅在这些端口上打开 localhost，让智能体查看它正在修改的应用。绝不包括 Chimera 自身的端口、私有网络或云元数据。留空：不打开任何本地地址。",
+    "仅在这些端口上打开 localhost，让智能体查看它正在修改的应用。绝不包括 Chimera 自身的端口或转发到这些端口的服务器（例如桌面应用自己的开发服务器）、私有网络或云元数据。留空：不打开任何本地地址。",
   "settings.pinned":
     "由这台服务器的环境变量固定。在这里保存只会写入 .env，服务器下次启动时又会被环境变量盖掉。",
   "settings.row.fallbackModels": "备用模型",
@@ -11385,7 +11385,7 @@ const ja: Dict = {
   "settings.row.browserLocalPorts":
     "ブラウザーが開けるローカルポート",
   "settings.hint.browserLocalPorts":
-    "これらのポートでのみ localhost を開き、エージェントが変更中のアプリを確認できるようにします。Chimera 自身のポート、プライベートネットワーク、クラウドのメタデータは決して開きません。空欄：ローカルアドレスは一切開きません。",
+    "これらのポートでのみ localhost を開き、エージェントが変更中のアプリを確認できるようにします。Chimera 自身のポートやそこへ中継するサーバー（デスクトップ自身の開発サーバーなど）、プライベートネットワーク、クラウドのメタデータは決して開きません。空欄：ローカルアドレスは一切開きません。",
   "settings.pinned":
     "このサーバーの環境変数で固定されています。ここで保存しても .env に書くだけで、次の起動時に環境変数が上書きします。",
   "settings.row.fallbackModels": "フォールバック",
@@ -13161,7 +13161,7 @@ const it: Dict = {
   "settings.row.browserLocalPorts":
     "Porte locali che il browser può aprire",
   "settings.hint.browserLocalPorts":
-    "Apre localhost solo su queste porte, perché l'agente veda l'app che sta modificando. Mai le porte di Chimera stesso, una rete privata o i metadati del cloud. Vuoto: nessun indirizzo locale.",
+    "Apre localhost solo su queste porte, perché l'agente veda l'app che sta modificando. Mai le porte di Chimera stesso o un server che vi inoltra (come il server di sviluppo del desktop stesso), una rete privata o i metadati del cloud. Vuoto: nessun indirizzo locale.",
   "settings.pinned":
     "Fissato nell'ambiente di questo server. Salvare qui scrive nel .env, che quell'ambiente sovrascrive al prossimo avvio.",
   "settings.row.fallbackModels": "Modelli di riserva",
@@ -14981,7 +14981,7 @@ const pl: Dict = {
   "settings.row.browserLocalPorts":
     "Porty lokalne, które przeglądarka może otwierać",
   "settings.hint.browserLocalPorts":
-    "Otwiera localhost tylko na tych portach, aby agent widział aplikację, którą zmienia. Nigdy porty samego Chimery, sieć prywatna ani metadane chmury. Puste: żaden adres lokalny.",
+    "Otwiera localhost tylko na tych portach, aby agent widział aplikację, którą zmienia. Nigdy porty samego Chimery ani serwer, który do nich przekazuje (jak serwer deweloperski samej aplikacji desktopowej), sieć prywatna ani metadane chmury. Puste: żaden adres lokalny.",
   "settings.pinned":
     "Ustalone w środowisku tego serwera. Zapis tutaj trafia do .env, które to środowisko nadpisze przy następnym starcie.",
   "settings.row.fallbackModels": "Modele zapasowe",
@@ -16797,7 +16797,7 @@ const ru: Dict = {
   "settings.row.browserLocalPorts":
     "Локальные порты, которые может открывать браузер",
   "settings.hint.browserLocalPorts":
-    "Открывает localhost только на этих портах, чтобы агент видел приложение, которое он меняет. Никогда — собственные порты Chimera, частную сеть или метаданные облака. Пусто: никаких локальных адресов.",
+    "Открывает localhost только на этих портах, чтобы агент видел приложение, которое он меняет. Никогда — собственные порты Chimera или сервер, который перенаправляет на них (как dev-сервер самого десктопа), частную сеть или метаданные облака. Пусто: никаких локальных адресов.",
   "settings.pinned":
     "Задано в окружении этого сервера. Сохранение здесь пишет в .env, а окружение перезапишет его при следующем запуске.",
   "settings.row.fallbackModels": "Запасные модели",

@@ -26,6 +26,13 @@ actions. So the exception is decided per request, against
   IPv4-mapped ``[::ffff:127.0.0.1]`` and the integer and octal spellings are all refused here and
   fall to the floor, which refuses them too. ``localhost`` itself must resolve only to loopback.
 
+- **who answers on the port**, not only its number. The desktop's own dev server (Vite on 5173,
+  ``npm --prefix apps/desktop run dev``) proxies ``/api`` to the app's API, so a declared 5173 would
+  reach ``/api/approvals`` through a port Chimera never held. Every Chimera listener marks its
+  responses (``chimera.core.listeners.INSTANCE_HEADER``) and a proxy relays the mark, so before a
+  request goes to a declared port the same URL is asked with an ``OPTIONS`` — which runs no route's
+  handler — and a port that answers with the mark, or does not answer, is refused for that request.
+
 **What this cannot close.** The floor resolves a public name once and Chromium resolves it again; a
 name that answers public to the first and loopback to the second (rebinding) is the gap the floor
 always had, on every port, sidecar included. Declaring a port does not widen it toward Chimera's own
@@ -34,9 +41,11 @@ ports, and the request the browser makes to a declared port is still that port.
 
 from __future__ import annotations
 
+import http.client
 import ipaddress
 import re
 import socket
+import ssl
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from urllib.parse import urlparse
@@ -124,6 +133,51 @@ def _port(url: str) -> int | None:
     return explicit or (443 if parsed.scheme == "https" else 80)
 
 
+#: What :func:`who_answers` found at a declared port.
+CHIMERA, SILENT, OTHER = "chimera", "silent", "other"
+
+#: Seconds the probe waits for a loopback server; a dev server that cannot answer an OPTIONS in this
+#: long is not one the page will get much from either.
+_PROBE_TIMEOUT = 2.0
+
+
+def who_answers(url: str) -> str:
+    """Ask ``url`` with an ``OPTIONS`` and read whether the answer is Chimera's own.
+
+    ``OPTIONS`` because it is the one method no route of Chimera's (or of a dev server worth
+    declaring) runs a handler for, so asking cannot do what the request it guards would do; and the
+    SAME path, because a proxy decides per path — Vite relays ``/api`` and serves ``/`` itself.
+    Nothing is cached: the answer belongs to this request. ``SILENT`` when nothing answered (a
+    refused connection, a timeout, a broken reply): refused like Chimera, because a port that cannot
+    be asked cannot be cleared. No proxy from the environment and no redirect is followed — the
+    question is about this port. A dev certificate is not verified: the answer is read for one
+    header, on loopback, and Chromium makes its own decision about the certificate."""
+    from chimera.core.listeners import INSTANCE_HEADER
+
+    parsed = urlparse(url)
+    host = parsed.hostname or ""
+    port = _port(url)
+    path = (parsed.path or "/") + (f"?{parsed.query}" if parsed.query else "")
+    conn: http.client.HTTPConnection
+    if parsed.scheme == "https":
+        context = ssl.create_default_context()
+        context.check_hostname = False
+        context.verify_mode = ssl.CERT_NONE
+        conn = http.client.HTTPSConnection(host, port, timeout=_PROBE_TIMEOUT, context=context)
+    else:
+        conn = http.client.HTTPConnection(host, port, timeout=_PROBE_TIMEOUT)
+    try:
+        conn.request("OPTIONS", path)
+        response = conn.getresponse()
+        marked = response.getheader(INSTANCE_HEADER) is not None
+        response.read(64 * 1024)
+    except (OSError, http.client.HTTPException):
+        return SILENT
+    finally:
+        conn.close()
+    return CHIMERA if marked else OTHER
+
+
 def _loopback_only(host: str) -> bool:
     """Every address ``host`` names is loopback. ``localhost`` is resolved, because a hosts file can
     point it anywhere; the two literals are what they say."""
@@ -149,6 +203,7 @@ class BrowserReach:
         home: Path | None = None,
         floor: Callable[[str], bool] = is_safe_url,
         owned: Callable[[], frozenset[int]] | None = None,
+        answers: Callable[[str], str] = who_answers,
     ) -> None:
         self.sites = tuple(sites)
         self.local_ports = frozenset(local_ports)
@@ -156,6 +211,9 @@ class BrowserReach:
         # The SSRF floor, injectable so a test can let a local server play the public web.
         self._floor = floor
         self._owned = owned or (lambda: chimera_ports(self.home))
+        # Who answers on a declared port (`who_answers`), injectable so a predicate test needs no
+        # server; the real-browser tests use the real probe against real servers.
+        self._answers = answers
         self._public: dict[str, bool] = {}
         self.approved: set[str] = set()
 
@@ -171,9 +229,10 @@ class BrowserReach:
 
     # --- the request predicate ---------------------------------------------------------------
 
-    def local_target(self, url: str) -> bool:
+    def declared_local(self, url: str) -> bool:
         """A declared loopback port, spelled one of the three accepted ways, that no Chimera server
-        holds — decided on every call, because the sidecar and the guest listener bind late."""
+        holds — decided on every call, because the sidecar and the guest listener bind late. Says
+        nothing about who answers there; :meth:`local_target` asks that too."""
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https") or not self.local_ports:
             return False
@@ -184,6 +243,11 @@ class BrowserReach:
         if port is None or port not in self.local_ports or port in self._owned():
             return False
         return _loopback_only(host)
+
+    def local_target(self, url: str) -> bool:
+        """A declared local port (:meth:`declared_local`) where something that is not Chimera
+        answers this very URL — the only loopback request the browser may send."""
+        return self.declared_local(url) and self._answers(url) == OTHER
 
     def permits(self, url: str) -> bool:
         """Every request the browser makes — navigations, redirect hops, subresources, popups."""
@@ -200,8 +264,20 @@ class BrowserReach:
     def check(self, url: str) -> None:
         """Raise ValueError when ``url`` may not be opened at all — the floor's own message, plus why
         a loopback address that looks declared is not."""
-        if self.local_target(url):
-            return
+        if self.declared_local(url):
+            answer = self._answers(url)
+            if answer == OTHER:
+                return
+            port = _port(url)
+            if answer == CHIMERA:
+                raise ValueError(
+                    f"blocked: {url} is answered by Chimera itself (port {port} relays to it, as "
+                    "the desktop's own dev server does for /api); it is never opened"
+                )
+            raise ValueError(
+                f"blocked: nothing answered at the declared local port {port} — start the dev "
+                "server first"
+            )
         host, port = _host(url), _port(url)
         if self.local_ports and host in _LOCAL_NAMES and port is not None:
             if port in self._owned():
@@ -223,7 +299,7 @@ class BrowserReach:
         parsed = urlparse(url)
         if not self.sites or parsed.scheme not in ("http", "https"):
             return True
-        if self.local_target(url):
+        if self.declared_local(url):
             return True  # the owner declared it, which is a statement about where the agent may go
         host = _host(url)
         if host in self.approved:

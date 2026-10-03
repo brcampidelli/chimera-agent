@@ -32,6 +32,7 @@ from chimera.tools.browser import BrowserTool, Element
 from chimera.tools.browser_playwright import PlaywrightDriver, RequestGuard
 from chimera.tools.browser_reach import (
     DEFAULT_SERVER_PORT,
+    OTHER,
     BrowserReach,
     chimera_ports,
     parse_ports,
@@ -41,8 +42,14 @@ DECLARED = 3000
 SIDECAR = 51234  # stands for the desktop's port: dynamic, known only to this process
 
 
+def _other(url: str) -> str:
+    """Something that is not Chimera answers every declared port (no server runs in these
+    predicate tests; who answers is `test_a_declared_port_that_relays_to_chimera_is_refused`'s)."""
+    return OTHER
+
+
 def _reach(*ports: int, owned: frozenset[int] = frozenset({SIDECAR})) -> BrowserReach:
-    return BrowserReach(local_ports=ports or (DECLARED,), owned=lambda: owned)
+    return BrowserReach(local_ports=ports or (DECLARED,), owned=lambda: owned, answers=_other)
 
 
 # --- the predicate ------------------------------------------------------------------------------
@@ -212,6 +219,7 @@ def test_a_redirect_from_an_allowed_site_to_loopback_is_refused_hop_by_hop() -> 
         local_ports={DECLARED},
         owned=lambda: frozenset({SIDECAR}),
         floor=lambda url: urlparse(url).hostname == "example.com",
+        answers=_other,
     )
     guard = RequestGuard(reach.permits, cache=False)
     sent: list[tuple[str, dict[str, Any]]] = []
@@ -242,7 +250,7 @@ def test_the_reach_decides_a_loopback_port_again_on_every_request() -> None:
     """The guest listener can open after the browser started. A decision cached at the first request
     would keep a port open that Chimera has since taken."""
     owned: set[int] = set()
-    reach = BrowserReach(local_ports={DECLARED}, owned=lambda: frozenset(owned))
+    reach = BrowserReach(local_ports={DECLARED}, owned=lambda: frozenset(owned), answers=_other)
     guard = RequestGuard(reach.permits, cache=False)
     assert guard.permits("http://localhost:3000/a")
     owned.add(DECLARED)

@@ -164,7 +164,16 @@ def make_server(
     ``Authorization: Bearer <token>`` header. /whatsapp is authenticated by HMAC (app secret) instead.
     """
 
+    from chimera.core.listeners import INSTANCE_HEADER
+
     class Handler(BaseHTTPRequestHandler):
+        def end_headers(self) -> None:
+            # Every response, the stdlib's own `send_error` (a 501 for the browser's OPTIONS probe)
+            # included: how the agent's browser recognises this gateway behind a declared port that
+            # relays to it (`chimera.core.listeners.INSTANCE_HEADER`).
+            self.send_header(INSTANCE_HEADER, "1")
+            super().end_headers()
+
         def _send(self, status: int, payload: dict[str, Any] | str) -> None:
             if isinstance(payload, str):
                 data, content_type = payload.encode("utf-8"), "text/plain"

@@ -1532,7 +1532,7 @@ export function Settings({
                   >
                     <TextField
                       value={(c.browser?.local_ports ?? []).join(", ")}
-                      placeholder="3000, 5173"
+                      placeholder="3000, 8080"
                       onSave={(v) => save({ CHIMERA_BROWSER_LOCAL_PORTS: v })}
                     />
                   </Row>
