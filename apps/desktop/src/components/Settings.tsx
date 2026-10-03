@@ -927,12 +927,38 @@ export function MessagingCard({
   );
 }
 
-type SettingsTab = "general" | "connections" | "usage" | "security" | "decisions";
+export type SettingsTab = "general" | "connections" | "usage" | "security" | "decisions";
 
-export function Settings() {
+const SETTINGS_TABS: readonly SettingsTab[] = [
+  "general",
+  "connections",
+  "usage",
+  "security",
+  "decisions",
+];
+
+/** A `?tab=` value from the URL, or General for anything that is not a tab — a stale link lands on
+ *  the screen rather than on nothing. */
+export function settingsTab(value: string | null | undefined): SettingsTab {
+  return SETTINGS_TABS.find((tab) => tab === value) ?? "general";
+}
+
+/**
+ * The tab can be owned by the caller. It lived only in `useState`, so nothing outside this screen
+ * could point at a tab: the status bar's cost chip said it opened Usage and called
+ * `navigate("settings")`, which always landed on General. `App` now keeps the tab in the route
+ * (`#/settings?tab=usage`) and passes it down; rendered without `onTabChange` — the tests, an
+ * embedded copy — the screen keeps its own state exactly as before.
+ */
+export function Settings({
+  tab: routeTab,
+  onTabChange,
+}: { tab?: SettingsTab; onTabChange?: (tab: SettingsTab) => void } = {}) {
   const t = useT();
   const tabsId = useId();
-  const [tab, setTab] = useState<SettingsTab>("general");
+  const [ownTab, setOwnTab] = useState<SettingsTab>("general");
+  const tab = onTabChange ? (routeTab ?? "general") : ownTab;
+  const setTab = onTabChange ?? setOwnTab;
   const qc = useQueryClient();
   const config = useQuery({ queryKey: ["config"], queryFn: getConfig });
   const doctor = useQuery({ queryKey: ["doctor"], queryFn: getDoctor });

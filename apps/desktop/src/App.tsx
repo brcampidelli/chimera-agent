@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { IconRail, type View } from "@/components/IconRail";
 import { useRoute } from "@/lib/router";
-import { Settings } from "@/components/Settings";
+import { Settings, settingsTab } from "@/components/Settings";
 import { Knowledge } from "@/components/Knowledge";
 import { Automation } from "@/components/Automation";
 import { Code } from "@/components/Code";
@@ -333,8 +333,9 @@ export default function App() {
         ignite={ignite}
         viewKey={view}
         viewLabel={t(`nav.${view}`)}
-        // Usage lives in Settings now; the cost chip still takes you straight there.
-        onOpenUsage={() => navigate("settings")}
+        // Usage lives in Settings now; the cost chip still takes you straight there — to the Usage
+        // TAB, which needs the tab in the route: a bare `navigate("settings")` opened General.
+        onOpenUsage={() => navigate("settings", { tab: "usage" })}
         rail={
           <IconRail
             view={view}
@@ -377,7 +378,14 @@ export default function App() {
         )}
         {/* Dev-only, matching the rail: in a shipped build this screen has no data. */}
         {view === "maturity" && import.meta.env.DEV && <Maturity />}
-        {view === "settings" && <Settings />}
+        {view === "settings" && (
+          <Settings
+            tab={settingsTab(route.params.get("tab"))}
+            // Replaces rather than pushes (see `setParams`): clicking through tabs should not fill
+            // the back button. General is the bare `#/settings`, so the common URL stays readable.
+            onTabChange={(next) => setParams(next === "general" ? {} : { tab: next })}
+          />
+        )}
       </AppShell>
       </Framed>
       </FloatHost>
