@@ -757,6 +757,32 @@ class KeepAwakeOut(BaseModel):
     on_battery_allowed: bool = False
 
 
+class PromptRouteOut(BaseModel):
+    """One provider a configured model role would send a prompt to (``prompt_routes``)."""
+
+    provider: str
+    local: bool = False
+    """A keyless runtime on this machine or the owner's (``ollama_chat/``, ``lm_studio/``…)."""
+    roles: list[str] = Field(default_factory=list)
+    """``default``, ``weak``, ``fusion_judge``, ``embeddings``, ``decisions``… — why it is listed."""
+
+
+class PrivacyCfgOut(BaseModel):
+    """The Security screen's privacy card (``chimera/providers/privacy.py``). Read-only facts plus
+    the two OpenRouter switches; a server without the block is on the shipped defaults, which send
+    nothing."""
+
+    openrouter_data_collection: str = "allow"
+    """``allow`` (the default: nothing sent) or ``deny`` (only routes that keep no prompts)."""
+    openrouter_zdr: bool = False
+    routes: list[PromptRouteOut] = Field(default_factory=list)
+    telemetry: bool = False
+    """Whether the OpenTelemetry exporter is on (``CHIMERA_OTEL`` or ``OTEL_EXPORTER_OTLP_ENDPOINT``)."""
+    unscoped: list[str] = Field(default_factory=list)
+    """Surfaces that reach OpenRouter WITHOUT the preference above (``decisions``), so the card can
+    say so instead of letting ``deny`` read as covering every call."""
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -774,6 +800,7 @@ class ConfigOut(BaseModel):
     mcp: McpCfgOut
     automation: AutomationCfgOut
     messaging: MessagingCfgOut = Field(default_factory=MessagingCfgOut)
+    privacy: PrivacyCfgOut = Field(default_factory=PrivacyCfgOut)
     guard: GuardCfgOut
     providers: list[ProviderOut]
     pools: list[PoolOut] = Field(default_factory=list)

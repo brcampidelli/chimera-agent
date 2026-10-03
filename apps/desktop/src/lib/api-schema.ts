@@ -4605,6 +4605,7 @@ export interface components {
             pinned?: string[];
             /** Pools */
             pools?: components["schemas"]["PoolOut"][];
+            privacy?: components["schemas"]["PrivacyCfgOut"];
             /** Providers */
             providers: components["schemas"]["ProviderOut"][];
             sandbox: components["schemas"]["SandboxCfgOut"];
@@ -7244,6 +7245,33 @@ export interface components {
             names: string[];
         };
         /**
+         * PrivacyCfgOut
+         * @description The Security screen's privacy card (``chimera/providers/privacy.py``). Read-only facts plus
+         *     the two OpenRouter switches; a server without the block is on the shipped defaults, which send
+         *     nothing.
+         */
+        PrivacyCfgOut: {
+            /**
+             * Openrouter Data Collection
+             * @default allow
+             */
+            openrouter_data_collection: string;
+            /**
+             * Openrouter Zdr
+             * @default false
+             */
+            openrouter_zdr: boolean;
+            /** Routes */
+            routes?: components["schemas"]["PromptRouteOut"][];
+            /**
+             * Telemetry
+             * @default false
+             */
+            telemetry: boolean;
+            /** Unscoped */
+            unscoped?: string[];
+        };
+        /**
          * ProfileWorth
          * @description One configuration's record, over the runs that actually happened here.
          */
@@ -7321,6 +7349,21 @@ export interface components {
             plan_approved: boolean;
             /** Status */
             status: string;
+        };
+        /**
+         * PromptRouteOut
+         * @description One provider a configured model role would send a prompt to (``prompt_routes``).
+         */
+        PromptRouteOut: {
+            /**
+             * Local
+             * @default false
+             */
+            local: boolean;
+            /** Provider */
+            provider: string;
+            /** Roles */
+            roles?: string[];
         };
         /**
          * ProviderOut

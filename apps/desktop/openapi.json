@@ -2653,6 +2653,9 @@
             "title": "Pools",
             "type": "array"
           },
+          "privacy": {
+            "$ref": "#/components/schemas/PrivacyCfgOut"
+          },
           "providers": {
             "items": {
               "$ref": "#/components/schemas/ProviderOut"
@@ -8298,6 +8301,42 @@
         "title": "PresenceOut",
         "type": "object"
       },
+      "PrivacyCfgOut": {
+        "description": "The Security screen's privacy card (``chimera/providers/privacy.py``). Read-only facts plus\nthe two OpenRouter switches; a server without the block is on the shipped defaults, which send\nnothing.",
+        "properties": {
+          "openrouter_data_collection": {
+            "default": "allow",
+            "title": "Openrouter Data Collection",
+            "type": "string"
+          },
+          "openrouter_zdr": {
+            "default": false,
+            "title": "Openrouter Zdr",
+            "type": "boolean"
+          },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/PromptRouteOut"
+            },
+            "title": "Routes",
+            "type": "array"
+          },
+          "telemetry": {
+            "default": false,
+            "title": "Telemetry",
+            "type": "boolean"
+          },
+          "unscoped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unscoped",
+            "type": "array"
+          }
+        },
+        "title": "PrivacyCfgOut",
+        "type": "object"
+      },
       "ProfileWorth": {
         "description": "One configuration's record, over the runs that actually happened here.",
         "properties": {
@@ -8477,6 +8516,32 @@
           "max_iterations"
         ],
         "title": "ProjectStateOut",
+        "type": "object"
+      },
+      "PromptRouteOut": {
+        "description": "One provider a configured model role would send a prompt to (``prompt_routes``).",
+        "properties": {
+          "local": {
+            "default": false,
+            "title": "Local",
+            "type": "boolean"
+          },
+          "provider": {
+            "title": "Provider",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "title": "PromptRouteOut",
         "type": "object"
       },
       "ProviderOut": {

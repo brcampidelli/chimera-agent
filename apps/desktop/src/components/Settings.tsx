@@ -1314,6 +1314,36 @@ export function Settings({
                       onChange={(v) => save({ CHIMERA_CASCADE: String(v) })}
                     />
                   </Row>
+                  {/* What an OpenRouter route may keep. Both rows narrow which upstream providers may
+                      answer, so both ship off and the hint says what turning them on costs; the
+                      Security screen's privacy card reads the same two values back. A server that
+                      predates the block reports nothing, which is the shipped default. */}
+                  <Row
+                    label={t("settings.row.orDataCollection")}
+                    hint={t("settings.hint.orDataCollection")}
+                    env="CHIMERA_OPENROUTER_DATA_COLLECTION"
+                  >
+                    <Select
+                      value={c.privacy?.openrouter_data_collection === "deny" ? "deny" : "allow"}
+                      options={["allow", "deny"]}
+                      render={(v) =>
+                        v === "deny"
+                          ? t("settings.orDataCollection.deny")
+                          : t("settings.orDataCollection.allow")
+                      }
+                      onChange={(v) => save({ CHIMERA_OPENROUTER_DATA_COLLECTION: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.orZdr")}
+                    hint={t("settings.hint.orZdr")}
+                    env="CHIMERA_OPENROUTER_ZDR"
+                  >
+                    <Toggle
+                      on={c.privacy?.openrouter_zdr ?? false}
+                      onChange={(v) => save({ CHIMERA_OPENROUTER_ZDR: String(v) })}
+                    />
+                  </Row>
                 </Card>
 
                 <Card title={t("settings.card.apiKeys")}>

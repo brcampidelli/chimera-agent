@@ -40,6 +40,10 @@ CLAIMS: dict[str, tuple[str, ...]] = {
     "code.posture.unguarded": ("CHIMERA_GUARD_CHAT",),
     "mcp.autoloadOff": ("CHIMERA_MCP_AUTOLOAD",),
     "mcp.note": ("CHIMERA_GUARD_CHAT",),
+    "governance.privacy.retentionAllow": (
+        "CHIMERA_OPENROUTER_DATA_COLLECTION",
+        "CHIMERA_OPENROUTER_ZDR",
+    ),
 }
 
 _SETTINGS_CLAIM = re.compile(r"\bin Settings\b")
