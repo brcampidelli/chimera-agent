@@ -50,6 +50,13 @@ _log = get_logger("api.sharing")
 
 SHARES_FILE = "code_shares.json"
 
+#: The key a link WITH an expiry keeps its token under on disk, instead of ``token``. A version of
+#: this app from before expiry existed reads ``token`` and drops every other key, so it would load
+#: an expired link as one that never expires and open its conversation again after a downgrade.
+#: Under this key that version does not see the link at all: a downgrade loses the links that had
+#: an expiry, which is the safe way round. Links with no expiry keep ``token``, readable by both.
+EXPIRING_TOKEN = "expiring_token"
+
 #: Frames a session keeps for replay. A turn is a few hundred frames; twenty turns of history is
 #: what a viewer who reconnects after a nap needs, and a viewer who has been away longer gets the
 #: stored conversation instead.
@@ -133,23 +140,15 @@ class ShareStore:
         except (OSError, ValueError) as exc:
             _log.warning("share store unreadable, starting empty: %s", exc)
             raw = []
-        self._shares = [
-            Share(
-                token=str(item.get("token") or ""),
-                session_id=str(item.get("session_id") or ""),
-                created_at=float(item.get("created_at") or 0.0),
-                label=str(item.get("label") or ""),
-                expires_at=_expiry(item.get("expires_at")),
-            )
-            for item in (raw if isinstance(raw, list) else [])
-            if isinstance(item, dict) and item.get("token") and item.get("session_id")
-        ]
+        rows = raw if isinstance(raw, list) else []
+        loaded = (_loaded(item) for item in rows if isinstance(item, dict))
+        self._shares = [share for share in loaded if share is not None]
 
     def _write(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_text(
             self.path,
-            json.dumps([share.__dict__ for share in self._shares], indent=2),
+            json.dumps([_stored(share) for share in self._shares], indent=2),
         )
 
     def mint(
@@ -245,6 +244,39 @@ def _same(stored: str, given: str) -> bool:
     either."""
     return hmac.compare_digest(
         stored.encode("utf-8", "surrogatepass"), given.encode("utf-8", "surrogatepass")
+    )
+
+
+def _stored(share: Share) -> dict[str, Any]:
+    """One link as the file keeps it: under ``token`` when it never expires, under
+    :data:`EXPIRING_TOKEN` when it does."""
+    row: dict[str, Any] = {
+        "session_id": share.session_id,
+        "created_at": share.created_at,
+        "label": share.label,
+        "expires_at": share.expires_at,
+    }
+    row["token" if share.expires_at is None else EXPIRING_TOKEN] = share.token
+    return row
+
+
+def _loaded(item: dict[str, Any]) -> Share | None:
+    """One stored link, or None for a row that names no token or no conversation."""
+    expiring = item.get(EXPIRING_TOKEN)
+    token = str(expiring or item.get("token") or "")
+    session_id = str(item.get("session_id") or "")
+    if not token or not session_id:
+        return None
+    expires_at = _expiry(item.get("expires_at"))
+    if expiring and expires_at is None:
+        # Filed as a link that expires, with no time anyone can read: expired, not "never".
+        expires_at = 0.0
+    return Share(
+        token=token,
+        session_id=session_id,
+        created_at=float(item.get("created_at") or 0.0),
+        label=str(item.get("label") or ""),
+        expires_at=expires_at,
     )
 
 
