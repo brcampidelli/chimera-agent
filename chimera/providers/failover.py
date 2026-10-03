@@ -371,14 +371,32 @@ class PolicyBlock:
     secret, and what a support desk asks for."""
 
     def sentence(self) -> str:
-        """One sentence a chat surface can send as it is: what refused, and that nothing retried."""
+        """The app's sentence: what refused, that nothing retried, and that the choice is theirs.
+
+        For a surface that offers the choice (the desktop's card has the model list). A chat bot
+        does not — see :meth:`chat_sentence`.
+        """
+        return self._said("Nothing was retried on another model: that is a choice for you to make.")
+
+    def chat_sentence(self) -> str:
+        """The same for a chat platform, which has no model picker to offer.
+
+        The app's sentence ends "that is a choice for you to make", which on Discord or WhatsApp
+        invites an action nothing there lets the person take — and the person writing may not be
+        the owner, whose decision it is. This one says where the decision is made instead.
+        English like every other line the gateway adds under an answer: the bots have no language
+        setting to localise by.
+        """
+        return self._said(
+            "Nothing was retried on another model; switching models is the owner's decision,"
+            " made in the Chimera app."
+        )
+
+    def _said(self, after: str) -> str:
         where = self.model or "this model"
         route = f" (served by {self.provider})" if self.provider else ""
         ident = f" Request id: {self.request_id}." if self.request_id else ""
-        return (
-            f"Blocked by the provider's content policy on {where}{route}. Nothing was retried on"
-            f" another model: that is a choice for you to make.{ident}"
-        )
+        return f"Blocked by the provider's content policy on {where}{route}. {after}{ident}"
 
 
 def policy_block(exc: BaseException) -> PolicyBlock | None:

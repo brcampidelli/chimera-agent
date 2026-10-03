@@ -217,7 +217,7 @@ class MessageGateway:
             if block is None:
                 raise
             _log.warning("content-policy refusal on %s: %s", message.key, exc)
-            return block.sentence()
+            return block.chat_sentence()
 
     def _route(self, message: InboundMessage) -> str:
         if self._intercept is not None:

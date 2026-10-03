@@ -356,7 +356,23 @@ def test_a_chat_bot_answers_a_refusal_with_one_sentence() -> None:
     reply = _gateway(exc, chat=True).on_message(InboundMessage(text="x", platform="discord"))
 
     # The Discord adapter sends whatever comes back; before, nothing came back and nothing was sent.
-    assert reply == PolicyBlock("openrouter/openai/gpt-4o", "OpenAI", None).sentence()
+    # The chat form: the app's sentence invited a model choice the bot cannot offer.
+    assert reply == PolicyBlock("openrouter/openai/gpt-4o", "OpenAI", None).chat_sentence()
+
+
+def test_the_chat_sentence_does_not_invite_a_choice_the_chat_cannot_offer() -> None:
+    block = PolicyBlock("openrouter/openai/gpt-4o", "OpenAI", "req_9f2c41")
+
+    chat = block.chat_sentence()
+
+    # A chat has no model list, and the person writing may not be the owner whose call it is.
+    assert "a choice for you to make" not in chat
+    assert "owner" in chat and "app" in chat
+    # Everything that identifies the refusal is still said.
+    assert "openrouter/openai/gpt-4o" in chat and "OpenAI" in chat and "req_9f2c41" in chat
+    assert "Nothing was retried" in chat
+    # The app keeps its own sentence: there the card does offer the choice.
+    assert "a choice for you to make" in block.sentence()
 
 
 def test_the_http_route_and_other_failures_keep_their_exception() -> None:
