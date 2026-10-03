@@ -521,6 +521,10 @@ class SandboxCfgOut(BaseModel):
     network: Literal["none", "bridge"] = "none"
     """The docker sandbox's network as the factory reads it. Means something only when the sandbox
     that answers is a container — see ``SandboxStateOut.network`` for what a command can reach."""
+    verify_network: bool = False
+    """``CHIMERA_VERIFY_NETWORK``: the verifier's own exception to ``network``. On, a docker sandbox
+    is rebuilt for the verify command with the network open, and under a kernel sandbox a verify
+    command the user typed runs on the host (``chimera.core.verify``)."""
 
 
 class FusionKinshipOut(BaseModel):

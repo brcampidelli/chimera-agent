@@ -52,7 +52,7 @@ const CONFIG = {
   memory: { backend: "json", semantic: false, auto_consolidate: false, remember_from_chat: false },
   cache: { completion: false, prompt: false },
   autonomy: { reach: "read_only", approval: "", host_exec: "ask", denied_tools: [] },
-  sandbox: { mode: "auto", image: "python:3.12-slim", network: "none" },
+  sandbox: { mode: "auto", image: "python:3.12-slim", network: "none", verify_network: false },
   browser: { headless: true },
   server: { token_set: false },
   mcp: { autoload: false },
@@ -74,9 +74,32 @@ const HOST = {
   network: "host",
 };
 
-function sandbox(mode: string, network = "none") {
-  return { ...CONFIG, sandbox: { mode, image: "python:3.12-slim", network } };
+function sandbox(mode: string, network = "none", verifyNetwork = false) {
+  return {
+    ...CONFIG,
+    sandbox: { mode, image: "python:3.12-slim", network, verify_network: verifyNetwork },
+  };
 }
+
+const CONTAINER = {
+  ...HOST,
+  configured: "docker",
+  backend: "docker",
+  isolated: true,
+  reason: "",
+  reason_code: "",
+  network: "none",
+};
+
+const KERNEL = {
+  configured: "auto",
+  backend: "bubblewrap",
+  isolated: true,
+  reason: "",
+  reason_code: "",
+  platform: "Linux",
+  network: "none",
+};
 
 function doctor(codePython: Record<string, unknown> | undefined) {
   return {
@@ -202,7 +225,9 @@ describe("Settings — the network a command can reach", () => {
 
     const select = await within(region).findByRole("combobox", { name: "Command network" });
     expect(select).toHaveValue("none");
-    expect(within(region).getByText(/The container has no network/)).toBeInTheDocument();
+    expect(
+      within(region).getByText(/Shell commands and execute_code in the container have no network/),
+    ).toBeInTheDocument();
     // When it applies is said on the row, and both moments are said: a `!` command, a workflow and
     // the verifier take a save at once; only an open chat keeps the network it started with. "Next
     // conversation" alone described the side that widens access as later than it is.
@@ -278,7 +303,7 @@ describe("Settings — the network a command can reach", () => {
     renderWithProviders(<Settings />);
     const region = await card();
 
-    expect(await within(region).findByText("python3 in the container")).toBeInTheDocument();
+    expect(await within(region).findByText("the image's Python")).toBeInTheDocument();
     expect(within(region).queryByText(INTERPRETER.path)).not.toBeInTheDocument();
   });
   it("never keeps the sandbox probe cached, so the Security screen cannot be served a stale one", async () => {
@@ -307,5 +332,99 @@ describe("Settings — the network a command can reach", () => {
     renderWithProviders(app);
     await card();
     await waitFor(() => expect(getSandboxState).toHaveBeenCalledTimes(2));
+  });
+  // --- each sentence claims only what the code does ---------------------------------------------
+
+  it("says the verifier is the exception to a closed container network, when it is on", async () => {
+    vi.mocked(getConfig).mockResolvedValue(sandbox("docker", "none", true) as never);
+    vi.mocked(getSandboxState).mockResolvedValue(CONTAINER as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    const hint = await within(region).findByText(/have no network/);
+    // core/verify.py rebuilds the container with network=True for the verify command.
+    expect(hint).toHaveTextContent(/Exception: CHIMERA_VERIFY_NETWORK is on/);
+    expect(hint).toHaveTextContent(/container with the network open/);
+  });
+
+  it("says a typed verify command leaves a blocking kernel sandbox for this machine, when it is on", async () => {
+    vi.mocked(getConfig).mockResolvedValue(sandbox("auto", "none", true) as never);
+    vi.mocked(getSandboxState).mockResolvedValue(KERNEL as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    expect(await within(region).findByText("blocked")).toBeInTheDocument();
+    expect(within(region).getByText(/gives shell commands and execute_code no network/)).toHaveTextContent(
+      /a verify command you typed runs on this machine/,
+    );
+  });
+
+  it("names no exception while CHIMERA_VERIFY_NETWORK is off", async () => {
+    vi.mocked(getConfig).mockResolvedValue(sandbox("docker") as never);
+    vi.mocked(getSandboxState).mockResolvedValue(CONTAINER as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    await within(region).findByRole("combobox", { name: "Command network" });
+    expect(within(region).queryByText(/CHIMERA_VERIFY_NETWORK/)).not.toBeInTheDocument();
+  });
+
+  it("says bridge also reaches services on this machine", async () => {
+    vi.mocked(getConfig).mockResolvedValue(sandbox("docker", "bridge") as never);
+    vi.mocked(getSandboxState).mockResolvedValue({ ...CONTAINER, network: "bridge" } as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    // Docker Desktop's host.docker.internal reaches this machine's loopback: Ollama, our own API.
+    expect(await within(region).findByText(/Not an allowlist/)).toHaveTextContent(
+      /services listening on this machine/,
+    );
+  });
+
+  it("says execute_code cannot run without a Python, not that no code can", async () => {
+    vi.mocked(getDoctor).mockResolvedValue(
+      doctor({ path: "", source: "missing", frozen: true, looked_for: ["python", "py"] }) as never,
+    );
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    // code_interpreter runs in-process, inside the app's own interpreter, Python on PATH or not.
+    const hint = await within(region).findByText(/Looked for python, py on PATH/);
+    expect(hint).toHaveTextContent(/execute_code cannot run here/);
+    expect(hint).toHaveTextContent(/code_interpreter still runs/);
+    expect(hint).not.toHaveTextContent(/code the agent writes/);
+  });
+
+  it("says the container's Python is the image's, naming the image", async () => {
+    vi.mocked(getConfig).mockResolvedValue(sandbox("docker") as never);
+    vi.mocked(getSandboxState).mockResolvedValue(CONTAINER as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    expect(await within(region).findByText("the image's Python")).toBeInTheDocument();
+    expect(within(region).getByText(/python3 or python the image python:3\.12-slim has/)).toBeInTheDocument();
+    expect(within(region).queryByText(/python3 in the container/)).not.toBeInTheDocument();
+  });
+
+  it("names this machine's Python while the sandbox answer is missing, outside docker", async () => {
+    // Our own endpoint failing is not evidence about the machine; nor does it hide the Python row,
+    // which depends only on doctor when nothing can put the command in a container.
+    vi.mocked(getSandboxState).mockRejectedValue(new Error("boom") as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    expect(await within(region).findByText(INTERPRETER.path)).toBeInTheDocument();
+    expect(within(region).queryByText("not isolated")).not.toBeInTheDocument();
+  });
+
+  it("says nothing about the Python while it cannot tell whether docker answered", async () => {
+    vi.mocked(getConfig).mockResolvedValue(sandbox("docker") as never);
+    vi.mocked(getSandboxState).mockRejectedValue(new Error("boom") as never);
+    renderWithProviders(<Settings />);
+    const region = await card();
+
+    await waitFor(() => expect(getSandboxState).toHaveBeenCalled());
+    expect(within(region).queryByText(INTERPRETER.path)).not.toBeInTheDocument();
+    expect(within(region).queryByText("the image's Python")).not.toBeInTheDocument();
   });
 });

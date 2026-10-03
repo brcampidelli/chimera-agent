@@ -376,3 +376,23 @@ def test_the_alias_is_tried_once_not_on_every_doctor_tick(
         host_python_report()
 
     assert calls == [[str(alias), "-c", "import sys"]]
+
+
+# --- the verifier's exception is reported, so the row can say it -----------------------------------
+
+
+@pytest.mark.parametrize("on", [False, True])
+def test_the_config_reports_the_verifiers_own_network_exception(tmp_path: Path, on: bool) -> None:
+    """`core/verify.py` opens a container's network for the verify command, and under a kernel
+    sandbox runs one the user typed on the host. A row that says "no network" must be able to know."""
+    settings = Settings(CHIMERA_HOME=str(tmp_path), CHIMERA_VERIFY_NETWORK=on)  # type: ignore[arg-type]
+
+    assert read_config(settings)["sandbox"]["verify_network"] is on
+
+
+def test_the_config_endpoint_carries_it(tmp_path: Path) -> None:
+    from tests.test_api import _client  # noqa: PLC0415
+
+    body = _client(tmp_path).get("/api/config").json()
+
+    assert body["sandbox"]["verify_network"] is False

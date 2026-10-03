@@ -9311,6 +9311,11 @@
             ],
             "title": "Network",
             "type": "string"
+          },
+          "verify_network": {
+            "default": false,
+            "title": "Verify Network",
+            "type": "boolean"
           }
         },
         "required": [

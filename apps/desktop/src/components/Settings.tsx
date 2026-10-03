@@ -541,14 +541,26 @@ function CompletionAcceptanceRow() {
  * so a caller with no such endpoint degrades to these rows saying nothing, never to a crash of the
  * screen. Silent on an error from our OWN endpoint, as the Ollama picker is: it is not evidence
  * about the machine.
+ *
+ * The Python row does not wait for that answer, because only one case needs it: a configured
+ * `docker` that may or may not have answered. Every other mode runs `execute_code` on this
+ * machine, which is what `doctor` already measured.
  */
 function SandboxReachRows({
+  mode,
   network,
+  image,
+  verifyNetwork,
   applies,
   python,
   save,
 }: {
+  /** The configured sandbox (`CHIMERA_SANDBOX`). Only `docker` can put a command in a container. */
+  mode: string;
   network: string;
+  image: string;
+  /** `CHIMERA_VERIFY_NETWORK`: the verifier's own exception to whatever these rows say. */
+  verifyNetwork: boolean;
   applies?: string;
   python?: DoctorInfo["code_python"];
   save: (updates: Record<string, string>) => void;
@@ -565,18 +577,28 @@ function SandboxReachRows({
     gcTime: 0,
   });
   const s: SandboxState | undefined = state.data;
-  if (!s) return null;
+  if (!s) {
+    // Not known yet, or our endpoint failed. Outside `docker` that changes nothing about the Python;
+    // with `docker`, whether a container answers is exactly what is not known, so say nothing.
+    return mode === "docker" ? null : (
+      <CodePythonRow python={python} inContainer={false} image={image} />
+    );
+  }
   const inContainer = s.backend === "docker";
   return (
     <>
       {inContainer ? (
         <Row
           label={t("settings.row.sandboxNetwork")}
-          hint={t(
+          hint={
             network === "bridge"
-              ? "settings.hint.sandboxNetworkBridge"
-              : "settings.hint.sandboxNetworkNone",
-          )}
+              ? t("settings.hint.sandboxNetworkBridge")
+              : // Closed for shell commands and execute_code; the verifier may still open it.
+                withException(
+                  t("settings.hint.sandboxNetworkNone"),
+                  verifyNetwork && t("settings.hint.verifyNetworkContainer"),
+                )
+          }
           // Bridge is the value that widens what a command can reach, so its hint is the warning.
           warn={network === "bridge"}
           applies={applies}
@@ -592,15 +614,20 @@ function SandboxReachRows({
           />
         </Row>
       ) : (
-        <NetworkFactRow state={s} />
+        <NetworkFactRow state={s} verifyNetwork={verifyNetwork} />
       )}
-      <CodePythonRow python={python} inContainer={inContainer} />
+      <CodePythonRow python={python} inContainer={inContainer} image={image} />
     </>
   );
 }
 
+/** A row's sentence plus the exception that qualifies it, when there is one. */
+function withException(base: string, exception: string | false): string {
+  return exception ? `${base} ${exception}` : base;
+}
+
 /** The network outside a container that answered: closed by a kernel sandbox, or this machine's own. */
-function NetworkFactRow({ state }: { state: SandboxState }) {
+function NetworkFactRow({ state, verifyNetwork }: { state: SandboxState; verifyNetwork: boolean }) {
   const t = useT();
   // An older server sends no `network`. Derived the only safe way: isolated without a container is a
   // kernel sandbox, which has no network to give; anything else is the host, never "closed".
@@ -612,7 +639,13 @@ function NetworkFactRow({ state }: { state: SandboxState }) {
       ? "settings.hint.networkNoContainer"
       : "settings.hint.networkHost";
   return (
-    <Row label={t("settings.row.sandboxNetwork")} hint={t(hint)} warn={!blocked}>
+    <Row
+      label={t("settings.row.sandboxNetwork")}
+      // "Blocked" holds for shell commands and execute_code. The verifier, when it is asked for a
+      // network the kernel sandbox cannot give, runs a command the user typed on this machine.
+      hint={withException(t(hint), blocked && verifyNetwork && t("settings.hint.verifyNetworkHost"))}
+      warn={!blocked}
+    >
       <span className="text-xs text-muted-foreground">
         {t(blocked ? "settings.network.blocked" : "settings.network.host")}
       </span>
@@ -628,15 +661,19 @@ function NetworkFactRow({ state }: { state: SandboxState }) {
 function CodePythonRow({
   python,
   inContainer,
+  image,
 }: {
   python?: DoctorInfo["code_python"];
   inContainer: boolean;
+  image: string;
 }) {
   const t = useT();
   const label = t("settings.row.codePython");
   if (inContainer) {
+    // Not "python3": the command is `command -v python3 || command -v python`, so it is whichever the
+    // image has — and nothing, for an image without one.
     return (
-      <Row label={label}>
+      <Row label={label} hint={t("settings.hint.codePythonImage", { image })}>
         <span className="text-xs text-muted-foreground">
           {t("settings.value.codePythonContainer")}
         </span>
@@ -1656,7 +1693,10 @@ export function Settings({
                     </Row>
                   ) : null}
                   <SandboxReachRows
+                    mode={c.sandbox.mode}
                     network={c.sandbox.network ?? "none"}
+                    image={c.sandbox.image}
+                    verifyNetwork={c.sandbox.verify_network ?? false}
                     applies={c.applies?.CHIMERA_SANDBOX_NETWORK}
                     python={d?.code_python}
                     save={save}

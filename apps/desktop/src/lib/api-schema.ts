@@ -7687,6 +7687,11 @@ export interface components {
              * @enum {string}
              */
             network: "none" | "bridge";
+            /**
+             * Verify Network
+             * @default false
+             */
+            verify_network: boolean;
         };
         /**
          * SandboxStateOut

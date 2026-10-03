@@ -450,6 +450,10 @@ def read_config(settings: Settings) -> dict[str, Any]:
             # for nothing else, so a hand-edited `.env` holding anything else is `none` in fact and
             # must not be shown as something else on the row that edits it.
             "network": sandbox_network(settings),
+            # The one exception to that network, read where it acts (`core/verify.py`): the verifier
+            # rebuilds a container with the network on, and under a kernel sandbox runs a command
+            # the user typed on the host. A row reading "no network" has to be able to say so.
+            "verify_network": settings.verify_network,
         },
         "browser": {"headless": settings.browser_headless},
         "experimental": {
