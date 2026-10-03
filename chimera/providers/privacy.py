@@ -63,10 +63,75 @@ def prompt_routes(settings: Settings) -> list[dict[str, Any]]:
     for role, model in roles:
         slug = (model or "").strip()
         if slug:
-            _add(routes, _provider_of(slug), is_local_model(slug), role)
+            local, host = _reach(slug, settings)
+            _add(routes, _provider_of(slug), local, role, host)
     if _decisions_api_use(settings):
         _add(routes, "openrouter", False, "decisions")
     return list(routes.values())
+
+
+# Where LiteLLM sends a keyless-runtime prefix when no `api_base` is passed: the env var it reads
+# first (the gateway exports Ollama's and LM Studio's from Settings only when unset), then the
+# Settings field or LiteLLM's own default. `None` for the base = no server is asked at all.
+_RUNTIME_BASES: dict[str, tuple[str, str | None]] = {
+    "ollama": ("OLLAMA_API_BASE", "ollama_base_url"),
+    "ollama_chat": ("OLLAMA_API_BASE", "ollama_base_url"),
+    "lm_studio": ("LM_STUDIO_API_BASE", "lm_studio_base_url"),
+    "llamafile": ("LLAMAFILE_API_BASE", "=http://127.0.0.1:8080/v1"),
+    "hosted_vllm": ("HOSTED_VLLM_API_BASE", None),
+}
+
+
+def _reach(slug: str, settings: Settings) -> tuple[bool, str]:
+    """``(local, host)`` for a model slug: local only when the prompt stays on this machine.
+
+    The prefix alone said ``ollama_chat/`` is local, and with CHIMERA_OLLAMA_BASE_URL at Ollama
+    Cloud or a remote server the card showed a green "local runtime" for a prompt that left the
+    machine. So a keyless-runtime prefix is local only when the URL it is actually sent to — the
+    custom endpoint when one is set (it applies to every call), else the runtime's own base — is a
+    loopback address; otherwise it is remote, with the host it goes to. ``vllm/`` without an endpoint
+    is LiteLLM's in-process engine, and an unknown base (``hosted_vllm/`` with nothing set) cannot be
+    shown to be local, so it is not called local. ``host`` is ``""`` for a local or a hosted route.
+    """
+    if not is_local_model(slug):
+        return False, ""
+    prefix = _provider_of(slug)
+    url = (settings.api_base or "").strip()
+    if not url:
+        if prefix == "vllm":
+            return True, ""
+        env_var, source = _RUNTIME_BASES.get(prefix, ("", None))
+        url = os.environ.get(env_var, "").strip() if env_var else ""
+        if not url and source is not None:
+            url = source[1:] if source.startswith("=") else str(getattr(settings, source, "") or "")
+    host = _host_of(url)
+    if _is_loopback(host):
+        return True, ""
+    return False, host
+
+
+def _host_of(url: str) -> str:
+    from urllib.parse import urlsplit
+
+    try:
+        return (urlsplit(url.strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _is_loopback(host: str) -> bool:
+    """Parsed as an address, never matched as a prefix (`127.0.0.1.example.com` is not loopback);
+    an empty or unparseable host is NOT local — the card must not call an unknown place this machine."""
+    import ipaddress
+
+    if not host:
+        return False
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 #: Model-shaped settings the card deliberately does not list, and why.
@@ -77,10 +142,14 @@ EXCLUDED_MODEL_SETTINGS: dict[str, str] = {
 }
 
 
-def _add(routes: dict[str, dict[str, Any]], name: str, local: bool, role: str) -> None:
-    entry = routes.setdefault(name, {"provider": name, "local": local, "roles": []})
+def _add(
+    routes: dict[str, dict[str, Any]], name: str, local: bool, role: str, host: str = ""
+) -> None:
+    entry = routes.setdefault(name, {"provider": name, "local": local, "host": host, "roles": []})
     # One remote slug makes the provider remote: "local" must hold for every role listed under it.
     entry["local"] = bool(entry["local"]) and local
+    if host and not entry["host"]:
+        entry["host"] = host
     if role not in entry["roles"]:
         entry["roles"].append(role)
 

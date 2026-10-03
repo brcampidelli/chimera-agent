@@ -7356,6 +7356,11 @@ export interface components {
          */
         PromptRouteOut: {
             /**
+             * Host
+             * @default
+             */
+            host: string;
+            /**
              * Local
              * @default false
              */

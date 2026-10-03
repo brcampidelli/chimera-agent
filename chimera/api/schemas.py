@@ -762,7 +762,10 @@ class PromptRouteOut(BaseModel):
 
     provider: str
     local: bool = False
-    """A keyless runtime on this machine or the owner's (``ollama_chat/``, ``lm_studio/``…)."""
+    """A keyless runtime whose URL is a loopback address — the prompt stays on this machine."""
+    host: str = ""
+    """For a keyless-runtime prefix (``ollama_chat/``, ``lm_studio/``…) that is NOT local: the host it
+    is sent to (Ollama Cloud, a remote server). Empty for a local or a hosted provider."""
     roles: list[str] = Field(default_factory=list)
     """``default``, ``weak``, ``fusion_judge``, ``embeddings``, ``decisions``… — why it is listed."""
 

@@ -56,8 +56,14 @@ export function PrivacyPanel({
         {routes.map((route) => (
           <div key={route.provider} className="flex flex-wrap items-center gap-2">
             <span className="font-mono text-xs text-foreground">{route.provider}</span>
+            {/* `local` is the server's reading of the URL the prompt goes to, not of the slug's
+                prefix: a remote Ollama names its host instead of reading as this machine. */}
             <Badge tone={route.local ? "ok" : "muted"}>
-              {route.local ? t("governance.privacy.local") : t("governance.privacy.remote")}
+              {route.local
+                ? t("governance.privacy.local")
+                : route.host
+                  ? t("governance.privacy.remoteHost", { host: route.host })
+                  : t("governance.privacy.remote")}
             </Badge>
             <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
               {(route.roles ?? []).join(", ")}

@@ -215,3 +215,50 @@ def test_hosted_image_and_dictation_are_listed_under_openai_only_when_the_key_ma
     assert {"image", "dictation"} <= set(openai["roles"])
     local_images = {r["provider"]: r for r in prompt_routes(_settings(CHIMERA_IMAGE_BACKEND="local"))}
     assert "image" not in local_images["openai"]["roles"]
+
+
+def test_an_ollama_base_off_this_machine_is_not_called_local() -> None:
+    """Ollama Cloud (or any remote Ollama) behind `ollama_chat/` used to read "local runtime" in
+    green: the prefix was local, the URL the prompt goes to was not."""
+    routes = {
+        r["provider"]: r
+        for r in prompt_routes(
+            _settings(
+                CHIMERA_OLLAMA_BASE_URL="https://ollama.com",
+                CHIMERA_WEAK_MODEL="ollama_chat/gpt-oss:120b",
+            )
+        )
+    }
+    assert routes["ollama_chat"]["local"] is False
+    assert routes["ollama_chat"]["host"] == "ollama.com"
+
+
+@pytest.mark.parametrize(
+    ("env", "slug", "local"),
+    [
+        ({}, "ollama_chat/llama3", True),
+        ({"CHIMERA_OLLAMA_BASE_URL": "http://localhost:11434"}, "ollama_chat/llama3", True),
+        ({"CHIMERA_OLLAMA_BASE_URL": "http://[::1]:11434"}, "ollama_chat/llama3", True),
+        ({"CHIMERA_OLLAMA_BASE_URL": "http://127.0.0.1.example.com:11434"}, "ollama_chat/llama3", False),
+        ({"CHIMERA_LM_STUDIO_BASE_URL": "http://10.0.0.5:1234/v1"}, "lm_studio/qwen", False),
+        ({}, "lm_studio/qwen", True),
+        ({"CHIMERA_API_BASE": "https://inference.example.com/v1"}, "ollama_chat/llama3", False),
+        ({}, "hosted_vllm/meta/llama", False),
+        ({}, "llamafile/model", True),
+    ],
+)
+def test_local_is_read_from_the_url_the_prompt_is_sent_to(
+    env: dict[str, str], slug: str, local: bool
+) -> None:
+    provider = slug.split("/", 1)[0]
+    routes = {r["provider"]: r for r in prompt_routes(_settings(CHIMERA_WEAK_MODEL=slug, **env))}
+    assert routes[provider]["local"] is local
+
+
+def test_an_exported_ollama_base_wins_over_the_setting_as_it_does_in_litellm(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OLLAMA_API_BASE", "https://gpu.example.net")
+    routes = {r["provider"]: r for r in prompt_routes(_settings(CHIMERA_WEAK_MODEL="ollama_chat/x"))}
+    assert routes["ollama_chat"]["local"] is False
+    assert routes["ollama_chat"]["host"] == "gpu.example.net"

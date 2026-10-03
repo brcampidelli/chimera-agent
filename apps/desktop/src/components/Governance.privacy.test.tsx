@@ -94,6 +94,19 @@ describe("Governance — the privacy card", () => {
     expect(panel.getByText("local runtime")).toBeInTheDocument();
   });
 
+  it("names the host a remote runtime sends to instead of calling it local", async () => {
+    vi.mocked(getConfig).mockResolvedValue(
+      config({
+        ...PRIVACY,
+        routes: [{ provider: "ollama_chat", local: false, host: "ollama.com", roles: ["weak"] }],
+      }),
+    );
+    renderWithProviders(<Governance />);
+    const panel = within(await card());
+    expect(panel.getByText("leaves this machine for ollama.com")).toBeInTheDocument();
+    expect(panel.queryByText("local runtime")).toBeNull();
+  });
+
   it("says the OpenRouter route keeps what its own policy allows while nothing is set", async () => {
     vi.mocked(getConfig).mockResolvedValue(config(PRIVACY));
     renderWithProviders(<Governance />);

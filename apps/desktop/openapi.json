@@ -8521,6 +8521,11 @@
       "PromptRouteOut": {
         "description": "One provider a configured model role would send a prompt to (``prompt_routes``).",
         "properties": {
+          "host": {
+            "default": "",
+            "title": "Host",
+            "type": "string"
+          },
           "local": {
             "default": false,
             "title": "Local",
