@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Added
 
 - **A scheduled job that could not run says so where its answers go** (#751). Chimera's own scheduler posts one short line when a job with a destination enters failure (error, timeout, spend cap, brake) and one when it recovers, never the raw error text. A job that flaps is one notice, not one per tick. `CHIMERA_CRON_NOTIFY_FAILURES=0` silences it; `chimera cron add --deliver-to URL` records the destination. This covers Chimera's scheduler only, not the VPS sidecar scripts.
+- **Answer a pending approval from the chat bot, with a one-time code** (#753), off by default (`CHIMERA_APPROVE_VIA_CHAT`). It works only with the setting on, a non-empty allowlist for that bot and an approval webhook. Each request gets a 6-digit code, valid once, shown only in the question the webhook delivers; only its hash is stored. A message shaped like an answer is intercepted before it becomes a turn, even with the setting off, so the code never reaches the model, the history or memory. Every refusal gets the same neutral line, and failed attempts are rate-limited. Silence is still a refusal.
 - **Cron jobs post only what is worth posting, and hold only their tools** (#736).
   - A scheduled run is told it is unattended, where its answer goes, and to assume rather than ask. It may answer
     with a fixed "nothing new" sentinel, which is never delivered.
