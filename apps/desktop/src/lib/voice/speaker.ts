@@ -157,18 +157,25 @@ export function voicesOf(locale: string): SpeechSynthesisVoice[] {
 
 /** The voice that reads: the one chosen by name when the window still has it, else the
  *  highest-scoring voice with the exact tag, else the highest-scoring one of the same language,
- *  else none (the engine's default then reads). Ties keep the list's order. */
+ *  else none (the engine's default then reads). Ties keep the list's order.
+ *
+ *  `sameLanguageOnly`: honour the named voice only while it speaks the language being read. Set
+ *  when a voice language was chosen in Settings — then the language is a decision, and a
+ *  Portuguese voice chosen before it became English would read English with a Portuguese mouth
+ *  while the card (which lists that language's voices only) says "Automatic" over it. Unset, the
+ *  named voice reads whatever its language, as it always did: an Edge "Multilingual" voice
+ *  declares en-US and reads Portuguese well, and someone who picked one and then changed the
+ *  interface's language keeps hearing it. */
 export function pickVoice(
   voices: SpeechSynthesisVoice[],
   locale: string,
   preferred = "",
+  sameLanguageOnly = false,
 ): SpeechSynthesisVoice | null {
   if (preferred) {
-    // Only while it speaks the language being read. A Portuguese voice chosen before the voice
-    // language (or the interface's) changed to English would otherwise read English with a
-    // Portuguese mouth — and the Settings card, which lists that language's voices only, would
-    // say "Automatic" over it.
-    const named = voices.find((v) => v.name === preferred && sameLanguage(v.lang, locale));
+    const named = voices.find(
+      (v) => v.name === preferred && (!sameLanguageOnly || sameLanguage(v.lang, locale)),
+    );
     if (named) return named;
   }
   const norm = (tag: string) => tag.toLowerCase().replace("_", "-");
@@ -244,7 +251,9 @@ export class BrowserSpeaker implements SpeakerLike {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = locale;
         utterance.rate = preferredVoiceRate();
-        const voice = pickVoice(voices, locale, preferredVoiceName());
+        // Strict about the voice's language only once one was chosen — before that, the named
+        // voice reads as it did before there was a choice.
+        const voice = pickVoice(voices, locale, preferredVoiceName(), chosenVoiceLang() !== "");
         if (voice) utterance.voice = voice;
         utterance.onend = done;
         // A cancel fires `error` with `interrupted`/`canceled` — the same ending for the caller.

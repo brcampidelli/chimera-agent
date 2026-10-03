@@ -13,7 +13,9 @@ import { renderWithProviders } from "@/test/utils";
  * and transcribes into the draft; the language hint is the voice's language from Settings, the
  * interface's when none was chosen; a tap that ends before the microphone opens gives it straight
  * back instead of recording a silence nobody will stop; a recording started with the button is not
- * stopped by the release of a hold that started nothing; and nothing is opened while dictation is unavailable.
+ * stopped by the release of a hold that started nothing; a click while a held chord is still asking
+ * for the microphone does not ask again; and nothing is opened while dictation is unavailable, or
+ * while the composer is mounted but not on screen.
  */
 
 vi.mock("@/lib/api", () => ({
@@ -131,6 +133,62 @@ describe("dictation by holding the chord", () => {
     chord("keyup", "ControlLeft", "Control");
     expect(FakeRecorder.made).toHaveLength(1);
     expect(FakeRecorder.made[0].state).toBe("recording");
+  });
+
+  it("opens nothing while the composer is mounted but hidden, as under a maximised viewer", async () => {
+    // The Code screen keeps the conversation mounted under `hidden` (display: none) while the
+    // viewer is maximised, or a file is open on a narrow window. A hold there would record into
+    // a draft nobody can see, with every sign of it hidden too.
+    renderWithProviders(
+      <div style={{ display: "none" }}>
+        <DictateButton onText={vi.fn()} />
+      </div>,
+    );
+    await waitFor(() => expect(getDictationSupport).toHaveBeenCalled());
+    await act(async () => {});
+
+    chord("keydown");
+    chord("keyup");
+    expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("asks the engine whether the button is visible where the engine can say", async () => {
+    // The WebView2 has `checkVisibility`; jsdom does not, so the walk above is what it exercises.
+    const check = vi.fn(() => false);
+    Object.defineProperty(HTMLElement.prototype, "checkVisibility", { value: check, configurable: true });
+    try {
+      renderWithProviders(<DictateButton onText={vi.fn()} />);
+      await waitFor(() => expect(getDictationSupport).toHaveBeenCalled());
+      await act(async () => {});
+      chord("keydown");
+      chord("keyup");
+      expect(check).toHaveBeenCalled();
+      expect(getUserMedia).not.toHaveBeenCalled();
+    } finally {
+      delete (HTMLElement.prototype as { checkVisibility?: unknown }).checkVisibility;
+    }
+  });
+
+  it("does not ask twice when the button is clicked while a held chord is still asking", async () => {
+    let grant: (s: MediaStream) => void = () => {};
+    getUserMedia.mockImplementation(() => new Promise<MediaStream>((resolve) => (grant = resolve)));
+    const user = userEvent.setup();
+    const onText = vi.fn();
+    renderWithProviders(<DictateButton onText={onText} />);
+    await waitFor(() => expect(getDictationSupport).toHaveBeenCalled());
+
+    chord("keydown");
+    await waitFor(() => expect(getUserMedia).toHaveBeenCalledOnce());
+    // Still idle on screen, so the click reaches `start` — which must not ask again.
+    await user.click(screen.getByRole("button", { name: /dictate/i }));
+    expect(getUserMedia).toHaveBeenCalledOnce();
+
+    await act(async () => grant(mic.stream));
+    expect(FakeRecorder.made).toHaveLength(1);
+    chord("keyup");
+    await waitFor(() => expect(onText).toHaveBeenCalledWith("hello there"));
+    expect(FakeRecorder.made[0].state).toBe("inactive");
+    expect(mic.track.stop).toHaveBeenCalled();
   });
 
   it("opens nothing while dictation is unavailable", async () => {

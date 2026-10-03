@@ -255,6 +255,28 @@ describe("hands-free voice", () => {
     }
   });
 
+  it("follows a voice language changed while it stays mounted, as a conversation window does", async () => {
+    // A separate conversation window keeps this mounted while Settings changes in the main one.
+    try {
+      const { mic, speaker, transcribe, deps } = harness();
+      const user = userEvent.setup();
+      const { rerender } = renderWithProviders(<VoiceMode onUtterance={vi.fn()} answer={null} deps={deps} />);
+      await user.click(screen.getByTestId("voice-mode"));
+      await waitFor(() => expect(mic.started).toBe(1));
+
+      localStorage.setItem(VOICE_LANG_KEY, "pt");
+      speakUtterance(mic);
+      await waitFor(() => expect(transcribe).toHaveBeenCalledTimes(1));
+      expect(transcribe.mock.calls[0][2]).toBe("pt");
+
+      rerender(<VoiceMode onUtterance={vi.fn()} answer={{ seq: 0, text: "Pronto.", done: true }} deps={deps} />);
+      await waitFor(() => expect(speaker.spoken).toHaveLength(1));
+      expect(speaker.locales).toEqual(["pt-BR"]);
+    } finally {
+      localStorage.removeItem(VOICE_LANG_KEY);
+    }
+  });
+
   it("stops after the sentence cap, as a net under a model that ignores the instruction", async () => {
     const { mic, speaker, deps } = harness();
     const user = userEvent.setup();

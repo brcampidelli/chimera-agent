@@ -312,7 +312,7 @@ question a person actually has, or a feature you want them to notice.
 | `⌘⇧F` | focus mode on and off |
 | `⌘⇧M` | maximise the panel that holds focus, or restore the maximised one |
 | `⌘⇧A` | go to the approval waiting in the conversation |
-| `⌘⇧Space` (hold) | dictate into the composer while held, by the physical key; release to stop. Only where the composer and its Dictate button are on screen. Not `⌘D`, the browser's bookmark |
+| `⌘⇧Space` (hold) | dictate into the composer while held, by the physical key; release to stop. Only where the composer and its Dictate button are on screen — visible, not just mounted: a composer kept under a maximised viewer does not listen. Not `⌘D`, the browser's bookmark |
 | `Esc` | restore a maximised panel, from anywhere (a menu or dialog open first takes it) |
 
 The palette is what makes a five-icon rail cost nothing in reach: the long tail lives there instead

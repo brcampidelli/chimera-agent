@@ -7,6 +7,7 @@ import {
   preferredVoiceRate,
   setPreferredVoiceLang,
   setPreferredVoiceRate,
+  VOICE_KEY,
   VOICE_LANG_KEY,
   VOICE_RATE_KEY,
   VOICES_WAIT_MS,
@@ -54,11 +55,17 @@ describe("the voice that reads", () => {
     expect(pickVoice(EDGE, "pt-BR", "Microsoft Thalita multilíngue Online (Natural) - Portuguese (Brazil)")?.name).toContain("Francisca");
   });
 
-  it("is not a voice chosen for another language, which would read this one with the wrong mouth", () => {
+  it("is not a voice chosen for another language once a voice language was chosen", () => {
     // Chosen while the voice spoke Portuguese, then the voice language became English.
-    expect(pickVoice(EDGE, "en-US", "Microsoft Antônio Online (Natural) - Portuguese (Brazil)")?.name).toContain("Ava");
+    expect(pickVoice(EDGE, "en-US", "Microsoft Antônio Online (Natural) - Portuguese (Brazil)", true)?.name).toContain("Ava");
     // A Portugal voice chosen by name is still Portuguese, and is still honoured for pt-BR.
-    expect(pickVoice(EDGE, "pt-BR", "Microsoft Raquel Online (Natural) - Portuguese (Portugal)")?.name).toContain("Raquel");
+    expect(pickVoice(EDGE, "pt-BR", "Microsoft Raquel Online (Natural) - Portuguese (Portugal)", true)?.name).toContain("Raquel");
+  });
+
+  it("keeps a voice chosen by name whatever its language while no voice language was chosen, as before", () => {
+    // The default is today's behaviour: the named voice reads, even one declared in another
+    // language (an Edge "Multilingual" voice declares en-US and reads Portuguese).
+    expect(pickVoice(EDGE, "en-US", "Microsoft Antônio Online (Natural) - Portuguese (Brazil)")?.name).toContain("Antônio");
   });
 
   it("falls back to the same language, then to the engine's default", () => {
@@ -233,6 +240,21 @@ describe("the pace and the language the voice uses", () => {
     expect(preferredVoiceLang("de")).toBe("de");
     localStorage.setItem(VOICE_LANG_KEY, "xx");
     expect(preferredVoiceLang("fr")).toBe("fr");
+  });
+
+  it("keeps the voice chosen by name across languages until a voice language is chosen", async () => {
+    localStorage.setItem(VOICE_KEY, "Microsoft Antônio Online (Natural) - Portuguese (Brazil)");
+    const speaker = new BrowserSpeaker();
+    // No voice language chosen: the named voice reads English too, as it did before the row.
+    void speaker.speak("Hello.", "en-US");
+    await vi.waitFor(() => expect(synth.spoken).toHaveLength(1));
+    expect(synth.spoken[0].voice?.name).toContain("Antônio");
+
+    // English chosen as the voice's language: a Portuguese voice no longer reads it.
+    setPreferredVoiceLang("en");
+    void speaker.speak("Hello.", "en-US");
+    await vi.waitFor(() => expect(synth.spoken).toHaveLength(2));
+    expect(synth.spoken[1].voice?.name).toContain("Ava");
   });
 
   it("still reads, at the normal pace and in the interface's language, when storage refuses", async () => {

@@ -181,6 +181,19 @@ export function AttachButton({ onAdded }: { onAdded: (a: Attachment) => void }) 
   );
 }
 
+/** Whether someone can see this element: it and every ancestor rendered. `checkVisibility` where
+ *  the engine has it (the WebView2 does), else a walk up for `display: none` or `hidden`. */
+function onScreen(el: HTMLElement | null): boolean {
+  if (!el || !el.isConnected) return false;
+  if (typeof el.checkVisibility === "function") return el.checkVisibility({ visibilityProperty: true });
+  for (let node: HTMLElement | null = el; node; node = node.parentElement) {
+    if (node.hidden) return false;
+    const style = getComputedStyle(node);
+    if (style.display === "none" || style.visibility === "hidden") return false;
+  }
+  return true;
+}
+
 export function DictateButton({ onText }: { onText: (text: string) => void }) {
   const { t, lang } = useI18n();
   const recorder = useRef<MediaRecorder | null>(null);
@@ -200,6 +213,7 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   /** This recording was started by holding the chord, so letting go of it stops it. A recording
    *  started with the button is not stopped by the release of a hold that started nothing. */
   const byKey = useRef(false);
+  const button = useRef<HTMLButtonElement | null>(null);
 
   // Hold the chord to dictate, let go to stop: the button's own start and stop, so the two ways in
   // cannot drift apart. A keydown is a gesture as much as a click is — the microphone still opens
@@ -207,6 +221,11 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   useDictateKey(
     () => {
       if (state !== "idle" || unavailable || opening.current) return;
+      // Mounted is not on screen. The Code screen keeps the conversation mounted under `hidden`
+      // while the viewer is maximised, or while a file is open on a narrow window; a hold there
+      // would open the microphone and type into a draft nobody can see, with the recording
+      // state, the "working" note and any error all hidden with it.
+      if (!onScreen(button.current)) return;
       byKey.current = true;
       void start();
     },
@@ -219,6 +238,10 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   );
 
   async function start() {
+    // Already asking for the microphone, or already recording: a click landing while a held
+    // chord's request is still out would ask again, overwrite the recorder, and leave the first
+    // one recording with the microphone open for good.
+    if (opening.current || recorder.current) return;
     setNote("");
     releasedEarly.current = false;
     opening.current = true;
@@ -287,6 +310,7 @@ export function DictateButton({ onText }: { onText: (text: string) => void }) {
   return (
     <>
       <Button
+        ref={button}
         size="sm"
         variant={state === "recording" ? "primary" : "ghost"}
         disabled={state === "working" || unavailable}
