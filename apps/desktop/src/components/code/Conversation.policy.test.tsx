@@ -143,6 +143,55 @@ describe("a turn the provider refused on content policy", () => {
     expect(retry.model).toBe("openrouter/vendor/mid");
   });
 
+  it("opens the list with nothing selected, so no row is the one that refused by default", async () => {
+    vi.mocked(streamCodeTurn).mockImplementation(failing(BLOCK));
+    const user = await ask("escreve o conto");
+
+    await user.click(await screen.findByRole("button", { name: /try with another model/i }));
+    await screen.findByText("Vendor: Mid");
+
+    // The list opened on the conversation's model — usually the one that refused — and a click on
+    // the highlighted row sent at once.
+    expect(within(screen.getByRole("dialog")).queryAllByRole("button", { pressed: true })).toEqual([]);
+  });
+
+  it("asks before redoing the turn on the very model that refused it", async () => {
+    vi.mocked(streamCodeTurn).mockImplementation(
+      failing({ ...BLOCK, model: "openrouter/vendor/mid" }),
+    );
+    const user = await ask("escreve o conto");
+
+    await user.click(await screen.findByRole("button", { name: /try with another model/i }));
+    await user.click(await screen.findByText("Vendor: Mid"));
+
+    // Nothing sent: one click would have paid for the same refusal, and the receipt would have
+    // said "redone on X by the owner's choice" over X's own refusal.
+    expect(await screen.findByTestId("policy-same-model")).toBeInTheDocument();
+    expect(streamCodeTurn).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: /redo it on the same model/i }));
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(2));
+    expect((vi.mocked(streamCodeTurn).mock.calls[1]?.[0] as CodeTurnInput).model).toBe(
+      "openrouter/vendor/mid",
+    );
+  });
+
+  it("asks too when the default is the model that refused, and Cancel sends nothing", async () => {
+    // The mock catalogue's default is `test/model`.
+    vi.mocked(streamCodeTurn).mockImplementation(failing({ ...BLOCK, model: "test/model" }));
+    const user = await ask("escreve o conto");
+
+    await user.click(await screen.findByRole("button", { name: /try with another model/i }));
+    // The default row, by the slug it resolves to.
+    await user.click(await screen.findByText("test/model"));
+
+    expect(await screen.findByTestId("policy-same-model")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /^cancel$/i }));
+    expect(screen.queryByTestId("policy-same-model")).toBeNull();
+    expect(screen.getByRole("button", { name: /try with another model/i })).toBeInTheDocument();
+    expect(streamCodeTurn).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the ordinary card and its Try again for any other failure", async () => {
     vi.mocked(streamCodeTurn).mockImplementation(failing());
     const user = await ask("escreve o conto");

@@ -1833,7 +1833,6 @@ export function Conversation({
                   {e.blocked ? (
                     <PolicyBlocked
                       block={e.blocked}
-                      current={model}
                       canRetry={i === exchanges.length - 1 && !busy && !busyElsewhere}
                       filesMissing={e.attachments === undefined}
                       onRetry={(picked) => {
