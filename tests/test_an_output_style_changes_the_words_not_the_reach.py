@@ -250,3 +250,56 @@ def test_on_the_real_loop_the_default_keeps_the_prompts_fingerprint_and_a_style_
     concise = sha(style="concise")
     assert concise != plain
     assert sha(style="explanatory") not in {plain, concise}
+
+
+def test_on_the_real_loop_a_style_never_enters_the_stored_conversation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same promise as above, held by the loop that writes the transcript.
+
+    The fake agent above builds its transcript from the history and the message alone, so it could
+    never put a system message in it, and that test would go on passing if the real loop began
+    to. Here the product's own `Agent` produces the transcript (system message included, which
+    `CodeSession.absorb` drops), and the stored file on disk is read, not the API's view of it.
+    """
+    from chimera.api import build_api_app
+    from chimera.config import get_settings
+    from chimera.core import Agent
+    from chimera.providers.gateway import CompletionResult
+    from chimera.tools import ToolRegistry
+
+    seen: list[str] = []
+
+    class _Model:
+        def __init__(self, *_a: Any, **_k: Any) -> None:
+            pass
+
+        def complete(self, messages: Any, *_a: Any, **_k: Any) -> CompletionResult:
+            seen.extend(str(m.get("content")) for m in messages if m.get("role") == "system")
+            return CompletionResult(content="done", model="fake/model", prompt_tokens=10, completion_tokens=1)
+
+    home = tmp_path / "home"
+    monkeypatch.setenv("CHIMERA_HOME", str(home))
+    get_settings.cache_clear()
+    monkeypatch.setattr("chimera.providers.LLMGateway", _Model)
+    ws = tmp_path / "ws"
+    ws.mkdir(exist_ok=True)
+    settings = Settings(CHIMERA_HOME=str(home))  # type: ignore[call-arg]
+    client = TestClient(
+        build_api_app(lambda: ChatSession(Agent(_Model(), ToolRegistry())), workspace=ws, settings=settings)
+    )
+
+    first = _turn(client, stream=False, style="explanatory")
+    session_id = first["session"]["session_id"]
+    _turn(client, stream=False, style="explanatory", session_id=session_id)
+
+    # The model was given the style — so its absence below is the store's doing, not the turn's.
+    assert any(EXPLANATORY_NOTE in text for text in seen)
+    stored_files = list((home / "code_sessions").glob("*.json"))
+    assert stored_files, "the conversation was not stored"
+    on_disk = "".join(path.read_text(encoding="utf-8") for path in stored_files)
+    assert "explain the parser" in on_disk  # the conversation itself is there
+    assert "Output style for this conversation" not in on_disk
+    assert '"role": "system"' not in on_disk
+    # And the second turn was handed the stored history without it, too.
+    assert sum(EXPLANATORY_NOTE in text for text in seen) == 2
