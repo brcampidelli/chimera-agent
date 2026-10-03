@@ -191,6 +191,13 @@ def test_the_explorer_cannot_walk_past_the_deployment_lists(tmp_path: Any) -> No
     assert set(registry.names()) == {"read_file", "explore_repository"}
 
 
+def _grant(home: Any, ws: Any) -> None:
+    """Record the owner's command grant for ``ws``, the way the Folders card does."""
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    CodeProjectRegistry(home / "code_projects.json").set_grant(str(ws), True)
+
+
 def test_a_defence_that_fires_leaves_a_line_in_the_audit_trail(tmp_path: Any) -> None:
     """An empty Security screen used to mean "nothing is recording" while reading as "nothing has
     happened". Those are opposite claims, and the screen was making the wrong one.
@@ -207,6 +214,9 @@ def test_a_defence_that_fires_leaves_a_line_in_the_audit_trail(tmp_path: Any) ->
     ws.mkdir()
     home = tmp_path / "home"
     settings = Settings(CHIMERA_HOME=str(home))
+    # The shell has to be MOUNTED for the defence to have something to stop, and since the grant
+    # moved to the server a `workspace_shell` request mounts it only in a folder the owner granted.
+    _grant(home, ws)
     seams = CodeSeams(posture=Posture(reach="workspace_shell", approval="suspicious"))
     registry, ledger = assemble_registry(seams, ws, settings, LLMGateway(), steps=8)
 
@@ -325,6 +335,7 @@ def test_the_deployments_approval_arms_narrowing_even_when_the_request_waives_it
     ws.mkdir()
     home = tmp_path / "home"
     settings = Settings(CHIMERA_HOME=str(home), CHIMERA_APPROVAL="suspicious")
+    _grant(home, ws)  # mounted only in a granted folder; see the test above
     seams = CodeSeams(posture=Posture(reach="workspace_shell", approval="never"))
     registry, ledger = assemble_registry(seams, ws, settings, LLMGateway(), steps=8)
 

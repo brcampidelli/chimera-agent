@@ -381,6 +381,11 @@ def _assemble(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, sink: Any) -> tup
         CHIMERA_APPROVAL_WAIT="5",
         CHIMERA_SANDBOX="local",
     )
+    # `allow_host_exec` is a request; the folder's grant is the server's record of the owner's
+    # answer, and without one the shell stays gated however the request asks.
+    from chimera.core.code_projects import CodeProjectRegistry
+
+    CodeProjectRegistry(home / "code_projects.json").set_grant(str(ws), True)
     registry, _ = assemble_registry(
         CodeSeams(allow_host_exec=True), ws, settings, LLMGateway(), steps=4,
         surface="api:turn", approval_sink=sink,

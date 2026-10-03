@@ -55,9 +55,23 @@ def _r(method: str, path: str, doc: str, **kw: Any) -> BridgeRoute:
 #: whose ``action`` is an enum of that area's actions, so the tool list is derived, never kept twice.
 ROUTES: dict[str, BridgeRoute] = {
     # --- projects (the Code screen's sidebar) ---
-    "projects.list": _r("GET", "/api/code/workspaces", "The projects the owner added."),
+    "projects.list": _r(
+        "GET",
+        "/api/code/workspaces",
+        "The projects the owner added, with where commands are granted (shell_granted).",
+    ),
     "projects.add": _r("POST", "/api/code/workspaces", "Register a project. body: {path, alias?}"),
     "projects.remove": _r("DELETE", "/api/code/workspaces", "Forget a project. params: {path}"),
+    # Pinning and hiding only ever narrow what the agent may do (hiding revokes a grant), so they
+    # are operate. GRANTING commands in a folder is the posture itself, so it is Full, and lives in
+    # the `settings` area below rather than here: the MCP server makes one tool per area and holds
+    # a whole area to one tier, so a Full action in `projects` would take the list away from
+    # operate.
+    "projects.flag": _r(
+        "PATCH",
+        "/api/code/workspaces",
+        "Pin or hide a project (hiding revokes its grant). body: {path, pinned?, hidden?}",
+    ),
     "projects.delete_conversations": _r(
         "DELETE",
         "/api/code/projects",
@@ -349,6 +363,13 @@ ROUTES: dict[str, BridgeRoute] = {
         "PUT",
         "/api/agents/registry",
         "Save an agent definition (with its tool grants).",
+        tier="full",
+    ),
+    "settings.folder_grant": _r(
+        "PUT",
+        "/api/code/workspaces/grant",
+        "Let the agent run commands in one folder, or stop it. body: {path, shell_granted}. The "
+        "same record the Code screen's switch and the Folders card write.",
         tier="full",
     ),
     "settings.mcp_remove": _r(

@@ -202,6 +202,50 @@ class CodeProjectOut(BaseModel):
 
     path: str
     alias: str = ""
+    shell_granted: bool = False
+    """The owner let the agent run commands in this folder — the record the server enforces.
+
+    A request that asks for the shell in a folder without this is answered with the reach below it
+    (see ``assemble_registry``). It never beats a ``read_only`` reach nor ``CHIMERA_HOST_EXEC=deny``.
+    """
+    granted_at: str = ""
+    """When it was granted, ISO-8601 UTC. Empty when not granted."""
+    pinned: bool = False
+    """Listed first, above the projects ordered by recency."""
+    last_used_at: str = ""
+    """When a coding turn last started here, ISO-8601 UTC. Empty = never."""
+    hidden: bool = False
+    """Removed from the lists by the owner. Kept as a row so a folder with conversations does not
+    reappear the moment it is removed; hiding also revoked any grant and pin it had."""
+
+
+class CodeProjectFlagsIn(BaseModel):
+    """Pin or hide a project. An absent field says nothing about it, so pinning cannot unhide."""
+
+    path: str
+    pinned: bool | None = None
+    hidden: bool | None = None
+
+
+class CodeProjectGrantIn(BaseModel):
+    """Grant or revoke commands in one folder. Its own route, so the bridge can hold it to Full."""
+
+    path: str
+    shell_granted: bool
+
+
+class CodeGrantMigrationIn(BaseModel):
+    """The folders the desktop had granted in its own browser storage, sent once."""
+
+    paths: list[str] = Field(default_factory=list, max_length=500)
+
+
+class CodeGrantMigrationOut(BaseModel):
+    """What the one-time migration did. ``migrated=False`` = it had already happened; nothing changed."""
+
+    migrated: bool
+    recorded: int
+    projects: list[CodeProjectOut]
 
 
 class CodeProjectIn(BaseModel):

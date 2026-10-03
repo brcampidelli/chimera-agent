@@ -21,13 +21,14 @@ import {
   listCodeSessions,
   listRunningTurns,
   registerCodeProject,
+  type CodeProject,
   type CodeSessionMeta,
 } from "@/lib/api";
 import { HideRegionButton } from "@/components/shell/RegionToggle";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
-import { aliasesOf, loadProjects, projectLabel } from "@/lib/projects";
+import { aliasesOf, loadProjects, projectLabel, sidebarOrder } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 import { readLastSession, writeLastSession } from "@/lib/workspace";
 
@@ -44,7 +45,8 @@ import { readLastSession, writeLastSession } from "@/lib/workspace";
  */
 function groupByProject(
   sessions: CodeSessionMeta[],
-  registered: string[],
+  rows: CodeProject[],
+  current: string,
 ): [string, CodeSessionMeta[]][] {
   const groups = new Map<string, CodeSessionMeta[]>();
   for (const session of sessions) {
@@ -53,15 +55,10 @@ function groupByProject(
     if (list) list.push(session);
     else groups.set(key, [session]);
   }
-  // Registered projects come after, and only the ones no conversation already placed. Union, never
-  // replace: a project you have talked about must not vanish from the list because you never got
-  // round to registering it, and the ordering keeps the "most recently used" property below.
-  for (const project of registered) {
-    if (!groups.has(project)) groups.set(project, []);
-  }
-  // Insertion order = the order the server sent, which is newest-first. So the project you touched
-  // most recently is at the top without a second sort deciding what "most recent project" means.
-  return [...groups.entries()];
+  // Registered projects join the ones conversations placed — union, never replace: a project you
+  // have talked about must not vanish from the list because you never got round to registering it.
+  // The ORDER is `sidebarOrder`'s: pinned first, then most recently used, hidden ones left out.
+  return sidebarOrder(sessions, rows, current).map((key) => [key, groups.get(key) ?? []]);
 }
 
 export function SessionSidebar({
@@ -105,7 +102,6 @@ export function SessionSidebar({
   // its projects instead of meeting an empty sidebar after an update.
   const projects = useQuery({ queryKey: ["code-projects"], queryFn: loadProjects });
   const rows = projects.data ?? [];
-  const registered = rows.map((row) => row.path);
   const aliases = aliasesOf(rows);
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -118,7 +114,7 @@ export function SessionSidebar({
   const [confirming, setConfirming] = useState<
     { kind: "session"; session: CodeSessionMeta } | { kind: "project"; project: string; n: number } | null
   >(null);
-  const groups = groupByProject(q.data ?? [], registered);
+  const groups = groupByProject(q.data ?? [], rows, workspace);
 
   const fork = useMutation({
     mutationFn: forkCodeSession,

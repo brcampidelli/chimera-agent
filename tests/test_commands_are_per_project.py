@@ -15,6 +15,14 @@ was global.
 decides whether a mounted one may run on the host. Neither does anything alone, which is the
 property most worth testing: a single-lock design fails open the day someone sets one of them for
 an unrelated reason.
+
+**And a record behind both.** Until study 29 (P4.3) the per-folder grant lived in the desktop's
+`localStorage` and reached the server only as those two fields, so the request WAS the grant: the
+desktop, the bridge's Full tier and any local process were believed. The grant is now a row in the
+server's project registry, and the two locks are a request held to it — a folder nobody granted
+gets the reach below `workspace_shell` and a gated tool, whatever the request says. The tests that
+open both locks therefore record the grant first, the way the Folders card does; the ones that do
+not are the point of the change.
 """
 
 from __future__ import annotations
@@ -26,6 +34,7 @@ import pytest
 
 from chimera.api.code_api import CodeSeams, assemble_registry
 from chimera.config import Settings
+from chimera.core.code_projects import CodeProjectRegistry
 
 
 class _Gateway:
@@ -35,11 +44,23 @@ class _Gateway:
         raise AssertionError("no model call belongs in this test")
 
 
-def _montar(tmp_path: Path, **over: Any) -> Any:
+def _registro(tmp_path: Path) -> CodeProjectRegistry:
+    return CodeProjectRegistry(tmp_path / "home" / "code_projects.json")
+
+
+def _conceder(tmp_path: Path, folder: Path | None = None) -> None:
+    """Record the owner's grant for a folder (the test's workspace by default)."""
+    _registro(tmp_path).set_grant(str(folder or tmp_path), True)
+
+
+def _montar(tmp_path: Path, *, ws: Path | None = None, **over: Any) -> Any:
+    settings_over = over.pop("_settings", {})
+    grant_root = over.pop("_grant_root", None)
     seams = CodeSeams(**over)
-    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), **over.pop("_settings", {}))
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), **settings_over)
     registry, _ledger = assemble_registry(
-        seams, tmp_path, settings, _Gateway(), steps=4, surface="test"
+        seams, ws or tmp_path, settings, _Gateway(), steps=4, surface="test",
+        grant_root=grant_root,
     )
     return registry
 
@@ -90,14 +111,16 @@ def test_neither_lock_alone_mounts_a_runnable_shell(tmp_path: Path) -> None:
 
 
 def test_the_reach_alone_mounts_the_tool_but_leaves_it_gated(tmp_path: Path) -> None:
-    """Unchanged behaviour: a reach that mounts the shell still meets the confirmation gate, which
-    on a server with no terminal is a refusal. This is what every install did before, and does."""
+    """Unchanged behaviour in a granted folder: a reach that mounts the shell still meets the
+    confirmation gate, which on a server with no terminal is a refusal."""
+    _conceder(tmp_path)
     registry = _montar(tmp_path, posture=COM_SHELL)
     assert _tem_shell(registry), "workspace_shell did not mount the shell tool"
     assert _gated(registry), "the tool was ungated without anybody asking"
 
 
 def test_both_locks_together_let_the_agent_run_commands(tmp_path: Path) -> None:
+    _conceder(tmp_path)
     registry = _montar(tmp_path, posture=COM_SHELL, allow_host_exec=True)
     assert _tem_shell(registry)
     assert not _gated(registry), "both locks were open and the tool was still gated"
@@ -113,6 +136,8 @@ def test_the_owner_can_refuse_system_wide(tmp_path: Path, monkeypatch: pytest.Mo
     from chimera.config import get_settings
 
     get_settings.cache_clear()
+    # Granted, so the only thing standing between the request and the host is the owner's `deny`.
+    _conceder(tmp_path)
     try:
         seams = CodeSeams(posture=COM_SHELL, allow_host_exec=True)
         settings = Settings(CHIMERA_HOME=str(tmp_path / "home"), CHIMERA_HOST_EXEC="deny")
@@ -132,6 +157,127 @@ def test_the_default_is_unchanged(tmp_path: Path) -> None:
 
 
 def test_read_only_stays_read_only_however_loudly_asked(tmp_path: Path) -> None:
-    """The strictest reach is not negotiable by a field further down the same request."""
+    """The strictest reach is not negotiable by a field further down the same request — nor by the
+    folder's grant: the grant answers "may it run commands HERE", not "may it do more than the
+    owner's standing reach"."""
+    _conceder(tmp_path)
     registry = _montar(tmp_path, posture=LEITURA, allow_host_exec=True)
     assert not _tem_shell(registry)
+
+
+# ---------------------------------------------------------------- the record behind the locks
+
+
+def test_a_client_claim_without_a_server_grant_gets_no_shell(tmp_path: Path) -> None:
+    """THE change. Both locks open in the request, nothing recorded for the folder: no shell tool.
+
+    Before, this was exactly the request the desktop sent for a folder its `localStorage` listed —
+    and the server had nothing to check it against, so any client that sent it was granted.
+    """
+    registry = _montar(tmp_path, posture=COM_SHELL, allow_host_exec=True)
+    assert not _tem_shell(registry), "a request granted itself the shell"
+
+
+def test_no_posture_and_a_host_exec_claim_still_meets_the_gate(tmp_path: Path) -> None:
+    """The other door: a request with NO posture denies nothing, so the shell is mounted — and
+    `allow_host_exec` alone used to ungate it. Without a recorded grant it stays gated."""
+    registry = _montar(tmp_path, allow_host_exec=True)
+    assert _tem_shell(registry)
+    assert _gated(registry), "allow_host_exec ungated the shell with no grant on record"
+
+
+def test_a_grant_on_another_folder_does_not_carry_over(tmp_path: Path) -> None:
+    outro = tmp_path / "outro"
+    outro.mkdir()
+    _conceder(tmp_path, outro)
+    registry = _montar(tmp_path, posture=COM_SHELL, allow_host_exec=True)
+    assert not _tem_shell(registry)
+
+
+def test_the_grant_follows_the_folder_not_the_spelling(tmp_path: Path) -> None:
+    """Recorded as one string, asked for as another that resolves to the same directory. The grant
+    is about where a command runs, and that is the resolved folder."""
+    projeto = tmp_path / "loja"
+    projeto.mkdir()
+    _registro(tmp_path).set_grant(str(tmp_path / "loja" / ".." / "loja"), True)
+    registry = _montar(tmp_path, ws=projeto, posture=COM_SHELL, allow_host_exec=True)
+    assert _tem_shell(registry) and not _gated(registry)
+
+
+def test_a_revoked_grant_takes_the_shell_away(tmp_path: Path) -> None:
+    _conceder(tmp_path)
+    _registro(tmp_path).set_grant(str(tmp_path), False)
+    registry = _montar(tmp_path, posture=COM_SHELL, allow_host_exec=True)
+    assert not _tem_shell(registry)
+
+
+def test_hiding_a_folder_revokes_its_grant(tmp_path: Path) -> None:
+    """A folder taken out of the lists is one nobody can see a grant on to take it back."""
+    _conceder(tmp_path)
+    _registro(tmp_path).set_flags(str(tmp_path), hidden=True)
+    registry = _montar(tmp_path, posture=COM_SHELL, allow_host_exec=True)
+    assert not _tem_shell(registry)
+
+
+def test_the_owners_reach_everywhere_is_a_grant_everywhere(tmp_path: Path) -> None:
+    """`CHIMERA_REACH=workspace_shell` is the owner granting every folder at once, which is what the
+    bridge has always sent `allow_host_exec` for. No per-folder row is needed."""
+    registry = _montar(
+        tmp_path, posture=COM_SHELL, allow_host_exec=True,
+        _settings={"CHIMERA_REACH": "workspace_shell"},
+    )
+    assert _tem_shell(registry) and not _gated(registry)
+
+
+def test_a_worker_in_a_copy_uses_the_projects_grant(tmp_path: Path) -> None:
+    """A crew worker runs in its own worktree, a folder no grant names. The project it was cut from
+    is the one the owner granted, and `grant_root` is how the server says so — never the request."""
+    _conceder(tmp_path)
+    copia = tmp_path / "worktree"
+    copia.mkdir()
+    sem = _montar(tmp_path, ws=copia, posture=COM_SHELL, allow_host_exec=True)
+    com = _montar(
+        tmp_path, ws=copia, posture=COM_SHELL, allow_host_exec=True, _grant_root=tmp_path
+    )
+    assert not _tem_shell(sem)
+    assert _tem_shell(com) and not _gated(com)
+
+
+def test_the_grant_root_cannot_be_sent_by_a_request() -> None:
+    """The worktree's root is server state. A request field named like it is ignored, not obeyed —
+    otherwise any request could borrow the grant of any folder it could name."""
+    seams = CodeSeams.model_validate({"_grant_root": "/somewhere/granted", "grant_root": "/x"})
+    assert seams._grant_root is None
+
+
+def test_a_batch_task_carries_the_projects_folder_to_the_grant(tmp_path: Path) -> None:
+    """`POST /api/agents` runs each task in a worktree cut from the project. The server stamps the
+    project on the task's seams so the grant is looked up there, and a request cannot set it."""
+    from fastapi.testclient import TestClient
+
+    from chimera.api import build_api_app
+    from chimera.interface.session import ChatSession
+
+    ws = tmp_path / "plain"
+    ws.mkdir()
+    seen: list[Any] = []
+
+    class _Done:
+        def run(self, task: str) -> Any:
+            from chimera.core.autonomous import AutonomousResult
+
+            return AutonomousResult(answer="ok", success=True)
+
+    def factory(req: Any, run_ws: Any, *_rest: Any) -> Any:
+        seen.append(req._grant_root)
+        return _Done()
+
+    settings = Settings(CHIMERA_HOME=str(tmp_path / "home"))
+    client = TestClient(
+        build_api_app(lambda: ChatSession(_Done()), settings=settings, solve_agent_factory=factory)
+    )
+    client.post(
+        "/api/agents",
+        json={"tasks": [{"task": "t"}], "workspace": str(ws), "_grant_root": "/elsewhere"},
+    )
+    assert seen == [ws.resolve()]

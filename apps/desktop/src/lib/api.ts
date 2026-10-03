@@ -1859,12 +1859,23 @@ export const deleteCodeProject = (workspace: string) =>
     method: "DELETE",
   });
 
-/** One registered project: where it is, and what you call it. */
+/** One registered project: where it is, what you call it, and what you decided about it. */
 export interface CodeProject {
   path: string;
   /** Your name for it. Empty means "no name", not the name "" — the fallback depends on telling
    *  those apart. */
   alias: string;
+  /** The agent may run commands here. The SERVER's record, which every turn is held to: the screen
+   *  reads it from here and never asserts it. Absent from a server that predates it = not granted. */
+  shell_granted?: boolean;
+  /** When it was granted (ISO-8601 UTC); empty when not granted. */
+  granted_at?: string;
+  /** Listed first in the sidebar. */
+  pinned?: boolean;
+  /** When a turn last started here (ISO-8601 UTC); empty = never. */
+  last_used_at?: string;
+  /** Removed from the lists. Kept as a row so a folder with conversations stays out of the sidebar. */
+  hidden?: boolean;
 }
 
 /** The projects you have added, in the order you added them.
@@ -1892,6 +1903,37 @@ export const registerCodeProject = (path: string, alias?: string) =>
 export const forgetCodeProject = (path: string) =>
   json<CodeProject[]>(`/api/code/workspaces?path=${encodeURIComponent(path)}`, {
     method: "DELETE",
+  });
+
+/** Pin or hide a project; it is registered if it was not. Hiding also revokes its command grant and
+ *  its pin — a permission on a row nobody can see is one nobody takes back. Leave a field undefined
+ *  to say nothing about it. */
+export const flagCodeProject = (path: string, flags: { pinned?: boolean; hidden?: boolean }) =>
+  json<CodeProject[]>("/api/code/workspaces", {
+    method: "PATCH",
+    body: JSON.stringify({ path, ...flags }),
+  });
+
+/** Let the agent run commands in one folder, or stop it. The record the server enforces. */
+export const grantCodeProjectShell = (path: string, granted: boolean) =>
+  json<CodeProject[]>("/api/code/workspaces/grant", {
+    method: "PUT",
+    body: JSON.stringify({ path, shell_granted: granted }),
+  });
+
+/** What the one-time hand-over of this browser's old grants did. */
+export interface GrantMigration {
+  /** False = it had already happened on this installation, and nothing changed. */
+  migrated: boolean;
+  recorded: number;
+  projects: CodeProject[];
+}
+
+/** Hand the grants this webview kept in its own storage to the server — once per installation. */
+export const migrateShellGrants = (paths: string[]) =>
+  json<GrantMigration>("/api/code/workspaces/grant/migrate", {
+    method: "POST",
+    body: JSON.stringify({ paths }),
   });
 
 /** Branch a conversation into a new one, and get the new one's sidebar row back.
