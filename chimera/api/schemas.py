@@ -654,6 +654,42 @@ class DecisionsCfgOut(BaseModel):
     verified_answers_threshold: float = 0.8
 
 
+class SpendCfgOut(BaseModel):
+    """The day's dollar ceiling (``CHIMERA_DAILY_USD_CAP``). ``None`` is no cap, the shipped state.
+
+    It brakes SCHEDULED jobs only (``chimera/scheduler/job_runner.py``): a chat or Code turn is not
+    stopped by it, and the Usage screen says so beside the field rather than letting "daily cap"
+    read as a ceiling on everything."""
+
+    daily_usd_cap: float | None = None
+
+
+class KeepAwakeCfgOut(BaseModel):
+    """What the owner chose for ``chimera/core/keep_awake.py``. Off by default; a server without
+    the block is on that default."""
+
+    mode: str = "off"
+    on_battery: bool = False
+
+
+class KeepAwakeOut(BaseModel):
+    """Whether this process is holding the machine awake right now, and why.
+
+    ``active`` is the OS state, not the setting: ``working`` with nothing running is not active, and
+    work present on battery is ``blocked="battery"``. The status bar shows a line only while
+    ``active`` is true, so it can never claim a hold that is not there."""
+
+    mode: str = "off"
+    active: bool = False
+    reasons: list[str] = Field(default_factory=list)
+    """``turn``, ``work``, ``run``, ``cron``, ``always`` — what is keeping it up."""
+    blocked: str = ""
+    """``battery`` or ``unsupported`` when there is work and the machine is NOT held; else empty."""
+    mechanism: str = ""
+    """``windows``, ``systemd-inhibit``, ``none``; empty until the keeper first needed one."""
+    on_battery_allowed: bool = False
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -664,6 +700,8 @@ class ConfigOut(BaseModel):
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
+    spend: SpendCfgOut = Field(default_factory=SpendCfgOut)
+    keep_awake: KeepAwakeCfgOut = Field(default_factory=KeepAwakeCfgOut)
     autonomy: AutonomyCfgOut
     server: ServerCfgOut
     mcp: McpCfgOut

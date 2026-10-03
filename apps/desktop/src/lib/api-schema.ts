@@ -1767,6 +1767,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/keep-awake": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Keep Awake Endpoint
+         * @description Whether this process holds the machine awake now, and for what — the status bar's line.
+         *
+         *     The keeper's last decision, never a fresh one: the OS is touched only from the keeper's own
+         *     thread (on Windows the hold belongs to the thread that set it).
+         */
+        get: operations["keep_awake_endpoint_api_keep_awake_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/lifecycle": {
         parameters: {
             query?: never;
@@ -4346,6 +4369,7 @@ export interface components {
             experimental?: components["schemas"]["ExperimentalCfgOut"];
             fusion?: components["schemas"]["FusionCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
+            keep_awake?: components["schemas"]["KeepAwakeCfgOut"];
             mcp: components["schemas"]["McpCfgOut"];
             memory: components["schemas"]["MemoryCfgOut"];
             messaging?: components["schemas"]["MessagingCfgOut"];
@@ -4358,6 +4382,7 @@ export interface components {
             providers: components["schemas"]["ProviderOut"][];
             sandbox: components["schemas"]["SandboxCfgOut"];
             server: components["schemas"]["ServerCfgOut"];
+            spend?: components["schemas"]["SpendCfgOut"];
         };
         /** ConfigTestOut */
         ConfigTestOut: {
@@ -6080,6 +6105,60 @@ export interface components {
             workspace?: string | null;
         };
         /**
+         * KeepAwakeCfgOut
+         * @description What the owner chose for ``chimera/core/keep_awake.py``. Off by default; a server without
+         *     the block is on that default.
+         */
+        KeepAwakeCfgOut: {
+            /**
+             * Mode
+             * @default off
+             */
+            mode: string;
+            /**
+             * On Battery
+             * @default false
+             */
+            on_battery: boolean;
+        };
+        /**
+         * KeepAwakeOut
+         * @description Whether this process is holding the machine awake right now, and why.
+         *
+         *     ``active`` is the OS state, not the setting: ``working`` with nothing running is not active, and
+         *     work present on battery is ``blocked="battery"``. The status bar shows a line only while
+         *     ``active`` is true, so it can never claim a hold that is not there.
+         */
+        KeepAwakeOut: {
+            /**
+             * Active
+             * @default false
+             */
+            active: boolean;
+            /**
+             * Blocked
+             * @default
+             */
+            blocked: string;
+            /**
+             * Mechanism
+             * @default
+             */
+            mechanism: string;
+            /**
+             * Mode
+             * @default off
+             */
+            mode: string;
+            /**
+             * On Battery Allowed
+             * @default false
+             */
+            on_battery_allowed: boolean;
+            /** Reasons */
+            reasons?: string[];
+        };
+        /**
          * LibraryCardOut
          * @description One curated skill card, at the level the browser asked for.
          *
@@ -7591,6 +7670,18 @@ export interface components {
         SpecWriteOut: {
             /** Path */
             path: string;
+        };
+        /**
+         * SpendCfgOut
+         * @description The day's dollar ceiling (``CHIMERA_DAILY_USD_CAP``). ``None`` is no cap, the shipped state.
+         *
+         *     It brakes SCHEDULED jobs only (``chimera/scheduler/job_runner.py``): a chat or Code turn is not
+         *     stopped by it, and the Usage screen says so beside the field rather than letting "daily cap"
+         *     read as a ceiling on everything.
+         */
+        SpendCfgOut: {
+            /** Daily Usd Cap */
+            daily_usd_cap?: number | null;
         };
         /** SubtaskOut */
         SubtaskOut: {
@@ -10915,6 +11006,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keep_awake_endpoint_api_keep_awake_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KeepAwakeOut"];
                 };
             };
         };

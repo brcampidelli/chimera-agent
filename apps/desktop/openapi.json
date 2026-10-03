@@ -2440,6 +2440,9 @@
           "guard": {
             "$ref": "#/components/schemas/GuardCfgOut"
           },
+          "keep_awake": {
+            "$ref": "#/components/schemas/KeepAwakeCfgOut"
+          },
           "mcp": {
             "$ref": "#/components/schemas/McpCfgOut"
           },
@@ -2478,6 +2481,9 @@
           },
           "server": {
             "$ref": "#/components/schemas/ServerCfgOut"
+          },
+          "spend": {
+            "$ref": "#/components/schemas/SpendCfgOut"
           }
         },
         "required": [
@@ -6066,6 +6072,62 @@
         "title": "KanbanRunIn",
         "type": "object"
       },
+      "KeepAwakeCfgOut": {
+        "description": "What the owner chose for ``chimera/core/keep_awake.py``. Off by default; a server without\nthe block is on that default.",
+        "properties": {
+          "mode": {
+            "default": "off",
+            "title": "Mode",
+            "type": "string"
+          },
+          "on_battery": {
+            "default": false,
+            "title": "On Battery",
+            "type": "boolean"
+          }
+        },
+        "title": "KeepAwakeCfgOut",
+        "type": "object"
+      },
+      "KeepAwakeOut": {
+        "description": "Whether this process is holding the machine awake right now, and why.\n\n``active`` is the OS state, not the setting: ``working`` with nothing running is not active, and\nwork present on battery is ``blocked=\"battery\"``. The status bar shows a line only while\n``active`` is true, so it can never claim a hold that is not there.",
+        "properties": {
+          "active": {
+            "default": false,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "blocked": {
+            "default": "",
+            "title": "Blocked",
+            "type": "string"
+          },
+          "mechanism": {
+            "default": "",
+            "title": "Mechanism",
+            "type": "string"
+          },
+          "mode": {
+            "default": "off",
+            "title": "Mode",
+            "type": "string"
+          },
+          "on_battery_allowed": {
+            "default": false,
+            "title": "On Battery Allowed",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          }
+        },
+        "title": "KeepAwakeOut",
+        "type": "object"
+      },
       "LibraryCardOut": {
         "description": "One curated skill card, at the level the browser asked for.\n\n``body`` is empty in the list and filled on the detail route \u2014 the progressive disclosure the\ncard format is built around (metadata decides relevance, instructions load when chosen). Sending\nall twenty-three bodies to draw a list would be a quarter of a megabyte to render one line each.",
         "properties": {
@@ -9528,6 +9590,24 @@
           "path"
         ],
         "title": "SpecWriteOut",
+        "type": "object"
+      },
+      "SpendCfgOut": {
+        "description": "The day's dollar ceiling (``CHIMERA_DAILY_USD_CAP``). ``None`` is no cap, the shipped state.\n\nIt brakes SCHEDULED jobs only (``chimera/scheduler/job_runner.py``): a chat or Code turn is not\nstopped by it, and the Usage screen says so beside the field rather than letting \"daily cap\"\nread as a ceiling on everything.",
+        "properties": {
+          "daily_usd_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily Usd Cap"
+          }
+        },
+        "title": "SpendCfgOut",
         "type": "object"
       },
       "SubtaskOut": {
@@ -14178,6 +14258,25 @@
           }
         },
         "summary": "Run Kanban"
+      }
+    },
+    "/api/keep-awake": {
+      "get": {
+        "description": "Whether this process holds the machine awake now, and for what \u2014 the status bar's line.\n\nThe keeper's last decision, never a fresh one: the OS is touched only from the keeper's own\nthread (on Windows the hold belongs to the thread that set it).",
+        "operationId": "keep_awake_endpoint_api_keep_awake_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeepAwakeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Keep Awake Endpoint"
       }
     },
     "/api/lifecycle": {

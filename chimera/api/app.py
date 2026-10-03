@@ -90,6 +90,7 @@ from chimera.api.schemas import (
     JobLogOut,
     JobOut,
     JobsOut,
+    KeepAwakeOut,
     LocalRuntimesOut,
     MaturityOut,
     McpAddRequest,
@@ -607,6 +608,14 @@ def build_api_app(
     app.state.folder_locks = folder_locks
     # The runs that can still be stopped, readable from outside for the same reason `/cancel` exists.
     app.state.run_cancels = _run_cancels
+    # The machine's sleep, held while there is work (`chimera/core/keep_awake.py`; off by default).
+    # The turns hold it themselves (`code_api`); the runs are counted from the map above, which
+    # registers a run before its worker starts and drops it in the worker's `finally`.
+    from chimera.core.keep_awake import service as keep_awake_service
+
+    keep_awake = keep_awake_service()
+    keep_awake.add_probe("run", lambda: len(_run_cancels))
+    app.state.keep_awake = keep_awake
 
     # Cross-origin, only for the origins the operator named, and only when they named some.
     #
@@ -637,6 +646,14 @@ def build_api_app(
     def health() -> dict[str, Any]:
         return {"status": "ok", "sessions": len(store.list())}
 
+    @app.get("/api/keep-awake", dependencies=[guard], response_model=KeepAwakeOut)
+    def keep_awake_endpoint() -> dict[str, Any]:
+        """Whether this process holds the machine awake now, and for what — the status bar's line.
+
+        The keeper's last decision, never a fresh one: the OS is touched only from the keeper's own
+        thread (on Windows the hold belongs to the thread that set it)."""
+        return keep_awake.state().to_dict()
+
     @app.get("/api/config", dependencies=[guard], response_model=ConfigOut)
     def read_config_endpoint() -> dict[str, Any]:
         from chimera.api.config_api import read_config
@@ -655,6 +672,10 @@ def build_api_app(
         # rather than at a relaunch the screen would have to ask for.
         if BRIDGE_SETTINGS & set(updates):
             desktop_bridge.sync()
+        # A keep-awake switch applies at the keeper's next tick; nudge it so that is now, and the
+        # status bar does not go on describing the old setting for up to fifteen seconds.
+        if {"CHIMERA_KEEP_AWAKE", "CHIMERA_KEEP_AWAKE_ON_BATTERY"} & set(updates):
+            keep_awake.nudge()
         return result
 
     # Pools are edited by OPERATION, not by value. `PATCH /api/config` writes a string, and a string

@@ -1310,6 +1310,12 @@ def register_code_api(
     from chimera.api.live_turns import LiveTurns
 
     live_turns = LiveTurns()
+    # The machine must not go to sleep under a turn (`chimera/core/keep_awake.py`). The app's keeper
+    # when there is one, so the status route and the turns read the same counter; a test mounting
+    # this alone gets the process's.
+    from chimera.core.keep_awake import service as _keep_awake_service
+
+    keep_awake = getattr(app.state, "keep_awake", None) or _keep_awake_service()
     # What the turns running at once have spent together. Each turn warns about its own spend; five
     # at once could each stay under that and spend five times it without a word (R14, 2026-09-30).
     from chimera.api.combined_spend import CombinedSpend
@@ -2017,6 +2023,11 @@ def register_code_api(
             # the merge used a fresh gateway and still does not go through fusion.
             turn_backend = getattr(agent, "backend", None)
             tidy_meter = None if turn_backend is None else _Meter(turn_backend, label="tidy")
+            # Held from here to the `finally` that releases it, with nothing between that can raise,
+            # and under its own name so the status bar can say which kind of work keeps the machine
+            # up. Counting is all this does unless the owner turned CHIMERA_KEEP_AWAKE on.
+            awake_reason = "work" if background is not None else "turn"
+            keep_awake.acquire(awake_reason)
             try:
                 # Taken BEFORE the turn, so a turn that edits can be judged and undone like a run.
                 #
@@ -2472,6 +2483,7 @@ def register_code_api(
                     folder.release()
                 # Every way out of a turn, so a turn that died still stops being "running".
                 live_turns.finish(turn_id)
+                keep_awake.release(awake_reason)
                 combined_spend.close(turn_id)
                 deleted_mid_turn.discard(turn_id)
                 if held:

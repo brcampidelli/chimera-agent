@@ -2,6 +2,7 @@ import { Square } from "lucide-react";
 
 import { BrandMark } from "@/components/BrandMark";
 import { FocusButton, HiddenTray } from "@/components/shell/HiddenTray";
+import { KeepAwakeIndicator } from "@/components/shell/KeepAwakeIndicator";
 import { PendingApprovals } from "@/components/shell/PendingApprovals";
 import { RunningElsewhere } from "@/components/shell/RunningElsewhere";
 import { ServerBadge } from "@/components/ServerBadge";
@@ -117,6 +118,10 @@ export function AgentStatusBar({ onOpenUsage }: { onOpenUsage?: () => void }) {
       )}
 
       <div className="flex-1" />
+
+      {/* Why the machine is not going to sleep, while it is not. Renders nothing otherwise — the
+          setting is off by default, and when it is on the line appears only while something holds. */}
+      <KeepAwakeIndicator />
 
       {/* First in the right-hand cluster, beside Stop, because it is the same kind of thing: the
           agent is waiting on YOU, from whichever screen you happen to be on. Renders nothing at

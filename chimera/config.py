@@ -849,6 +849,27 @@ class Settings(BaseSettings):
         default=True, validation_alias="CHIMERA_CRON_NOTIFY_FAILURES"
     )
 
+    # Keep this computer from going to sleep while there is work (study 29, P2.5;
+    # `chimera/core/keep_awake.py`). `off` (the default) never touches the operating system;
+    # `working` holds the machine awake while a coding turn, a background work, an autonomous run
+    # or a scheduled job is running or due within ten minutes, and lets go when the last one ends;
+    # `always` holds it for as long as the app is open. OFF by default because it changes what the
+    # machine does and spends battery, and nothing has measured that it should be on: the item's
+    # measure is the count of missed schedules on the owner's machine, before and after.
+    #
+    # What it prevents is IDLE sleep. Closing the lid, pressing the power button or choosing Sleep
+    # still sleeps, and the setting's hint says so. A headless server has no idle sleep to prevent,
+    # so there it does nothing. Read on every tick of the keeper, so a change applies in seconds.
+    keep_awake: Literal["off", "working", "always"] = Field(
+        default="off", validation_alias="CHIMERA_KEEP_AWAKE"
+    )
+    # Whether `keep_awake` still holds while the machine runs on battery. Off by default: a laptop
+    # unplugged in a bag that refuses to sleep is the failure that costs the most, and it is the one
+    # nobody is there to see.
+    keep_awake_on_battery: bool = Field(
+        default=False, validation_alias="CHIMERA_KEEP_AWAKE_ON_BATTERY"
+    )
+
     # Auto-start the messaging adapters (Discord/Telegram) inside `chimera app` at boot, so the agent
     # can reach you on chat without a separate `chimera serve --discord` terminal. OFF by default: it
     # opens a network bot, so it's a deliberate opt-in. The desktop UI's Messaging toggle sets this
@@ -1233,6 +1254,34 @@ class Settings(BaseSettings):
             )
             return "ask"
         return word
+
+    @field_validator("keep_awake", mode="before")
+    @classmethod
+    def _keep_awake_is_a_mode_word(cls, value: object) -> object:
+        """Unknown or empty falls back to `off` — the state that touches nothing, so a typo cannot
+        keep a laptop awake in a bag. Warned rather than raised, for the reason
+        `_empty_boolean_is_unset` gives: a bad line must not stop the app from starting."""
+        if not isinstance(value, str):
+            return value
+        word = value.strip().lower()
+        if word in ("off", "working", "always"):
+            return word
+        if word:
+            _log.warning(
+                "CHIMERA_KEEP_AWAKE=%r is not one of off, working, always; falling back to 'off'.",
+                word,
+            )
+        return "off"
+
+    @field_validator("daily_usd_cap", mode="before")
+    @classmethod
+    def _empty_cap_is_no_cap(cls, value: object) -> object:
+        """`CHIMERA_DAILY_USD_CAP=` is how the Usage screen removes the cap, and pydantic reads an
+        empty string as a float that failed to parse — which would stop the app from starting the
+        moment the person cleared the field. Empty is the absence of a cap, as unset already is."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("taint_authority", mode="before")
     @classmethod

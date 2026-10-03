@@ -40,6 +40,7 @@ import type {
   MemoryLayers,
   MemoryProfile,
   ModelListing,
+  KeepAwakeState,
   LocalRuntimes,
   NetworkShare,
   ShareInfo,
@@ -160,6 +161,9 @@ async function json<T>(path: string, init?: RequestInit): Promise<T> {
 export const getVersion = () => json<VersionInfo>("/api/version");
 
 export const getConfig = () => json<AppConfig>("/api/config");
+// What the keeper is DOING, as opposed to what the owner chose (that is `getConfig().keep_awake`):
+// `active` is true only while the operating system is actually being asked to stay up.
+export const getKeepAwake = () => json<KeepAwakeState>("/api/keep-awake");
 export const getInstructions = () => json<AgentIdentity>("/api/instructions");
 // The agents you send work to. Every call returns the WHOLE registry, so a screen never has
 // to guess what the list looks like after a change it just made.

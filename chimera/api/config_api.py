@@ -14,7 +14,9 @@ This maps directly to the competitor's Model / API-Keys / Gateway settings panes
 
 from __future__ import annotations
 
+import math
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +91,14 @@ _EDITABLE_SETTINGS = {
     # Whether a scheduled job's channel hears that it could not run. Beside the cron switch for the
     # same reason that one is here; read per tick, so it needs no APPLIES_WHEN entry.
     "CHIMERA_CRON_NOTIFY_FAILURES",
+    # The day's dollar ceiling. It existed and braked the scheduler with no screen anywhere, so a
+    # person who wanted to bound what unattended jobs spend had to find it in the source. It brakes
+    # ONLY scheduled jobs (`chimera/scheduler/job_runner.py`), and the Usage screen says so on the row.
+    "CHIMERA_DAILY_USD_CAP",
+    # Whether the machine is held awake while there is work (`chimera/core/keep_awake.py`), and
+    # whether that still holds on battery. Read on the keeper's every tick, so no APPLIES_WHEN entry.
+    "CHIMERA_KEEP_AWAKE",
+    "CHIMERA_KEEP_AWAKE_ON_BATTERY",
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
     # Who may talk to each bot. Not secrets — platform ids — so they are read back in full, like the
     # egress list: a list the owner cannot read is a list they cannot correct, and the failure it
@@ -420,6 +430,13 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "research_agent": settings.research_agent,
             "explorer_contract": settings.explorer_contract,
         },
+        # The day's dollar ceiling, as set; `None` is no cap. Scheduled jobs only — see SpendCfgOut.
+        "spend": {"daily_usd_cap": settings.daily_usd_cap},
+        # The owner's keep-awake choice. What the keeper is DOING is `GET /api/keep-awake`.
+        "keep_awake": {
+            "mode": settings.keep_awake,
+            "on_battery": settings.keep_awake_on_battery,
+        },
         # Which backend answers a typed decision, and which model; empty = the backend's default.
         "decisions": {
             "backend": (settings.decision_backend or "local_logprob").strip(),
@@ -595,6 +612,48 @@ def _write_env_var(path: Path, key: str, value: str) -> None:
     tmp.replace(path)
 
 
+def _check_daily_cap(value: str) -> None:
+    """Empty (no cap) or a positive dollar amount.
+
+    Zero is refused rather than stored: the scheduler reads the cap with ``if cap``, so ``0`` would
+    be saved, shown as a cap of $0.00, and brake nothing. A value that does not parse is refused
+    because ``Settings`` would then fail to build and take the whole app down at the next read.
+    """
+    text = value.strip()
+    if not text:
+        return
+    try:
+        amount = float(text)
+    except ValueError as exc:
+        raise ValueError(f"CHIMERA_DAILY_USD_CAP must be a dollar amount, not {text!r}") from exc
+    if not math.isfinite(amount) or amount <= 0:
+        raise ValueError(
+            "CHIMERA_DAILY_USD_CAP must be more than zero; leave it empty for no daily cap"
+        )
+
+
+def _check_keep_awake(value: str) -> None:
+    if value.strip().lower() not in ("off", "working", "always"):
+        raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
+
+
+def _check_boolean(key: str) -> Callable[[str], None]:
+    def check(value: str) -> None:
+        if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+            raise ValueError(f"{key} must be true or false")
+
+    return check
+
+
+#: Values checked before anything is written, for the keys where a bad value is worse than a
+#: refusal: one the app would fail to start on, or one that would be saved and silently do nothing.
+_VALUE_CHECKS: dict[str, Callable[[str], None]] = {
+    "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
+    "CHIMERA_KEEP_AWAKE": _check_keep_awake,
+    "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
+}
+
+
 def _check_decision_choice(updates: dict[str, str]) -> None:
     """Refuse a decision backend/model pair the factory cannot honour, before anything is written.
 
@@ -628,6 +687,10 @@ def patch_config(updates: dict[str, str], *, env_path: Path | None = None) -> di
     for key, value in updates.items():
         if any(c in str(value) for c in "\r\n"):
             raise ValueError(f"value for {key} may not contain a newline")
+    for key, value in updates.items():
+        check = _VALUE_CHECKS.get(key)
+        if check is not None:
+            check(str(value))
     _check_decision_choice(updates)
     path = env_path or Path(".env")
     for key, value in updates.items():

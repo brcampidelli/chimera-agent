@@ -3258,6 +3258,14 @@ def _start_cron_daemon(
         on_outcome=notices,
     )
     _thread, stop = daemon.start()
+    # A job due within the next minutes keeps the machine awake for it, and so does the one running
+    # now (its `next_run` advances only after it returns). Registered here, beside the daemon that
+    # fires them, because a schedule nobody in this process will fire is no reason to stay up. Does
+    # nothing unless CHIMERA_KEEP_AWAKE is on (`chimera/core/keep_awake.py`).
+    from chimera.core.keep_awake import cron_due_probe
+    from chimera.core.keep_awake import service as keep_awake_service
+
+    keep_awake_service().add_probe("cron", cron_due_probe(scheduler))
     jobs = len(scheduler.store.list())
     console.print(f"[dim]cron daemon on (tick {tick}s, {jobs} job(s) scheduled)[/dim]")
     return stop

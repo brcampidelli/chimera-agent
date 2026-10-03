@@ -277,6 +277,32 @@ const en: Dict = {
   "settings.row.appCron": "Run scheduled jobs",
   "settings.hint.appCron":
     "Fires the jobs on the Automation screen, but only while this app is open. For jobs that run 24/7, run `chimera serve --cron` on a machine that stays on.",
+  "settings.card.keepAwake": "Keep this computer awake",
+  "settings.keepAwake.intro":
+    "Stops the computer from going to sleep while Chimera has work, and lets it sleep again when the work ends. The status bar says when it is holding the computer awake, and why.",
+  "settings.keepAwake.off": "Off",
+  "settings.keepAwake.offHint": "Never touches the computer's sleep. The default.",
+  "settings.keepAwake.working": "While there is work",
+  "settings.keepAwake.workingHint":
+    "While a coding turn, a background work or a run is going, or a scheduled task is due within ten minutes.",
+  "settings.keepAwake.always": "Always, while the app is open",
+  "settings.keepAwake.alwaysHint":
+    "Holds the computer awake for as long as Chimera is running, work or not.",
+  "settings.keepAwake.onBattery": "Also on battery",
+  "settings.keepAwake.onBatteryHint":
+    "When off, the computer may sleep on battery even with work running.",
+  "settings.keepAwake.limits":
+    "Prevents idle sleep only. Closing the lid, the power button or choosing Sleep still puts the computer to sleep, and the screen may still turn off.",
+  "settings.keepAwake.blockedBattery":
+    "There is work, but the computer is on battery, so it is not being held awake.",
+  "settings.keepAwake.blockedUnsupported":
+    "There is work, but this system gives Chimera no way to hold it awake (supported: Windows, and Linux desktops with systemd).",
+  "keepAwake.status": "Keeping awake: {reason}",
+  "keepAwake.reason.turn": "a coding turn",
+  "keepAwake.reason.work": "a background work",
+  "keepAwake.reason.run": "a run",
+  "keepAwake.reason.cron": "a scheduled task",
+  "keepAwake.reason.always": "always on",
   "settings.tab.connections": "Connections",
   "settings.tab.capabilities": "Capabilities",
   "settings.tab.security": "Security",
@@ -707,6 +733,10 @@ const en: Dict = {
   "fusion.agreement": "agreement",
   "nav.usage": "Usage",
   "usage.title": "Cost & Usage",
+  "usage.dailyCap": "Daily cap",
+  "usage.dailyCap.none": "no cap",
+  "usage.dailyCap.hint":
+    "Applies to scheduled tasks only. When today's spend reaches it, a scheduled job is refused and its status says why; a job marked critical still runs. Chat and Code turns are not stopped by it. The day is counted in UTC. Empty means no cap.",
   "usage.empty": "Usage is recorded from now on — chat a bit and come back.",
   "usage.totals": "Totals",
   "usage.turns": "Turns",
@@ -1945,6 +1975,32 @@ const pt: Dict = {
   "settings.row.appCron": "Executar agendamentos",
   "settings.hint.appCron":
     "Dispara os jobs da tela Automação, mas só enquanto este app estiver aberto. Para jobs 24/7, rode `chimera serve --cron` numa máquina que fique ligada.",
+  "settings.card.keepAwake": "Manter o computador acordado",
+  "settings.keepAwake.intro":
+    "Impede o computador de dormir enquanto o Chimera tem trabalho e o deixa dormir de novo quando o trabalho acaba. A barra de status diz quando está mantendo o computador acordado, e por quê.",
+  "settings.keepAwake.off": "Desligado",
+  "settings.keepAwake.offHint": "Nunca mexe na suspensão do computador. É o padrão.",
+  "settings.keepAwake.working": "Enquanto houver trabalho",
+  "settings.keepAwake.workingHint":
+    "Enquanto houver um turno de código, um trabalho em segundo plano ou uma execução em andamento, ou um agendamento previsto para os próximos dez minutos.",
+  "settings.keepAwake.always": "Sempre, com o app aberto",
+  "settings.keepAwake.alwaysHint":
+    "Mantém o computador acordado enquanto o Chimera estiver rodando, com ou sem trabalho.",
+  "settings.keepAwake.onBattery": "Também na bateria",
+  "settings.keepAwake.onBatteryHint":
+    "Desligado, o computador pode dormir na bateria mesmo com trabalho em andamento.",
+  "settings.keepAwake.limits":
+    "Impede só a suspensão por inatividade. Fechar a tampa, o botão de energia ou escolher Suspender ainda põem o computador para dormir, e a tela ainda pode apagar.",
+  "settings.keepAwake.blockedBattery":
+    "Há trabalho, mas o computador está na bateria, então não está sendo mantido acordado.",
+  "settings.keepAwake.blockedUnsupported":
+    "Há trabalho, mas este sistema não dá ao Chimera um jeito de mantê-lo acordado (com suporte: Windows e Linux de mesa com systemd).",
+  "keepAwake.status": "Mantendo acordado: {reason}",
+  "keepAwake.reason.turn": "um turno de código",
+  "keepAwake.reason.work": "um trabalho em segundo plano",
+  "keepAwake.reason.run": "uma execução",
+  "keepAwake.reason.cron": "um agendamento",
+  "keepAwake.reason.always": "sempre ligado",
   "settings.tab.connections": "Conexões",
   "settings.tab.capabilities": "Capacidades",
   "settings.tab.security": "Segurança",
@@ -2381,6 +2437,10 @@ const pt: Dict = {
   "fusion.agreement": "concordância",
   "nav.usage": "Uso",
   "usage.title": "Custo e uso",
+  "usage.dailyCap": "Teto diário",
+  "usage.dailyCap.none": "sem teto",
+  "usage.dailyCap.hint":
+    "Vale só para tarefas agendadas. Quando o gasto do dia chega a ele, um agendamento é recusado e o status diz por quê; um agendamento marcado como crítico roda mesmo assim. Turnos de chat e de Código não são parados por ele. O dia é contado em UTC. Vazio significa sem teto.",
   "usage.empty":
     "O uso é registrado a partir de agora — converse um pouco e volte.",
   "usage.totals": "Totais",
@@ -3664,6 +3724,32 @@ const es: Dict = {
   "settings.row.appCron": "Ejecutar tareas programadas",
   "settings.hint.appCron":
     "Dispara las tareas de la pantalla Automatización, pero solo mientras esta app está abierta. Para tareas 24/7, ejecuta `chimera serve --cron` en una máquina que quede encendida.",
+  "settings.card.keepAwake": "Mantener el equipo despierto",
+  "settings.keepAwake.intro":
+    "Impide que el equipo entre en suspensión mientras Chimera tiene trabajo, y lo deja dormir de nuevo cuando el trabajo termina. La barra de estado indica cuándo lo mantiene despierto y por qué.",
+  "settings.keepAwake.off": "Desactivado",
+  "settings.keepAwake.offHint": "Nunca toca la suspensión del equipo. Es el valor predeterminado.",
+  "settings.keepAwake.working": "Mientras haya trabajo",
+  "settings.keepAwake.workingHint":
+    "Mientras haya un turno de código, un trabajo en segundo plano o una ejecución en curso, o una tarea programada prevista en los próximos diez minutos.",
+  "settings.keepAwake.always": "Siempre, con la app abierta",
+  "settings.keepAwake.alwaysHint":
+    "Mantiene el equipo despierto mientras Chimera esté en marcha, haya trabajo o no.",
+  "settings.keepAwake.onBattery": "También con batería",
+  "settings.keepAwake.onBatteryHint":
+    "Desactivado, el equipo puede suspenderse con batería aunque haya trabajo en curso.",
+  "settings.keepAwake.limits":
+    "Solo impide la suspensión por inactividad. Cerrar la tapa, el botón de encendido o elegir Suspender siguen suspendiendo el equipo, y la pantalla aún puede apagarse.",
+  "settings.keepAwake.blockedBattery":
+    "Hay trabajo, pero el equipo funciona con batería, así que no se mantiene despierto.",
+  "settings.keepAwake.blockedUnsupported":
+    "Hay trabajo, pero este sistema no le da a Chimera forma de mantenerlo despierto (compatibles: Windows y Linux de escritorio con systemd).",
+  "keepAwake.status": "Manteniendo despierto: {reason}",
+  "keepAwake.reason.turn": "un turno de código",
+  "keepAwake.reason.work": "un trabajo en segundo plano",
+  "keepAwake.reason.run": "una ejecución",
+  "keepAwake.reason.cron": "una tarea programada",
+  "keepAwake.reason.always": "siempre activo",
   "settings.tab.connections": "Conexiones",
   "settings.tab.capabilities": "Capacidades",
   "settings.tab.security": "Seguridad",
@@ -4068,6 +4154,10 @@ const es: Dict = {
   "fusion.agreement": "acuerdo",
   "nav.usage": "Uso",
   "usage.title": "Coste y uso",
+  "usage.dailyCap": "Tope diario",
+  "usage.dailyCap.none": "sin tope",
+  "usage.dailyCap.hint":
+    "Solo se aplica a las tareas programadas. Cuando el gasto del día lo alcanza, una tarea programada se rechaza y su estado dice por qué; una tarea marcada como crítica se ejecuta igualmente. Los turnos de chat y de Código no se detienen por él. El día se cuenta en UTC. Vacío significa sin tope.",
   "usage.empty":
     "El uso se registra a partir de ahora — chatea un poco y vuelve.",
   "usage.totals": "Totales",
@@ -5358,6 +5448,33 @@ const fr: Dict = {
   "settings.row.appCron": "Exécuter les tâches planifiées",
   "settings.hint.appCron":
     "Déclenche les tâches de l'écran Automatisation, mais seulement tant que cette app est ouverte. Pour des tâches 24 h/24, lancez `chimera serve --cron` sur une machine qui reste allumée.",
+  "settings.card.keepAwake": "Garder l'ordinateur éveillé",
+  "settings.keepAwake.intro":
+    "Empêche l'ordinateur de se mettre en veille tant que Chimera a du travail, et le laisse dormir de nouveau quand le travail se termine. La barre d'état indique quand il le garde éveillé, et pourquoi.",
+  "settings.keepAwake.off": "Désactivé",
+  "settings.keepAwake.offHint":
+    "Ne touche jamais à la mise en veille de l'ordinateur. C'est le réglage par défaut.",
+  "settings.keepAwake.working": "Tant qu'il y a du travail",
+  "settings.keepAwake.workingHint":
+    "Tant qu'un tour de code, un travail en arrière-plan ou une exécution est en cours, ou qu'une tâche planifiée est prévue dans les dix minutes.",
+  "settings.keepAwake.always": "Toujours, tant que l'app est ouverte",
+  "settings.keepAwake.alwaysHint":
+    "Garde l'ordinateur éveillé tant que Chimera tourne, avec ou sans travail.",
+  "settings.keepAwake.onBattery": "Aussi sur batterie",
+  "settings.keepAwake.onBatteryHint":
+    "Désactivé, l'ordinateur peut se mettre en veille sur batterie même avec du travail en cours.",
+  "settings.keepAwake.limits":
+    "Empêche seulement la veille par inactivité. Fermer le capot, le bouton d'alimentation ou choisir Veille mettent toujours l'ordinateur en veille, et l'écran peut encore s'éteindre.",
+  "settings.keepAwake.blockedBattery":
+    "Il y a du travail, mais l'ordinateur est sur batterie : il n'est donc pas gardé éveillé.",
+  "settings.keepAwake.blockedUnsupported":
+    "Il y a du travail, mais ce système ne donne à Chimera aucun moyen de le garder éveillé (pris en charge : Windows, et Linux de bureau avec systemd).",
+  "keepAwake.status": "Maintenu éveillé : {reason}",
+  "keepAwake.reason.turn": "un tour de code",
+  "keepAwake.reason.work": "un travail en arrière-plan",
+  "keepAwake.reason.run": "une exécution",
+  "keepAwake.reason.cron": "une tâche planifiée",
+  "keepAwake.reason.always": "toujours actif",
   "settings.tab.connections": "Connexions",
   "settings.tab.capabilities": "Capacités",
   "settings.tab.security": "Sécurité",
@@ -5765,6 +5882,10 @@ const fr: Dict = {
   "fusion.agreement": "accord",
   "nav.usage": "Usage",
   "usage.title": "Coût et usage",
+  "usage.dailyCap": "Plafond quotidien",
+  "usage.dailyCap.none": "aucun plafond",
+  "usage.dailyCap.hint":
+    "S'applique aux tâches planifiées uniquement. Quand la dépense du jour l'atteint, une tâche planifiée est refusée et son état dit pourquoi ; une tâche marquée critique s'exécute quand même. Les tours de chat et de Code ne sont pas arrêtés par lui. Le jour est compté en UTC. Vide signifie aucun plafond.",
   "usage.empty":
     "L'usage est enregistré à partir de maintenant — discutez un peu et revenez.",
   "usage.totals": "Totaux",
@@ -7062,6 +7183,33 @@ const de: Dict = {
   "settings.row.appCron": "Geplante Jobs ausführen",
   "settings.hint.appCron":
     "Löst die Jobs im Automatisierungs-Screen aus, aber nur, solange diese App offen ist. Für Jobs rund um die Uhr `chimera serve --cron` auf einem Rechner starten, der eingeschaltet bleibt.",
+  "settings.card.keepAwake": "Computer wach halten",
+  "settings.keepAwake.intro":
+    "Verhindert, dass der Computer in den Ruhezustand geht, solange Chimera Arbeit hat, und lässt ihn wieder schlafen, wenn die Arbeit endet. Die Statusleiste zeigt, wann und warum er wach gehalten wird.",
+  "settings.keepAwake.off": "Aus",
+  "settings.keepAwake.offHint":
+    "Greift nie in den Ruhezustand des Computers ein. Die Voreinstellung.",
+  "settings.keepAwake.working": "Solange es Arbeit gibt",
+  "settings.keepAwake.workingHint":
+    "Solange ein Code-Durchlauf, eine Hintergrundarbeit oder ein Lauf aktiv ist oder ein geplanter Job in den nächsten zehn Minuten fällig ist.",
+  "settings.keepAwake.always": "Immer, solange die App offen ist",
+  "settings.keepAwake.alwaysHint":
+    "Hält den Computer wach, solange Chimera läuft, mit oder ohne Arbeit.",
+  "settings.keepAwake.onBattery": "Auch im Akkubetrieb",
+  "settings.keepAwake.onBatteryHint":
+    "Wenn aus, darf der Computer im Akkubetrieb schlafen, auch wenn Arbeit läuft.",
+  "settings.keepAwake.limits":
+    "Verhindert nur den Ruhezustand bei Inaktivität. Deckel schließen, Ein/Aus-Taste oder Energie sparen versetzen den Computer weiterhin in den Ruhezustand, und der Bildschirm kann sich trotzdem ausschalten.",
+  "settings.keepAwake.blockedBattery":
+    "Es gibt Arbeit, aber der Computer läuft im Akkubetrieb, daher wird er nicht wach gehalten.",
+  "settings.keepAwake.blockedUnsupported":
+    "Es gibt Arbeit, aber dieses System bietet Chimera keinen Weg, ihn wach zu halten (unterstützt: Windows und Linux-Desktops mit systemd).",
+  "keepAwake.status": "Wach gehalten: {reason}",
+  "keepAwake.reason.turn": "ein Code-Durchlauf",
+  "keepAwake.reason.work": "eine Hintergrundarbeit",
+  "keepAwake.reason.run": "ein Lauf",
+  "keepAwake.reason.cron": "ein geplanter Job",
+  "keepAwake.reason.always": "immer an",
   "settings.tab.connections": "Verbindungen",
   "settings.tab.capabilities": "Fähigkeiten",
   "settings.tab.security": "Sicherheit",
@@ -7468,6 +7616,10 @@ const de: Dict = {
   "fusion.agreement": "Übereinstimmung",
   "nav.usage": "Nutzung",
   "usage.title": "Kosten & Nutzung",
+  "usage.dailyCap": "Tageslimit",
+  "usage.dailyCap.none": "kein Limit",
+  "usage.dailyCap.hint":
+    "Gilt nur für geplante Jobs. Erreichen die heutigen Ausgaben es, wird ein geplanter Job abgelehnt und sein Status sagt warum; ein als kritisch markierter Job läuft trotzdem. Chat- und Code-Durchläufe werden davon nicht gestoppt. Der Tag wird in UTC gezählt. Leer bedeutet kein Limit.",
   "usage.empty":
     "Die Nutzung wird ab jetzt erfasst — chatte etwas und komm zurück.",
   "usage.totals": "Summen",
@@ -8752,6 +8904,26 @@ const zh: Dict = {
   "settings.row.appCron": "运行计划任务",
   "settings.hint.appCron":
     "触发“自动化”页面中的任务，但仅在本应用打开时运行。如需 24/7 运行，请在一台保持开机的机器上运行 `chimera serve --cron`。",
+  "settings.card.keepAwake": "保持电脑唤醒",
+  "settings.keepAwake.intro": "在 Chimera 有工作时阻止电脑进入睡眠，工作结束后让它再次睡眠。状态栏会显示何时保持唤醒以及原因。",
+  "settings.keepAwake.off": "关闭",
+  "settings.keepAwake.offHint": "从不干预电脑的睡眠。默认设置。",
+  "settings.keepAwake.working": "有工作时",
+  "settings.keepAwake.workingHint": "当编码轮次、后台工作或运行正在进行，或计划任务将在十分钟内触发时。",
+  "settings.keepAwake.always": "始终，只要应用打开",
+  "settings.keepAwake.alwaysHint": "只要 Chimera 在运行就保持电脑唤醒，无论是否有工作。",
+  "settings.keepAwake.onBattery": "使用电池时也保持",
+  "settings.keepAwake.onBatteryHint": "关闭时，即使有工作在进行，电脑在使用电池时也可以睡眠。",
+  "settings.keepAwake.limits": "仅阻止空闲睡眠。合上盖子、按电源键或选择睡眠仍会让电脑睡眠，屏幕也仍可能关闭。",
+  "settings.keepAwake.blockedBattery": "有工作，但电脑正在使用电池，因此未保持唤醒。",
+  "settings.keepAwake.blockedUnsupported":
+    "有工作，但此系统没有让 Chimera 保持唤醒的方法（支持：Windows，以及带 systemd 的 Linux 桌面）。",
+  "keepAwake.status": "保持唤醒：{reason}",
+  "keepAwake.reason.turn": "一个编码轮次",
+  "keepAwake.reason.work": "一个后台工作",
+  "keepAwake.reason.run": "一次运行",
+  "keepAwake.reason.cron": "一个计划任务",
+  "keepAwake.reason.always": "始终开启",
   "settings.tab.connections": "连接",
   "settings.tab.capabilities": "能力",
   "settings.tab.security": "安全",
@@ -9137,6 +9309,9 @@ const zh: Dict = {
   "fusion.agreement": "一致度",
   "nav.usage": "用量",
   "usage.title": "成本与用量",
+  "usage.dailyCap": "每日上限",
+  "usage.dailyCap.none": "无上限",
+  "usage.dailyCap.hint": "仅适用于计划任务。当日花费达到上限时，计划任务会被拒绝，其状态会说明原因；标记为关键的任务仍会运行。聊天和代码轮次不受其限制。日期按 UTC 计算。留空表示无上限。",
   "usage.empty": "从现在起开始记录用量——先聊几句再回来看。",
   "usage.totals": "合计",
   "usage.turns": "轮次",
@@ -10389,6 +10564,27 @@ const ja: Dict = {
   "settings.row.appCron": "スケジュール実行",
   "settings.hint.appCron":
     "「自動化」画面のジョブを実行しますが、このアプリが開いている間だけです。24時間動かすには、電源を入れたままのマシンで `chimera serve --cron` を実行してください。",
+  "settings.card.keepAwake": "コンピューターをスリープさせない",
+  "settings.keepAwake.intro":
+    "Chimera に作業がある間はコンピューターのスリープを防ぎ、作業が終わると再びスリープできるようにします。スリープを防いでいる間とその理由はステータスバーに表示されます。",
+  "settings.keepAwake.off": "オフ",
+  "settings.keepAwake.offHint": "コンピューターのスリープには一切触れません。既定値です。",
+  "settings.keepAwake.working": "作業がある間",
+  "settings.keepAwake.workingHint": "コードのターン、バックグラウンド作業、実行が進行中のとき、またはスケジュールが10分以内に予定されているとき。",
+  "settings.keepAwake.always": "常に（アプリが開いている間）",
+  "settings.keepAwake.alwaysHint": "作業の有無にかかわらず、Chimera が動いている間はスリープさせません。",
+  "settings.keepAwake.onBattery": "バッテリー駆動時も",
+  "settings.keepAwake.onBatteryHint": "オフのときは、作業中でもバッテリー駆動ならスリープできます。",
+  "settings.keepAwake.limits": "防ぐのはアイドル時のスリープだけです。蓋を閉じる、電源ボタン、スリープの選択では引き続きスリープし、画面も消えることがあります。",
+  "settings.keepAwake.blockedBattery": "作業はありますが、バッテリー駆動中のためスリープを防いでいません。",
+  "settings.keepAwake.blockedUnsupported":
+    "作業はありますが、このシステムには Chimera がスリープを防ぐ手段がありません（対応：Windows、systemd を使う Linux デスクトップ）。",
+  "keepAwake.status": "スリープ防止中: {reason}",
+  "keepAwake.reason.turn": "コードのターン",
+  "keepAwake.reason.work": "バックグラウンド作業",
+  "keepAwake.reason.run": "実行",
+  "keepAwake.reason.cron": "スケジュール",
+  "keepAwake.reason.always": "常時オン",
   "settings.tab.connections": "接続",
   "settings.tab.capabilities": "機能",
   "settings.tab.security": "セキュリティ",
@@ -10789,6 +10985,10 @@ const ja: Dict = {
   "fusion.agreement": "一致度",
   "nav.usage": "使用状況",
   "usage.title": "コストと使用状況",
+  "usage.dailyCap": "1日の上限",
+  "usage.dailyCap.none": "上限なし",
+  "usage.dailyCap.hint":
+    "スケジュールされたタスクにのみ適用されます。その日の支出が上限に達すると、スケジュールされたジョブは拒否され、ステータスに理由が表示されます。重要とマークされたジョブはそれでも実行されます。チャットとコードのターンはこれでは止まりません。日付は UTC で数えます。空欄は上限なしを意味します。",
   "usage.empty":
     "使用状況はこれから記録されます — 少しチャットしてから戻ってきてください。",
   "usage.totals": "合計",
@@ -12036,6 +12236,33 @@ const it: Dict = {
   "settings.row.appCron": "Esegui i lavori pianificati",
   "settings.hint.appCron":
     "Fa scattare i lavori della schermata Automazione, ma solo finché questa app è aperta. Per lavori 24/7, esegui `chimera serve --cron` su una macchina che resta accesa.",
+  "settings.card.keepAwake": "Tieni sveglio il computer",
+  "settings.keepAwake.intro":
+    "Impedisce al computer di andare in sospensione mentre Chimera ha del lavoro, e lo lascia dormire di nuovo quando il lavoro finisce. La barra di stato dice quando lo tiene sveglio, e perché.",
+  "settings.keepAwake.off": "Disattivato",
+  "settings.keepAwake.offHint":
+    "Non tocca mai la sospensione del computer. È l'impostazione predefinita.",
+  "settings.keepAwake.working": "Finché c'è lavoro",
+  "settings.keepAwake.workingHint":
+    "Finché è in corso un turno di codice, un lavoro in background o un'esecuzione, o un'attività pianificata è prevista entro dieci minuti.",
+  "settings.keepAwake.always": "Sempre, finché l'app è aperta",
+  "settings.keepAwake.alwaysHint":
+    "Tiene sveglio il computer finché Chimera è in esecuzione, che ci sia lavoro o no.",
+  "settings.keepAwake.onBattery": "Anche a batteria",
+  "settings.keepAwake.onBatteryHint":
+    "Se disattivato, a batteria il computer può andare in sospensione anche con lavoro in corso.",
+  "settings.keepAwake.limits":
+    "Impedisce solo la sospensione per inattività. Chiudere il coperchio, il tasto di accensione o scegliere Sospendi mettono comunque il computer in sospensione, e lo schermo può comunque spegnersi.",
+  "settings.keepAwake.blockedBattery":
+    "C'è lavoro, ma il computer è a batteria, quindi non viene tenuto sveglio.",
+  "settings.keepAwake.blockedUnsupported":
+    "C'è lavoro, ma questo sistema non dà a Chimera modo di tenerlo sveglio (supportati: Windows e Linux desktop con systemd).",
+  "keepAwake.status": "Tenuto sveglio: {reason}",
+  "keepAwake.reason.turn": "un turno di codice",
+  "keepAwake.reason.work": "un lavoro in background",
+  "keepAwake.reason.run": "un'esecuzione",
+  "keepAwake.reason.cron": "un'attività pianificata",
+  "keepAwake.reason.always": "sempre attivo",
   "settings.tab.connections": "Connessioni",
   "settings.tab.capabilities": "Capacità",
   "settings.tab.security": "Sicurezza",
@@ -12478,6 +12705,10 @@ const it: Dict = {
   "fusion.agreement": "accordo",
   "nav.usage": "Utilizzo",
   "usage.title": "Costo e utilizzo",
+  "usage.dailyCap": "Tetto giornaliero",
+  "usage.dailyCap.none": "nessun tetto",
+  "usage.dailyCap.hint":
+    "Vale solo per le attività pianificate. Quando la spesa del giorno lo raggiunge, un'attività pianificata viene rifiutata e il suo stato dice perché; un'attività contrassegnata come critica viene eseguita comunque. I turni di chat e di Codice non vengono fermati. Il giorno è contato in UTC. Vuoto significa nessun tetto.",
   "usage.empty":
     "L'utilizzo viene registrato da ora in poi — chatta un po' e torna qui.",
   "usage.totals": "Totali",
@@ -13732,6 +13963,32 @@ const pl: Dict = {
   "settings.row.appCron": "Uruchamiaj zaplanowane zadania",
   "settings.hint.appCron":
     "Odpala zadania z ekranu Automatyzacja, ale tylko gdy ta aplikacja jest otwarta. Aby działały 24/7, uruchom `chimera serve --cron` na maszynie, która pozostaje włączona.",
+  "settings.card.keepAwake": "Nie usypiaj komputera",
+  "settings.keepAwake.intro":
+    "Nie pozwala komputerowi przejść w stan uśpienia, dopóki Chimera ma pracę, i pozwala mu zasnąć, gdy praca się skończy. Pasek stanu pokazuje, kiedy i dlaczego komputer nie jest usypiany.",
+  "settings.keepAwake.off": "Wyłączone",
+  "settings.keepAwake.offHint": "Nigdy nie ingeruje w usypianie komputera. Ustawienie domyślne.",
+  "settings.keepAwake.working": "Dopóki jest praca",
+  "settings.keepAwake.workingHint":
+    "Dopóki trwa tura kodu, praca w tle lub przebieg albo zaplanowane zadanie ma się uruchomić w ciągu dziesięciu minut.",
+  "settings.keepAwake.always": "Zawsze, gdy aplikacja jest otwarta",
+  "settings.keepAwake.alwaysHint":
+    "Nie usypia komputera, dopóki Chimera działa, niezależnie od pracy.",
+  "settings.keepAwake.onBattery": "Także na baterii",
+  "settings.keepAwake.onBatteryHint":
+    "Gdy wyłączone, komputer na baterii może zasnąć nawet w trakcie pracy.",
+  "settings.keepAwake.limits":
+    "Zapobiega tylko uśpieniu z bezczynności. Zamknięcie pokrywy, przycisk zasilania lub wybór Uśpij nadal usypiają komputer, a ekran nadal może się wyłączyć.",
+  "settings.keepAwake.blockedBattery":
+    "Jest praca, ale komputer działa na baterii, więc nie jest wstrzymywane jego usypianie.",
+  "settings.keepAwake.blockedUnsupported":
+    "Jest praca, ale ten system nie daje Chimerze sposobu, by nie usypiać komputera (obsługiwane: Windows i Linux z pulpitem i systemd).",
+  "keepAwake.status": "Nie usypiam: {reason}",
+  "keepAwake.reason.turn": "tura kodu",
+  "keepAwake.reason.work": "praca w tle",
+  "keepAwake.reason.run": "przebieg",
+  "keepAwake.reason.cron": "zaplanowane zadanie",
+  "keepAwake.reason.always": "zawsze włączone",
   "settings.tab.connections": "Połączenia",
   "settings.tab.capabilities": "Możliwości",
   "settings.tab.security": "Bezpieczeństwo",
@@ -14169,6 +14426,10 @@ const pl: Dict = {
   "fusion.agreement": "zgodność",
   "nav.usage": "Zużycie",
   "usage.title": "Koszt i zużycie",
+  "usage.dailyCap": "Limit dzienny",
+  "usage.dailyCap.none": "bez limitu",
+  "usage.dailyCap.hint":
+    "Dotyczy tylko zaplanowanych zadań. Gdy dzisiejsze wydatki go osiągną, zaplanowane zadanie zostaje odrzucone, a jego stan mówi dlaczego; zadanie oznaczone jako krytyczne i tak się uruchomi. Tury czatu i kodu nie są przez niego zatrzymywane. Doba liczona jest w UTC. Puste oznacza brak limitu.",
   "usage.empty":
     "Zużycie jest zapisywane od teraz — porozmawiaj chwilę i wróć.",
   "usage.totals": "Sumy",
@@ -15422,6 +15683,32 @@ const ru: Dict = {
   "settings.row.appCron": "Выполнять задания по расписанию",
   "settings.hint.appCron":
     "Запускает задания с экрана «Автоматизация», но только пока это приложение открыто. Чтобы они работали 24/7, запустите `chimera serve --cron` на машине, которая не выключается.",
+  "settings.card.keepAwake": "Не давать компьютеру засыпать",
+  "settings.keepAwake.intro":
+    "Не даёт компьютеру уйти в сон, пока у Chimera есть работа, и снова позволяет ему засыпать, когда работа закончена. Строка состояния показывает, когда и почему компьютер удерживается.",
+  "settings.keepAwake.off": "Выключено",
+  "settings.keepAwake.offHint": "Никогда не вмешивается в сон компьютера. По умолчанию.",
+  "settings.keepAwake.working": "Пока есть работа",
+  "settings.keepAwake.workingHint":
+    "Пока идёт ход с кодом, фоновая работа или запуск либо задание по расписанию должно сработать в ближайшие десять минут.",
+  "settings.keepAwake.always": "Всегда, пока приложение открыто",
+  "settings.keepAwake.alwaysHint":
+    "Не даёт компьютеру засыпать, пока работает Chimera, есть работа или нет.",
+  "settings.keepAwake.onBattery": "И от батареи",
+  "settings.keepAwake.onBatteryHint":
+    "Если выключено, от батареи компьютер может уснуть даже во время работы.",
+  "settings.keepAwake.limits":
+    "Предотвращает только сон по бездействию. Закрытие крышки, кнопка питания или выбор «Сон» по-прежнему усыпляют компьютер, и экран всё равно может погаснуть.",
+  "settings.keepAwake.blockedBattery":
+    "Работа есть, но компьютер работает от батареи, поэтому он не удерживается от сна.",
+  "settings.keepAwake.blockedUnsupported":
+    "Работа есть, но эта система не даёт Chimera способа удержать компьютер от сна (поддерживаются: Windows и Linux с рабочим столом и systemd).",
+  "keepAwake.status": "Не даю уснуть: {reason}",
+  "keepAwake.reason.turn": "ход с кодом",
+  "keepAwake.reason.work": "фоновая работа",
+  "keepAwake.reason.run": "запуск",
+  "keepAwake.reason.cron": "задание по расписанию",
+  "keepAwake.reason.always": "всегда включено",
   "settings.tab.connections": "Подключения",
   "settings.tab.capabilities": "Возможности",
   "settings.tab.security": "Безопасность",
@@ -15861,6 +16148,10 @@ const ru: Dict = {
   "fusion.agreement": "согласие",
   "nav.usage": "Расход",
   "usage.title": "Стоимость и расход",
+  "usage.dailyCap": "Дневной лимит",
+  "usage.dailyCap.none": "без лимита",
+  "usage.dailyCap.hint":
+    "Действует только на задания по расписанию. Когда расходы за день его достигают, задание по расписанию отклоняется, и его статус объясняет причину; задание, помеченное как критическое, всё равно выполняется. Ходы в чате и с кодом им не останавливаются. День считается по UTC. Пусто — без лимита.",
   "usage.empty":
     "Расход учитывается с этого момента — пообщайтесь немного и возвращайтесь.",
   "usage.totals": "Итого",

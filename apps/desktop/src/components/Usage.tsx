@@ -3,6 +3,7 @@ import { BarChart3 } from "lucide-react";
 import { getUsage } from "@/lib/api";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
+import { DailyCapRow } from "@/components/DailyCapRow";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
 import type { UsageSummary } from "@/lib/types";
 
@@ -144,6 +145,7 @@ export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
   if (q.isLoading) {
     return (
       <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
+        <DailyCapRow />
         <Panel>
           <Spinner />
         </Panel>
@@ -157,6 +159,7 @@ export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
   if (!data || !totals || totals.turns === 0) {
     return (
       <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
+        <DailyCapRow />
         <Panel>
           <EmptyState text={t("usage.empty")} />
         </Panel>
@@ -176,6 +179,7 @@ export function Usage({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <Screen title={t("usage.title")} icon={<BarChart3 className="h-5 w-5" />} embedded={embedded}>
+      <DailyCapRow />
       <Panel title={t("usage.totals")}>
         <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
           <Tile label={t("usage.turns")} value={num(totals.turns)} />
