@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
 import time
@@ -195,26 +196,69 @@ def find_worktree_dirs() -> list[Path]:
     return sorted(set(found))
 
 
-def _admin_dir(path: Path) -> Path | None:
+def _read_admin_dir(path: Path) -> Path | None:
     """The worktree's git admin directory, read from its ``.git`` file; None when it has none.
 
     A linked worktree's ``.git`` is a FILE holding ``gitdir: <repo>/.git/worktrees/<name>``. A
     directory without one is not a worktree at all — what is left when git forgot it, or when
     `create` died between making the folder and registering it.
+
+    Raises ``OSError`` when the file is there but could not be read. That is not "has none": an
+    antivirus or indexer holding the file for a moment on Windows, or the repository's drive gone
+    for a second, used to come back as None — "unregistered" — and an hour-old checkout of a run
+    still working was then removed by the next prune. Only a missing file is an answer.
     """
     marker = path / ".git"
     try:
-        if not marker.is_file():
-            return None
-        line = marker.read_text(encoding="utf-8", errors="replace").strip()
-    except OSError:
+        info = os.stat(marker)
+    except (FileNotFoundError, NotADirectoryError):
         return None
+    if not stat.S_ISREG(info.st_mode):
+        return None
+    line = marker.read_text(encoding="utf-8", errors="replace").strip()
     if not line.startswith("gitdir:"):
         return None
     admin = Path(line[len("gitdir:") :].strip())
     if not admin.is_absolute():
         admin = (path / admin).resolve()
     return admin
+
+
+def _admin_dir(path: Path) -> Path | None:
+    """:func:`_read_admin_dir` for the callers that act only on a known admin directory (recording
+    the owner, unregistering a dead run): unreadable is as good as absent to them. Never use this to
+    DECIDE that a worktree is unregistered — :func:`classify_worktree_dir` does not."""
+    try:
+        return _read_admin_dir(path)
+    except OSError:
+        return None
+
+
+AdminPresence = Literal["present", "forgotten", "unreachable"]
+
+
+def _admin_presence(admin: Path) -> AdminPresence:
+    """Whether git still knows the worktree whose ``.git`` file points at ``admin``.
+
+    ``forgotten`` only when the repository's git directory is there and the admin entry is not —
+    git pruned it. When the git directory itself cannot be reached (a drive unmounted for a moment,
+    a network share, a path this account may not read) nothing is known, and that is
+    ``unreachable``, which keeps the worktree. Also kept by this: the leftover of a repository the
+    owner deleted outright. Disk, against a live checkout read as dead.
+    """
+    try:
+        return "present" if stat.S_ISDIR(os.stat(admin).st_mode) else "unreachable"
+    except (FileNotFoundError, NotADirectoryError):
+        pass
+    except OSError:
+        return "unreachable"
+    if admin.parent.name != "worktrees":
+        return "unreachable"
+    try:
+        common_is_dir = stat.S_ISDIR(os.stat(admin.parent.parent).st_mode)
+    except OSError:
+        return "unreachable"
+    return "forgotten" if common_is_dir else "unreachable"
 
 
 #: Two readings of one process's start time, both from the OS, agree to well within this. Wider than
@@ -338,9 +382,17 @@ def classify_worktree_dir(path: Path, *, now: float | None = None) -> WorktreeDi
         return WorktreeDir(path, "kept", "unreadable", False)
     if age < _ORPHAN_MIN_AGE_SECONDS:
         return WorktreeDir(path, "live", "too_new", False)
-    admin = _admin_dir(path)
-    if admin is None or not admin.is_dir():
+    try:
+        admin = _read_admin_dir(path)
+    except OSError:
+        return WorktreeDir(path, "kept", "unreadable", False)
+    if admin is None:
         return WorktreeDir(path, "orphan", "unregistered", False)
+    presence = _admin_presence(admin)
+    if presence == "forgotten":
+        return WorktreeDir(path, "orphan", "unregistered", False)
+    if presence == "unreachable":
+        return WorktreeDir(path, "kept", "unreachable", True)
     try:
         owner = json.loads((admin / OWNER_FILE).read_text(encoding="utf-8"))
         if not isinstance(owner, dict):

@@ -341,3 +341,58 @@ def test_asking_where_worktrees_go_creates_no_folder(
         assert elsewhere.is_dir() and tree.path.parent in (elsewhere, elsewhere.resolve())
     finally:
         tree.remove()
+
+
+def test_a_git_file_that_cannot_be_read_for_a_moment_keeps_the_worktree(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review finding: an antivirus or indexer holding the `.git` file for a moment (a sharing
+    violation on Windows) made the read fail, the failure read as "no `.git` file", and an hour-old
+    checkout of a live run was classified unregistered and removed. Unreadable is not absent."""
+    tree = GitWorktree.create(repo)
+    (tree.path / "wip.txt").write_text("unsaved\n", encoding="utf-8")
+    wt._live_here.discard(tree.path.resolve())
+    age(tree.path)
+    real = Path.read_text
+
+    def held_by_another_process(self: Path, *args: object, **kwargs: object) -> str:
+        if self.name == ".git":
+            raise PermissionError(13, "The process cannot access the file", str(self))
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", held_by_another_process)
+    try:
+        state = classify_worktree_dir(tree.path)
+        assert (state.state, state.reason) == ("kept", "unreadable")
+        assert prune_worktree_dirs()["removed"] == 0
+        assert (tree.path / "wip.txt").exists(), "a checkout was removed over a read error"
+    finally:
+        monkeypatch.undo()
+        shutil.rmtree(tree.path, ignore_errors=True)
+
+
+def test_a_worktree_whose_repository_cannot_be_reached_is_kept(tmp_path: Path) -> None:
+    """Its `.git` points into a git directory that is not there right now — a drive unmounted for a
+    moment looks exactly like this. Nothing says git forgot it, so it is not collected."""
+    folder = Path(tempfile.mkdtemp(prefix="chimera-wt-"))
+    gone = tmp_path / "unmounted-drive" / "repo" / ".git" / "worktrees" / folder.name
+    (folder / ".git").write_text(f"gitdir: {gone}\n", encoding="utf-8")
+    age(folder)
+
+    state = classify_worktree_dir(folder)
+    assert (state.state, state.reason) == ("kept", "unreachable")
+    assert prune_worktree_dirs()["removed"] == 0 and folder.exists()
+
+
+def test_a_worktree_git_has_forgotten_is_still_collected(repo: Path) -> None:
+    """The repository is there and its admin entry is not: git pruned it. That is an answer."""
+    tree = GitWorktree.create(repo)
+    wt._live_here.discard(tree.path.resolve())
+    admin = wt._admin_dir(tree.path)
+    assert admin is not None
+    shutil.rmtree(admin)
+    age(tree.path)
+
+    state = classify_worktree_dir(tree.path)
+    assert (state.state, state.reason) == ("orphan", "unregistered")
+    assert prune_worktree_dirs()["removed"] == 1 and not tree.path.exists()
