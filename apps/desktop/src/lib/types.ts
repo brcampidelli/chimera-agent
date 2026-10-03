@@ -117,6 +117,8 @@ export type ModelListing = Schemas["ModelsOut"];
  *  tool calling can only describe an edit, and the UI has to say which of the two it knows. */
 export type ModelOption = Schemas["ModelOptionOut"];
 export type GitStatus = Schemas["GitStatusOut"];
+/** Which of a turn's edits git still reports as changed, workspace-relative (the commit chip). */
+export type GitUncommitted = Schemas["GitUncommittedOut"];
 export type GitFile = Schemas["GitFileOut"];
 export type GitDiff = Schemas["GitDiffOut"];
 export type GitCommitResult = Schemas["GitCommitOut"];

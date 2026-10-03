@@ -2139,6 +2139,11 @@ class GitStatusOut(BaseModel):
     files: list[GitFileOut]  # changed files (empty when the tree is clean)
 
 
+class GitUncommittedOut(BaseModel):
+    is_repo: bool  # False when the folder isn't a git repo (or git is missing): nothing is known
+    files: list[str]  # the asked-about files git still reports as changed, workspace-relative, in order
+
+
 class GitDiffOut(BaseModel):
     is_repo: bool  # False when the folder isn't a git repo (or git is missing)
     patch: str  # the real unified-diff body (@@ hunks, +/- lines); "" when there's no diff

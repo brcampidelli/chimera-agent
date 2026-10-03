@@ -39,6 +39,9 @@ export function makeCodeApiMock() {
     getFsTree: vi.fn(),
     getGitDiff: vi.fn(),
     getGitStatus: vi.fn(),
+    // "Not a repository" by default: nothing known, so no commit chip appears in a suite that is not
+    // about it, and the call never resolves `undefined` into react-query.
+    getGitUncommitted: vi.fn(async () => ({ is_repo: false, files: [] })),
     // Resolves an EMPTY conversation by default, not `undefined`: the replay path reads
     // `.exchanges` on whatever comes back, and a bare `vi.fn()` makes every suite that mounts the
     // conversation die on a property access that has nothing to do with what it is testing.

@@ -60,6 +60,38 @@ describe("a conversation in a window of its own", () => {
     expect(document.title).toBe("shop · Chimera");
   });
 
+  it("keeps the style the conversation was last answered in", async () => {
+    // The same conversation opened in its own window: written the way it was, not quietly reset.
+    vi.mocked(getCodeSession).mockResolvedValue({
+      id: "s9",
+      workspace: "/projects/shop",
+      exchanges: [
+        {
+          you: "explain the cart",
+          answer: "ok",
+          tools: [],
+          edits: [],
+          done: {
+            answer: "ok", steps: 1, stopped_reason: "final", tool_names: [], model: "m", prompt_tokens: 0,
+            completion_tokens: 0, usd: null, context_peak_tokens: 0, route_meta: null,
+            style: "explanatory", style_version: 1,
+          },
+          verified: null,
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof getCodeSession>>);
+    const user = userEvent.setup({ delay: null });
+    renderWithProviders(<ConversationWindow sessionId="s9" />);
+
+    await screen.findByText("explain the cart");
+    await user.type(await screen.findByPlaceholderText(/^Ask about this code/), "and the checkout");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalled());
+    const calls = vi.mocked(streamCodeTurn).mock.calls;
+    expect(calls[calls.length - 1][0]).toMatchObject({ style: "explanatory" });
+  });
+
   it("reads the person's layout and writes none of it", async () => {
     // Mounted as `main.tsx` mounts it: no layout of the app's around it, only its own. The test
     // wrapper brings one that writes on mount, which would hide whether the window's does.

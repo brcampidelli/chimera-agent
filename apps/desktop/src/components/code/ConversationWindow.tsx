@@ -7,6 +7,7 @@ import { Conversation } from "@/components/code/Conversation";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { PostureNote } from "@/components/code/PostureNote";
 import { ProviderPicker } from "@/components/code/ProviderPicker";
+import { StylePicker, styleLabel } from "@/components/code/StylePicker";
 import { AgentProvider } from "@/lib/agent-context";
 import { getCodeSession, getConfig, type Approval, type Profile, type Reach } from "@/lib/api";
 import { useT } from "@/lib/i18n";
@@ -14,6 +15,7 @@ import { LayoutProvider } from "@/lib/layout/context";
 import { shellGranted } from "@/lib/project-shell";
 import { loadProjects } from "@/lib/projects";
 import { RunSessionProvider, useRunSession } from "@/lib/run-session";
+import type { OutputStyle } from "@/lib/types";
 
 /**
  * One conversation in a window of its own, so two can be worked side by side.
@@ -48,6 +50,9 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
   const run = useRunSession();
   const [provider, setProvider] = useState("");
   const [model, setModel] = useState("");
+  // The conversation's style, as the main window keeps it: the default until the stored conversation
+  // says its last turn ran under another, so opening it here does not quietly change how it is written.
+  const [style, setStyle] = useState<OutputStyle>("default");
   const [batch, setBatch] = useState<{ tasks: string[]; at: number } | null>(null);
   const workspace = session.data?.workspace ?? "";
   const project = workspace.split(/[\\/]/).filter(Boolean).pop() ?? t("approvals.defaultProject");
@@ -94,6 +99,8 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
         posture={{ reach, approval }}
         provider={provider}
         model={model}
+        style={style}
+        onStyleRestored={(restored) => setStyle((current) => (current === "default" ? restored : current))}
         profile={profile}
         controls={
           <div className="flex flex-col gap-1.5">
@@ -101,10 +108,12 @@ function ConversationWindowBody({ sessionId }: { sessionId: string }) {
               summary={[
                 provider === "" ? t("code.provider.native") : provider,
                 ...(provider === "" ? [model ? (model.split("/").pop() ?? model) : t("model.pick.default")] : []),
+                ...(provider === "" && style !== "default" ? [styleLabel(t, style)] : []),
               ]}
             >
               <ProviderPicker value={provider} onChange={setProvider} disabled={runBusy} />
               {provider === "" ? <ModelPicker value={model} onChange={setModel} disabled={runBusy} /> : null}
+              {provider === "" ? <StylePicker value={style} onChange={setStyle} disabled={runBusy} /> : null}
             </ComposerSettings>
             <PostureNote workspace={workspace} reach={reach} approval={approval} provider={provider} />
           </div>

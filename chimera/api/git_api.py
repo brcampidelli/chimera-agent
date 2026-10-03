@@ -177,6 +177,74 @@ def git_status(ws: Path) -> dict[str, Any]:
     return {"is_repo": True, "branch": branch, "files": files}
 
 
+#: At most this many paths are asked about at once — a turn's own edits, never a tree.
+_MAX_UNCOMMITTED_PATHS = 200
+
+
+def git_uncommitted(ws: Path, paths: list[str]) -> dict[str, Any]:
+    """Which of ``paths`` — files a turn wrote, as the agent named them — git still reports as changed.
+
+    Returns ``{is_repo, files}`` with ``files`` the workspace-relative POSIX paths, in the order
+    given, of those that are modified, staged, deleted or untracked. The Code screen offers "commit
+    these" from it (study 29, P4.5), so the matching is decided HERE, where the workspace and the
+    repository root are both known, rather than by comparing strings on the client. That comparison
+    got three cases wrong, and none of them raised anything:
+
+    * the agent may name a file by an ABSOLUTE path (the edit frame carries what the model passed to
+      the tool), which never equals git's repo-relative one — the chip silently never appeared;
+    * a new file in a new folder is reported by a plain ``git status`` as the folder (``newdir/``),
+      which no file path equals — git is asked about each file by its own pathspec, with ``-uall``,
+      and either makes it list the file rather than the folder;
+    * matching by suffix made ``a.py`` in the workspace "the same file" as a dirty ``vendor/a.py``,
+      and offered to commit an ``a.py`` that was already clean.
+
+    Each path is resolved against the workspace (an absolute one is kept), then made relative to
+    the repository root and compared EXACTLY with git's output for that pathspec. A path outside the
+    workspace is not asked about: the chip is about this workspace's changes. Pathspecs are literal,
+    so a file named ``*.py`` is that file and not a glob (the exact comparison would drop a glob's
+    matches anyway; literal keeps git from walking the tree for them).
+    """
+    if not is_git_repo(ws):
+        return {"is_repo": False, "files": []}
+    base = Path(ws).resolve()
+    top = _git(["rev-parse", "--show-toplevel"], base)
+    if top.returncode != 0 or not top.stdout.strip():
+        return {"is_repo": False, "files": []}
+    root = Path(top.stdout.strip()).resolve()
+    # repo-relative → workspace-relative, insertion-ordered so the answer keeps the turn's order.
+    wanted: dict[str, str] = {}
+    for raw in paths[:_MAX_UNCOMMITTED_PATHS]:
+        if not raw.strip():
+            continue
+        given = Path(raw)
+        full = (given if given.is_absolute() else base / given).resolve()
+        try:
+            in_ws = full.relative_to(base).as_posix()
+            in_repo = full.relative_to(root).as_posix()
+        except ValueError:
+            continue
+        if in_ws and in_ws != ".":
+            wanted.setdefault(in_repo, in_ws)
+    if not wanted:
+        return {"is_repo": True, "files": []}
+    # `-z`: no quoting of unusual names to undo, and a rename is "XY new\0old\0" — the new path first.
+    result = _git(
+        ["--literal-pathspecs", "status", "--porcelain=v1", "-z", "-uall", "--", *wanted], root
+    )
+    reported: set[str] = set()
+    fields = result.stdout.split("\0")
+    i = 0
+    while i < len(fields):
+        entry = fields[i]
+        i += 1
+        if len(entry) < 4:
+            continue
+        reported.add(entry[3:])
+        if entry[0] in "RC":
+            i += 1  # the rename's/copy's source, which the turn's path is not
+    return {"is_repo": True, "files": [ws_path for repo_path, ws_path in wanted.items() if repo_path in reported]}
+
+
 def git_diff(ws: Path, *, path: str | None = None, staged: bool = False) -> dict[str, Any]:
     """The real unified diff (``git diff [--cached] [-- <path>]``), or ``{is_repo: False}``.
 

@@ -32,11 +32,17 @@ export interface TurnFacts {
   fixText?: string;
   /** The agent's own task list, as its last frame left it. */
   todos: { task: string; status: string }[];
-  /** The files the turn wrote, workspace-relative. */
-  edited: string[];
-  /** The files git reports as changed now, or null when that is not known (no repository, not
-   *  asked yet). Null offers no commit: "these may be uncommitted" is a guess, not a fact. */
-  dirty: string[] | null;
+  /** The files the turn wrote that git still reports as changed, workspace-relative and in the order
+   *  they were written — as the server answered it (`POST /api/git/uncommitted`), or null when that
+   *  is not known (no repository, not asked yet). Null offers no commit: "these may be uncommitted"
+   *  is a guess, not a fact.
+   *
+   *  Decided by the server and not matched here: comparing the agent's path for a file with git's
+   *  path for it went wrong three ways that never raised — an absolute path never matched, a file in
+   *  a new folder never matched (git names the folder), and a suffix match made a clean `a.py` the
+   *  dirty `vendor/a.py`. Both paths are only comparable where the workspace and the repository
+   *  root are both known. */
+  uncommitted: string[] | null;
 }
 
 /** At most this many. Three kinds, so the cap is also a promise that none is ever doubled. */
@@ -45,16 +51,6 @@ export const MAX_SUGGESTIONS = 3;
 const LABEL_CHARS = 60;
 /** File names on the commit chip; the rest are counted. */
 const FILES_ON_CHIP = 2;
-
-const norm = (p: string) => p.replace(/\\/g, "/").replace(/^\.\//, "");
-
-/** Whether git's path (repo-relative) and the turn's (workspace-relative) name the same file. The
- *  workspace may be a folder inside the repository, so git's path can be the longer one. */
-function samePath(gitPath: string, edited: string): boolean {
-  const g = norm(gitPath);
-  const e = norm(edited);
-  return g === e || g.endsWith(`/${e}`);
-}
 
 function cut(text: string): string {
   return text.length > LABEL_CHARS ? `${text.slice(0, LABEL_CHARS - 1)}…` : text;
@@ -76,11 +72,8 @@ export function turnSuggestions(facts: TurnFacts, t: TFunc): Suggestion[] {
   }
   // Not after a failed check: committing what the check just rejected is the one suggestion here
   // that could make things worse, and "try to fix it" is already the next step on offer.
-  if (!facts.fixText && facts.dirty) {
-    const dirty = facts.dirty;
-    const files = [...new Set(facts.edited.map(norm))].filter((path) =>
-      dirty.some((gitPath) => samePath(gitPath, path)),
-    );
+  if (!facts.fixText && facts.uncommitted) {
+    const files = [...new Set(facts.uncommitted)];
     if (files.length > 0) {
       const names = files.slice(0, FILES_ON_CHIP).map((path) => path.split("/").pop() ?? path);
       const more = files.length - names.length;

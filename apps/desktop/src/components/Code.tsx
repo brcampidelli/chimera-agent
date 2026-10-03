@@ -636,6 +636,9 @@ export function Code() {
           <Conversation
             key={conversationKey}
             resumeSession={sessionId}
+            // Only over the default: a style the person picked while the conversation loaded is
+            // theirs, and the stored one is a fact about the past turn, not a newer choice.
+            onStyleRestored={(restored) => setStyle((current) => (current === "default" ? restored : current))}
             workspace={workspace}
             openFile={openFile}
             onOpenFile={setOpenFile}

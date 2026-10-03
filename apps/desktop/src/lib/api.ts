@@ -16,6 +16,7 @@ import type {
   GitInitResult,
   GitRevertResult,
   GitStatus,
+  GitUncommitted,
   RouteMeta,
   Resources,
   BackgroundJob,
@@ -416,6 +417,14 @@ export const getGitStatus = (workspace?: string | null) => {
   const qs = params.toString();
   return json<GitStatus>(`/api/git/status${qs ? `?${qs}` : ""}`);
 };
+// Which of a turn's edits are still uncommitted. Asked of the server, which knows the workspace and
+// the repository root: comparing the agent's path with git's on this side got an absolute path, a new
+// folder and two files of the same name wrong (study 29, P4.5).
+export const getGitUncommitted = (workspace: string | null | undefined, paths: string[]) =>
+  json<GitUncommitted>("/api/git/uncommitted", {
+    method: "POST",
+    body: JSON.stringify({ workspace: workspace || null, paths }),
+  });
 export const getGitDiff = (workspace: string | null | undefined, path?: string | null, staged = false) => {
   const params = new URLSearchParams();
   if (workspace) params.set("workspace", workspace);

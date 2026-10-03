@@ -5365,6 +5365,54 @@
         "title": "GitStatusOut",
         "type": "object"
       },
+      "GitUncommittedOut": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "is_repo": {
+            "title": "Is Repo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "is_repo",
+          "files"
+        ],
+        "title": "GitUncommittedOut",
+        "type": "object"
+      },
+      "GitUncommittedRequest": {
+        "properties": {
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "paths"
+        ],
+        "title": "GitUncommittedRequest",
+        "type": "object"
+      },
       "GovernanceAuditOut": {
         "properties": {
           "chain": {
@@ -14439,6 +14487,44 @@
           }
         },
         "summary": "Git Status Endpoint"
+      }
+    },
+    "/api/git/uncommitted": {
+      "post": {
+        "operationId": "git_uncommitted_endpoint_api_git_uncommitted_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GitUncommittedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GitUncommittedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Uncommitted Endpoint"
       }
     },
     "/api/governance/audit": {

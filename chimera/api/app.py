@@ -82,6 +82,7 @@ from chimera.api.schemas import (
     GitInitOut,
     GitRevertOut,
     GitStatusOut,
+    GitUncommittedOut,
     GovernanceAuditOut,
     HealthOut,
     HitlOut,
@@ -260,6 +261,13 @@ class GitRevertRequest(BaseModel):
     """The workspace (repo) the revert is scoped to. None = the app's launch workspace."""
     paths: list[str]
     """The run's changed paths to discard (git-backed revert, scoped to these only)."""
+
+
+class GitUncommittedRequest(BaseModel):
+    workspace: str | None = None
+    """The workspace the paths are relative to. None = the app's launch workspace."""
+    paths: list[str]
+    """Files a turn wrote, as the agent named them (relative to the workspace, or absolute)."""
 
 
 class GitInitRequest(BaseModel):
@@ -2148,6 +2156,15 @@ def build_api_app(
         from chimera.api.git_api import git_status
 
         return git_status(_resolve_fs_workspace(workspace))
+
+    @app.post("/api/git/uncommitted", dependencies=[guard], response_model=GitUncommittedOut)
+    def git_uncommitted_endpoint(req: GitUncommittedRequest) -> dict[str, Any]:
+        # Read-only, though a POST: the paths are a list the client already holds, and a body carries
+        # it without a URL length to outgrow. Which of a turn's edits git still reports as changed,
+        # matched where the workspace and the repository root are both known (the commit chip).
+        from chimera.api.git_api import git_uncommitted
+
+        return git_uncommitted(_resolve_fs_workspace(req.workspace), req.paths)
 
     @app.get("/api/git/diff", dependencies=[guard], response_model=GitDiffOut)
     def git_diff_endpoint(

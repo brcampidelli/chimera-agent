@@ -1664,6 +1664,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/git/uncommitted": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Git Uncommitted Endpoint */
+        post: operations["git_uncommitted_endpoint_api_git_uncommitted_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/governance/audit": {
         parameters: {
             query?: never;
@@ -5898,6 +5915,20 @@ export interface components {
             files: components["schemas"]["GitFileOut"][];
             /** Is Repo */
             is_repo: boolean;
+        };
+        /** GitUncommittedOut */
+        GitUncommittedOut: {
+            /** Files */
+            files: string[];
+            /** Is Repo */
+            is_repo: boolean;
+        };
+        /** GitUncommittedRequest */
+        GitUncommittedRequest: {
+            /** Paths */
+            paths: string[];
+            /** Workspace */
+            workspace?: string | null;
         };
         /** GovernanceAuditOut */
         GovernanceAuditOut: {
@@ -11175,6 +11206,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GitStatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_uncommitted_endpoint_api_git_uncommitted_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GitUncommittedRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GitUncommittedOut"];
                 };
             };
             /** @description Validation Error */

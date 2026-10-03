@@ -3,15 +3,15 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Conversation, TurnReceipt } from "@/components/code/Conversation";
-import { getGitStatus, postSuggestionEvent, streamCodeTurn } from "@/lib/api";
+import { getCodeSession, getGitUncommitted, postSuggestionEvent, streamCodeTurn, type CodeTurnHandlers } from "@/lib/api";
 import { DICTS } from "@/lib/i18n";
 import type { OutputStyle } from "@/lib/types";
-import { gitStatus, scriptTurn } from "@/test/code-api-mock";
+import { scriptTurn } from "@/test/code-api-mock";
 import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
 
-function mount(over: { style?: OutputStyle; provider?: string } = {}) {
+function mount(over: { style?: OutputStyle; provider?: string; resumeSession?: string } = {}) {
   return renderWithProviders(
     <Conversation
       workspace="/proj"
@@ -50,7 +50,8 @@ describe("suggested next steps", () => {
   beforeEach(() => {
     vi.mocked(streamCodeTurn).mockReset();
     vi.mocked(postSuggestionEvent).mockClear();
-    vi.mocked(getGitStatus).mockReset().mockResolvedValue(gitStatus());
+    vi.mocked(getGitUncommitted).mockReset().mockResolvedValue({ is_repo: false, files: [] });
+    vi.mocked(getCodeSession).mockReset().mockResolvedValue({ id: "s1", workspace: "/w", exchanges: [] });
     localStorage.clear();
   });
 
@@ -117,7 +118,7 @@ describe("suggested next steps", () => {
         verified: { state: "failed", command: "pytest -q", source: "inferred", output: "E assert 3 == 4" },
       }),
     );
-    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [{ path: "src/a.py", x: " ", y: "M", staged: false, untracked: false }] }));
+    vi.mocked(getGitUncommitted).mockResolvedValue({ is_repo: true, files: ["src/a.py"] });
     mount();
     await ask("make the sum 4");
 
@@ -134,11 +135,14 @@ describe("suggested next steps", () => {
     vi.mocked(streamCodeTurn).mockImplementation(
       scriptTurn({ edits: [{ path: "src/a.py", patch: "@@" }], verified: { state: "passed", command: "pytest", source: "inferred", output: "" } }),
     );
-    vi.mocked(getGitStatus).mockResolvedValue(gitStatus({ files: [{ path: "src/a.py", x: " ", y: "M", staged: false, untracked: false }] }));
+    vi.mocked(getGitUncommitted).mockResolvedValue({ is_repo: true, files: ["src/a.py"] });
     mount();
     await ask("tidy a.py");
 
     expect(await screen.findByRole("button", { name: /Commit a\.py/ })).toBeInTheDocument();
+    // The server is asked about the turn's own files, as the agent named them, in this workspace —
+    // it matches them against git where the workspace and the repository root are both known.
+    expect(getGitUncommitted).toHaveBeenCalledWith("/proj", ["src/a.py"]);
   });
 
   it("offers nothing after a turn with no open fact", async () => {
@@ -148,8 +152,99 @@ describe("suggested next steps", () => {
 
     await screen.findByText("done");
     expect(screen.queryByRole("group", { name: /suggested next steps/i })).not.toBeInTheDocument();
-    expect(getGitStatus).not.toHaveBeenCalled();
+    expect(getGitUncommitted).not.toHaveBeenCalled();
     expect(events()).toEqual([]);
+  });
+
+  it("counts a pick once per offer, however often the box is emptied and the chip clicked again", async () => {
+    vi.mocked(streamCodeTurn).mockImplementation(scriptTurn({ todos: [[{ task: "ship it", status: "pending" }]] }));
+    mount();
+    await ask("go");
+
+    const box = screen.getByRole("textbox");
+    for (let i = 0; i < 3; i++) {
+      await userEvent.click(await screen.findByRole("button", { name: /Continue: ship it/ }));
+      await userEvent.clear(box);
+    }
+
+    // One offer, taken: a pick per click read "3 of 1 picked", a rate over 100%.
+    expect(events().filter((e) => e.event === "picked")).toHaveLength(1);
+    expect(events().filter((e) => e.event === "shown")).toHaveLength(1);
+  });
+
+  it("offers nothing, and counts nothing, under a turn read back from a reopened conversation", async () => {
+    // The last stored turn failed its check: chips offered here were counted as shown again on every
+    // reopen (the screen remounts with no memory of what it counted), and every app start reopens.
+    vi.mocked(getCodeSession).mockResolvedValue({
+      id: "s9",
+      workspace: "/proj",
+      exchanges: [
+        {
+          you: "make the sum 4",
+          answer: "done",
+          tools: [],
+          edits: [{ path: "src/a.py", patch: "@@" }],
+          done: { answer: "done", steps: 1, stopped_reason: "final", tool_names: [], model: "m", prompt_tokens: 0, completion_tokens: 0, usd: null, context_peak_tokens: 0, route_meta: null },
+          verified: { state: "failed", command: "pytest -q", source: "inferred", output: "E assert 3 == 4" },
+        },
+      ],
+    } as never);
+    for (let i = 0; i < 2; i++) {
+      const view = mount({ resumeSession: "s9" });
+      expect(await screen.findByText("make the sum 4")).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 20));
+      expect(screen.queryByRole("group", { name: /suggested next steps/i })).not.toBeInTheDocument();
+      view.unmount();
+    }
+    expect(events().filter((e) => e.event === "shown")).toEqual([]);
+  });
+
+  it("counts nothing as shown for the moment before the app continues a turn by itself", async () => {
+    // The first turn stops at the step limit with an item open; "continue" is then sent by the app.
+    // For the one commit between the two the chips used to be drawn, and a "shown" counted for an
+    // offer nobody could take.
+    localStorage.setItem("chimera.autoContinue", "1");
+    let call = 0;
+    vi.mocked(streamCodeTurn).mockImplementation(async (_req: unknown, h: CodeTurnHandlers) => {
+      call += 1;
+      const first = call === 1;
+      await new Promise((r) => setTimeout(r, 25));
+      if (first) h.onTodo?.([{ task: "ship it", status: "pending" }]);
+      h.onDone?.({
+        answer: "done", steps: 1, stopped_reason: first ? "max_steps" : "final", tool_names: [], model: "m",
+        prompt_tokens: 0, completion_tokens: 0, usd: null, context_peak_tokens: 0, route_meta: null,
+      });
+    });
+    mount();
+    await ask("start");
+
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(events().filter((e) => e.event === "shown")).toEqual([]);
+  });
+
+  it("counts nothing as shown for the moment before a queued follow-up goes out", async () => {
+    let release: () => void = () => {};
+    let call = 0;
+    vi.mocked(streamCodeTurn).mockImplementation(async (_req: unknown, h: CodeTurnHandlers) => {
+      call += 1;
+      const first = call === 1;
+      if (first) await new Promise<void>((r) => (release = r));
+      if (first) h.onTodo?.([{ task: "ship it", status: "pending" }]);
+      h.onDone?.({
+        answer: "done", steps: 1, stopped_reason: "final", tool_names: [], model: "m",
+        prompt_tokens: 0, completion_tokens: 0, usd: null, context_peak_tokens: 0, route_meta: null,
+      });
+    });
+    mount();
+    await ask("start");
+    // Typed while the turn runs: queued, and sent by the app the moment the turn ends.
+    await userEvent.type(screen.getByRole("textbox"), "and then the docs{Enter}");
+    release();
+
+    await waitFor(() => expect(streamCodeTurn).toHaveBeenCalledTimes(2), { timeout: 5000 });
+    await new Promise((r) => setTimeout(r, 60));
+    expect(events().filter((e) => e.event === "shown")).toEqual([]);
   });
 });
 

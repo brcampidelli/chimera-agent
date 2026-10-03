@@ -29,7 +29,7 @@ import {
 import {
   deleteCodeSession,
   getCodeSession,
-  getGitStatus,
+  getGitUncommitted,
   listShares,
   listWorks,
   revertCodeTurn,
@@ -78,7 +78,7 @@ import {
   type Cast,
 } from "@/components/code/FusionCast";
 import { DEFAULT_SPEND_CEILING, SpendCeiling } from "@/components/code/SpendCeiling";
-import { styleLabel } from "@/components/code/StylePicker";
+import { OUTPUT_STYLES, styleLabel } from "@/components/code/StylePicker";
 import { TurnSuggestions } from "@/components/code/TurnSuggestions";
 import { recordSuggestion, turnSuggestions, type Suggestion } from "@/lib/suggestions";
 import { decompose } from "@/lib/decompose";
@@ -190,6 +190,11 @@ interface Exchange {
   /** Stopped by the Stop button. Distinct from `failed`: nothing went wrong, the user changed
    *  their mind — and distinct from a finished turn, which has a `done`. */
   abandoned?: boolean;
+  /** Sent by THIS mounting of the screen. Absent on a turn read back from the stored conversation
+   *  and on one followed over the live stream: suggestions are offered, and counted as shown, only
+   *  under a turn the screen itself sent — a reopened conversation remounts with a fresh memory of
+   *  what it has counted, and offering there counted the same offer again on every app start. */
+  sentHere?: boolean;
 }
 
 /** What "let the agent try to fix it" actually sends.
@@ -581,6 +586,7 @@ export function Conversation({
   onOpenFile,
   resumeSession,
   onOpenWindow,
+  onStyleRestored,
 }: {
   workspace: string;
   openFile: string | null;
@@ -617,6 +623,9 @@ export function Conversation({
   resumeSession?: string | null;
   /** Open this conversation in a window of its own. Absent inside that window: it already is one. */
   onOpenWindow?: (sessionId: string) => void;
+  /** A reopened conversation was last answered in this style: the owner of the style chip sets it,
+   *  so the next turn is written the way the last one was rather than quietly in the default. */
+  onStyleRestored?: (style: OutputStyle) => void;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -712,6 +721,10 @@ export function Conversation({
   // for reasons the user could not see. `replayed` distinguishes "still loading" from "this
   // conversation really is empty", which otherwise render identically and mean opposite things.
   const [replayed, setReplayed] = useState(!resumeSession);
+  // A ref, so the replay below runs once per conversation and not again whenever a parent passes a
+  // new function.
+  const onStyleRestoredRef = useRef(onStyleRestored);
+  onStyleRestoredRef.current = onStyleRestored;
   useEffect(() => {
     if (!resumeSession) return;
     let live = true;
@@ -740,6 +753,17 @@ export function Conversation({
         // exchange and the replay below would draw it a second time. The server says which.
         const running = session.running_turn ?? null;
         setExchanges(running?.transcript_saved ? stored.slice(0, -1) : stored);
+        // "Per conversation" has to survive reopening it: the style is screen state, reset to the
+        // default on every Resume, so a conversation held in Concise came back in Standard and its
+        // next turn went out with a different system prompt nobody chose. The receipt of its last
+        // turn of Chimera's own loop names the style that turn's prompt carried, so that is what it
+        // resumes in. A last receipt naming none (the default; also a spoken turn, which carries no
+        // style) leaves the default, which is what that turn ran under.
+        const lastOwn = [...stored].reverse().find((e) => e.done && !e.done.external);
+        const restored = lastOwn?.done?.style;
+        if (restored && restored !== "default" && OUTPUT_STYLES.includes(restored)) {
+          onStyleRestoredRef.current?.(restored);
+        }
         if (running) {
           // Everything after the sequence before its opening frame: the turn comes back whole.
           liveSeq.current = running.live_since;
@@ -1126,16 +1150,30 @@ export function Conversation({
   // while nothing else is asking for the person's next move: a turn running, an approval or a batch
   // proposal waiting, a message queued, or text already in the box, which a click would replace.
   const lastExchange = lastAt >= 0 ? exchanges[lastAt] : null;
-  const settled = lastExchange !== null && lastExchange.done !== null && !lastExchange.failed && !lastExchange.abandoned;
-  const quiet = !busy && !busyElsewhere && !following && !pendingApproval && !proposal && !queued;
+  // Only under a turn this screen sent (`sentHere`): a turn read back from the stored conversation
+  // or followed from another window is not an offer this screen made, and the screen remounts on
+  // every reopen with no memory of what it already counted.
+  const settled =
+    lastExchange !== null &&
+    lastExchange.sentHere === true &&
+    lastExchange.done !== null &&
+    !lastExchange.failed &&
+    !lastExchange.abandoned;
+  // The two refs are the app about to send by itself — an automatic "continue" after `max_steps`, or
+  // the follow-up queued behind the turn. They are armed in the render where `busy` goes false and
+  // consumed by the `[busy]` effects right after it, so without them the chips appeared for exactly
+  // that one commit and a "shown" was counted for an offer the app then answered itself. Read in
+  // render, like `sendRef` is written in render: they are set before that render, never during it.
+  const handingOff = autoContinueRef.current !== null || queuedToSendRef.current !== null;
+  const quiet = !busy && !busyElsewhere && !following && !pendingApproval && !proposal && !queued && !handingOff;
   // Files this turn wrote and did not undo. Whether they are still uncommitted is git's to say, so
   // it is asked only when there is something to ask about, and refreshed by the same invalidation a
-  // finished turn already sends.
-  // Joined into one string so the memo below depends on the paths, not on a new array each render.
+  // finished turn already sends (the key starts with "git-status").
+  // Joined into one string so the query and the memo depend on the paths, not on a new array.
   const editedNow = settled && quiet && !lastExchange.undone ? lastExchange.edits.map((e) => e.path).join("\n") : "";
   const gitNow = useQuery({
-    queryKey: ["git-status", workspace],
-    queryFn: async () => (await getGitStatus(workspace || null)) ?? null,
+    queryKey: ["git-status", workspace, "uncommitted", editedNow],
+    queryFn: async () => (await getGitUncommitted(workspace || null, editedNow.split("\n"))) ?? null,
     enabled: editedNow !== "",
   });
   const suggestions = useMemo<Suggestion[]>(() => {
@@ -1145,8 +1183,7 @@ export function Conversation({
       {
         fixText: v?.state === "failed" && !lastExchange.undone ? fixBrief(lastExchange.you, v, t) : undefined,
         todos: lastExchange.todos,
-        edited: editedNow ? editedNow.split("\n") : [],
-        dirty: gitNow.data?.is_repo ? gitNow.data.files.map((f) => f.path) : null,
+        uncommitted: editedNow && gitNow.data?.is_repo ? gitNow.data.files : null,
       },
       t,
     );
@@ -1155,20 +1192,31 @@ export function Conversation({
   // turn's position and the suggestion's kind, so a re-render, or the box being emptied and the chips
   // coming back, does not count the same offer twice.
   const shownRef = useRef<Set<string>>(new Set());
+  // "Picked", once per offer too, under the same key. Picking, emptying the box (the chips come back)
+  // and picking again is one offer taken once: counted per click it made "3 of 1 picked", a rate
+  // over 100% on the one number the plan measures these by.
+  const pickedKeys = useRef<Set<string>>(new Set());
+  const offerKey = useCallback((kind: Suggestion["kind"]) => `${sessionId ?? ""}:${lastAt}:${kind}`, [sessionId, lastAt]);
   useEffect(() => {
     for (const item of suggestions) {
-      const key = `${sessionId ?? ""}:${lastAt}:${item.kind}`;
+      const key = offerKey(item.kind);
       if (shownRef.current.has(key)) continue;
       shownRef.current.add(key);
       recordSuggestion({ event: "shown", kind: item.kind, edited: false });
     }
-  }, [suggestions, sessionId, lastAt]);
+  }, [suggestions, offerKey]);
   /** A suggestion was clicked: its text goes in the box, and nothing is sent. */
-  const pickSuggestion = useCallback((item: Suggestion) => {
-    pickedRef.current = item;
-    setDraft(item.text);
-    recordSuggestion({ event: "picked", kind: item.kind, edited: false });
-  }, []);
+  const pickSuggestion = useCallback(
+    (item: Suggestion) => {
+      pickedRef.current = item;
+      setDraft(item.text);
+      const key = offerKey(item.kind);
+      if (pickedKeys.current.has(key)) return;
+      pickedKeys.current.add(key);
+      recordSuggestion({ event: "picked", kind: item.kind, edited: false });
+    },
+    [offerKey],
+  );
 
   function send(force = false, override?: string, spoken = false, auto = false) {
     // `override` is the queued follow-up being released: it was typed into the box, then moved out
@@ -1221,7 +1269,7 @@ export function Conversation({
     turnStartedAtRef.current = Date.now();
     setExchanges((prev) => [
       ...prev,
-      { you: message, answer: "", tools: [], edits: [], todos: [], done: null },
+      { you: message, answer: "", tools: [], edits: [], todos: [], done: null, sentHere: true },
     ]);
     let touchedFiles = false;
     // Measured from the send, not from the first token: what the person walked away from is the
