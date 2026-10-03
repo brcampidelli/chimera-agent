@@ -518,6 +518,9 @@ class CacheCfgOut(BaseModel):
 class SandboxCfgOut(BaseModel):
     mode: str
     image: str
+    network: Literal["none", "bridge"] = "none"
+    """The docker sandbox's network as the factory reads it. Means something only when the sandbox
+    that answers is a container — see ``SandboxStateOut.network`` for what a command can reach."""
 
 
 class FusionKinshipOut(BaseModel):
@@ -1107,6 +1110,20 @@ class EditorCapabilityOut(BaseModel):
     hint: str
 
 
+class CodePythonOut(BaseModel):
+    """The interpreter ``execute_code`` uses when a snippet runs on this machine.
+
+    The frozen desktop build has no interpreter of its own, so it is whatever PATH holds, or none;
+    without this, a snippet that could not start reads in a transcript like a model that wrote bad
+    code. Only the host half: whether a container answers instead is ``/api/governance/sandbox``.
+    """
+
+    path: str = ""
+    source: Literal["interpreter", "path", "missing"] = "missing"
+    frozen: bool = False
+    looked_for: list[str] = Field(default_factory=list)
+
+
 class DoctorOut(BaseModel):
     has_any_key: bool
     #: The default model runs on this machine and needs no key (``ollama_chat/…``, ``lm_studio/…``).
@@ -1126,6 +1143,8 @@ class DoctorOut(BaseModel):
     #: Whether the default model can be priced. A spend cap stops on a call it cannot price,
     #: so an unpriced default is a cap that refuses to work — said here, before one is set.
     spend: EditorCapabilityOut | None = None
+    #: Which Python ``execute_code`` runs on THIS machine — see ``CodePythonOut``.
+    code_python: CodePythonOut | None = None
 
 
 class ConfigTestOut(BaseModel):
@@ -1335,6 +1354,11 @@ class SandboxStateOut(BaseModel):
     not know falls back to ``reason``: a new cause must degrade to English, never to silence."""
     platform: str = ""
     """The OS, because the answer is different on each and the reason names it."""
+    network: Literal["none", "bridge", "host"] = "host"
+    """What a command can reach on the network here. ``none``: a container without one, or a kernel
+    sandbox (which has none to give). ``bridge``: a container given the bridge — every destination,
+    not an allowlist. ``host``: no fence, the machine's own network. Defaults to ``host`` because a
+    reader that cannot tell must not be told the network is closed."""
 
 
 class CronCreateIn(BaseModel):

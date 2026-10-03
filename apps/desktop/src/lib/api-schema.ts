@@ -4319,6 +4319,34 @@ export interface components {
             shell_granted: boolean;
         };
         /**
+         * CodePythonOut
+         * @description The interpreter ``execute_code`` uses when a snippet runs on this machine.
+         *
+         *     The frozen desktop build has no interpreter of its own, so it is whatever PATH holds, or none;
+         *     without this, a snippet that could not start reads in a transcript like a model that wrote bad
+         *     code. Only the host half: whether a container answers instead is ``/api/governance/sandbox``.
+         */
+        CodePythonOut: {
+            /**
+             * Frozen
+             * @default false
+             */
+            frozen: boolean;
+            /** Looked For */
+            looked_for?: string[];
+            /**
+             * Path
+             * @default
+             */
+            path: string;
+            /**
+             * Source
+             * @default missing
+             * @enum {string}
+             */
+            source: "interpreter" | "path" | "missing";
+        };
+        /**
          * CodeSessionArchiveOut
          * @description A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.
          *
@@ -5474,6 +5502,7 @@ export interface components {
              * @default false
              */
             can_answer: boolean;
+            code_python?: components["schemas"]["CodePythonOut"] | null;
             /** Configured Providers */
             configured_providers: string[];
             /** Default Model */
@@ -7652,6 +7681,12 @@ export interface components {
             image: string;
             /** Mode */
             mode: string;
+            /**
+             * Network
+             * @default none
+             * @enum {string}
+             */
+            network: "none" | "bridge";
         };
         /**
          * SandboxStateOut
@@ -7670,6 +7705,12 @@ export interface components {
             configured: string;
             /** Isolated */
             isolated: boolean;
+            /**
+             * Network
+             * @default host
+             * @enum {string}
+             */
+            network: "none" | "bridge" | "host";
             /**
              * Platform
              * @default

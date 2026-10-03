@@ -15,7 +15,7 @@ for gVisor); :func:`get_sandbox` reads the settings.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from chimera.sandbox.base import Sandbox, SandboxResult
 from chimera.sandbox.docker import DockerSandbox
@@ -67,6 +67,15 @@ def _warn_unsandboxed() -> None:
         _log.warning("commands run WITHOUT an OS sandbox: %s", reason)
 
 
+def sandbox_network(settings: Settings) -> Literal["none", "bridge"]:
+    """The docker sandbox's network as the factory reads it: ``bridge`` opens it, anything else is ``none``.
+
+    One rule for the factory and for every screen that reports it, so a hand-edited value the factory
+    reads as ``none`` cannot be displayed as something else.
+    """
+    return "bridge" if (settings.sandbox_network or "none").strip().lower() == "bridge" else "none"
+
+
 def get_sandbox(settings: Settings | None = None) -> Sandbox:
     """Return the configured sandbox backend.
 
@@ -97,7 +106,7 @@ def get_sandbox(settings: Settings | None = None) -> Sandbox:
         # the container was hard-wired to no-network/512m whatever the settings said.
         return DockerSandbox(
             image=settings.sandbox_image,
-            network=(settings.sandbox_network or "none").lower() == "bridge",
+            network=sandbox_network(settings) == "bridge",
             memory=settings.sandbox_memory,
             cpus=settings.sandbox_cpus,
             pids_limit=settings.sandbox_pids_limit,
@@ -115,6 +124,7 @@ __all__ = [
     "claim_unsandboxed_notice",
     "get_sandbox",
     "os_sandbox_available",
+    "sandbox_network",
     "unavailable_cause",
     "unavailable_reason",
 ]

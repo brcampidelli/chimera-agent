@@ -15,6 +15,7 @@ import {
   getMessaging,
   getCompletionStats,
   getOllamaModels,
+  getSandboxState,
   patchConfig,
   putInstructions,
   removePoolKey,
@@ -50,6 +51,7 @@ import type {
   DoctorInfo,
   PoolCfg,
   ProviderCfg,
+  SandboxState,
 } from "@/lib/types";
 
 function Card({ title, children }: { title: string; children: ReactNode }) {
@@ -521,6 +523,149 @@ function CompletionAcceptanceRow() {
   );
 }
 
+
+/**
+ * What a command the agent runs can reach on the network HERE, and the one switch that changes it.
+ *
+ * `CHIMERA_SANDBOX_NETWORK` means something only inside a container that answered. Everywhere else
+ * a "none / bridge" row would be a fence that does not exist: on Windows the default `auto` resolves
+ * to this machine, whose network nothing fences, and a kernel sandbox (bubblewrap, Seatbelt) has no
+ * network to give whatever the setting says. So the switch appears only when the sandbox that would
+ * actually run a command is docker, and every other case says in words what is true instead.
+ *
+ * The answer comes from `GET /api/governance/sandbox`, which asks the sandbox object rather than
+ * reading the setting: the same probe the Security screen and the posture line use, so the three
+ * cannot disagree. `queryFn` is an arrow on purpose: the reference is resolved when the query runs,
+ * so a caller with no such endpoint degrades to these rows saying nothing, never to a crash of the
+ * screen. Silent on an error from our OWN endpoint, as the Ollama picker is: it is not evidence
+ * about the machine.
+ */
+function SandboxReachRows({
+  network,
+  applies,
+  python,
+  save,
+}: {
+  network: string;
+  applies?: string;
+  python?: DoctorInfo["code_python"];
+  save: (updates: Record<string, string>) => void;
+}) {
+  const t = useT();
+  const state = useQuery({ queryKey: ["governance-sandbox"], queryFn: () => getSandboxState() });
+  const s: SandboxState | undefined = state.data;
+  if (!s) return null;
+  const inContainer = s.backend === "docker";
+  return (
+    <>
+      {inContainer ? (
+        <Row
+          label={t("settings.row.sandboxNetwork")}
+          hint={t(
+            network === "bridge"
+              ? "settings.hint.sandboxNetworkBridge"
+              : "settings.hint.sandboxNetworkNone",
+          )}
+          // Bridge is the value that widens what a command can reach, so its hint is the warning.
+          warn={network === "bridge"}
+          applies={applies}
+          env="CHIMERA_SANDBOX_NETWORK"
+        >
+          <Select
+            value={network === "bridge" ? "bridge" : "none"}
+            options={["none", "bridge"]}
+            render={(v) =>
+              t(v === "bridge" ? "settings.value.networkBridge" : "settings.value.networkNone")
+            }
+            onChange={(v) => save({ CHIMERA_SANDBOX_NETWORK: v })}
+          />
+        </Row>
+      ) : (
+        <NetworkFactRow state={s} />
+      )}
+      <CodePythonRow python={python} inContainer={inContainer} />
+    </>
+  );
+}
+
+/** The network outside a container that answered: closed by a kernel sandbox, or this machine's own. */
+function NetworkFactRow({ state }: { state: SandboxState }) {
+  const t = useT();
+  // An older server sends no `network`. Derived the only safe way: isolated without a container is a
+  // kernel sandbox, which has no network to give; anything else is the host, never "closed".
+  const reach = state.network ?? (state.isolated ? "none" : "host");
+  const blocked = reach === "none";
+  const hint = blocked
+    ? "settings.hint.networkOsBlocked"
+    : state.reason_code === "no_container"
+      ? "settings.hint.networkNoContainer"
+      : "settings.hint.networkHost";
+  return (
+    <Row label={t("settings.row.sandboxNetwork")} hint={t(hint)} warn={!blocked}>
+      <span className="text-xs text-muted-foreground">
+        {t(blocked ? "settings.network.blocked" : "settings.network.host")}
+      </span>
+    </Row>
+  );
+}
+
+/**
+ * Which Python `execute_code` runs. The frozen desktop build has none of its own, so it is whatever
+ * PATH holds, or nothing; and a snippet that could not start reads, in a transcript, exactly like a
+ * model that wrote bad code. Inside a container the container's own interpreter answers instead.
+ */
+function CodePythonRow({
+  python,
+  inContainer,
+}: {
+  python?: DoctorInfo["code_python"];
+  inContainer: boolean;
+}) {
+  const t = useT();
+  const label = t("settings.row.codePython");
+  if (inContainer) {
+    return (
+      <Row label={label}>
+        <span className="text-xs text-muted-foreground">
+          {t("settings.value.codePythonContainer")}
+        </span>
+      </Row>
+    );
+  }
+  if (!python) return null;
+  if (python.source === "missing" || !python.path) {
+    return (
+      <Row
+        label={label}
+        hint={t("settings.hint.codePythonMissing", {
+          names: (python.looked_for ?? []).join(", "),
+        })}
+        warn
+      >
+        <span className="text-xs text-warn-foreground">
+          {t("settings.value.codePythonMissing")}
+        </span>
+      </Row>
+    );
+  }
+  return (
+    <Row
+      label={label}
+      hint={t(
+        python.source === "path"
+          ? "settings.hint.codePythonPath"
+          : "settings.hint.codePythonInterpreter",
+      )}
+    >
+      <span
+        className="max-w-56 truncate font-mono text-xs text-muted-foreground"
+        title={python.path}
+      >
+        {python.path}
+      </span>
+    </Row>
+  );
+}
 
 function OllamaModelPicker({
   baseUrl,
@@ -1011,6 +1156,8 @@ export function Settings({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["config"] });
       qc.invalidateQueries({ queryKey: ["doctor"] });
+      // A changed sandbox changes what a command can reach; the network rows read it from there.
+      qc.invalidateQueries({ queryKey: ["governance-sandbox"] });
     },
   });
   const save = (updates: Record<string, string>) => mutation.mutate(updates);
@@ -1464,11 +1611,21 @@ export function Settings({
                     />
                   </Row>
                   <Row label={t("settings.row.sandbox")} env="CHIMERA_SANDBOX">
+                    {/* `auto` is the shipped default and was missing from the list, so the browser
+              showed the first option ("local") for a sandbox that was not set to local, and `auto`
+              could not be chosen back once left. The configured value is always offered, so an
+              `os` set by hand reads as itself rather than as the first entry. */}
                     <Select
                       value={c.sandbox.mode}
-                      options={["local", "docker"]}
+                      options={Array.from(
+                        new Set(["auto", "local", "docker", c.sandbox.mode]),
+                      )}
                       render={(v) =>
-                        v === "docker" ? v : t("settings.value.local")
+                        v === "auto"
+                          ? t("settings.value.sandboxAuto")
+                          : v === "local"
+                            ? t("settings.value.local")
+                            : v
                       }
                       onChange={(v) => save({ CHIMERA_SANDBOX: v })}
                     />
@@ -1487,6 +1644,12 @@ export function Settings({
                       />
                     </Row>
                   ) : null}
+                  <SandboxReachRows
+                    network={c.sandbox.network ?? "none"}
+                    applies={c.applies?.CHIMERA_SANDBOX_NETWORK}
+                    python={d?.code_python}
+                    save={save}
+                  />
                   {/* Filed with the sandbox rows because it answers the same question they do — where does
               the agent's work happen on this machine — for the one tool that has a window.
 

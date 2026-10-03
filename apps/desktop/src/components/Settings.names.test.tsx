@@ -56,7 +56,7 @@ function config() {
     governance: "off",
     approval_webhook_set: false,
   },
-    sandbox: { mode: "local", image: "python:3.12-slim" },
+    sandbox: { mode: "local", image: "python:3.12-slim", network: "none" },
     server: { token_set: false },
     mcp: { autoload: false },
     automation: { cron: true },

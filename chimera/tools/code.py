@@ -15,7 +15,7 @@ import shlex
 import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
@@ -63,10 +63,45 @@ def python_command(sandbox: Sandbox, script_name: str) -> str | None:
         return f'python "{script_name}"'
     # Here the command runs on this machine: the local sandbox, the OS sandbox, or a Docker sandbox
     # that fell back to local because the daemon is not there.
-    if not getattr(sys, "frozen", False):
-        return f"{_quote(sys.executable)} {_quote(script_name)}"
-    found = next((p for p in (shutil.which(n) for n in _PATH_PYTHONS) if p), None)
+    found, _source = host_python()
     return f"{_quote(found)} {_quote(script_name)}" if found else None
+
+
+#: How :func:`host_python` found the interpreter: this process's own, one on PATH (a frozen build,
+#: which has no interpreter of its own), or none at all.
+HostPythonSource = Literal["interpreter", "path", "missing"]
+
+
+def host_python() -> tuple[str | None, HostPythonSource]:
+    """The Python that runs ``execute_code`` when the command runs on THIS machine, and how it was found.
+
+    One function for the tool and for ``doctor``, so the screen that answers "which Python?" cannot
+    name a different one from the one the tool then runs. The question needs asking at all because
+    of the frozen desktop build: there ``sys.executable`` is the app, so the interpreter is whatever
+    PATH happens to hold — or nothing — and a snippet that fails because none was found reads, in a
+    transcript, exactly like a model that wrote bad code.
+    """
+    if not getattr(sys, "frozen", False):
+        return sys.executable, "interpreter"
+    found = next((p for p in (shutil.which(n) for n in _PATH_PYTHONS) if p), None)
+    return (found, "path") if found else (None, "missing")
+
+
+def host_python_report() -> dict[str, object]:
+    """``doctor``'s answer to "which Python does execute_code use here?", measured on this machine.
+
+    Only the host half. Whether a container answers instead is the sandbox's question, already asked
+    live by ``GET /api/governance/sandbox``; probing Docker here would put a subprocess with a ten
+    second timeout behind ``doctor``, which the app polls as its heartbeat.
+    """
+    path, source = host_python()
+    return {
+        "path": path or "",
+        "source": source,
+        "frozen": bool(getattr(sys, "frozen", False)),
+        # The names a frozen build looks for, so "missing" can say what was looked for.
+        "looked_for": list(_PATH_PYTHONS),
+    }
 
 
 class CodeInterpreterTool(Tool):

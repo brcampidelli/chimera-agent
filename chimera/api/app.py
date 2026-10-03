@@ -1141,7 +1141,7 @@ def build_api_app(
         # asks is what is TRUE.
         import platform as _platform
 
-        from chimera.sandbox import get_sandbox
+        from chimera.sandbox import get_sandbox, sandbox_network
         from chimera.sandbox.confirm import sandbox_is_isolated
         from chimera.sandbox.os_sandbox import (
             bubblewrap_available,
@@ -1191,6 +1191,13 @@ def build_api_app(
             "reason": reason,
             "reason_code": reason_code,
             "platform": _platform.system(),
+            # What a command can reach on the network HERE, which is a different question from the
+            # setting: `CHIMERA_SANDBOX_NETWORK` only means something inside a container that
+            # answered. A kernel sandbox unshares the network (bubblewrap) or denies it (Seatbelt);
+            # the host has whatever this machine has, and no setting fences it.
+            "network": (
+                sandbox_network(live) if backend == "docker" else "none" if isolated else "host"
+            ),
         }
 
     @app.get("/api/maturity", dependencies=[guard], response_model=MaturityOut)
