@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { getDictationSupport, transcribe as transcribeAudio, warmTranscriber, type Transcript } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
+import { DICTS, useI18n } from "@/lib/i18n";
 import { BrowserMicrophone, FRAME_MS, type MicrophoneLike } from "@/lib/voice/microphone";
 import { Segmenter, rmsOf } from "@/lib/voice/segmenter";
-import { BrowserSpeaker, type SpeakerLike } from "@/lib/voice/speaker";
+import { BrowserSpeaker, preferredVoiceLang, type SpeakerLike } from "@/lib/voice/speaker";
 import { countSentences, firstSentences, plainForSpeech, readyCut, screenPartStart, speechLocale } from "@/lib/voice/speech-text";
 import { encodeWav } from "@/lib/voice/wav";
 
@@ -123,7 +123,14 @@ export function VoiceMode({
   const announcedSeq = useRef<number>(announce?.seq ?? -1);
   const onUtteranceRef = useRef(onUtterance);
   onUtteranceRef.current = onUtterance;
-  const locale = useMemo(() => speechLocale(lang), [lang]);
+  // The voice's language, chosen in Settings, else the interface's. Read once per mount: the
+  // choice is made on another screen, and coming back here mounts this again. The pace is read by
+  // the speaker itself on every piece, so it needs nothing here.
+  const voiceLang = useMemo(() => preferredVoiceLang(lang), [lang]);
+  const locale = useMemo(() => speechLocale(voiceLang), [voiceLang]);
+  /** The two sentences the voice itself says, in the language it speaks — "the rest is on the
+   *  screen" in Portuguese read by an English voice is noise. The screen keeps the interface's. */
+  const say = useCallback((key: string) => DICTS[voiceLang][key] ?? t(key), [voiceLang, t]);
 
   const setPhaseBoth = useCallback((next: VoicePhase) => {
     phaseRef.current = next;
@@ -154,7 +161,7 @@ export function VoiceMode({
       setPhaseBoth("transcribing");
       const began = performance.now();
       try {
-        const result = await deps.transcribe(encodeWav(samples, sampleRate), "speech.wav", lang);
+        const result = await deps.transcribe(encodeWav(samples, sampleRate), "speech.wav", voiceLang);
         const seconds = Math.round((performance.now() - began) / 100) / 10;
         if (result.text) {
           setHeard({ text: result.text, seconds });
@@ -168,7 +175,7 @@ export function VoiceMode({
       }
       if (phaseRef.current === "transcribing") setPhaseBoth("listening");
     },
-    [deps, lang, setPhaseBoth, t],
+    [deps, voiceLang, setPhaseBoth, t],
   );
 
   const start = useCallback(async () => {
@@ -259,11 +266,11 @@ export function VoiceMode({
       piece.closed = true;
       if (rest && !piece.restSaid) {
         piece.restSaid = true;
-        queue(t("code.voice.restOnScreen"));
+        queue(say("code.voice.restOnScreen"));
       }
     };
     if (cut > piece.queued) {
-      const text = plainForSpeech(raw.slice(piece.queued, cut), t("code.voice.codeMarker"));
+      const text = plainForSpeech(raw.slice(piece.queued, cut), say("code.voice.codeMarker"));
       piece.queued = cut;
       if (text) {
         const { kept, truncated } = firstSentences(text, MAX_SPOKEN_SENTENCES - piece.sentences);
@@ -286,7 +293,7 @@ export function VoiceMode({
         setPhaseBoth("listening");
       });
     }
-  }, [answer, deps.speaker, locale, setPhaseBoth, t]);
+  }, [answer, deps.speaker, locale, say, setPhaseBoth]);
 
   const on = phase !== "off";
   const status =

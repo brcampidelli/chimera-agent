@@ -1,6 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BrowserSpeaker, pickVoice, VOICES_WAIT_MS } from "@/lib/voice/speaker";
+import {
+  BrowserSpeaker,
+  pickVoice,
+  preferredVoiceLang,
+  preferredVoiceRate,
+  setPreferredVoiceLang,
+  setPreferredVoiceRate,
+  VOICE_LANG_KEY,
+  VOICE_RATE_KEY,
+  VOICES_WAIT_MS,
+} from "@/lib/voice/speaker";
 
 /**
  * The voice that reads, chosen from what the window offers — measured lists, not guessed ones.
@@ -42,6 +52,13 @@ describe("the voice that reads", () => {
   it("is the one chosen by name while the window still has it, and the ranked pick otherwise", () => {
     expect(pickVoice(EDGE, "pt-BR", "Microsoft Maria - Portuguese (Brazil)")?.name).toContain("Maria");
     expect(pickVoice(EDGE, "pt-BR", "Microsoft Thalita multilíngue Online (Natural) - Portuguese (Brazil)")?.name).toContain("Francisca");
+  });
+
+  it("is not a voice chosen for another language, which would read this one with the wrong mouth", () => {
+    // Chosen while the voice spoke Portuguese, then the voice language became English.
+    expect(pickVoice(EDGE, "en-US", "Microsoft Antônio Online (Natural) - Portuguese (Brazil)")?.name).toContain("Ava");
+    // A Portugal voice chosen by name is still Portuguese, and is still honoured for pt-BR.
+    expect(pickVoice(EDGE, "pt-BR", "Microsoft Raquel Online (Natural) - Portuguese (Portugal)")?.name).toContain("Raquel");
   });
 
   it("falls back to the same language, then to the engine's default", () => {
@@ -88,6 +105,7 @@ class FakeSynthesis {
 
 class FakeUtterance {
   lang = "";
+  rate = 1;
   voice: SpeechSynthesisVoice | null = null;
   onend: ((ev: SpeechSynthesisEvent) => void) | null = null;
   onerror: ((ev: SpeechSynthesisErrorEvent) => void) | null = null;
@@ -161,5 +179,75 @@ describe("the browser speaker", () => {
     // The engine's late `error` for the cancelled pieces changes nothing.
     synth.spoken[2].onerror?.(new Event("error") as SpeechSynthesisErrorEvent);
     expect(speaker.speaking()).toBe(false);
+  });
+});
+
+describe("the pace and the language the voice uses", () => {
+  let synth: FakeSynthesis;
+  beforeEach(() => {
+    synth = new FakeSynthesis();
+    synth.list = EDGE;
+    vi.stubGlobal("speechSynthesis", synth);
+    vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    localStorage.clear();
+  });
+
+  it("reads at the engine's normal pace until a pace is chosen, and at the chosen one after", async () => {
+    const speaker = new BrowserSpeaker();
+    void speaker.speak("Um.", "pt-BR");
+    await vi.waitFor(() => expect(synth.spoken).toHaveLength(1));
+    expect(synth.spoken[0].rate).toBe(1);
+
+    setPreferredVoiceRate(1.5);
+    expect(localStorage.getItem(VOICE_RATE_KEY)).toBe("1.5");
+    void speaker.speak("Dois.", "pt-BR");
+    await vi.waitFor(() => expect(synth.spoken).toHaveLength(2));
+    expect(synth.spoken[1].rate).toBe(1.5);
+    expect(synth.spoken[1].lang).toBe("pt-BR");
+
+    // Back to normal is stored as nothing, the same as never having chosen.
+    setPreferredVoiceRate(1);
+    expect(localStorage.getItem(VOICE_RATE_KEY)).toBeNull();
+  });
+
+  it("ignores a pace that is not one of the offered steps", () => {
+    localStorage.setItem(VOICE_RATE_KEY, "9");
+    expect(preferredVoiceRate()).toBe(1);
+    localStorage.setItem(VOICE_RATE_KEY, "nonsense");
+    expect(preferredVoiceRate()).toBe(1);
+    localStorage.setItem(VOICE_RATE_KEY, "0.8");
+    expect(preferredVoiceRate()).toBe(0.8);
+  });
+
+  it("follows the interface's language until another is chosen, and a stale code falls back", () => {
+    expect(preferredVoiceLang("en")).toBe("en");
+    setPreferredVoiceLang("pt");
+    expect(localStorage.getItem(VOICE_LANG_KEY)).toBe("pt");
+    expect(preferredVoiceLang("en")).toBe("pt");
+    setPreferredVoiceLang("");
+    expect(localStorage.getItem(VOICE_LANG_KEY)).toBeNull();
+    expect(preferredVoiceLang("de")).toBe("de");
+    localStorage.setItem(VOICE_LANG_KEY, "xx");
+    expect(preferredVoiceLang("fr")).toBe("fr");
+  });
+
+  it("still reads, at the normal pace and in the interface's language, when storage refuses", async () => {
+    const getItem = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    try {
+      expect(preferredVoiceRate()).toBe(1);
+      expect(preferredVoiceLang("ja")).toBe("ja");
+      const speaker = new BrowserSpeaker();
+      void speaker.speak("Hello.", "en-US");
+      await vi.waitFor(() => expect(synth.spoken).toHaveLength(1));
+      expect(synth.spoken[0].rate).toBe(1);
+    } finally {
+      getItem.mockRestore();
+    }
   });
 });
