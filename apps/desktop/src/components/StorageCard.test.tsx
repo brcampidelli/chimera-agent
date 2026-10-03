@@ -149,4 +149,16 @@ describe("the diagnostics card", () => {
     expect(writeText).toHaveBeenCalledWith(diag.report);
     expect(await screen.findByRole("button", { name: "Copied" })).toBeInTheDocument();
   });
+
+  it("promises only what the scrub does, and asks for a read before posting", async () => {
+    // Review finding: the card said credentials ARE removed, and the server removes known formats —
+    // a secret with no name beside it and no recognisable shape survives any list. Whoever reads the
+    // card decides whether to paste the text into a public issue on the strength of this sentence.
+    vi.mocked(api.getAppDiagnostics).mockResolvedValue(diag);
+    render(<DiagnosticsCard />);
+
+    const claim = await screen.findByText(/credential formats are removed/);
+    expect(claim).toHaveTextContent(/Known credential formats/);
+    expect(claim).toHaveTextContent(/review the text before posting it publicly/);
+  });
 });

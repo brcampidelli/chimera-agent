@@ -224,3 +224,40 @@ def test_a_worktree_folder_inside_the_project_is_refused_at_the_save(
     assert refused.status_code == 400 and "inside the project" in refused.json()["detail"]
     accepted = client.patch("/api/config", json={"CHIMERA_WORKTREE_DIR": str(tmp_path / "outside")})
     assert accepted.status_code == 200
+
+
+@pytest.mark.parametrize(
+    ("line", "secret"),
+    [
+        ('{"api_key": "plainvalue-0123456789abcdef"}', "plainvalue-0123456789abcdef"),
+        ("{'x-api-key': 'anthropicvalue-0123456789'}", "anthropicvalue-0123456789"),
+        ("password=hunter2-correct-horse", "hunter2-correct-horse"),
+        ("openai_api_key='lowercase-value-0123456789'", "lowercase-value-0123456789"),
+        ("Api-Key: MixedCaseValue0123456789", "MixedCaseValue0123456789"),
+        ('{"client_secret": "a secret with spaces in it"}', "a secret with spaces"),
+        ("key AIzaSyA1234567890abcdefghijklmnopqrstuv in a url", "AIzaSyA1234567890abcdefghijklmnopqrstuv"),
+        (
+            "GET https://api.telegram.org/bot123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw/getMe",
+            "AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw",
+        ),
+    ],
+)
+def test_credentials_this_process_never_held_are_scrubbed_in_every_known_format(
+    line: str, secret: str
+) -> None:
+    """Review finding: the net masked only UPPER_CASE `NAME=value`, so a key rotated since the crash,
+    or one from an MCP server's config — not in this environment — passed intact in JSON, in a dict's
+    repr (the Anthropic client's headers), in lowercase, and in the Google and Telegram shapes. The
+    text is what a person pastes into a public issue, after a screen told them it was safe."""
+    from chimera.api.storage_api import scrub
+
+    shown = scrub(f"provider error: {line}\n")
+    assert secret not in shown, shown
+    assert "[redacted]" in shown and "provider error" in shown
+
+
+def test_the_scrub_leaves_the_numbers_that_diagnose_a_provider_error() -> None:
+    from chimera.api.storage_api import scrub
+
+    line = "max_tokens=4096 prompt_tokens: 123 tokenizer: gpt2 api_key=[redacted]"
+    assert scrub(line) == line

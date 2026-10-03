@@ -30,6 +30,7 @@ from chimera.api.schemas import (
     WorktreePruneOut,
 )
 from chimera.config import Settings
+from chimera.core.redact import MASK, redact
 
 #: What the desktop writes when the backend dies mid-session (`apps/desktop/src-tauri/src/main.rs`,
 #: `Trouble::DiedMidSession`), in its data directory.
@@ -45,19 +46,45 @@ CRASH_MAX_CHARS = 20_000
 #: is somebody's project — not a place to go reading a file of this name from.
 _DESKTOP_HOME_NAME = "data"
 
-#: ``SOMETHING_API_KEY=value`` and friends: an environment dump in a traceback names its secrets by
-#: the variable. `redact` masks the values this process holds; this masks the ones it does not.
-_ENV_ASSIGNMENT = re.compile(
-    r"(?P<keep>\b[A-Z0-9_]*(?:API_KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIAL|PRIVATE_KEY)"
-    r"[A-Z0-9_]*\s*[=:]\s*['\"]?)(?P<hide>[^\s'\"]+)"
+#: A name that marks what follows it as a credential, in any case and any spelling a crash carries:
+#: ``OPENAI_API_KEY``, ``openai_api_key``, ``api-key``, ``x-api-key``, ``password``, ``bot_token``.
+#: ``token`` is not followed by ``s`` or ``iz``, so ``max_tokens=4096`` and ``tokenizer: gpt2`` —
+#: ordinary lines of a provider error — keep the numbers that diagnose it.
+_SECRET_NAME = (
+    r"[\w-]*?(?:api[_-]?key|apikey|secret|token(?!s|iz)|password|passwd|credential|private[_-]?key)"
+    r"[\w-]*"
+)
+
+#: ``name=value``, ``name: value``, ``"name": "value"``, ``'name': 'value'`` — an environment dump,
+#: a config file, a dict's repr (how the Anthropic client prints its headers) and JSON. `redact`
+#: masks the values this process holds; this masks the ones it does not: a key rotated since the
+#: crash, or one that belonged to an MCP server's config rather than this environment. A quoted value
+#: is hidden to its closing quote, spaces included; an unquoted one to the next separator. A value
+#: already masked is left as it is.
+_ASSIGNMENT = re.compile(
+    rf"(?P<keep>(?<![\w-])[\"']?{_SECRET_NAME}[\"']?[ \t]*[=:][ \t]*[\"']?)"
+    rf"(?!{re.escape(MASK)})(?P<hide>(?<=[\"'])[^\"'\n]+|[^\s\"',;}}\]]+)",
+    re.IGNORECASE,
+)
+
+#: Credentials recognised by their shape, which `redact` does not list: a Google API key, and a
+#: Telegram bot token inside its API URL (`/bot<id>:<secret>/getMe`), where the URL IS the secret.
+_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{35}"), MASK),
+    (re.compile(r"\bbot\d{3,}:[A-Za-z0-9_-]{30,}"), f"bot{MASK}"),
 )
 
 
 def scrub(text: str) -> str:
-    """Credentials out of text that is about to be shown or copied."""
-    from chimera.core.redact import MASK, redact
+    """Known credential formats out of text that is about to be shown or copied.
 
-    return _ENV_ASSIGNMENT.sub(lambda m: f"{m.group('keep')}{MASK}", redact(text))
+    Known formats, not every credential: a secret with no name beside it and no recognisable shape
+    survives any list. The card says exactly that, and asks for a read before posting publicly.
+    """
+    text = _ASSIGNMENT.sub(lambda m: f"{m.group('keep')}{MASK}", redact(text))
+    for pattern, replacement in _SHAPES:
+        text = pattern.sub(replacement, text)
+    return text
 
 
 def crash_report(home: Path) -> dict[str, str] | None:

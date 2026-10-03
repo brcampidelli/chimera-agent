@@ -326,7 +326,7 @@ const en: Dict = {
   "settings.diag.noCrash": "No crash report.",
   "settings.diag.copy": "Copy diagnostics",
   "settings.diag.copied": "Copied",
-  "settings.diag.scrubbed": "Credentials are removed before anything is shown or copied.",
+  "settings.diag.scrubbed": "Known credential formats are removed before anything is shown or copied — review the text before posting it publicly.",
   "settings.card.keepAwake": "Keep this computer awake",
   "settings.keepAwake.intro":
     "Stops the computer from going to sleep while Chimera has work, and lets it sleep again when the work ends. The status bar says when it is holding the computer awake, and why.",
@@ -2156,7 +2156,7 @@ const pt: Dict = {
   "settings.diag.noCrash": "Nenhum relatório de falha.",
   "settings.diag.copy": "Copiar diagnóstico",
   "settings.diag.copied": "Copiado",
-  "settings.diag.scrubbed": "Credenciais são removidas antes de qualquer coisa ser mostrada ou copiada.",
+  "settings.diag.scrubbed": "Formatos conhecidos de credencial são removidos antes de mostrar ou copiar — revise o texto antes de publicá-lo.",
   "settings.card.keepAwake": "Manter o computador acordado",
   "settings.keepAwake.intro":
     "Impede o computador de dormir enquanto o Chimera tem trabalho e o deixa dormir de novo quando o trabalho acaba. A barra de status diz quando está mantendo o computador acordado, e por quê.",
@@ -4037,7 +4037,7 @@ const es: Dict = {
   "settings.diag.noCrash": "Ningún informe de fallo.",
   "settings.diag.copy": "Copiar diagnóstico",
   "settings.diag.copied": "Copiado",
-  "settings.diag.scrubbed": "Las credenciales se eliminan antes de mostrar o copiar nada.",
+  "settings.diag.scrubbed": "Los formatos conocidos de credenciales se eliminan antes de mostrar o copiar — revisa el texto antes de publicarlo.",
   "settings.card.keepAwake": "Mantener el equipo despierto",
   "settings.keepAwake.intro":
     "Impide que el equipo entre en suspensión mientras Chimera tiene trabajo, y lo deja dormir de nuevo cuando el trabajo termina. La barra de estado indica cuándo lo mantiene despierto y por qué.",
@@ -5893,7 +5893,7 @@ const fr: Dict = {
   "settings.diag.noCrash": "Aucun rapport de plantage.",
   "settings.diag.copy": "Copier le diagnostic",
   "settings.diag.copied": "Copié",
-  "settings.diag.scrubbed": "Les identifiants sont retirés avant tout affichage ou copie.",
+  "settings.diag.scrubbed": "Les formats d’identifiants connus sont retirés avant tout affichage ou copie — relisez le texte avant de le publier.",
   "settings.card.keepAwake": "Garder l'ordinateur éveillé",
   "settings.keepAwake.intro":
     "Empêche l'ordinateur de se mettre en veille tant que Chimera a du travail, et le laisse dormir de nouveau quand le travail se termine. La barre d'état indique quand il le garde éveillé, et pourquoi.",
@@ -7760,7 +7760,7 @@ const de: Dict = {
   "settings.diag.noCrash": "Kein Absturzbericht.",
   "settings.diag.copy": "Diagnose kopieren",
   "settings.diag.copied": "Kopiert",
-  "settings.diag.scrubbed": "Zugangsdaten werden entfernt, bevor etwas angezeigt oder kopiert wird.",
+  "settings.diag.scrubbed": "Bekannte Formate von Zugangsdaten werden vor dem Anzeigen oder Kopieren entfernt — prüfen Sie den Text, bevor Sie ihn öffentlich posten.",
   "settings.card.keepAwake": "Computer wach halten",
   "settings.keepAwake.intro":
     "Verhindert, dass der Computer in den Ruhezustand geht, solange Chimera Arbeit hat, und lässt ihn wieder schlafen, wenn die Arbeit endet. Die Statusleiste zeigt, wann und warum er wach gehalten wird.",
@@ -9613,7 +9613,7 @@ const zh: Dict = {
   "settings.diag.noCrash": "没有崩溃报告。",
   "settings.diag.copy": "复制诊断信息",
   "settings.diag.copied": "已复制",
-  "settings.diag.scrubbed": "在显示或复制之前会移除凭据。",
+  "settings.diag.scrubbed": "在显示或复制之前会移除已知格式的凭据——公开发布前请先检查文本。",
   "settings.card.keepAwake": "保持电脑唤醒",
   "settings.keepAwake.intro": "在 Chimera 有工作时阻止电脑进入睡眠，工作结束后让它再次睡眠。状态栏会显示何时保持唤醒以及原因。",
   "settings.keepAwake.off": "关闭",
@@ -11405,7 +11405,7 @@ const ja: Dict = {
   "settings.diag.noCrash": "クラッシュレポートはありません。",
   "settings.diag.copy": "診断情報をコピー",
   "settings.diag.copied": "コピーしました",
-  "settings.diag.scrubbed": "表示やコピーの前に認証情報は取り除かれます。",
+  "settings.diag.scrubbed": "既知の形式の認証情報は表示やコピーの前に取り除かれます。公開する前にテキストを確認してください。",
   "settings.card.keepAwake": "コンピューターをスリープさせない",
   "settings.keepAwake.intro":
     "Chimera に作業がある間はコンピューターのスリープを防ぎ、作業が終わると再びスリープできるようにします。スリープを防いでいる間とその理由はステータスバーに表示されます。",
@@ -13209,7 +13209,7 @@ const it: Dict = {
   "settings.diag.noCrash": "Nessun rapporto di crash.",
   "settings.diag.copy": "Copia la diagnostica",
   "settings.diag.copied": "Copiato",
-  "settings.diag.scrubbed": "Le credenziali vengono rimosse prima di mostrare o copiare qualsiasi cosa.",
+  "settings.diag.scrubbed": "I formati noti di credenziali vengono rimossi prima di mostrare o copiare — rileggi il testo prima di pubblicarlo.",
   "settings.card.keepAwake": "Tieni sveglio il computer",
   "settings.keepAwake.intro":
     "Impedisce al computer di andare in sospensione mentre Chimera ha del lavoro, e lo lascia dormire di nuovo quando il lavoro finisce. La barra di stato dice quando lo tiene sveglio, e perché.",
@@ -15068,7 +15068,7 @@ const pl: Dict = {
   "settings.diag.noCrash": "Brak raportu awarii.",
   "settings.diag.copy": "Kopiuj diagnostykę",
   "settings.diag.copied": "Skopiowano",
-  "settings.diag.scrubbed": "Dane uwierzytelniające są usuwane przed wyświetleniem lub skopiowaniem czegokolwiek.",
+  "settings.diag.scrubbed": "Znane formaty danych uwierzytelniających są usuwane przed wyświetleniem lub skopiowaniem — przejrzyj tekst przed publikacją.",
   "settings.card.keepAwake": "Nie usypiaj komputera",
   "settings.keepAwake.intro":
     "Nie pozwala komputerowi przejść w stan uśpienia, dopóki Chimera ma pracę, i pozwala mu zasnąć, gdy praca się skończy. Pasek stanu pokazuje, kiedy i dlaczego komputer nie jest usypiany.",
@@ -16920,7 +16920,7 @@ const ru: Dict = {
   "settings.diag.noCrash": "Отчётов о сбоях нет.",
   "settings.diag.copy": "Копировать диагностику",
   "settings.diag.copied": "Скопировано",
-  "settings.diag.scrubbed": "Учётные данные удаляются перед показом или копированием.",
+  "settings.diag.scrubbed": "Учётные данные известных форматов удаляются перед показом или копированием — проверьте текст перед публикацией.",
   "settings.card.keepAwake": "Не давать компьютеру засыпать",
   "settings.keepAwake.intro":
     "Не даёт компьютеру уйти в сон, пока у Chimera есть работа, и снова позволяет ему засыпать, когда работа закончена. Строка состояния показывает, когда и почему компьютер удерживается.",
