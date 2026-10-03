@@ -20,7 +20,7 @@ Round-trips losslessly with :class:`chimera.evolution.learned_skill.LearnedSkill
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import IntEnum
 from typing import TYPE_CHECKING
 
@@ -174,6 +174,19 @@ def parse_skill_md(text: str) -> SkillMd:
         topic=_vocab(front.get("topic"), TOPICS),
     )
     return SkillMd(manifest=manifest, instructions=body.strip())
+
+
+def untrusted(skill: SkillMd) -> SkillMd:
+    """The same skill with the trust its own file claimed taken away: tainted, held ``pending``.
+
+    ``provenance`` and ``status`` are frontmatter, and frontmatter is written by whoever wrote the
+    file. Read as-is, a stranger's card that simply omits ``provenance: tainted`` parses as clean
+    and active and goes straight into card retrieval — the author of the instructions deciding
+    whether anyone reads them first. The boundary that brings a file in owns the label instead.
+    Returns a copy; the parsed original is left as it was read.
+    """
+    manifest = replace(skill.manifest, provenance="tainted", status="pending")
+    return replace(skill, manifest=manifest)
 
 
 def from_learned(skill: LearnedSkill) -> SkillMd:

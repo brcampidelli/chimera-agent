@@ -93,6 +93,32 @@ def load_card(name: str) -> SkillMd | None:
         return None
 
 
+def is_shipped_card(name: str, text: str) -> bool:
+    """True when ``text`` is, content for content, the curated card called ``name``.
+
+    For a SKILL.md arriving by path. Such a file is held tainted unless it IS one of ours — and that
+    is decided by what it says, not by the name it gives itself: a stranger can copy a curated
+    card's name and its ``provenance: clean`` in one line, and cannot make the instructions under
+    them match ours without making them ours. This keeps ``chimera skills-import skills/<name>``,
+    the form the READMEs print, landing active from a checkout.
+
+    Compare text read with ``read_text`` (universal newlines), as the caller does: a Windows
+    checkout and a wheel can hold the same card as CRLF and LF, and nothing a card means lives in
+    its line terminators.
+    """
+    root = library_root()
+    if root is None:
+        return False
+    path = _card_path(root, name)
+    if path is None:
+        return False
+    try:
+        shipped = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return shipped == text
+
+
 def load_library() -> list[SkillMd]:
     """Every curated card, ordered by name.
 

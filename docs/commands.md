@@ -80,7 +80,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`skills-catalog`](#skills-catalog) | Browse the installable skills from the wider Agent Skills ecosystem. |
 | [`skills-evolve`](#skills-evolve) | Reflectively evolve a skill's prompt template against graded instances (GEPA). |
 | [`skills-export`](#skills-export) | Export a learned skill to the open SKILL.md format (portable to the agent-skills ecosystem). |
-| [`skills-import`](#skills-import) | Import a SKILL.md into the store. A tainted-provenance skill is held pending for review. |
+| [`skills-import`](#skills-import) | Import a SKILL.md into the store. A file imported by path is held pending for review. |
 | [`skills-install`](#skills-install) | Download a skill bundle from its source repository into your skills directory. |
 | [`skills-library`](#skills-library) | Browse the curated skill cards that ship with Chimera. |
 | [`skills-lifecycle`](#skills-lifecycle) | Run the measured skill-lifecycle loop (M18-4): promote proven provisionals, demote regressions. |
@@ -1297,12 +1297,18 @@ chimera skills-export NAME
 
 ## skills-import
 
-Import a SKILL.md into the store. A tainted-provenance skill is held pending for review.
+Import a SKILL.md into the store. A file imported by path is held pending for review.
 
 Accepts the plain name of a curated card (``chimera skills-import verify-before-claiming``) as
 well as a path. The documented form was ``skills/<name>``, a repo-relative path that resolves
 only inside a checkout — so the one line the README gives for using the shipped library failed
 for everybody who installed Chimera instead of cloning it.
+
+A file by path lands tainted and pending whatever its frontmatter says, until
+``chimera skills-approve <name>``. Its ``provenance`` and ``status`` were written by its author,
+so reading them let the stranger decide whether anybody reads the card before the agent does.
+Only a curated card keeps what it declares: by name, or by a path whose content is exactly the
+shipped card.
 
 Validated on the way in. This is the only path by which a skill written by somebody else enters
 the store, and it was the only one that skipped the validator the agent's own proposals must
@@ -1343,8 +1349,10 @@ chimera skills-install NAME
 
 Browse the curated skill cards that ship with Chimera.
 
-Data, not code: each is a markdown page of Trigger/Do/Avoid/Check/Risk that the agent reads into
-its prompt when it matches. Load one into your own store with ``chimera skills-import <name>``.
+Data, not code: each is a markdown page of Trigger/Do/Avoid/Check/Risk. Load one into your own
+store with ``chimera skills-import <name>``. The agent reads a matching card from that store into
+its prompt only with CHIMERA_SKILL_CARDS=on (or ``chimera solve --skill-cards``); it is off by
+default, so an imported card is otherwise reference for you, not advice to the agent.
 
 ```bash
 chimera skills-library [NAME]
