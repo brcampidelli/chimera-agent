@@ -9,6 +9,9 @@
 //! at that localhost origin. The SPA is served BY the sidecar (same origin), so its relative `/api`
 //! calls just work — no divergent server code, no base-URL rewiring. The sidecar is killed on exit.
 
+mod prefs;
+mod sidecar_http;
+
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
 use std::net::{SocketAddr, TcpStream};
@@ -18,12 +21,17 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::webview::NewWindowResponse;
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, UserAttentionType, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
+
+use crate::prefs::{OnClose, Prefs};
+use crate::sidecar_http::Fetch;
 
 /// A running backend: the process, the origin it serves, and the last thing it said.
 ///
@@ -996,6 +1004,18 @@ mod tests {
             ("parou", d.parou),
             ("relatorio", d.relatorio),
             ("ultima_tentativa", d.ultima_tentativa),
+            ("abrir", d.abrir),
+            ("manter_na_bandeja", d.manter_na_bandeja),
+            ("iniciar_com_sistema", d.iniciar_com_sistema),
+            ("chamar_atencao", d.chamar_atencao),
+            ("atalho", d.atalho),
+            ("atalho_falhou", d.atalho_falhou),
+            ("autostart_falhou", d.autostart_falhou),
+            ("prefs_falhou", d.prefs_falhou),
+            ("sem_acesso", d.sem_acesso),
+            ("dica_rodando", d.dica_rodando),
+            ("dica_gasto", d.dica_gasto),
+            ("dica_aguardando", d.dica_aguardando),
         ]
     }
 
@@ -1053,6 +1073,16 @@ mod tests {
                 ("atual", d.atual, "{v}"),
                 ("falhou", d.falhou, "{e}"),
                 ("parou", d.parou, "{n}"),
+                ("atalho", d.atalho, "{k}"),
+                ("atalho_falhou", d.atalho_falhou, "{k}"),
+                ("atalho_falhou", d.atalho_falhou, "{e}"),
+                ("autostart_falhou", d.autostart_falhou, "{e}"),
+                ("prefs_falhou", d.prefs_falhou, "{f}"),
+                ("prefs_falhou", d.prefs_falhou, "{e}"),
+                ("sem_acesso", d.sem_acesso, "{e}"),
+                ("dica_rodando", d.dica_rodando, "{n}"),
+                ("dica_gasto", d.dica_gasto, "{usd}"),
+                ("dica_aguardando", d.dica_aguardando, "{n}"),
             ] {
                 assert!(
                     texto.contains(marcador),
@@ -1206,10 +1236,21 @@ mod tests {
             menu.contains(concat!("dialogo()", ".menu")),
             "o rotulo do item de bandeja parou de vir da tabela de idiomas"
         );
-        assert!(
-            producao.contains(concat!("&[&atual", "izar, &quit]")),
-            "o item saiu do menu da bandeja"
-        );
+        // Read over the LIST the menu is built from, not over one spelling of it. This used to be
+        // `contains("&[&atualizar, &quit]")`, which the tray switches of study 29 broke by adding
+        // items to the same list — the property ("the update item is in the menu") still held, the
+        // literal did not. Bounded at the list's own `]`, so an item mentioned elsewhere cannot pass.
+        let lista = producao
+            .split_once(concat!("Menu::with_", "items(\n"))
+            .or_else(|| producao.split_once(concat!("Menu::with_", "items(")))
+            .expect("o menu da bandeja e' montado de uma lista")
+            .1
+            .split_once("],")
+            .expect("a lista fecha")
+            .0;
+        for item in [concat!("&atual", "izar,"), concat!("&qu", "it,")] {
+            assert!(lista.contains(item), "o item {item} saiu do menu da bandeja: {lista}");
+        }
         assert!(
             producao.contains(concat!("\"update\" =", ">")),
             "o clique no item nao e' mais tratado"
@@ -2005,6 +2046,26 @@ struct Dialogo {
     parou: &'static str,
     relatorio: &'static str,
     ultima_tentativa: &'static str,
+    // --- The tray's switches (study 29, P2.2, P2.3, P2.4, P2.6). ---
+    /// Brings the window back: the only way to it once closing it only hides it.
+    abrir: &'static str,
+    manter_na_bandeja: &'static str,
+    iniciar_com_sistema: &'static str,
+    chamar_atencao: &'static str,
+    /// `{k}` is the chord, as the person will press it.
+    atalho: &'static str,
+    /// `{k}` the chord, `{e}` why it could not be registered (another program holds it, or it does
+    /// not parse). Shown in the tray menu rather than swallowed.
+    atalho_falhou: &'static str,
+    autostart_falhou: &'static str,
+    /// `{f}` the preferences file, `{e}` the OS's words.
+    prefs_falhou: &'static str,
+    /// `{e}` is what the backend answered. The tray must not read a refusal as "nothing pending".
+    sem_acesso: &'static str,
+    /// Tooltip pieces, shown only while the app keeps running in the tray.
+    dica_rodando: &'static str,
+    dica_gasto: &'static str,
+    dica_aguardando: &'static str,
 }
 
 /// The update dialog, in the ten languages the app ships.
@@ -2033,6 +2094,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Chimera's backend stopped, and the app could not bring it back (it tried {n} times).\n\nClose Chimera and open it again.",
         relatorio: "What the backend said before it stopped:",
         ultima_tentativa: "The last attempt to restart it:",
+        abrir: "Open Chimera",
+        manter_na_bandeja: "Keep running in the tray when closed",
+        iniciar_com_sistema: "Start at sign-in, in the tray",
+        chamar_atencao: "Flash the taskbar when an approval is waiting",
+        atalho: "Quick-entry shortcut ({k})",
+        atalho_falhou: "Shortcut {k} is not active: {e}",
+        autostart_falhou: "Could not change start at sign-in: {e}",
+        prefs_falhou: "Tray preferences not saved or read ({f}): {e}",
+        sem_acesso: "No access to the backend ({e}): approvals and spending cannot be shown here",
+        dica_rodando: "{n} running",
+        dica_gasto: "US$ {usd} today (UTC)",
+        dica_aguardando: "{n} waiting for you",
     },
     Dialogo {
         codigo: "pt",
@@ -2050,6 +2123,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "O backend do Chimera parou e o app não conseguiu trazê-lo de volta (tentou {n} vezes).\n\nFeche o Chimera e abra de novo.",
         relatorio: "O que o backend disse antes de parar:",
         ultima_tentativa: "A última tentativa de reiniciá-lo:",
+        abrir: "Abrir o Chimera",
+        manter_na_bandeja: "Manter rodando na bandeja ao fechar",
+        iniciar_com_sistema: "Iniciar com o sistema, na bandeja",
+        chamar_atencao: "Piscar a barra de tarefas quando houver aprovação pendente",
+        atalho: "Atalho de entrada rápida ({k})",
+        atalho_falhou: "O atalho {k} não está ativo: {e}",
+        autostart_falhou: "Não foi possível mudar o início com o sistema: {e}",
+        prefs_falhou: "Preferências da bandeja não gravadas ou lidas ({f}): {e}",
+        sem_acesso: "Sem acesso ao backend ({e}): aprovações e gasto não podem ser mostrados aqui",
+        dica_rodando: "{n} rodando",
+        dica_gasto: "US$ {usd} hoje (UTC)",
+        dica_aguardando: "{n} esperando por você",
     },
     Dialogo {
         codigo: "es",
@@ -2067,6 +2152,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "El backend de Chimera se detuvo y la app no pudo recuperarlo (lo intentó {n} veces).\n\nCierra Chimera y ábrelo de nuevo.",
         relatorio: "Lo que dijo el backend antes de detenerse:",
         ultima_tentativa: "El último intento de reiniciarlo:",
+        abrir: "Abrir Chimera",
+        manter_na_bandeja: "Seguir en la bandeja al cerrar",
+        iniciar_com_sistema: "Iniciar con el sistema, en la bandeja",
+        chamar_atencao: "Hacer parpadear la barra de tareas cuando haya una aprobación pendiente",
+        atalho: "Atajo de entrada rápida ({k})",
+        atalho_falhou: "El atajo {k} no está activo: {e}",
+        autostart_falhou: "No se pudo cambiar el inicio con el sistema: {e}",
+        prefs_falhou: "Preferencias de la bandeja no guardadas o leídas ({f}): {e}",
+        sem_acesso: "Sin acceso al backend ({e}): aquí no se pueden mostrar aprobaciones ni gasto",
+        dica_rodando: "{n} en curso",
+        dica_gasto: "US$ {usd} hoy (UTC)",
+        dica_aguardando: "{n} esperándote",
     },
     Dialogo {
         codigo: "fr",
@@ -2084,6 +2181,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Le backend de Chimera s'est arrêté et l'application n'a pas pu le relancer ({n} tentatives).\n\nFermez Chimera et rouvrez-le.",
         relatorio: "Ce que le backend a dit avant de s'arrêter :",
         ultima_tentativa: "La dernière tentative de redémarrage :",
+        abrir: "Ouvrir Chimera",
+        manter_na_bandeja: "Rester dans la zone de notification à la fermeture",
+        iniciar_com_sistema: "Démarrer avec le système, dans la zone de notification",
+        chamar_atencao: "Faire clignoter la barre des tâches quand une approbation attend",
+        atalho: "Raccourci de saisie rapide ({k})",
+        atalho_falhou: "Le raccourci {k} n'est pas actif : {e}",
+        autostart_falhou: "Impossible de modifier le démarrage avec le système : {e}",
+        prefs_falhou: "Préférences de la zone de notification non enregistrées ou lues ({f}) : {e}",
+        sem_acesso: "Pas d'accès au backend ({e}) : les approbations et les dépenses ne peuvent pas être affichées ici",
+        dica_rodando: "{n} en cours",
+        dica_gasto: "{usd} US$ aujourd'hui (UTC)",
+        dica_aguardando: "{n} en attente de vous",
     },
     Dialogo {
         codigo: "de",
@@ -2101,6 +2210,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Chimeras Backend wurde beendet und die App konnte es nicht wiederherstellen ({n} Versuche).\n\nSchließen Sie Chimera und öffnen Sie es erneut.",
         relatorio: "Was das Backend zuletzt gemeldet hat:",
         ultima_tentativa: "Der letzte Neustartversuch:",
+        abrir: "Chimera öffnen",
+        manter_na_bandeja: "Beim Schließen im Infobereich weiterlaufen",
+        iniciar_com_sistema: "Mit dem System starten, im Infobereich",
+        chamar_atencao: "Taskleiste blinken lassen, wenn eine Freigabe wartet",
+        atalho: "Schnelleingabe-Tastenkürzel ({k})",
+        atalho_falhou: "Das Tastenkürzel {k} ist nicht aktiv: {e}",
+        autostart_falhou: "Autostart konnte nicht geändert werden: {e}",
+        prefs_falhou: "Einstellungen des Infobereichs nicht gespeichert oder gelesen ({f}): {e}",
+        sem_acesso: "Kein Zugriff auf das Backend ({e}): Freigaben und Kosten können hier nicht angezeigt werden",
+        dica_rodando: "{n} laufen",
+        dica_gasto: "US$ {usd} heute (UTC)",
+        dica_aguardando: "{n} warten auf Sie",
     },
     Dialogo {
         codigo: "it",
@@ -2118,6 +2239,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Il backend di Chimera si è fermato e l'app non è riuscita a riavviarlo ({n} tentativi).\n\nChiudi Chimera e riaprilo.",
         relatorio: "Che cosa ha detto il backend prima di fermarsi:",
         ultima_tentativa: "L'ultimo tentativo di riavviarlo:",
+        abrir: "Apri Chimera",
+        manter_na_bandeja: "Resta nell'area di notifica alla chiusura",
+        iniciar_com_sistema: "Avvia con il sistema, nell'area di notifica",
+        chamar_atencao: "Fai lampeggiare la barra delle applicazioni quando un'approvazione è in attesa",
+        atalho: "Scorciatoia di inserimento rapido ({k})",
+        atalho_falhou: "La scorciatoia {k} non è attiva: {e}",
+        autostart_falhou: "Impossibile modificare l'avvio con il sistema: {e}",
+        prefs_falhou: "Preferenze dell'area di notifica non salvate o lette ({f}): {e}",
+        sem_acesso: "Nessun accesso al backend ({e}): approvazioni e spesa non possono essere mostrate qui",
+        dica_rodando: "{n} in esecuzione",
+        dica_gasto: "US$ {usd} oggi (UTC)",
+        dica_aguardando: "{n} in attesa di te",
     },
     Dialogo {
         codigo: "pl",
@@ -2135,6 +2268,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Backend Chimery zatrzymał się, a aplikacja nie zdołała go przywrócić (prób: {n}).\n\nZamknij Chimerę i otwórz ją ponownie.",
         relatorio: "Co backend powiedział, zanim się zatrzymał:",
         ultima_tentativa: "Ostatnia próba ponownego uruchomienia:",
+        abrir: "Otwórz Chimerę",
+        manter_na_bandeja: "Działaj w zasobniku po zamknięciu",
+        iniciar_com_sistema: "Uruchamiaj z systemem, w zasobniku",
+        chamar_atencao: "Migaj paskiem zadań, gdy czeka zatwierdzenie",
+        atalho: "Skrót szybkiego wprowadzania ({k})",
+        atalho_falhou: "Skrót {k} nie jest aktywny: {e}",
+        autostart_falhou: "Nie udało się zmienić uruchamiania z systemem: {e}",
+        prefs_falhou: "Ustawienia zasobnika nie zostały zapisane ani odczytane ({f}): {e}",
+        sem_acesso: "Brak dostępu do backendu ({e}): nie można tu pokazać zatwierdzeń ani wydatków",
+        dica_rodando: "Uruchomione: {n}",
+        dica_gasto: "US$ {usd} dzisiaj (UTC)",
+        dica_aguardando: "Czeka na ciebie: {n}",
     },
     Dialogo {
         codigo: "zh",
@@ -2152,6 +2297,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Chimera 的后端已停止，应用无法将其恢复（已尝试 {n} 次）。\n\n请关闭 Chimera 后重新打开。",
         relatorio: "后端停止前的输出：",
         ultima_tentativa: "最后一次重启尝试：",
+        abrir: "打开 Chimera",
+        manter_na_bandeja: "关闭时保留在托盘中运行",
+        iniciar_com_sistema: "随系统启动（在托盘中）",
+        chamar_atencao: "有待批准事项时闪烁任务栏",
+        atalho: "快速输入快捷键（{k}）",
+        atalho_falhou: "快捷键 {k} 未生效：{e}",
+        autostart_falhou: "无法更改随系统启动：{e}",
+        prefs_falhou: "托盘偏好未能保存或读取（{f}）：{e}",
+        sem_acesso: "无法访问后端（{e}）：此处无法显示待批准事项和花费",
+        dica_rodando: "{n} 个运行中",
+        dica_gasto: "今日 US$ {usd}（UTC）",
+        dica_aguardando: "{n} 个等待你处理",
     },
     Dialogo {
         codigo: "ja",
@@ -2169,6 +2326,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Chimera のバックエンドが停止し、アプリは復帰させられませんでした ({n} 回試行)。\n\nChimera を閉じて開き直してください。",
         relatorio: "停止する前にバックエンドが出力した内容:",
         ultima_tentativa: "最後の再起動の試み:",
+        abrir: "Chimera を開く",
+        manter_na_bandeja: "閉じてもトレイで実行を続ける",
+        iniciar_com_sistema: "システムと一緒に起動（トレイに常駐）",
+        chamar_atencao: "承認待ちがあるときにタスクバーを点滅させる",
+        atalho: "クイック入力のショートカット（{k}）",
+        atalho_falhou: "ショートカット {k} は有効ではありません: {e}",
+        autostart_falhou: "システムと一緒に起動する設定を変更できませんでした: {e}",
+        prefs_falhou: "トレイの設定を保存または読み込めませんでした ({f}): {e}",
+        sem_acesso: "バックエンドにアクセスできません ({e}): 承認待ちと支出はここに表示できません",
+        dica_rodando: "{n} 件実行中",
+        dica_gasto: "本日 US$ {usd}（UTC）",
+        dica_aguardando: "{n} 件があなたを待っています",
     },
     Dialogo {
         codigo: "ru",
@@ -2186,6 +2355,18 @@ const DIALOGO: [Dialogo; 10] = [
         parou: "Бэкенд Chimera остановился, и приложение не смогло его восстановить (попыток: {n}).\n\nЗакройте Chimera и откройте снова.",
         relatorio: "Что бэкенд сообщил перед остановкой:",
         ultima_tentativa: "Последняя попытка перезапуска:",
+        abrir: "Открыть Chimera",
+        manter_na_bandeja: "При закрытии оставаться в трее",
+        iniciar_com_sistema: "Запускать вместе с системой, в трее",
+        chamar_atencao: "Мигать панелью задач, когда ждёт одобрение",
+        atalho: "Сочетание клавиш быстрого ввода ({k})",
+        atalho_falhou: "Сочетание {k} не активно: {e}",
+        autostart_falhou: "Не удалось изменить автозапуск: {e}",
+        prefs_falhou: "Настройки трея не сохранены или не прочитаны ({f}): {e}",
+        sem_acesso: "Нет доступа к бэкенду ({e}): одобрения и расходы здесь показать нельзя",
+        dica_rodando: "Выполняется: {n}",
+        dica_gasto: "US$ {usd} сегодня (UTC)",
+        dica_aguardando: "Ждут вас: {n}",
     },
 ];
 
@@ -2331,15 +2512,375 @@ fn bring_forward(app: &tauri::AppHandle) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// The tray's switches (study 29: P2.2 keep running in the tray, P2.3 start at sign-in, P2.4 call
+// attention, P2.6 the quick-entry shortcut). All of it is driven from here: the window grants no
+// IPC and still does not, so the page cannot flip any of these and none of the plugins' own
+// webview commands are reachable from it.
+// ---------------------------------------------------------------------------------------------
+
+/// The argument the sign-in entry launches the app with. One constant, so the plugin that writes
+/// the entry and the code that reads the launch can never disagree about the spelling.
+const AUTOSTART_ARG: &str = "--autostart";
+
+/// Was this launch the sign-in entry rather than a person clicking the icon?
+fn launched_by_autostart(args: impl IntoIterator<Item = String>) -> bool {
+    args.into_iter().skip(1).any(|a| a == AUTOSTART_ARG)
+}
+
+/// Stand where a shortcut launch stands: in the install directory.
+///
+/// Not tidiness. The backend reads its `.env` — API keys, the server token — relative to its
+/// working directory, which it inherits from this process, and Settings writes it there too. The
+/// Start-menu and desktop shortcuts start the app in the install directory (their "Start in" is
+/// it; checked on an installed 0.64), so that is where every key the owner saved lives. The
+/// Windows `Run` entry gives the process whatever directory Explorer has — not that one — and
+/// the app would come up at sign-in without its keys, looking configured and answering nothing.
+///
+/// Windows only, and only for a sign-in launch: on macOS a Finder launch already starts in `/`, the
+/// same place a LaunchAgent does, so changing it there would make the sign-in launch the odd one.
+fn root_at_install_dir() {
+    #[cfg(windows)]
+    if let Some(dir) = std::env::current_exe().ok().and_then(|exe| exe.parent().map(Path::to_path_buf)) {
+        let _ = std::env::set_current_dir(dir);
+    }
+}
+
+/// Why the tray has to say something, by source, so fixing one does not erase the report of another.
+#[derive(Default)]
+struct Problems {
+    prefs: Option<String>,
+    autostart: Option<String>,
+    shortcut: Option<String>,
+    backend: Option<String>,
+}
+
+impl Problems {
+    /// One line for the tray, or nothing when all is well.
+    fn line(&self) -> Option<String> {
+        let all: Vec<&str> = [&self.prefs, &self.autostart, &self.shortcut, &self.backend]
+            .into_iter()
+            .filter_map(|p| p.as_deref())
+            .collect();
+        (!all.is_empty()).then(|| all.join(" · "))
+    }
+}
+
+/// What the shell knows about itself that the tray and the window events share.
+struct Shell {
+    data_dir: PathBuf,
+    prefs: Mutex<Prefs>,
+    /// Whether the main window is in front. Written by its `Focused` events, read by the watcher:
+    /// a flash for an approval the owner is already looking at is noise.
+    focused: AtomicBool,
+    problems: Mutex<Problems>,
+}
+
+impl Shell {
+    fn prefs(&self) -> Prefs {
+        self.prefs.lock().map(|p| p.clone()).unwrap_or_default()
+    }
+}
+
+/// The tray's menu and the items that change after it is built.
+///
+/// `status` is a disabled line that is in the menu only while there is something wrong to say: a
+/// shortcut another program holds, a sign-in entry the OS refused, a preferences file that did not
+/// save, a backend that answers 401. Each of those used to be the kind of failure that is simply
+/// never seen.
+struct Tray {
+    menu: Menu<tauri::Wry>,
+    status: MenuItem<tauri::Wry>,
+    status_shown: AtomicBool,
+    autostart: CheckMenuItem<tauri::Wry>,
+    quick_entry: CheckMenuItem<tauri::Wry>,
+}
+
+/// Put the current problems in the menu, or take the line out when there are none.
+fn show_problems(app: &tauri::AppHandle) {
+    let (Some(shell), Some(tray)) = (app.try_state::<Arc<Shell>>(), app.try_state::<Tray>()) else {
+        return;
+    };
+    let line = shell.problems.lock().ok().and_then(|p| p.line());
+    match line {
+        Some(text) => {
+            let _ = tray.status.set_text(&text);
+            if !tray.status_shown.swap(true, Ordering::SeqCst) {
+                let _ = tray.menu.insert(&tray.status, 0);
+            }
+        }
+        None => {
+            if tray.status_shown.swap(false, Ordering::SeqCst) {
+                let _ = tray.menu.remove(&tray.status);
+            }
+        }
+    }
+}
+
+fn set_problem(app: &tauri::AppHandle, pick: impl FnOnce(&mut Problems) -> &mut Option<String>, value: Option<String>) {
+    if let Some(shell) = app.try_state::<Arc<Shell>>() {
+        if let Ok(mut problems) = shell.problems.lock() {
+            *pick(&mut problems) = value;
+        }
+    }
+    show_problems(app);
+}
+
+/// Change one preference and write the file. A write that fails is SAID in the tray: the switch
+/// still takes effect for this session, and the person learns it will not survive a restart.
+fn change_prefs(app: &tauri::AppHandle, edit: impl FnOnce(&mut Prefs)) {
+    let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
+    let saved = match shell.prefs.lock() {
+        Ok(mut prefs) => {
+            edit(&mut prefs);
+            prefs::save(&shell.data_dir, &prefs)
+        }
+        Err(_) => Err("preferences lock poisoned".to_string()),
+    };
+    let problem = saved.err().map(|e| prefs_problem(dialogo(), &shell.data_dir, &e));
+    set_problem(app, |p| &mut p.prefs, problem);
+}
+
+fn prefs_problem(d: &Dialogo, data_dir: &Path, why: &str) -> String {
+    d.prefs_falhou
+        .replace("{f}", &prefs::prefs_path(data_dir).display().to_string())
+        .replace("{e}", why)
+}
+
+/// Turn the sign-in entry on or off, and show what the OS actually has afterwards.
+///
+/// The checkbox shows the OS's answer, never the click: muda ticks a check item the moment it is
+/// clicked, so a refused write (a policy, a locked key) would otherwise leave a tick on a feature
+/// that is off.
+fn apply_autostart(app: &tauri::AppHandle, wanted: bool) {
+    let manager = app.autolaunch();
+    let result = if wanted { manager.enable() } else { manager.disable() };
+    let problem = result
+        .err()
+        .map(|e| dialogo().autostart_falhou.replace("{e}", &e.to_string()));
+    let actual = manager.is_enabled().unwrap_or(false);
+    if let Some(tray) = app.try_state::<Tray>() {
+        let _ = tray.autostart.set_checked(actual);
+    }
+    set_problem(app, |p| &mut p.autostart, problem);
+}
+
+/// The chord as a person reads it: `CommandOrControl` is Ctrl here and Cmd on a Mac.
+fn chord_label(chord: &str) -> String {
+    let local = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+    chord
+        .split('+')
+        .map(|part| match part.trim().to_ascii_lowercase().as_str() {
+            "commandorcontrol" | "commandorctrl" | "cmdorctrl" | "cmdorcontrol" => local.to_string(),
+            _ => part.trim().to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join("+")
+}
+
+/// Parse the chord from the preferences file. Its own function so the failure path — a chord the
+/// parser refuses — is tested without an app, and so its error reaches the tray verbatim.
+fn parse_chord(chord: &str) -> Result<Shortcut, String> {
+    chord.parse::<Shortcut>().map_err(|e| e.to_string())
+}
+
+/// The tray line for a quick-entry shortcut that did not register, or `None` when it did (or was
+/// not asked for).
+fn quick_entry_problem(d: &Dialogo, chord: &str, registered: &Result<(), String>) -> Option<String> {
+    registered.as_ref().err().map(|why| {
+        d.atalho_falhou.replace("{k}", &chord_label(chord)).replace("{e}", why)
+    })
+}
+
+/// What pressing the quick-entry chord does to the page: go to the Code screen, whose composer takes
+/// the focus on its own. A fixed string — nothing from outside is ever spliced into it — run by
+/// this process in the page; the page gains no way to call back.
+const QUICK_ENTRY_SCRIPT: &str = "window.location.hash = '#/code'";
+
+fn open_quick_entry(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.eval(QUICK_ENTRY_SCRIPT);
+    }
+    bring_forward(app);
+}
+
+/// Register — or drop — the quick-entry chord to match the preferences, and report what happened.
+///
+/// Registration fails for ordinary reasons: another program already holds the chord, or the file
+/// names one that does not parse. Either is put in the tray menu with the chord and the reason,
+/// because a shortcut that silently does nothing reads as a broken app.
+fn apply_quick_entry(app: &tauri::AppHandle) {
+    let Some(shell) = app.try_state::<Arc<Shell>>() else { return };
+    let prefs = shell.prefs();
+    let shortcuts = app.global_shortcut();
+    // This app registers one chord and only this function touches it, so "all" is that one.
+    let _ = shortcuts.unregister_all();
+    let registered = if prefs.quick_entry {
+        parse_chord(&prefs.quick_entry_chord).and_then(|shortcut| {
+            shortcuts
+                .on_shortcut(shortcut, |app, _shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        open_quick_entry(app);
+                    }
+                })
+                .map_err(|e| e.to_string())
+        })
+    } else {
+        Ok(())
+    };
+    let d = dialogo();
+    if let Some(tray) = app.try_state::<Tray>() {
+        let _ = tray.quick_entry.set_text(d.atalho.replace("{k}", &chord_label(&prefs.quick_entry_chord)));
+        let _ = tray.quick_entry.set_checked(prefs.quick_entry && registered.is_ok());
+    }
+    let problem = quick_entry_problem(d, &prefs.quick_entry_chord, &registered);
+    set_problem(app, |p| &mut p.shortcut, problem);
+}
+
+/// How often the watcher looks. Three seconds is the study's number: an approval refuses itself
+/// after 300, so the owner hears about it with almost all of that left.
+const WATCH_TICK: Duration = Duration::from_secs(3);
+
+/// How often the tooltip is refreshed while the app lives in the tray. `/api/usage` reads the whole
+/// usage log, which is not a thing to do every three seconds for a line nobody may be hovering.
+const TOOLTIP_EVERY: Duration = Duration::from_secs(30);
+
+/// The tray's tooltip: the app's name, then what is known. A part that could not be read is left
+/// out rather than shown as zero.
+fn tooltip(d: &Dialogo, running: Option<usize>, spent: Option<f64>, waiting: Option<usize>) -> String {
+    let mut parts = vec!["Chimera".to_string()];
+    if let Some(n) = running.filter(|n| *n > 0) {
+        parts.push(d.dica_rodando.replace("{n}", &n.to_string()));
+    }
+    if let Some(usd) = spent {
+        parts.push(d.dica_gasto.replace("{usd}", &format!("{usd:.2}")));
+    }
+    if let Some(n) = waiting.filter(|n| *n > 0) {
+        parts.push(d.dica_aguardando.replace("{n}", &n.to_string()));
+    }
+    parts.join(" · ")
+}
+
+/// The line for a backend that refused this shell. The fix is the token, so the message names it.
+fn backend_refused(d: &Dialogo) -> String {
+    d.sem_acesso.replace("{e}", &format!("HTTP 401, {}", sidecar_http::TOKEN_VAR))
+}
+
+/// Whether the tray should be saying "no access to the backend" after this tick.
+///
+/// A tick that asked something knows. One that asked nothing keeps what was known — the window
+/// being in front says nothing about the token — unless nothing is WANTED any more (both switches
+/// off), in which case there is no access left to report on and the line goes.
+fn still_refused(asked: bool, refused_now: bool, refused_before: bool, wanted: bool) -> bool {
+    if asked {
+        refused_now
+    } else {
+        refused_before && wanted
+    }
+}
+
+/// Watch the backend for the two things the tray shows: approvals waiting (to flash the taskbar
+/// while the window is not in front — P2.4) and, while the app lives in the tray, the tooltip
+/// (P2.2). A thread of its own, for the reason the supervisor gives: it sleeps and blocks on I/O.
+///
+/// A backend that is down or restarting is NOT reported from here: the supervisor owns that, and
+/// the window says it. A 401 is, every time, because nothing else would.
+fn watch_for_the_tray(app: tauri::AppHandle, sidecar: Arc<Sidecar>, origin: Arc<Mutex<String>>, shell: Arc<Shell>) {
+    let d = dialogo();
+    let mut flashed: Vec<String> = Vec::new();
+    let mut waiting: Option<usize> = None;
+    let mut last_tooltip: Option<Instant> = None;
+    let mut refused_before = false;
+    loop {
+        std::thread::sleep(WATCH_TICK);
+        if sidecar.stopping.load(Ordering::SeqCst) {
+            return;
+        }
+        let prefs = shell.prefs();
+        let origin = origin.lock().map(|o| o.clone()).unwrap_or_default();
+        let token = sidecar_http::token_now();
+        let token = token.as_deref();
+        let mut refused = false;
+        // Whether this tick asked the backend anything. A tick that asked nothing (the window is in
+        // front, the tooltip is not due) has learned nothing about access and must not clear — or
+        // re-announce — a 401 seen a moment ago.
+        let mut asked = false;
+
+        if prefs.call_attention && !shell.focused.load(Ordering::SeqCst) {
+            asked = true;
+            match sidecar_http::get_json(&origin, "/api/approvals", token, Duration::from_secs(3)) {
+                Fetch::Json(list) => {
+                    let ids = sidecar_http::pending_ids(&list);
+                    if sidecar_http::has_new(&flashed, &ids) {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.request_user_attention(Some(UserAttentionType::Informational));
+                        }
+                    }
+                    waiting = Some(ids.len());
+                    flashed = ids;
+                }
+                Fetch::Unauthorized => refused = true,
+                Fetch::Failed(_) => {}
+            }
+        }
+
+        if prefs.keep_in_tray {
+            if last_tooltip.is_none_or(|t| t.elapsed() >= TOOLTIP_EVERY) {
+                last_tooltip = Some(Instant::now());
+                asked = true;
+                let look = |path: &str| sidecar_http::get_json(&origin, path, token, Duration::from_secs(5));
+                let (turns, usage) = (look("/api/code/turns/running"), look("/api/usage"));
+                refused |= matches!(turns, Fetch::Unauthorized) || matches!(usage, Fetch::Unauthorized);
+                let running = match &turns { Fetch::Json(v) => sidecar_http::running_count(v), _ => None };
+                let spent = match &usage {
+                    Fetch::Json(v) => sidecar_http::spent_on(v, &sidecar_http::utc_today()),
+                    _ => None,
+                };
+                if let Some(tray) = app.tray_by_id("main") {
+                    let _ = tray.set_tooltip(Some(tooltip(d, running, spent, waiting)));
+                }
+            }
+        } else if last_tooltip.take().is_some() {
+            if let Some(tray) = app.tray_by_id("main") {
+                let _ = tray.set_tooltip(Some("Chimera"));
+            }
+        }
+
+        let refused = still_refused(asked, refused, refused_before, prefs.call_attention || prefs.keep_in_tray);
+        // Only a CHANGE is written to stderr — the tray line is the record a person sees, and a
+        // 401 every three seconds in a log is a log nobody reads.
+        if refused != refused_before {
+            eprintln!(
+                "chimera tray: {}",
+                if refused { backend_refused(d) } else { "backend access restored".to_string() }
+            );
+            set_problem(&app, |p| &mut p.backend, refused.then(|| backend_refused(d)));
+            refused_before = refused;
+        }
+    }
+}
+
 fn main() {
+    // A sign-in launch starts hidden in the tray and stands where a shortcut launch stands — see
+    // `root_at_install_dir`. Decided before anything else, because the backend inherits the CWD.
+    let autostarted = launched_by_autostart(std::env::args());
+    if autostarted {
+        root_at_install_dir();
+    }
     tauri::Builder::default()
         // First, as the plugin requires: a second launch must hand over before anything else runs,
         // the backend above all. Two backends on one data folder each believed they were alone
         // (R12 of the review of 2026-09-30), and the backend now refuses the second one.
+        //
+        // It also brings back a window that "Keep in tray" hid: `bring_forward` shows it.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| bring_forward(app)))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
-        .setup(|app| {
+        // Registered always, used only when the owner turns them on from the tray. Neither adds a
+        // permission to the capability file, so their webview commands stay out of the page's reach.
+        .plugin(tauri_plugin_autostart::Builder::new().arg(AUTOSTART_ARG).build())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .setup(move |app| {
             // Bring up the backend, then open the window at its origin.
             //
             // The failure branch is the point. This used to be a bare `?`, which propagated to the
@@ -2376,10 +2917,28 @@ fn main() {
             let float_origin = Arc::new(Mutex::new(url.clone()));
             let allowed = Arc::clone(&float_origin);
             let opener = app.handle().clone();
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
+
+            // The tray's preferences. A file that would not read is reported in the tray below,
+            // and the defaults — today's behaviour — stand in for it meanwhile.
+            let (loaded, prefs_unreadable) = prefs::load(&paths.data_dir);
+            let shell = Arc::new(Shell {
+                data_dir: paths.data_dir.clone(),
+                prefs: Mutex::new(loaded),
+                focused: AtomicBool::new(!autostarted),
+                problems: Mutex::new(Problems {
+                    prefs: prefs_unreadable.map(|e| prefs_problem(dialogo(), &paths.data_dir, &e)),
+                    ..Problems::default()
+                }),
+            });
+            app.manage(Arc::clone(&shell));
+
+            let main_window = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url.parse()?))
                 .title("Chimera")
                 .inner_size(1200.0, 800.0)
                 .min_inner_size(760.0, 520.0)
+                // A sign-in launch comes up in the tray: a window opening by itself at every login
+                // is what makes people turn the feature off again.
+                .visible(!autostarted)
                 .on_new_window(move |target, features| {
                     let origin = allowed.lock().map(|origin| origin.clone()).unwrap_or_default();
                     if !is_float_url(&target, &origin) {
@@ -2409,21 +2968,96 @@ fn main() {
                 })
                 .build()?;
 
+            // Closing the window: hide it when the owner chose the tray, close it otherwise.
+            //
+            // Hiding is `prevent_close` + `hide`, and nothing else. In particular it does NOT reach
+            // `kill_sidecar` — that runs from the exit hook, which a prevented close never fires —
+            // so the backend, its scheduled jobs and its runs carry on. The panel windows close
+            // with it, as they do when the window really closes: the app has gone to the tray, and
+            // a floating panel left on screen would be the app half-open.
+            let closing = Arc::clone(&shell);
+            let hiding = main_window.clone();
+            let floats_of = app.handle().clone();
+            main_window.on_window_event(move |event| match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    if prefs::on_close(&closing.prefs()) == OnClose::Hide {
+                        api.prevent_close();
+                        let _ = hiding.hide();
+                        closing.focused.store(false, Ordering::SeqCst);
+                        close_floats(&floats_of);
+                    }
+                }
+                tauri::WindowEvent::Focused(focused) => closing.focused.store(*focused, Ordering::SeqCst),
+                _ => {}
+            });
+
             // Tray: check for updates, and quit (which kills the sidecar via the exit hook below).
             //
             // The update item is the only way to ASK. The automatic check runs once at startup and
             // stays silent when there is nothing — deliberately, so it never nags — which left the
             // user with no way to find out except launching again tomorrow.
+            //
+            // Above them, the switches of study 29. Each check item starts at the state that is
+            // actually in force: the file for three of them, the OS for the sign-in entry.
+            let d = dialogo();
+            let prefs_now = shell.prefs();
+            let abrir = MenuItem::with_id(app, "open", d.abrir, true, None::<&str>)?;
+            let manter = CheckMenuItem::with_id(app, "keep_in_tray", d.manter_na_bandeja, true, prefs_now.keep_in_tray, None::<&str>)?;
+            let iniciar = CheckMenuItem::with_id(app, "autostart", d.iniciar_com_sistema, true, app.autolaunch().is_enabled().unwrap_or(false), None::<&str>)?;
+            let chamar = CheckMenuItem::with_id(app, "attention", d.chamar_atencao, true, prefs_now.call_attention, None::<&str>)?;
+            let atalho = CheckMenuItem::with_id(app, "quick_entry", d.atalho.replace("{k}", &chord_label(&prefs_now.quick_entry_chord)), true, false, None::<&str>)?;
+            let status = MenuItem::with_id(app, "status", "", false, None::<&str>)?;
             let atualizar = MenuItem::with_id(app, "update", dialogo().menu, true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", dialogo().sair, true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&atualizar, &quit])?;
+            let menu = Menu::with_items(
+                app,
+                &[
+                    &abrir,
+                    &PredefinedMenuItem::separator(app)?,
+                    &manter,
+                    &iniciar,
+                    &chamar,
+                    &atalho,
+                    &PredefinedMenuItem::separator(app)?,
+                    &atualizar,
+                    &quit,
+                ],
+            )?;
             let icon = app.default_window_icon().cloned();
-            let mut tray = TrayIconBuilder::new().menu(&menu).tooltip("Chimera");
+            // An id, so the watcher can find the tray again to write its tooltip.
+            let mut tray = TrayIconBuilder::with_id("main").menu(&menu).tooltip("Chimera");
             if let Some(icon) = icon {
                 tray = tray.icon(icon);
             }
-            tray.on_menu_event(|app, event| match event.id.as_ref() {
+            app.manage(Tray {
+                menu: menu.clone(),
+                status,
+                status_shown: AtomicBool::new(false),
+                autostart: iniciar.clone(),
+                quick_entry: atalho.clone(),
+            });
+            // muda ticks a check item before the event arrives, so `is_checked` IS the new wish.
+            let keep = manter.clone();
+            let attention = chamar.clone();
+            let wish = iniciar.clone();
+            let quick = atalho.clone();
+            tray.on_menu_event(move |app, event| match event.id.as_ref() {
                 "quit" => app.exit(0),
+                "open" => bring_forward(app),
+                "keep_in_tray" => {
+                    let on = keep.is_checked().unwrap_or(false);
+                    change_prefs(app, |p| p.keep_in_tray = on);
+                }
+                "attention" => {
+                    let on = attention.is_checked().unwrap_or(true);
+                    change_prefs(app, |p| p.call_attention = on);
+                }
+                "autostart" => apply_autostart(app, wish.is_checked().unwrap_or(false)),
+                "quick_entry" => {
+                    let on = quick.is_checked().unwrap_or(false);
+                    change_prefs(app, |p| p.quick_entry = on);
+                    apply_quick_entry(app);
+                }
                 "update" => {
                     // Spawned, not awaited: this handler runs on the UI thread and the check does
                     // network I/O. Blocking here freezes the window while GitHub is asked.
@@ -2515,6 +3149,15 @@ fn main() {
                 }
             });
 
+            // The tray's own look at the backend: the approval flash and the tooltip. After the
+            // tray exists, because it writes into it; the shortcut and any startup problem too.
+            apply_quick_entry(app.handle());
+            show_problems(app.handle());
+            let watcher = app.handle().clone();
+            let watched_origin = Arc::clone(&float_origin);
+            let watched_sidecar = app.state::<Arc<Sidecar>>().inner().clone();
+            std::thread::spawn(move || watch_for_the_tray(watcher, watched_sidecar, watched_origin, shell));
+
             Ok(())
         })
         .build(tauri::generate_context!())
@@ -2534,6 +3177,9 @@ fn main() {
                 {
                     close_floats(app_handle);
                 }
+                // macOS: clicking the Dock icon of an app whose window "Keep in tray" hid.
+                #[cfg(target_os = "macos")]
+                tauri::RunEvent::Reopen { .. } => bring_forward(app_handle),
                 _ => {}
             }
         });
@@ -2642,5 +3288,199 @@ mod float_window_tests {
         assert_eq!(json["windows"], serde_json::json!(["main"]));
         assert!(json.get("webviews").is_none(), "a webview grant would reach the panel windows");
         assert!(!FLOAT_LABEL.starts_with("main"));
+    }
+}
+
+#[cfg(test)]
+mod tray_tests {
+    //! The tray's switches (study 29: P2.2, P2.3, P2.4, P2.6).
+    //!
+    //! What can run without an app runs for real: the chord parser, the tooltip, the problem line,
+    //! the launch-argument check. What cannot — `main`'s setup closure needs a `tauri::App` — is read
+    //! from the source, with every needle assembled by `concat!` so this module never contains the
+    //! text it searches for, and over a window that excludes EVERY test module in the file (the
+    //! older `producao()` resumes after the first one and so still sees this module and the float
+    //! tests, which is a window that can contain its own answer).
+    use super::*;
+
+    /// main.rs with every `#[cfg(test)] mod … { … }` block cut out.
+    fn production_only() -> String {
+        let mut rest = include_str!("main.rs").replace("\r\n", "\n");
+        let attribute = concat!("#[cfg(", "test)]");
+        while let Some(start) = rest.find(attribute) {
+            let end = rest[start..].find("\n}\n").map_or(rest.len(), |i| start + i + 3);
+            rest.replace_range(start..end, "");
+        }
+        rest
+    }
+
+    /// The body of the first function named `name`, up to the next top-level item.
+    fn body_of(source: &str, signature: &str) -> String {
+        let after = source
+            .split_once(signature)
+            .unwrap_or_else(|| panic!("{signature} exists"))
+            .1;
+        after.split_once("\n}\n").map_or(after, |(body, _)| body).to_string()
+    }
+
+    /// P2.2's own measure, from the study: with the option on, CloseRequested does not end the
+    /// backend. The handler consults the rule, prevents the close and hides — and nothing in it
+    /// reaches the function that kills the sidecar.
+    #[test]
+    fn closing_the_window_hides_it_when_asked_and_never_kills_the_backend() {
+        let source = production_only();
+        let handler = source
+            .split_once(concat!("tauri::WindowEvent::Close", "Requested { api, .. } =>"))
+            .expect("the main window intercepts its close")
+            .1;
+        let handler = handler
+            .split_once(concat!("tauri::WindowEvent::Foc", "used("))
+            .map_or(handler, |(arm, _)| arm);
+        for step in [
+            concat!("prefs::on_", "close(&closing.prefs()) == OnClose::Hide"),
+            concat!("api.prevent_", "close()"),
+            concat!("hiding.", "hide()"),
+        ] {
+            assert!(handler.contains(step), "the close handler no longer does {step}");
+        }
+        assert!(
+            !handler.contains(concat!("kill_", "sidecar")),
+            "hiding the window reaches kill_sidecar — the backend would die with the window again"
+        );
+        // And the rule it consults is the one tested in prefs.rs: hide only when asked.
+        assert_eq!(prefs::on_close(&Prefs::default()), OnClose::Close);
+        assert_eq!(prefs::on_close(&Prefs { keep_in_tray: true, ..Prefs::default() }), OnClose::Hide);
+        // Quit still ends everything: the exit hook still kills the sidecar.
+        let run = source.rsplit_once(concat!(".run(|app_handle, ", "event|")).expect("the run hook").1;
+        assert!(run.contains(concat!("kill_sidecar(app_", "handle)")), "Quit stopped killing the backend");
+    }
+
+    #[test]
+    fn a_sign_in_launch_is_recognised_by_its_argument_alone() {
+        let args = |v: &[&str]| v.iter().map(|s| (*s).to_string()).collect::<Vec<_>>();
+        assert!(launched_by_autostart(args(&["chimera-desktop.exe", "--autostart"])));
+        assert!(!launched_by_autostart(args(&["chimera-desktop.exe"])));
+        // argv[0] is the program, not an argument — an exe renamed to the flag is not a sign-in.
+        assert!(!launched_by_autostart(args(&["--autostart"])));
+    }
+
+    /// The entry the plugin writes and the flag main reads are the same constant, and a sign-in
+    /// launch starts hidden and in the install directory (where the backend's `.env` lives).
+    #[test]
+    fn a_sign_in_launch_starts_hidden_where_its_keys_are() {
+        let source = production_only();
+        assert!(source.contains(concat!("Builder::new().arg(AUTO", "START_ARG)")));
+        let main = body_of(&source, concat!("fn ", "main() {"));
+        assert!(main.contains(concat!("if autostarted {\n        root_at_install_", "dir();")));
+        assert!(main.contains(concat!(".visible(!auto", "started)")), "a sign-in launch opens a window");
+    }
+
+    #[test]
+    fn a_chord_that_does_not_parse_is_reported_with_its_reason() {
+        assert!(parse_chord(prefs::DEFAULT_CHORD).is_ok(), "the default chord must register");
+        let refused = parse_chord("Ctrl+Nope");
+        assert!(refused.is_err());
+        let d = &DIALOGO[0];
+        let line = quick_entry_problem(d, "Ctrl+Nope", &refused.map(|_| ())).expect("a line");
+        assert!(line.contains("Ctrl+Nope"), "the line does not name the chord: {line}");
+        assert!(!line.contains("{k}") && !line.contains("{e}"), "{line}");
+        // A chord another program holds is the same path with the OS's words.
+        let taken = quick_entry_problem(d, prefs::DEFAULT_CHORD, &Err("HotKey already registered".into()))
+            .expect("a line");
+        assert!(taken.contains("Ctrl+Shift+Space") && taken.contains("already registered"), "{taken}");
+        assert_eq!(quick_entry_problem(d, prefs::DEFAULT_CHORD, &Ok(())), None);
+    }
+
+    /// The registration's result reaches the tray. The path the study asked to see tested: a
+    /// failure that is computed and then dropped on the floor would pass every test above.
+    #[test]
+    fn a_failed_registration_is_put_in_the_tray_not_swallowed() {
+        let body = body_of(&production_only(), concat!("fn apply_quick_", "entry("));
+        assert!(body.contains(concat!("let registered = if prefs.quick_", "entry {")));
+        assert!(body.contains(concat!("quick_entry_problem(d, &prefs.quick_entry_chord, &regis", "tered)")));
+        assert!(body.contains(concat!("set_problem(app, |p| &mut p.short", "cut, problem)")));
+        // And the check mark says whether it is ACTIVE, not whether it was wished for.
+        assert!(body.contains(concat!("set_checked(prefs.quick_entry && registered.is_", "ok())")));
+    }
+
+    #[test]
+    fn chords_read_the_way_the_keyboard_says_them() {
+        let local = if cfg!(target_os = "macos") { "Cmd" } else { "Ctrl" };
+        assert_eq!(chord_label("CommandOrControl+Shift+Space"), format!("{local}+Shift+Space"));
+        assert_eq!(chord_label("Alt+K"), "Alt+K");
+    }
+
+    #[test]
+    fn the_tooltip_leaves_out_what_it_could_not_read() {
+        let d = &DIALOGO[0];
+        assert_eq!(tooltip(d, None, None, None), "Chimera");
+        assert_eq!(tooltip(d, Some(0), None, Some(0)), "Chimera", "zero running is not news");
+        assert_eq!(
+            tooltip(d, Some(2), Some(0.4199), Some(1)),
+            "Chimera · 2 running · US$ 0.42 today (UTC) · 1 waiting for you"
+        );
+        // A spend that could not be read is absent — never "US$ 0.00".
+        assert!(!tooltip(d, Some(1), None, None).contains("US$"));
+    }
+
+    #[test]
+    fn every_problem_keeps_its_place_in_the_line() {
+        let mut p = Problems::default();
+        assert_eq!(p.line(), None, "nothing wrong, no line in the menu");
+        p.shortcut = Some("a".into());
+        p.backend = Some("b".into());
+        assert_eq!(p.line().as_deref(), Some("a · b"));
+        p.shortcut = None;
+        assert_eq!(p.line().as_deref(), Some("b"), "clearing one source erased another");
+        assert!(backend_refused(d0()).contains(sidecar_http::TOKEN_VAR), "the 401 line must name the fix");
+    }
+
+    #[test]
+    fn a_tick_that_asked_nothing_does_not_forget_a_refusal() {
+        assert!(still_refused(true, true, false, true), "a 401 now is a 401");
+        assert!(!still_refused(true, false, true, true), "an answer now clears it");
+        assert!(still_refused(false, false, true, true), "the window came forward and the 401 vanished");
+        assert!(!still_refused(false, false, true, false), "nothing wanted, nothing to report");
+        assert!(!still_refused(false, false, false, true));
+    }
+
+    fn d0() -> &'static Dialogo {
+        &DIALOGO[0]
+    }
+
+    /// P2.4 is wired: the watcher runs, flashes only while the window is not in front, asks for the
+    /// informational kind (the taskbar, not a modal), and a 401 is reported rather than read as zero.
+    #[test]
+    fn the_watcher_runs_and_a_refusal_is_said_out_loud() {
+        let source = production_only();
+        let main = body_of(&source, concat!("fn ", "main() {"));
+        assert!(main.contains(concat!("watch_for_the_", "tray(watcher")), "the watcher is never started");
+        let watch = body_of(&source, concat!("fn watch_for_the_", "tray("));
+        for needle in [
+            concat!("prefs.call_attention && !shell.focused.", "load("),
+            concat!("request_user_attention(Some(UserAttentionType::Inform", "ational))"),
+            concat!("sidecar_http::has_", "new(&flashed, &ids)"),
+            concat!("Fetch::Unauthorized => refused = ", "true"),
+            concat!("set_problem(&app, |p| &mut p.back", "end"),
+            concat!("still_refused(asked, refused, refused_", "before"),
+            concat!("sidecar_http::token_", "now()"),
+        ] {
+            assert!(watch.contains(needle), "the watcher no longer does {needle}");
+        }
+    }
+
+    /// The webview gains nothing: no permission for either plugin is granted to any window.
+    #[test]
+    fn the_new_plugins_add_no_permission_to_the_page() {
+        let text = include_str!("../capabilities/default.json");
+        let json: serde_json::Value = serde_json::from_str(text).expect("the capability file parses");
+        let permissions = json["permissions"].as_array().expect("a permission list");
+        for granted in permissions {
+            let name = granted.as_str().unwrap_or_default();
+            assert!(
+                !name.starts_with("autostart") && !name.starts_with("global-shortcut"),
+                "{name} hands the page a plugin this shell drives from Rust only"
+            );
+        }
     }
 }
