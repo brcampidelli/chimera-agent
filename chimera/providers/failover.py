@@ -163,6 +163,31 @@ _BY_STATUS: dict[int, FailoverReason] = {
 }
 
 
+#: Phrases that name the policy itself. Kept for an error with no status at all, which did not come
+#: through LiteLLM's mapping (every LiteLLM class carries one) and so has nothing but its words.
+_POLICY_PHRASES = ("content policy", "content management policy")
+#: Words a refusal uses and so does an unrelated message: a provider body that echoes the prompt
+#: ("thread-safety", "the flagged rows"), or a guard model's slug. Trusted only on a 400.
+_POLICY_WORDS = ("flagged", "safety")
+
+
+def _reads_as_policy_refusal(msg: str, status: int | None) -> bool:
+    """Whether the prose may call this a content-policy refusal, given the status it came with.
+
+    A refusal is a 400 on every provider that sends one as an error, so the bare words are believed
+    only there. Any other status is a fact that already says something else happened — a 500, a
+    404, a 408 — and ABORT on it would skip the fallback model for a failure the fallback exists
+    for. The refusals LiteLLM recognises arrive as ``ContentPolicyViolationError``, which the caller
+    matches by class name before this is asked, whatever their wording — Anthropic's "content
+    filtering policy" matches none of the substrings and is carried by the class alone.
+    """
+    if status == 400:
+        return any(n in msg for n in (*_POLICY_PHRASES, *_POLICY_WORDS))
+    if status is None:
+        return any(n in msg for n in _POLICY_PHRASES)
+    return False
+
+
 def classify(exc: BaseException) -> FailoverReason:
     """Map an exception to a :class:`FailoverReason`.
 
@@ -210,9 +235,7 @@ def classify(exc: BaseException) -> FailoverReason:
         msg, "maximum context", "context length", "too many tokens", "reduce the length"
     ):
         return FailoverReason.CONTEXT_OVERFLOW
-    if "contentpolicy" in name or any_in(
-        msg, "content policy", "content management policy", "flagged", "safety"
-    ):
+    if "contentpolicy" in name or _reads_as_policy_refusal(msg, status):
         return FailoverReason.CONTENT_POLICY
     if "notfound" in name or any_in(
         msg, "not a valid model", "no endpoints", "does not exist", "404", "model_not_found"
