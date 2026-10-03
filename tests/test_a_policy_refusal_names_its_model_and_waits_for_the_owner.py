@@ -103,15 +103,21 @@ def test_the_sentence_names_the_model_and_says_nothing_was_retried() -> None:
 
 
 def test_a_mark_on_an_exception_that_refuses_attributes_is_not_a_crash() -> None:
-    class Slotted(Exception):
-        __slots__ = ()
-
     exc = ValueError("x")
     mark_model(exc, "prov/m")
     assert failed_model(exc) == "prov/m"
-    # `BaseException` instances always take attributes; the guard is for a stranger type. Either
-    # way the call returns and the original exception is what gets raised.
-    mark_model(Slotted(), "prov/m")
+
+    # The guard's case for real: an exception type whose `__setattr__` refuses. (The first version
+    # of this test used `__slots__ = ()`, which a `BaseException` subclass ignores — it still has a
+    # `__dict__` — so the guard was never exercised.) The gateway calls this on the way to a
+    # `raise`; if the mark raised instead, the provider's exception would be replaced by ours.
+    class Locked(Exception):
+        def __setattr__(self, name: str, value: object) -> None:
+            raise AttributeError(name)
+
+    locked = Locked("refused")
+    mark_model(locked, "prov/m")
+    assert failed_model(locked) is None
 
 
 # --- the gateway names the model that refused, past a fallback -----------------------------------
@@ -180,6 +186,9 @@ class _Refuses:
         self.run_state = RunState()
 
     def run(self, task: str, **_kw: Any) -> AgentResult:
+        if "unmarked" in task:
+            # A backend that is not the gateway (a fused panel, a test double) marks nothing.
+            raise _router_refusal()
         if "refuse" in task:
             exc = _router_refusal()
             mark_model(exc, "openrouter/openai/gpt-4o")
@@ -230,6 +239,26 @@ def test_a_refused_turn_says_it_was_refused_and_by_what(
     # It used to read "the coding turn failed", which is what a bug in this repository reads as.
     assert error["message"] != "the coding turn failed"
     assert "content policy" in error["message"] and "openrouter/openai/gpt-4o" in error["message"]
+
+
+def test_a_refusal_nothing_marked_is_put_on_the_turns_own_model(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _client(tmp_path, monkeypatch)
+
+    named = _frames(
+        client.post(
+            "/api/code/turn", json={"message": "unmarked refusal", "model": "prov/turn-model"}
+        ).text
+    )["error"]
+    unnamed = _frames(client.post("/api/code/turn", json={"message": "unmarked refusal"}).text)[
+        "error"
+    ]
+
+    # No mark on the exception: the turn's model is the best account there is, and the card needs
+    # one to say what refused and to resolve "default" against.
+    assert named["reason"] == "content_policy" and named["model"] == "prov/turn-model"
+    assert unnamed["model"] == get_settings().default_model
 
 
 def test_any_other_failure_carries_no_policy_reason(
