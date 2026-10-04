@@ -1,5 +1,5 @@
 ---
-source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
+source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
 ---
 
 # Podłączanie serwerów MCP
@@ -134,11 +134,20 @@ zatrzyma się na którymś, `desktop_send` od razu odpowiada, że czeka na ciebi
 w aplikacji; `desktop_job` mówi, jak się kończy.
 
 Drugi przełącznik, **Pełna kontrola**, dodaje `desktop_approve` (odpowiadanie na zatwierdzenia i
-kroki z bramką) oraz `desktop_settings` (edycja ustawień, tożsamości agenta i zapisanych agentów,
-uruchomienie polecenia w Runnerze). Gdy jest włączony, Claude może zatwierdzać działania bez
-ciebie — a strona lub wiadomość z prompt injection przeczytana przez agenta może go do tego
-skłonić. Te dwa narzędzia w ogóle nie są wymieniane, dopóki jest wyłączony, a aplikacja je
-odrzuca, jeśli mimo to zostaną wywołane.
+kroki z bramką) oraz `desktop_settings` (edycja ustawień i tożsamości agenta). Gdy jest włączony,
+Claude może zatwierdzać działania bez ciebie — a strona lub wiadomość z prompt injection
+przeczytana przez agenta może go do tego skłonić. Te dwa narzędzia w ogóle nie są wymieniane,
+dopóki jest wyłączony, a aplikacja je odrzuca, jeśli mimo to zostaną wywołane.
+
+Niektóre decyzje zostają twoje, niezależnie od przełącznika. Który model odpowiada — każde
+ustawienie modelu, łańcuch zapasowy, panel, sędzia i syntezator fuzji, tryb kosztów, kaskada i
+weryfikowane odpowiedzi — oraz czy aplikacja uruchamia zaplanowane zadania, Claude może tylko
+*zasugerować*: nic nie jest zapisywane, a aplikacja pokazuje ci kartę z obecną i proponowaną
+wartością każdego ustawienia, do zatwierdzenia lub odrzucenia na miejscu. Claude nie może
+odpowiedzieć na tę kartę żadną drogą; jeśli ustawienie zmieniło się przed twoim zatwierdzeniem,
+nic nie zostaje zastosowane. A nadanie folderowi prawa do poleceń, uruchomienie polecenia w
+Runnerze, start bota komunikatora i zapisanie agenta z jego uprawnieniami do narzędzi są przez
+most całkowicie odrzucane: robisz to w aplikacji.
 
 Czego nie pozwala żaden przełącznik: czytać ani zapisywać klucza API, tokenu czy webhooka.
 Edycje ustawień odrzucają nazwy poświadczeń, trasy niosące klucze lub linki udostępniania są

@@ -32,6 +32,7 @@ import type {
   SearchResult,
   Benchmarks,
   ApprovalQuestion,
+  ApprovalAnswer,
   GovernanceAudit,
   SandboxState,
   InjectionReport,
@@ -304,9 +305,10 @@ export const getGovernanceAudit = () => json<GovernanceAudit>("/api/governance/a
 export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox");
 /** Questions waiting on a person right now — the same files `chimera approve` reads. */
 export const getApprovals = () => json<ApprovalQuestion[]>("/api/approvals");
-/** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. */
+/** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. A settings
+ *  suggestion also says how it ended (`outcome`): only `applied` wrote anything. */
 export const answerApproval = (id: string, approved: boolean) =>
-  json<{ ok: boolean }>(`/api/approvals/${encodeURIComponent(id)}`, {
+  json<ApprovalAnswer>(`/api/approvals/${encodeURIComponent(id)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ approved }),

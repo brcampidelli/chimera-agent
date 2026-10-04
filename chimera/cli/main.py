@@ -6671,6 +6671,39 @@ def approve(
         # whichever way the default fell, half the answers would be the one nobody chose.
         console.print("[yellow]say which: --yes or --no[/yellow]")
         raise typer.Exit(code=1)
+    from chimera.governance import setting_suggestions
+
+    if setting_suggestions.is_suggestion(home, request_id):
+        if yes:
+            # Approved only in the app. Not because a terminal is less the owner's than a screen:
+            # the change is applied by the app's own save, which also updates the RUNNING app, and a
+            # `.env` written from here could be another folder's and would reach the app only at its
+            # next launch. And a shell the agent was given could run this line.
+            console.print(
+                f"[yellow]{request_id} is a settings change somebody suggested; approve it in the "
+                "app (the card shows the value now and the value proposed). From here it can only "
+                "be refused: chimera approve <id> --no[/yellow]"
+            )
+            raise typer.Exit(code=1)
+
+        def _never(_updates: dict[str, str]) -> None:  # a refusal applies nothing
+            raise ValueError("a refusal applies nothing")
+
+        outcome, _ = setting_suggestions.resolve(
+            home,
+            request_id,
+            False,
+            via="cli",
+            current_of=lambda _key: "",
+            check=_never,
+            apply=_never,
+            allowed=lambda _key: False,
+        )
+        if outcome != "refused":
+            console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
+            raise typer.Exit(code=1)
+        console.print(f"[green]refused[/green] {request_id}")
+        return
     if not responder(home, request_id, yes, via="cli"):
         console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
         raise typer.Exit(code=1)

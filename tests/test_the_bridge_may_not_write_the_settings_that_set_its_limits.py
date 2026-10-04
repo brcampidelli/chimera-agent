@@ -16,9 +16,13 @@ who answers an approval is the owner's. What is pinned here:
   process environment — and the owner's own ``PATCH /api/config`` still saves the same value;
 * every key in ``OWNER_ONLY_SETTINGS`` is a setting the endpoint really edits (a typo would be a
   key that protects nothing);
-* the WHOLE editable allowlist is classified, owner-only or bridge-writable, so a setting added
-  later has to be put on one side on purpose;
-* a body mixing an owner-only key with a writable one is refused whole.
+* the WHOLE editable allowlist is classified three ways — owner-only and refused flat, owner-only
+  but suggestable (the model choices and the scheduler's switch, since 2026-10-04: the bridge
+  leaves the owner a card and writes nothing, see
+  `test_the_bridge_may_only_suggest_which_model_answers.py`), or bridge-writable — so a setting
+  added later has to be put on one side on purpose;
+* a body mixing an owner-only key with a writable one is refused whole, and so is a body mixing a
+  suggestable key with a writable one.
 """
 
 from __future__ import annotations
@@ -31,7 +35,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chimera.api import build_api_app
-from chimera.api.bridge_routes import OWNER_ONLY_SETTINGS
+from chimera.api.bridge_routes import OWNER_ONLY_SETTINGS, SUGGESTABLE_SETTINGS, is_secret_setting
 from chimera.api.config_api import _EDITABLE_SETTINGS, _SECRET_KEYS, is_editable
 from chimera.config import get_settings
 from chimera.interface import ChatSession
@@ -91,27 +95,37 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_KEY_VAULT": ("true", "false"),
 }
 
+#: The settings the bridge may only SUGGEST (owner's decision, 2026-10-04): which model or route a
+#: prompt goes to, and whether the app runs scheduled jobs. Each with the value it starts at and the
+#: value a client proposes; the round trip — card, owner's yes, exactly that value written — is held
+#: in `test_the_bridge_may_only_suggest_which_model_answers.py`.
+SUGGESTABLE: dict[str, tuple[str, str]] = {
+    "CHIMERA_DEFAULT_MODEL": ("openrouter/vendor/before", "openrouter/vendor/after"),
+    "CHIMERA_WEAK_MODEL": ("openrouter/vendor/weak-a", "openrouter/vendor/weak-b"),
+    "CHIMERA_MID_MODEL": ("openrouter/vendor/mid-a", "openrouter/vendor/mid-b"),
+    "CHIMERA_ORCHESTRATOR_MODEL": ("openrouter/vendor/orch-a", "openrouter/vendor/orch-b"),
+    "CHIMERA_FALLBACK_MODELS": ("openrouter/a/one", "openrouter/b/two,openrouter/c/three"),
+    "CHIMERA_EMBED_MODEL": ("openrouter/openai/embed-a", "ollama/nomic-embed-text"),
+    "CHIMERA_COMPLETE_MODEL": ("ollama/base-a", "ollama/base-b"),
+    "CHIMERA_VOICE_MODEL": ("openrouter/vendor/voice-a", "openrouter/vendor/voice-b"),
+    "CHIMERA_VOICE_WORK_MODEL": ("openrouter/vendor/work-a", "openrouter/vendor/work-b"),
+    "CHIMERA_FUSION_PANEL": (
+        "openrouter/a/one,openrouter/b/two",
+        "openrouter/c/three,openrouter/d/four",
+    ),
+    "CHIMERA_FUSION_JUDGE": ("openrouter/judge/a", "openrouter/judge/b"),
+    "CHIMERA_FUSION_SYNTHESIZER": ("openrouter/synth/a", "openrouter/synth/b"),
+    "CHIMERA_COST_MODE": ("auto", "premium"),
+    "CHIMERA_CASCADE": ("false", "true"),
+    "CHIMERA_VERIFIED_ANSWERS": ("true", "false"),
+    "CHIMERA_APP_CRON": ("false", "true"),
+}
+
 #: Every other editable setting, and why the bridge may keep writing it. None of these changes what a
-#: run may reach, what judges it, who may command it, or where its prompts go.
+#: run may reach, what judges it, who may command it, where its prompts go, or which model reads
+#: them.
 BRIDGE_WRITABLE: frozenset[str] = frozenset(
     {
-        # Which model answers — among the providers the owner already holds keys for. Where those
-        # providers may keep a prompt is fenced by the privacy keys above, which are the owner's.
-        "CHIMERA_DEFAULT_MODEL",
-        "CHIMERA_WEAK_MODEL",
-        "CHIMERA_MID_MODEL",
-        "CHIMERA_ORCHESTRATOR_MODEL",
-        "CHIMERA_FALLBACK_MODELS",
-        "CHIMERA_EMBED_MODEL",
-        "CHIMERA_COMPLETE_MODEL",
-        "CHIMERA_VOICE_MODEL",
-        "CHIMERA_VOICE_WORK_MODEL",
-        "CHIMERA_FUSION_PANEL",
-        "CHIMERA_FUSION_JUDGE",  # grades answers for quality; it gates no action
-        "CHIMERA_FUSION_SYNTHESIZER",
-        "CHIMERA_COST_MODE",
-        "CHIMERA_CASCADE",
-        "CHIMERA_VERIFIED_ANSWERS",  # checks an answer; gates nothing
         # Caches and memory: local stores, read by the same agent under the same posture.
         "CHIMERA_CACHE",
         "CHIMERA_PROMPT_CACHE",
@@ -120,9 +134,9 @@ BRIDGE_WRITABLE: frozenset[str] = frozenset(
         "CHIMERA_AUTO_CONSOLIDATE",
         "CHIMERA_CHAT_MEMORY",
         "CHIMERA_SKILL_CARDS",  # reads back skills, which only an approval publishes
-        # When things run, not what they may reach: every job runs under the configured posture and
-        # asks through the unattended approval path; the spend cap that bounds them is the owner's.
-        "CHIMERA_APP_CRON",
+        # Whether a job's channel hears that it failed, and the machine's sleep. (Whether the
+        # scheduler runs at all, `CHIMERA_APP_CRON`, is suggestable only: what runs unattended is
+        # the owner's to decide.)
         "CHIMERA_CRON_NOTIFY_FAILURES",
         "CHIMERA_KEEP_AWAKE",
         "CHIMERA_KEEP_AWAKE_ON_BATTERY",
@@ -193,13 +207,35 @@ def test_every_owner_only_setting_is_one_the_settings_endpoint_really_edits() ->
     assert not OWNER_ONLY_SETTINGS & _SECRET_KEYS
 
 
-def test_the_whole_allowlist_is_classified_owner_only_or_bridge_writable() -> None:
-    """A setting added to the allowlist has to be put on one side on purpose."""
+def test_the_whole_allowlist_is_classified_flat_suggestable_or_bridge_writable() -> None:
+    """A setting added to the allowlist has to be put on one side on purpose: refused flat, only
+    suggested to the owner, or written by the bridge — and on exactly one."""
     assert set(OWNER_ONLY) == OWNER_ONLY_SETTINGS
+    assert set(SUGGESTABLE) == SUGGESTABLE_SETTINGS
     assert not OWNER_ONLY_SETTINGS & BRIDGE_WRITABLE
-    unclassified = sorted(_EDITABLE_SETTINGS - OWNER_ONLY_SETTINGS - BRIDGE_WRITABLE)
-    assert unclassified == [], "classify each: owner-only (bridge_routes) or BRIDGE_WRITABLE here"
+    assert not SUGGESTABLE_SETTINGS & BRIDGE_WRITABLE
+    assert not SUGGESTABLE_SETTINGS & OWNER_ONLY_SETTINGS
+    unclassified = sorted(
+        _EDITABLE_SETTINGS - OWNER_ONLY_SETTINGS - SUGGESTABLE_SETTINGS - BRIDGE_WRITABLE
+    )
+    assert unclassified == [], (
+        "classify each: owner-only or suggestable (bridge_routes), or BRIDGE_WRITABLE here"
+    )
     assert sorted(BRIDGE_WRITABLE - _EDITABLE_SETTINGS) == [], "not an editable setting"
+    # Suggestable keys are settings, never credential slots: a card shows their values whole.
+    assert SUGGESTABLE_SETTINGS <= _EDITABLE_SETTINGS
+    assert not SUGGESTABLE_SETTINGS & _SECRET_KEYS
+    assert not any(is_secret_setting(k) for k in SUGGESTABLE_SETTINGS)
+
+
+def test_every_model_the_allowlist_holds_is_never_one_the_bridge_writes() -> None:
+    """The audit, kept: any `*_MODEL(S)` the settings screen can write is either the owner's flat
+    refusal (the decision model, the governance band's instrument) or suggestable — never one the
+    bridge writes. A model setting added to the allowlist later is caught here."""
+    models = {k for k in _EDITABLE_SETTINGS if k.endswith(("_MODEL", "_MODELS"))}
+    assert len(models) >= 10, "probe is broken"
+    assert not models & BRIDGE_WRITABLE
+    assert models - OWNER_ONLY_SETTINGS <= SUGGESTABLE_SETTINGS
 
 
 @pytest.mark.parametrize("key", sorted(OWNER_ONLY))
@@ -232,13 +268,14 @@ def test_a_body_that_mixes_an_owner_setting_with_a_writable_one_is_refused_whole
     app = _app(
         tmp_path,
         monkeypatch,
+        CHIMERA_SANDBOX_IMAGE="before:image",
         CHIMERA_DEFAULT_MODEL="before/model",
         CHIMERA_REACH="read_only",
         CHIMERA_GOVERNANCE="enforce",
     )
     with TestClient(app) as client:
         body = {
-            "CHIMERA_DEFAULT_MODEL": "after/model",
+            "CHIMERA_SANDBOX_IMAGE": "after:image",
             "CHIMERA_REACH": "workspace_shell",
             "CHIMERA_GOVERNANCE": "off",
         }
@@ -249,10 +286,25 @@ def test_a_body_that_mixes_an_owner_setting_with_a_writable_one_is_refused_whole
             "not editable through the bridge: CHIMERA_GOVERNANCE, CHIMERA_REACH"
         )
         assert _env_file(tmp_path) == ""
+        assert os.environ["CHIMERA_SANDBOX_IMAGE"] == "before:image"
+
+        # A suggestable key mixed with a writable one: refused whole too, naming the suggestable
+        # one — half written and half turned into a card would leave the client unsure which.
+        mixed = _bridge_edit(
+            client,
+            app,
+            {"CHIMERA_SANDBOX_IMAGE": "after:image", "CHIMERA_DEFAULT_MODEL": "after/model"},
+        )
+        assert mixed.status_code == 403, mixed.text
+        assert mixed.json()["detail"].startswith(
+            "only suggested to the owner through the bridge, never written: CHIMERA_DEFAULT_MODEL;"
+        )
+        assert _env_file(tmp_path) == ""
         assert os.environ["CHIMERA_DEFAULT_MODEL"] == "before/model"
+        assert not list((tmp_path / "home" / "approvals").glob("*.ask.json"))
 
         # The writable one alone still goes through: full control operates the app.
-        ok = _bridge_edit(client, app, {"CHIMERA_DEFAULT_MODEL": "after/model"})
+        ok = _bridge_edit(client, app, {"CHIMERA_SANDBOX_IMAGE": "after:image"})
     assert ok.status_code == 200 and ok.json()["status"] == 200
-    assert "CHIMERA_DEFAULT_MODEL=after/model" in _env_file(tmp_path).splitlines()
+    assert "CHIMERA_SANDBOX_IMAGE=after:image" in _env_file(tmp_path).splitlines()
     get_settings.cache_clear()

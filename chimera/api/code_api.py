@@ -3500,8 +3500,9 @@ def register_code_api(
     def grant_code_workspace(body: CodeProjectGrantIn) -> list[dict[str, Any]]:
         """Grant or revoke commands in one folder — the record every coding turn is held to.
 
-        Its own route rather than a field on the PATCH above, so the bridge can hold granting to its
-        Full tier while pinning and hiding stay at operate. Behind the same guard as the rest of the
+        Its own route rather than a field on the PATCH above, so the bridge can be kept out of
+        granting altogether (`bridge_routes.OWNER_DECISION_ROUTES`, every tier) while pinning and
+        hiding stay at operate. Behind the same guard as the rest of the
         API: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach
         every other route. What moving the grant here changes is that a REQUEST no longer carries
         it; recording one is a separate act, listed in the Folders card where it can be revoked.

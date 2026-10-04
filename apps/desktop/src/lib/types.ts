@@ -174,6 +174,10 @@ export type GitInitResult = Schemas["GitInitOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];
 /** One question an attended turn is waiting on — written by the taint ledger, answered from the screen. */
 export type ApprovalQuestion = Schemas["ApprovalOut"];
+/** The answer to a question. `outcome`/`detail` come only for a settings suggestion. */
+export type ApprovalAnswer = Schemas["ApprovalAnswerOut"];
+/** A settings change the desktop bridge suggested, as the card draws it. */
+export type SettingsSuggestion = Schemas["SettingsSuggestionOut"];
 export type GovernanceAudit = Schemas["GovernanceAuditOut"];
 export type SandboxState = Schemas["SandboxStateOut"];
 export type ToolInfo = Schemas["ToolInfoOut"];

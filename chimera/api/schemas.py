@@ -2272,8 +2272,34 @@ class HitlOut(BaseModel):
     # accept/edit/ignore conclude on the reviewed output without re-running the worker.
 
 
+class SettingChangeOut(BaseModel):
+    """One setting a suggestion would change: what it holds now, and what was proposed."""
+
+    key: str
+    current: str
+    proposed: str
+
+
+class SettingsSuggestionOut(BaseModel):
+    """A settings change the desktop bridge suggested (`governance/setting_suggestions.py`).
+
+    Nothing has been written: the owner's yes on this card is what writes it, and only if every key
+    still holds ``current`` when the yes arrives."""
+
+    changes: list[SettingChangeOut]
+    suggested_by: str  # the surface — `desktop_bridge`
+    client_hint: str = ""  # which bridge token: its last four characters, as Settings shows it
+    expires_at: float  # server epoch seconds; past it the card is retired as a timeout
+
+
 class ApprovalOut(BaseModel):
     """One question waiting for a person, written by `pending.ask_durably` from an attended surface."""
+
+    kind: str = ""
+    """Empty for a question a tool call is parked on; ``settings_suggestion`` for a settings change
+    waiting for the owner, whose ``suggestion`` says exactly what would change."""
+
+    suggestion: SettingsSuggestionOut | None = None
 
     #: Which turn asked, which conversation it belongs to, and in which folder: what a card needs to
     #: say where it comes from, with several conversations working at once. Empty when unknown (a
@@ -2323,6 +2349,14 @@ class ApprovalAnswerIn(BaseModel):
 
 class ApprovalAnswerOut(BaseModel):
     ok: bool  # False when no question with that id is waiting — a stale click, 200, not a 404
+    outcome: str | None = None
+    """For a settings suggestion only: ``applied`` | ``refused`` | ``stale`` (a key no longer holds
+    the value the card showed) | ``invalid`` (the value fails a check now) | ``expired``. Only
+    ``applied`` wrote anything. Absent for every other question, whose answer stays ``{ok}``."""
+
+    detail: str | None = None
+    """The keys applied, the keys that moved, or the check that refused — for the sentence the
+    screen shows. Never a value."""
 
 
 class DecisionLabelIn(BaseModel):

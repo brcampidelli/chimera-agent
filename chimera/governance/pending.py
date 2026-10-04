@@ -82,6 +82,22 @@ def _dir(home: Path) -> Path:
     return Path(home) / "approvals"
 
 
+#: The ``kind`` of a question file that is a settings change somebody suggested
+#: (`setting_suggestions.py`). No thread waits on one and no answer file applies it: only the owner's
+#: own answering route resolves it, so :func:`answer` and :func:`answer_with_code` — the paths every
+#: other surface answers through, the chat bot's codes and ``chimera approve`` among them — refuse it.
+SETTINGS_SUGGESTION = "settings_suggestion"
+
+
+def _kind_of(home: Path, request_id: str) -> str:
+    """The ``kind`` written on a waiting question, or "" (an ordinary question, or none)."""
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(data.get("kind") or "") if isinstance(data, dict) else ""
+
+
 #: The order a person should see questions in: the level of the verdict first, then age. A queue
 #: sorted by age alone spends a scarce answerer on whatever came first, and 2608.06949 measured
 #: what that costs when the answerer is overloaded — coverage fell 100% → 65.6% while judgement on
@@ -126,6 +142,10 @@ class PendingApproval:
     """The turn (or run) that asked, when the surface named it. What lets a screen say which
     conversation and which project a question comes from: with several working at once, a list of
     questions with no origin let the wrong one be approved. Empty for a surface that names none."""
+
+    kind: str = ""
+    """Empty for a question a tool call is parked on; :data:`SETTINGS_SUGGESTION` for a settings
+    change waiting for the owner, which the screens draw as the change itself."""
 
     @property
     def age_seconds(self) -> float:
@@ -172,6 +192,7 @@ def pending(home: Path) -> list[PendingApproval]:
                 decider_model=str(data.get("decider_model") or ""),
                 decision_id=str(data.get("decision_id") or ""),
                 run_id=str(data.get("run_id") or ""),
+                kind=str(data.get("kind") or ""),
             )
         )
     return sorted(out, key=lambda p: (level_rank(p.decision), p.asked_at))
@@ -187,6 +208,12 @@ def answer(home: Path, request_id: str, approved: bool, *, via: str = "") -> boo
     directory = _dir(home)
     pergunta = directory / f"{request_id}.ask.json"
     if not pergunta.exists():
+        return False
+    if _kind_of(home, request_id) == SETTINGS_SUGGESTION:
+        # Not answerable here, by anyone. An answer file is what applies every other question, and
+        # this is the function every answering path ends in — the chat code, `chimera approve`, the
+        # app's own route for ordinary questions. A suggestion is resolved only by the owner's
+        # route, which calls `setting_suggestions.resolve` and never this.
         return False
     (directory / f"{request_id}.answer.json").write_text(
         json.dumps(
@@ -276,6 +303,11 @@ def answer_with_code(
         except (OSError, ValueError):
             return "no_such_request"
         stored = data.get("code_hash") if isinstance(data, dict) else None
+        if isinstance(data, dict) and data.get("kind") == SETTINGS_SUGGESTION:
+            # A settings suggestion is never answered from a chat: no code is issued for one, and a
+            # code that somehow sat on its file is not honoured either. The chat holds whoever the
+            # bot's allowlist admits; the owner's settings are the owner's screen's to change.
+            return "no_code"
         if not isinstance(stored, str) or not stored:
             # Never issued, or already consumed: the same answer, because to the sender they are.
             return "no_code"

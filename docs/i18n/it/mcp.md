@@ -1,5 +1,5 @@
 ---
-source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
+source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
 ---
 
 # Connettere server MCP
@@ -136,11 +136,21 @@ turno si ferma su una, `desktop_send` risponde subito che ti sta aspettando, e i
 nell'app; `desktop_job` dice come finisce.
 
 Il secondo interruttore, **Controllo totale**, aggiunge `desktop_approve` (rispondere ad
-approvazioni e passi con cancello) e `desktop_settings` (modificare le impostazioni, l'identità
-dell'agente e gli agenti salvati, eseguire un comando nel Runner). Con esso attivo, Claude può
-approvare azioni senza di te — e una pagina o un messaggio con prompt injection letto dall'agente
-potrebbe indurlo a farlo. Questi due strumenti non compaiono affatto nell'elenco finché è spento,
-e l'app li rifiuta se vengono chiamati comunque.
+approvazioni e passi con cancello) e `desktop_settings` (modificare le impostazioni e l'identità
+dell'agente). Con esso attivo, Claude può approvare azioni senza di te — e una pagina o un
+messaggio con prompt injection letto dall'agente potrebbe indurlo a farlo. Questi due strumenti
+non compaiono affatto nell'elenco finché è spento, e l'app li rifiuta se vengono chiamati
+comunque.
+
+Alcune decisioni restano tue, qualunque interruttore sia acceso. Quale modello risponde — ogni
+impostazione di modello, la catena di riserva, il panel, il giudice e il sintetizzatore della
+fusione, la modalità di costo, la cascata e le risposte verificate — e se l'app esegue i lavori
+pianificati, Claude può solo *suggerirlo*: non viene scritto nulla, e l'app ti mostra una scheda
+con il valore attuale e quello proposto di ogni impostazione, da approvare o rifiutare lì. Claude
+non può rispondere a quella scheda per nessuna via; se l'impostazione è cambiata prima della tua
+approvazione, non viene applicato nulla. E concedere i comandi a una cartella, eseguire un comando
+nel Runner, avviare un bot di messaggistica e salvare un agente con i suoi permessi sugli strumenti
+sono rifiutati del tutto attraverso il ponte: li fai tu nell'app.
 
 Ciò che nessun interruttore consente: leggere o scrivere una chiave API, un token o un webhook.
 Le modifiche alle impostazioni rifiutano i nomi di credenziali, le rotte che portano chiavi o

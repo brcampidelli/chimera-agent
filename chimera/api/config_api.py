@@ -998,19 +998,12 @@ def _check_decision_choice(updates: dict[str, str]) -> None:
     check_choice(backend, model, list_models() if model.strip() else SystemOneListing(models=()))
 
 
-def patch_config(
-    updates: dict[str, str], *, env_path: Path | None = None, workspace: Path | None = None
-) -> dict[str, Any]:
-    """Persist ``updates`` (env-var -> value) to ``.env`` after allowlisting the keys.
+def check_updates(updates: dict[str, str], *, workspace: Path | None = None) -> None:
+    """Every refusal ``patch_config`` makes before it writes, without writing. ``ValueError`` names it.
 
-    Returns ``{"updated": [keys]}``, plus ``in_vault`` / ``vault_fallback`` when not empty. Raises
-    ``ValueError`` naming any rejected key (so the endpoint can 400 it). Clears the ``get_settings``
-    cache so the next read sees the new values. Values are written verbatim and never logged.
-
-    With ``CHIMERA_KEY_VAULT`` on — as it stands AFTER this save, so a patch that turns it on and
-    sets a key does both — a vault-storable credential goes to the OS vault and its ``.env`` line
-    becomes a marker (``in_vault``); with no vault on the machine it goes to ``.env`` and is named
-    in ``vault_fallback``. See `chimera/api/key_vault.py`.
+    Its own function so a write that happens LATER than the request — a settings suggestion the
+    owner approves a day after it was made (`governance/setting_suggestions.py`) — is held to the
+    same checks at both moments, by the same code.
     """
     rejected = [k for k in updates if not is_editable(k)]
     if rejected:
@@ -1029,6 +1022,71 @@ def patch_config(
         # API's, and a caller without one (the CLI) gets the path check above only.
         _check_worktree_dir(str(updates["CHIMERA_WORKTREE_DIR"]), workspace)
     _check_decision_choice(updates)
+
+
+def check_parses(updates: dict[str, str]) -> None:
+    """Refuse a value ``Settings`` could not read back — ``CHIMERA_CASCADE=maybe``.
+
+    The owner's own save does not ask this (a typo there is the owner's, made on the screen that
+    shows it). A suggestion is someone else's value, applied by a click on a card, and a boolean
+    that does not parse takes the whole app down at its next read — so it is refused before the
+    card exists and again before it is applied. Only errors located AT one of the keys count: a
+    cross-field rule evaluated against defaults would refuse for reasons the real settings do not
+    have.
+    """
+    from pydantic import ValidationError
+
+    try:
+        Settings.model_validate(dict(updates))
+    except ValidationError as exc:
+        wrong = sorted(
+            {
+                str(err["loc"][0])
+                for err in exc.errors()
+                if err.get("loc") and str(err["loc"][0]).upper() in {k.upper() for k in updates}
+            }
+        )
+        if wrong:
+            raise ValueError(f"not a valid value for {', '.join(wrong)}") from None
+
+
+def setting_value(settings: Settings, key: str) -> str:
+    """The value ``key`` holds in ``settings``, written the way ``.env`` would hold it.
+
+    What a settings suggestion shows as "now" and compares at apply time, so both readings go
+    through one function: a list is comma-joined (the documented form), a boolean is
+    ``true``/``false``, an unset value is "". ``ValueError`` for a key no field reads.
+    """
+    for name, field in type(settings).model_fields.items():
+        if str(field.validation_alias or "").upper() == key.upper():
+            value = getattr(settings, name)
+            break
+    else:
+        raise ValueError(f"no setting reads {key}")
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (list, tuple)):
+        return ",".join(str(v) for v in value)
+    return str(value)
+
+
+def patch_config(
+    updates: dict[str, str], *, env_path: Path | None = None, workspace: Path | None = None
+) -> dict[str, Any]:
+    """Persist ``updates`` (env-var -> value) to ``.env`` after allowlisting the keys.
+
+    Returns ``{"updated": [keys]}``, plus ``in_vault`` / ``vault_fallback`` when not empty. Raises
+    ``ValueError`` naming any rejected key (so the endpoint can 400 it). Clears the ``get_settings``
+    cache so the next read sees the new values. Values are written verbatim and never logged.
+
+    With ``CHIMERA_KEY_VAULT`` on — as it stands AFTER this save, so a patch that turns it on and
+    sets a key does both — a vault-storable credential goes to the OS vault and its ``.env`` line
+    becomes a marker (``in_vault``); with no vault on the machine it goes to ``.env`` and is named
+    in ``vault_fallback``. See `chimera/api/key_vault.py`.
+    """
+    check_updates(updates, workspace=workspace)
     path = env_path or Path(".env")
     texts = {key: str(value) for key, value in updates.items()}
     vault_on = (

@@ -49,6 +49,8 @@ function question(id = "q1") {
     session_id: "",
     workspace: "",
     work: "",
+    // A question a tool call is parked on; `settings_suggestion` is a change the bridge suggested.
+    kind: "",
   };
 }
 

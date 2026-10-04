@@ -32,7 +32,7 @@ from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.benchmarks_api import benchmark_report
-from chimera.api.bridge_routes import BRIDGE_SETTINGS
+from chimera.api.bridge_routes import BRIDGE_SETTINGS, VIA_BRIDGE_SCOPE_KEY
 from chimera.api.code_api import (
     CodeSeams,
     assemble_registry,
@@ -1559,7 +1559,13 @@ def build_api_app(
         `pending.ask_durably` announced the question on its own stream, but a screen that reloaded,
         or a second window, has to be able to find it again. Same files `chimera approve` reads.
         """
-        from chimera.governance.pending import pending
+        from chimera.governance import setting_suggestions
+        from chimera.governance.pending import SETTINGS_SUGGESTION, pending
+
+        home = live_settings().home
+        # A suggestion past its day is retired as a timeout before the list is read, so no card
+        # offers buttons for a change that can no longer be applied.
+        setting_suggestions.expire_due(home)
 
         # Where each question comes from. With several conversations working at once, a list of
         # questions with no project and no conversation on them let the wrong one be approved.
@@ -1567,6 +1573,26 @@ def build_api_app(
 
         def origin(run_id: str) -> dict[str, str]:
             return origin_of(run_id) if (origin_of is not None and run_id) else {}
+
+        def suggestion(q_id: str, kind: str) -> dict[str, Any]:
+            if kind != SETTINGS_SUGGESTION:
+                return {}
+            s = setting_suggestions.read(home, q_id)
+            if s is None:
+                return {}
+            # The change itself, so the card can draw key, now and proposed as three things rather
+            # than one line of prose — the yes is to exactly these values.
+            return {
+                "suggestion": {
+                    "changes": [
+                        {"key": c.key, "current": c.current, "proposed": c.proposed}
+                        for c in s.changes
+                    ],
+                    "suggested_by": s.suggested_by,
+                    "client_hint": s.client_hint,
+                    "expires_at": s.expires_at,
+                }
+            }
 
         return [
             {
@@ -1585,22 +1611,66 @@ def build_api_app(
                 "decider_model": q.decider_model,
                 "decision_id": q.decision_id,
                 "run_id": q.run_id,
+                "kind": q.kind,
                 **origin(q.run_id),
+                **suggestion(q.id, q.kind),
             }
-            for q in pending(live_settings().home)
+            for q in pending(home)
         ]
 
-    @app.post("/api/approvals/{request_id}", dependencies=[guard], response_model=ApprovalAnswerOut)
-    def answer_approval(request_id: str, req: ApprovalAnswerIn) -> dict[str, Any]:
+    @app.post(
+        "/api/approvals/{request_id}",
+        dependencies=[guard],
+        response_model=ApprovalAnswerOut,
+        response_model_exclude_none=True,
+    )
+    def answer_approval(request_id: str, req: ApprovalAnswerIn, request: Request) -> dict[str, Any]:
         """Record the person's decision; the waiting tool call sees it on its next poll.
 
         `ok: False` is a stale click — the question timed out (silence refused it) or was answered
         from the CLI — and is a 200, because a verdict on a question that already resolved is
         exactly what a late button press sends and there is nothing to do about it.
+
+        A settings suggestion (`governance/setting_suggestions.py`) is resolved HERE, by this route
+        and no other, and never for a request the desktop bridge forwarded: the bridge suggested it,
+        and a door that could approve its own suggestion would make the suggestion a write with one
+        extra step. The bridge's mark is in the ASGI scope, which only this process can set.
         """
+        from chimera.governance import setting_suggestions
         from chimera.governance.pending import answer
 
-        return {"ok": answer(live_settings().home, request_id, bool(req.approved), via="app")}
+        home = live_settings().home
+        if setting_suggestions.is_suggestion(home, request_id):
+            if request.scope.get(VIA_BRIDGE_SCOPE_KEY):
+                raise HTTPException(
+                    status_code=403,
+                    detail="a settings suggestion is answered by the owner in the app, "
+                    "never through the desktop bridge",
+                )
+            return _resolve_suggestion(home, request_id, bool(req.approved))
+        return {"ok": answer(home, request_id, bool(req.approved), via="app")}
+
+    def _resolve_suggestion(home: Path, request_id: str, approved: bool) -> dict[str, Any]:
+        """The owner's answer to a settings suggestion: applied, refused, or why it was not applied."""
+        from chimera.api.bridge_routes import SUGGESTABLE_SETTINGS, is_secret_setting
+        from chimera.api.config_api import check_parses, check_updates, patch_config, setting_value
+        from chimera.governance import setting_suggestions
+
+        def check(updates: dict[str, str]) -> None:
+            check_updates(updates, workspace=workspace)
+            check_parses(updates)
+
+        outcome, detail = setting_suggestions.resolve(
+            home,
+            request_id,
+            approved,
+            via="app",
+            current_of=lambda key: setting_value(live_settings(), key),
+            check=check,
+            apply=lambda updates: patch_config(updates, workspace=workspace),
+            allowed=lambda key: key in SUGGESTABLE_SETTINGS and not is_secret_setting(key),
+        )
+        return {"ok": outcome != "no_such_request", "outcome": outcome, "detail": detail}
 
     @app.get("/api/decisions", dependencies=[guard], response_model=DecisionsOut)
     def decisions_route(limit: int = 50) -> dict[str, Any]:

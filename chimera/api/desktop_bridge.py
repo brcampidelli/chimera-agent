@@ -59,8 +59,11 @@ from chimera.api.bridge_discovery import (
     write_discovery,
 )
 from chimera.api.bridge_routes import (
+    OWNER_DECISION_ROUTES,
     OWNER_ONLY_SETTINGS,
     ROUTES,
+    SUGGESTABLE_SETTINGS,
+    VIA_BRIDGE_SCOPE_KEY,
     BridgeRoute,
     Tier,
     full_only_keys_in,
@@ -253,6 +256,11 @@ async def asgi_call(
         "headers": header_list,
         "client": ("127.0.0.1", 0),
         "server": ("127.0.0.1", 0),
+        # Every request this function makes is the bridge's, and the app's handlers can tell: a
+        # settings suggestion the bridge made must never be approved by a request the bridge
+        # forwards (`POST /api/approvals/{id}` reads this). In the scope rather than a header,
+        # because no request that arrives over a socket can put a key here.
+        VIA_BRIDGE_SCOPE_KEY: True,
     }
     sent = False
     never = asyncio.Event()
@@ -603,7 +611,13 @@ def register_bridge_api(
                     "through the bridge",
                 )
 
-    def police(route_id: str, route: BridgeRoute, body: Any, tier: Tier) -> Any:
+    def police(
+        route_id: str,
+        route: BridgeRoute,
+        body: Any,
+        tier: Tier,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
         """Refuse what the caller's tier may not do; set the owner's posture on an operate run."""
         if route_id == "settings.edit":
             if not isinstance(body, dict) or not body:
@@ -615,6 +629,29 @@ def register_bridge_api(
                 raise HTTPException(
                     status_code=403,
                     detail=f"not editable through the bridge: {', '.join(refused)}",
+                )
+            suggestable = sorted(k for k in body if k in SUGGESTABLE_SETTINGS)
+            if suggestable and len(suggestable) != len(body):
+                # Refused whole, like a body mixing an owner-only key: half a body written and half
+                # turned into a card would leave the client unsure which of its edits happened.
+                raise HTTPException(
+                    status_code=403,
+                    detail="only suggested to the owner through the bridge, never written: "
+                    f"{', '.join(suggestable)}; send them alone to suggest them, and the other "
+                    "settings in a separate call",
+                )
+        if route_id == "approve.approval":
+            from chimera.governance.setting_suggestions import is_suggestion
+
+            request_id = str((params or {}).get("request_id") or "")
+            if is_suggestion(Path(live_settings().home), request_id):
+                # The first of two locks on the same door. The app's answering route refuses a
+                # forwarded request for a suggestion too (it reads the bridge's scope mark), so a
+                # route added here later that reaches it some other way still meets the second.
+                raise HTTPException(
+                    status_code=403,
+                    detail="a settings suggestion is answered by the owner in the app, "
+                    "never through the bridge",
                 )
         if route_id == "skills.bundle_status" and not switches_off(body):
             # A bundle switched on puts a stranger's text into every run's prompt, on every
@@ -667,6 +704,69 @@ def register_bridge_api(
             body.setdefault("allow_host_exec", reach == "workspace_shell")
         return body
 
+    def suggest_settings(body: dict[str, Any]) -> dict[str, Any]:
+        """Leave the owner a card for a change to the settings the bridge may only suggest.
+
+        Nothing is written. The value is held to every check a save would make NOW, so the card
+        never offers the owner a change the app would refuse; the owner's yes runs the checks again
+        and applies only if the setting still holds the value shown here.
+        """
+        from chimera.api.config_api import check_parses, check_updates, setting_value
+        from chimera.core.redact import redact
+        from chimera.governance.setting_suggestions import Change, suggest
+
+        updates: dict[str, str] = {}
+        for key, value in body.items():
+            if not isinstance(value, str):
+                raise HTTPException(status_code=400, detail=f"the value for {key} must be a string")
+            if redact(value) != value:
+                # A model slug never looks like a key. A value the redactor would mask is one the
+                # card could not show the owner whole, and a card that shows less than it applies
+                # is not asking.
+                raise HTTPException(
+                    status_code=400, detail=f"the value for {key} looks like a credential"
+                )
+            updates[str(key)] = value
+        try:
+            check_updates(updates, workspace=workspace)
+            check_parses(updates)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        settings = live_settings()
+        changes = [
+            Change(key=key, current=setting_value(settings, key), proposed=value)
+            for key, value in sorted(updates.items())
+        ]
+        changes = [c for c in changes if c.current != c.proposed]
+        if not changes:
+            return {
+                "route": "settings.edit",
+                "status": 200,
+                "data": {"suggestion": None, "unchanged": sorted(updates), "written": []},
+            }
+        try:
+            request_id = suggest(
+                Path(settings.home),
+                changes,
+                suggested_by="desktop_bridge",
+                client_hint=bridge.hint(),
+            )
+        except OSError as exc:
+            _log.warning("could not record a settings suggestion: %s", exc)
+            raise HTTPException(
+                status_code=500, detail="the suggestion could not be recorded"
+            ) from exc
+        data = {
+            "suggestion": request_id,
+            "written": [],
+            "changes": [
+                {"key": c.key, "current": c.current, "proposed": c.proposed} for c in changes
+            ],
+            "message": "Nothing was written. The owner sees this change as a card in the app "
+            "and approves or refuses it there; it expires in 24 hours.",
+        }
+        return {"route": "settings.edit", "status": 202, "data": scrub(data, hidden())}
+
     @app.get("/api/bridge/status", response_model=BridgeStatusOut, tags=["bridge"])
     async def bridge_status(request: Request) -> dict[str, Any]:
         tier = bridge.authorize(request)
@@ -706,11 +806,22 @@ def register_bridge_api(
         if route is None:
             # Checked after the token so an unauthenticated caller cannot map the table.
             bridge.authorize(request)
+            closed = OWNER_DECISION_ROUTES.get(req.route)
+            if closed is not None:
+                # At every tier: these widen what the agent may reach, and the owner decides that
+                # in the app. The sentence says where, so a client can tell the person.
+                raise HTTPException(status_code=403, detail=closed)
             raise HTTPException(status_code=404, detail=f"no such bridge route: {req.route}")
         tier = bridge.authorize(request, route.tier)
         path, query = _resolve_path(route, req.params)
         guard_places(req.route, query, req.body)
-        body = police(req.route, route, req.body, tier)
+        body = police(req.route, route, req.body, tier, req.params)
+        if (
+            req.route == "settings.edit"
+            and isinstance(body, dict)
+            and set(body) <= SUGGESTABLE_SETTINGS
+        ):
+            return suggest_settings(body)
         if not route.stream:
             try:
                 status, data = await plain(route.method, path, query, body)

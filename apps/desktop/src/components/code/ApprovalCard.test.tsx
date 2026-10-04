@@ -3,9 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApprovalCard, type ApprovalQuestionLike } from "@/components/code/ApprovalCard";
 import { I18nProvider } from "@/lib/i18n";
+import { ToastProvider } from "@/components/ui/toast";
 
 const { answerApproval, labelDecision } = vi.hoisted(() => ({
-  answerApproval: vi.fn(async (_id: string, _approved: boolean) => ({ ok: true })),
+  answerApproval: vi.fn(
+    async (_id: string, _approved: boolean): Promise<{ ok: boolean; outcome?: string; detail?: string }> => ({
+      ok: true,
+    }),
+  ),
   labelDecision: vi.fn(async (_id: string, _event: boolean) => ({ ok: true })),
 }));
 vi.mock("@/lib/api", () => ({ answerApproval, labelDecision }));
@@ -324,6 +329,72 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
     it("a rule-raised question has no decision to label and does not ask", () => {
       mount();
       expect(screen.queryByRole("button", { name: /dangerous/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a settings change the desktop bridge suggested", () => {
+    const suggested: ApprovalQuestionLike = {
+      id: "sugg01",
+      action: "settings.edit\nCHIMERA_DEFAULT_MODEL: 'openrouter/a/now' -> 'openrouter/b/next'",
+      reason: "Suggested by the desktop bridge (token …k9Zq).",
+      decision: "review",
+      suggestion: {
+        changes: [
+          { key: "CHIMERA_DEFAULT_MODEL", current: "openrouter/a/now", proposed: "openrouter/b/next" },
+          { key: "CHIMERA_WEAK_MODEL", current: "", proposed: "openrouter/c/weak" },
+        ],
+        suggested_by: "desktop_bridge",
+        client_hint: "…k9Zq",
+        expires_at: 4_000_000_000,
+      },
+    };
+
+    function mountWithToasts(q: ApprovalQuestionLike = suggested) {
+      return render(
+        <I18nProvider>
+          <ToastProvider>
+            <ApprovalCard question={q} onAnswered={() => {}} />
+          </ToastProvider>
+        </I18nProvider>,
+      );
+    }
+
+    it("draws each key with its value now and the value proposed, and who suggested it", () => {
+      mountWithToasts();
+      expect(screen.getByText(/settings change suggested/i)).toBeInTheDocument();
+      expect(screen.getByText("CHIMERA_DEFAULT_MODEL")).toBeInTheDocument();
+      expect(screen.getByText(/now: openrouter\/a\/now/)).toBeInTheDocument();
+      expect(screen.getByText(/proposed: openrouter\/b\/next/)).toBeInTheDocument();
+      // An empty value is said, not left as a blank that reads like a missing line.
+      expect(screen.getByText(/now: \(empty\)/)).toBeInTheDocument();
+      expect(screen.getByText(/token …k9Zq/)).toBeInTheDocument();
+      expect(screen.getByText(/nothing changes until you approve it here/i)).toBeInTheDocument();
+      // The raw action line is not drawn on top of the change it describes.
+      expect(screen.queryByText(/settings\.edit/)).not.toBeInTheDocument();
+    });
+
+    it("a yes that landed on a setting that moved says nothing was written", async () => {
+      answerApproval.mockClear();
+      answerApproval.mockResolvedValueOnce({ ok: true, outcome: "stale", detail: "CHIMERA_DEFAULT_MODEL" });
+      mountWithToasts();
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("sugg01", true));
+      expect(await screen.findByText(/not applied: CHIMERA_DEFAULT_MODEL changed/i)).toBeInTheDocument();
+    });
+
+    it("an applied yes says what was saved", async () => {
+      answerApproval.mockResolvedValueOnce({ ok: true, outcome: "applied", detail: "CHIMERA_DEFAULT_MODEL" });
+      mountWithToasts();
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      expect(await screen.findByText(/saved: CHIMERA_DEFAULT_MODEL/i)).toBeInTheDocument();
+    });
+
+    it("an ordinary question's answer never raises a settings notice", async () => {
+      answerApproval.mockResolvedValueOnce({ ok: true, outcome: "applied", detail: "X" });
+      mountWithToasts(question);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      await waitFor(() => expect(answerApproval).toHaveBeenCalled());
+      expect(screen.queryByText(/saved: X/i)).not.toBeInTheDocument();
     });
   });
 });

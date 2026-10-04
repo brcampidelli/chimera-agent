@@ -897,9 +897,31 @@
       },
       "ApprovalAnswerOut": {
         "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
           "ok": {
             "title": "Ok",
             "type": "boolean"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
           }
         },
         "required": [
@@ -947,6 +969,11 @@
             "title": "Id",
             "type": "string"
           },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
           "p": {
             "anyOf": [
               {
@@ -971,6 +998,16 @@
             "default": "",
             "title": "Session Id",
             "type": "string"
+          },
+          "suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SettingsSuggestionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "work": {
             "default": "",
@@ -11549,6 +11586,62 @@
         "title": "SessionMetaOut",
         "type": "object"
       },
+      "SettingChangeOut": {
+        "description": "One setting a suggestion would change: what it holds now, and what was proposed.",
+        "properties": {
+          "current": {
+            "title": "Current",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "proposed": {
+            "title": "Proposed",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "current",
+          "proposed"
+        ],
+        "title": "SettingChangeOut",
+        "type": "object"
+      },
+      "SettingsSuggestionOut": {
+        "description": "A settings change the desktop bridge suggested (`governance/setting_suggestions.py`).\n\nNothing has been written: the owner's yes on this card is what writes it, and only if every key\nstill holds ``current`` when the yes arrives.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/SettingChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "client_hint": {
+            "default": "",
+            "title": "Client Hint",
+            "type": "string"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "number"
+          },
+          "suggested_by": {
+            "title": "Suggested By",
+            "type": "string"
+          }
+        },
+        "required": [
+          "changes",
+          "suggested_by",
+          "expires_at"
+        ],
+        "title": "SettingsSuggestionOut",
+        "type": "object"
+      },
       "ShareIn": {
         "properties": {
           "label": {
@@ -13916,7 +14009,7 @@
     },
     "/api/approvals/{request_id}": {
       "post": {
-        "description": "Record the person's decision; the waiting tool call sees it on its next poll.\n\n`ok: False` is a stale click \u2014 the question timed out (silence refused it) or was answered\nfrom the CLI \u2014 and is a 200, because a verdict on a question that already resolved is\nexactly what a late button press sends and there is nothing to do about it.",
+        "description": "Record the person's decision; the waiting tool call sees it on its next poll.\n\n`ok: False` is a stale click \u2014 the question timed out (silence refused it) or was answered\nfrom the CLI \u2014 and is a 200, because a verdict on a question that already resolved is\nexactly what a late button press sends and there is nothing to do about it.\n\nA settings suggestion (`governance/setting_suggestions.py`) is resolved HERE, by this route\nand no other, and never for a request the desktop bridge forwarded: the bridge suggested it,\nand a door that could approve its own suggestion would make the suggestion a write with one\nextra step. The bridge's mark is in the ASGI scope, which only this process can set.",
         "operationId": "answer_approval_api_approvals__request_id__post",
         "parameters": [
           {
@@ -15581,7 +15674,7 @@
     },
     "/api/code/workspaces/grant": {
       "put": {
-        "description": "Grant or revoke commands in one folder \u2014 the record every coding turn is held to.\n\nIts own route rather than a field on the PATCH above, so the bridge can hold granting to its\nFull tier while pinning and hiding stay at operate. Behind the same guard as the rest of the\nAPI: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach\nevery other route. What moving the grant here changes is that a REQUEST no longer carries\nit; recording one is a separate act, listed in the Folders card where it can be revoked.",
+        "description": "Grant or revoke commands in one folder \u2014 the record every coding turn is held to.\n\nIts own route rather than a field on the PATCH above, so the bridge can be kept out of\ngranting altogether (`bridge_routes.OWNER_DECISION_ROUTES`, every tier) while pinning and\nhiding stay at operate. Behind the same guard as the rest of the\nAPI: with no ``CHIMERA_SERVER_TOKEN`` set, a local process can reach this as it can reach\nevery other route. What moving the grant here changes is that a REQUEST no longer carries\nit; recording one is a separate act, listed in the Folders card where it can be revoked.",
         "operationId": "grant_code_workspace_api_code_workspaces_grant_put",
         "requestBody": {
           "content": {

@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { ShieldQuestion, ShieldX } from "lucide-react";
 import { answerApproval, labelDecision } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { useOptionalToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
-import { useP, useT } from "@/lib/i18n";
+import { useP, useT, type TFunc } from "@/lib/i18n";
+import type { ApprovalAnswer, SettingsSuggestion } from "@/lib/types";
 
 /**
  * The question a turn is parked on, with the two answers.
@@ -66,6 +68,10 @@ export interface ApprovalQuestionLike {
    *  frame (`chimera/api/code_api.py`) and `ApprovalOut` — and it is what lets a card that mounts
    *  LATE show the time that is actually left rather than the time the question started with. */
   asked_at?: number;
+  /** A settings change the desktop bridge suggested (`chimera/governance/setting_suggestions.py`):
+   *  the card draws the change itself — each key, its value now, the value proposed — because the
+   *  yes is to exactly those values. Absent on every question a tool call is parked on. */
+  suggestion?: SettingsSuggestion | null;
 }
 
 /**
@@ -145,6 +151,52 @@ const BAND_LABEL: Record<string, string | undefined> = {
   none: "code.approval.band.none",
 };
 
+/** What a settings suggestion's answer means, as a toast; `null` for a refusal, which needs no word.
+ *
+ * The card disappears on the next poll whatever happened, so the outcome has to be said somewhere
+ * that outlives it — and "approved" is not "applied": a key that moved since the card was written
+ * makes the yes `stale`, and nothing is written. A toast and not an error surface, because nothing
+ * is left to decide: the change did not happen, and the card it belonged to is gone. */
+function suggestionNotice(
+  answer: ApprovalAnswer,
+  t: TFunc,
+): { message: string; tone: "ok" | "bad" } | null {
+  switch (answer.outcome) {
+    case "applied":
+      return { message: t("code.approval.suggestion.applied", { keys: answer.detail ?? "" }), tone: "ok" };
+    case "stale":
+      return { message: t("code.approval.suggestion.stale", { keys: answer.detail ?? "" }), tone: "bad" };
+    case "invalid":
+      return { message: t("code.approval.suggestion.invalid", { detail: answer.detail ?? "" }), tone: "bad" };
+    case "expired":
+      return { message: t("code.approval.suggestion.expired"), tone: "bad" };
+    default:
+      return null;
+  }
+}
+
+/** The change a suggestion would make: each key, with the value now and the value proposed. Mono,
+ *  and every value whole — a model slug cut short is a different model. */
+function SuggestedChanges({ suggestion }: { suggestion: SettingsSuggestion }) {
+  const t = useT();
+  const shown = (value: string) => (value === "" ? t("code.approval.suggestion.empty") : value);
+  return (
+    <dl className="mt-1 space-y-1 font-mono text-xs">
+      {suggestion.changes.map((change) => (
+        <div key={change.key} className="rounded-md bg-surface-2 px-2 py-1">
+          <dt className="font-medium text-foreground">{change.key}</dt>
+          <dd className="break-all text-muted-foreground">
+            {t("code.approval.suggestion.now")}: {shown(change.current)}
+          </dd>
+          <dd className="break-all text-foreground">
+            {t("code.approval.suggestion.proposed")}: {shown(change.proposed)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 export function ApprovalCard({
   question,
   onAnswered,
@@ -154,6 +206,8 @@ export function ApprovalCard({
 }) {
   const t = useT();
   const pct = useP();
+  const toast = useOptionalToast();
+  const suggestion = question.suggestion ?? null;
   const [busy, setBusy] = useState(false);
   const [labelled, setLabelled] = useState(false);
   const left = useSecondsLeft(question);
@@ -187,7 +241,9 @@ export function ApprovalCard({
   const answer = async (approved: boolean) => {
     setBusy(true);
     try {
-      await answerApproval(question.id, approved);
+      const answered = await answerApproval(question.id, approved);
+      const notice = suggestion ? suggestionNotice(answered, t) : null;
+      if (notice) toast(notice.message, notice.tone);
     } finally {
       setBusy(false);
       onAnswered();
@@ -208,7 +264,7 @@ export function ApprovalCard({
         ) : (
           <ShieldQuestion className="h-4 w-4 text-accent-foreground" aria-hidden="true" />
         )}
-        {t("code.approval.title")}
+        {suggestion ? t("code.approval.suggestion.title") : t("code.approval.title")}
         {/* The level, at the top, beside the title: it is what the backend sorted this queue by,
             and the answerer could not see it. Unknown levels render nothing rather than a guess. */}
         {level ? (
@@ -217,7 +273,13 @@ export function ApprovalCard({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-muted-foreground">{question.reason}</p>
+      {/* A suggestion says who suggested it in the reader's language, and that nothing changes until
+          the yes; the server's English reason says the same for the terminal. */}
+      <p className="mt-1 text-muted-foreground">
+        {suggestion
+          ? t("code.approval.suggestion.by", { hint: suggestion.client_hint || "-" })
+          : question.reason}
+      </p>
       {/* The number that raised the question, and what it was read against: `p=0.80 · band REVIEW ·
           qwen3:4b`. This is the line study 20 §2.6 named as the bottleneck — the card showed a
           reason and nothing else, so the answer it collected could not be joined to the probability
@@ -235,7 +297,9 @@ export function ApprovalCard({
       {/* `whitespace-pre-wrap`: the action is one line for a tool call and a numbered list for a
           plan-gate question (`chimera/api/plan_gate.py`), and a plan collapsed onto one line is a
           plan nobody can refuse on. */}
-      {question.action ? (
+      {suggestion ? (
+        <SuggestedChanges suggestion={suggestion} />
+      ) : question.action ? (
         <p className="mt-1 whitespace-pre-wrap font-mono text-xs text-muted-foreground">
           {question.action}
         </p>

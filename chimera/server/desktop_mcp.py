@@ -33,7 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import quote, urlencode
 
-from chimera.api.bridge_routes import ROUTES, areas, scrub
+from chimera.api.bridge_routes import OWNER_DECISION_ROUTES, ROUTES, areas, scrub
 
 NOT_RUNNING = (
     "Chimera desktop is not running, or 'Allow Claude to operate this app' is off in Settings."
@@ -99,8 +99,16 @@ _AREA_TITLES: dict[str, str] = {
     ),
     "insights": "Spend, worth, benchmarks, health.",
     "app": "How the app is set up. Credentials are reported only as set/unset.",
-    "approve": "FULL CONTROL: answer approvals and gated steps on the owner's behalf.",
-    "settings": "FULL CONTROL: edit settings (never credentials), identity, agents, run a command.",
+    "approve": (
+        "FULL CONTROL: answer approvals and gated steps on the owner's behalf. Never a settings "
+        "suggestion: the owner answers those in the app."
+    ),
+    "settings": (
+        "FULL CONTROL: edit settings (never credentials; the model and scheduling ones are only "
+        "suggested to the owner, who approves them in the app), the agent's identity, remove an "
+        "MCP server. Granting a folder's commands, running a command, starting a messaging bot "
+        "and saving an agent are the owner's, in the app."
+    ),
 }
 
 
@@ -297,6 +305,10 @@ class DesktopMCP:
         if area == "runs" and action == "read":
             return self._run_by_index(url, token, params)
         route_id = f"{area}.{action}"
+        if route_id in OWNER_DECISION_ROUTES:
+            # Said here as well as by the app: a client holding a list from before these closed
+            # should read why, not "unknown action".
+            return f"Refused: {OWNER_DECISION_ROUTES[route_id]}"
         if route_id not in ROUTES:
             return f"Unknown action {action!r} for {name}."
         return self._call(

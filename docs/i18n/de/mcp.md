@@ -1,5 +1,5 @@
 ---
-source_sha256: 0b37c6a629b664aa240e9c6470ce524d074bd195b985dfb116d34c593901f615
+source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
 ---
 
 # MCP-Server verbinden
@@ -135,11 +135,21 @@ nur auf. Hält ein Zug bei einer an, antwortet `desktop_send` sofort, dass er au
 der Zug läuft in der App weiter; `desktop_job` meldet, wie er endet.
 
 Der zweite Schalter, **Volle Kontrolle**, fügt `desktop_approve` (Freigaben und Schritte mit
-Schranke beantworten) und `desktop_settings` (Einstellungen, die Identität des Agenten und
-gespeicherte Agenten bearbeiten, einen Befehl im Runner ausführen) hinzu. Damit kann Claude
-Aktionen ohne dich freigeben — und eine Seite oder Nachricht mit Prompt-Injection, die der Agent
-liest, könnte es dazu bringen. Diese beiden Tools werden gar nicht gelistet, solange er aus ist,
-und die App lehnt sie ab, falls sie trotzdem aufgerufen werden.
+Schranke beantworten) und `desktop_settings` (Einstellungen und die Identität des Agenten
+bearbeiten) hinzu. Damit kann Claude Aktionen ohne dich freigeben — und eine Seite oder Nachricht
+mit Prompt-Injection, die der Agent liest, könnte es dazu bringen. Diese beiden Tools werden gar
+nicht gelistet, solange er aus ist, und die App lehnt sie ab, falls sie trotzdem aufgerufen
+werden.
+
+Manche Entscheidungen bleiben deine, egal welcher Schalter an ist. Welches Modell antwortet —
+jede Modelleinstellung, die Fallback-Kette, Panel, Richter und Synthesizer der Fusion, der
+Kostenmodus, die Kaskade und geprüfte Antworten — und ob die App geplante Jobs ausführt, kann
+Claude nur *vorschlagen*: Es wird nichts geschrieben, und die App zeigt dir eine Karte mit dem
+aktuellen und dem vorgeschlagenen Wert jeder Einstellung, die du dort freigibst oder ablehnst.
+Claude kann diese Karte auf keinem Weg beantworten; hat sich die Einstellung vor deiner Freigabe
+geändert, wird nichts übernommen. Einem Ordner Befehle erlauben, einen Befehl im Runner ausführen,
+einen Messaging-Bot starten und einen Agenten mit seinen Tool-Rechten speichern lehnt die Brücke
+ganz ab: Das machst du in der App.
 
 Was kein Schalter erlaubt: einen API-Schlüssel, ein Token oder einen Webhook lesen oder
 schreiben. Einstellungsänderungen lehnen Namen von Zugangsdaten ab, die Routen mit Schlüsseln

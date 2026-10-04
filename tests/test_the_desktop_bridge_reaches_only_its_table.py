@@ -469,10 +469,15 @@ def test_a_folder_grant_does_not_lift_the_owners_read_only(
     assert seen[0]["posture"]["reach"] == "read_only" and seen[0]["allow_host_exec"] is False
 
 
-def test_pinning_is_operate_and_granting_needs_full_control(
+def test_pinning_is_operate_and_granting_is_the_owners_at_every_tier(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Pinning and hiding only narrow (hiding revokes); granting widens, so it is Full."""
+    """Pinning and hiding only narrow (hiding revokes); granting widens, so it is the owner's.
+
+    Until 2026-10-04 granting was Full control's, and this test asserted that a full-control client
+    could grant. The owner decided otherwise: a folder's command grant is the posture itself, and
+    the bridge now refuses it at every tier (`bridge_routes.OWNER_DECISION_ROUTES`). The owner's
+    own route still grants, and the bridge reads that grant (the tests above)."""
     folder = tmp_path / "proj"
     folder.mkdir()
     operate = _app(tmp_path, monkeypatch)
@@ -489,15 +494,22 @@ def test_pinning_is_operate_and_granting_needs_full_control(
 
     full = _app(tmp_path, monkeypatch, full=True)
     with TestClient(full) as client:
-        granted = _call(
+        still_refused = _call(
             client,
             full,
             "settings.folder_grant",
             body={"path": str(folder), "shell_granted": True},
         )
         listed = _call(client, full, "projects.list")
-    assert granted.status_code == 200
-    assert listed.json()["data"][0]["shell_granted"] is True
+        owner = client.put(
+            "/api/code/workspaces/grant", json={"path": str(folder), "shell_granted": True}
+        )
+        after_owner = _call(client, full, "projects.list")
+    assert still_refused.status_code == 403
+    assert "owner's decision" in still_refused.json()["detail"]
+    assert listed.json()["data"][0]["shell_granted"] is False
+    assert owner.status_code == 200
+    assert after_owner.json()["data"][0]["shell_granted"] is True
 
 
 def test_the_widening_scan_reads_nested_bodies_and_ignores_empty_values() -> None:
@@ -511,7 +523,7 @@ def test_the_widening_scan_reads_nested_bodies_and_ignores_empty_values() -> Non
 def test_settings_edit_refuses_credentials_and_the_switches_even_with_full_control(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    app = _app(tmp_path, monkeypatch, full=True, CHIMERA_DEFAULT_MODEL="before/model")
+    app = _app(tmp_path, monkeypatch, full=True, CHIMERA_SANDBOX_IMAGE="before:image")
 
     with TestClient(app) as client:
         for key in (
@@ -524,10 +536,13 @@ def test_settings_edit_refuses_credentials_and_the_switches_even_with_full_contr
             "CHIMERA_TELEGRAM_BOT_TOKEN",
         ):
             assert _call(client, app, "settings.edit", body={key: "x"}).status_code == 403, key
-        ok = _call(client, app, "settings.edit", body={"CHIMERA_DEFAULT_MODEL": "after/model"})
+        # A setting the bridge still writes. It was the default model until 2026-10-04, when the
+        # model choices became the owner's to write and the bridge's only to suggest
+        # (`tests/test_the_bridge_may_only_suggest_which_model_answers.py`).
+        ok = _call(client, app, "settings.edit", body={"CHIMERA_SANDBOX_IMAGE": "after:image"})
     assert ok.status_code == 200 and ok.json()["status"] == 200
     env = (tmp_path / ".env").read_text(encoding="utf-8")
-    assert "CHIMERA_DEFAULT_MODEL=after/model" in env
+    assert "CHIMERA_SANDBOX_IMAGE=after:image" in env
     assert "API_KEY" not in env and "BRIDGE" not in env
     get_settings.cache_clear()
 
