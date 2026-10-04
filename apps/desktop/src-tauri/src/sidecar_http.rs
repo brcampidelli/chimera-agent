@@ -66,13 +66,10 @@ fn token_in_dotenv(body: &str) -> Option<String> {
         if !name.trim().eq_ignore_ascii_case(TOKEN_VAR) {
             continue;
         }
-        let value = value.trim();
-        let value = match value.chars().next() {
-            Some(q @ ('"' | '\'')) => value[1..].split(q).next().unwrap_or(""),
-            // Unquoted: an inline comment starts at " #".
-            _ => value.split(" #").next().unwrap_or("").trim_end(),
-        };
-        found = Some(value.to_string());
+        // The backend's own rule (`key_vault.encode_env_value`): single-quoted values carry
+        // escapes, and a reader that stopped at the first quote would read a different token.
+        let value = crate::dotenv_value::dotenv_value(value);
+        found = Some(value);
     }
     found.filter(|v| !v.is_empty())
 }
@@ -285,6 +282,24 @@ mod tests {
         assert_eq!(server_token(Some(String::new()), Some(file)), None);
         assert_eq!(server_token(None, None), None);
         assert_eq!(server_token(None, Some("OTHER=1\n")), None);
+    }
+
+    /// The token line as the backend writes it, for every case of the shared fixture: what the
+    /// tray sends is what the backend's guard compares against.
+    #[test]
+    fn the_token_reads_back_as_the_backend_wrote_it() {
+        let fixture = include_str!("../fixtures/dotenv_values.tsv");
+        for line in fixture.lines().filter(|l| !l.is_empty() && !l.starts_with('#')) {
+            let (hex, encoded) = line.split_once('\t').expect("hex<TAB>encoded");
+            let bytes: Vec<u8> = (0..hex.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&hex[i..i + 2], 16).expect("hex"))
+                .collect();
+            let value = String::from_utf8(bytes).expect("utf-8");
+            let body = format!("OTHER=1\nCHIMERA_SERVER_TOKEN={encoded}\nAFTER='x'\n");
+            let want = (!value.is_empty()).then_some(value);
+            assert_eq!(server_token(None, Some(&body)), want, "case {encoded:?}");
+        }
     }
 
     #[test]

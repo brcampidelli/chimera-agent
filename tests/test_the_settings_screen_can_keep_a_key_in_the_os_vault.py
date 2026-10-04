@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from dotenv import dotenv_values
 
 from chimera import config_vault
 from chimera.api import key_vault
@@ -603,23 +604,32 @@ def test_the_way_back_reads_each_key_from_the_file_before_the_vault_copy_goes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The screen says each key is read back where it goes before its old copy is removed. On the
-    way back, "where it goes" is a file dotenv parses: an unquoted value containing " #" comes
-    back cut, and deleting the vault copy then would lose the key. It stays in the vault, the file
-    goes back to how it was, and the key is named."""
+    way back, "where it goes" is a file dotenv parses, and a key that does not come back whole
+    must not lose its vault copy: it stays in the vault, the file goes back to how it was, and the
+    key is named.
+
+    Rewritten on 2026-10-04. The key that used to fail here held " #", which a BARE line cut; the
+    writer now quotes such a value (`key_vault.encode_env_value`), so it comes back whole and
+    moves — asserted below. The key that cannot come back whole now is one carrying ``${…}``,
+    which python-dotenv expands whatever the quoting: the writer refuses it, and it stays."""
     cofre = _cofre(monkeypatch)
-    cortada = "valor-de-teste #resto-que-o-dotenv-corta"
-    cofre.dados[(config_vault.SERVICE, "OPENROUTER_API_KEY")] = cortada  # moved by this screen
-    cofre.dados[(config_vault.SERVICE, "TAVILY_API_KEY")] = cortada  # `chimera secrets set`
+    cortada = "valor-de-teste #resto-que-o-dotenv-cortava"
+    expandida = "valor-${HOME}-que-o-dotenv-expandiria"
+    cofre.dados[(config_vault.SERVICE, "OPENROUTER_API_KEY")] = expandida  # moved by this screen
+    cofre.dados[(config_vault.SERVICE, "TAVILY_API_KEY")] = expandida  # `chimera secrets set`
     cofre.dados[(config_vault.SERVICE, "GROQ_API_KEY")] = CHAVE  # an ordinary key still moves
+    cofre.dados[(config_vault.SERVICE, "MISTRAL_API_KEY")] = cortada  # comes back whole now
     marcador = f"{config_vault.marker('OPENROUTER_API_KEY')}\n"
     (tmp_path / ".env").write_text(marcador, "utf-8")
 
     result = vault_move("file", env_path=tmp_path / ".env")
 
     assert sorted(result["failed"]) == ["OPENROUTER_API_KEY", "TAVILY_API_KEY"]
-    assert result["moved"] == ["GROQ_API_KEY"]
-    assert _env(tmp_path) == f"{marcador}GROQ_API_KEY={CHAVE}\n"
-    assert cofre.tem("OPENROUTER_API_KEY") == cortada and cofre.tem("TAVILY_API_KEY") == cortada
+    assert sorted(result["moved"]) == ["GROQ_API_KEY", "MISTRAL_API_KEY"]
+    assert dotenv_values(tmp_path / ".env")["MISTRAL_API_KEY"] == cortada
+    assert dotenv_values(tmp_path / ".env")["GROQ_API_KEY"] == CHAVE
+    assert _env(tmp_path).startswith(marcador)
+    assert cofre.tem("OPENROUTER_API_KEY") == expandida and cofre.tem("TAVILY_API_KEY") == expandida
 
 
 def test_with_no_vault_neither_move_pretends(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -56,7 +56,12 @@ def test_the_two_values_the_factory_reads_are_saved(
     assert patch_config({"CHIMERA_SANDBOX_NETWORK": value}, env_path=env) == {
         "updated": ["CHIMERA_SANDBOX_NETWORK"]
     }
-    assert f"CHIMERA_SANDBOX_NETWORK={value}" in env.read_text(encoding="utf-8")
+    # Read back the way the app reads it, not as raw text: since 2026-10-04 the writer quotes a
+    # value a bare line would change (`key_vault.encode_env_value`), so " none " is stored quoted
+    # and comes back with its spaces — which the factory strips, as it did before.
+    from dotenv import dotenv_values
+
+    assert dotenv_values(env)["CHIMERA_SANDBOX_NETWORK"] == value
     get_settings.cache_clear()
 
 

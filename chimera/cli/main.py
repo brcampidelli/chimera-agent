@@ -95,20 +95,21 @@ console = Console()
 def _set_env_var(path: Path, key: str, value: str) -> None:
     """Set KEY=value in a .env file, replacing the line if present, appending otherwise.
 
-    Held to the same rule as every other writer of the file (`key_vault.check_env_value`), and the
-    file is split on newlines only, so a value cannot break out into a second assignment here either.
+    Held to the same rule as every other writer of the file: the value is encoded so every reader
+    reads it back unchanged (`key_vault.encode_env_value`, which refuses what no spelling makes
+    safe), and the file is split on newlines only.
     """
-    from chimera.api.key_vault import check_env_value, env_lines
+    from chimera.api.key_vault import encode_env_value, env_lines
 
-    check_env_value(key, value)
+    line_for = f"{key}={encode_env_value(key, value)}"
     lines = env_lines(path.read_text(encoding="utf-8")) if path.exists() else []
     prefix = f"{key}="
     for i, line in enumerate(lines):
         if line.strip().startswith(prefix):
-            lines[i] = f"{key}={value}"
+            lines[i] = line_for
             break
     else:
-        lines.append(f"{key}={value}")
+        lines.append(line_for)
     # Atomic write: a crash mid-write to .env must not truncate the user's secrets/config.
     tmp = path.parent / (path.name + ".tmp")
     tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")

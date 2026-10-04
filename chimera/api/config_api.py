@@ -22,7 +22,7 @@ from typing import Any
 
 from chimera.api.key_vault import (
     SCREEN_STORABLE,
-    check_env_value,
+    encode_env_value,
     move_to_file,
     move_to_vault,
     vault_snapshot,
@@ -453,7 +453,7 @@ def pool_add(provider: str, key: str, *, env_path: Path | None = None) -> dict[s
         raise ValueError("key may not contain a comma — that is the separator between pool entries")
     if any(c in candidate for c in "\r\n"):
         raise ValueError("key may not contain a newline")
-    check_env_value("key", candidate)
+    encode_env_value("key", candidate)
     if candidate.startswith("…") or set(candidate) <= {"*", "•", "·"}:
         # A client echoing back what it displayed. Cheap to check, and it fails loudly here instead
         # of quietly replacing a working pool with its own mask.
@@ -1012,9 +1012,10 @@ def check_updates(updates: dict[str, str], *, workspace: Path | None = None) -> 
         raise ValueError(f"not editable: {', '.join(sorted(rejected))}")
     # Allowlisting the KEY isn't enough: a line break in the VALUE would split into extra .env lines
     # and inject arbitrary env vars (a provider key, the posture). Every character that breaks a line
-    # anywhere — not only \r and \n, see `key_vault.check_env_value` — and every control character.
+    # anywhere — not only \r and \n, see `key_vault.check_env_value` — and every control character;
+    # and what no spelling can make every .env reader read back as written (`encode_env_value`).
     for key, value in updates.items():
-        check_env_value(key, str(value))
+        encode_env_value(key, str(value))
     for key, value in updates.items():
         check = _VALUE_CHECKS.get(key)
         if check is not None:
@@ -1024,32 +1025,68 @@ def check_updates(updates: dict[str, str], *, workspace: Path | None = None) -> 
         # API's, and a caller without one (the CLI) gets the path check above only.
         _check_worktree_dir(str(updates["CHIMERA_WORKTREE_DIR"]), workspace)
     _check_decision_choice(updates)
+    # Last: a value Settings cannot parse from .env would stop the app at its next read.
+    check_parses(updates)
 
 
 def check_parses(updates: dict[str, str]) -> None:
-    """Refuse a value ``Settings`` could not read back — ``CHIMERA_CASCADE=maybe``.
+    """Refuse a value ``Settings`` could not read back from ``.env`` — ``CHIMERA_CASCADE=maybe``.
 
-    The owner's own save does not ask this (a typo there is the owner's, made on the screen that
-    shows it). A suggestion is someone else's value, applied by a click on a card, and a boolean
-    that does not parse takes the whole app down at its next read — so it is refused before the
-    card exists and again before it is applied. Only errors located AT one of the keys count: a
-    cross-field rule evaluated against defaults would refuse for reasons the real settings do not
-    have.
+    A value Settings cannot parse takes the whole app down at its next read: the review of
+    2026-10-04 had the bridge write ``CHIMERA_BROWSER_SITUATION='x"'`` (a 200), after which
+    ``get_settings()`` raised until someone hand-edited the file. So every save asks this
+    (:func:`check_updates` calls it), the owner's included.
+
+    Asked the way the app will ask it: the values are written, encoded as the save would encode
+    them, into a scratch ``.env`` that a Settings reading NOTHING else parses — so a list or JSON
+    field is decoded exactly as at startup, and the encoding itself is part of what is checked. Only
+    errors located AT one of the keys count: a cross-field rule evaluated against defaults would
+    refuse for reasons the real settings do not have.
     """
-    from pydantic import ValidationError
+    import tempfile
 
-    try:
-        Settings.model_validate(dict(updates))
-    except ValidationError as exc:
-        wrong = sorted(
-            {
-                str(err["loc"][0])
-                for err in exc.errors()
-                if err.get("loc") and str(err["loc"][0]).upper() in {k.upper() for k in updates}
-            }
+    from pydantic import ValidationError
+    from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
+
+    from chimera.api.key_vault import encode_env_value
+
+    fields = {
+        str(f.validation_alias or name).upper()
+        for name, f in Settings.model_fields.items()
+    }
+    probe = {k: str(v) for k, v in updates.items() if k.upper() in fields}
+    if not probe:
+        return
+
+    class _OnlyThisFile(Settings):
+        @classmethod
+        def settings_customise_sources(
+            cls,
+            settings_cls: type[BaseSettings],
+            init_settings: PydanticBaseSettingsSource,
+            env_settings: PydanticBaseSettingsSource,
+            dotenv_settings: PydanticBaseSettingsSource,
+            file_secret_settings: PydanticBaseSettingsSource,
+        ) -> tuple[PydanticBaseSettingsSource, ...]:
+            return (dotenv_settings,)
+
+    with tempfile.TemporaryDirectory() as scratch:
+        env = Path(scratch) / "probe.env"
+        env.write_text(
+            "".join(f"{k}={encode_env_value(k, v)}\n" for k, v in probe.items()), encoding="utf-8"
         )
-        if wrong:
-            raise ValueError(f"not a valid value for {', '.join(wrong)}") from None
+        try:
+            _OnlyThisFile(_env_file=env)  # type: ignore[call-arg]  # pydantic-settings' init kwarg
+        except ValidationError as exc:
+            wrong = sorted(
+                {
+                    str(err["loc"][0])
+                    for err in exc.errors()
+                    if err.get("loc") and str(err["loc"][0]).upper() in {k.upper() for k in probe}
+                }
+            )
+            if wrong:
+                raise ValueError(f"not a valid value for {', '.join(wrong)}") from None
 
 
 def setting_value(settings: Settings, key: str) -> str:

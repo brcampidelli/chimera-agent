@@ -30,6 +30,7 @@ No function here returns a value. Names, never secrets — the same rule as `con
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from pathlib import Path
 from typing import Any
@@ -111,6 +112,101 @@ def env_lines(text: str) -> list[str]:
     return [line[:-1] if line.endswith("\r") else line for line in lines]
 
 
+#: python-dotenv's own interpolation pattern (``dotenv/variables.py``), which it applies to EVERY
+#: value, quoted or not, with no escape: ``${NAME}`` and ``${NAME:-default}``. pydantic-settings reads
+#: ``.env`` through it, so a value carrying one becomes another variable of the process on the next
+#: start — a key from the environment, read back through ``GET /api/config`` (review of 2026-10-04).
+_INTERPOLATION = re.compile(r"\$\{[^\}:]*(?::-[^\}]*)?\}")
+
+
+def _plain(value: str) -> bool:
+    """Whether ``value`` reads back unchanged written bare after ``=``.
+
+    python-dotenv reads a bare value to the end of the line, cuts it at whitespace followed by
+    ``#`` (a comment), strips it, and switches to quoted parsing when it starts with a quote. A bare
+    value is literal otherwise — no escapes — so it is the form every reader agrees on.
+    """
+    return value == "" or (
+        value == value.strip()
+        and value[0] not in "'\""
+        and not re.search(r"\s#", value)
+    )
+
+
+def encode_env_value(key: str, value: str) -> str:
+    """The right-hand side that every reader of ``.env`` reads back as exactly ``value``.
+
+    The readers are python-dotenv (and pydantic-settings through it), :func:`decode_env_value`, and
+    the desktop shell's ``dotenv_value.rs``; the cases they must agree on are a shared fixture
+    (``apps/desktop/src-tauri/fixtures/dotenv_values.tsv``, read by pytest and by cargo test).
+
+    Bare when bare is literal (:func:`_plain`); otherwise single-quoted, with ``\\`` and ``'``
+    escaped — the two escapes python-dotenv decodes inside single quotes. Refused, with the reason,
+    for the only values no spelling makes safe: a line break or control character
+    (:func:`check_env_value`), an interpolation python-dotenv would expand (it has no escape for
+    ``${``), and a value that needs quotes and ends in ``\\`` — python-dotenv's single-quote pattern
+    reads the escaped backslash before the closing quote as an escaped QUOTE and runs on into the
+    next lines. Until 2026-10-04 every value was written bare: ``"python:3.12-slim`` opened a quote
+    python-dotenv closed lines later, and the owner's ``CHIMERA_REACH`` and ``CHIMERA_APPROVAL`` in
+    between stopped being read (review of 2026-10-04).
+    """
+    text = str(value)
+    check_env_value(key, text)
+    if _INTERPOLATION.search(text):
+        raise ValueError(
+            f"value for {key} may not contain ${{…}}: .env would read it as another variable"
+        )
+    if _plain(text):
+        return text
+    if text.endswith("\\"):
+        raise ValueError(
+            f"value for {key} may not end in a backslash when it also needs quotes "
+            "(spaces at its ends, a leading quote, or ' #')"
+        )
+    return "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def decode_env_value(raw: str) -> str:
+    """The value of an assignment's right-hand side, read by the rule :func:`encode_env_value`
+    writes: single-quoted with ``\\\\`` and ``\\'`` decoded and nothing after the closing quote;
+    double-quoted to the next quote (written by hand only); bare to an inline comment, stripped.
+    The same rule as the desktop shell's reader."""
+    text = raw.strip()
+    if text.startswith("'"):
+        out: list[str] = []
+        i = 1
+        while i < len(text):
+            ch = text[i]
+            if ch == "\\" and i + 1 < len(text) and text[i + 1] in "\\'":
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == "'":
+                break
+            out.append(ch)
+            i += 1
+        return "".join(out)
+    if text.startswith('"'):
+        return text[1:].split('"', 1)[0]
+    return re.split(r"\s#", text, maxsplit=1)[0].rstrip()
+
+
+def read_env_values(text: str) -> dict[str, str]:
+    """Every assignment in ``.env`` text, by :func:`env_lines` and :func:`decode_env_value`; the
+    last one wins, as in python-dotenv. Comments and markers are skipped."""
+    values: dict[str, str] = {}
+    for line in env_lines(text):
+        body = line.strip()
+        if not body or body.startswith("#"):
+            continue
+        if body.startswith("export "):
+            body = body[len("export ") :].lstrip()
+        name, sep, rest = body.partition("=")
+        if sep:
+            values[name.strip()] = decode_env_value(rest)
+    return values
+
+
 def set_env_entry(path: Path, key: str, line: str, *, keep_export: bool = False) -> None:
     """Make ``line`` the only entry for ``key`` in ``.env``, atomically.
 
@@ -156,8 +252,11 @@ def remove_env_entry(path: Path, key: str) -> None:
 
 
 def write_env_value(path: Path, key: str, value: str) -> None:
-    """``KEY=value`` in ``.env`` — the file path every non-vault write takes (``export`` kept)."""
-    set_env_entry(path, key, f"{key}={value}", keep_export=True)
+    """``KEY=value`` in ``.env`` — the file path every non-vault write takes (``export`` kept).
+
+    The value is encoded (:func:`encode_env_value`), so what every reader reads back is ``value``.
+    """
+    set_env_entry(path, key, f"{key}={encode_env_value(key, value)}", keep_export=True)
 
 
 def _store_verified(name: str, value: str) -> bool:
@@ -348,7 +447,13 @@ def move_to_file(path: Path) -> dict[str, list[str]]:
         if value is None:
             failed.append(name)
             continue
-        write_env_value(path, name, value)
+        try:
+            write_env_value(path, name, value)
+        except ValueError:
+            # A value no `.env` spelling reads back (a `${…}` dotenv would expand): refused before
+            # anything was written, so the file is as it was and the vault copy stays.
+            failed.append(name)
+            continue
         if dotenv_values(path).get(name) != value:
             if name in marked:
                 set_env_entry(path, name, config_vault.marker(name))

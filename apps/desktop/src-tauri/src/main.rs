@@ -9,6 +9,7 @@
 //! at that localhost origin. The SPA is served BY the sidecar (same origin), so its relative `/api`
 //! calls just work — no divergent server code, no base-URL rewiring. The sidecar is killed on exit.
 
+mod dotenv_value;
 mod prefs;
 mod sidecar_http;
 
