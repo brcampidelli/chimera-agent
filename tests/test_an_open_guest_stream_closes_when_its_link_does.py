@@ -267,10 +267,34 @@ def served(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[st
     try:
         yield base, app
     finally:
+        # End every guest stream a test left open BEFORE asking the server to exit. uvicorn's
+        # graceful shutdown waits for every connection, a live stream never finishes on its own, and
+        # `join(timeout=5)` then gives up and returns as if it had worked. The server thread lived on
+        # for the rest of the session with the stream inside it, and each heartbeat asked
+        # `still_open()` -> `sharing_on()` -> `get_settings()`. Every test clears that cache in
+        # setup; a heartbeat landing between the clear and a test's own `monkeypatch.setenv` filled
+        # it from the environment as it was at that instant, and the test then read a settings
+        # object that ignored what it had just set. `test_env.py`'s
+        # `CHIMERA_HOST_EXEC=allow` became `ask`, the verifier abstained, and a correct fix scored
+        # 0.0 — once in a while, dozens of files after the stream was opened, on whichever runner
+        # the timing fell. `test_closing_the_door_ends_the_streams_through_it_at_once` leaves the
+        # owner's /guest mount open on purpose (that is its assertion); ending it is this
+        # fixture's job, not the test's.
+        app.state.session_bus.end_guests()
         app.state.guest_server.stop()
         server.should_exit = True
         thread.join(timeout=5)
         get_settings.cache_clear()
+        # A join that times out says nothing, so say it here: a server still running after the
+        # fixture is a leak into every later test, and it must be red where it starts, not a
+        # flake wherever it happens to land.
+        if thread.is_alive():
+            pytest.fail(
+                "the served app's uvicorn thread outlived the fixture — a connection is still open "
+                "(a live stream the teardown did not end?) and its heartbeats will read the "
+                "settings during every later test",
+                pytrace=False,
+            )
 
 
 def _session(client: httpx.Client) -> str:
