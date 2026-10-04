@@ -629,9 +629,21 @@ _SECRET_FILE = re.compile(
 
 
 def is_secret_file(path: str) -> bool:
-    """Whether any component of ``path`` names a credential file (``.env``, a private key, ...)."""
+    """Whether any component of ``path`` names a credential file (``.env``, a private key, ...).
+
+    Each component as Windows OPENS it (:func:`chimera.core.own_files.normal_name`): ``.env ``,
+    ``.env.`` and ``.env::$DATA`` are the file ``.env``, and matching the raw text let all three read
+    and write it through the bridge at the operate tier (review of 2026-10-04). An 8.3 short name
+    (``ENV~1``) has no text to match; the bridge also checks the name the path RESOLVES to.
+    """
+    from chimera.core.own_files import normal_name
+
     parts = re.split(r"[\\/]+", str(path))
-    return any(_SECRET_FILE.match(part) for part in parts if part)
+    return any(
+        _SECRET_FILE.match(part) or _SECRET_FILE.match(normal_name(part))
+        for part in parts
+        if part
+    )
 
 
 def is_secret_setting(name: str) -> bool:

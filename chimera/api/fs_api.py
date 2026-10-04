@@ -19,7 +19,12 @@ from pathlib import Path
 from typing import Any
 
 from chimera.core.checkpoint import _IGNORE_DIRS
-from chimera.tools.workspace import atomic_write_text, read_text_for_edit, resolve_in_workspace
+from chimera.tools.workspace import (
+    atomic_write_text,
+    read_text_for_edit,
+    refuse_own_files,
+    resolve_in_workspace,
+)
 
 _MAX_READ_CHARS = 20_000  # mirrors ReadFileTool's cap
 _MAX_WRITE_BYTES = 1_000_000  # 1 MB cap for the editable viewer's save
@@ -106,6 +111,7 @@ def list_tree(workspace: Path, rel: str, *, max_entries: int = 500) -> dict[str,
     """
     root = Path(workspace).resolve()
     target = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    refuse_own_files(target, "list")
     entries: list[dict[str, Any]] = []
     capped = False
     if target.is_dir():
@@ -135,6 +141,7 @@ def read_file(workspace: Path, rel: str) -> dict[str, Any]:
     """
     root = Path(workspace).resolve()
     path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    refuse_own_files(path, "read")
     if path.is_dir():
         return {"path": rel, "content": "", "truncated": False, "note": "binary or non-text"}
     if not path.is_file():
@@ -176,6 +183,7 @@ def read_image(
     """
     root = Path(workspace).resolve()
     path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    refuse_own_files(path, "read")
     media_type = _IMAGE_MEDIA_TYPES.get(path.suffix.lower())
     if media_type is None:
         raise UnsupportedImageError(f"{rel!r} is not a displayable image type")
@@ -207,6 +215,7 @@ def write_file(
     """
     root = Path(workspace).resolve()
     path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    refuse_own_files(path, "write")
     # A save is TEXT. `read_file` hands a .docx/.pdf/.xlsx/.pptx back as MarkItDown's text of it, so
     # a client that saves what it was shown would replace the document with its own preview; and an
     # existing non-UTF-8 file was shown as empty, so saving would replace it with whatever was typed.

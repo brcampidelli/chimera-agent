@@ -505,6 +505,25 @@ def _job_out(job: BridgeJob, since: int, tokens: list[str]) -> dict[str, Any]:
     )
 
 
+#: Body and query fields that name a place on disk, at any depth.
+_PATH_FIELDS = frozenset({"workspace", "path", "paths", "cwd"})
+
+
+def _path_texts(node: Any) -> list[str]:
+    """Every string carried under a path-naming field of ``node``, however deep."""
+    found: list[str] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key in _PATH_FIELDS:
+                values = value if isinstance(value, list) else [value]
+                found += [v for v in values if isinstance(v, str)]
+            found += _path_texts(value)
+    elif isinstance(node, list):
+        for item in node:
+            found += _path_texts(item)
+    return found
+
+
 def _resolve_path(route: BridgeRoute, params: dict[str, Any]) -> tuple[str, dict[str, Any]]:
     """The concrete path for ``route``, and the params left over for the query string."""
     names = re.findall(r"{(\w+)}", route.path)
@@ -569,19 +588,38 @@ def register_bridge_api(
         workspace that CONTAINS it is the same door one level up. And `.env` is the key the settings
         screen masks; reading it as a file would hand it over by a side door.
         """
-        roots = [Path(live_settings().home), bridge_path().parent]
-        roots = [r.expanduser().resolve() for r in roots]
+        from chimera.core.own_files import (
+            contains,
+            is_device_or_unc,
+            is_own_env,
+            normal_name,
+            within,
+        )
+
+        roots = [Path(live_settings().home).expanduser(), bridge_path().parent.expanduser()]
         fields = dict(query)
         if isinstance(body, dict):
             fields.update({k: v for k, v in body.items() if k not in fields})
+        # Every path-shaped value, at any depth (a batch carries one workspace per task). A device
+        # or network spelling — `\\?\C:\…`, `\\localhost\C$\…` — is refused before any comparison:
+        # `Path.resolve` keeps the prefix, so it compared unequal to the very folder it names, and
+        # the review of 2026-10-04 answered an approval through `\\?\<home>` at the operate tier.
+        for text in _path_texts(query) + _path_texts(body):
+            if is_device_or_unc(text):
+                raise HTTPException(
+                    status_code=403,
+                    detail="device and network paths (\\\\?\\, \\\\.\\, \\\\server\\share) are not "
+                    "reachable through the bridge",
+                )
         places = [fields.get("workspace")]
         if route_id in {"projects.add", "projects.remove", "files.mkdir"}:
             places.append(fields.get("path"))
         for place in places:
             if not isinstance(place, str) or not place.strip():
                 continue
-            target = Path(place).expanduser().resolve()
-            if any(target == r or r in target.parents or target in r.parents for r in roots):
+            target = Path(place).expanduser()
+            # By file identity (`own_files`), both ways: a workspace inside the data, or holding it.
+            if any(within(target, r) or contains(target, r) for r in roots):
                 raise HTTPException(
                     status_code=403,
                     detail="that folder holds the app's own data; it is not reachable through the bridge",
@@ -603,8 +641,20 @@ def register_bridge_api(
         for f in files:
             if not isinstance(f, str) or not f.strip():
                 continue
-            target = (base.expanduser() / f).resolve()
-            if any(target == r or r in target.parents for r in roots):
+            target = base.expanduser() / f
+            try:
+                opened = normal_name(target.resolve().name)
+            except (OSError, ValueError):
+                opened = ""
+            # The name the path OPENS, not the text: an 8.3 short name (`ENV~1`) resolves to `.env`
+            # on a file system that keeps them, and no pattern over the typed text could see that.
+            # And Chimera's own `.env` by identity, whatever it is called on the way.
+            if (opened and is_secret_file(opened)) or is_own_env(target):
+                raise HTTPException(
+                    status_code=403,
+                    detail="credential files are not reachable through the bridge",
+                )
+            if any(within(target, r) for r in roots):
                 raise HTTPException(
                     status_code=403,
                     detail="that file is in the app's own data folder; it is not reachable "

@@ -18,6 +18,39 @@ class PathEscapesWorkspaceError(ValueError):
     """Raised when a requested path resolves outside the workspace root."""
 
 
+class ProtectedPathError(PathEscapesWorkspaceError):
+    """The path is Chimera's own ``.env`` or inside its data folder (`chimera/core/own_files.py`).
+
+    A subclass of the escape error so every caller that already refuses an escape refuses this too,
+    with no new branch to forget."""
+
+
+def chimera_home() -> Path | None:
+    """The data folder the running process uses, or None when settings cannot be read."""
+    try:
+        from chimera.config import get_settings
+
+        return Path(get_settings().home).expanduser()
+    except Exception:  # noqa: BLE001 — a guard must not crash a tool; None protects the .env only
+        return None
+
+
+def refuse_own_files(candidate: Path, verb: str) -> None:
+    """Refuse ``candidate`` when it is Chimera's own ``.env`` or inside its data folder.
+
+    For the agent's write tools (every turn, every posture) and the app's file routes (every
+    caller). A workspace that happens to contain the install folder — an app started from the home
+    directory — put both within reach of `write_file`: the posture and the keys in ``.env``, and the
+    approval queue in ``<home>/approvals``, where a written answer file answers a question. Another
+    project's ``.env`` is ordinary work and is not touched by this: only Chimera's own, by identity.
+    """
+    from chimera.core.own_files import protected_reason
+
+    reason = protected_reason(candidate, chimera_home())
+    if reason is not None:
+        raise ProtectedPathError(f"no tool may {verb} {candidate}: {reason}. Do not retry.")
+
+
 def resolve_in_workspace(workspace: Path, path: str) -> Path:
     """Resolve ``path`` against ``workspace`` and ensure it stays inside it.
 
@@ -105,6 +138,9 @@ _READ_VERBS = frozenset({"read", "list", "search"})
 def _refuse_shell_owned(candidate: Path, verb: str) -> None:
     if verb in _READ_VERBS:
         return
+    # Chimera's own `.env` and data folder, for every write a tool makes — inside the workspace or
+    # outside it with a person's yes, which cannot grant this one either.
+    refuse_own_files(candidate, verb)
     for env in SHELL_OWNED_ENV:
         owned = os.environ.get(env, "").strip()
         if owned and Path(owned).resolve() == candidate:
