@@ -4344,6 +4344,8 @@ export interface components {
         ApprovalAnswerIn: {
             /** Approved */
             approved: boolean;
+            /** Digest */
+            digest?: string | null;
         };
         /** ApprovalAnswerOut */
         ApprovalAnswerOut: {
@@ -9441,6 +9443,11 @@ export interface components {
              * @default
              */
             client_hint: string;
+            /**
+             * Digest
+             * @default
+             */
+            digest: string;
             /** Expires At */
             expires_at: number;
             /** Suggested By */

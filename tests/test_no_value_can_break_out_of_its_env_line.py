@@ -192,7 +192,11 @@ def test_a_card_that_carries_one_anyway_is_never_applied(
         suggested_by="desktop_bridge",
     )
     with TestClient(app) as client:
-        answered = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        card = client.get("/api/approvals").json()[0]
+        answered = client.post(
+            f"/api/approvals/{request_id}",
+            json={"approved": True, "digest": card["suggestion"]["digest"]},
+        )
     assert answered.json()["outcome"] == "invalid"
     assert "CHIMERA_APPROVAL" not in (tmp_path / ".env").read_text(encoding="utf-8")
     get_settings.cache_clear()

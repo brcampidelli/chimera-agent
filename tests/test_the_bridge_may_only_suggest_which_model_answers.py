@@ -114,6 +114,15 @@ def _suggest(client: TestClient, app: Any, body: dict[str, str] | None = None) -
     return str(made.json()["data"]["suggestion"])
 
 
+def _yes(client: TestClient, tmp_path: Path, request_id: str) -> Any:
+    """The owner's yes as the screen sends it: with the digest of the card it drew."""
+    s = setting_suggestions.read(_home(tmp_path), request_id)
+    body: dict[str, Any] = {"approved": True}
+    if s is not None:
+        body["digest"] = setting_suggestions.digest(s)
+    return client.post(f"/api/approvals/{request_id}", json=body)
+
+
 def _untouched(tmp_path: Path, key: str = KEY, value: str = BEFORE) -> None:
     """Nothing reached ``.env`` or the process, and the card is still waiting."""
     assert f"{key}=" not in _env_file(tmp_path)
@@ -152,7 +161,13 @@ def test_the_bridge_suggests_it_writes_nothing_and_the_owners_yes_writes_exactly
         assert hint and card["suggestion"]["client_hint"] == hint
         assert app.state.desktop_bridge.token not in json.dumps(card)
 
-        answered = client.post(f"/api/approvals/{card['id']}", json={"approved": True})
+        assert card["suggestion"]["digest"] == setting_suggestions.digest(
+            cast(setting_suggestions.Suggestion, setting_suggestions.read(_home(tmp_path), card["id"]))
+        )
+        answered = client.post(
+            f"/api/approvals/{card['id']}",
+            json={"approved": True, "digest": card["suggestion"]["digest"]},
+        )
     assert answered.status_code == 200
     assert answered.json() == {"ok": True, "outcome": "applied", "detail": key}
     assert f"{key}={proposed}" in _env_file(tmp_path).splitlines()
@@ -192,8 +207,8 @@ def test_a_second_click_on_an_applied_card_is_a_stale_click(
     app = _app(tmp_path, monkeypatch)
     with TestClient(app) as client:
         request_id = _suggest(client, app)
-        first = client.post(f"/api/approvals/{request_id}", json={"approved": True})
-        second = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        first = _yes(client, tmp_path, request_id)
+        second = _yes(client, tmp_path, request_id)
     assert first.json()["outcome"] == "applied"
     # No longer a suggestion, so the ordinary answer: nothing is waiting under that id.
     assert second.json() == {"ok": False}
@@ -242,7 +257,7 @@ def test_a_card_whose_setting_moved_since_is_stale_and_writes_nothing(
         request_id = _suggest(client, app)
         moved = client.patch("/api/config", json={KEY: "openrouter/vendor/owners-own"})
         assert moved.status_code == 200
-        answered = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        answered = _yes(client, tmp_path, request_id)
     assert answered.json() == {"ok": True, "outcome": "stale", "detail": KEY}
     assert os.environ[KEY] == "openrouter/vendor/owners-own"
     assert f"{KEY}={AFTER}" not in _env_file(tmp_path)
@@ -264,7 +279,7 @@ def test_a_value_that_fails_a_check_now_is_invalid_and_writes_nothing(
             raise ValueError(f"{KEY} is not offered any more")
 
         monkeypatch.setitem(config_api._VALUE_CHECKS, KEY, refuses)
-        answered = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        answered = _yes(client, tmp_path, request_id)
     assert answered.json() == {
         "ok": True,
         "outcome": "invalid",
@@ -287,7 +302,7 @@ def test_a_card_for_a_setting_that_is_not_suggestable_is_never_applied(
         suggested_by="desktop_bridge",
     )
     with TestClient(app) as client:
-        answered = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        answered = _yes(client, tmp_path, request_id)
     assert answered.json()["outcome"] == "invalid"
     assert os.environ["CHIMERA_REACH"] == "read_only"
     assert "CHIMERA_REACH=" not in _env_file(tmp_path)
@@ -303,7 +318,7 @@ def test_a_card_past_its_day_is_expired_and_writes_nothing(
         data = json.loads(path.read_text(encoding="utf-8"))
         data["suggestion"]["expires_at"] = time.time() - 1
         path.write_text(json.dumps(data), encoding="utf-8")
-        answered = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        answered = _yes(client, tmp_path, request_id)
     assert answered.json() == {"ok": True, "outcome": "expired", "detail": ""}
     _untouched(tmp_path)
     assert history(_home(tmp_path))[-1]["outcome"] == "timeout"
@@ -382,7 +397,7 @@ def test_a_request_the_bridge_forwards_to_the_owners_answering_route_is_refused(
                 app, "POST", f"/api/approvals/{request_id}", body={"approved": True}
             )
         )
-        owner = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        owner = _yes(client, tmp_path, request_id)
     assert status == 403, raw
     assert b"never through the desktop bridge" in raw
     # The owner's own request, a moment later, still applies it: the refusal was about who asked.
@@ -529,4 +544,31 @@ def test_the_guest_door_has_no_answering_route(
             assert got.status_code in (401, 403, 404, 405), (path, got.status_code)
         listed = client.get("/api/approvals").json()
     assert [q["id"] for q in listed] == [request_id]
+    _untouched(tmp_path)
+
+
+def test_a_card_changed_after_it_was_shown_is_not_applied(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The yes is to the card the owner SAW. A file rewritten between the drawing and the click —
+    the review did it through a device path — is `changed`, writes nothing, and stays waiting so the
+    owner can look at what it says now. A yes that names no card at all is the same."""
+    app = _app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        request_id = _suggest(client, app)
+        shown = client.get("/api/approvals").json()[0]["suggestion"]["digest"]
+        path = _home(tmp_path) / "approvals" / f"{request_id}.ask.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data["suggestion"]["changes"][0]["proposed"] = "openrouter/attacker/model"
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+        tampered = client.post(
+            f"/api/approvals/{request_id}", json={"approved": True, "digest": shown}
+        )
+        blind = client.post(f"/api/approvals/{request_id}", json={"approved": True})
+        listed = client.get("/api/approvals").json()
+    assert tampered.json() == {"ok": True, "outcome": "changed", "detail": ""}
+    assert blind.json()["outcome"] == "changed"
+    assert [q["id"] for q in listed] == [request_id]
+    assert listed[0]["suggestion"]["changes"][0]["proposed"] == "openrouter/attacker/model"
     _untouched(tmp_path)

@@ -307,11 +307,13 @@ export const getSandboxState = () => json<SandboxState>("/api/governance/sandbox
 export const getApprovals = () => json<ApprovalQuestion[]>("/api/approvals");
 /** `ok: false` is a stale click: the question timed out or was answered elsewhere. A 200. A settings
  *  suggestion also says how it ended (`outcome`): only `applied` wrote anything. */
-export const answerApproval = (id: string, approved: boolean) =>
+export const answerApproval = (id: string, approved: boolean, digest?: string) =>
   json<ApprovalAnswer>(`/api/approvals/${encodeURIComponent(id)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ approved }),
+    // `digest` only for a settings suggestion: the card that was drawn, so a yes cannot land on a
+    // card whose file changed after it was shown.
+    body: JSON.stringify(digest === undefined ? { approved } : { approved, digest }),
   });
 /** The card's second question — was the action dangerous? — as the label of the decision that raised
  *  it. Separate from `answerApproval`: approving says "may it run", not "was it dangerous". */

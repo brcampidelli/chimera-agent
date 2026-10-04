@@ -170,6 +170,8 @@ function suggestionNotice(
       return { message: t("code.approval.suggestion.invalid", { detail: answer.detail ?? "" }), tone: "bad" };
     case "expired":
       return { message: t("code.approval.suggestion.expired"), tone: "bad" };
+    case "changed":
+      return { message: t("code.approval.suggestion.changed"), tone: "bad" };
     default:
       return null;
   }
@@ -241,7 +243,9 @@ export function ApprovalCard({
   const answer = async (approved: boolean) => {
     setBusy(true);
     try {
-      const answered = await answerApproval(question.id, approved);
+      const answered = suggestion
+        ? await answerApproval(question.id, approved, suggestion.digest)
+        : await answerApproval(question.id, approved);
       const notice = suggestion ? suggestionNotice(answered, t) : null;
       if (notice) toast(notice.message, notice.tone);
     } finally {

@@ -346,6 +346,7 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
         suggested_by: "desktop_bridge",
         client_hint: "…k9Zq",
         expires_at: 4_000_000_000,
+        digest: "d1g3st",
       },
     };
 
@@ -378,8 +379,16 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
       answerApproval.mockResolvedValueOnce({ ok: true, outcome: "stale", detail: "CHIMERA_DEFAULT_MODEL" });
       mountWithToasts();
       await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
-      await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("sugg01", true));
+      // With the digest of the card it drew: the yes is to THIS card.
+      await waitFor(() => expect(answerApproval).toHaveBeenCalledWith("sugg01", true, "d1g3st"));
       expect(await screen.findByText(/not applied: CHIMERA_DEFAULT_MODEL changed/i)).toBeInTheDocument();
+    });
+
+    it("a yes on a card whose file changed after it was drawn says so", async () => {
+      answerApproval.mockResolvedValueOnce({ ok: true, outcome: "changed", detail: "" });
+      mountWithToasts();
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      expect(await screen.findByText(/the card changed after it was shown/i)).toBeInTheDocument();
     });
 
     it("an applied yes says what was saved", async () => {

@@ -28,11 +28,18 @@ setting must still hold the value the card SHOWED: if the owner, or anything els
 between, the card is ``stale`` and nothing is written — the yes was given to a change from a value
 that no longer exists, and applying it would overwrite a decision the person made after reading the
 card. A card past :data:`TTL_SECONDS` is ``expired``: silence refuses here as everywhere else.
+
+**And the yes is to the card the owner SAW.** The card lives in a file, and a file can change
+between the moment the screen drew it and the click. The listing hands the screen a
+:func:`digest` of exactly what it shows; the screen sends it back with the yes, and a card whose
+file no longer hashes to it is ``changed`` and not applied (review of 2026-10-04: through a
+Windows device path the bridge could rewrite a suggestion's file after the owner had read it).
 """
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import threading
@@ -54,7 +61,9 @@ _log = get_logger("governance.setting_suggestions")
 TTL_SECONDS = 24 * 3600.0
 
 #: How a suggestion ends. Only ``applied`` wrote anything.
-Outcome = Literal["applied", "refused", "stale", "invalid", "expired", "no_such_request"]
+Outcome = Literal[
+    "applied", "refused", "stale", "changed", "invalid", "expired", "no_such_request"
+]
 
 #: One resolution at a time in this process: two clicks on the same card (two windows) must not
 #: apply it twice, and a resolution must not race the expiry sweep.
@@ -190,6 +199,21 @@ def read(home: Path, request_id: str) -> Suggestion | None:
     return _parse(data)
 
 
+def digest(s: Suggestion) -> str:
+    """A hash of everything the card shows and the yes applies: the id, every key with its value now
+    and the value proposed, who suggested it, and when it expires."""
+    shown = {
+        "id": s.id,
+        "changes": [[c.key, c.current, c.proposed] for c in s.changes],
+        "suggested_by": s.suggested_by,
+        "client_hint": s.client_hint,
+        "expires_at": s.expires_at,
+    }
+    return hashlib.sha256(
+        json.dumps(shown, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ).hexdigest()
+
+
 def is_suggestion(home: Path, request_id: str) -> bool:
     """Whether ``request_id`` names a waiting settings suggestion."""
     return read(home, request_id) is not None
@@ -244,6 +268,7 @@ def resolve(
     check: Callable[[dict[str, str]], None],
     apply: Callable[[dict[str, str]], object],
     allowed: Callable[[str], bool],
+    shown: str | None = None,
     now: float | None = None,
 ) -> tuple[Outcome, str]:
     """End a suggestion with the owner's answer. Returns ``(outcome, detail)``.
@@ -255,6 +280,9 @@ def resolve(
     ``allowed`` says whether a key may still be suggested at all (the classification may have moved
     since the card was written, and a key that became the owner's flat refusal is not applied off a
     card).
+
+    ``shown`` is the :func:`digest` the owner's screen was given with the card. A yes without it, or
+    with one the card no longer hashes to, is ``changed`` and writes nothing.
 
     A refusal writes nothing. A yes writes the proposed values only if the card has not expired,
     every key is still suggestable, every key still holds the value the card showed, and the update
@@ -271,6 +299,10 @@ def resolve(
         if not approved:
             _end(home, s, "refused", agora, via)
             return "refused", ""
+        if shown is None or shown != digest(s):
+            # Left waiting, not ended: the owner can look again at what the card says NOW.
+            _log.warning("suggestion %s not applied: it changed after it was shown", s.id)
+            return "changed", ""
         updates = {c.key: c.proposed for c in s.changes}
         not_allowed = sorted(k for k in updates if not allowed(k))
         if not_allowed:

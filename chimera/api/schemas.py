@@ -2290,6 +2290,9 @@ class SettingsSuggestionOut(BaseModel):
     suggested_by: str  # the surface — `desktop_bridge`
     client_hint: str = ""  # which bridge token: its last four characters, as Settings shows it
     expires_at: float  # server epoch seconds; past it the card is retired as a timeout
+    digest: str = ""
+    """A hash of everything above. The screen sends it back with a yes (``ApprovalAnswerIn.digest``):
+    a card whose file changed after it was shown is not applied."""
 
 
 class ApprovalOut(BaseModel):
@@ -2345,13 +2348,17 @@ class ApprovalOut(BaseModel):
 
 class ApprovalAnswerIn(BaseModel):
     approved: bool
+    digest: str | None = None
+    """For a settings suggestion: the ``suggestion.digest`` the card was drawn from. A yes without
+    it, or with one the card no longer matches, is ``changed`` and writes nothing."""
 
 
 class ApprovalAnswerOut(BaseModel):
     ok: bool  # False when no question with that id is waiting — a stale click, 200, not a 404
     outcome: str | None = None
     """For a settings suggestion only: ``applied`` | ``refused`` | ``stale`` (a key no longer holds
-    the value the card showed) | ``invalid`` (the value fails a check now) | ``expired``. Only
+    the value the card showed) | ``changed`` (the card's file changed after it was shown) |
+    ``invalid`` (the value fails a check now) | ``expired``. Only
     ``applied`` wrote anything. Absent for every other question, whose answer stays ``{ok}``."""
 
     detail: str | None = None

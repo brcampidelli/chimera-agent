@@ -887,6 +887,17 @@
           "approved": {
             "title": "Approved",
             "type": "boolean"
+          },
+          "digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Digest"
           }
         },
         "required": [
@@ -11623,6 +11634,11 @@
           "client_hint": {
             "default": "",
             "title": "Client Hint",
+            "type": "string"
+          },
+          "digest": {
+            "default": "",
+            "title": "Digest",
             "type": "string"
           },
           "expires_at": {

@@ -1591,6 +1591,8 @@ def build_api_app(
                     "suggested_by": s.suggested_by,
                     "client_hint": s.client_hint,
                     "expires_at": s.expires_at,
+                    # What the screen sends back with a yes: the yes is to THIS card.
+                    "digest": setting_suggestions.digest(s),
                 }
             }
 
@@ -1647,10 +1649,12 @@ def build_api_app(
                     detail="a settings suggestion is answered by the owner in the app, "
                     "never through the desktop bridge",
                 )
-            return _resolve_suggestion(home, request_id, bool(req.approved))
+            return _resolve_suggestion(home, request_id, bool(req.approved), req.digest)
         return {"ok": answer(home, request_id, bool(req.approved), via="app")}
 
-    def _resolve_suggestion(home: Path, request_id: str, approved: bool) -> dict[str, Any]:
+    def _resolve_suggestion(
+        home: Path, request_id: str, approved: bool, shown: str | None
+    ) -> dict[str, Any]:
         """The owner's answer to a settings suggestion: applied, refused, or why it was not applied."""
         from chimera.api.bridge_routes import SUGGESTABLE_SETTINGS, is_secret_setting
         from chimera.api.config_api import check_parses, check_updates, patch_config, setting_value
@@ -1669,6 +1673,7 @@ def build_api_app(
             check=check,
             apply=lambda updates: patch_config(updates, workspace=workspace),
             allowed=lambda key: key in SUGGESTABLE_SETTINGS and not is_secret_setting(key),
+            shown=shown,
         )
         return {"ok": outcome != "no_such_request", "outcome": outcome, "detail": detail}
 
