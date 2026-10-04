@@ -81,6 +81,12 @@ export type WeeklyReview = Schemas["WeeklyReviewOut"];
  *  MCP half is absent when it is. `saving_pct` is negative when deferral would cost more. */
 export type DeferSaving = Schemas["DeferSavingOut"];
 export type DeferSavingHalf = Schemas["DeferSavingHalfOut"];
+// What this install keeps on disk, by kind; `bytes: null` is "not measured", never zero (P5.3).
+export type StorageReport = Schemas["StorageOut"];
+export type StorageCategory = Schemas["StorageCategoryOut"];
+export type WorktreePrune = Schemas["WorktreePruneOut"];
+export type LogRotate = Schemas["LogRotateOut"];
+export type AppDiagnostics = Schemas["AppDiagnosticsOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];

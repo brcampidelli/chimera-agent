@@ -883,6 +883,16 @@ class Settings(BaseSettings):
         default=False, validation_alias="CHIMERA_KEEP_AWAKE_ON_BATTERY"
     )
 
+    # Where an isolated run's git worktree is checked out (study 29, P5.3; `chimera/core/worktree.py`).
+    # Empty (the default) is the system temp folder, which is what it always was. A worktree is a
+    # full checkout of the repository, so on a machine whose temp lives on a small system drive a
+    # few killed runs are gigabytes on the one disk that must not fill — this lets the owner point
+    # them at another drive. Must be an absolute path OUTSIDE the project: a worktree inside the
+    # repository it was made from would show up in that repository's own status, search and
+    # checkpoints. A value that breaks either rule is ignored with a warning and temp is used.
+    # Read at every worktree creation, so a change applies from the next isolated run.
+    worktree_dir: str = Field(default="", validation_alias="CHIMERA_WORKTREE_DIR")
+
     # Auto-start the messaging adapters (Discord/Telegram) inside `chimera app` at boot, so the agent
     # can reach you on chat without a separate `chimera serve --discord` terminal. OFF by default: it
     # opens a network bot, so it's a deliberate opt-in. The desktop UI's Messaging toggle sets this

@@ -540,6 +540,61 @@
         "title": "AgentsRequest",
         "type": "object"
       },
+      "AppDiagnosticsOut": {
+        "description": "What a bug report needs, in one place (study 29, P5.3).",
+        "properties": {
+          "backend_version": {
+            "title": "Backend Version",
+            "type": "string"
+          },
+          "crash": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CrashReportOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "home": {
+            "title": "Home",
+            "type": "string"
+          },
+          "platform": {
+            "title": "Platform",
+            "type": "string"
+          },
+          "python": {
+            "title": "Python",
+            "type": "string"
+          },
+          "report": {
+            "title": "Report",
+            "type": "string"
+          },
+          "workspace": {
+            "title": "Workspace",
+            "type": "string"
+          },
+          "worktree_dir": {
+            "title": "Worktree Dir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "backend_version",
+          "python",
+          "platform",
+          "home",
+          "workspace",
+          "worktree_dir",
+          "crash",
+          "report"
+        ],
+        "title": "AppDiagnosticsOut",
+        "type": "object"
+      },
       "ApproachOut": {
         "properties": {
           "id": {
@@ -2724,6 +2779,9 @@
           },
           "spend": {
             "$ref": "#/components/schemas/SpendCfgOut"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageCfgOut"
           }
         },
         "required": [
@@ -2816,6 +2874,30 @@
           }
         },
         "title": "ConversationsCfgOut",
+        "type": "object"
+      },
+      "CrashReportOut": {
+        "description": "The desktop's last ``backend-crash.txt``, with credentials scrubbed before it left disk.",
+        "properties": {
+          "modified": {
+            "title": "Modified",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "modified",
+          "text"
+        ],
+        "title": "CrashReportOut",
         "type": "object"
       },
       "CrewDoneOut": {
@@ -4696,6 +4778,43 @@
           "how"
         ],
         "title": "DictationOut",
+        "type": "object"
+      },
+      "DiskOut": {
+        "properties": {
+          "free": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "path",
+          "total",
+          "free"
+        ],
+        "title": "DiskOut",
         "type": "object"
       },
       "DoctorOut": {
@@ -6936,6 +7055,29 @@
           }
         },
         "title": "LocalRuntimesOut",
+        "type": "object"
+      },
+      "LogRotateOut": {
+        "properties": {
+          "bytes_freed": {
+            "title": "Bytes Freed",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "rotated": {
+            "title": "Rotated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rotated",
+          "bytes_freed",
+          "failed"
+        ],
+        "title": "LogRotateOut",
         "type": "object"
       },
       "MaturityOut": {
@@ -10153,6 +10295,168 @@
         "title": "SpendCfgOut",
         "type": "object"
       },
+      "StorageCategoryOut": {
+        "description": "One kind of thing this install keeps on disk. ``bytes`` null = not measured, never zero.",
+        "properties": {
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "files": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Files"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "bytes",
+          "files",
+          "paths",
+          "note"
+        ],
+        "title": "StorageCategoryOut",
+        "type": "object"
+      },
+      "StorageCfgOut": {
+        "description": "``CHIMERA_WORKTREE_DIR`` as set; empty is the system temp folder (the default).",
+        "properties": {
+          "worktree_dir": {
+            "default": "",
+            "title": "Worktree Dir",
+            "type": "string"
+          }
+        },
+        "title": "StorageCfgOut",
+        "type": "object"
+      },
+      "StorageConfirmIn": {
+        "description": "The two storage actions remove files; each must be asked for in so many words.",
+        "properties": {
+          "confirm": {
+            "default": false,
+            "title": "Confirm",
+            "type": "boolean"
+          }
+        },
+        "title": "StorageConfirmIn",
+        "type": "object"
+      },
+      "StorageOut": {
+        "description": "What this install keeps on disk, by kind (study 29, P5.3). Nullable like `ResourcesOut`.",
+        "properties": {
+          "categories": {
+            "items": {
+              "$ref": "#/components/schemas/StorageCategoryOut"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "disks": {
+            "items": {
+              "$ref": "#/components/schemas/DiskOut"
+            },
+            "title": "Disks",
+            "type": "array"
+          },
+          "home": {
+            "title": "Home",
+            "type": "string"
+          },
+          "rotatable_logs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Rotatable Logs",
+            "type": "array"
+          },
+          "worktree_dir": {
+            "title": "Worktree Dir",
+            "type": "string"
+          },
+          "worktrees": {
+            "items": {
+              "$ref": "#/components/schemas/StorageWorktreeOut"
+            },
+            "title": "Worktrees",
+            "type": "array"
+          }
+        },
+        "required": [
+          "home",
+          "worktree_dir",
+          "categories",
+          "worktrees",
+          "disks",
+          "rotatable_logs"
+        ],
+        "title": "StorageOut",
+        "type": "object"
+      },
+      "StorageWorktreeOut": {
+        "description": "One isolated worktree folder, and whether the prune would collect it.\n\n``state`` is ``live`` (a run is using it, or it is too new to judge), ``orphan`` (the prune\nremoves it) or ``kept`` (its maker cannot be identified, so it is not called dead on a guess).\n``reason`` is a fixed word a screen translates.",
+        "properties": {
+          "bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bytes"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "bytes",
+          "state",
+          "reason"
+        ],
+        "title": "StorageWorktreeOut",
+        "type": "object"
+      },
       "SubtaskOut": {
         "properties": {
           "boundaries": {
@@ -11452,6 +11756,39 @@
           "works"
         ],
         "title": "WorksOut",
+        "type": "object"
+      },
+      "WorktreePruneOut": {
+        "properties": {
+          "bytes_freed": {
+            "title": "Bytes Freed",
+            "type": "integer"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "kept": {
+            "title": "Kept",
+            "type": "integer"
+          },
+          "live": {
+            "title": "Live",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "removed",
+          "bytes_freed",
+          "kept",
+          "live",
+          "failed"
+        ],
+        "title": "WorktreePruneOut",
         "type": "object"
       },
       "WorthReport": {
@@ -14215,6 +14552,24 @@
           }
         },
         "summary": "Label Decision"
+      }
+    },
+    "/api/diagnostics": {
+      "get": {
+        "operationId": "diagnostics_endpoint_api_diagnostics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppDiagnosticsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Diagnostics Endpoint"
       }
     },
     "/api/dictation": {
@@ -17470,6 +17825,103 @@
           }
         },
         "summary": "Retire Skill"
+      }
+    },
+    "/api/storage": {
+      "get": {
+        "description": "What this install keeps on disk, by kind. A category that could not be counted is null.",
+        "operationId": "storage_endpoint_api_storage_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Storage Endpoint"
+      }
+    },
+    "/api/storage/logs/rotate": {
+      "post": {
+        "description": "Rotate the diagnostic traces now \u2014 the rename their writers make at the size cap.",
+        "operationId": "rotate_logs_endpoint_api_storage_logs_rotate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogRotateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Logs Endpoint"
+      }
+    },
+    "/api/storage/worktrees/prune": {
+      "post": {
+        "description": "Collect orphaned worktrees. A live run's worktree, or one whose maker cannot be\nidentified, is never touched \u2014 see `chimera.core.worktree.classify_worktree_dir`.",
+        "operationId": "prune_worktrees_endpoint_api_storage_worktrees_prune_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageConfirmIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorktreePruneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Prune Worktrees Endpoint"
       }
     },
     "/api/suggestions/event": {
