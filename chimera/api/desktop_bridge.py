@@ -584,6 +584,24 @@ def register_bridge_api(
             raise HTTPException(
                 status_code=403, detail="credential files are not reachable through the bridge"
             )
+        # The FILE, not only the workspace. A call that names no workspace runs in the app's own,
+        # and when that folder contains the data directory (an app started from the home folder,
+        # the test suite's temporary folder) a plain `files.write` of
+        # `<home>/approvals/<id>.answer.json` answered an approval with no workspace field for the
+        # check above to see. Resolved the way the route resolves it: an absolute path stands on its
+        # own, a relative one is read inside the workspace the call runs in.
+        explicit = fields.get("workspace")
+        base = Path(explicit if isinstance(explicit, str) and explicit.strip() else workspace)
+        for f in files:
+            if not isinstance(f, str) or not f.strip():
+                continue
+            target = (base.expanduser() / f).resolve()
+            if any(target == r or r in target.parents for r in roots):
+                raise HTTPException(
+                    status_code=403,
+                    detail="that file is in the app's own data folder; it is not reachable "
+                    "through the bridge",
+                )
 
     def police(route_id: str, route: BridgeRoute, body: Any, tier: Tier) -> Any:
         """Refuse what the caller's tier may not do; set the owner's posture on an operate run."""

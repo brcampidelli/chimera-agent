@@ -683,6 +683,40 @@ def test_a_workspace_on_or_around_the_apps_data_is_refused_at_every_tier(
     assert not (directory / "q1.answer.json").exists()
 
 
+def test_a_file_in_the_apps_data_is_refused_when_the_call_names_no_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The check above read only a workspace the call NAMED. A call that names none runs in the
+    app's own folder, and this app's own folder (the test's `tmp_path`, like an app started from the
+    home folder) contains its data: a plain `files.write` of the answer file answered the question,
+    at the operate tier, with no workspace field for the check to see."""
+    app = _app(tmp_path, monkeypatch)  # operate: no switch that allows answering
+    home = tmp_path / "home"
+    directory = _ask(home)
+
+    with TestClient(app) as client:
+        absolute = _call(
+            client,
+            app,
+            "files.write",
+            body={"path": str(directory / "q1.answer.json"), "content": '{"approved": true}'},
+        )
+        relative = _call(
+            client,
+            app,
+            "files.write",
+            body={"path": "home/approvals/q1.answer.json", "content": '{"approved": true}'},
+        )
+        read = _call(client, app, "files.read", params={"path": "home/approvals/q1.ask.json"})
+        elsewhere = _call(
+            client, app, "files.write", body={"path": "notes.txt", "content": "still fine"}
+        )
+    assert (absolute.status_code, relative.status_code, read.status_code) == (403, 403, 403)
+    assert not (directory / "q1.answer.json").exists()
+    assert elsewhere.status_code == 200 and elsewhere.json()["status"] == 200
+    assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == "still fine"
+
+
 def test_credential_files_are_unreadable_unwritable_and_unsearchable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
