@@ -159,9 +159,13 @@ execution and gated too, so "configured docker" never quietly becomes "ran on th
 
 **Taint narrowing is armed on the API server.** Once a run consumes untrusted content, the tools in
 `DANGEROUS_WHEN_TAINTED` — execution, file writes, **and every outbound channel** (`send_email`,
-`send_message`, `send_sms`, `http_post`, `post_webhook`, `create_issue`, `browser`) — require approval.
-The server has no tool-level approver yet, so this resolves to a refusal with an explanatory result:
-fail closed. Set `CHIMERA_TAINT_NARROW=0` on a deployment that must keep acting autonomously after
+`send_message`, `send_sms`, `http_post`, `post_webhook`, `create_issue`, `browser`,
+`open_pull_request`) — require approval. For most of them the server has no tool-level approver
+yet, so this resolves to a refusal with an explanatory result: fail closed. `open_pull_request`
+(present only when `CHIMERA_PULL_REQUESTS` is on) is the exception that asks rather than refuses: it
+asks the owner on **every** call, tainted or not and under every approval setting, on the owner's
+channel where silence refuses; on a tainted run its card first names where the untrusted content
+came from. Set `CHIMERA_TAINT_NARROW=0` on a deployment that must keep acting autonomously after
 reading the web, accepting that a laundered injection could steer those tools. Routing the approval to
 the desktop's human-in-the-loop UI (so it can be *answered*, not only refused) is the follow-up.
 

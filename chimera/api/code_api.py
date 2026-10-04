@@ -78,6 +78,8 @@ from chimera.api.schemas import (
     CodeTurnStopOut,
     DeletedCountOut,
     DictationOut,
+    ProjectPackAcceptIn,
+    ProjectPackOut,
     RunningTurnOut,
     TranscriberWarmOut,
     TranscriptOut,
@@ -100,6 +102,7 @@ from chimera.providers.failover import policy_block
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool
 from chimera.tools.browser import FrameAnnouncer
+from chimera.tools.chart import ChartAnnouncer
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from chimera.config import Settings
@@ -598,6 +601,8 @@ def assemble_registry(
     run_id: str | None = None,
     notice_sink: Any = None,
     grant_root: Path | None = None,
+    chart_sink: Any = None,
+    guest: bool = False,
 ) -> tuple[ToolRegistry, Any]:
     """Build the tool registry for a coding turn, and the taint ledger watching it.
 
@@ -620,6 +625,11 @@ def assemble_registry(
 
     ``grant_root`` is the folder whose recorded shell grant applies when ``ws`` is a copy of it — a
     crew worker's worktree. None = ``ws`` itself (or the root the server stamped on the seams).
+
+    ``guest`` is a turn somebody other than the owner sent, through a conversation's share link.
+    It gets no OpenAPI connector: a connector's GET runs with the owner's key and needs no
+    approval, so on a guest's turn it would read the owner's private API for whoever holds the
+    link — the exposure the bots are closed to (``unattended_surface_may_load``).
     """
     from chimera.core import ExploreRepositoryTool
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
@@ -688,6 +698,30 @@ def assemble_registry(
         for tool in registry.tools():
             if hasattr(tool, "workspace"):
                 tool.ask_outside = owner  # type: ignore[attr-defined]
+    # `open_pull_request` asks the owner on every call, and `owner` above is NOT the approver for
+    # it: under CHIMERA_APPROVAL_MODE=allow that one says yes to everything, which is a choice about
+    # taint and policy reviews, not about publishing the owner's code. `always_ask` reads `allow` as
+    # `ask`. With a screen bound the card shows on the turn's own stream (and waits as long as the
+    # owner's other cards do); without one the tool keeps its default, the durable question on the
+    # owner's channel — never a yes.
+    from chimera.tools.pull_request import OpenPullRequestTool
+
+    pull_request = registry.get("open_pull_request") if "open_pull_request" in registry else None
+    if approval_sink is not None and isinstance(pull_request, OpenPullRequestTool):
+        from chimera.governance.approval import always_ask, deliverer_for
+
+        def wait_for_the_screen() -> float:
+            bound = getattr(approval_sink, "emit", None) is not None
+            return float(settings.approval_wait) if bound else 0.0
+
+        pull_request.approve = always_ask(
+            settings.home,
+            mode=settings.approval_mode,
+            deliver=deliverer_for(settings),
+            on_asked=approval_sink,
+            wait_seconds=wait_for_the_screen,
+            facts={k: v for k, v in (("run_id", run_id), ("surface", surface)) if v},
+        )
     # The browser draws its viewport on the screen after every action — only for a request that
     # has a screen to draw on (`frame_sink`, bound to the turn's stream the way the approval
     # announcer is). A headless run never captures a frame: the tool checks the sink before it
@@ -696,6 +730,13 @@ def assemble_registry(
         for tool in registry.tools():
             if getattr(tool, "name", "") == "browser" and hasattr(tool, "on_frame"):
                 tool.on_frame = frame_sink  # type: ignore[attr-defined]
+    # The same for a chart: `render_chart` tells the screen about each chart it wrote, so the
+    # conversation can draw it where it was asked for instead of leaving a file name in a tool row.
+    # Bound only where a screen is (`chart_sink`); headless, the tool writes the file and says nothing.
+    if chart_sink is not None:
+        for tool in registry.tools():
+            if getattr(tool, "name", "") == "render_chart" and hasattr(tool, "on_chart"):
+                tool.on_chart = chart_sink  # type: ignore[attr-defined]
     # The configured MCP servers, HERE and not lower down, because everything below this line has to
     # reach them: the denial list, the trust kernel, and the taint ledger that treats their output as
     # untrusted. The chat path learned this the hard way and says so at its own injection point — "a
@@ -706,8 +747,29 @@ def assemble_registry(
     # Pooled per process rather than connected here: this function runs once per TURN and once per
     # worker in a fan-out, so connecting per call would spawn a container per message.
     pool = mcp_pool.connectors(settings)
+    # The project's pack (study 29, P7.6), when the owner switched packs on and accepted a pack for
+    # this folder. Read from the folder whose grant applies (a crew worktree's original), because
+    # that is the folder the owner accepted. Decided ONCE, here, for every half it narrows: the
+    # servers it leaves out are dropped from the pool before any of them is listed (so nothing below
+    # can register, defer or call them), its `tools_deny` joins the denials further down, and the
+    # skills narrowing is stamped on the registry this returns, which is where the agent reads it.
+    from chimera.core.project_pack import applied_pack, bundle_filter, denied_tools, narrow_pool
+
+    pack = applied_pack(settings, grant_root or seams._grant_root or ws)
+    pool = narrow_pool(pack, pool)
     if pool is not None and not settings.mcp_defer:
         pool.into_tool_registry(registry)
+    # The OpenAPI connectors the owner added and switched on (study 29, P7.5), here for the reason
+    # the MCP servers are: above the lists, so CHIMERA_TOOL_DENYLIST reaches them by name, and
+    # inside the kernel and the ledger, which fences what they return. An operation that is not GET
+    # asks the owner on the card the file tools use; with no screen bound it is refused. Not on a
+    # guest's turn: the owner's approval card guards the writes, but nothing guards a GET, and a
+    # guest is not the owner. Not even a connector switched on for the unattended surfaces — that
+    # switch sends it to the owner's bots and jobs, and says nothing about a share link.
+    from chimera.integrations.openapi_store import with_connectors
+
+    if not guest:
+        with_connectors(registry, settings, ask=owner if approval_sink is not None else None)
     # Union, never replace: a posture, an explicit denylist and the deployment's own denylist are
     # three ways of saying "not this tool", and letting one overwrite another means the strictest of
     # several stated intentions loses.
@@ -723,6 +785,10 @@ def assemble_registry(
         *deployment_posture(settings).deny_tools,
         *settings.tool_denylist,
     })
+    # The pack's `tools_deny`, joined to the union above and never the other way round — a pack is
+    # names to REMOVE, and nothing reads one into `allowed`, so a pack naming a tool cannot grant it.
+    if pack is not None:
+        denied = sorted({*denied, *denied_tools(pack)})
     allowed = _intersect_allow(seams.allow_tools, settings.tool_allowlist or None)
     if allowed is not None or denied:
         registry = restrict_registry(registry, allow=allowed, deny=denied or None)
@@ -869,7 +935,7 @@ def assemble_registry(
         lineage=ledger.lineage,
         screen=owner if approval_sink is not None else None,
     )
-    return ledger_registry(
+    governed = ledger_registry(
         step.registry,
         ledger,
         narrow_on_taint=narrow,
@@ -904,7 +970,16 @@ def assemble_registry(
         # that reaches a shell, the network or a path outside the workspace still asks.
         warn_workspace_writes=approval_sink is not None,
         notify=notice_sink,
-    ), ledger
+    )
+    # The pack's skills half, carried by the registry the agent is built with — not re-derived by
+    # the agent from its `project_root`, which for a crew worker is a temporary worktree nobody
+    # accepted a pack for, and for a hierarchy worker is nothing at all. Both had their tools
+    # narrowed here and their skills not.
+    governed.bundle_only = bundle_filter(pack)
+    # And the home they are read from: these settings may be the app's own (`settings=` at build),
+    # not the process's, and the agent must list the bundles of the home this run was assembled in.
+    governed.bundle_home = Path(settings.home)
+    return governed, ledger
 
 
 def _message_texts(messages: Sequence[Any]) -> list[str]:
@@ -1550,8 +1625,10 @@ def register_code_api(
         extra_tools: Sequence[Tool] | None = None,
         run_id: str | None = None,
         notice_sink: Any = None,
+        chart_sink: Any = None,
+        guest: bool = False,
     ) -> tuple[Agent, Any]:
-        """The agent for this turn, and the ledger watching it.
+        """The agent for this turn, and the ledger watching it. ``guest``: a share link's turn.
 
         The ledger used to be built and thrown away, which left the turn unable to answer the one
         question the posture claims to care about: did this run read untrusted content? Narrowing
@@ -1570,6 +1647,8 @@ def register_code_api(
             extra_tools=extra_tools,
             run_id=run_id,
             notice_sink=notice_sink,
+            chart_sink=chart_sink,
+            guest=guest,
         )
         # Recalled facts and the turn's notes go in the TURN CONTEXT, not the system prompt (study
         # 25, wave 2). They used to be appended to the system prompt so that `absorb`, which drops
@@ -1998,6 +2077,8 @@ def register_code_api(
         frame_sink = FrameAnnouncer()
         # And for a warning a tool raises (a write after untrusted input): bound to `emit` below.
         notice_sink = NoticeAnnouncer()
+        # And for a chart `render_chart` wrote: bound to `emit` below, like the frames.
+        chart_sink = ChartAnnouncer()
         # The turn's id is minted here, before the agent, because the registry's approver writes it
         # on every question it asks (`pending.FACTS`): a record line that names its run can be
         # joined to the run's trace and receipt; one that does not is a sentence in a file.
@@ -2005,6 +2086,10 @@ def register_code_api(
         agent, ledger = build_agent(
             req, ws, facts, note, approval_sink=approval_sink, frame_sink=frame_sink,
             extra_tools=extra_tools or None, run_id=turn_id, notice_sink=notice_sink,
+            chart_sink=chart_sink,
+            # A turn with an author was sent through a share link (`guest_api` never sends an empty
+            # name: `_clean_name` falls back to ANONYMOUS), or is a background work one started.
+            guest=bool(author),
         )
         if background is not None:
             session = CodeSession(agent, session_id=background.session_id)
@@ -2118,6 +2203,9 @@ def register_code_api(
             )
 
         frame_sink.emit = announce_frame
+        # Kept, unlike a browser frame: a chart is part of the answer, not a picture of a moment, and a
+        # screen that reconnects mid-turn should get it back. `chart_frame` caps what it carries.
+        chart_sink.emit = lambda frame: emit("chart", frame)
         approval_sink.emit = lambda question: emit(
             "approval",
             {
@@ -3423,6 +3511,91 @@ def register_code_api(
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return _project_rows(rows)
+
+    # ---- The project's pack (study 29, P7.6) --------------------------------------------------
+    # Not on the bridge: accepting a pack is the owner reading a file from a repository and
+    # deciding it may shape the agent there, and revoking one widens again. Both are the owner's.
+    def _pack_state(path: str) -> dict[str, Any]:
+        from chimera.core import project_pack as packs
+        from chimera.integrations.mcp_config import load_servers
+        from chimera.skills.bundles import active as active_bundles
+
+        current = live()
+        folder = path.strip()
+        if not folder:
+            raise HTTPException(status_code=400, detail="name the project folder")
+        found = packs.read_pack(folder)
+        out = ProjectPackOut(enabled=bool(current.project_pack), present=found.present)
+        out.error = found.error
+        out.digest = found.digest
+        agreed = packs.accepted_digest(current.home, folder)
+        out.accepted = found.present and bool(agreed) and agreed == found.digest
+        out.changed = bool(agreed) and agreed != found.digest
+        # The file moved away from what was accepted — edited, broken or deleted — and the version
+        # the owner accepted still applies, from their record. Said on the card, with the revoke
+        # button, even when the file is gone: a narrowing nobody can see is one nobody can lift.
+        out.held = out.changed and packs.held_pack(current.home, folder) is not None
+        out.applied = out.enabled and (out.accepted or out.held)
+        pack = found.pack
+        if pack is None:
+            return out.model_dump()
+        out.skills = list(pack.skills) if pack.skills is not None else None
+        out.mcp = list(pack.mcp) if pack.mcp is not None else None
+        out.tools_deny = list(pack.tools_deny)
+        out.ignored = list(pack.ignored)
+        # Held against what is switched on and configured — read from disk, never by connecting a
+        # server: a screen asking "what would this hide?" must not be what spawns them.
+        effect = packs.effect(
+            pack,
+            (b.name for b in active_bundles(current.home)),
+            [s.name for s in load_servers(current.home / "mcp.json")],
+        )
+        for name, value in vars(effect).items():
+            setattr(out, name, value)
+        return out.model_dump()
+
+    def _pack_folder(path: str) -> Path:
+        """The folder a write names, checked BEFORE the record is touched (400 otherwise). A blank
+        path resolved to the sidecar's working directory, so a blank revoke lifted that folder's
+        acceptance and a blank accept could accept a pack nobody named."""
+        from chimera.core.project_pack import PackError, project_folder
+
+        try:
+            return project_folder(path)
+        except PackError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/code/pack", dependencies=[guard], response_model=ProjectPackOut)
+    def get_code_pack(path: str) -> dict[str, Any]:
+        """What this folder's pack asks for, what it would hide, and whether it applies now."""
+        return _pack_state(path)
+
+    @app.post("/api/code/pack/accept", dependencies=[guard], response_model=ProjectPackOut)
+    def accept_code_pack(body: ProjectPackAcceptIn) -> dict[str, Any]:
+        """Let this folder's pack narrow runs here — the file the screen showed, by its digest.
+
+        A file that changed between the screen reading it and this request is refused (409): the
+        click was about the bytes that were shown, and transferring it to new ones would be a
+        consent nobody gave. Accepting never widens anything; it is still the owner's, because the
+        file may come from someone else's repository.
+        """
+        from chimera.core.project_pack import PackError, accept
+
+        folder = _pack_folder(body.path)
+        try:
+            accept(live().home, folder, body.digest.strip())
+        except PackError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return _pack_state(str(folder))
+
+    @app.delete("/api/code/pack", dependencies=[guard], response_model=ProjectPackOut)
+    def revoke_code_pack(path: str) -> dict[str, Any]:
+        """Stop applying this folder's pack. The file stays; the owner's settings apply whole."""
+        from chimera.core.project_pack import revoke
+
+        folder = _pack_folder(path)
+        revoke(live().home, folder)
+        return _pack_state(str(folder))
 
     @app.post(
         "/api/code/workspaces/grant/migrate",

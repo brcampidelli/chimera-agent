@@ -201,4 +201,57 @@ describe("Code — the file viewer", () => {
       screen.getByText("No undo after save (unless this folder is a git repo you commit)."),
     ).toBeInTheDocument();
   });
+
+  // Study 29, P6.3: what the turn produced is one press from the viewer, and a document shows as its
+  // text instead of "binary or non-text", which is what "Open beside" would have opened before.
+  it("offers to open the document a turn wrote beside the conversation, as a text preview", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getFsFile).mockResolvedValue(
+      fsFile({ path: "report.docx", content: "# Relatório\n\nVendas subiram.", document: "docx" }),
+    );
+    vi.mocked(streamCodeTurn).mockImplementation(
+      scriptTurn({
+        tools: [
+          { name: "create_document", arguments: { path: "report.docx" }, ok: true, observation: "saved" },
+        ],
+      }),
+    );
+    renderWithProviders(<Code />);
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "write the report");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+
+    await user.click(await screen.findByRole("button", { name: "Open report.docx beside" }));
+
+    expect(getFsFile).toHaveBeenCalledWith(null, "report.docx");
+    expect(await screen.findByText(/Text preview of this DOCX/)).toBeInTheDocument();
+    expect(screen.getByText(/Vendas subiram\./)).toBeInTheDocument();
+    // Its text, not the file: saving it would replace the .docx with its own text.
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Binary or non-text file — not shown.")).not.toBeInTheDocument();
+  });
+
+  it("says a document has no preview here rather than calling it binary", async () => {
+    await openFile(
+      fsFile({ path: "deck.pptx", content: "", document: "pptx", note: "previewing documents needs the 'documents' extra" }),
+      "deck.pptx",
+    );
+
+    expect(await screen.findByText(/No preview of this PPTX here/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Edit$/ })).not.toBeInTheDocument();
+  });
+
+  it("offers nothing to open under a turn that produced nothing openable", async () => {
+    const user = userEvent.setup();
+    vi.mocked(streamCodeTurn).mockImplementation(
+      scriptTurn({
+        tools: [{ name: "write_file", arguments: { path: "src/app.py" }, ok: true, observation: "" }],
+      }),
+    );
+    renderWithProviders(<Code />);
+    await user.type(screen.getByPlaceholderText(/Ask about this code/i), "edit it");
+    await user.click(screen.getByRole("button", { name: /Send/ }));
+
+    expect(await screen.findByRole("button", { name: "src/app.py" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /beside$/ })).not.toBeInTheDocument();
+  });
 });

@@ -13,14 +13,34 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Protocol
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.code_session import _accepts
 from chimera.interface import ChatSession, render
 from chimera.providers.failover import policy_block
 from chimera.telemetry import get_logger
 
+if TYPE_CHECKING:
+    from chimera.server.attachments import Attachments
+
 _log = get_logger("server.gateway")
+
+
+class Reply(str):
+    """A chat reply that also names the files its turn wrote and may attach (study 29, P6.3).
+
+    A ``str`` on purpose: every adapter, test and transport takes the gateway's answer as text, and
+    only the Discord adapter knows what to do with ``files``. Everything else reads the text and
+    never notices; an adapter that does not attach cannot be made to by receiving one of these.
+    """
+
+    files: tuple[Path, ...]
+
+    def __new__(cls, text: str, files: Sequence[Path] = ()) -> Reply:
+        reply = super().__new__(cls, text)
+        reply.files = tuple(files)
+        return reply
 
 
 def with_warnings(answer: str, warnings: Sequence[str]) -> str:
@@ -162,8 +182,14 @@ class MessageGateway:
         warnings_in_reply: bool = False,
         name_the_channel: bool = False,
         intercept: Callable[[InboundMessage], str | None] | None = None,
+        attach: Callable[[list[Any]], Attachments] | None = None,
     ) -> None:
         self._factory = session_factory
+        #: Which of a turn's written files go back with the reply (``attachments.turn_attachments``
+        #: bound to the workspace), or ``None``: no attachment, and the turn's tool calls are not
+        #: even collected. Passed only by a bot that attaches — today, Discord with the switch on
+        #: and an allowlist set.
+        self._attach = attach
         #: Consulted before a message can become a turn; a non-``None`` answer is the whole reply
         #: and no session is touched. The chat bots pass
         #: :meth:`~chimera.server.chat_approval.ChatApprovals.intercept`, so an approval code typed
@@ -244,11 +270,21 @@ class MessageGateway:
             if line not in said:
                 said.append(line)
 
-        report = verbose(message.text, on_notice=hear, **_noted(verbose, note))
+        activities: list[Any] = []
+        extra: dict[str, Any] = {}
+        if self._attach is not None and _accepts(verbose, "on_tool"):
+            extra["on_tool"] = activities.append
+        report = verbose(message.text, on_notice=hear, **extra, **_noted(verbose, note))
         cut = render.cut_short_text(report)
         if cut:
             said.append(cut)
-        return with_warnings(report.answer, said)
+        if self._attach is None:
+            return with_warnings(report.answer, said)
+        attached = self._attach(activities)
+        # A file the turn wrote and the bot will not send is said, not dropped: "here is the
+        # report" with no report attached reads as a broken bot, and the reason is the fix.
+        said.extend(f"not attached: {why}" for why in attached.skipped)
+        return Reply(with_warnings(report.answer, said), attached.files)
 
     @property
     def active_chats(self) -> int:

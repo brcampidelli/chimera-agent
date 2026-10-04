@@ -278,6 +278,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/code/pack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Code Pack
+         * @description What this folder's pack asks for, what it would hide, and whether it applies now.
+         */
+        get: operations["get_code_pack_api_code_pack_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Code Pack
+         * @description Stop applying this folder's pack. The file stays; the owner's settings apply whole.
+         */
+        delete: operations["revoke_code_pack_api_code_pack_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/code/pack/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept Code Pack
+         * @description Let this folder's pack narrow runs here — the file the screen showed, by its digest.
+         *
+         *     A file that changed between the screen reading it and this request is refused (409): the
+         *     click was about the bytes that were shown, and transferring it to new ones would be a
+         *     consent nobody gave. Accepting never widens anything; it is still the owner's, because the
+         *     file may come from someone else's repository.
+         */
+        post: operations["accept_code_pack_api_code_pack_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/code/posture": {
         parameters: {
             query?: never;
@@ -1115,6 +1164,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config/vault/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Vault Move Endpoint */
+        post: operations["vault_move_endpoint_api_config_vault_move_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connectors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Connectors List Endpoint
+         * @description The configured connectors. File reads only — nothing is fetched or connected.
+         */
+        get: operations["connectors_list_endpoint_api_connectors_get"];
+        put?: never;
+        /**
+         * Connectors Add Endpoint
+         * @description Fetch the spec once (SSRF-guarded), pin it, and record the connector switched OFF.
+         */
+        post: operations["connectors_add_endpoint_api_connectors_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/connectors/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Connectors Remove Endpoint
+         * @description Forget the connector and its pinned spec. Its key stays in ``.env`` — a file the owner edits.
+         */
+        delete: operations["connectors_remove_endpoint_api_connectors__name__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Connectors Patch Endpoint
+         * @description Switch it on or off, allow changes, send it to the unattended surfaces, pick operations,
+         *     or say how the key is sent.
+         */
+        patch: operations["connectors_patch_endpoint_api_connectors__name__patch"];
+        trace?: never;
+    };
+    "/api/connectors/{name}/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Connectors Key Endpoint
+         * @description Store the key in ``.env``. Write-only: the answer carries at most its last four characters.
+         */
+        put: operations["connectors_key_endpoint_api_connectors__name__key_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cron": {
         parameters: {
             query?: never;
@@ -1665,6 +1800,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/git/pull-request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Git Pull Request Preview */
+        get: operations["git_pull_request_preview_api_git_pull_request_get"];
+        put?: never;
+        /** Git Pull Request Open */
+        post: operations["git_pull_request_open_api_git_pull_request_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/git/revert": {
         parameters: {
             query?: never;
@@ -2160,6 +2313,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/memory/consolidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Consolidation
+         * @description Merge the clusters the owner reviewed. The one memory route that calls a model.
+         *
+         *     Each merge is a model call, metered and written to the usage log as a row of its own —
+         *     the same accounting `chimera memory consolidate` keeps, so the Cost screen sees it.
+         */
+        post: operations["apply_consolidation_api_memory_consolidate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memory/consolidate/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Consolidation */
+        post: operations["preview_consolidation_api_memory_consolidate_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memory/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Memory File */
+        get: operations["export_memory_file_api_memory_export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memory/import/claude/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Claude Import */
+        post: operations["apply_claude_import_api_memory_import_claude_apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/memory/import/claude/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Preview Claude Import */
+        post: operations["preview_claude_import_api_memory_import_claude_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/memory/layers": {
         parameters: {
             query?: never;
@@ -2202,7 +2446,8 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        put?: never;
+        /** Edit Memory */
+        put: operations["edit_memory_api_memory__item_id__put"];
         post?: never;
         /** Delete Memory */
         delete: operations["delete_memory_api_memory__item_id__delete"];
@@ -3062,6 +3307,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/skills/bundles/{name}/skill-md": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Bundle Text
+         * @description The SKILL.md of an installed skill, as plain text — what the switch would consent to.
+         */
+        get: operations["read_bundle_text_api_skills_bundles__name__skill_md_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/skills/bundles/{name}/status": {
         parameters: {
             query?: never;
@@ -3076,6 +3341,30 @@ export interface paths {
          * @description Switch an installed bundle on or off, keeping it on disk either way.
          */
         post: operations["set_bundle_status_api_skills_bundles__name__status_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/bundles/{name}/update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Check Bundle Update
+         * @description Ask the skill's source whether its directory changed since it was installed.
+         *
+         *     One request to the host install already uses, made only when a person clicks. It changes
+         *     nothing: updating is `POST /api/skills/catalog/{name}/install?force=true`, which lands the
+         *     new files `pending` like any install — new instructions are a new decision.
+         */
+        get: operations["check_bundle_update_api_skills_bundles__name__update_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -3125,6 +3414,68 @@ export interface paths {
          *     consenting, and it is a separate click.
          */
         post: operations["install_bundle_api_skills_catalog__name__install_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/effective": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Effective Skills
+         * @description What a run started now would be told about skills, read from the code that tells it.
+         *
+         *     "Mine" was spread over three panels — learned cards, the library, the catalogue — and none
+         *     of them answered the one question that matters when a run behaves oddly: what did the agent
+         *     actually get? The bundle text is `prompt_block`, the function the agent itself calls, so the
+         *     screen cannot show a list the prompt does not carry. Cards are task-dependent: a run reads
+         *     at most `cards_k` of the eligible ones, and only with reading on — which is off by default,
+         *     and said so here rather than left for a count of zero to suggest otherwise.
+         *
+         *     ``project`` is the folder a run would start in. When its pack applies (study 29, P7.6) the
+         *     bundles are narrowed exactly as an app run there is narrowed — the same two functions
+         *     `assemble_registry` calls. The Skills screen itself sends no project (it belongs to none),
+         *     so it shows the whole home and says so; and built-in skills, retrieved per task by
+         *     `Agent._skill_context`, are not listed here, because which ones match depends on the task.
+         */
+        get: operations["effective_skills_api_skills_effective_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/skills/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Skill
+         * @description Add a skill that is in no catalogue — the owner's own, or one found somewhere.
+         *
+         *     Lands `pending` and `tainted` whatever its file declares — the rule a card imported by path
+         *     follows for its labels: handing a file to the app is choosing to send it, not vouching for
+         *     what it says. Its instructions reach no prompt until the owner switches it on; after that,
+         *     `tainted` means what `skill_view` reads from it is marked untrusted and its description
+         *     enters the prompt quoted and attributed to its author (`bundles._context_line`).
+         *     Every limit the catalogue install has applies, and an archive is read as hostile input —
+         *     see `chimera/skills/bundle_upload.py`. 409 when the name is taken and `replace` was not
+         *     asked for, so the screen can offer the replacement instead of only reporting a failure.
+         */
+        post: operations["import_skill_api_skills_import_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4194,6 +4545,11 @@ export interface components {
              */
             host_exec: string;
             /**
+             * Pull Requests
+             * @default false
+             */
+            pull_requests: boolean;
+            /**
              * Reach
              * @default
              */
@@ -4287,6 +4643,20 @@ export interface components {
             /** Generated For */
             generated_for: string | null;
             internal_lift: components["schemas"]["BenchmarkLiftOut"] | null;
+        };
+        /** Body_import_skill_api_skills_import_post */
+        Body_import_skill_api_skills_import_post: {
+            /**
+             * Files
+             * @description One .zip, one SKILL.md, or every file of a skill folder.
+             */
+            files: string[];
+            /**
+             * Paths
+             * @description For a folder: each file's path inside it, in the same order as `files`. A browser does not send a picked folder's structure in the file name, so it travels beside it.
+             * @default []
+             */
+            paths: string[];
         };
         /** Body_transcribe_audio_api_transcribe_post */
         Body_transcribe_audio_api_transcribe_post: {
@@ -4431,6 +4801,12 @@ export interface components {
         /** BundleOut */
         BundleOut: {
             /**
+             * Committed At
+             * @description When the commit in `ref` was made, as the source reported it at install.
+             * @default
+             */
+            committed_at: string;
+            /**
              * Description
              * @default
              */
@@ -4452,6 +4828,24 @@ export interface components {
              * @default
              */
             name: string;
+            /**
+             * Origin
+             * @description catalog | upload — how it arrived.
+             * @default catalog
+             */
+            origin: string;
+            /**
+             * Provenance
+             * @description Always tainted: every bundle is somebody else's text and scripts.
+             * @default tainted
+             */
+            provenance: string;
+            /**
+             * Reconfirm
+             * @description The bundle was switched on while a switched-on bundle reached no prompt; it reads as `pending` and reaches nothing until switched on again.
+             * @default false
+             */
+            reconfirm: boolean;
             /**
              * Ref
              * @default
@@ -4477,6 +4871,55 @@ export interface components {
              * @default active
              */
             status: string;
+        };
+        /**
+         * BundleTextOut
+         * @description An installed skill's SKILL.md, as text, for the owner to read before switching it on.
+         */
+        BundleTextOut: {
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+            /**
+             * Truncated
+             * @default false
+             */
+            truncated: boolean;
+        };
+        /** BundleUpdateOut */
+        BundleUpdateOut: {
+            /**
+             * Changed
+             * @description Whether that commit is newer than the installed one; null when unknowable.
+             */
+            changed?: boolean | null;
+            /**
+             * Current Date
+             * @default
+             */
+            current_date: string;
+            /**
+             * Current Ref
+             * @default
+             */
+            current_ref: string;
+            /**
+             * Latest Date
+             * @default
+             */
+            latest_date: string;
+            /**
+             * Latest Ref
+             * @description The newest commit that touched the skill's own directory.
+             * @default
+             */
+            latest_ref: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
         };
         /** CacheCfgOut */
         CacheCfgOut: {
@@ -4627,6 +5070,62 @@ export interface components {
              * @default 0
              */
             sources: number;
+        };
+        /** ClaudeImportApplyIn */
+        ClaudeImportApplyIn: {
+            /** Contents */
+            contents?: string[];
+            /** Path */
+            path?: string | null;
+        };
+        /** ClaudeImportApplyOut */
+        ClaudeImportApplyOut: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Ignored */
+            ignored: number;
+            /** Written */
+            written: number;
+        };
+        /** ClaudeImportCandidateOut */
+        ClaudeImportCandidateOut: {
+            /**
+             * Claude Project
+             * @default
+             */
+            claude_project: string;
+            /** Content */
+            content: string;
+            /** File */
+            file: string;
+            /**
+             * Known
+             * @default false
+             */
+            known: boolean;
+            /** Project */
+            project?: string | null;
+        };
+        /** ClaudeImportPreviewIn */
+        ClaudeImportPreviewIn: {
+            /** Path */
+            path?: string | null;
+        };
+        /**
+         * ClaudeImportPreviewOut
+         * @description What an import WOULD write. Producing this writes nothing.
+         */
+        ClaudeImportPreviewOut: {
+            /** Candidates */
+            candidates: components["schemas"]["ClaudeImportCandidateOut"][];
+            /** Files */
+            files: string[];
+            /** Notes */
+            notes: string[];
+            /** Path */
+            path: string;
         };
         /**
          * CodeExchangeOut
@@ -5080,6 +5579,7 @@ export interface components {
             /** Pools */
             pools?: components["schemas"]["PoolOut"][];
             privacy?: components["schemas"]["PrivacyCfgOut"];
+            project_pack?: components["schemas"]["ProjectPackCfgOut"];
             /** Providers */
             providers: components["schemas"]["ProviderOut"][];
             sandbox: components["schemas"]["SandboxCfgOut"];
@@ -5087,6 +5587,7 @@ export interface components {
             sharing?: components["schemas"]["SharingCfgOut"];
             spend?: components["schemas"]["SpendCfgOut"];
             storage?: components["schemas"]["StorageCfgOut"];
+            vault?: components["schemas"]["VaultCfgOut"];
         };
         /** ConfigTestOut */
         ConfigTestOut: {
@@ -5110,6 +5611,153 @@ export interface components {
              * @default
              */
             path: string;
+        };
+        /** ConnectorAddIn */
+        ConnectorAddIn: {
+            /** Base Url */
+            base_url?: string | null;
+            /** Name */
+            name: string;
+            /** Source */
+            source: string;
+        };
+        /** ConnectorKeyIn */
+        ConnectorKeyIn: {
+            /** Value */
+            value: string;
+        };
+        /** ConnectorOperationOut */
+        ConnectorOperationOut: {
+            /** Id */
+            id: string;
+            /** Method */
+            method: string;
+            /** Path */
+            path: string;
+            /** Selected */
+            selected: boolean;
+            /** Summary */
+            summary: string;
+            /** Tool */
+            tool: string;
+        };
+        /** ConnectorOut */
+        ConnectorOut: {
+            /** Added At */
+            added_at: string;
+            /** Allow Writes */
+            allow_writes: boolean;
+            /** Base Url */
+            base_url: string;
+            /** Enabled */
+            enabled: boolean;
+            /** Key Env */
+            key_env: string;
+            /** Key Envs */
+            key_envs: string[];
+            /** Key Hint */
+            key_hint: string;
+            /** Key In */
+            key_in: string;
+            /** Key Name */
+            key_name: string;
+            /** Key Prefix */
+            key_prefix: string;
+            /** Key Set */
+            key_set: boolean;
+            /** Name */
+            name: string;
+            /** Operations */
+            operations: components["schemas"]["ConnectorOperationOut"][];
+            /** Problem */
+            problem: string;
+            /** Source */
+            source: string;
+            /** Unattended */
+            unattended: boolean;
+        };
+        /** ConnectorPatchIn */
+        ConnectorPatchIn: {
+            /** Allow Writes */
+            allow_writes?: boolean | null;
+            /** Base Url */
+            base_url?: string | null;
+            /** Enabled */
+            enabled?: boolean | null;
+            /** Key Env */
+            key_env?: string | null;
+            /** Key In */
+            key_in?: ("header" | "query") | null;
+            /** Key Name */
+            key_name?: string | null;
+            /** Key Prefix */
+            key_prefix?: string | null;
+            /** Operations */
+            operations?: string[] | null;
+            /** Unattended */
+            unattended?: boolean | null;
+        };
+        /** ConnectorsOut */
+        ConnectorsOut: {
+            /** Connectors */
+            connectors: components["schemas"]["ConnectorOut"][];
+            /** Store */
+            store: string;
+        };
+        /** ConsolidateApplyIn */
+        ConsolidateApplyIn: {
+            /** Groups */
+            groups?: string[][];
+            /**
+             * Threshold
+             * @default 0.5
+             */
+            threshold: number;
+        };
+        /** ConsolidateApplyOut */
+        ConsolidateApplyOut: {
+            /** Merged */
+            merged: number;
+            /** Removed */
+            removed: number;
+            /** Skipped */
+            skipped: number;
+            /** Stale */
+            stale: number;
+            /** Usd */
+            usd: number | null;
+        };
+        /** ConsolidateGroupOut */
+        ConsolidateGroupOut: {
+            /** Items */
+            items: components["schemas"]["MemoryItemOut"][];
+            /** Kind */
+            kind: string;
+            /** Project */
+            project?: string | null;
+            /**
+             * Unverified
+             * @default false
+             */
+            unverified: boolean;
+        };
+        /** ConsolidatePreviewIn */
+        ConsolidatePreviewIn: {
+            /**
+             * Threshold
+             * @default 0.5
+             */
+            threshold: number;
+        };
+        /**
+         * ConsolidatePreviewOut
+         * @description The clusters a consolidation would merge. Computed without a model call or a write.
+         */
+        ConsolidatePreviewOut: {
+            /** Can Answer */
+            can_answer: boolean;
+            /** Groups */
+            groups: components["schemas"]["ConsolidateGroupOut"][];
         };
         /**
          * ConversationsCfgOut
@@ -6091,6 +6739,64 @@ export interface components {
              */
             probed: boolean;
         };
+        /** EffectiveBundleOut */
+        EffectiveBundleOut: {
+            /**
+             * Committed At
+             * @default
+             */
+            committed_at: string;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /**
+             * Name
+             * @default
+             */
+            name: string;
+            /**
+             * Ref
+             * @default
+             */
+            ref: string;
+        };
+        /**
+         * EffectiveSkillsOut
+         * @description What a run started now is told about skills — read from the code that tells it.
+         */
+        EffectiveSkillsOut: {
+            /**
+             * Bundle Text
+             * @description The installed-skills block byte for byte as a run's prompt carries it (`bundles.prompt_block`), or empty when no bundle is switched on.
+             * @default
+             */
+            bundle_text: string;
+            /** Bundles */
+            bundles?: components["schemas"]["EffectiveBundleOut"][];
+            /**
+             * Cards
+             * @description Learned cards the retriever may choose from (active and provisional). Which of them a run reads depends on its task, at most `cards_k` per run; empty when reading is off.
+             */
+            cards?: string[];
+            /**
+             * Cards K
+             * @default 0
+             */
+            cards_k: number;
+            /**
+             * Cards Read
+             * @description `CHIMERA_SKILL_CARDS`. Off, no learned card reaches any prompt whatever its status.
+             * @default false
+             */
+            cards_read: boolean;
+            /**
+             * Reconfirm
+             * @description Bundles switched on while a switched-on bundle reached no prompt (before study 29, P7.1). They reach nothing until switched on again, and are named here so the change is seen where the prompt's skills are.
+             */
+            reconfirm?: string[];
+        };
         /**
          * ExecCancelOut
          * @description Whether a command was actually stopped.
@@ -6218,6 +6924,11 @@ export interface components {
         FsFileOut: {
             /** Content */
             content: string;
+            /**
+             * Document
+             * @default
+             */
+            document: string;
             /** Note */
             note: string;
             /** Path */
@@ -7214,6 +7925,11 @@ export interface components {
         McpCatalogEntry: {
             /** Args */
             args?: string[];
+            /**
+             * Auth
+             * @default oauth
+             */
+            auth: string;
             /** Available */
             available: boolean;
             /** Command */
@@ -7265,6 +7981,11 @@ export interface components {
             /** Key */
             key: string;
             /**
+             * Pattern
+             * @default
+             */
+            pattern: string;
+            /**
              * Source
              * @default
              */
@@ -7275,6 +7996,21 @@ export interface components {
             /** Autoload */
             autoload: boolean;
         };
+        /**
+         * McpLastTestOut
+         * @description The remembered outcome of the last Test of a server — history, not a live state.
+         *
+         *     Kept so the screen can say "tested at 14:02, 4 tools" after a relaunch. It must never be shown
+         *     as "connected": a test from yesterday says nothing about whether the server starts today.
+         */
+        McpLastTestOut: {
+            /** Ok */
+            ok: boolean;
+            /** Tested At */
+            tested_at: number;
+            /** Tool Count */
+            tool_count: number;
+        };
         /** McpServerOut */
         McpServerOut: {
             /** Args */
@@ -7283,6 +8019,7 @@ export interface components {
             command: string;
             /** Env Keys */
             env_keys: string[];
+            last_test?: components["schemas"]["McpLastTestOut"] | null;
             /** Name */
             name: string;
         };
@@ -7353,6 +8090,30 @@ export interface components {
              * @default false
              */
             skill_cards: boolean;
+        };
+        /** MemoryEdit */
+        MemoryEdit: {
+            /** Content */
+            content: string;
+        };
+        /**
+         * MemoryExportOut
+         * @description The whole memory as one file's text. Built here, saved by the client: nothing is uploaded.
+         *
+         *     Secrets are masked again on the way out and ``metadata`` is not included — see
+         *     :mod:`chimera.memory.export` for why each.
+         */
+        MemoryExportOut: {
+            /** Content */
+            content: string;
+            /** Count */
+            count: number;
+            /** Filename */
+            filename: string;
+            /** Format */
+            format: string;
+            /** Media Type */
+            media_type: string;
         };
         /** MemoryItemOut */
         MemoryItemOut: {
@@ -7433,6 +8194,11 @@ export interface components {
             };
             /** Configured */
             configured?: string[];
+            /**
+             * Discord Attach Files
+             * @default false
+             */
+            discord_attach_files: boolean;
         };
         /**
          * MessagingPlatformOut
@@ -7754,8 +8520,12 @@ export interface components {
         PoolWriteOut: {
             /** Count */
             count: number;
+            /** In Vault */
+            in_vault?: string[];
             /** Provider */
             provider: string;
+            /** Vault Fallback */
+            vault_fallback?: string[];
         };
         /**
          * Posture
@@ -7925,6 +8695,102 @@ export interface components {
             state: components["schemas"]["ProjectStateOut"];
         };
         /**
+         * ProjectPackAcceptIn
+         * @description Accept one folder's pack — the file whose SHA-256 the screen showed, and only that file.
+         */
+        ProjectPackAcceptIn: {
+            /** Digest */
+            digest: string;
+            /** Path */
+            path: string;
+        };
+        /**
+         * ProjectPackCfgOut
+         * @description ``CHIMERA_PROJECT_PACK`` — whether a project's ``.chimera/pack.json`` may narrow a run.
+         *
+         *     Off by default, and a server that predates the block reads as off, which is what it does.
+         */
+        ProjectPackCfgOut: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+        };
+        /**
+         * ProjectPackOut
+         * @description One folder's ``.chimera/pack.json`` held against the owner's settings (study 29, P7.6).
+         *
+         *     Everything a pack asks for is listed, including what it asked for and could not have: names it
+         *     lists that are not switched on or not configured (clamped — never activated, never launched)
+         *     and keys a pack cannot set (``ignored``). A pack only narrows, and the card is where that is
+         *     seen rather than assumed.
+         */
+        ProjectPackOut: {
+            /**
+             * Accepted
+             * @default false
+             */
+            accepted: boolean;
+            /**
+             * Applied
+             * @default false
+             */
+            applied: boolean;
+            /**
+             * Changed
+             * @default false
+             */
+            changed: boolean;
+            /**
+             * Digest
+             * @default
+             */
+            digest: string;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Error
+             * @default
+             */
+            error: string;
+            /**
+             * Held
+             * @default false
+             */
+            held: boolean;
+            /** Ignored */
+            ignored?: string[];
+            /** Mcp */
+            mcp?: string[] | null;
+            /** Mcp Hidden */
+            mcp_hidden?: string[];
+            /** Mcp Kept */
+            mcp_kept?: string[];
+            /** Mcp Not Configured */
+            mcp_not_configured?: string[];
+            /**
+             * Present
+             * @default false
+             */
+            present: boolean;
+            /** Skills */
+            skills?: string[] | null;
+            /** Skills Hidden */
+            skills_hidden?: string[];
+            /** Skills Kept */
+            skills_kept?: string[];
+            /** Skills Not Active */
+            skills_not_active?: string[];
+            /** Tools Denied */
+            tools_denied?: string[];
+            /** Tools Deny */
+            tools_deny?: string[];
+        };
+        /**
          * ProjectStartIn
          * @description Create a project from a spec.
          *
@@ -7996,6 +8862,11 @@ export interface components {
             /** Hint */
             hint: string;
             /**
+             * In Vault
+             * @default false
+             */
+            in_vault: boolean;
+            /**
              * Keys Url
              * @default
              */
@@ -8019,6 +8890,83 @@ export interface components {
             name: string;
             /** Set */
             set: boolean;
+        };
+        /** PullRequestOut */
+        PullRequestOut: {
+            /** Error */
+            error: string | null;
+            /** Ok */
+            ok: boolean;
+            /** Output */
+            output: string;
+            /** Url */
+            url: string;
+        };
+        /**
+         * PullRequestReadinessOut
+         * @description What opening a pull request from the workspace would push, or the first reason it cannot.
+         *
+         *     ``reason`` is a word the screen translates (``chimera.core.pull_request.REASONS``); empty when
+         *     ``ready``. Nothing here is a credential: ``remote`` is origin's PUSH URL (where the push goes)
+         *     with any credential in it replaced by ``***``, and gh is asked for its exit code only.
+         */
+        PullRequestReadinessOut: {
+            /** Ahead */
+            ahead: number;
+            /** Base */
+            base: string;
+            /** Branch */
+            branch: string;
+            /** Commits */
+            commits: string[];
+            /** Diffstat */
+            diffstat: string;
+            /** Gh */
+            gh: boolean;
+            /** Gh Signed In */
+            gh_signed_in: boolean;
+            /** Head */
+            head: string;
+            /** Is Repo */
+            is_repo: boolean;
+            /** Ready */
+            ready: boolean;
+            /** Reason */
+            reason: string;
+            /** Remote */
+            remote: string;
+            /** Remote Head */
+            remote_head: string;
+            /** Uncommitted */
+            uncommitted: number;
+        };
+        /**
+         * PullRequestRequest
+         * @description Open a pull request from the workspace's branch — the Git panel's button, pressed by the owner.
+         */
+        PullRequestRequest: {
+            /** Base */
+            base?: string | null;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /**
+             * Draft
+             * @default false
+             */
+            draft: boolean;
+            /** Head */
+            head: string;
+            /** Remote */
+            remote?: string | null;
+            /** Remote Head */
+            remote_head?: string | null;
+            /** Title */
+            title: string;
+            /** Workspace */
+            workspace?: string | null;
         };
         /** ReliabilityBinOut */
         ReliabilityBinOut: {
@@ -8695,6 +9643,11 @@ export interface components {
          */
         StorageCfgOut: {
             /**
+             * Branch Prefix
+             * @default chimera
+             */
+            branch_prefix: string;
+            /**
              * Worktree Dir
              * @default
              */
@@ -9053,8 +10006,12 @@ export interface components {
         };
         /** UpdatedOut */
         UpdatedOut: {
+            /** In Vault */
+            in_vault?: string[];
             /** Updated */
             updated: string[];
+            /** Vault Fallback */
+            vault_fallback?: string[];
         };
         /** UsageDayOut */
         UsageDayOut: {
@@ -9146,6 +10103,56 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * VaultCfgOut
+         * @description Where the Settings screen saves a key — ``chimera/api/key_vault.py``.
+         *
+         *     ``enabled`` is the owner's switch (``CHIMERA_KEY_VAULT``, off by default). ``available`` is
+         *     whether this machine has a vault at all: false without the ``secrets`` extra, on a headless box,
+         *     or in a build that could not bundle one — and then a save with the switch on goes to ``.env``
+         *     and says so. ``keys`` are NAMES, asked of the vault only when the switch is on or ``.env`` marks
+         *     a key as moved, so an owner who never opted in gets no keychain access from this read.
+         */
+        VaultCfgOut: {
+            /**
+             * Available
+             * @default false
+             */
+            available: boolean;
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /** Keys */
+            keys?: string[];
+        };
+        /**
+         * VaultMoveIn
+         * @description Which way to move the keys: ``vault`` (out of ``.env``) or ``file`` (back into it).
+         */
+        VaultMoveIn: {
+            /**
+             * To
+             * @enum {string}
+             */
+            to: "vault" | "file";
+        };
+        /**
+         * VaultMoveOut
+         * @description What a move did, by NAME. ``failed`` stayed where it was; ``skipped`` had a value in ``.env``
+         *     already, which is the one in force, so the vault copy was left alone rather than written over it.
+         */
+        VaultMoveOut: {
+            /** Failed */
+            failed?: string[];
+            /** Moved */
+            moved?: string[];
+            /** Skipped */
+            skipped?: string[];
+            /** Too Large */
+            too_large?: string[];
         };
         /** VersionOut */
         VersionOut: {
@@ -9863,6 +10870,101 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_code_pack_api_code_pack_get: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectPackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_code_pack_api_code_pack_delete: {
+        parameters: {
+            query: {
+                path: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectPackOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    accept_code_pack_api_code_pack_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectPackAcceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectPackOut"];
                 };
             };
             /** @description Validation Error */
@@ -11192,6 +12294,193 @@ export interface operations {
             };
         };
     };
+    vault_move_endpoint_api_config_vault_move_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VaultMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VaultMoveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connectors_list_endpoint_api_connectors_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorsOut"];
+                };
+            };
+        };
+    };
+    connectors_add_endpoint_api_connectors_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectorAddIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connectors_remove_endpoint_api_connectors__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connectors_patch_endpoint_api_connectors__name__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectorPatchIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connectors_key_endpoint_api_connectors__name__key_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConnectorKeyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cron_api_cron_get: {
         parameters: {
             query?: never;
@@ -12023,6 +13312,71 @@ export interface operations {
             };
         };
     };
+    git_pull_request_preview_api_git_pull_request_get: {
+        parameters: {
+            query?: {
+                workspace?: string | null;
+                base?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullRequestReadinessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    git_pull_request_open_api_git_pull_request_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PullRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullRequestOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     git_revert_endpoint_api_git_revert_post: {
         parameters: {
             query?: never;
@@ -12831,6 +14185,169 @@ export interface operations {
             };
         };
     };
+    apply_consolidation_api_memory_consolidate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsolidateApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsolidateApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_consolidation_api_memory_consolidate_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConsolidatePreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsolidatePreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_memory_file_api_memory_export_get: {
+        parameters: {
+            query?: {
+                format?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryExportOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_claude_import_api_memory_import_claude_apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaudeImportApplyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaudeImportApplyOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_claude_import_api_memory_import_claude_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ClaudeImportPreviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClaudeImportPreviewOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     memory_layers_api_memory_layers_get: {
         parameters: {
             query?: never;
@@ -12867,6 +14384,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MemoryProfileOut"];
+                };
+            };
+        };
+    };
+    edit_memory_api_memory__item_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryEdit"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -14122,6 +15674,37 @@ export interface operations {
             };
         };
     };
+    read_bundle_text_api_skills_bundles__name__skill_md_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleTextOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     set_bundle_status_api_skills_bundles__name__status_post: {
         parameters: {
             query?: never;
@@ -14144,6 +15727,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_bundle_update_api_skills_bundles__name__update_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleUpdateOut"];
                 };
             };
             /** @description Validation Error */
@@ -14189,6 +15803,72 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BundleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    effective_skills_api_skills_effective_get: {
+        parameters: {
+            query?: {
+                project?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EffectiveSkillsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    import_skill_api_skills_import_post: {
+        parameters: {
+            query?: {
+                replace?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_skill_api_skills_import_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

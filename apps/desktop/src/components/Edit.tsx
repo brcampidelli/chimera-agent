@@ -147,11 +147,15 @@ export function Edit({
   // A truncated read is a PREFIX of the file. Saving it would delete everything past the cut, so
   // the editor refuses rather than trusting anyone to notice a warning.
   const truncated = file.data?.truncated === true;
-  const readOnly = truncated;
+  // A document (.docx/.pdf/.xlsx/.pptx) arrives as MarkItDown's TEXT of it, and a file with a note
+  // ("binary or non-text") as an empty string. Saving either writes text over the real file, so
+  // both are read-only here as they are in the Code viewer — and the server refuses the save too.
+  const readOnly = truncated || !!file.data?.document || !!file.data?.note;
 
   const save = useMutation({
     mutationFn: async () => {
-      if (path === null) return;
+      // Ctrl+S reaches here from the editor's keymap even when the button is disabled.
+      if (path === null || readOnly) return;
       const text = drafts[path];
       if (text === undefined) return;
       await saveFile(workspace, path, text);

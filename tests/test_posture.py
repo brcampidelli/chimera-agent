@@ -384,6 +384,8 @@ def test_read_config_reports_autonomy_as_configured(tmp_path: Any) -> None:
         # a list you cannot correct. Split and stripped here so the screen renders hosts rather
         # than whatever spacing the field was typed with.
         "egress_allow": ["api.github.com", "docs.example"],
+        # Whether the agent has `open_pull_request` (study 29, P8.1) — off, since nothing set it.
+        "pull_requests": False,
     }
     assert "hooks.example" not in repr(cfg), "the webhook URL must not travel to a client"
     stock = read_config(Settings(CHIMERA_HOME=str(tmp_path)))["autonomy"]

@@ -22,6 +22,7 @@ with ``--no-open --port 0 --emit-port-file <tmp>``, then points the window at th
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 import subprocess
 import sys
@@ -58,6 +59,17 @@ def main() -> int:
     # checkout, where nothing has. Without this line the desktop app ships with an empty library.
     skills_data = f"{SKILL_LIBRARY}{os.pathsep}chimera/_skill_library"
     mode = "--onefile" if args.onefile else "--onedir"
+    # The OS vault (study 29, P7.7): the Settings screen can keep keys in Keychain / Credential
+    # Manager / Secret Service through `keyring`, the optional `secrets` extra. Its backends are
+    # found through entry points, which live in the package's METADATA — a freeze that collected the
+    # modules alone would find no backend and report "no vault" on every machine. Collected only when
+    # installed, so a local freeze without the extra still works: the app then says on the Settings
+    # row that this build has no vault, and saves keys to .env as it always did.
+    vault = (
+        ["--collect-all", "keyring", "--copy-metadata", "keyring"]
+        if importlib.util.find_spec("keyring") is not None
+        else []
+    )
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--name", "chimera-backend",
@@ -79,6 +91,12 @@ def main() -> int:
         # which is more than the rest of the app. Dictation goes through the hosted path instead,
         # and the interface says so when the key for it is missing.
         "--collect-all", "markitdown",
+        # The create_document tool's writers (the `documents-out` extra). python-docx and
+        # python-pptx open a template that ships as package DATA (`default.docx`, `default.pptx`),
+        # so a modules-only freeze imports fine and fails on the first document. ~1 MB together.
+        "--collect-all", "docx",
+        "--collect-all", "pptx",
+        "--collect-all", "openpyxl",
         "--collect-all", "faster_whisper",
         "--collect-all", "ctranslate2",
         "--collect-all", "onnxruntime",
@@ -92,6 +110,7 @@ def main() -> int:
         # ~36 MB per platform (the wheel's size, most of it the bundled node), against the ~300 MB of
         # speech tooling deliberately left out above. Same kind of trade, smaller side of it.
         "--collect-all", "playwright",
+        *vault,
         "--collect-data", "chimera",
         # The package's own .dist-info. `--collect-data` gathers files INSIDE the package and this is
         # not one of them: it lives beside it in site-packages, and without it

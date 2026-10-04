@@ -113,7 +113,7 @@ class MetaAgent:
         role = Role(blueprint.name, blueprint.role_prompt, blueprint.model)
         restricted: ToolRegistry | None = None
         if tools is not None and blueprint.tools:
-            restricted = ToolRegistry()
+            restricted = ToolRegistry.like(tools)
             for name in blueprint.tools:  # already filtered to allowed_tools at design time
                 if name in tools:
                     restricted.register(tools.get(name))

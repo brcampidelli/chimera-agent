@@ -94,7 +94,7 @@ class SubAgentTool(Tool):
         allowed = self._allowed
         names = (set(requested) & allowed) if requested else set(allowed)
         source = self._current()
-        sub = ToolRegistry()
+        sub = ToolRegistry.like(source)  # the parent's skill scope comes along with its tools
         for name in sorted(names):
             if name in source:
                 sub.register(source.get(name))

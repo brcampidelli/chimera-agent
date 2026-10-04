@@ -67,6 +67,7 @@ from chimera.api.bridge_routes import (
     is_secret_file,
     is_secret_setting,
     scrub,
+    switches_off,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -597,6 +598,19 @@ def register_bridge_api(
                     status_code=403,
                     detail=f"not editable through the bridge: {', '.join(refused)}",
                 )
+        if route_id == "skills.bundle_status" and not switches_off(body):
+            # A bundle switched on puts a stranger's text into every run's prompt, on every
+            # surface — the same standing as a learned card the owner approves, and approving one
+            # is Full (`approve.skill`). Switching one OFF only narrows, so the operate tier keeps
+            # this route for that and nothing else. Switching ON is `approve.skill_bundle`, a Full
+            # route in the `approve` area: the MCP server holds a whole area to one tier, so an
+            # approval let through here at Full would sit inside `desktop_skills`, a tool the
+            # operate tier lists — refused for every tier, not only below Full.
+            raise HTTPException(
+                status_code=403,
+                detail='skills.bundle_status only switches a bundle off ({"status": "inactive"}); '
+                "switching one on is approve.skill_bundle, which needs Full control in Settings",
+            )
         if tier != "full":
             widening = full_only_keys_in(body)
             if widening:

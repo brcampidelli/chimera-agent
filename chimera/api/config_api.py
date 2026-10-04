@@ -20,6 +20,14 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from chimera.api.key_vault import (
+    SCREEN_STORABLE,
+    move_to_file,
+    move_to_vault,
+    vault_snapshot,
+    write_credentials,
+    write_env_value,
+)
 from chimera.config import Settings, get_settings, pinned_by_environment
 from chimera.memory.backend import resolve_memory_backend
 from chimera.providers.catalog import PROVIDERS
@@ -43,12 +51,17 @@ from chimera.providers.privacy import privacy_snapshot
 # if one did. So the three keys are what `.env.example` already called Stability: reserved. Setting
 # one stores it and changes nothing. Kept rather than removed so a key already saved stays visible
 # (and masked) instead of becoming an invisible line in `.env`.
+#
+# Study 29, P7.5 made the importer real: Connections › OpenAPI adds a connector from a spec, and a
+# connector may read exactly these three keys besides its own (`openapi_store.RESERVED_KEY_ENVS`).
+# So the labels point there again — and still say no built-in tool uses them, because none does:
+# setting one alone changes nothing until a connector that names it is switched on.
 _TOOL_CREDENTIALS = {
     "TAVILY_API_KEY": "Tavily (web search)",
-    "BRAVE_API_KEY": "Brave — reserved; no built-in tool uses this key yet",
-    "SERPAPI_API_KEY": "SerpAPI — reserved; no built-in tool uses this key yet",
+    "BRAVE_API_KEY": "Brave — no built-in tool; an OpenAPI connector (Connections › OpenAPI) can use it",
+    "SERPAPI_API_KEY": "SerpAPI — no built-in tool; an OpenAPI connector (Connections › OpenAPI) can use it",
     "ELEVENLABS_API_KEY": "ElevenLabs (TTS)",
-    "STABILITY_API_KEY": "Stability — reserved; no built-in tool uses this key yet",
+    "STABILITY_API_KEY": "Stability — no built-in tool; an OpenAPI connector (Connections › OpenAPI) can use it",
 }
 # The model providers come from the catalog, which owns their slugs and their labels. Keeping a
 # second list here is how the CLI and the app end up disagreeing about what a provider is called.
@@ -110,6 +123,14 @@ _EDITABLE_SETTINGS = {
     # Where isolated runs check their worktrees out (`chimera/core/worktree.py`). Read at every
     # worktree creation, so no APPLIES_WHEN entry: it applies from the next isolated run.
     "CHIMERA_WORKTREE_DIR",
+    # The first segment of the branches those runs make (study 29, P8.1). Read at every worktree
+    # creation, so no APPLIES_WHEN entry. Checked before it is written: a value git would refuse
+    # would otherwise be read as the default with a warning nobody on this screen sees.
+    "CHIMERA_BRANCH_PREFIX",
+    # Whether the agent has `open_pull_request` at all (study 29, P8.1). Off by default; each call
+    # asks the owner whatever this says. Owner-only (`bridge_routes.OWNER_ONLY_SETTINGS`): turning
+    # it on widens where the owner's code can go, so no client but the owner's own screen writes it.
+    "CHIMERA_PULL_REQUESTS",
     # Whether a conversation may be shared at all, and how long a new link opens it. Both only
     # narrow, and both are read per request, so neither needs an APPLIES_WHEN entry. The bridge may
     # write neither (`bridge_routes.OWNER_ONLY_SETTINGS`): their other direction widens.
@@ -124,6 +145,11 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_SLACK_ALLOWED_USERS",
     "CHIMERA_SIGNAL_ALLOWED_USERS",
     "CHIMERA_WHATSAPP_ALLOWED_NUMBERS",
+    # Whether the Discord bot attaches the files its turn wrote (study 29, P6.3). Off; and refused
+    # while the Discord allowlist above is empty (`chimera/server/attachments.py`). Owner-only: it
+    # sends the owner's files to a channel, so the desktop bridge may not turn it on
+    # (`bridge_routes.OWNER_ONLY_SETTINGS`).
+    "CHIMERA_DISCORD_ATTACH_FILES",
     "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
@@ -190,6 +216,11 @@ _EDITABLE_SETTINGS = {
     # screen shows that, and the saving measured here (`GET /api/tools/defer-saving`), on the row.
     "CHIMERA_DEFER_TOOLS",
     "CHIMERA_MCP_DEFER",
+    # A project's pack narrowing skills, MCP servers and tools (study 29, P7.6). Off until measured.
+    # Read per request — the agent and the registry both read it at the turn — so it needs no
+    # APPLIES_WHEN entry. The bridge may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`): on,
+    # it only narrows, and off is the direction that widens again.
+    "CHIMERA_PROJECT_PACK",
     # The desktop bridge's two switches (`chimera/api/desktop_bridge.py`). The owner's, and only the
     # owner's: the bridge refuses to write either one on Claude's behalf, even with full control on,
     # so a client can never widen its own access.
@@ -209,6 +240,11 @@ _EDITABLE_SETTINGS = {
     # owner of the desktop app cannot make. Read per call by the gateway, so no APPLIES_WHEN entry.
     "CHIMERA_OPENROUTER_DATA_COLLECTION",
     "CHIMERA_OPENROUTER_ZDR",
+    # Where this screen saves a key: `.env`, or the OS vault (study 29, P7.7; `api/key_vault.py`).
+    # Off by default. The bridge may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`): its other
+    # direction sends the next key typed here back into a plain-text file. Read at every save, so
+    # no APPLIES_WHEN entry.
+    "CHIMERA_KEY_VAULT",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -273,6 +309,9 @@ APPLIES_WHEN: dict[str, str] = {
     # `get_settings()` fresh) and per turn on the Code screen, which is sooner. "Next conversation"
     # is the scope that is true on both; an open chat keeps the tool list it started with.
     "CHIMERA_DEFER_TOOLS": NEXT_CONVERSATION,
+    # `default_registry` decides whether to build the tool: per conversation in the chat, per turn on
+    # the Code screen, per job on cron. "Next conversation" is the scope true on all of them.
+    "CHIMERA_PULL_REQUESTS": NEXT_CONVERSATION,
     "CHIMERA_MCP_DEFER": NEXT_CONVERSATION,
     # Read at two points. `default_registry` builds the chat's shell and code tools, each with its
     # own sandbox object (`get_sandbox()` in `chimera/tools/builtin.py`), so an open chat keeps the
@@ -297,6 +336,8 @@ APPLIES_WHEN: dict[str, str] = {
     "CHIMERA_SLACK_ALLOWED_USERS": NEXT_LAUNCH,
     "CHIMERA_SIGNAL_ALLOWED_USERS": NEXT_LAUNCH,
     "CHIMERA_WHATSAPP_ALLOWED_NUMBERS": NEXT_LAUNCH,
+    # Read at the same point: the adapter is built with it, and the gateway's hook with the adapter.
+    "CHIMERA_DISCORD_ATTACH_FILES": NEXT_LAUNCH,
 }
 
 
@@ -376,10 +417,24 @@ def read_pools(settings: Settings) -> list[dict[str, Any]]:
 def _write_pool(provider: str, keys: list[str], env_path: Path | None) -> dict[str, Any]:
     env = _pool_env(provider)
     value = ",".join(keys)
-    _write_env_var(env_path or Path(".env"), env, value)
+    path = env_path or Path(".env")
+    # A pool is a list of keys, so it follows the vault switch like any single key does — a toggle
+    # that kept the rotation's keys in the file would be a promise about "the keys" that holds for
+    # some of them. The pool variables are vault-storable for exactly this.
+    in_vault, fallback = write_credentials({env: value}, path=path, vault_on=get_settings().key_vault)
+    if env not in SCREEN_STORABLE:
+        _write_env_var(path, env, value)
     os.environ[env] = value
     get_settings.cache_clear()
-    return {"provider": provider, "count": len(keys)}
+    result: dict[str, Any] = {"provider": provider, "count": len(keys)}
+    # Passed on, as `patch_config` does, and only when there is something to say. A pool written to
+    # `.env` with the switch on (no vault on this machine) is the state the screen must never show
+    # in silence - the pool card reads `vault_fallback` and says so.
+    if in_vault:
+        result["in_vault"] = in_vault
+    if fallback:
+        result["vault_fallback"] = fallback
+    return result
 
 
 def pool_add(provider: str, key: str, *, env_path: Path | None = None) -> dict[str, Any]:
@@ -416,9 +471,11 @@ def pool_remove(provider: str, index: int, *, env_path: Path | None = None) -> d
     return _write_pool(provider, existing[:index] + existing[index + 1 :], env_path)
 
 
-def read_config(settings: Settings) -> dict[str, Any]:
+def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str, Any]:
     """The settings snapshot for the UI. Secrets are masked to ``{set, hint}`` — never cleartext."""
     creds = settings.credentials()
+    vault = vault_snapshot(enabled=settings.key_vault, path=env_path or Path(".env"))
+    in_vault = set(vault["keys"])
     known = {p.env: p for p in PROVIDERS}
     providers = [
         {
@@ -434,6 +491,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "llm": env in known,
             "model": known[env].default_model if env in known else "",
             "keys_url": known[env].keys_url if env in known else "",
+            "in_vault": env in in_vault,
         }
         for env in _PROVIDER_LABELS
     ]
@@ -530,6 +588,9 @@ def read_config(settings: Settings) -> dict[str, Any]:
         },
         # Tools on demand, both halves. What they would save is `GET /api/tools/defer-saving`.
         "defer": {"tools": settings.defer_tools, "mcp": settings.mcp_defer},
+        # Whether a project's `.chimera/pack.json` may narrow a run. What one pack does is
+        # `GET /api/code/pack`, per folder.
+        "project_pack": {"enabled": settings.project_pack},
         # The day's dollar ceiling, as set; `None` is no cap. Scheduled jobs only — see SpendCfgOut.
         "spend": {"daily_usd_cap": settings.daily_usd_cap},
         # The owner's keep-awake choice. What the keeper is DOING is `GET /api/keep-awake`.
@@ -539,7 +600,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
         },
         # As set; empty is the system temp folder. Where the next worktree actually goes (after the
         # rules that can refuse a value) is `GET /api/storage`'s `worktree_dir`.
-        "storage": {"worktree_dir": settings.worktree_dir},
+        "storage": {"worktree_dir": settings.worktree_dir, "branch_prefix": settings.branch_prefix},
         # The two settings that narrow sharing. Which links exist is `GET /api/security/access`.
         "sharing": {
             "enabled": settings.sharing,
@@ -571,6 +632,8 @@ def read_config(settings: Settings) -> dict[str, Any]:
             # Reported as a fact about configuration, never as the value: the URL is a credential,
             # and whoever holds it can post into that channel. Same shape as `server.token_set`.
             "approval_webhook_set": bool(settings.approval_webhook.strip()),
+            # Whether the agent may propose a pull request at all. Every proposal asks the owner.
+            "pull_requests": settings.pull_requests,
             # The destinations the owner declared as not-a-way-out. A plain list, not a secret:
             # it is a statement the owner made and has to be able to read back, and a row that
             # cannot show what it holds is a row nobody can correct.
@@ -602,11 +665,18 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "configured": [
                 platform for platform in ALLOWLIST_FIELDS if bot_configured(settings, platform)
             ],
+            # The switch as saved. Whether it ACTS also needs the Discord allowlist, and the card
+            # says so beside the switch rather than letting an "on" read as files being sent.
+            "discord_attach_files": settings.discord_attach_files,
         },
         # Who receives a prompt and what the OpenRouter route may keep — the Security screen's
         # privacy card. See `chimera/providers/privacy.py`.
         "privacy": privacy_snapshot(settings),
         "providers": providers,
+        # Whether this screen saves keys into the OS vault, whether there is one, and which keys
+        # (names) it holds — `api/key_vault.py`. Read before `providers` is built, so each row can
+        # carry its own badge.
+        "vault": vault,
         "pools": pools,
         # Keys absent here apply to the next call; see APPLIES_WHEN.
         "applies": dict(APPLIES_WHEN),
@@ -726,18 +796,13 @@ def editor_capabilities(settings: Settings) -> list[dict[str, object]]:
 
 
 def _write_env_var(path: Path, key: str, value: str) -> None:
-    """Set ``KEY=value`` in ``.env`` atomically (mirrors the CLI's ``_set_env_var``)."""
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    prefix = f"{key}="
-    for i, line in enumerate(lines):
-        if line.strip().startswith(prefix):
-            lines[i] = f"{key}={value}"
-            break
-    else:
-        lines.append(f"{key}={value}")
-    tmp = path.parent / (path.name + ".tmp")
-    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    tmp.replace(path)
+    """Set ``KEY=value`` in ``.env`` atomically.
+
+    Through `key_vault.set_env_entry`, which replaces EVERY entry for the key — duplicate
+    assignments (the last one wins when the file is read, so replacing only the first left the old
+    value in force) and a vault marker (which would otherwise sit above the key it says is elsewhere).
+    """
+    write_env_value(path, key, value)
 
 
 def _check_daily_cap(value: str) -> None:
@@ -856,12 +921,35 @@ def _check_data_collection(value: str) -> None:
         raise ValueError("CHIMERA_OPENROUTER_DATA_COLLECTION must be allow or deny")
 
 
+#: How the settings validator reads a boolean as on. Needed here, before the save, to decide where
+#: the keys in the same patch go.
+_ON_WORDS = ("true", "1", "yes", "on")
+
+
 def _check_boolean(key: str) -> Callable[[str], None]:
     def check(value: str) -> None:
         if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
             raise ValueError(f"{key} must be true or false")
 
     return check
+
+
+def _check_branch_prefix(value: str) -> None:
+    """One ref segment, or empty for the default — the shape the setting's validator accepts.
+
+    Refused here rather than left to the validator, which reads a bad value as `chimera` and logs
+    it: a save that the screen reports as done while the branches keep their old name is a control
+    that confirms a change it did not make.
+    """
+    from chimera.config import is_branch_prefix
+
+    word = value.strip()
+    if word and not is_branch_prefix(word):
+        raise ValueError(
+            "CHIMERA_BRANCH_PREFIX must be one word of letters, digits, '-' or '_' "
+            "(at most 40), not a name Windows reserves (CON, PRN, AUX, NUL, COM0-9, LPT0-9), "
+            "or empty for 'chimera'"
+        )
 
 
 #: Values checked before anything is written, for the keys where a bad value is worse than a
@@ -879,12 +967,16 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     # worse than a refusal here.
     "CHIMERA_DEFER_TOOLS": _check_boolean("CHIMERA_DEFER_TOOLS"),
     "CHIMERA_MCP_DEFER": _check_boolean("CHIMERA_MCP_DEFER"),
+    "CHIMERA_PROJECT_PACK": _check_boolean("CHIMERA_PROJECT_PACK"),
     # CHIMERA_WORKTREE_DIR is checked in `patch_config` itself: its check needs the workspace.
     "CHIMERA_SANDBOX_NETWORK": _check_sandbox_network,
     "CHIMERA_SHARING": _check_boolean("CHIMERA_SHARING"),
     "CHIMERA_SHARE_EXPIRY_HOURS": _check_share_expiry,
     "CHIMERA_OPENROUTER_DATA_COLLECTION": _check_data_collection,
     "CHIMERA_OPENROUTER_ZDR": _check_boolean("CHIMERA_OPENROUTER_ZDR"),
+    "CHIMERA_KEY_VAULT": _check_boolean("CHIMERA_KEY_VAULT"),
+    "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
+    "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }
 
 
@@ -911,9 +1003,14 @@ def patch_config(
 ) -> dict[str, Any]:
     """Persist ``updates`` (env-var -> value) to ``.env`` after allowlisting the keys.
 
-    Returns ``{"updated": [keys]}``. Raises ``ValueError`` naming any rejected key (so the endpoint
-    can 400 it). Clears the ``get_settings`` cache so the next read sees the new values. Values are
-    written verbatim and never logged.
+    Returns ``{"updated": [keys]}``, plus ``in_vault`` / ``vault_fallback`` when not empty. Raises
+    ``ValueError`` naming any rejected key (so the endpoint can 400 it). Clears the ``get_settings``
+    cache so the next read sees the new values. Values are written verbatim and never logged.
+
+    With ``CHIMERA_KEY_VAULT`` on — as it stands AFTER this save, so a patch that turns it on and
+    sets a key does both — a vault-storable credential goes to the OS vault and its ``.env`` line
+    becomes a marker (``in_vault``); with no vault on the machine it goes to ``.env`` and is named
+    in ``vault_fallback``. See `chimera/api/key_vault.py`.
     """
     rejected = [k for k in updates if not is_editable(k)]
     if rejected:
@@ -933,11 +1030,49 @@ def patch_config(
         _check_worktree_dir(str(updates["CHIMERA_WORKTREE_DIR"]), workspace)
     _check_decision_choice(updates)
     path = env_path or Path(".env")
+    texts = {key: str(value) for key, value in updates.items()}
+    vault_on = (
+        texts["CHIMERA_KEY_VAULT"].strip().lower() in _ON_WORDS
+        if "CHIMERA_KEY_VAULT" in texts
+        else get_settings().key_vault
+    )
+    # First, because it is the step that can refuse: a locked keychain fails the save before any
+    # line of `.env` has changed.
+    in_vault, fallback = write_credentials(texts, path=path, vault_on=vault_on)
     for key, value in updates.items():
-        _write_env_var(path, key, str(value))
+        if key not in SCREEN_STORABLE:
+            _write_env_var(path, key, str(value))
         # Also update the live process env, so the running gateway / get_settings() sees the new value
         # THIS session without a restart — a key added in the onboarding wizard is usable immediately
         # (Settings reads from os.environ; .env is only re-read on a fresh process).
         os.environ[key] = str(value)
     get_settings.cache_clear()  # the lru_cache must not serve stale settings after a write
-    return {"updated": sorted(updates)}
+    result: dict[str, Any] = {"updated": sorted(updates)}
+    # Only when there is something to say: a save that touched no credential answers exactly as it
+    # did before the vault existed (the response model fills both with [] for the client).
+    if in_vault:
+        result["in_vault"] = in_vault
+    if fallback:
+        result["vault_fallback"] = fallback
+    return result
+
+
+def vault_move(to: str, *, env_path: Path | None = None) -> dict[str, list[str]]:
+    """Move the keys between `.env` and the OS vault, in either direction. See `api/key_vault.py`.
+
+    Into the vault only with the switch on: the switch is the owner's statement that keys belong
+    there, and a move behind it would leave the screen saying "saves to .env" over a file of
+    markers. Out of the vault always — it is the way back, and it has to work after the switch is
+    off, which is exactly when someone wants it.
+    """
+    path = env_path or Path(".env")
+    if to == "vault":
+        if not get_settings().key_vault:
+            raise ValueError("turn on CHIMERA_KEY_VAULT before moving keys into the vault")
+        result = move_to_vault(path)
+    elif to == "file":
+        result = move_to_file(path)
+    else:
+        raise ValueError("to must be vault or file")
+    get_settings.cache_clear()
+    return result

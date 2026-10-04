@@ -1,6 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plug, Trash2, Check, X, Loader2, Plus, ExternalLink, TriangleAlert } from "lucide-react";
+import {
+  Plug,
+  Trash2,
+  Check,
+  X,
+  Loader2,
+  Plus,
+  ExternalLink,
+  TriangleAlert,
+  Search,
+  History,
+} from "lucide-react";
 import {
   addMcpServer,
   getConfig,
@@ -12,7 +23,7 @@ import {
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { Button } from "@/components/ui/button";
-import { useT, type TFunc } from "@/lib/i18n";
+import { useI18n, useT, type TFunc } from "@/lib/i18n";
 import type { McpCatalogEntry } from "@/lib/api";
 import type { McpServer, McpTest } from "@/lib/types";
 
@@ -48,8 +59,15 @@ function ServerRow({
   onRemove: () => void;
   t: TFunc;
 }) {
+  const { lang } = useI18n();
   const result = state?.result;
   const cmd = [server.command, ...server.args].join(" ");
+  // The remembered test, shown ONLY while this window has not tested the server itself. It is
+  // history — "tested at 14:02, 4 tools" — and never the green "connected" badge: a test from
+  // yesterday says nothing about whether the server starts today, and the badge is the one claim
+  // this screen makes only after a real connect in this process.
+  const last = result ? null : (server.last_test ?? null);
+  const lastWhen = last ? new Date(last.tested_at * 1000).toLocaleString(lang) : "";
   return (
     <div className="flex flex-col gap-2 px-4 py-3">
       <div className="flex items-start gap-3">
@@ -65,6 +83,16 @@ function ServerRow({
           <div className="mt-1.5">
             <EnvChips keys={server.env_keys} />
           </div>
+          {last && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <History className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                {last.ok
+                  ? t("mcp.lastTest.ok", { when: lastWhen, n: last.tool_count })
+                  : t("mcp.lastTest.failed", { when: lastWhen })}
+              </span>
+            </div>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" variant="outline" disabled={state?.loading} onClick={onTest}>
@@ -125,9 +153,23 @@ export interface Prefill {
   command: string;
   args: string;
   envRows: { key: string; value: string }[];
+  /** Picked from the catalogue — the only case that offers "Add and test". */
+  fromCatalog: boolean;
+  /** The env keys the entry declares as secrets: the form will not save while one is empty. */
+  secretKeys: string[];
+  /** The form each secret's value must have, by key, when the entry declares one. */
+  secretPatterns: Record<string, string>;
 }
 
-const BLANK: Prefill = { name: "", command: "", args: "", envRows: [] };
+const BLANK: Prefill = {
+  name: "",
+  command: "",
+  args: "",
+  envRows: [],
+  fromCatalog: false,
+  secretKeys: [],
+  secretPatterns: {},
+};
 
 /** What the entry would write into `mcp.json`, in the form's own shape.
  *
@@ -143,7 +185,37 @@ function toPrefill(entry: McpCatalogEntry): Prefill {
       ...Object.entries(entry.env).map(([key, value]) => ({ key, value })),
       ...entry.secrets.map((s) => ({ key: s.key, value: "" })),
     ],
+    fromCatalog: true,
+    secretKeys: entry.secrets.map((s) => s.key),
+    secretPatterns: Object.fromEntries(
+      entry.secrets.filter((s) => s.pattern).map((s) => [s.key, s.pattern as string]),
+    ),
   };
+}
+
+/** The env map exactly as Add will send it: the LAST row of a key wins, and keys are trimmed.
+ *
+ *  The secret checks read this rather than the rows, because a check of the rows can pass on a
+ *  value that is not the one saved: two rows of the same key, the first filled and the second
+ *  empty, used to satisfy "some row has a value" and then save the empty one.
+ */
+function envFromRows(rows: { key: string; value: string }[]): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const row of rows) {
+    if (row.key.trim()) env[row.key.trim()] = row.value;
+  }
+  return env;
+}
+
+/** Whether `value` has the declared form. A pattern that does not compile refuses everything:
+ *  the alternative is to stop checking, and the check is what keeps a refused key from opening a
+ *  whole-user sign-in. A broken pattern then shows up as an entry that cannot be saved. */
+function hasForm(pattern: string, value: string): boolean {
+  try {
+    return new RegExp(pattern).test(value);
+  } catch {
+    return false;
+  }
 }
 
 /** The entry's own words, in the reader's language.
@@ -160,10 +232,7 @@ function toPrefill(entry: McpCatalogEntry): Prefill {
  *  The fallback is the backend's own text, so an entry added to the catalogue and not to the
  *  dictionary still says something rather than rendering blank.
  */
-const ENTRY_TEXT: Record<
-  string,
-  { summary: "mcp.entry.github.summary" | "mcp.entry.githubBinary.summary" | "mcp.entry.firebase.summary" | "mcp.entry.supabase.summary"; containment: "mcp.entry.github.containment" | "mcp.entry.githubBinary.containment" | "mcp.entry.firebase.containment" | "mcp.entry.supabase.containment" }
-> = {
+const ENTRY_TEXT: Record<string, { summary: string; containment: string }> = {
   github: { summary: "mcp.entry.github.summary", containment: "mcp.entry.github.containment" },
   "github-binary": {
     summary: "mcp.entry.githubBinary.summary",
@@ -171,6 +240,13 @@ const ENTRY_TEXT: Record<
   },
   firebase: { summary: "mcp.entry.firebase.summary", containment: "mcp.entry.firebase.containment" },
   supabase: { summary: "mcp.entry.supabase.summary", containment: "mcp.entry.supabase.containment" },
+  stripe: { summary: "mcp.entry.stripe.summary", containment: "mcp.entry.stripe.containment" },
+  notion: { summary: "mcp.entry.notion.summary", containment: "mcp.entry.notion.containment" },
+  sentry: { summary: "mcp.entry.sentry.summary", containment: "mcp.entry.sentry.containment" },
+  hostinger: {
+    summary: "mcp.entry.hostinger.summary",
+    containment: "mcp.entry.hostinger.containment",
+  },
 };
 
 function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => void }) {
@@ -232,7 +308,14 @@ function CatalogCard({ entry, onPick }: { entry: McpCatalogEntry; onPick: () => 
   );
 }
 
-function AddForm({ prefill, onAdded }: { prefill: Prefill; onAdded: () => void }) {
+function AddForm({
+  prefill,
+  onAdded,
+}: {
+  prefill: Prefill;
+  /** `test` is true only when the owner pressed "Add and test" — the click is the consent to run. */
+  onAdded: (name: string, test: boolean) => void;
+}) {
   const t = useT();
   // Seeded from the prefill rather than synced to it. The parent remounts this component with a
   // `key` per pick, which is the same device the run boards use — and it is what lets somebody
@@ -243,30 +326,53 @@ function AddForm({ prefill, onAdded }: { prefill: Prefill; onAdded: () => void }
   const [envRows, setEnvRows] = useState<{ key: string; value: string }[]>(prefill.envRows);
 
   const add = useMutation({
-    mutationFn: addMcpServer,
-    onSuccess: () => {
+    mutationFn: (req: { body: Parameters<typeof addMcpServer>[0]; test: boolean }) =>
+      addMcpServer(req.body),
+    onSuccess: (_data, req) => {
       setName("");
       setCommand("");
       setArgs("");
       setEnvRows([]);
-      onAdded();
+      onAdded(req.body.name, req.test);
     },
   });
 
-  const submit = () => {
-    const env: Record<string, string> = {};
-    for (const row of envRows) {
-      if (row.key.trim()) env[row.key.trim()] = row.value;
-    }
+  const submit = (test: boolean) => {
+    const env = envFromRows(envRows);
     add.mutate({
-      name: name.trim(),
-      command: command.trim(),
-      args: args.trim() ? args.trim().split(/\s+/) : [],
-      env,
+      body: {
+        name: name.trim(),
+        command: command.trim(),
+        args: args.trim() ? args.trim().split(/\s+/) : [],
+        env,
+      },
+      test,
     });
   };
 
-  const canSubmit = name.trim().length > 0 && command.trim().length > 0 && !add.isPending;
+  // A secret the entry asks for, still empty. Saving without it is not a harmless half-step: the
+  // Stripe entry would send an empty Authorization header, Stripe answers 401, and the mcp-remote
+  // bridge answers THAT by opening Stripe's OAuth consent page — the whole-user grant the key is
+  // there to avoid — and keeping the tokens in its own file. Plain Add is held too, because the
+  // saved server would do the same on the first run that autoloads it.
+  //
+  // "Not empty" alone was not enough: the key pasted on its own — the natural copy from Stripe's
+  // dashboard — is not empty, goes out with no "Bearer", and is refused the same way. So a secret
+  // that declares a form has to have it too.
+  const sentEnv = envFromRows(envRows);
+  const missingSecrets = prefill.secretKeys.filter((k) => !(sentEnv[k] ?? "").trim());
+  const malformedSecrets = prefill.secretKeys.filter(
+    (k) =>
+      !missingSecrets.includes(k) &&
+      prefill.secretPatterns[k] !== undefined &&
+      !hasForm(prefill.secretPatterns[k], sentEnv[k] ?? ""),
+  );
+  const canSubmit =
+    name.trim().length > 0 &&
+    command.trim().length > 0 &&
+    missingSecrets.length === 0 &&
+    malformedSecrets.length === 0 &&
+    !add.isPending;
 
   return (
     <div className="flex flex-col gap-3 px-4 py-3">
@@ -322,10 +428,33 @@ function AddForm({ prefill, onAdded }: { prefill: Prefill; onAdded: () => void }
           <Plus className="mr-1 h-3.5 w-3.5" /> {t("mcp.addEnv")}
         </Button>
         <div className="flex-1" />
-        <Button size="sm" disabled={!canSubmit} onClick={submit}>
+        {/* Offered only for a catalogue pick, and as its OWN button rather than a side effect of
+            Add: testing starts the server's command on this machine (npx fetches a package), so
+            the click that runs it has to say so. Add alone still only writes mcp.json. */}
+        {prefill.fromCatalog && (
+          <Button size="sm" variant="outline" disabled={!canSubmit} onClick={() => submit(true)}>
+            {t("mcp.addAndTest")}
+          </Button>
+        )}
+        <Button size="sm" disabled={!canSubmit} onClick={() => submit(false)}>
           {add.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("mcp.add")}
         </Button>
       </div>
+      {missingSecrets.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {t("mcp.secretMissing", { n: missingSecrets.join(", ") })}
+        </p>
+      )}
+      {malformedSecrets.length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {t("mcp.secretFormat", { n: malformedSecrets.join(", ") })}
+        </p>
+      )}
+      {prefill.fromCatalog && (
+        <p className="text-xs text-muted-foreground">
+          {t("mcp.addAndTest.note")} {t("mcp.addAndTest.signIn")}
+        </p>
+      )}
       {add.isError && <p className="text-xs text-bad-foreground">{t("mcp.addError")}</p>}
     </div>
   );
@@ -343,6 +472,8 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   // leave whatever the user had half-typed in place.
   const [prefill, setPrefill] = useState<Prefill>(BLANK);
   const [picked, setPicked] = useState(0);
+  const [query, setQuery] = useState("");
+  const [runner, setRunner] = useState<string | null>(null);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mcp"] });
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
@@ -352,6 +483,9 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
     try {
       const result = await testMcpServer(name);
       setTests((s) => ({ ...s, [name]: { loading: false, result } }));
+      // The test was also remembered on disk; refetch so the list carries it once this window's
+      // own result is gone (a relaunch, or the server removed and added back).
+      invalidate();
     } catch {
       setTests((s) => ({
         ...s,
@@ -361,6 +495,20 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
   };
 
   const autoloadOff = config.data ? !config.data.mcp.autoload : false;
+
+  const entries = useMemo(() => catalog.data?.entries ?? [], [catalog.data]);
+  const runners = useMemo(() => [...new Set(entries.map((e) => e.runner))].sort(), [entries]);
+  // Matched against the label, the id and the machine facts (command, args), not the translated
+  // sentences: a search for "postgres" or "docker" should find the entry in every language, and
+  // the sentences are the dictionary's, not the entry's.
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return entries.filter(
+      (e) =>
+        (runner === null || e.runner === runner) &&
+        (!q || [e.id, e.label, e.command, ...e.args].join(" ").toLowerCase().includes(q)),
+    );
+  }, [entries, query, runner]);
 
   if (servers.isError) {
     return (
@@ -413,12 +561,49 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
         )}
       </Panel>
 
-      {catalog.data?.entries.length ? (
+      {entries.length ? (
         <Panel title={t("mcp.catalog.title")}>
           <div className="flex flex-col gap-3 px-4 py-3">
             <p className="text-sm text-muted-foreground">{t("mcp.catalog.lead")}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex min-w-0 flex-1 items-center gap-2">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("mcp.catalog.search")}
+                  aria-label={t("mcp.catalog.search")}
+                  className="field h-8 w-full px-2.5 text-sm"
+                />
+              </div>
+              <div role="group" aria-label={t("mcp.catalog.runner")} className="flex flex-wrap gap-1">
+                <Button
+                  size="sm"
+                  variant={runner === null ? "outline" : "ghost"}
+                  aria-pressed={runner === null}
+                  onClick={() => setRunner(null)}
+                >
+                  {t("mcp.catalog.allRunners")}
+                </Button>
+                {runners.map((r) => (
+                  <Button
+                    key={r}
+                    size="sm"
+                    variant={runner === r ? "outline" : "ghost"}
+                    aria-pressed={runner === r}
+                    onClick={() => setRunner(runner === r ? null : r)}
+                    className="font-mono"
+                  >
+                    {r}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {shown.length === 0 && (
+              <p className="text-sm text-muted-foreground">{t("mcp.catalog.noMatch")}</p>
+            )}
             <div className="grid gap-2 lg:grid-cols-2">
-              {catalog.data.entries.map((entry) => (
+              {shown.map((entry) => (
                 <CatalogCard
                   key={entry.id}
                   entry={entry}
@@ -437,7 +622,27 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
       ) : null}
 
       <Panel title={t("mcp.addServer")}>
-        <AddForm key={picked} prefill={prefill} onAdded={invalidate} />
+        <AddForm
+          key={picked}
+          prefill={prefill}
+          onAdded={(name, test) => {
+            // Whatever this window last saw for that name was about the server just REPLACED —
+            // maybe a different token under the same key names. Left in place, the row went on
+            // showing the green "connected" for a configuration that never connected.
+            setTests((prev) => {
+              const next = { ...prev };
+              delete next[name];
+              return next;
+            });
+            invalidate();
+            // Back to a blank, hand-written form: "Add and test" belonged to the pick just saved.
+            setPrefill(BLANK);
+            setPicked((n) => n + 1);
+            // Never on boot, never on a hand-written server: only right after the owner pressed
+            // "Add and test" on a catalogue pick, and only for the server that click saved.
+            if (test) void runTest(name);
+          }}
+        />
       </Panel>
 
       <p className="px-1 text-xs text-muted-foreground">{t("mcp.note")}</p>

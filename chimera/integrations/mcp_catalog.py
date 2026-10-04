@@ -42,6 +42,16 @@ class CatalogSecret:
     hint: str
     #: Where it comes from. A URL when there is a page for it, else a command.
     source: str = ""
+    #: The FORM the value must have, as a regular expression the whole value has to match, or empty
+    #: for "anything not empty". The screen will not save a value that fails it. Written in the
+    #: subset that means the same in Python's ``re`` and in a JavaScript ``RegExp``, because the
+    #: browser is where it is enforced and the tests here are where it is checked.
+    #:
+    #: It exists because "not empty" turned out to be the wrong guard for a header: the Stripe entry
+    #: needs ``Bearer <key>``, and the most natural paste is the key alone, straight from Stripe's
+    #: dashboard. That passes "not empty", goes out as a header with no scheme, is refused, and the
+    #: bridge answers the refusal by opening the whole-user sign-in the key was there to avoid.
+    pattern: str = ""
 
 
 @dataclass(frozen=True)
@@ -64,6 +74,12 @@ class CatalogEntry:
     #: First-party from the vendor, or community. Never guessed.
     official: bool = True
     docs: str = ""
+    #: How the server proves who it is acting as, so an entry with no ``secrets`` is a DECLARATION
+    #: rather than an omission: ``oauth`` (a browser sign-in the server or its bridge keeps),
+    #: ``login`` (reuses a CLI that is already signed in), ``key`` (a token the user pastes into
+    #: ``secrets``) or ``url`` (a connection string in ``secrets`` that carries the credential).
+    #: Without it, "asks for nothing" and "somebody forgot to list the token" read the same.
+    auth: str = "oauth"
 
 
 #: The default GitHub entry runs the official server through Docker, and the reason is the strongest
@@ -160,6 +176,7 @@ def _alchemy(db_id: str, label: str, driver: str, example: str) -> CatalogEntry:
         command="uvx",
         args=args,
         secrets=[CatalogSecret(key="DB_URL", hint=example, source="")],
+        auth="url",
         containment=_ALCHEMY_CONTAINMENT,
         # Community, by one maintainer. Said out loud: it is a good server and it is not a vendor's.
         official=False,
@@ -180,6 +197,7 @@ _FIREBASE = CatalogEntry(
     runner="npx",
     command="npx",
     args=["-y", "firebase-tools@latest", "mcp"],
+    auth="login",
     containment=(
         "It acts as whoever ran `firebase login` on this machine, so the account's own permissions "
         "are the boundary. There is no read-only switch: the per-tool read-only marks are hints to "
@@ -216,11 +234,154 @@ _SUPABASE = CatalogEntry(
 )
 
 
+#: The four below were added together and are pinned to the version that was READ, not to
+#: ``@latest``: each package was unpacked or its README read at that version, and a pin is the only
+#: way the sentence in ``containment`` stays about the code that actually runs. Bumping one is an
+#: edit that should come with re-reading it.
+_MCP_REMOTE = "mcp-remote@0.14.3"
+
+#: Stripe's documented server is REMOTE only (``mcp.stripe.com``); the old local ``@stripe/mcp``
+#: package is not what its docs describe any more. So this goes through the same named bridge as
+#: Supabase, authenticated with a key in a header rather than OAuth, because a key can be narrowed
+#: and an OAuth grant here is the whole Stripe user.
+#:
+#: The header is ``Authorization:${STRIPE_AUTH_HEADER}`` with NO space after the colon, and the
+#: secret holds ``Bearer <key>``. That shape is mcp-remote's own workaround: on Windows an argument
+#: with a space is re-split on its way through ``npx.cmd``, and the header arrives mangled. The
+#: ``${VAR}`` is expanded by mcp-remote from its environment, so the key never sits in ``args`` —
+#: arguments are visible in the process table, the environment far less so.
+#:
+#: Stripe announced that from 31 October 2026 its MCP accepts only OAuth or keys carrying the Agent
+#: tag; a plain restricted or secret key then answers 401. The hint asks for an Agent key, which is
+#: also the one Stripe lets you create with only the permissions the client needs.
+#:
+#: What a refused key does is the bridge's choice, not Stripe's, and it is the opposite of the one
+#: this entry makes: mcp-remote 0.14.3 treats any 401 as "Authentication required", runs its OAuth
+#: flow and opens the browser on Stripe's consent page - the whole-user grant the key is here to
+#: avoid - and keeps the tokens under ``~/.mcp-auth``, hashed on the header TEMPLATE, so they would
+#: serve any later key. There is no flag to turn that off, so the screen refuses to save the entry
+#: with the header empty OR not of the form ``Bearer <key>`` (the secret's ``pattern``; a key pasted
+#: on its own is refused exactly like an empty one), and the containment tells the person to decline
+#: the page if it appears.
+_STRIPE = CatalogEntry(
+    id="stripe",
+    label="Stripe",
+    summary="Read customers, payments, subscriptions and invoices, and search Stripe's documentation.",
+    runner="npx",
+    command="npx",
+    args=[
+        "-y", _MCP_REMOTE,
+        "https://mcp.stripe.com",
+        "--header", "Authorization:${STRIPE_AUTH_HEADER}",
+    ],
+    secrets=[
+        CatalogSecret(
+            key="STRIPE_AUTH_HEADER",
+            hint="Bearer rk_… (an Agent key with read permissions only)",
+            source="https://docs.stripe.com/keys#agent-keys",
+            # The word, ONE space, then a key with no whitespace in it. The key alone, the word
+            # alone, and "Bearer " with nothing after it are each a header Stripe refuses - and a
+            # refusal is what opens the browser sign-in.
+            pattern=r"^Bearer \S+$",
+        )
+    ],
+    auth="key",
+    containment=(
+        "The key is the boundary: the server has one tool that can call any write method of the "
+        "Stripe API, so create an Agent key with read permissions only and a write is refused by "
+        "Stripe rather than by a hint. Stripe also asks a human to confirm some writes, such as "
+        "refunds and outbound payments, through a link. STRIPE_AUTH_HEADER takes the word Bearer, "
+        "a space, then the key. It reaches mcp.stripe.com through the third-party mcp-remote bridge. "
+        "If Stripe refuses the key - an empty one, or from 31 Oct 2026 one without the Agent tag - "
+        "the bridge opens Stripe's sign-in in the browser instead: decline it, because that grant is "
+        "your whole Stripe user and the bridge keeps it in a file on this computer, outside mcp.json."
+    ),
+    docs="https://docs.stripe.com/mcp",
+)
+
+#: Notion's own local server (``@notionhq/notion-mcp-server``) says in its README that it is "no
+#: longer actively maintained" and points at the remote one — the same trap as the deprecated GitHub
+#: package, so it is not offered. Notion documents exactly this command for stdio-only clients.
+_NOTION = CatalogEntry(
+    id="notion",
+    label="Notion",
+    summary="Search and read the pages and databases of a Notion workspace.",
+    runner="npx",
+    command="npx",
+    args=["-y", _MCP_REMOTE, "https://mcp.notion.com/mcp"],
+    containment=(
+        "It acts as you: what it can reach is decided by your permissions in the workspace you sign "
+        "in to, and Notion documents no read-only switch for it, so it can edit what you can edit. "
+        "Sign-in happens in the browser, so there is no key to store. It goes through the "
+        "third-party mcp-remote bridge, because Notion's own local server is no longer maintained."
+    ),
+    docs="https://developers.notion.com/docs/get-started-with-mcp",
+)
+
+#: Sentry's skills are enforced by the server — a skill left out is a set of tools never registered,
+#: not a hint. ``inspect`` is described by Sentry as "read-only access to core Sentry data", and it is
+#: the only one turned on here: the default set also includes ``seer``, which runs Sentry's own AI
+#: on your issues, and ``triage``/``project-management`` mutate. The token travels in the
+#: environment (the docs' example puts it in ``--access-token``, i.e. on the command line).
+_SENTRY = CatalogEntry(
+    id="sentry",
+    label="Sentry",
+    summary="Read issues, events, traces and releases from Sentry to investigate an error.",
+    runner="npx",
+    command="npx",
+    args=["-y", "@sentry/mcp-server@0.42.0", "--skills=inspect"],
+    secrets=[
+        CatalogSecret(
+            key="SENTRY_ACCESS_TOKEN",
+            hint="a Sentry user auth token",
+            source="https://sentry.io/settings/account/api/auth-tokens/",
+        )
+    ],
+    auth="key",
+    containment=(
+        "Narrowed to the read-only inspect skill, which the server enforces by not registering the "
+        "other tools. The token is the outer boundary: Sentry's docs ask for write scopes "
+        "(project:write, team:write, event:write), so widening --skills turns those writes on. "
+        "Needs Node 22.13 or newer."
+    ),
+    docs="https://github.com/getsentry/sentry-mcp",
+)
+
+#: Hostinger's package ships one binary per API group, and that is the only narrowing it offers:
+#: there is no read-only mode, and the credential reaches the whole account. The all-groups binary
+#: is 403 operations, billing and domain transfers among them; this entry runs the VPS group alone.
+#: Counted in the 2.7.0 package rather than taken from the README: 64 operations, 21 of them GET.
+#:
+#: With no token set, the server runs its own OAuth sign-in and keeps the result in its OWN file
+#: (``%APPDATA%/hostinger-mcp/credentials.json``, ``~/.config/hostinger-mcp/`` elsewhere) — on disk,
+#: unlike GitHub's, and said so. A ``HOSTINGER_API_TOKEN`` overrides it; it is not asked for here
+#: because the sign-in needs nothing pasted into ``mcp.json``.
+_HOSTINGER = CatalogEntry(
+    id="hostinger",
+    label="Hostinger (VPS)",
+    summary="See and manage Hostinger VPS machines: state, backups, snapshots, firewalls and Docker.",
+    runner="npx",
+    command="npx",
+    args=["-y", "--package=@hostinger/mcp@2.7.0", "hostinger-vps-mcp"],
+    containment=(
+        "There is no read-only mode: 43 of the 64 VPS operations change something — restoring a "
+        "backup or snapshot, deleting a snapshot or a firewall, stopping a container. Only the VPS "
+        "group runs (billing, domains and DNS are left out), but the sign-in reaches the whole "
+        "account, and the server keeps it in its own file on this machine."
+    ),
+    docs="https://github.com/hostinger/api-mcp-server",
+)
+
+
 CATALOG: tuple[CatalogEntry, ...] = (
     _GITHUB_DOCKER,
     _GITHUB_BINARY,
     _FIREBASE,
     _SUPABASE,
+    _STRIPE,
+    _NOTION,
+    _SENTRY,
+    _HOSTINGER,
     *(_alchemy(*db) for db in _ALCHEMY_DBS),
 )
 
@@ -251,10 +412,14 @@ def catalog_as_dicts() -> list[dict[str, object]]:
             "command": e.command,
             "args": list(e.args),
             "env": dict(e.env),
-            "secrets": [{"key": s.key, "hint": s.hint, "source": s.source} for s in e.secrets],
+            "secrets": [
+                {"key": s.key, "hint": s.hint, "source": s.source, "pattern": s.pattern}
+                for s in e.secrets
+            ],
             "containment": e.containment,
             "official": e.official,
             "docs": e.docs,
+            "auth": e.auth,
         }
         for e in CATALOG
     ]

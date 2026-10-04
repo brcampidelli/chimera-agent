@@ -101,7 +101,16 @@ jobs:
           # dependency. Verified by searching the frozen binary for the SDK's module names, with
           # `chimera.integrations.mcp_client` and `litellm.utils` as controls to prove the search
           # finds what IS there.
-          uv sync --extra desktop --extra documents --extra stt --extra mcp
+          # `documents-out` ships too — the create_document tool's Word/Excel/PowerPoint writers.
+          # Pure Python over lxml, which `documents` already brings: python-docx 253 KB, openpyxl
+          # 251 KB, python-pptx 473 KB and its xlsxwriter 175 KB as wheels, the last three already
+          # resolved through markitdown. Without it the switch on the Tools screen would turn on a
+          # tool that answers every format but PDF with an install hint.
+          # `secrets` ships too (study 29, P7.7): `keyring` is pure Python plus a small backend per
+          # platform, and without it the Settings switch that keeps keys in the OS vault can only say
+          # "no vault in this build". The switch is off by default, and the frozen build reads the
+          # vault at startup only once `.env` marks a key as moved (`config_vault.consulted`).
+          uv sync --extra desktop --extra documents --extra documents-out --extra stt --extra mcp --extra secrets
           uv pip install pyinstaller
 
       - name: Freeze the backend sidecar

@@ -123,10 +123,18 @@ def _idempotency_key(name: str, args: Mapping[str, Any]) -> str:
 # and clicks, so it can carry data out through a form just as an http_post can.
 DANGEROUS_WHEN_TAINTED = frozenset(
     {"run_shell", "execute_code", "code_interpreter", "write_file", "edit_file",
-     "apply_patch", "edit_batch",
+     "apply_patch", "edit_batch", "create_document",
      # exfiltration channels — everything in SIDE_EFFECT_TOOLS, plus the browser
      "send_email", "send_message", "send_sms", "http_post", "post_webhook", "create_issue",
-     "browser"}
+     "browser",
+     # Publishes a branch and a title and description the run wrote to a remote: an outbound
+     # channel like the rest. It asks the owner on every call anyway (`tools/pull_request.py`);
+     # what this adds, once the run is tainted, is the question that names WHERE the untrusted
+     # content came from — the one fact the pull request card does not carry. Not in
+     # SIDE_EFFECT_TOOLS: its idempotency cache keeps a refusal as if it were the result, so a
+     # retry after the owner said no would read "already executed", and gh already refuses a
+     # second pull request for the same branch.
+     "open_pull_request"}
 )
 
 
@@ -134,7 +142,9 @@ DANGEROUS_WHEN_TAINTED = frozenset(
 #: adds for them is a card on every edit after the run read anything external. The owner decided on
 #: 2026-09-27 that this is a warning: a card is for untrusted content reaching a shell, a write
 #: outside the workspace, or a send over the network (all of which stay gated below).
-WORKSPACE_WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch"})
+WORKSPACE_WRITE_TOOLS = frozenset(
+    {"write_file", "edit_file", "apply_patch", "edit_batch", "create_document"}
+)
 
 _RECIPIENT_KEYS = ("to", "recipient", "recipients", "cc", "bcc", "email")
 
@@ -478,7 +488,7 @@ def ledger_registry(
     ``warn_workspace_writes`` is the surface saying a person is watching: a write inside the
     workspace after untrusted input goes ahead and ``notify`` is told, instead of asking a card.
     """
-    wrapped = ToolRegistry()
+    wrapped = ToolRegistry.like(registry)
     for tool in registry.tools():
         wrapped.register(
             LedgeredTool(

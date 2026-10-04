@@ -151,7 +151,7 @@ def test_unknown_source_raises(tmp_path: Path) -> None:
 
 
 def test_available_sources() -> None:
-    assert set(available_sources()) == {"hermes", "openclaw"}
+    assert set(available_sources()) == {"hermes", "openclaw", "claude"}
 
 
 def test_memory_candidates_resolving_to_same_file_deduped(tmp_path: Path) -> None:

@@ -72,6 +72,11 @@ POLL_SECONDS = 2.0
 #: directory of dead questions makes `chimera approve` unreadable and hides the live one.
 STALE_SECONDS = 24 * 3600.0
 
+#: The most characters one delivered message carries when the whole action is sent
+#: (``ask_durably(whole_action=True)``). Below `scheduler.delivery.MAX_CHARS` (Discord refuses a
+#: body over 2000) with room for the ``(2/3) `` in front, so the webhook's own clip never cuts one.
+DELIVERY_PART_CHARS = 1800
+
 
 def _dir(home: Path) -> Path:
     return Path(home) / "approvals"
@@ -294,6 +299,33 @@ def answer_with_code(
         return "applied"
 
 
+def split_for_channel(text: str, limit: int = DELIVERY_PART_CHARS) -> list[str]:
+    """``text`` in pieces of at most ``limit`` characters, broken between lines where it can be.
+
+    Nothing is dropped. When no line is longer than ``limit``, the pieces joined with newlines are
+    ``text`` again; a line that is longer is cut into ``limit``-sized pieces rather than shortened.
+    """
+    parts: list[str] = []
+    current: str | None = None
+    for line in text.split("\n"):
+        while len(line) > limit:
+            if current is not None:
+                parts.append(current)
+                current = None
+            parts.append(line[:limit])
+            line = line[limit:]
+        if current is None:
+            current = line
+        elif len(current) + 1 + len(line) > limit:
+            parts.append(current)
+            current = line
+        else:
+            current = f"{current}\n{line}"
+    if current is not None:
+        parts.append(current)
+    return parts
+
+
 def ask_durably(
     home: Path,
     action: str,
@@ -311,8 +343,15 @@ def ask_durably(
     band: str = "",
     decider_model: str = "",
     decision_id: str = "",
+    whole_action: bool = False,
 ) -> bool:
     """Put one question to a person who is elsewhere, and wait for the answer.
+
+    ``whole_action`` sends the action in full on the text channel, in as many messages as it takes
+    (:func:`split_for_channel`), instead of its first 300 characters. For the actions asked every
+    time (`approval.always_ask`): the pull request card is the text that will be PUBLISHED, and an
+    owner answering from a phone was shown a card that stopped inside the commit list — the
+    description, the diff summary and the "N changed files are NOT included" line never arrived.
 
     ``decision`` is the level of the verdict that raised it; it orders the queue (:func:`pending`)
     and is kept on the record, so the answer rate can be read per level.
@@ -425,23 +464,26 @@ def ask_durably(
         except Exception as exc:  # noqa: BLE001 — the question is on disk; the notice is a courtesy
             _log.warning("approval request not announced: %s", exc)
     if deliver is not None:
-        try:
-            deliver(
-                f"Chimera needs a decision.\n\n{reason or 'review required'}\n"
-                f"Action: {action[:300]}\n\n"
-                f"Answer with:  chimera approve {request_id} --yes   (or --no)"
-                + (
-                    # Each answer on a line of its own, so a phone can copy exactly one of them.
-                    "\n\nOr send the bot one of these lines (the code works once, for this "
-                    "request only, until the question times out):\n"
-                    f"aprovar {request_id} {code}\n"
-                    f"recusar {request_id} {code}"
-                    if code
-                    else ""
-                )
-            )
-        except Exception as exc:  # noqa: BLE001 — a failed delivery must not fail the run
-            _log.warning("approval request not delivered: %s", exc)
+        how = f"Answer with:  chimera approve {request_id} --yes   (or --no)" + (
+            # Each answer on a line of its own, so a phone can copy exactly one of them.
+            "\n\nOr send the bot one of these lines (the code works once, for this "
+            "request only, until the question times out):\n"
+            f"aprovar {request_id} {code}\n"
+            f"recusar {request_id} {code}"
+            if code
+            else ""
+        )
+        head = f"Chimera needs a decision.\n\n{reason or 'review required'}\n"
+        if whole_action:
+            # The answer lines LAST, so they arrive after everything the answer is about.
+            parts = split_for_channel(f"{head}Action:\n{action}\n\n{how}")
+        else:
+            parts = [f"{head}Action: {action[:300]}\n\n{how}"]
+        for number, part in enumerate(parts, start=1):
+            try:
+                deliver(part if len(parts) == 1 else f"({number}/{len(parts)}) {part}")
+            except Exception as exc:  # noqa: BLE001 — a failed delivery must not fail the run
+                _log.warning("approval request not delivered: %s", exc)
 
     resposta = directory / f"{request_id}.answer.json"
     limite = clock() + wait_seconds

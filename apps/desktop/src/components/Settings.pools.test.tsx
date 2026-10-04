@@ -161,4 +161,67 @@ describe("Settings — key pools", () => {
 
     expect(await screen.findByText(/Refused/i)).toBeTruthy();
   });
+
+  it("shows the server's reason under the refusal, not only the usual guess", async () => {
+    // With the vault on, a pool can outgrow what Windows' Credential Manager keeps per entry; the
+    // generic "check it is a key" line alone would be the wrong advice.
+    vi.mocked(addPoolKey).mockRejectedValueOnce(
+      new Error("CHIMERA_OPENROUTER_KEYS is too large for the Windows Credential Manager"),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const row = (await screen.findByText("…1111")).closest("div.px-4") as HTMLElement;
+
+    await user.type(within(row).getAllByPlaceholderText(/Paste/i)[0], "sk-or-new3333");
+    await user.click(within(row).getByRole("button", { name: "Add" }));
+
+    expect(await screen.findByText(/too large for the Windows Credential Manager/)).toBeTruthy();
+  });
+
+  it("says when a pool went to .env in plain text although the vault switch is on", async () => {
+    // No vault on this machine: the server writes the whole pool to the file and names it in
+    // `vault_fallback`. The switch's row only reads a PATCH's answer, so this card has to say it.
+    vi.mocked(addPoolKey).mockResolvedValueOnce({
+      provider: "openrouter",
+      count: 3,
+      vault_fallback: ["CHIMERA_OPENROUTER_KEYS"],
+    } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const row = (await screen.findByText("…1111")).closest("div.px-4") as HTMLElement;
+
+    await user.type(within(row).getAllByPlaceholderText(/Paste/i)[0], "sk-or-new3333");
+    await user.click(within(row).getByRole("button", { name: "Add" }));
+
+    expect(await within(row).findByText(/saved to \.env: CHIMERA_OPENROUTER_KEYS/)).toBeTruthy();
+  });
+
+  it("says it on a removal too, since the rest of the pool is written back", async () => {
+    vi.mocked(removePoolKey).mockResolvedValueOnce({
+      provider: "openrouter",
+      count: 1,
+      vault_fallback: ["CHIMERA_OPENROUTER_KEYS"],
+    } as never);
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    await screen.findByText("…2222");
+
+    await user.click(screen.getByRole("button", { name: /…2222/ }));
+
+    expect(await screen.findByText(/saved to \.env: CHIMERA_OPENROUTER_KEYS/)).toBeTruthy();
+  });
+
+  it("says nothing about the vault when the pool write did not fall back", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Settings />);
+    const row = (await screen.findByText("…1111")).closest("div.px-4") as HTMLElement;
+
+    await user.type(within(row).getAllByPlaceholderText(/Paste/i)[0], "sk-or-new3333");
+    await user.click(within(row).getByRole("button", { name: "Add" }));
+
+    await waitFor(() => expect(addPoolKey).toHaveBeenCalled());
+    // Scoped to the pool row and to the note's own shape: the switch row's hint also mentions
+    // `.env` ("keys are still saved to .env") on a machine with no vault.
+    expect(within(row).queryByText(/saved to \.env: /)).toBeNull();
+  });
 });

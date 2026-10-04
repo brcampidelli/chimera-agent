@@ -19,6 +19,7 @@ import {
   Loader2,
   MessageSquare,
   Network,
+  PanelRight,
   RotateCcw,
   Send,
   ShieldCheck,
@@ -65,10 +66,13 @@ import { GroundedBadge } from "@/components/code/GroundedBadge";
 import { PolicyBlocked } from "@/components/code/PolicyBlocked";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
 import { BrowserView } from "@/components/code/BrowserView";
+import { ChartCard } from "@/components/code/ChartView";
+import type { CodeChartFrame } from "@/lib/chart/spec";
 import { SafeMarkdown } from "@/components/markdown/SafeMarkdown";
 import { SharePanel } from "@/components/code/SharePanel";
 import { WorksPanel } from "@/components/code/WorksPanel";
 import { TodoPanel, type TodoEntry } from "@/components/code/TodoPanel";
+import { turnOutputs } from "@/components/code/turnOutputs";
 import { CardChrome, cardId, useCardModes } from "@/components/code/CardChrome";
 import { useLayout } from "@/lib/layout/context";
 import { TRANSCRIPT_WIDTH_CLASS } from "@/lib/layout/model";
@@ -178,6 +182,10 @@ interface Exchange {
   /** The agent's browser after its last action of this turn, or null. Replaced on every frame
    *  (a picture of a moment), and never replayed. */
   browser?: CodeBrowserFrame | null;
+  /** The charts `render_chart` drew in this turn, in order. Streamed like `todos`, so a reopened
+   *  conversation has none of them here — the files are still in the project, and the tool row
+   *  that wrote each one opens it. */
+  charts?: CodeChartFrame[];
   done: CodeTurnDone | null;
   failed?: boolean;
   /** What the server actually said when the turn failed. A wrong API key, a rate limit, a model
@@ -591,6 +599,45 @@ export function TurnReceipt({ done, t }: { done: CodeTurnDone; t: TFunc }) {
   );
 }
 
+/** "Open beside" for what the turn produced (study 29, P6.3): the page, chart, image or document the
+ *  agent just wrote, one press from the viewer. Drawn under the receipt because it is part of what
+ *  the turn did, and only where there is a viewer to open into (`onOpenFile`). Nothing is drawn for a
+ *  turn that produced nothing openable — an empty row would read as "it made something". */
+export function TurnOutputs({
+  tools,
+  edits,
+  onOpenFile,
+  t,
+}: {
+  tools: readonly CodeToolEvent[];
+  edits: readonly { path: string }[];
+  onOpenFile?: (path: string) => void;
+  t: TFunc;
+}) {
+  const outputs = turnOutputs(tools, edits);
+  if (!onOpenFile || outputs.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      {outputs.map((path) => {
+        const name = path.split(/[\\/]/).pop() ?? path;
+        return (
+          <Button
+            key={path}
+            size="sm"
+            variant="outline"
+            title={path}
+            aria-label={t("code.chat.openBeside", { name })}
+            onClick={() => onOpenFile(path)}
+          >
+            <PanelRight className="h-3.5 w-3.5" />
+            <span className="max-w-64 truncate">{t("code.chat.openBeside", { name })}</span>
+          </Button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** A coding conversation over one workspace: turns that read and edit, keeping their tool calls.
  *
  *  The composer has two buttons and they are not two modes of the same thing. **Send** is a turn:
@@ -908,6 +955,9 @@ export function Conversation({
         break;
       case "todo":
         patch((e) => ({ ...e, todos: ((data.items ?? []) as TodoEntry[]) }));
+        break;
+      case "chart":
+        patch((e) => ({ ...e, charts: [...(e.charts ?? []), data as unknown as CodeChartFrame] }));
         break;
       case "notice": {
         const code = String(data.code ?? "");
@@ -1481,6 +1531,10 @@ export function Conversation({
           // it has left.
           patchLast((e) => ({ ...e, browser: frame }));
         },
+        onChart: (chart) => {
+          // Appended: each chart is its own result, unlike the browser's picture of where it is.
+          patchLast((e) => ({ ...e, charts: [...(e.charts ?? []), chart] }));
+        },
         onVerified: (v) => {
           verifyFailed = v.state === "failed";
           patchLast((e) => ({ ...e, verified: v }));
@@ -1893,6 +1947,12 @@ export function Conversation({
                   <BrowserView frame={e.browser} />
                 </CardChrome>
               ) : null}
+              {e.charts?.map((chart, j) => (
+                <CardChrome key={j} id={cardId(i, "chart", j)} kind="chart" cards={cards}
+                  summary={chart.title ?? chart.path}>
+                  <ChartCard frame={chart} onOpenFile={onOpenFile} />
+                </CardChrome>
+              ))}
               {e.edits.map((edit, j) => (
                 <CardChrome key={j} id={cardId(i, "diff", j)} kind="diff" cards={cards} summary={edit.path}>
                 <div className="space-y-1">
@@ -2036,6 +2096,7 @@ export function Conversation({
               {e.done ? (
                 <CardChrome id={cardId(i, "receipt")} kind="receipt" cards={cards}>
                   <TurnReceipt done={e.done} t={t} />
+                  <TurnOutputs tools={e.tools} edits={e.edits} onOpenFile={onOpenFile} t={t} />
                 </CardChrome>
               ) : null}
               {i === lastAt ? <TurnSuggestions items={suggestions} onPick={pickSuggestion} /> : null}

@@ -17,6 +17,8 @@ built the catalogue nearly shipped each mistake:
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from chimera.integrations.mcp_catalog import CATALOG, catalog_as_dicts, runner_available
@@ -168,3 +170,165 @@ def test_no_secret_value_is_ever_baked_in() -> None:
             assert not any(
                 marca in valor for marca in ("ghp_", "github_pat_", "sk_live", "sk_test", "rk_live")
             ), f"{e.id} carries a credential-shaped value in {chave}"
+
+
+# --- the four entries added with study 29 (P7.3) --------------------------------------------------
+#
+# Each was checked against the vendor's own page, and two of them against the PACKAGE itself, because
+# the README and the code disagreed in small ways that matter (Hostinger's token variable has two
+# names; its README says one binary where the package ships twelve).
+
+_NOVAS = ("stripe", "notion", "sentry", "hostinger")
+_AUTH = {"oauth", "login", "key", "url"}
+
+
+def test_every_entry_declares_how_it_signs_in() -> None:
+    """An entry with no `secrets` must be a statement, not a gap.
+
+    "Asks for nothing" can mean the server signs in through the browser, reuses a CLI login, or that
+    somebody forgot to list the token. The three read the same on screen; `auth` is what tells them
+    apart, and it has to agree with `secrets` — a key-based entry that asks for no key is the
+    forgotten-token case, and an OAuth one that asks for a key is a leak waiting to be typed in.
+    """
+    for e in CATALOG:
+        assert e.auth in _AUTH, f"{e.id} declares no way of signing in"
+        pede = bool(e.secrets)
+        assert pede == (e.auth in {"key", "url"}), (
+            f"{e.id}: auth={e.auth!r} but secrets={[s.key for s in e.secrets]}"
+        )
+    assert {d["auth"] for d in catalog_as_dicts()} <= _AUTH
+
+
+@pytest.mark.parametrize("entry_id", _NOVAS)
+def test_a_new_entry_says_what_bounds_it_and_what_it_asks_for(entry_id: str) -> None:
+    """The plan's own measure for these four: containment and secrets, each declared.
+
+    A secret must say where it comes from — the URL is half of what makes a catalogue entry better
+    than a blank form.
+    """
+    e = _entry(entry_id)
+
+    assert len(e.containment) >= 120, f"{entry_id} says too little about what limits it"
+    assert e.docs.startswith("https://")
+    for s in e.secrets:
+        assert s.source.startswith("https://"), f"{entry_id}: {s.key} does not say where to get it"
+        assert s.hint, f"{entry_id}: {s.key} does not say what to paste"
+
+
+@pytest.mark.parametrize("entry_id", _NOVAS)
+def test_a_new_entry_runs_the_version_that_was_read(entry_id: str) -> None:
+    """`@latest` would make the containment sentence about whatever npm serves next week."""
+    alvo = " ".join(_entry(entry_id).args)
+
+    assert "@latest" not in alvo
+    assert any(re.search(r"@\d+\.\d+\.\d+", a) for a in _entry(entry_id).args), (
+        f"{entry_id} runs an unpinned package"
+    )
+
+
+def test_the_stripe_key_never_reaches_the_command_line() -> None:
+    """The header is built by mcp-remote from the environment, so `args` holds only a reference.
+
+    Arguments are readable from the process table. The Windows space-mangling workaround (no space
+    after the colon, `Bearer <key>` inside the variable) is mcp-remote's documented form, and the
+    variable it names has to be one the entry actually asks for — or the header is sent empty.
+    """
+    e = _entry("stripe")
+    header = e.args[e.args.index("--header") + 1]
+
+    assert header == "Authorization:${STRIPE_AUTH_HEADER}"
+    assert [s.key for s in e.secrets] == ["STRIPE_AUTH_HEADER"]
+    assert not any(marca in " ".join(e.args) for marca in ("Bearer", "rk_", "sk_"))
+    # The read-only advice is the containment, so it has to be in the words the user sees.
+    assert "read permissions only" in e.containment
+    assert "Agent key" in e.secrets[0].hint
+
+
+def test_the_stripe_entry_says_a_refused_key_opens_a_sign_in_to_decline() -> None:
+    """mcp-remote answers a 401 by opening the OAuth consent page - the whole-user grant the key is
+    there to avoid - and keeps the tokens on disk. That cannot be switched off from the command, so
+    the person has to be told, in the sentence they read before choosing the entry."""
+    texto = _entry("stripe").containment
+
+    assert "sign-in" in texto and "decline" in texto, "a refused key's browser sign-in is unmentioned"
+    assert "outside mcp.json" in texto, "the grant kept in the bridge's own file is unmentioned"
+
+
+@pytest.mark.parametrize(
+    "valor",
+    [
+        "rk_test_51Abc",  # the key alone: the most natural paste from Stripe's dashboard
+        "Bearer",  # the word alone
+        "Bearer ",  # the word and a space, with nothing after
+        "Bearer  rk_test_51Abc",  # two spaces: the scheme no longer reads as "Bearer"
+        "Bearerrk_test_51Abc",  # no space at all
+        "Bearer rk_test 51Abc",  # a key broken by a space is two tokens, not one key
+    ],
+)
+def test_a_stripe_header_without_the_bearer_form_is_refused_by_its_pattern(valor: str) -> None:
+    """"Not empty" was the whole guard, and a key pasted on its own passes it.
+
+    The header goes out as ``Authorization:<value>``, so a value without the scheme is a header
+    Stripe refuses - and mcp-remote answers a refusal by opening the whole-user OAuth page. The
+    pattern is what the screen enforces; these are the values it must refuse.
+    """
+    padrao = _entry("stripe").secrets[0].pattern
+
+    assert padrao, "the Stripe header declares no form, so the screen only checks it is not empty"
+    assert re.search(padrao, valor) is None, f"{valor!r} would be saved and sent to Stripe"
+
+
+def test_a_stripe_header_in_the_bearer_form_is_accepted_and_the_hint_fits_its_own_pattern() -> None:
+    """The guard must not refuse the value it asks for - including the example in its own hint."""
+    segredo = _entry("stripe").secrets[0]
+
+    assert re.search(segredo.pattern, "Bearer rk_test_51Abc") is not None
+    assert re.search(segredo.pattern, segredo.hint.split(" (")[0]) is not None
+
+
+def test_every_secret_pattern_is_anchored_and_reaches_the_screen() -> None:
+    """A pattern is matched with ``RegExp.test`` in the browser, which looks for it ANYWHERE in the
+    value: an unanchored one accepts "rk_x Bearer y". And one left out of the API answer is a guard
+    the screen never hears about."""
+    por_id = {d["id"]: d for d in catalog_as_dicts()}
+    for e in CATALOG:
+        for s in e.secrets:
+            if s.pattern:
+                re.compile(s.pattern)
+                assert s.pattern.startswith("^") and s.pattern.endswith("$"), (e.id, s.key)
+            secrets = por_id[e.id]["secrets"]
+            assert isinstance(secrets, list)
+            enviados = {x["key"]: x for x in secrets}
+            assert enviados[s.key]["pattern"] == s.pattern, (e.id, s.key)
+
+
+def test_notion_does_not_use_its_unmaintained_local_server() -> None:
+    """Notion's own README: the local server is "no longer actively maintained" — the GitHub trap."""
+    alvo = " ".join([_entry("notion").command, *_entry("notion").args])
+
+    assert "@notionhq/notion-mcp-server" not in alvo
+    assert "https://mcp.notion.com/mcp" in alvo
+
+
+def test_sentry_starts_with_only_the_read_only_skill() -> None:
+    """The default skill set includes `seer` (Sentry's AI over your issues); triage and project
+    management mutate. Only `inspect` is turned on, and the token travels in the environment."""
+    e = _entry("sentry")
+
+    assert "--skills=inspect" in e.args
+    assert not any(a.startswith("--access-token") for a in e.args)
+    assert [s.key for s in e.secrets] == ["SENTRY_ACCESS_TOKEN"]
+
+
+def test_hostinger_runs_one_api_group_and_admits_it_can_write() -> None:
+    """The all-groups binary is 403 operations, billing among them, and nothing is read-only.
+
+    The group binary is the only narrowing the package offers, so it is the default — and the
+    containment still has to say that most of what is left changes something.
+    """
+    e = _entry("hostinger")
+
+    assert "hostinger-vps-mcp" in e.args
+    assert "hostinger-api-mcp" not in e.args
+    assert "no read-only mode" in e.containment
+    assert "whole account" in e.containment

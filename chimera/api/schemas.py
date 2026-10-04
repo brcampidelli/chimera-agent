@@ -119,6 +119,10 @@ class McpCatalogSecret(BaseModel):
     key: str
     hint: str
     source: str = ""
+    # The form the whole value must match (a regular expression), or "" for "anything not empty".
+    # The screen refuses to save a value that fails it: a Stripe header pasted without "Bearer " is
+    # refused by Stripe, and the bridge answers a refusal with a whole-user browser sign-in.
+    pattern: str = ""
 
 
 class McpCatalogEntry(BaseModel):
@@ -144,6 +148,9 @@ class McpCatalogEntry(BaseModel):
     containment: str = ""
     official: bool = True
     docs: str = ""
+    # How the server authenticates: "oauth", "login", "key" or "url". Makes an entry with no
+    # `secrets` a declaration ("signs in through the browser") rather than a possible omission.
+    auth: str = "oauth"
 
 
 class McpCatalogOut(BaseModel):
@@ -255,6 +262,50 @@ class CodeProjectGrantIn(BaseModel):
 
     path: str
     shell_granted: bool
+
+
+class ProjectPackAcceptIn(BaseModel):
+    """Accept one folder's pack — the file whose SHA-256 the screen showed, and only that file."""
+
+    path: str
+    digest: str
+
+
+class ProjectPackOut(BaseModel):
+    """One folder's ``.chimera/pack.json`` held against the owner's settings (study 29, P7.6).
+
+    Everything a pack asks for is listed, including what it asked for and could not have: names it
+    lists that are not switched on or not configured (clamped — never activated, never launched)
+    and keys a pack cannot set (``ignored``). A pack only narrows, and the card is where that is
+    seen rather than assumed.
+    """
+
+    #: ``CHIMERA_PROJECT_PACK``. Off, no pack applies anywhere, accepted or not.
+    enabled: bool = False
+    present: bool = False
+    #: Why a present pack is refused whole; empty when it reads cleanly.
+    error: str = ""
+    digest: str = ""
+    #: The owner accepted exactly these bytes for this folder.
+    accepted: bool = False
+    #: An earlier version was accepted and the file has changed since (or was broken, or deleted).
+    changed: bool = False
+    #: ``changed``, and the version the owner accepted keeps applying from their record until they
+    #: accept the new file or revoke. A change to the file never lifts a narrowing.
+    held: bool = False
+    #: The switch is on and an accepted pack — this file, or the held version — narrows runs here.
+    applied: bool = False
+    skills: list[str] | None = None
+    mcp: list[str] | None = None
+    tools_deny: list[str] = Field(default_factory=list)
+    ignored: list[str] = Field(default_factory=list)
+    skills_kept: list[str] = Field(default_factory=list)
+    skills_hidden: list[str] = Field(default_factory=list)
+    skills_not_active: list[str] = Field(default_factory=list)
+    mcp_kept: list[str] = Field(default_factory=list)
+    mcp_hidden: list[str] = Field(default_factory=list)
+    mcp_not_configured: list[str] = Field(default_factory=list)
+    tools_denied: list[str] = Field(default_factory=list)
 
 
 class CodeGrantMigrationIn(BaseModel):
@@ -585,6 +636,9 @@ class AutonomyCfgOut(BaseModel):
     A fact about configuration, never the value: the URL is a credential and whoever holds it
     can post into that channel. Without one, a review on an unattended surface is a refusal —
     which the refusal now says, naming this setting."""
+    pull_requests: bool = False
+    """``CHIMERA_PULL_REQUESTS``: whether the agent has ``open_pull_request``. Off by default, and a
+    server without the field is off. On or off, every pull request the agent proposes asks the owner."""
 
 
 class ServerCfgOut(BaseModel):
@@ -622,6 +676,10 @@ class ProviderOut(BaseModel):
 
     keys_url: str = ""
     """Where to get a key. Empty for a provider we discovered rather than one we ship."""
+
+    in_vault: bool = False
+    """Whether this key is held by the OS vault rather than by ``.env`` (study 29, P7.7). A fact
+    about where it lives — the value is never sent, from either place."""
 
 
 class PoolKeyOut(BaseModel):
@@ -728,6 +786,9 @@ class MessagingCfgOut(BaseModel):
     configured: list[str] = Field(default_factory=list)
     """The platforms whose bot has what it needs to start (``allowlist.bot_configured``). A server
     that predates the field omits it, and the card then treats every platform as connected."""
+    discord_attach_files: bool = False
+    """``CHIMERA_DISCORD_ATTACH_FILES`` as saved (study 29, P6.3). It attaches nothing while the
+    Discord allowlist is empty, which the card says beside the switch."""
 
 
 class GuardCfgOut(BaseModel):
@@ -791,6 +852,15 @@ class DeferCfgOut(BaseModel):
     mcp: bool = False
 
 
+class ProjectPackCfgOut(BaseModel):
+    """``CHIMERA_PROJECT_PACK`` — whether a project's ``.chimera/pack.json`` may narrow a run.
+
+    Off by default, and a server that predates the block reads as off, which is what it does.
+    """
+
+    enabled: bool = False
+
+
 class BridgeCfgOut(BaseModel):
     """The desktop bridge's two switches (``chimera/api/desktop_bridge.py``), both off by default.
 
@@ -836,6 +906,8 @@ class StorageCfgOut(BaseModel):
     """``CHIMERA_WORKTREE_DIR`` as set; empty is the system temp folder (the default)."""
 
     worktree_dir: str = ""
+    branch_prefix: str = "chimera"
+    """``CHIMERA_BRANCH_PREFIX``: the first segment of an isolated run's branch, ``<prefix>/attempt-…``."""
 
 
 class SharingCfgOut(BaseModel):
@@ -899,6 +971,20 @@ class PrivacyCfgOut(BaseModel):
     ``local_logprob``, an OpenRouter key)."""
 
 
+class VaultCfgOut(BaseModel):
+    """Where the Settings screen saves a key — ``chimera/api/key_vault.py``.
+
+    ``enabled`` is the owner's switch (``CHIMERA_KEY_VAULT``, off by default). ``available`` is
+    whether this machine has a vault at all: false without the ``secrets`` extra, on a headless box,
+    or in a build that could not bundle one — and then a save with the switch on goes to ``.env``
+    and says so. ``keys`` are NAMES, asked of the vault only when the switch is on or ``.env`` marks
+    a key as moved, so an owner who never opted in gets no keychain access from this read."""
+
+    enabled: bool = False
+    available: bool = False
+    keys: list[str] = Field(default_factory=list)
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -908,6 +994,7 @@ class ConfigOut(BaseModel):
     browser: BrowserCfgOut = Field(default_factory=BrowserCfgOut)
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
     defer: DeferCfgOut = Field(default_factory=DeferCfgOut)
+    project_pack: ProjectPackCfgOut = Field(default_factory=ProjectPackCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
     spend: SpendCfgOut = Field(default_factory=SpendCfgOut)
@@ -923,6 +1010,7 @@ class ConfigOut(BaseModel):
     privacy: PrivacyCfgOut = Field(default_factory=PrivacyCfgOut)
     guard: GuardCfgOut
     providers: list[ProviderOut]
+    vault: VaultCfgOut = Field(default_factory=VaultCfgOut)
     pools: list[PoolOut] = Field(default_factory=list)
     """Multi-key rotation, per provider. Never the keys — see :class:`PoolKeyOut`."""
 
@@ -979,6 +1067,31 @@ class AgentDefOut(BaseModel):
 
 class UpdatedOut(BaseModel):
     updated: list[str]
+    in_vault: list[str] = Field(default_factory=list)
+    """The credentials this save put in the OS vault; their ``.env`` lines are now markers."""
+
+    vault_fallback: list[str] = Field(default_factory=list)
+    """Credentials saved to ``.env`` although the vault switch is on, because this machine has no
+    vault. Named so the screen can say it, rather than a switch reading "on" over a plain-text file."""
+
+
+class VaultMoveIn(BaseModel):
+    """Which way to move the keys: ``vault`` (out of ``.env``) or ``file`` (back into it)."""
+
+    to: Literal["vault", "file"]
+
+
+class VaultMoveOut(BaseModel):
+    """What a move did, by NAME. ``failed`` stayed where it was; ``skipped`` had a value in ``.env``
+    already, which is the one in force, so the vault copy was left alone rather than written over it."""
+
+    moved: list[str] = Field(default_factory=list)
+    failed: list[str] = Field(default_factory=list)
+    skipped: list[str] = Field(default_factory=list)
+    too_large: list[str] = Field(default_factory=list)
+    """Left in ``.env`` without trying: larger than this machine's vault holds per entry (Windows'
+    Credential Manager, 2560 bytes — a long rotation pool reaches it). Named apart from ``failed``
+    because the reason is known, and "it refused" would send the owner after a locked vault."""
 
 
 class PoolAddIn(BaseModel):
@@ -990,6 +1103,12 @@ class PoolWriteOut(BaseModel):
 
     provider: str
     count: int
+    in_vault: list[str] = Field(default_factory=list)
+    """The pool variable, when this write put it in the OS vault (study 29, P7.7)."""
+
+    vault_fallback: list[str] = Field(default_factory=list)
+    """The pool variable, when it went to ``.env`` although the vault switch is on, because this
+    machine has no vault — named so the pool card can say it."""
 
 
 class DiagnosticOut(BaseModel):
@@ -1435,6 +1554,81 @@ class MemoryProfileOut(BaseModel):
 class MemoryAddOut(BaseModel):
     status: str
     item: MemoryItemOut
+
+
+class MemoryExportOut(BaseModel):
+    """The whole memory as one file's text. Built here, saved by the client: nothing is uploaded.
+
+    Secrets are masked again on the way out and ``metadata`` is not included — see
+    :mod:`chimera.memory.export` for why each."""
+
+    format: str
+    filename: str
+    media_type: str
+    count: int
+    content: str
+
+
+class ClaudeImportCandidateOut(BaseModel):
+    content: str
+    """The fact as it would be stored: markup removed, secrets already masked."""
+    file: str
+    """Which file under the folder it came from, relative to that folder."""
+    known: bool = False
+    """Memory already holds this fact (same words, ignoring case and spacing): writing it is a no-op."""
+    project: str | None = None
+    """The folder it will be filed under, or null for a fact that will apply in every folder."""
+    claude_project: str = ""
+    """The Claude project slug the note sits under (``projects/<slug>/memory``), "" for a global note.
+    Set with ``project`` null means a note about one repository that no registered folder matches —
+    it would apply everywhere."""
+
+
+class ClaudeImportPreviewOut(BaseModel):
+    """What an import WOULD write. Producing this writes nothing."""
+
+    path: str
+    files: list[str]
+    candidates: list[ClaudeImportCandidateOut]
+    notes: list[str]
+
+
+class ClaudeImportApplyOut(BaseModel):
+    written: int
+    """Candidates the selection named, handed to the merge (ADD + UPDATE + NOOP)."""
+    ignored: int
+    """Strings in the selection that are not a candidate of this folder — never written."""
+    counts: dict[str, int]
+
+
+class ConsolidateGroupOut(BaseModel):
+    kind: str
+    project: str | None = None
+    """The folder every member belongs to (a cluster never spans two), which the merged fact keeps."""
+    unverified: bool = False
+    """A member is unverified, so the merged fact will be too — including the members that were not."""
+    items: list[MemoryItemOut]
+
+
+class ConsolidatePreviewOut(BaseModel):
+    """The clusters a consolidation would merge. Computed without a model call or a write."""
+
+    groups: list[ConsolidateGroupOut]
+    can_answer: bool
+    """Whether a model is configured to write the merged facts. The preview is free either way."""
+
+
+class ConsolidateApplyOut(BaseModel):
+    merged: int
+    """Reviewed clusters merged into one fact."""
+    skipped: int
+    """Reviewed clusters the model answered with nothing: left as they were, though the call was made."""
+    stale: int
+    """Reviewed clusters that are no longer the same set of facts, so were left alone."""
+    removed: int
+    """Net facts removed (each merged cluster of N leaves one)."""
+    usd: float | None
+    """What the merges cost, or null when a model had no price — not zero."""
 
 
 # --- skills ---------------------------------------------------------------------------------------
@@ -2365,6 +2559,10 @@ class FsFileOut(BaseModel):
     content: str  # UTF-8 text, truncated at the read cap; empty for a binary/dir/missing file
     truncated: bool  # the content was clipped at the read cap
     note: str  # a short honest note ("binary or non-text", "not found") or "" for a clean read
+    #: ``pdf``/``docx``/``xlsx``/``pptx`` when ``content`` is a TEXT PREVIEW of that document
+    #: (study 29, P6.3) — never editable, since saving it would replace the document with its text.
+    #: Empty for every other file.
+    document: str = ""
 
 
 class FsFileWrittenOut(BaseModel):
@@ -2417,6 +2615,36 @@ class GitRevertOut(BaseModel):
     ok: bool  # True when the scoped revert completed (git checkout + clean on the passed paths)
     reverted: list[str]  # the paths the revert was scoped to (echoed back on success)
     error: str | None  # a short git error when ok is False; null on success
+
+
+class PullRequestReadinessOut(BaseModel):
+    """What opening a pull request from the workspace would push, or the first reason it cannot.
+
+    ``reason`` is a word the screen translates (``chimera.core.pull_request.REASONS``); empty when
+    ``ready``. Nothing here is a credential: ``remote`` is origin's PUSH URL (where the push goes)
+    with any credential in it replaced by ``***``, and gh is asked for its exit code only."""
+
+    ready: bool
+    reason: str
+    is_repo: bool
+    branch: str
+    base: str
+    head: str  # the full hash that would be pushed; sent back with the request, pushed by hash
+    remote: str
+    remote_head: str  # the commit the branch is at on origin now; "" when the push creates it
+    ahead: int
+    commits: list[str]  # "<short hash> <subject>", newest first, at most 20
+    diffstat: str
+    uncommitted: int  # changed files the push will NOT carry
+    gh: bool
+    gh_signed_in: bool
+
+
+class PullRequestOut(BaseModel):
+    ok: bool
+    url: str  # the pull request, when gh printed one
+    output: str  # git's and gh's output, credentials removed, truncated
+    error: str | None
 
 
 # --- governance / security (injection red-team scoreboard + audit log) -----------------------------
@@ -2594,11 +2822,25 @@ class ToolsOut(BaseModel):
 # --- MCP / Integrations (configured servers + live test) ------------------------------------------
 
 
+class McpLastTestOut(BaseModel):
+    """The remembered outcome of the last Test of a server — history, not a live state.
+
+    Kept so the screen can say "tested at 14:02, 4 tools" after a relaunch. It must never be shown
+    as "connected": a test from yesterday says nothing about whether the server starts today.
+    """
+
+    ok: bool
+    tool_count: int
+    tested_at: float  # unix seconds
+
+
 class McpServerOut(BaseModel):
     name: str
     command: str
     args: list[str]
     env_keys: list[str]  # env variable NAMES only — the secret VALUES are never returned
+    # Null when never tested, or when the config changed since (an edit forgets the old result).
+    last_test: McpLastTestOut | None = None
 
 
 class McpServersOut(BaseModel):
@@ -2716,3 +2958,61 @@ class BenchmarksOut(BaseModel):
     internal_lift: BenchmarkLiftOut | None  # the promising weak-model lift (null when unavailable)
     external: list[BenchmarkExternalOut]  # recorded external results (e.g. Terminal-Bench); [] otherwise
     generated_for: str | None  # the chimera version the snapshot was generated for (null when unavailable)
+
+
+# --- OpenAPI connectors (study 29, P7.5) ----------------------------------------------------------
+
+
+class ConnectorOperationOut(BaseModel):
+    id: str  # the operationId in the pinned spec — what `operations` in a PATCH names
+    tool: str  # the tool name the agent sees: `api_<connector>_<operationId>`
+    method: str  # GET, POST, PUT, PATCH or DELETE
+    path: str
+    summary: str  # the spec's own words, truncated — third-party text, shown as such
+    selected: bool
+
+
+class ConnectorOut(BaseModel):
+    name: str
+    source: str  # where the spec was fetched from, once; loading never re-fetches it
+    base_url: str  # the only origin a call may reach
+    enabled: bool  # off when added: nothing loads until the owner switches it on
+    allow_writes: bool  # off when added: without it no operation but GET can be selected
+    unattended: bool  # off when added: the bots, cron, lanes and servers load it only when on
+    key_env: str  # the `.env` variable NAME the key is read from; never its value
+    key_envs: list[str]  # the names this connector may read: its own, or a reserved tool slot
+    key_in: str  # "header" or "query"
+    key_name: str  # the header or query parameter the key is sent as
+    key_prefix: str  # e.g. "Bearer " — header style only
+    key_set: bool
+    key_hint: str  # at most the last four characters, as on the settings screen
+    added_at: str
+    operations: list[ConnectorOperationOut]
+    problem: str  # empty when the pinned spec reads; else why this connector loads nothing
+
+
+class ConnectorsOut(BaseModel):
+    connectors: list[ConnectorOut]
+    store: str  # the file the VPS can be configured through: `<home>/connectors.json`
+
+
+class ConnectorAddIn(BaseModel):
+    name: str
+    source: str  # an http(s) URL (fetched through the SSRF guard) or a file on this machine
+    base_url: str | None = None  # overrides the spec's own server
+
+
+class ConnectorPatchIn(BaseModel):
+    enabled: bool | None = None
+    allow_writes: bool | None = None
+    unattended: bool | None = None
+    operations: list[str] | None = None
+    base_url: str | None = None
+    key_env: str | None = None
+    key_in: Literal["header", "query"] | None = None
+    key_name: str | None = None
+    key_prefix: str | None = None
+
+
+class ConnectorKeyIn(BaseModel):
+    value: str  # write-only: stored in `.env`, never returned

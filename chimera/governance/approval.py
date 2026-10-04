@@ -18,6 +18,7 @@ policy decision; an approver that denies invisibly is a bug with a configuration
 
 from __future__ import annotations
 
+import re
 import sys
 import threading
 from collections.abc import Callable
@@ -27,6 +28,20 @@ from typing import Any, Protocol
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.approval")
+
+#: C0 and C1 control characters other than newline and tab: what a terminal OBEYS rather than
+#: shows (cursor movement, line erase, OSC 52 clipboard writes).
+_CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+
+
+def visible(text: str) -> str:
+    """``text`` with every control character written out as ``\\xNN``, for a terminal.
+
+    An action is text the agent wrote, and the whole of it is printed when it is a card asked every
+    time. Printed raw, an ESC sequence in it could erase the lines above the prompt or rewrite the
+    card the person is approving; written out, the person sees that it is there.
+    """
+    return _CONTROLS.sub(lambda m: f"\\x{ord(m.group()):02x}", text)
 
 
 class _HasReason(Protocol):
@@ -191,12 +206,17 @@ def allow(ledger: ApprovalLedger | None = None) -> Approver:
 _TERMINAL = threading.Lock()
 
 
-def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver:
+def ask(
+    ledger: ApprovalLedger | None = None, *, stream: Any = None, whole_action: bool = False
+) -> Approver:
     """Prompt a person. Anything other than an explicit yes is a no.
 
     Default-deny on EOF, on a closed pipe, and on an unreadable answer — a prompt that treats
     silence as consent is worse than no prompt, because it produces a record of an approval nobody
     gave.
+
+    ``whole_action`` prints the action in full instead of its first 300 characters — for the
+    actions asked every time (:func:`always_ask`), where what is shown is what will be published.
 
     Serialized on :data:`_TERMINAL`, so concurrent callers queue rather than overlap.
     """
@@ -208,7 +228,7 @@ def ask(ledger: ApprovalLedger | None = None, *, stream: Any = None) -> Approver
         try:
             print(f"\n[governance] {reason or 'review required'}", file=out)
             if action:
-                print(f"  action: {action[:300]}", file=out)
+                print(f"  action: {visible(action if whole_action else action[:300])}", file=out)
             print("  allow this once? [y/N] ", end="", file=out, flush=True)
             answer = input().strip().lower()
         except (EOFError, OSError, KeyboardInterrupt):
@@ -381,8 +401,11 @@ def ask_elsewhere(
     on_asked: Any = None,
     wait_seconds: float | Callable[[], float] | None = None,
     facts: dict[str, Any] | None = None,
+    whole_action: bool = False,
 ) -> Approver:
     """Ask a person who is elsewhere, and wait. Anything but an explicit yes is a no.
+
+    ``whole_action`` sends the action in full on the text channel (`pending.ask_durably`).
 
     ``on_asked`` receives the structured question the moment it is written, so a surface that has a
     screen can show it with a button instead of waiting for someone to read a webhook. ``deliver`` is
@@ -405,6 +428,10 @@ def ask_elsewhere(
         wait = wait_seconds() if callable(wait_seconds) else wait_seconds
         if wait is not None:
             extra["wait_seconds"] = float(wait)
+        if whole_action:
+            # Only when asked for: callers that replace `ask_durably` (tests, a surface) keep the
+            # signature they were written against.
+            extra["whole_action"] = True
         approved = ask_durably(
             home, action, reason, deliver=deliver, on_asked=on_asked,
             decision=_decision_of(*args), facts={**(facts or {}), **_facts_of(*args)}, **extra,
@@ -414,3 +441,55 @@ def ask_elsewhere(
         return approved
 
     return approve
+
+
+
+def always_ask(
+    home: Any,
+    ledger: ApprovalLedger | None = None,
+    *,
+    mode: str = "ask",
+    ask_with: Callable[[str, str], bool] | None = None,
+    deliver: Any = None,
+    on_asked: Any = None,
+    wait_seconds: float | Callable[[], float] | None = None,
+    facts: dict[str, Any] | None = None,
+) -> Approver:
+    """An approver that only a person's explicit yes can satisfy, under every configuration.
+
+    For the actions the owner decided are asked EVERY time, whoever runs them and however the rest
+    of the deployment is set (study 29, P8.1: ``open_pull_request``). What separates it from
+    :func:`approver_for` is the branch it does not have: ``mode="allow"`` is read as ``ask``. An
+    owner who chose ``CHIMERA_APPROVAL_MODE=allow`` chose to stop being asked about the taint
+    narrowing and the policy kernel's REVIEWs; publishing their code to a remote is not one of
+    those, and a standing yes must not become the answer to it.
+
+    ``deny`` still refuses: it only narrows. Nothing is cached, so each call is its own question,
+    the property :mod:`chimera.governance.pending` already guarantees for an answer file.
+
+    Who is asked, in order: the surface's own modal (``ask_with``, the TUI); a person at this
+    process's terminal when one could actually answer (:func:`chimera.sandbox.confirm.human_can_answer`,
+    which a server or the TUI that declared no human answers false); the durable question when
+    there is a ``home`` — on the screen through ``on_asked``, on the owner's channel through
+    ``deliver``, answerable with ``chimera approve`` — where silence refuses. With none of those,
+    nobody can be asked, and that is a recorded refusal.
+
+    The person is shown the WHOLE action on every one of those, never its first 300 characters: on
+    the terminal and on the text channel (in several messages when it is long). These are the
+    actions whose card is the thing being published, and a cut card is an approval of text nobody
+    read — on a phone it stopped inside the commit list, before the description.
+    """
+    if (mode or "ask").strip().lower() == "deny":
+        return deny(ledger)
+    if ask_with is not None:
+        return ask_via(ask_with, ledger)
+    from chimera.sandbox.confirm import human_can_answer
+
+    if human_can_answer():
+        return ask(ledger, whole_action=True)
+    if home is None:
+        return deny(ledger)
+    return ask_elsewhere(
+        home, ledger, deliver=deliver, on_asked=on_asked, wait_seconds=wait_seconds, facts=facts,
+        whole_action=True,
+    )

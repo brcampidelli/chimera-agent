@@ -7,6 +7,7 @@ import { useI18n, useT } from "@/lib/i18n";
 import type { StorageCategory } from "@/lib/types";
 
 const WORKTREE_DIR_KEY = "CHIMERA_WORKTREE_DIR";
+const BRANCH_PREFIX_KEY = "CHIMERA_BRANCH_PREFIX";
 
 /** The words for each category the server reports. Spelled out rather than built from the key, so
  *  each label is a literal the translation checks can see. A key the server adds later is shown
@@ -70,19 +71,24 @@ export function useBytes(): (n: number) => string {
  */
 export function StorageCard({
   worktreeDir,
+  branchPrefix = "chimera",
   onSave,
 }: {
   worktreeDir: string;
+  /** `CHIMERA_BRANCH_PREFIX`: the first segment of a worktree's branch (study 29, P8.1). */
+  branchPrefix?: string;
   onSave: (updates: Record<string, string>) => void;
 }) {
   const t = useT();
   const bytes = useBytes();
   const headingId = useId();
   const fieldId = useId();
+  const prefixId = useId();
   const qc = useQueryClient();
   const report = useQuery({ queryKey: ["storage"], queryFn: () => getStorage(), retry: false });
   const [confirming, setConfirming] = useState<"prune" | "rotate" | null>(null);
   const [dir, setDir] = useState(worktreeDir);
+  const [prefix, setPrefix] = useState(branchPrefix);
   const refresh = () => qc.invalidateQueries({ queryKey: ["storage"] });
   // Wrapped, not passed by reference, for the reason `FoldersCard` gives: this renders inside
   // Settings, and a client function that is missing must fail this card's action, not the screen.
@@ -176,6 +182,32 @@ export function StorageCard({
               {t("settings.storage.worktreeNow", { path: data.worktree_dir })}
             </div>
           )}
+        </div>
+
+        {/* Where a worktree's BRANCH is named, beside where its folder goes. The server refuses a
+            value git would refuse, so a save that comes back is a name that will be used. */}
+        <div className="space-y-2 px-4 py-3">
+          <label htmlFor={prefixId} className="block text-sm font-medium">
+            {t("settings.row.branchPrefix")}
+          </label>
+          <div className="text-xs text-muted-foreground">{t("settings.hint.branchPrefix")}</div>
+          <div className="flex items-center gap-2">
+            <input
+              id={prefixId}
+              className="field h-8 min-w-0 flex-1 px-2.5 font-mono text-xs"
+              value={prefix}
+              maxLength={40}
+              placeholder="chimera"
+              onChange={(e) => setPrefix(e.target.value)}
+            />
+            <Button
+              size="sm"
+              disabled={prefix.trim() === branchPrefix}
+              onClick={() => onSave({ [BRANCH_PREFIX_KEY]: prefix.trim() })}
+            >
+              {t("common.save")}
+            </Button>
+          </div>
         </div>
 
         {data && (

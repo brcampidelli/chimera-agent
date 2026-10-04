@@ -112,8 +112,15 @@ class MessagingManager:
             _log.warning(open_bot_warning(platform))
         if platform == "discord":
             from chimera.server import DiscordAdapter
+            from chimera.server.attachments import attach_enabled, attach_refusal
 
-            return DiscordAdapter(token, allowed_users=allowed)
+            refusal = attach_refusal(self._settings, platform)
+            if refusal:
+                _log.warning(refusal)
+            return DiscordAdapter(
+                token, allowed_users=allowed,
+                attach_files=attach_enabled(self._settings, platform), workspace=self._workspace,
+            )
         if platform == "telegram":
             from chimera.server import TelegramAdapter
 
@@ -199,9 +206,17 @@ class MessagingManager:
         warning = startup_warning(self._settings, platform)
         if warning:
             _log.warning(warning)
+        attach = None
+        if getattr(adapter, "attach_files", False):
+            from functools import partial
+
+            from chimera.server.attachments import turn_attachments
+
+            attach = partial(turn_attachments, workspace=self._workspace)
         return MessageGateway(
             factory, warnings_in_reply=True, name_the_channel=True,
             intercept=ChatApprovals(self._settings, self._settings.home).intercept,
+            attach=attach,
         ).on_message
 
     def start(self, platform: str) -> None:

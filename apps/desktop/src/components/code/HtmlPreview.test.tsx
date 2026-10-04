@@ -1,6 +1,6 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HtmlPreview,
@@ -13,8 +13,19 @@ import {
 } from "@/components/code/HtmlPreview";
 import { getFsFile } from "@/lib/api";
 import { renderWithProviders } from "@/test/utils";
+// What chart.py's `_html` writes, byte for byte: tests/test_chart.py checks the file against it.
+import CHART_PAGE from "@/lib/chart/fixtures/render-chart-page.html?raw";
 
 vi.mock("@/lib/api", async () => (await import("@/test/code-api-mock")).makeCodeApiMock());
+// The check off the app's thread runs in a Worker, which jsdom does not have (its protocol is tested
+// in preflight.test.ts); here it lets every chart through, so these tests see the drawing.
+vi.mock("@/lib/chart/preflight", () => ({ preflight: async () => ({ verdict: "draw" }) }));
+
+// Vega is a dynamic import, and the first one of a run can take seconds under a loaded suite.
+// Loaded once up front, so each test's wait measures the drawing, not the download.
+beforeAll(async () => {
+  await import("@/lib/chart/render");
+}, 60000);
 
 const PAGINA = `<!doctype html>
 <html><head>
@@ -94,10 +105,13 @@ describe("HtmlPreview", () => {
     expect(doc.startsWith(`<!doctype html><meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`)).toBe(true);
   });
 
-  it("says exactly what loads, including the one site charts need", async () => {
+  it("says exactly what loads: nothing from another site", async () => {
+    // It used to name cdn.jsdelivr.net, the one site charts needed. The app draws charts itself
+    // now, so no site is admitted, and a note that still named one would be a promise of a hole.
     vi.mocked(getFsFile).mockResolvedValue({ content: "", note: "", truncated: false } as never);
-    renderWithProviders(<HtmlPreview workspace="/proj" path="chart.html" source="<p>x</p>" />);
-    expect(await screen.findByText(/cdn\.jsdelivr\.net/)).toBeTruthy();
+    renderWithProviders(<HtmlPreview workspace="/proj" path="page.html" source="<p>x</p>" />);
+    expect(await screen.findByText(/nothing is loaded from another site/)).toBeTruthy();
+    expect(screen.queryByText(/jsdelivr/i)).toBeNull();
   });
 
   it("does not promise a sealed frame, in any language", () => {
@@ -111,6 +125,43 @@ describe("HtmlPreview", () => {
     const notes = [...source.matchAll(/^ {2}"code\.preview\.note": "(.*)",$/gm)].map((m) => m[1]);
     expect(notes).toHaveLength(10);
     for (const note of notes) expect(note).toContain("WebRTC");
+  });
+
+  it("draws a page render_chart wrote from its spec, without running the page", async () => {
+    // The page loads Vega from a CDN the policy no longer admits; in a frame it would be blank.
+    const { container } = renderWithProviders(
+      <HtmlPreview workspace="/proj" path="chart.html" source={CHART_PAGE} />,
+    );
+    expect(container.querySelector("iframe")).toBeNull();
+    const view = screen.getByTestId("chart-view");
+    expect(view.getAttribute("aria-label")).toBe("Chart: Sales");
+    await waitFor(() => expect(view.querySelector("svg")).not.toBeNull(), { timeout: 10000 });
+    expect(screen.getByText(/the app draws only the chart, from that spec/)).toBeInTheDocument();
+  });
+
+  it("says what it did with a chart page, not who wrote it", () => {
+    // Any page with the template's loader and spec element is drawn this way, including one from a
+    // cloned repository; the note used to say "a chart written by render_chart" in all ten
+    // languages, which the app never checks. It says what the app did instead.
+    renderWithProviders(<HtmlPreview workspace="/proj" path="chart.html" source={CHART_PAGE} />);
+    expect(screen.getByText(/carries a chart spec/)).toBeInTheDocument();
+    expect(screen.queryByText(/render_chart/)).toBeNull();
+  });
+
+  it("does not run a chart page that makes up millions of rows, and says why", () => {
+    const page = CHART_PAGE.replace('"title": "Sales",', '"title": "Sales", "transform": [{"density": "b", "steps": 5000000}],');
+    expect(page).not.toBe(CHART_PAGE);
+    renderWithProviders(<HtmlPreview workspace="/proj" path="chart.html" source={page} />);
+    expect(screen.getByText(/without freezing the window/)).toBeInTheDocument();
+    expect(screen.queryByTestId("chart-view")).toBeNull();
+  });
+
+  it("does not draw a chart page whose spec reaches outside itself, and says why", () => {
+    const page = CHART_PAGE.replace('"title": "Sales",', '"title": "Sales", "href": "https://example.com/?d=1",');
+    expect(page).not.toBe(CHART_PAGE);
+    renderWithProviders(<HtmlPreview workspace="/proj" path="chart.html" source={page} />);
+    expect(screen.queryByTestId("chart-view")).toBeNull();
+    expect(screen.getByText(/loads data or follows links from outside itself/)).toBeInTheDocument();
   });
 
   it("still offers the source", async () => {
@@ -169,8 +220,9 @@ describe("the preview policy", () => {
     expect(directive(csp, "frame-src")).toBe("frame-src 'none'");
     expect(directive(csp, "form-action")).toBe("form-action 'none'");
     expect(directive(csp, "object-src")).toBe("object-src 'none'");
-    // What render_chart needs, and only that host — measured: without 'unsafe-eval' Vega draws nothing.
-    expect(directive(csp, "script-src")).toBe("script-src 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net");
+    // The page's own inline scripts, and nothing from anywhere else. jsDelivr and 'unsafe-eval' were
+    // here for render_chart's pages alone; the app draws those itself now (study 29, P6.1).
+    expect(directive(csp, "script-src")).toBe("script-src 'unsafe-inline'");
   });
 
   it("goes before a script the page opens with, so the script runs under it", () => {

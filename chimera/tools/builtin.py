@@ -68,6 +68,8 @@ OPTIONAL_TOOLS: frozenset[str] = frozenset({
     "skill_view",
     # Switched on by `CHIMERA_DECIDE_TOOL` (a schema in every prompt; off by default).
     "decide",
+    # Switched on by `CHIMERA_CREATE_DOCUMENT`, off by default for the same reason as `decide`.
+    "create_document",
     # A test/demo tool that returns its input. Never in `default_registry`: tests and benches that
     # need it register `EchoTool()` themselves. Listed here so its translated description (an i18n
     # key nobody may delete) still has a tool to describe.
@@ -163,6 +165,15 @@ def default_registry(
         RecallHistoryTool(history_for(settings.home), project=project_key(workspace))
     )
     registry.register(HttpGetTool())
+    # Off by default (`CHIMERA_PULL_REQUESTS`): it publishes the owner's code to a remote. On, it is
+    # here and not on one surface, so the Code screen, chat, cron and the bots all get the same tool
+    # — and every one of its calls asks the owner (`tools/pull_request.py`). A surface with a screen
+    # hands it that screen's question after this returns (`code_api.assemble_registry`,
+    # `cli/right_hand.py`); the rest get the durable one.
+    if settings.pull_requests:
+        from chimera.tools.pull_request import OpenPullRequestTool
+
+        registry.register(OpenPullRequestTool(workspace))
 
     # Always-on reference tools (no credential needed).
     from chimera.tools.code import CodeInterpreterTool, ExecuteCodeTool
@@ -180,6 +191,13 @@ def default_registry(
     from chimera.tools.chart import RenderChartTool
 
     registry.register(RenderChartTool(workspace, write_region=write_region))  # Vega-Lite -> HTML/PNG/SVG
+    # Off by default (`CHIMERA_CREATE_DOCUMENT`): docx/xlsx/pptx/pdf from a declarative spec. Behind
+    # the setting rather than behind the extra, so switching it on is the owner's choice and a
+    # machine without the extra still gets PDF and an install hint for the rest.
+    if settings.create_document:
+        from chimera.tools.create_document import CreateDocumentTool
+
+        registry.register(CreateDocumentTool(workspace, write_region=write_region))
 
     # Web scraping + secure structured extraction (fetch->clean markdown; schema->JSON via quarantine)
     # + whole-site discovery (map/crawl, robots-aware).

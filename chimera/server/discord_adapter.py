@@ -9,11 +9,17 @@ messages through the ``send_message`` tool.
 core installs stay light. The message-filtering and :class:`InboundMessage` construction
 live in the pure :meth:`DiscordAdapter._inbound`, testable without the library or network.
 The bot token is read from the environment by the caller — never hard-coded.
+
+Files (study 29, P6.3): with ``attach_files`` the bot sends the deliverables its turn wrote beside
+the text — what :mod:`chimera.server.attachments` chose, re-checked here just before sending. Off
+unless the caller passes it, and refused here too when the bot has no allowlist, so a caller that
+forgets the rule cannot make an open bot hand files to strangers.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
+from pathlib import Path
 from typing import Any
 
 from chimera.server.gateway import InboundMessage, chunk_text
@@ -36,12 +42,34 @@ class DiscordAdapter:
         allowed_users: set[str] | None = None,
         respond_to_bots: bool = False,
         max_chars: int = _DISCORD_LIMIT,
+        attach_files: bool = False,
+        workspace: Path | None = None,
     ) -> None:
         self.token = token
         self.allowed_users = allowed_users  # None = anyone; else an allowlist of user ids
         self.respond_to_bots = respond_to_bots
         self.max_chars = min(max_chars, _DISCORD_LIMIT)
+        self.attach_files = False
+        self.workspace: Path | None = None
+        if attach_files:
+            self.enable_attachments(workspace)
         self._client: Any = None
+
+    def enable_attachments(self, workspace: Path | None) -> bool:
+        """Turn attachments on, checked against ``workspace`` — unless this bot is open.
+
+        Refused here as well as where the setting is read: an open bot never attaches, whoever built
+        it and whatever they passed, and with no workspace there is nothing to check a file against.
+        """
+        if self.allowed_users is None or workspace is None:
+            _log.warning(
+                "discord: attachments refused — the bot has no allowlist (or no workspace), and an "
+                "open bot would send the owner's files to anyone who asks for one"
+            )
+            return False
+        self.attach_files = True
+        self.workspace = Path(workspace)
+        return True
 
     def _inbound(
         self,
@@ -78,12 +106,16 @@ class DiscordAdapter:
         *,
         typing: Callable[[], Any],
         send: Callable[[str], Any],
+        send_files: Callable[[list[Path]], Any] | None = None,
     ) -> None:
         """Run the (sync) agent off the event loop under a typing indicator, then send the reply.
 
         The typing indicator ("Chimera is typing…") shows the message was received and a turn is in
         flight — the caller passes ``message.channel.typing`` (an async context manager) and
         ``message.channel.send`` (a coroutine). Kept free of discord.py so it's testable with fakes.
+
+        ``send_files`` posts the turn's attachments after the text, when this adapter attaches and the
+        reply names any (:class:`~chimera.server.gateway.Reply`).
         """
         import asyncio
 
@@ -92,6 +124,33 @@ class DiscordAdapter:
             reply = await loop.run_in_executor(None, route, inbound)
         for chunk in chunk_text(reply, self.max_chars) or ["(no reply)"]:
             await send(chunk)
+        files = self.files_to_send(getattr(reply, "files", ()))
+        if files and send_files is not None:
+            try:
+                await send_files(files)
+            except Exception as exc:  # noqa: BLE001 — the text already went; say why the file did not
+                _log.warning("discord: attaching %d file(s) failed: %s", len(files), exc)
+                await send(f"⚠ the file(s) could not be attached: {type(exc).__name__}")
+
+    def files_to_send(self, files: Sequence[Path]) -> list[Path]:
+        """The reply's files this adapter will actually send — none unless it attaches, each re-checked.
+
+        Checked again here and not only when the turn's list was built: the adapter is the last code
+        before the bytes leave, a reply could have been built by a path that never asked, and the file
+        itself may have changed between the two (grown past the limit, been replaced by another type).
+        """
+        if not self.attach_files or self.workspace is None:
+            return []
+        from chimera.server.attachments import MAX_ATTACHMENTS, check_attachment
+
+        kept: list[Path] = []
+        for path in files:
+            reason = check_attachment(Path(path), self.workspace)
+            if reason is not None:
+                _log.info("discord: not attaching %s: %s", Path(path).name, reason)
+                continue
+            kept.append(Path(path))
+        return kept[:MAX_ATTACHMENTS]
 
     def start(self, route: Callable[[InboundMessage], str]) -> None:
         """Connect the bot and serve until interrupted (blocking).
@@ -123,8 +182,14 @@ class DiscordAdapter:
                 return
             # Show a typing indicator while the (synchronous) agent runs off the event loop, so a
             # slow turn does not block the gateway and the user sees it was received and is working.
+            async def send_files(paths: list[Path]) -> None:
+                await message.channel.send(
+                    files=[discord.File(str(p), filename=p.name) for p in paths]
+                )
+
             await self._respond(
-                inbound, route, typing=message.channel.typing, send=message.channel.send
+                inbound, route, typing=message.channel.typing, send=message.channel.send,
+                send_files=send_files if self.attach_files else None,
             )
 
         client.run(self.token)

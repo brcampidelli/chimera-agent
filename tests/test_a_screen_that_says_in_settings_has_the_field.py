@@ -44,6 +44,11 @@ CLAIMS: dict[str, tuple[str, ...]] = {
         "CHIMERA_OPENROUTER_DATA_COLLECTION",
         "CHIMERA_OPENROUTER_ZDR",
     ),
+    # The Skills screen's "active now" panel (study 29, P7.1): card reading is the memory row.
+    "skills.active.cardsOff": ("CHIMERA_SKILL_CARDS",),
+    # The Code screen's "in this project" card (study 29, P7.6): the project-pack switch.
+    "code.pack.state.off": ("CHIMERA_PROJECT_PACK",),
+    "code.pack.state.acceptedOff": ("CHIMERA_PROJECT_PACK",),
 }
 
 _SETTINGS_CLAIM = re.compile(r"\bin Settings\b")

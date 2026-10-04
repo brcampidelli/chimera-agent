@@ -204,14 +204,27 @@ class SkillView(Tool):
     def run(self, **kwargs: Any) -> str:
         name = str(kwargs.get("name") or "").strip()
         inner_path = str(kwargs.get("file_path") or "SKILL.md").strip()
-        # A name, not a path. The arguments come from a model reading a stranger's instructions.
-        if not name or "/" in name or "\\" in name or name.startswith("."):
+        # A name, not a path. The arguments come from a model reading a stranger's instructions,
+        # and the bundle-name rule is the one check that also catches `C:` — a name on POSIX, the
+        # skills directory itself on Windows.
+        from chimera.skills.bundles import is_bundle_name
+
+        if not is_bundle_name(name):
             return f"error: {name!r} is not an installed skill name."
         base = (self._root / name).resolve()
         if not base.is_dir():
             return f"error: no installed skill named {name!r}."
+        if _bundle_status(base) != "active":
+            # Only what the owner switched on. A pending bundle is one nobody has read yet — and
+            # since skills can be uploaded, one whose author nobody knows — so the promise that it
+            # "reaches nothing until a person turns it on" has to hold for this tool as well as for
+            # the prompt line. Without this the agent could read any installed skill by guessing
+            # its name, which the line in the prompt only ever offers for the active ones.
+            return f"error: the {name} skill is installed but switched off."
         target = (base / inner_path).resolve()
-        if not str(target).startswith(str(base)):
+        # `is_relative_to`, not a string prefix: `skills/demo` is a prefix of `skills/demo2`, so a
+        # prefix test let `../demo2/SKILL.md` read a sibling skill — switched on or not.
+        if not target.is_relative_to(base):
             return f"error: {inner_path!r} is outside the {name} skill."
         if not target.is_file():
             return f"error: {name}/{inner_path} is not there."
@@ -221,6 +234,31 @@ class SkillView(Tool):
             # at step nine with no sign of why.
             return text[: self.MAX_CHARS] + f"\n\n[truncated at {self.MAX_CHARS} characters]"
         return text
+
+
+def _bundle_status(base: Path) -> str:
+    """The switch in a bundle's own record, or ``unknown`` when there is no record to read.
+
+    Read from the directory each call rather than cached: the owner flips it from a screen while a
+    run is alive, and a tool that remembered the old value would keep reading a skill just turned
+    off. A directory with no readable ``bundle.json`` is nobody's approval, so it reads as off.
+    """
+    import json
+
+    try:
+        raw = json.loads((base / "bundle.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "unknown"
+    status = raw.get("status") if isinstance(raw, dict) else None
+    if not isinstance(status, str):
+        return "unknown"
+    if status == "active" and not raw.get("switched_on_at"):
+        # The rule `bundles.installed` applies to the prompt line: an `active` with no record of
+        # when the owner switched it on was thrown while the switch reached no prompt, and reads as
+        # `pending` until switched on again. Read here too, or a skill the Skills screen shows as
+        # waiting for the owner would still be readable by name.
+        return "pending"
+    return status
 
 
 def install_into(registry: ToolRegistry, *, bundles_root: Path | None = None) -> list[str]:
@@ -257,7 +295,7 @@ def install_into(registry: ToolRegistry, *, bundles_root: Path | None = None) ->
 
 def adapt_registry(registry: ToolRegistry, *, bundles_root: Path | None = None) -> ToolRegistry:
     """A copy of ``registry`` that also answers to the names the catalogued skills use."""
-    out = ToolRegistry()
+    out = ToolRegistry.like(registry)
     for tool in registry.tools():
         out.register(tool)
     install_into(out, bundles_root=bundles_root)

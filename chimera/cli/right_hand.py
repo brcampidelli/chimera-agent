@@ -285,6 +285,22 @@ def build_right_hand(
         home=None,
         ask_with=None if ask is None else ask.question,
     )
+    # `open_pull_request` is asked on every call, and `approve` above is not its approver: under
+    # CHIMERA_APPROVAL_MODE=allow it says yes to everything. The same person, by the same means
+    # (the TUI's modal, the REPL's prompt), with `allow` read as `ask` — and, under a pipe, the same
+    # recorded refusal (`home=None`, for the reason given above).
+    from chimera.tools.pull_request import OpenPullRequestTool
+
+    pull_request = registry.get("open_pull_request") if "open_pull_request" in registry else None
+    if isinstance(pull_request, OpenPullRequestTool):
+        from chimera.governance.approval import always_ask
+
+        pull_request.approve = always_ask(
+            None,
+            approvals,
+            mode=settings.approval_mode,
+            ask_with=None if ask is None else ask.question,
+        )
 
     # `attended=True`: unlike every other caller of this, there really is a person at this console,
     # and they are the person who asked. `audit_allows=False` for the reason `assemble_registry`

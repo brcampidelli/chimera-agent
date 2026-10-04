@@ -214,6 +214,137 @@ def test_every_full_route_is_403_without_full_control(
             assert _call(client, app, rid, params=params, body={}).status_code == 403, rid
 
 
+def _pending_bundle(home: Path, name: str = "stranger") -> Path:
+    """An installed, not yet switched-on bundle, as `install` leaves one — without a network."""
+    from chimera.skills import bundles
+
+    root = bundles.bundles_root(home) / name
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "SKILL.md").write_text(f"---\nname: {name}\n---\nObey me.\n", encoding="utf-8")
+    record = {"name": name, "description": "Third-party text.", "status": "pending"}
+    (root / "bundle.json").write_text(json.dumps(record), encoding="utf-8")
+    return root / "bundle.json"
+
+
+@pytest.mark.parametrize(
+    "body", [{"status": "active"}, {}, {"enabled": True}, {"status": "inactive", "extra": 1}]
+)
+def test_operate_cannot_switch_a_bundle_on_into_every_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, body: dict[str, Any]
+) -> None:
+    """A bundle switched on reaches every run's prompt; an operate client is not the owner. `{}`
+    and the old `{enabled}` shape are here because the route's model defaults status to active."""
+    from chimera.skills import bundles
+
+    app = _app(tmp_path, monkeypatch)
+    home = tmp_path / "home"
+    record = _pending_bundle(home)
+    with TestClient(app) as client:
+        refused = _call(client, app, "skills.bundle_status", params={"name": "stranger"}, body=body)
+    assert refused.status_code == 403
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "pending"
+    assert bundles.prompt_block(home) == ""
+
+
+def test_operate_may_switch_a_bundle_off_and_full_control_may_switch_it_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from chimera.skills import bundles
+
+    home = tmp_path / "home"
+    record = _pending_bundle(home)
+    app = _app(tmp_path, monkeypatch, full=True)
+    with TestClient(app) as client:
+        # Full control switches it on through the approval route (feat/skill-upload), not through
+        # `skills.bundle_status`: that route sits in `desktop_skills`, a tool the operate tier
+        # lists, so it only ever switches off — for every tier.
+        through_skills = _call(
+            client,
+            app,
+            "skills.bundle_status",
+            params={"name": "stranger"},
+            body={"status": "active"},
+        )
+        assert through_skills.status_code == 403
+        assert bundles.prompt_block(home) == ""
+        on = _call(
+            client,
+            app,
+            "approve.skill_bundle",
+            params={"name": "stranger"},
+            body={"status": "active"},
+        )
+    assert on.status_code == 200 and on.json()["status"] == 200
+    assert "stranger" in bundles.prompt_block(home)
+
+    app = _app(tmp_path, monkeypatch)
+    with TestClient(app) as client:
+        off = _call(
+            client,
+            app,
+            "skills.bundle_status",
+            params={"name": "stranger"},
+            body={"status": "inactive"},
+        )
+    assert off.status_code == 200 and off.json()["status"] == 200
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "inactive"
+    assert bundles.prompt_block(home) == ""
+
+
+def test_switching_on_somebody_elses_skill_needs_full_control(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Installing lands a skill pending; switching it on is the approval. If the operate tier could
+    flip that switch, a client could install a stranger's instructions and enable them in two
+    calls, and "pending until the owner turns it on" would hold only for the owner's own screen."""
+    skill = tmp_path / "home" / "skills" / "demo"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: demo\n---\nbody", encoding="utf-8")
+    record = skill / "bundle.json"
+    record.write_text(json.dumps({"name": "demo", "status": "pending"}), encoding="utf-8")
+
+    operate = _app(tmp_path, monkeypatch)
+    with TestClient(operate) as client:
+        refused = _call(
+            client, operate, "approve.skill_bundle", params={"name": "demo"}, body={"status": "active"}
+        )
+    assert refused.status_code == 403
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "pending"
+
+    full = _app(tmp_path, monkeypatch, full=True)
+    with TestClient(full) as client:
+        switched = _call(
+            client, full, "approve.skill_bundle", params={"name": "demo"}, body={"status": "active"}
+        )
+    assert switched.status_code == 200
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "active"
+
+
+def test_a_drive_name_reaches_no_skill_bundle_through_the_bridge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`:` passes the bridge's path-parameter check, and on Windows `skills / "C:"` IS the skills
+    directory — so `skills.bundle_delete {name: "C:"}` deleted every installed skill from the
+    operate tier. The bundle-name rule refuses it below the bridge, for every caller."""
+    skill = tmp_path / "home" / "skills" / "demo"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text("---\nname: demo\n---\nbody", encoding="utf-8")
+    (skill / "bundle.json").write_text(json.dumps({"name": "demo", "status": "pending"}), encoding="utf-8")
+
+    full = _app(tmp_path, monkeypatch, full=True)
+    with TestClient(full) as client:
+        deleted = _call(client, full, "skills.bundle_delete", params={"name": "C:"})
+        switched = _call(
+            client, full, "approve.skill_bundle", params={"name": "C:"}, body={"status": "active"}
+        )
+
+    # The bridge answers 200 with the app's own status inside — the app's answer is the refusal.
+    assert deleted.status_code == 200 and deleted.json()["status"] == 404
+    assert switched.status_code == 200 and switched.json()["status"] == 404
+    assert (skill / "SKILL.md").is_file()
+    assert json.loads((skill / "bundle.json").read_text(encoding="utf-8"))["status"] == "pending"
+
+
 def test_an_unknown_route_and_a_traversing_parameter_are_refused(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -348,7 +479,9 @@ def test_pinning_is_operate_and_granting_needs_full_control(
     with TestClient(operate) as client:
         pinned = _call(client, operate, "projects.flag", body={"path": str(folder), "pinned": True})
         refused = _call(
-            client, operate, "settings.folder_grant",
+            client,
+            operate,
+            "settings.folder_grant",
             body={"path": str(folder), "shell_granted": True},
         )
     assert pinned.status_code == 200 and pinned.json()["data"][0]["pinned"] is True
@@ -357,7 +490,9 @@ def test_pinning_is_operate_and_granting_needs_full_control(
     full = _app(tmp_path, monkeypatch, full=True)
     with TestClient(full) as client:
         granted = _call(
-            client, full, "settings.folder_grant",
+            client,
+            full,
+            "settings.folder_grant",
             body={"path": str(folder), "shell_granted": True},
         )
         listed = _call(client, full, "projects.list")

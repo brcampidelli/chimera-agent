@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import math
 import os
+import re
 from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
@@ -27,6 +28,29 @@ _log = logging.getLogger("chimera.config")
 #: to — a message that only says "invalid" sends someone to the wrong file.
 _POSTURE_WORDS = frozenset({"always", "suspicious", "never"})  # CHIMERA_APPROVAL
 _GOVERNANCE_WORDS = frozenset({"ask", "allow", "deny"})  # CHIMERA_APPROVAL_MODE
+#: One ref segment `git worktree add -b <prefix>/attempt-<hex>` accepts on every platform, and no
+#: more: no slash (a second segment would make `chimera/x` and `chimera` collide as ref and
+#: directory), no dot (`.lock`, `..`), no leading `-` (it would read as an option). Forty is ample.
+BRANCH_PREFIX_SHAPE = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,39}")
+
+#: Names Windows reserves for devices, in any case. The shape above accepts them, and git on
+#: Windows cannot make the directory `.git/refs/heads/aux/` — measured: `git worktree add -b
+#: aux/attempt-9` answers "fatal: cannot lock ref ... unable to create directory", so every isolated
+#: run would fail. Only the exact name: `con-x` and `auxx` are ordinary names and work. `com0` was
+#: accepted by one Windows 11 machine and `lpt0` refused; both are in Microsoft's reserved list and
+#: refusing a name costs the owner nothing, so both are refused. (The superscript-digit forms
+#: Windows also reserves cannot pass the ASCII-only shape.)
+_WINDOWS_DEVICE_NAMES = frozenset(
+    {"con", "prn", "aux", "nul"}
+    | {f"com{n}" for n in range(10)}
+    | {f"lpt{n}" for n in range(10)}
+)
+
+
+def is_branch_prefix(word: str) -> bool:
+    """Whether ``word`` is a prefix `git worktree add -b <word>/attempt-<hex>` accepts on every
+    platform this runs on: one ref segment of the right shape, and not a Windows device name."""
+    return bool(BRANCH_PREFIX_SHAPE.fullmatch(word)) and word.lower() not in _WINDOWS_DEVICE_NAMES
 
 if TYPE_CHECKING:
     from chimera.providers.catalog import TierLadder
@@ -408,6 +432,13 @@ class Settings(BaseSettings):
     # `chimera.tools.defer.describe_saving` reports the measured half on your own registry — and can
     # report a LOSS, which below a handful of tools it truthfully is.
     defer_tools: bool = Field(default=False, validation_alias="CHIMERA_DEFER_TOOLS")
+    #: A project's `.chimera/pack.json` narrowing the skills, MCP servers and tools a run in that
+    #: folder receives (study 29, P7.6; `chimera/core/project_pack.py`). OFF until measured:
+    #: narrowing changes what a run can do, and `bench/project_pack/PREREGISTRATION.md` registers
+    #: the comparison (prompt tokens and tool-selection accuracy, with and without) without having
+    #: run it. Even on, a pack applies only after the owner accepted that file for that folder, and
+    #: it can only remove — never install, activate, launch or allow anything.
+    project_pack: bool = Field(default=False, validation_alias="CHIMERA_PROJECT_PACK")
 
     # --- The task list the agent keeps for itself (chimera/tools/todo.py).
     # On, and the reasoning differs from the two flags above it, so it is written down rather than
@@ -426,6 +457,10 @@ class Settings(BaseSettings):
     # answered by the configured decision backend. OFF by default for the reason `edit_batch` is: a
     # schema in every prompt of every step. Nothing is gated on its answers — they go to the agent.
     decide_tool: bool = Field(default=False, validation_alias="CHIMERA_DECIDE_TOOL")
+    # --- `create_document` (study 29, P6.2): Word/Excel/PowerPoint/PDF from a declarative spec. OFF
+    # for the reason `decide_tool` is — a rarely-used tool whose schema is paid on every step — and
+    # not for any reach it adds: it writes only where `write_file` may, through the same gate.
+    create_document: bool = Field(default=False, validation_alias="CHIMERA_CREATE_DOCUMENT")
     # --- The explorer's contract (study 25, S12; chimera/core/explorer.py). On, the explorer is
     # asked for a thoroughness level, reports findings with a path:line each and a gaps section, and
     # its cited locations are checked against the workspace. OFF by default: today's explorer text
@@ -437,6 +472,14 @@ class Settings(BaseSettings):
     # tool schema in every prompt and a new model bill per call, earned only by its bench
     # (bench/web_research).
     research_agent: bool = Field(default=False, validation_alias="CHIMERA_RESEARCH_AGENT")
+    # --- `open_pull_request` (study 29, P8.1; chimera/tools/pull_request.py). On, every surface that
+    # builds the default registry — the Code screen, chat, cron, the bots — gains a tool that pushes
+    # the workspace's current branch to `origin` and opens a pull request with the GitHub CLI. OFF by
+    # default: it publishes the owner's code and text to a remote, which is a new place for their
+    # data to go. On or off, EVERY call is a question to the owner — no approval mode, posture,
+    # governance mode or remembered answer turns it into a yes (`approval.always_ask`). Owner-only:
+    # the desktop bridge may not write it (`bridge_routes.OWNER_ONLY_SETTINGS`).
+    pull_requests: bool = Field(default=False, validation_alias="CHIMERA_PULL_REQUESTS")
     # --- Where an approval question goes when there is nobody at a console.
     #
     # This is what makes the three-state gate reachable on the surfaces that need it most. A cron
@@ -612,6 +655,17 @@ class Settings(BaseSettings):
     )
     openrouter_zdr: bool = Field(default=False, validation_alias="CHIMERA_OPENROUTER_ZDR")
 
+    # `CHIMERA_KEY_VAULT=true` makes the desktop Settings screen save a credential into the operating
+    # system's vault (`chimera/config_vault.py`) instead of into `.env`, leaving a comment in the
+    # file where the key was (study 29, P7.7). The vault itself is older than this switch — `chimera
+    # secrets set` and the startup read in `get_settings` — and this only decides where the SCREEN
+    # writes. OFF by default: it changes where a key lives, it depends on an optional extra the
+    # frozen build may not carry, and a keychain that later refuses (locked, a prompt cancelled, a
+    # re-signed binary on macOS) is a key the app cannot read. With no vault on the machine the save
+    # falls back to `.env` and says so. Only the owner may switch it: the bridge refuses the key
+    # (`bridge_routes.OWNER_ONLY_SETTINGS`), because its other direction puts keys back in the file.
+    key_vault: bool = Field(default=False, validation_alias="CHIMERA_KEY_VAULT")
+
     # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
     # the command pick the first model measured as a reviewer whose family differs from the
     # author's (`MEASURED_REVIEWERS` in `chimera/review/family.py`, chosen by `bench/review_reviewer`),
@@ -664,6 +718,12 @@ class Settings(BaseSettings):
     whatsapp_allowed_numbers: Annotated[list[str], NoDecode] = Field(
         default_factory=list, validation_alias="CHIMERA_WHATSAPP_ALLOWED_NUMBERS"
     )
+    # Study 29, P6.3: the Discord bot attaches the deliverables its turn wrote (a PDF, a sheet, a
+    # chart) to its reply. OFF, and refused while CHIMERA_DISCORD_ALLOWED_USERS is empty even when
+    # on: a file in a channel is the owner's data where others read it, and an open bot would make
+    # the owner's tools a file-export service for anyone (`chimera/server/attachments.py`). Read
+    # when the bot is built, so a change applies at the next launch.
+    discord_attach_files: bool = Field(default=False, validation_alias="CHIMERA_DISCORD_ATTACH_FILES")
     # Optional bearer token guarding the state-changing HTTP endpoints (/a2a, /chat, /webhook/*).
     # Unset = no auth (fine for localhost); set it before exposing the server to a network.
     server_token: str | None = Field(default=None, validation_alias="CHIMERA_SERVER_TOKEN")
@@ -915,6 +975,14 @@ class Settings(BaseSettings):
     # checkpoints. A value that breaks either rule is ignored with a warning and temp is used.
     # Read at every worktree creation, so a change applies from the next isolated run.
     worktree_dir: str = Field(default="", validation_alias="CHIMERA_WORKTREE_DIR")
+    # The first segment of every branch an isolated run makes: `<prefix>/attempt-<hex>` (study 29,
+    # P8.1). `chimera`, which is what it always was. Those branches land in the OWNER's repository,
+    # where `git branch` is read by people and by tooling with its own naming rules, so the name is
+    # theirs to choose. One segment of letters, digits, `-` and `_`: anything else (a slash, a dot,
+    # a space) is read as the default with a warning rather than handed to `git worktree add`, which
+    # would refuse it and fail the run. Every prefix that has made a branch is remembered, so the
+    # cleanup of a killed run still finds branches made under the previous one.
+    branch_prefix: str = Field(default="chimera", validation_alias="CHIMERA_BRANCH_PREFIX")
 
     # Auto-start the messaging adapters (Discord/Telegram) inside `chimera app` at boot, so the agent
     # can reach you on chat without a separate `chimera serve --discord` terminal. OFF by default: it
@@ -1300,6 +1368,25 @@ class Settings(BaseSettings):
             return ""
         return word
 
+    @field_validator("branch_prefix", mode="before")
+    @classmethod
+    def _branch_prefix_is_one_ref_segment(cls, value: object) -> object:
+        """A prefix git would refuse fails every isolated run at `git worktree add`; read it as the
+        default instead, and say so. Empty is the default too — an empty first segment is no name."""
+        if not isinstance(value, str):
+            return value
+        word = value.strip()
+        if not word:
+            return "chimera"
+        if not is_branch_prefix(word):
+            _log.warning(
+                "CHIMERA_BRANCH_PREFIX=%r is not one segment of letters, digits, '-' or '_', or "
+                "is a name Windows reserves (CON, NUL, AUX, COM1...); using 'chimera'.",
+                word,
+            )
+            return "chimera"
+        return word
+
     @field_validator("approval_mode", mode="before")
     @classmethod
     def _approval_mode_is_a_policy_word(cls, value: object) -> object:
@@ -1638,7 +1725,18 @@ def get_settings() -> Settings:
     #
     # Gap-filling only: anything already in the environment wins, so an install that works today is
     # untouched and `OPENROUTER_API_KEY=… chimera solve` still means what it says.
-    from chimera.config_vault import load_into_environment
+    #
+    # Gap-filling against the `.env` too: a name the file assigns is the file's, because a vault
+    # copy put in the environment would outrank the file (pydantic-settings ranks the environment
+    # first) and silently override what the owner typed there.
+    #
+    # The frozen desktop build reads only the names its `.env` marks as moved
+    # (`config_vault.startup_names`) — none, for an owner who never opted in, who must launch
+    # exactly as before; and never more than they moved, though the vault may hold more.
+    from chimera.config_vault import load_into_environment, startup_names
 
-    load_into_environment()
+    env_file = Settings.model_config.get("env_file")
+    names = startup_names(env_file)
+    if names:
+        load_into_environment(names=names, env_file=env_file)
     return Settings()

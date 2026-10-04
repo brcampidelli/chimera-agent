@@ -1,0 +1,938 @@
+[
+  {
+    "name": "a bar chart of inline rows",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "the reviewer's 125-byte sequence",
+    "spec": {
+      "data": {
+        "sequence": {
+          "start": 0,
+          "stop": 4000000,
+          "as": "x"
+        }
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {
+          "field": "x",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 4000000
+  },
+  {
+    "name": "a small sequence",
+    "spec": {
+      "data": {
+        "sequence": {
+          "start": 0,
+          "stop": 100,
+          "step": 0.5,
+          "as": "x"
+        }
+      },
+      "mark": "line",
+      "encoding": {
+        "x": {
+          "field": "x",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 200
+  },
+  {
+    "name": "a sequence with no stop",
+    "spec": {
+      "data": {
+        "sequence": {
+          "start": 0,
+          "as": "x"
+        }
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {
+          "field": "x",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": "inf"
+  },
+  {
+    "name": "a sequence stepping zero",
+    "spec": {
+      "data": {
+        "sequence": {
+          "start": 0,
+          "stop": 10,
+          "step": 0
+        }
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {
+          "field": "x",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": "inf"
+  },
+  {
+    "name": "a sequence counting down the wrong way",
+    "spec": {
+      "data": {
+        "sequence": {
+          "start": 10,
+          "stop": 0
+        }
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {
+          "field": "x",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "a sequence stop given as a signal",
+    "spec": {
+      "data": {
+        "sequence": {
+          "start": 0,
+          "stop": {
+            "signal": "n"
+          }
+        }
+      },
+      "mark": "point",
+      "encoding": {
+        "x": {
+          "field": "x",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": "inf"
+  },
+  {
+    "name": "impute key values as a sequence",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "impute": "b",
+          "key": "a",
+          "keyvals": {
+            "start": 0,
+            "stop": 1000000
+          }
+        }
+      ]
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "impute key values as a list",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "impute": "b",
+          "key": "a",
+          "keyvals": [
+            1,
+            2,
+            3
+          ]
+        }
+      ]
+    },
+    "rows": 0
+  },
+  {
+    "name": "density at its default steps",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "density": "b"
+        }
+      ]
+    },
+    "rows": 200
+  },
+  {
+    "name": "density with a million steps",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "density": "b",
+          "steps": 1000000
+        }
+      ]
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "quantile at its default step",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "quantile": "b"
+        }
+      ]
+    },
+    "rows": 100
+  },
+  {
+    "name": "quantile stepping a millionth",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "quantile": "b",
+          "step": 1e-06
+        }
+      ]
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "bin set to true",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "b",
+          "bin": true,
+          "type": "quantitative"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "bin with its default maxbins",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "b",
+          "bin": {
+            "nice": true
+          },
+          "type": "quantitative"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 10
+  },
+  {
+    "name": "bin with a million maxbins",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "b",
+          "bin": {
+            "maxbins": 1000000
+          },
+          "type": "quantitative"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "bin stepping over a stated extent",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "bin": {
+            "step": 0.0001,
+            "extent": [
+              0,
+              100
+            ]
+          },
+          "field": "b",
+          "as": "bb"
+        }
+      ]
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "bin stepping over the data's extent",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "b",
+          "bin": {
+            "step": 5
+          },
+          "type": "quantitative"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "an axis asking for a million ticks",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative",
+          "axis": {
+            "tickCount": 1000000
+          }
+        }
+      }
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "an axis ticking by month",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative",
+          "axis": {
+            "tickCount": "month"
+          }
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "a calculate making a sequence",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "calculate": "sequence(0, 1e6)",
+          "as": "s"
+        }
+      ]
+    },
+    "rows": 1000000
+  },
+  {
+    "name": "a calculate making a sequence with a step",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "calculate": "sequence(0, 10, 0.5)",
+          "as": "s"
+        }
+      ]
+    },
+    "rows": 20
+  },
+  {
+    "name": "a calculate making a sequence of a computed length",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "calculate": "sequence(0, datum.b * 1000)",
+          "as": "s"
+        }
+      ]
+    },
+    "rows": "inf"
+  },
+  {
+    "name": "a calculate padding to a literal length",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "calculate": "pad(datum.a, 12)",
+          "as": "s"
+        }
+      ]
+    },
+    "rows": 12
+  },
+  {
+    "name": "a calculate padding to a computed length",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "transform": [
+        {
+          "calculate": "pad(datum.a, datum.b)",
+          "as": "s"
+        }
+      ]
+    },
+    "rows": "inf"
+  },
+  {
+    "name": "a title that mentions sequence(",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "A",
+            "b": 5,
+            "g": "p"
+          },
+          {
+            "a": "B",
+            "b": 8,
+            "g": "q"
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      },
+      "title": "the sequence(1 to 10)"
+    },
+    "rows": 0
+  },
+  {
+    "name": "inline rows that hold sequence(",
+    "spec": {
+      "data": {
+        "values": [
+          {
+            "a": "sequence(0, 1e9)",
+            "b": 1
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "a dataset row that holds pad(",
+    "spec": {
+      "data": {
+        "name": "t"
+      },
+      "datasets": {
+        "t": [
+          {
+            "a": "pad('x', 1e9)",
+            "b": 1
+          }
+        ]
+      },
+      "mark": "bar",
+      "encoding": {
+        "x": {
+          "field": "a",
+          "type": "nominal"
+        },
+        "y": {
+          "field": "b",
+          "type": "quantitative"
+        }
+      }
+    },
+    "rows": 0
+  },
+  {
+    "name": "two generators add up",
+    "spec": {
+      "layer": [
+        {
+          "data": {
+            "sequence": {
+              "start": 0,
+              "stop": 30000,
+              "as": "x"
+            }
+          },
+          "mark": "point",
+          "encoding": {
+            "x": {
+              "field": "x",
+              "type": "quantitative"
+            }
+          }
+        },
+        {
+          "data": {
+            "sequence": {
+              "start": 0,
+              "stop": 30000,
+              "as": "x"
+            }
+          },
+          "mark": "point",
+          "encoding": {
+            "x": {
+              "field": "x",
+              "type": "quantitative"
+            }
+          }
+        }
+      ]
+    },
+    "rows": 60000
+  }
+]

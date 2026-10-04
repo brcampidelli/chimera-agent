@@ -384,7 +384,7 @@ def govern_registry(
     ledger per tool would answer "how much was this run refused" with as many numbers as there are
     tools in the registry.
     """
-    governed = ToolRegistry()
+    governed = ToolRegistry.like(registry)
     for tool in registry.tools():
         governed.register(
             GovernedTool(

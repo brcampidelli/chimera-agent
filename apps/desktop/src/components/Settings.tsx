@@ -50,6 +50,7 @@ import { ConversationsCard } from "@/components/ConversationsCard";
 import { WeeklyReviewRow } from "@/components/WeeklyReviewRow";
 import { StorageCard } from "@/components/StorageCard";
 import { DiagnosticsCard } from "@/components/DiagnosticsCard";
+import { KeyVaultMove } from "@/components/KeyVaultMove";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type {
@@ -344,6 +345,22 @@ function AutonomyCard({
           </div>
         </div>
       )}
+      {/* The agent's `open_pull_request` (study 29, P8.1). Off unless the owner turns it on, and
+          worded as a warning: it widens where the owner's code can go. Each pull request still asks
+          on a card whatever this row says, so the switch decides whether the agent may PROPOSE one,
+          never whether it may open one unasked. The desktop bridge cannot write it. */}
+      <Row
+        label={t("settings.row.pullRequests")}
+        hint={t("settings.hint.pullRequests")}
+        warn
+        applies={c.applies?.CHIMERA_PULL_REQUESTS}
+        env="CHIMERA_PULL_REQUESTS"
+      >
+        <Toggle
+          on={c.autonomy.pull_requests ?? false}
+          onChange={(v) => save({ CHIMERA_PULL_REQUESTS: String(v) })}
+        />
+      </Row>
       <Row
         label={t("settings.row.governance")}
         hint={t("settings.hint.governance")}
@@ -908,6 +925,14 @@ function SecretField({
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Check className="h-3.5 w-3.5 text-ok" /> {t("settings.isSet")}{" "}
             {provider.hint}
+            {/* Where the key lives, when it is not the file (study 29, P7.7). A fact about the
+                key's place, never about its value. */}
+            {provider.in_vault ? (
+              <span className="ml-1 inline-flex items-center gap-1">
+                <KeyRound className="h-3.5 w-3.5" aria-hidden />
+                <span>{t("settings.vault.badge")}</span>
+              </span>
+            ) : null}
           </span>
         ) : (
           <span className="text-xs text-muted-foreground">
@@ -971,18 +996,34 @@ function PoolField({
   const t = useT();
   const [v, setV] = useState("");
   const [error, setError] = useState("");
+  // The server's own reason, under the generic line. "Check it is a key, not a masked hint" is the
+  // common case, but not the only one: with the vault switch on, a pool can outgrow what Windows'
+  // Credential Manager keeps per entry, and the server says so — a reason worth showing over a guess.
+  const [reason, setReason] = useState("");
+  // With the vault switch on and no vault on this machine, the server writes the whole pool to
+  // `.env` in plain text and says so in `vault_fallback`. The switch's own row only reads the answer
+  // of a PATCH, never of a pool write, so without this the pool would land in the file in silence.
+  const [fellBack, setFellBack] = useState<readonly string[]>([]);
   const add = useMutation({
     mutationFn: () => addPoolKey(pool.provider, v.trim()),
-    onSuccess: () => {
+    onSuccess: (data) => {
       setV("");
       setError("");
+      setReason("");
+      setFellBack(data.vault_fallback ?? []);
       onChanged();
     },
-    onError: () => setError(t("settings.pool.rejected")),
+    onError: (e: unknown) => {
+      setError(t("settings.pool.rejected"));
+      setReason(e instanceof Error ? e.message : "");
+    },
   });
   const drop = useMutation({
     mutationFn: (index: number) => removePoolKey(pool.provider, index),
-    onSuccess: onChanged,
+    onSuccess: (data) => {
+      setFellBack(data.vault_fallback ?? []);
+      onChanged();
+    },
   });
 
   return (
@@ -1025,6 +1066,7 @@ function PoolField({
           onChange={(e) => {
             setV(e.target.value);
             setError("");
+            setReason("");
           }}
         />
         <Button
@@ -1036,6 +1078,12 @@ function PoolField({
         </Button>
       </div>
       {error ? <p className="text-xs text-bad-foreground">{error}</p> : null}
+      {error && reason ? <p className="text-xs text-muted-foreground">{reason}</p> : null}
+      {fellBack.length ? (
+        <p className="text-xs text-warn-foreground">
+          {t("settings.vault.fellBack", { keys: fellBack.join(", ") })}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -1054,6 +1102,8 @@ export function MessagingCard({
   tokenEnv = "CHIMERA_DISCORD_BOT_TOKEN",
   allowed = [],
   allowedApplies,
+  attach = false,
+  attachApplies,
 }: {
   save: (u: Record<string, string>) => void;
   platform?: "discord" | "telegram";
@@ -1062,6 +1112,9 @@ export function MessagingCard({
   allowed?: readonly string[];
   /** When a saved list starts applying — the server's answer (`config.applies`), never a guess here. */
   allowedApplies?: string;
+  /** Discord only: `CHIMERA_DISCORD_ATTACH_FILES` as saved (`config.messaging.discord_attach_files`). */
+  attach?: boolean;
+  attachApplies?: string;
 }) {
   const t = useT();
   const qc = useQueryClient();
@@ -1184,6 +1237,29 @@ export function MessagingCard({
           {t("settings.messaging.open", { platform: label })}
         </div>
       )}
+      {/* Discord only: it is the one adapter that sends files. Below the allowlist because it depends
+          on it — the server attaches nothing while the list is empty, and the line under the switch
+          says so, so an "on" switch never reads as files going out when none do. */}
+      {platform === "discord" ? (
+        <>
+          <Row
+            label={t("settings.row.discordAttach")}
+            hint={t("settings.hint.discordAttach")}
+            applies={attachApplies}
+            env="CHIMERA_DISCORD_ATTACH_FILES"
+          >
+            <Toggle
+              on={attach}
+              onChange={(v) => save({ CHIMERA_DISCORD_ATTACH_FILES: String(v) })}
+            />
+          </Row>
+          {attach && allowed.length === 0 ? (
+            <div className="px-4 pb-3 text-xs text-warn-foreground">
+              {t("settings.messaging.attachRefused")}
+            </div>
+          ) : null}
+        </>
+      ) : null}
       {!configured && (
         <div className="px-4 pb-3 text-xs text-muted-foreground">
           {t("settings.messaging.note")}
@@ -1585,6 +1661,50 @@ export function Settings({
                 </Card>
 
                 <Card title={t("settings.card.apiKeys")}>
+                  {/* Where the next key typed below is saved (study 29, P7.7). Off: `.env`, as
+                    always. On: the OS vault, with a comment left in the file. With no vault on this
+                    machine the hint says so before the switch is touched, and a save that fell back
+                    names the keys it wrote to the file — a switch reading "on" over a plain-text
+                    key is the one state this row must never show silently. */}
+                  <Row
+                    label={t("settings.row.keyVault")}
+                    // The server token is the one key the switch never moves: the desktop shell
+                    // reads it from `.env` for the tray and cannot read the vault
+                    // (`api/key_vault.py`, SCREEN_STORABLE). Said here so the owner is not left to
+                    // find a plain-text line the switch seemed to promise away.
+                    hint={
+                      c.vault?.available
+                        ? `${t("settings.hint.keyVault")} ${t("settings.hint.keyVaultServerToken")}`
+                        : t("settings.hint.keyVaultUnavailable")
+                    }
+                    warn={!c.vault?.available}
+                    env="CHIMERA_KEY_VAULT"
+                    note={
+                      mutation.data?.vault_fallback?.length ? (
+                        <div className="text-xs text-warn-foreground">
+                          {t("settings.vault.fellBack", {
+                            keys: mutation.data.vault_fallback.join(", "),
+                          })}
+                        </div>
+                      ) : null
+                    }
+                  >
+                    <Toggle
+                      on={c.vault?.enabled ?? false}
+                      onChange={(v) => save({ CHIMERA_KEY_VAULT: String(v) })}
+                    />
+                  </Row>
+                  {c.vault?.available ? (
+                    <Row
+                      label={t("settings.row.keyVaultMove")}
+                      hint={t("settings.hint.keyVaultMove")}
+                    >
+                      <KeyVaultMove
+                        enabled={c.vault.enabled ?? false}
+                        inVault={c.vault.keys?.length ?? 0}
+                      />
+                    </Row>
+                  ) : null}
                   {c.providers.map((p) => (
                     <Row key={p.env} label={p.label} hint={p.env} env={p.env}>
                       <SecretField
@@ -1699,6 +1819,8 @@ export function Settings({
                   save={save}
                   allowed={c.messaging?.allowed_users?.discord ?? []}
                   allowedApplies={c.applies?.CHIMERA_DISCORD_ALLOWED_USERS}
+                  attach={c.messaging?.discord_attach_files ?? false}
+                  attachApplies={c.applies?.CHIMERA_DISCORD_ATTACH_FILES}
                 />
                 <MessagingCard
                   save={save}
@@ -1977,6 +2099,19 @@ export function Settings({
                       onChange={(v) => save({ CHIMERA_MCP_DEFER: String(v) })}
                     />
                   </Row>
+                  {/* A project's pack narrowing skills, servers and tools (study 29, P7.6). Off until
+                the registered comparison runs; each pack still needs its own yes on the Code
+                screen. The bridge cannot write this one — off is the direction that widens. */}
+                  <Row
+                    label={t("settings.row.projectPack")}
+                    hint={t("settings.hint.projectPack")}
+                    env="CHIMERA_PROJECT_PACK"
+                  >
+                    <Toggle
+                      on={c.project_pack?.enabled ?? false}
+                      onChange={(v) => save({ CHIMERA_PROJECT_PACK: String(v) })}
+                    />
+                  </Row>
                 </Card>
 
                 {/* Which instrument answers a typed decision. A server without the `decisions` block
@@ -2030,6 +2165,7 @@ export function Settings({
               P5.3). Measured, never guessed: a row the server could not count says so. */}
                 <StorageCard
                   worktreeDir={c.storage?.worktree_dir ?? ""}
+                  branchPrefix={c.storage?.branch_prefix ?? "chimera"}
                   onSave={save}
                 />
 
@@ -2055,6 +2191,9 @@ export function Settings({
                         llm: false,
                         model: "",
                         keys_url: "",
+                        // This screen never puts the token in the vault (the tray reads it from
+                        // `.env`); `chimera secrets set` can, and then the row says where it is.
+                        in_vault: (c.vault?.keys ?? []).includes("CHIMERA_SERVER_TOKEN"),
                       }}
                       onSave={(v) => save({ CHIMERA_SERVER_TOKEN: v })}
                     />

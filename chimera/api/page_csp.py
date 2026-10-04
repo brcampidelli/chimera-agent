@@ -23,14 +23,22 @@ app is the second layer, there so the person sees what was withheld instead of a
   licence, and the Appearance row that offers it still checks that it loads first.
 
 **Why `script-src` is looser than the rest.** The HTML preview is an `iframe srcdoc`, and a srcdoc
-document *inherits the parent's policy*: both policies must allow a script for it to run. The
-`render_chart` page loads Vega from cdn.jsdelivr.net, runs an inline script, and Vega's expression
-compiler uses `new Function`. Measured in headless Edge 154 (the engine WebView2 ships): without
-`'unsafe-eval'` on the PARENT the chart draws nothing even when the frame's own policy allows it,
-and without the CDN and `'unsafe-inline'` it never starts. So the parent carries those three, and
-the frame's own `<meta>` policy (`HtmlPreview.tsx`) is what narrows the preview back down. What
-is held tight here — images, connections, frames, forms, plugins — covers every channel a
-Markdown answer can reach WITHOUT running code.
+document *inherits the parent's policy*: both policies must allow a script for it to run, so a
+previewed page's own inline scripts need `'unsafe-inline'` here. The frame's own `<meta>` policy
+(`HtmlPreview.tsx`) is what narrows the preview back down. What is held tight here — images,
+connections, frames, forms, plugins — covers every channel a Markdown answer can reach WITHOUT
+running code.
+
+Until study 29 (P6.1) this rule also carried `https://cdn.jsdelivr.net` and `'unsafe-eval'`, for one
+kind of page: `render_chart`'s, which loads Vega from that CDN and whose expression compiler uses
+`new Function` (measured in headless Edge 154: without `'unsafe-eval'` on the PARENT that chart drew
+nothing). Charts are now drawn by the app's own Vega — in the conversation from the turn's `chart`
+frame, and in the viewer from the spec the page carries — with an expression interpreter instead of
+`new Function` and no network loader, so neither source is needed. The CDN admitted any package or
+GitHub repository a page named, and `'unsafe-eval'` applied to the app's own top-level page, not only
+to the preview. A page someone else wrote that loads a library from jsDelivr no longer runs in the
+preview; opened in a browser it does, and the preview's note says nothing is loaded from other
+sites.
 
 **What this policy does not close.** A page that runs script — only the HTML preview does — still
 has ways out that CSP does not govern. Measured in headless Edge 154 with this header on the page
@@ -41,10 +49,9 @@ So a previewed page can still send data out: in a STUN/TURN hostname (through DN
 server it names. `--webrtc-ip-handling-policy=disable_non_proxied_udp` on the browser stopped every
 UDP packet in the same probe (the `--force-` spelling of that switch changed nothing) and did
 NOT stop the TCP TURN connection, so it would narrow the channel, not close it; it is not set
-(the window is built in `main.rs`, and the real WebView2 is unmeasured). Smaller ones: `<link rel=dns-prefetch>` is outside CSP (unmeasured here), and
-`https://cdn.jsdelivr.net` in `script-src` admits any package or GitHub repository the page names,
-with whatever the page puts in the path. The preview's note says this rather than claiming the
-frame is sealed.
+(the window is built in `main.rs`, and the real WebView2 is unmeasured). A smaller one:
+`<link rel=dns-prefetch>` is outside CSP (unmeasured here). The preview's note says this rather than
+claiming the frame is sealed.
 
 **`frame-src 'none'`** does not block the preview (a srcdoc frame is not a fetch), and it is what
 stops the previewed page from navigating *its own frame* to `https://host/?d=…` — measured: with no
@@ -68,9 +75,9 @@ if TYPE_CHECKING:
 # Sources a remote Chimera can live at: the Servers screen refuses anything else.
 _REMOTE_SERVER_SOURCES = ("https:", "http://127.0.0.1:*", "http://localhost:*")
 
-# The preview iframe inherits this policy, so these three are the chart's requirements, not the
-# app's. Removing any of them blanks `render_chart`'s HTML output in the viewer.
-_PREVIEW_SCRIPT_SOURCES = ("'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net")
+# The preview iframe inherits this policy, so a previewed page's inline scripts need this here. The
+# CDN and 'unsafe-eval' that `render_chart`'s pages needed are gone: the app draws charts itself.
+_PREVIEW_SCRIPT_SOURCES = ("'unsafe-inline'",)
 
 APP_PAGE_CSP = "; ".join(
     (

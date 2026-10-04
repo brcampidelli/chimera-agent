@@ -63,7 +63,7 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
 | [`project`](#project) | Run a project start-to-finish against a Spec (drift = acceptance authority). |
 | [`redteam`](#redteam) | Red-team the injection defenses: attack success rate with vs without them. |
-| [`report`](#report) | Reports counted by code from this home's own logs — no model call. |
+| [`report`](#report) | Reports counted by code — from this home's own logs, or read with the GitHub CLI — no model call. |
 | [`review`](#review) | [experimental] Review a change: findings first, P0 to P3, from a model of another family. |
 | [`rubric-grade`](#rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
 | [`run`](#run) | Run a single-shot Tier-1 completion (no fusion). Requires a provider key. |
@@ -214,6 +214,7 @@ chimera approve [REQUEST_ID]
 | --- | --- | --- |
 | `--yes`, `-y` | Approve it. |  |
 | `--no`, `-n` | Refuse it. |  |
+| `--show` | Print the whole question — the full action — and answer nothing. |  |
 
 ## assist
 
@@ -509,7 +510,7 @@ chimera deliver REQUEST
 | Option | | Default |
 | --- | --- | --- |
 | `--out`, `-o` | Write the deliverable to this file. |  |
-| `--format`, `-f` | md | txt | html | `'md'` |
+| `--format`, `-f` | md | txt | html | docx | xlsx | pdf (the last three need --out) | `'md'` |
 | `--model`, `-m` | Override the model slug. |  |
 | `--fuse` | Use the fusion engine for higher quality. |  |
 
@@ -861,14 +862,17 @@ chimera meta TASK
 
 Import config + skills from another agent; --apply also merges long-term memory.
 
+``claude`` imports memory only (CLAUDE.md and memory/*.md), as unverified facts, never persona:
+the dry-run lists every fact it would write.
+
 ```bash
 chimera migrate SOURCE PATH
 ```
 
 | Argument | |
 | --- | --- |
-| `SOURCE` | Source agent: hermes | openclaw. |
-| `PATH` | Path to the source agent's home directory. |
+| `SOURCE` | Source agent: hermes | openclaw | claude. |
+| `PATH` | Path to the source agent's home directory (for claude: ~/.claude or a project). |
 
 | Option | | Default |
 | --- | --- | --- |
@@ -975,7 +979,7 @@ chimera redteam
 
 ## report
 
-Reports counted by code from this home's own logs — no model call.
+Reports counted by code — from this home's own logs, or read with the GitHub CLI — no model call.
 
 ```bash
 chimera report

@@ -66,6 +66,9 @@ class MigrationResult(BaseModel):
     skills: list[str] = Field(default_factory=list)
     memory_files: list[str] = Field(default_factory=list)
     memory_merged: dict[str, int] | None = None
+    #: The facts a dry-run WOULD write, one string each — filled by importers whose memory is prose
+    #: (Claude's), where a list of file names says nothing about what will land in memory.
+    candidates: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
 
 

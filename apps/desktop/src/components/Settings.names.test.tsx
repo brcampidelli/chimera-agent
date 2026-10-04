@@ -38,9 +38,9 @@ vi.mock("@/lib/api", () => ({
  */
 
 const PROVIDERS = [
-  { env: "OPENROUTER_API_KEY", label: "OpenRouter", hint: "sk-or-…", keys_url: "", llm: true, name: "openrouter", set: false, model: "" },
-  { env: "ANTHROPIC_API_KEY", label: "Anthropic", hint: "sk-ant-…", keys_url: "", llm: true, name: "anthropic", set: false, model: "" },
-  { env: "TAVILY_API_KEY", label: "Tavily", hint: "tvly-…", keys_url: "", llm: false, name: "tavily", set: false, model: "" },
+  { env: "OPENROUTER_API_KEY", label: "OpenRouter", hint: "sk-or-…", keys_url: "", llm: true, name: "openrouter", set: false, model: "", in_vault: false },
+  { env: "ANTHROPIC_API_KEY", label: "Anthropic", hint: "sk-ant-…", keys_url: "", llm: true, name: "anthropic", set: false, model: "", in_vault: false },
+  { env: "TAVILY_API_KEY", label: "Tavily", hint: "tvly-…", keys_url: "", llm: false, name: "tavily", set: false, model: "", in_vault: false },
 ];
 
 function config() {
@@ -55,6 +55,7 @@ function config() {
     denied_tools: [],
     governance: "off",
     approval_webhook_set: false,
+    pull_requests: false,
   },
     sandbox: { mode: "local", image: "python:3.12-slim", network: "none", verify_network: false },
     server: { token_set: false },

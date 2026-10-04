@@ -17,9 +17,16 @@ vi.mock("@/lib/api", () => ({
   installSkillBundle: vi.fn(),
   setSkillBundleStatus: vi.fn(),
   uninstallSkillBundle: vi.fn(),
+  checkSkillBundleUpdate: vi.fn(),
+  getEffectiveSkills: vi.fn(async () => ({ bundles: [], bundle_text: "", cards_read: false, cards: [], cards_k: 0 })),
 }));
 
 const mockCatalog = vi.mocked(getSkillCatalog);
+
+/** The portability filter (study 29, P7.1) lists every rating's name as an `<option>`, so a rating
+ *  asserted by its words must be looked for on the ROW — the badge beside the name — and not in the
+ *  menu that offers to filter by it. Same assertion as before, scoped to where it was always aimed. */
+const ROW_ONLY = { ignore: "option, script, style" } as const;
 
 function entry(over: Partial<CatalogEntry> = {}): CatalogEntry {
   return {
@@ -52,7 +59,7 @@ describe("the installable-skills catalogue", () => {
 
     // The order is the point: this is the list that decides whether the thing runs at all on this
     // machine, and finding it out after the download means finding it out from a failure.
-    expect(screen.getByText(/needs a GPU or gigabytes/i)).toBeInTheDocument();
+    expect(screen.getByText(/needs a GPU or gigabytes/i, ROW_ONLY)).toBeInTheDocument();
     expect(screen.getByText(/latex, ffmpeg/)).toBeInTheDocument();
   });
 
@@ -63,8 +70,8 @@ describe("the installable-skills catalogue", () => {
     );
 
     // Eighty names in one flat list would advertise eighty working features and deliver fewer.
-    expect(screen.getByText(/written for another agent/i)).toBeInTheDocument();
-    expect(screen.getByText(/works here/i)).toBeInTheDocument();
+    expect(screen.getByText(/written for another agent/i, ROW_ONLY)).toBeInTheDocument();
+    expect(screen.getByText(/works here/i, ROW_ONLY)).toBeInTheDocument();
   });
 
   it("shows the licence, and shows an unreadable one differently", async () => {

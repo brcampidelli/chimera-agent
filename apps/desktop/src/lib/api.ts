@@ -12,6 +12,8 @@ import type {
   FsFileWritten,
   FsTree,
   GitCommitResult,
+  PullRequestReadiness,
+  PullRequestResult,
   GitDiff,
   GitInitResult,
   GitRevertResult,
@@ -36,10 +38,19 @@ import type {
   CatalogEntry,
   LibraryCard,
   SkillBundle,
+  EffectiveSkills,
+  BundleUpdate,
+  ProjectPack,
+  SkillBundleText,
   CodeSessionRaw,
   Maturity,
   McpServers,
   McpTest,
+  ClaudeImportApply,
+  ClaudeImportPreview,
+  ConsolidateApply,
+  ConsolidatePreview,
+  MemoryExport,
   MemoryItem,
   MemoryLayers,
   MemoryProfile,
@@ -53,6 +64,9 @@ import type {
   WorktreePrune,
   LogRotate,
   AppDiagnostics,
+  Connector,
+  Connectors,
+  ConnectorPatch,
   LocalRuntimes,
   NetworkShare,
   AccessState,
@@ -60,6 +74,8 @@ import type {
   WorkInfo,
   OllamaModels,
   PoolWrite,
+  ConfigUpdated,
+  VaultMove,
   ProjectState,
   RunReceipt,
   SkillsResponse,
@@ -70,6 +86,7 @@ import type {
   UsageSummary,
   VersionInfo,
 } from "@/lib/types";
+import type { CodeChartFrame } from "@/lib/chart/spec";
 import { apiUrl, token } from "@/lib/server";
 import { parseSseFrame, readSseFrames } from "@/lib/sse";
 import { policyBlockOf, type PolicyBlockInfo } from "@/lib/policy-block";
@@ -474,6 +491,39 @@ export const gitCommit = (workspace: string | null | undefined, message: string,
     method: "POST",
     body: JSON.stringify({ workspace: workspace || null, message, paths }),
   });
+/** What opening a pull request from the workspace's branch would push, or the first reason it
+ *  cannot (study 29, P8.1). `head` is the commit shown; send it back with {@link openPullRequest}. */
+export const getPullRequestReadiness = (workspace?: string | null) => {
+  const params = new URLSearchParams();
+  if (workspace) params.set("workspace", workspace);
+  const qs = params.toString();
+  return json<PullRequestReadiness>(`/api/git/pull-request${qs ? `?${qs}` : ""}`);
+};
+/** Push the commit the owner was shown (`head`) to origin and open the pull request. The server
+ *  refuses the default branch, never forces, and refuses a branch that moved since `head`. `remote`
+ *  and `remote_head` are the destination and the remote branch's commit that were shown: a push URL
+ *  or a remote branch that changed since is refused too. */
+export const openPullRequest = (req: {
+  workspace: string | null | undefined;
+  title: string;
+  body: string;
+  head: string;
+  remote?: string;
+  remote_head?: string;
+  draft?: boolean;
+}) =>
+  json<PullRequestResult>("/api/git/pull-request", {
+    method: "POST",
+    body: JSON.stringify({
+      workspace: req.workspace || null,
+      title: req.title,
+      body: req.body,
+      head: req.head,
+      remote: req.remote ?? null,
+      remote_head: req.remote_head ?? null,
+      draft: req.draft ?? false,
+    }),
+  });
 export const gitRevert = (workspace: string | null | undefined, paths: string[]) =>
   json<GitRevertResult>("/api/git/revert", {
     method: "POST",
@@ -500,7 +550,12 @@ export const getMaturity = () => json<Maturity>("/api/maturity");
 // unavailable snapshot returns {available:false}, never a 500.
 export const getBenchmarks = () => json<Benchmarks>("/api/benchmarks");
 export const patchConfig = (updates: Record<string, string>) =>
-  json<{ updated: string[] }>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+  json<ConfigUpdated>("/api/config", { method: "PATCH", body: JSON.stringify(updates) });
+
+/** Move the keys between `.env` and the OS vault (study 29, P7.7). Names travel, never a value:
+ *  the server reads each key from where it is and writes it where it goes. */
+export const moveVaultKeys = (to: "vault" | "file") =>
+  json<VaultMove>("/api/config/vault/move", { method: "POST", body: JSON.stringify({ to }) });
 
 /** Add one key to a provider's rotation pool. ONE key, never the list.
  *
@@ -545,6 +600,40 @@ export const addMemory = (content: string, kind: string) =>
   });
 export const deleteMemory = (id: string) =>
   json<{ deleted: boolean }>(`/api/memory/${id}`, { method: "DELETE" });
+// Rewrite one fact in place. The server masks secrets and KEEPS the trust label: rewording a fact
+// learned from untrusted content does not vet it.
+export const editMemory = (id: string, content: string) =>
+  json<MemoryItem>(`/api/memory/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    body: JSON.stringify({ content }),
+  });
+// The whole store as one file's text, built locally; the screen turns it into a download.
+export const exportMemory = (format: "json" | "markdown") =>
+  json<MemoryExport>(`/api/memory/export?format=${format}`);
+// Import from Claude in two steps: a preview that writes nothing, then an apply that writes only
+// the candidates the owner ticked — as unverified facts, never persona.
+export const previewClaudeImport = (path: string) =>
+  json<ClaudeImportPreview>("/api/memory/import/claude/preview", {
+    method: "POST",
+    body: JSON.stringify({ path: path.trim() || null }),
+  });
+export const applyClaudeImport = (path: string, contents: string[]) =>
+  json<ClaudeImportApply>("/api/memory/import/claude/apply", {
+    method: "POST",
+    body: JSON.stringify({ path: path.trim() || null, contents }),
+  });
+// Consolidation likewise: the preview is free (no model call); the apply spends one model call per
+// reviewed group and merges only groups that are still exactly what was reviewed.
+export const previewConsolidation = () =>
+  json<ConsolidatePreview>("/api/memory/consolidate/preview", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+export const applyConsolidation = (groups: string[][]) =>
+  json<ConsolidateApply>("/api/memory/consolidate", {
+    method: "POST",
+    body: JSON.stringify({ groups }),
+  });
 
 // --- Skills ---
 export const getSkills = () => json<SkillsResponse>("/api/skills");
@@ -568,8 +657,30 @@ export const getSkillLibrary = () => json<LibraryCard[]>("/api/skills/library");
 
 export const getSkillCatalog = () => json<CatalogEntry[]>("/api/skills/catalog");
 export const getSkillBundles = () => json<SkillBundle[]>("/api/skills/bundles");
-export const installSkillBundle = (name: string) =>
-  json<SkillBundle>(`/api/skills/catalog/${encodeURIComponent(name)}/install`, { method: "POST" });
+/** `force` replaces an installed copy — the update path. It lands `pending` like any install. */
+export const installSkillBundle = (name: string, force = false) =>
+  json<SkillBundle>(
+    `/api/skills/catalog/${encodeURIComponent(name)}/install${force ? "?force=true" : ""}`,
+    { method: "POST" },
+  );
+/** What the agent is told about skills right now — the prompt's own text, not a summary. */
+export const getEffectiveSkills = () => json<EffectiveSkills>("/api/skills/effective");
+/** Ask the skill's source whether its directory changed since install. Changes nothing. */
+export const checkSkillBundleUpdate = (name: string) =>
+  json<BundleUpdate>(`/api/skills/bundles/${encodeURIComponent(name)}/update`);
+
+// --- The project's pack (study 29, P7.6) ---------------------------------------------------
+// A folder's `.chimera/pack.json` may only narrow what the owner switched on, and applies only
+// after the owner accepted that exact file — the digest the card showed, nothing else.
+export const getProjectPack = (path: string) =>
+  json<ProjectPack>(`/api/code/pack?path=${encodeURIComponent(path)}`);
+export const acceptProjectPack = (path: string, digest: string) =>
+  json<ProjectPack>("/api/code/pack/accept", {
+    method: "POST",
+    body: JSON.stringify({ path, digest }),
+  });
+export const revokeProjectPack = (path: string) =>
+  json<ProjectPack>(`/api/code/pack?path=${encodeURIComponent(path)}`, { method: "DELETE" });
 export const setSkillBundleStatus = (name: string, status: "active" | "inactive") =>
   json<SkillBundle>(`/api/skills/bundles/${encodeURIComponent(name)}/status`, {
     method: "POST",
@@ -579,6 +690,31 @@ export const uninstallSkillBundle = (name: string) =>
   json<{ retired: boolean }>(`/api/skills/bundles/${encodeURIComponent(name)}`, {
     method: "DELETE",
   });
+
+/** A skill handed to the app by its owner — one `.zip`, one `SKILL.md`, or a picked folder's files.
+ *
+ *  It lands switched off and marked untrusted whatever its own file says, and the server refuses a
+ *  name that is taken unless `replace` is asked for (409), so the screen can offer the replacement.
+ *  A folder's structure travels in `paths`: a browser hands over a picked folder's files with only
+ *  their own names, and `webkitRelativePath` is where the rest of the path lives. */
+export async function importSkill(files: File[], replace = false): Promise<SkillBundle> {
+  const body = new FormData();
+  const folder = files.some((file) => file.webkitRelativePath);
+  for (const file of files) {
+    body.append("files", file);
+    if (folder) body.append("paths", file.webkitRelativePath || file.name);
+  }
+  const res = await fetch(apiUrl(`/api/skills/import${replace ? "?replace=true" : ""}`), {
+    method: "POST",
+    headers: authHeadersNoContentType(),
+    body,
+  });
+  if (!res.ok) throw new ApiError(await refusal(res), res.status);
+  return (await res.json()) as SkillBundle;
+}
+/** The installed skill's SKILL.md as text, for reading before switching it on. */
+export const getSkillBundleText = (name: string) =>
+  json<SkillBundleText>(`/api/skills/bundles/${encodeURIComponent(name)}/skill-md`);
 /** One card WITH its body. The list carries metadata only — twenty-three Trigger/Do/Avoid/Check/Risk
  *  bodies is a quarter of a megabyte to draw a list of names. */
 export const getSkillLibraryCard = (name: string) =>
@@ -689,15 +825,37 @@ export interface McpCatalogEntry {
   command: string;
   args: string[];
   env: Record<string, string>;
-  secrets: { key: string; hint: string; source: string }[];
+  /** `pattern` is the form the whole value must match (a regular expression), or empty for
+   *  "anything not empty". Optional because an older backend does not send it. */
+  secrets: { key: string; hint: string; source: string; pattern?: string }[];
   containment: string;
   official: boolean;
   docs: string;
+  /** "oauth" | "login" | "key" | "url" — makes "asks for nothing" a statement, not a gap. Optional
+   *  because an older backend does not send it. */
+  auth?: string;
 }
 
 export const getMcpCatalog = () =>
   json<{ entries: McpCatalogEntry[]; count: number }>("/api/mcp/catalog");
 
+// OpenAPI connectors (study 29, P7.5). Added OFF with only GETs selected; a key goes in through
+// `setConnectorKey` and never comes back — every read carries at most its last four characters.
+export const getConnectors = () => json<Connectors>("/api/connectors");
+export const addConnector = (body: { name: string; source: string; base_url?: string | null }) =>
+  json<Connector>("/api/connectors", { method: "POST", body: JSON.stringify(body) });
+export const patchConnector = (name: string, change: ConnectorPatch) =>
+  json<Connector>(`/api/connectors/${encodeURIComponent(name)}`, {
+    method: "PATCH",
+    body: JSON.stringify(change),
+  });
+export const setConnectorKey = (name: string, value: string) =>
+  json<Connector>(`/api/connectors/${encodeURIComponent(name)}/key`, {
+    method: "PUT",
+    body: JSON.stringify({ value }),
+  });
+export const removeConnector = (name: string) =>
+  json<{ deleted: boolean }>(`/api/connectors/${encodeURIComponent(name)}`, { method: "DELETE" });
 export const getMcpServers = () => json<McpServers>("/api/mcp");
 export const addMcpServer = (body: {
   name: string;
@@ -1353,6 +1511,8 @@ export interface CodeTurnHandlers {
   onVerified?: (v: CodeVerified) => void;
   onApproval?: (q: CodeApprovalEvent) => void;
   onBrowser?: (f: CodeBrowserFrame) => void;
+  /** A chart `render_chart` wrote: its Vega-Lite spec, or why it is withheld (`chart_frame`). */
+  onChart?: (c: CodeChartFrame) => void;
   /** A spoken request for work became a background work instead of running here; the stream
    *  ends right after with a `done` whose `stopped_reason` is `work_started`. */
   onWorkStarted?: (w: WorkInfo) => void;
@@ -1566,6 +1726,7 @@ function applyCodeTurnFrame(
   else if (event === "verified") h.onVerified?.(payload as unknown as CodeVerified);
   else if (event === "approval") h.onApproval?.(payload as unknown as CodeApprovalEvent);
   else if (event === "browser") h.onBrowser?.(payload as unknown as CodeBrowserFrame);
+  else if (event === "chart") h.onChart?.(payload as unknown as CodeChartFrame);
   else if (event === "work_started") h.onWorkStarted?.(payload.work as WorkInfo);
   else if (event === "done") h.onDone?.(payload as unknown as CodeTurnDone);
   else if (event === "error") h.onError?.(payload.message as string, policyBlockOf(payload));

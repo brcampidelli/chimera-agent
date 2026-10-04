@@ -1115,14 +1115,25 @@ def run(
 def deliver(
     request: str = typer.Argument(..., help="What to produce (a report, plan, spec, README...)."),
     out: str = typer.Option(None, "--out", "-o", help="Write the deliverable to this file."),
-    fmt: str = typer.Option("md", "--format", "-f", help="md | txt | html"),
+    fmt: str = typer.Option(
+        "md", "--format", "-f", help="md | txt | html | docx | xlsx | pdf (the last three need --out)"
+    ),
     model: str = typer.Option(None, "--model", "-m", help="Override the model slug."),
     fuse: bool = typer.Option(False, "--fuse", help="Use the fusion engine for higher quality."),
 ) -> None:
     """Deliverable Mode: produce a polished, self-contained artifact. Requires a key."""
-    from chimera.deliver import produce_deliverable
+    from chimera.deliver import BINARY_FORMATS, FORMATS, produce_deliverable
     from chimera.providers import LLMGateway, MissingCredentialsError
 
+    fmt = fmt.lower()
+    if fmt not in FORMATS:
+        console.print(f"[red]Unknown format {fmt!r}: use {' | '.join(FORMATS)}.[/red]")
+        raise typer.Exit(code=2)
+    # Checked before the model is called: a Word file cannot be printed to a terminal, and finding
+    # that out after paying for the answer would be the expensive way to learn it.
+    if fmt in BINARY_FORMATS and not out:
+        console.print(f"[red]--format {fmt} writes a file: give it a path with --out.[/red]")
+        raise typer.Exit(code=2)
     settings = get_settings()
     if not settings.can_answer():
         console.print("[red]No provider key configured, and the default model is not a local one. Run 'chimera doctor'.[/red]")
@@ -1138,11 +1149,52 @@ def deliver(
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
-    if out:
+    if fmt in BINARY_FORMATS:
+        _write_binary_deliverable(document, fmt, Path(out))
+    elif out:
         Path(out).write_text(document, encoding="utf-8")
         console.print(f"[green]wrote[/green] {out} [dim]({len(document)} chars)[/dim]")
     else:
         console.print(document)
+
+
+def _unused_markdown_path(out: Path) -> Path:
+    """Where the kept Markdown goes: ``out`` as .md, or a numbered name beside it if that exists.
+
+    The owner named ``plano.xlsx``, never ``plano.md`` — an existing ``plano.md`` is theirs, and the
+    fallback used to overwrite it without a word.
+    """
+    candidate = out.with_suffix(".md")
+    n = 1
+    while candidate.exists():
+        candidate = out.with_name(f"{out.stem}-{n}.md")
+        n += 1
+    return candidate
+
+
+def _write_binary_deliverable(markdown: str, fmt: str, out: Path) -> None:
+    """Render the model's Markdown to ``fmt`` and write it — or say why not, and keep the Markdown.
+
+    A refusal here comes after the model was paid for, so the text is saved beside the requested path
+    rather than thrown away: the owner keeps what they bought and can see why it did not convert.
+    """
+    from chimera.deliver import render_deliverable
+
+    try:
+        data, note = render_deliverable(markdown, fmt)
+    except ImportError:
+        reason = f"writing {fmt} needs the 'documents-out' extra: pip install 'chimera-agent[documents-out]'"
+    except ValueError as exc:
+        reason = f"the answer has nothing a {fmt} can hold ({exc})"
+    else:
+        out.write_bytes(data)
+        console.print(f"[green]wrote[/green] {out} [dim]({len(data)} bytes{note})[/dim]")
+        return
+    fallback = _unused_markdown_path(out)
+    fallback.write_text(markdown, encoding="utf-8")
+    console.print(f"[red]{reason}[/red]")
+    console.print(f"[dim]the Markdown was kept in {fallback}[/dim]")
+    raise typer.Exit(code=1)
 
 
 @app.command()
@@ -3040,6 +3092,15 @@ def desktop_app(
             from chimera.integrations.mcp_defer import mount
 
             mount(mcp_connectors, registry, live)
+        # The owner's OpenAPI connectors (study 29, P7.5), before the lists for the same reason as
+        # the MCP tools. No approver yet: on the guarded path the owner's is handed to them below,
+        # beside the browser's; unguarded (`/v1/chat/completions`) a non-GET call stays refused.
+        # Their answers are fenced only where the ledger below is built — `guarded and
+        # live.guard_chat` — so with CHIMERA_GUARD_CHAT off, and always on `/v1/chat/completions`,
+        # what a connector returns reaches the model unfenced and does not mark the run.
+        from chimera.integrations.openapi_store import ConnectorTool, with_connectors
+
+        with_connectors(registry, live)
         # AFTER the MCP tools, for the same reason the guard below is: a denylist that covers only
         # the tools we wrote is not a denylist. CHIMERA_TOOL_ALLOWLIST/_DENYLIST reached `chimera
         # run` and `chimera solve` and nothing else, so an owner who fenced their agent in `.env`
@@ -3094,6 +3155,9 @@ def desktop_app(
             for tool in registry.tools():
                 if getattr(tool, "name", "") == "browser" and getattr(tool, "reach", None) is not None:
                     tool.ask_outside = approver  # type: ignore[attr-defined]  # BrowserTool reads it by getattr
+                elif isinstance(tool, ConnectorTool):
+                    # A connector's non-GET call asks on the same card (study 29, P7.5).
+                    tool.ask_outside = approver
             # The same file the coding turn writes and the Governance screen reads. One log, or the
             # screen shows a partial history while claiming to show the whole one.
             registry, chat_ledger = guard_chat_registry(
@@ -3344,6 +3408,11 @@ def _messaging_adapter(settings: Settings, platform: str) -> Any:
     adapter = _build_messaging_adapter(settings, platform)
     if adapter.allowed_users is None:
         _warn_open_bot(platform)
+    from chimera.server.attachments import attach_refusal
+
+    refusal = attach_refusal(settings, platform)
+    if refusal:
+        console.print(f"[bold red]WARNING:[/bold red] [yellow]{refusal}[/yellow]")
     return adapter
 
 
@@ -3363,6 +3432,7 @@ def _build_messaging_adapter(settings: Settings, platform: str) -> Any:
             raise typer.Exit(code=1)
         from chimera.server import DiscordAdapter
 
+        # Attachments are armed by `_serve_platform`, which knows the workspace they are checked in.
         return DiscordAdapter(settings.discord_bot_token, allowed_users=allowed)
     if platform == "telegram":
         if not settings.telegram_bot_token:
@@ -3676,6 +3746,7 @@ def _serve_platform(
     gateway = MessageGateway(
         factory, warnings_in_reply=True, name_the_channel=True,
         intercept=_chat_approvals(settings, adapter.platform),
+        attach=_turn_attachments(adapter, settings, workspace_path),
     )
     console.print(
         f"[bold]Chimera on {adapter.platform}[/bold] "
@@ -3690,6 +3761,27 @@ def _serve_platform(
         raise typer.Exit(code=1) from None
     finally:
         adapter.stop()
+
+
+def _turn_attachments(adapter: Any, settings: Settings, workspace: Path) -> Any:
+    """Arm the adapter's attachments when the owner asked and it is safe, and return the gateway's
+    ``attach`` hook — or ``None`` (nothing is collected) for an adapter that does not attach.
+
+    The adapter decides last: ``enable_attachments`` refuses for a bot with no allowlist whatever this
+    passes, and the hook follows what the adapter ended up with."""
+    from chimera.server.attachments import attach_enabled
+
+    enable = getattr(adapter, "enable_attachments", None)
+    if enable is not None and attach_enabled(settings, str(getattr(adapter, "platform", ""))):
+        enable(workspace)
+        console.print("[dim]attachments: on — files this bot's turns write go with the reply[/dim]")
+    if not getattr(adapter, "attach_files", False):
+        return None
+    from functools import partial
+
+    from chimera.server.attachments import turn_attachments
+
+    return partial(turn_attachments, workspace=workspace)
 
 
 def _chat_approvals(settings: Settings, platform: str) -> Any:
@@ -5884,9 +5976,14 @@ def skills_bundles() -> None:
         table.add_column(column)
     for bundle in found:
         tone = "green" if bundle.status == "active" else "yellow"
-        table.add_row(bundle.name, f"[{tone}]{bundle.status}[/{tone}]", str(len(bundle.files)),
+        label = f"{bundle.status} (switch on again)" if bundle.reconfirm else bundle.status
+        table.add_row(bundle.name, f"[{tone}]{label}[/{tone}]", str(len(bundle.files)),
                       bundle.license or "-", bundle.source or "-")
     console.print(table)
+    if any(b.reconfirm for b in found):
+        console.print("[yellow]Some bundles were switched on while a switched-on bundle reached no "
+                      "prompt. They reach nothing until switched on again: "
+                      "chimera skills-bundle-enable <name>[/yellow]")
     console.print(f"[dim]On disk at {escape(str(bundles_root(home)))}[/dim]")
 
 
@@ -6403,12 +6500,18 @@ def rubric_grade(
 
 @app.command()
 def migrate(
-    source: str = typer.Argument(..., help="Source agent: hermes | openclaw."),
-    path: str = typer.Argument(..., help="Path to the source agent's home directory."),
+    source: str = typer.Argument(..., help="Source agent: hermes | openclaw | claude."),
+    path: str = typer.Argument(
+        ..., help="Path to the source agent's home directory (for claude: ~/.claude or a project)."
+    ),
     apply: bool = typer.Option(False, "--apply", help="Write artifacts (default: dry-run preview)."),
     home: str = typer.Option(None, "--home", help="Target Chimera home (default: from config)."),
 ) -> None:
-    """Import config + skills from another agent; --apply also merges long-term memory."""
+    """Import config + skills from another agent; --apply also merges long-term memory.
+
+    ``claude`` imports memory only (CLAUDE.md and memory/*.md), as unverified facts, never persona:
+    the dry-run lists every fact it would write.
+    """
     from chimera.migration import get_importer
 
     if not Path(path).is_dir():
@@ -6424,6 +6527,14 @@ def migrate(
         raise typer.Exit(code=1) from exc
 
     target = Path(home) if home else get_settings().home
+    from chimera.migration import ClaudeImporter
+
+    if isinstance(importer, ClaudeImporter):
+        from chimera.migration.importers import registered_project_keys
+
+        # So a note from one repository's Claude memory is filed under that repository when it is
+        # registered here, rather than recalled in every folder (see ClaudeImporter).
+        importer.projects = tuple(registered_project_keys(Path(target)))
     if apply:
         from chimera.evolution.wiring import semantic_embed
         from chimera.memory import MemoryManager
@@ -6448,6 +6559,17 @@ def migrate(
     if result.memory_merged is not None:
         table.add_row("Memory merged", str(result.memory_merged))
     console.print(table)
+    if result.candidates and not apply:
+        # The review IS this list: --apply writes exactly these, so they are shown in full rather
+        # than counted. Escaped, because a note can hold text Rich would read as markup.
+        console.print(f"[bold]{len(result.candidates)} fact(s) would be imported as unverified:[/bold]")
+        # Each with where it would apply: a note about one repository that no registered folder
+        # matches would be recalled everywhere, and the review is the only place to see that.
+        scopes = {i.content: i.project for i in importer.memory_items()}
+        for number, fact in enumerate(result.candidates, 1):
+            where = scopes.get(fact)
+            label = f"project {where}" if where else "everywhere"
+            console.print(f"  {number:>4}. {escape(fact)} [dim]({escape(label)})[/dim]")
     for note in result.notes:
         console.print(f"[yellow]note:[/yellow] {note}")
     if not apply:
@@ -6475,6 +6597,9 @@ def approve(
     request_id: str = typer.Argument(None, help="The id from the message. Omit to list what is waiting."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Approve it."),
     no: bool = typer.Option(False, "--no", "-n", help="Refuse it."),
+    show: bool = typer.Option(
+        False, "--show", help="Print the whole question — the full action — and answer nothing."
+    ),
 ) -> None:
     """Answer a decision the agent is waiting on, from anywhere.
 
@@ -6508,15 +6633,37 @@ def approve(
                 # Forty characters of `why` used to be the whole question. The reason now names the
                 # page and who asked for it; cutting it back to the tool name would undo that.
                 tabela.add_row(
-                    p.id, p.decision, f"{p.age_seconds / 60:.0f} min", p.reason[:160], p.action[:120]
+                    p.id, p.decision, f"{p.age_seconds / 60:.0f} min", p.reason[:160],
+                    p.action[:120] + ("…" if len(p.action) > 120 else ""),
                 )
             console.print(tabela)
+            # The table cuts the action; the yes is about all of it. A pull request's card is the
+            # text that will be published, and answering from this table alone would approve the
+            # first 120 characters of it.
+            console.print("[dim]read the whole question: chimera approve <id> --show[/dim]")
             console.print("[dim]answer with: chimera approve <id> --yes | --no[/dim]")
         # The operating metrics of this mechanism, because a gate whose questions nobody answers
         # behaves exactly like no gate while its block rate still reads perfect. Printed here, on
         # the command a person runs to answer, so the person answering is the one who sees whether
         # anyone does.
         console.print(render.approval_stats_line(answer_stats(home)))
+        return
+
+    if show:
+        if yes or no:
+            # Reading and answering in one command would be answering before reading.
+            console.print("[yellow]--show answers nothing; read it, then run --yes or --no[/yellow]")
+            raise typer.Exit(code=1)
+        found = next((p for p in esperando(home) if p.id == request_id), None)
+        if found is None:
+            console.print(f"[yellow]no question waiting with id {request_id}[/yellow]")
+            raise typer.Exit(code=1)
+        # Plain print, not the console: the action holds text the agent wrote, and rich would read
+        # its square brackets as markup and drop them — the one place the full text must be exact.
+        # Control characters written out (`approval.visible`), so the text cannot drive the terminal.
+        from chimera.governance.approval import visible
+
+        print(visible(f"{found.id} ({found.decision}): {found.reason}\n\n{found.action}"))
         return
 
     if yes == no:
@@ -7068,7 +7215,7 @@ def cron_learn(
 # --- report subcommands -------------------------------------------------------
 
 report_app = typer.Typer(
-    help="Reports counted by code from this home's own logs — no model call.",
+    help="Reports counted by code — from this home's own logs, or read with the GitHub CLI — no model call.",
     no_args_is_help=True,
 )
 app.add_typer(report_app, name="report")
@@ -7148,6 +7295,95 @@ def report_weekly(
     if not job.enabled:
         console.print(f"  [dim]switch it on with: chimera cron enable {job.id}[/dim]")
     console.print("  [dim]see what it would say: chimera report weekly --print[/dim]")
+
+
+@report_app.command("pr-watch")
+def report_pr_watch(
+    workspace: str = typer.Option(
+        ".", "--workspace", "-w",
+        help="The repository to watch (a folder inside a git checkout whose origin is on GitHub).",
+    ),
+    print_now: bool = typer.Option(
+        False, "--print",
+        help="Look now and print the summary instead of proposing the job. Reads only; remembers nothing.",
+    ),
+    as_json: bool = typer.Option(
+        False, "--json", help="Look now and print what was found as JSON. Reads only; remembers nothing.",
+    ),
+    deliver_to: str | None = typer.Option(
+        None, "--deliver-to",
+        help="Chat webhook URL (Discord or Slack) the job posts to. Stored on the proposal; never printed in full.",
+    ),
+    lang: str | None = typer.Option(
+        None, "--lang",
+        help="pt or en. Default: the owner's identity language (Portuguese unless it names another).",
+    ),
+) -> None:
+    """Pull request watch: failing checks and new comments on your open pull requests, and failed runs
+    on the default branch — read with the GitHub CLI, never acted on.
+
+    Without `--print`/`--json` this registers the watch for WORKSPACE as an hourly job, DISABLED,
+    once per repository: it runs only after `chimera cron enable <id>`, posts only where
+    `--deliver-to` says, and posts again only when the summary changes. Nothing is pushed, commented,
+    merged or re-run, and other people's comments are quoted inside the data fence, as data.
+    """
+    import json as _json
+    import time
+
+    from chimera.scheduler import Scheduler
+    from chimera.scheduler.delivery import webhook_host_only
+    from chimera.scheduler.pr_watch import FIRST_LOOK_SECONDS, as_dict, collect, propose, render
+    from chimera.scheduler.weekly_review import Lang, owner_lang, valid_webhook
+
+    escolhida: Lang | None
+    if lang is None:
+        escolhida = None
+    elif lang in ("pt", "en"):
+        escolhida = "pt" if lang == "pt" else "en"
+    else:
+        console.print("[red]--lang must be pt or en[/red]")
+        raise typer.Exit(code=1)
+    root = Path(workspace).expanduser().resolve()
+    if not root.is_dir():
+        console.print(f"[red]--workspace {escape(str(root))} is not a folder[/red]")
+        raise typer.Exit(code=1)
+
+    settings = get_settings()
+    if print_now or as_json:
+        if deliver_to is not None:
+            console.print("[red]--deliver-to is for the job; --print and --json only look[/red]")
+            raise typer.Exit(code=1)
+        try:
+            report = collect(root, since=time.time() - FIRST_LOOK_SECONDS)
+        except (RuntimeError, ValueError) as exc:
+            console.print(f"[red]{escape(str(exc))}[/red]")
+            raise typer.Exit(code=1) from exc
+        # Plain print, not rich: quoted comments carry brackets rich would read as markup, and the
+        # text must reach the reader exactly as it was rendered.
+        if as_json:
+            print(_json.dumps(as_dict(report), ensure_ascii=False, indent=2))
+        else:
+            print(render(report, escolhida or owner_lang(settings.home)))
+        return
+
+    destino = (deliver_to or "").strip() or None
+    if destino is not None and not valid_webhook(destino):
+        console.print("[red]--deliver-to must be an http(s) webhook URL with a host[/red]")
+        raise typer.Exit(code=1)
+    job, created = propose(
+        Scheduler(_cron_store()), now=time.time(), workspace=str(root), deliver_to=destino,
+        lang=escolhida,
+    )
+    estado = "enabled" if job.enabled else "disabled"
+    verbo = "proposed" if created else "already proposed"
+    console.print(f"[green]{verbo}[/green] job {job.id} ({job.name}, '{job.schedule}', {estado})")
+    console.print(f"  watches: {escape(str(root))}")
+    console.print(
+        f"  posts to: {webhook_host_only(job.deliver_to) if job.deliver_to else 'nowhere yet — the result log only'}"
+    )
+    if not job.enabled:
+        console.print(f"  [dim]switch it on with: chimera cron enable {job.id}[/dim]")
+    console.print("  [dim]see what it would say: chimera report pr-watch --print[/dim]")
 
 
 # --- mcp subcommands ----------------------------------------------------------
@@ -7768,9 +8004,26 @@ def memory_consolidate(
     threshold: float = typer.Option(
         0.5, "--threshold", help="Similarity (Jaccard) to cluster facts; lower = merges more."
     ),
+    dry_run: bool = typer.Option(
+        False, "--dry-run", help="Only list the clusters that would be merged (no model call, no write)."
+    ),
 ) -> None:
     """Merge clusters of similar memories into one LLM-summarised fact (opt-in write)."""
     from uuid import uuid4
+
+    if dry_run:
+        # Before this, seeing what would be merged meant merging it — a model call per cluster.
+        # The clustering is free; only the summary costs.
+        groups = _memory_manager().consolidation_groups(threshold=threshold)
+        if not groups:
+            console.print("[dim]nothing to merge at this threshold[/dim]")
+            return
+        for number, group in enumerate(groups, 1):
+            console.print(f"[bold]group {number}[/bold] ({group[0].kind}, {len(group)} facts)")
+            for item in group:
+                console.print(f"  [cyan]{item.id}[/cyan] {escape(item.content)}")
+        console.print("[dim]Re-run without --dry-run to merge them (one model call per group).[/dim]")
+        return
 
     from chimera.memory.consolidate import model_summarizer
     from chimera.orchestration.metering import MeteredBackend as _Meter
@@ -7797,6 +8050,32 @@ def memory_consolidate(
     # "$0.0000" and "cost unknown" are different answers, and a missing line was neither.
     cost = "cost unknown (a merge had no price)" if meter.usd is None else f"${meter.usd:.4f}"
     console.print(f"consolidated: merged away {removed} redundant memory item(s) · {cost}")
+
+
+@memory_app.command("export")
+def memory_export(
+    fmt: str = typer.Option("json", "--format", help="json | markdown"),
+    out: str = typer.Option(None, "--out", help="Write to this file (default: print to stdout)."),
+) -> None:
+    """Export all memory as JSON or Markdown, locally. Secrets are masked; metadata is left out."""
+    from datetime import UTC, datetime
+
+    from chimera.memory.export import export_memory
+
+    try:
+        text = export_memory(
+            _memory_manager().store.all(), fmt,
+            exported_at=datetime.now(UTC).isoformat(timespec="seconds"),
+        )
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=1) from exc
+    if out:
+        Path(out).write_text(text, encoding="utf-8")
+        console.print(f"wrote {out}")
+        return
+    # Plain print, not Rich: the output is a file's content and Rich would read `[...]` as markup.
+    typer.echo(text)
 
 
 @memory_app.command("graph")

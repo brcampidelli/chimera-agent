@@ -42,7 +42,8 @@ WINDOW_DAYS = 7
 #: The key in ``CronJob.metadata`` that marks a job dispatched by code instead of by an agent.
 BUILTIN_KEY = "builtin"
 
-#: The one builtin there is. A name rather than a flag so a second report does not need a new field.
+#: The weekly review's builtin name. A name rather than a flag, so the second builtin — the pull
+#: request watch, `pr_watch.PR_WATCH` — needed no new field.
 WEEKLY_REVIEW = "weekly_review"
 
 #: The proposal's name and schedule: Mondays at 09:00, the start of the week the review is read in.
@@ -467,6 +468,11 @@ def run_builtin(job: CronJob, home: Path, *, now: float | None = None) -> str:
     nome = builtin_of(job)
     if nome == WEEKLY_REVIEW:
         return render_weekly_review(build_weekly_review(home, now=now), job_lang(job, home))
+    # The pull request watch (study 29, P8.2): read with gh, rendered by code, no model.
+    from chimera.scheduler.pr_watch import PR_WATCH, run_pr_watch
+
+    if nome == PR_WATCH:
+        return run_pr_watch(job, home, lang=job_lang(job, home), now=now)
     raise ValueError(f"unknown builtin job {nome!r}")
 
 

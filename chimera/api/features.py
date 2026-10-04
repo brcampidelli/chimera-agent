@@ -3,12 +3,14 @@
 Each endpoint reuses an existing manager/store (the same one the matching ``chimera`` CLI command
 builds), so the UI is a view over the real state, never a reimplementation. Reads and the HITL
 approve/deny writes are pure file I/O — no live LLM call. The token-spending paths (running a project
-step, executing a skill, consolidating memory) are deliberately NOT exposed here; the app drives those
-through the streaming chat / solve flows instead.
+step, executing a skill) are deliberately NOT exposed here; the app drives those through the
+streaming chat / solve flows instead.
 
-The one exception is ``POST /api/kanban/run``, and it is streamed for the same reason those are: a
-board dispatch calls models for as long as it has cards, so it reports each card as it lands rather
-than returning once at the end. Without it the board was a display case — every route it had was a
+The exceptions are ``POST /api/memory/consolidate`` and ``POST /api/kanban/run``. The first merges
+only the clusters the owner reviewed in a free preview, so its spend is a decision made on screen,
+and it is metered onto the usage log like the CLI command it mirrors. The second is streamed for the
+same reason the chat is: a board dispatch calls models for as long as it has cards, so it reports
+each card as it lands rather than returning once at the end. Without it the board was a display case — every route it had was a
 read, so the screen could show the work and change nothing about it.
 """
 
@@ -18,17 +20,23 @@ import asyncio
 import json
 import threading
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, params
+from fastapi import APIRouter, FastAPI, File, Form, HTTPException, Request, UploadFile, params
+from fastapi.responses import JSONResponse, Response
+from fastapi.routing import APIRoute
 from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
 from chimera.api.schemas import (
     ApprovedOut,
+    ClaudeImportApplyOut,
+    ClaudeImportPreviewOut,
+    ConsolidateApplyOut,
+    ConsolidatePreviewOut,
     CronCreateIn,
     CronJobOut,
     CronResultOut,
@@ -40,6 +48,7 @@ from chimera.api.schemas import (
     LibraryCardOut,
     LibraryImportOut,
     MemoryAddOut,
+    MemoryExportOut,
     MemoryItemOut,
     MemoryLayersOut,
     MemoryProfileOut,
@@ -159,6 +168,22 @@ def _memory_manager(settings: Any) -> Any:
     return build_memory_manager(settings)
 
 
+def _record_consolidation_spend(settings: Any, meter: Any, usage_id: str) -> None:
+    """One usage row for the merges ``meter`` saw, or none when no call returned.
+
+    The same row `chimera memory consolidate` writes (`cli.main._record_merge_spend`), kept here
+    rather than imported because the API does not import the CLI module."""
+    if not meter.calls:
+        return
+    from chimera.api.usage import record_spend
+
+    record_spend(
+        settings.home, session_id=usage_id, model=meter.last_model,
+        prompt_tokens=meter.prompt_tokens, completion_tokens=meter.completion_tokens,
+        usd=meter.usd, route_kind=None,
+    )
+
+
 def _skill_store(settings: Any) -> Any:
     from chimera.evolution import SkillStore
 
@@ -205,6 +230,33 @@ class MemoryAdd(BaseModel):
     #: typed into the Memory screen usually is — the owner stating something, rather than
     #: the agent noting what it learned inside one folder.
     project: str | None = None
+
+
+class MemoryEdit(BaseModel):
+    content: str
+
+
+class ClaudeImportPreviewIn(BaseModel):
+    #: The folder to read. Omitted means ``~/.claude``, where Claude keeps the global CLAUDE.md and
+    #: every project's auto-memory.
+    path: str | None = None
+
+
+class ClaudeImportApplyIn(BaseModel):
+    path: str | None = None
+    #: The candidates the owner ticked, as the preview returned them. Required and explicit: there
+    #: is no "import everything" here, because the review IS the selection.
+    contents: list[str] = Field(default_factory=list)
+
+
+class ConsolidatePreviewIn(BaseModel):
+    threshold: float = Field(default=0.5, ge=0.05, le=1.0)
+
+
+class ConsolidateApplyIn(BaseModel):
+    threshold: float = Field(default=0.5, ge=0.05, le=1.0)
+    #: The reviewed clusters, each as the ids the preview listed. Only an exact match is merged.
+    groups: list[list[str]] = Field(default_factory=list)
 
 
 class ApproveBody(BaseModel):
@@ -254,6 +306,172 @@ class BundleOut(BaseModel):
     ref: str = ""
     installed_at: str = ""
     files: list[str] = Field(default_factory=list)
+    committed_at: str = Field(
+        default="",
+        description="When the commit in `ref` was made, as the source reported it at install.",
+    )
+    reconfirm: bool = Field(
+        default=False,
+        description=(
+            "The bundle was switched on while a switched-on bundle reached no prompt; it reads as "
+            "`pending` and reaches nothing until switched on again."
+        ),
+    )
+    origin: str = Field(default="catalog", description="catalog | upload — how it arrived.")
+    provenance: str = Field(
+        default="tainted",
+        description="Always tainted: every bundle is somebody else's text and scripts.",
+    )
+
+
+class EffectiveBundleOut(BaseModel):
+    name: str = ""
+    description: str = ""
+    ref: str = ""
+    committed_at: str = ""
+
+
+class EffectiveSkillsOut(BaseModel):
+    """What a run started now is told about skills — read from the code that tells it."""
+
+    bundles: list[EffectiveBundleOut] = Field(default_factory=list)
+    bundle_text: str = Field(
+        default="",
+        description=(
+            "The installed-skills block byte for byte as a run's prompt carries it "
+            "(`bundles.prompt_block`), or empty when no bundle is switched on."
+        ),
+    )
+    reconfirm: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Bundles switched on while a switched-on bundle reached no prompt (before study 29, "
+            "P7.1). They reach nothing until switched on again, and are named here so the change "
+            "is seen where the prompt's skills are."
+        ),
+    )
+    cards_read: bool = Field(
+        default=False,
+        description=(
+            "`CHIMERA_SKILL_CARDS`. Off, no learned card reaches any prompt whatever its status."
+        ),
+    )
+    cards: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Learned cards the retriever may choose from (active and provisional). Which of them "
+            "a run reads depends on its task, at most `cards_k` per run; empty when reading is off."
+        ),
+    )
+    cards_k: int = 0
+
+
+class BundleUpdateOut(BaseModel):
+    name: str = ""
+    current_ref: str = ""
+    current_date: str = ""
+    latest_ref: str = Field(
+        default="", description="The newest commit that touched the skill's own directory."
+    )
+    latest_date: str = ""
+    changed: bool | None = Field(
+        default=None,
+        description="Whether that commit is newer than the installed one; null when unknowable.",
+    )
+
+
+class BundleTextOut(BaseModel):
+    """An installed skill's SKILL.md, as text, for the owner to read before switching it on."""
+
+    name: str
+    text: str
+    truncated: bool = False
+
+
+#: FastAPI's upload markers, hoisted out of the signature so a call in an argument default does not
+#: trip the linter — the same arrangement `code_api` uses for attachments.
+_SKILL_FILES = File(..., description="One .zip, one SKILL.md, or every file of a skill folder.")
+_SKILL_PATHS = Form(
+    default=[],
+    description=(
+        "For a folder: each file's path inside it, in the same order as `files`. A browser does "
+        "not send a picked folder's structure in the file name, so it travels beside it."
+    ),
+)
+
+
+def _cross_site(request: Request, named: Callable[[], list[str]]) -> bool:
+    """Whether a browser sent this request from a page that is not this app.
+
+    Without a server token (the desktop default) the bearer guard is a no-op, and a multipart POST
+    is a CORS "simple request": no preflight, so any page open in the owner's browser can send one
+    to 127.0.0.1 and the browser only withholds the ANSWER. For an upload the answer is not the
+    point — the skill would already be on disk, or an approved one replaced. Browsers say where a
+    request came from (`Origin`, and `Sec-Fetch-Site` in current ones); a client that is not a
+    browser sends neither and is not what this defends against.
+
+    Allowed: no Origin at all, this app's own origin, or an origin the operator named in
+    ``CHIMERA_ALLOWED_ORIGINS`` (the desktop pointed at this instance from another machine).
+
+    "Own" is built from the request's ``Host``, which a page that rebound its DNS name to
+    127.0.0.1 controls — its Origin then matches it exactly and ``Sec-Fetch-Site`` says
+    same-origin. So the own origin counts only when its host is one no DNS answer stands behind
+    (an IP literal or ``localhost``, :func:`chimera.api.host_guard.unrebindable`). The app-wide
+    :class:`~chimera.api.host_guard.LoopbackHostGuard` refuses such a Host first on a loopback
+    bind; this holds on any bind, for the one route where an answer is not needed to do harm.
+    """
+    from chimera.api.host_guard import unrebindable
+
+    origin = request.headers.get("origin")
+    own = f"{request.url.scheme}://{request.url.netloc}"
+    is_own = origin == own and unrebindable(request.url.hostname)
+    allowed = origin is not None and (is_own or origin in named())
+    if origin is not None and not allowed:
+        return True
+    fetch_site = request.headers.get("sec-fetch-site", "")
+    # `same-site` is still another page: a dev server on 127.0.0.1:3000 is the same site as :8765.
+    return fetch_site in ("cross-site", "same-site") and not allowed
+
+
+def _upload_route(named: Callable[[], list[str]], max_body: int) -> type[APIRoute]:
+    """A route class that judges the request BEFORE FastAPI reads its body.
+
+    FastAPI parses a `File`/`Form` body before dependencies run and before the handler is called —
+    the whole multipart lands in temporary files first — so a dependency is too late to refuse
+    anything about the body. The route's own handler wrapper is the first code that sees the
+    request.
+    """
+
+    class UploadRoute(APIRoute):
+        def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
+            handler = super().get_route_handler()
+
+            async def judged(request: Request) -> Response:
+                if _cross_site(request, named):
+                    return JSONResponse(
+                        {"detail": "refusing an upload sent from another site"}, status_code=403
+                    )
+                # By what the request DECLARES, because the alternative is reading it: the form
+                # parser spools every part to a temporary file (to disk past 1 MB) before the
+                # handler's own per-file bound runs, so a 5 GB body would be on the owner's disk
+                # before anything here could say no. A browser always declares the length of a
+                # FormData body; a client that will not declare it is refused rather than trusted.
+                declared = request.headers.get("content-length", "")
+                if not declared.isdigit():
+                    return JSONResponse(
+                        {"detail": "an upload has to say how large it is (Content-Length)"},
+                        status_code=411,
+                    )
+                if int(declared) > max_body:
+                    return JSONResponse(
+                        {"detail": f"the upload is larger than the {max_body // 1024 // 1024}MB limit"},
+                        status_code=413,
+                    )
+                return await handler(request)
+
+            return judged
+
+    return UploadRoute
 
 
 class BundleStatusIn(BaseModel):
@@ -333,6 +551,165 @@ def register_features(
         _memory_manager(_settings()).delete(item_id)
         return {"deleted": True}
 
+    # None of the routes below is in the desktop bridge's table (`bridge_routes.ROUTES`), and that is
+    # the decision, not an omission: rewriting a fact, reading another tool's notes into memory and
+    # spending tokens to merge facts are things the owner does from the screen, not things an agent
+    # driving the app should be able to do on its own.
+    @app.put("/api/memory/{item_id}", dependencies=[guard], response_model=MemoryItemOut)
+    def edit_memory(item_id: str, body: MemoryEdit) -> dict[str, Any]:
+        mgr = _memory_manager(_settings())
+        try:
+            item = mgr.edit(item_id, body.content)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="memory not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _item_dict(item)
+
+    @app.get("/api/memory/export", dependencies=[guard], response_model=MemoryExportOut)
+    def export_memory_file(format: str = "json") -> dict[str, Any]:  # noqa: A002 — the query name
+        from datetime import UTC, datetime
+
+        from chimera.memory.export import EXPORT_FORMATS, export_memory
+
+        if format not in EXPORT_FORMATS:
+            raise HTTPException(status_code=400, detail=f"format must be one of {list(EXPORT_FORMATS)}")
+        items = _memory_manager(_settings()).store.all()
+        now = datetime.now(UTC)
+        stamp = now.strftime("%Y%m%d-%H%M%S")
+        ext, media = ("json", "application/json") if format == "json" else ("md", "text/markdown")
+        return {
+            "format": format,
+            "filename": f"chimera-memory-{stamp}.{ext}",
+            "media_type": media,
+            "count": len(items),
+            "content": export_memory(items, format, exported_at=now.isoformat(timespec="seconds")),
+        }
+
+    def _claude_importer(path: str | None) -> Any:
+        from chimera.migration import ClaudeImporter
+        from chimera.migration.importers import registered_project_keys
+
+        folder = Path(path).expanduser() if path and path.strip() else Path.home() / ".claude"
+        if not folder.is_dir():
+            raise HTTPException(status_code=400, detail="not a folder")
+        # The registered folders, so a note from one repository's Claude memory is filed under that
+        # repository instead of being recalled everywhere (see ClaudeImporter).
+        return ClaudeImporter(folder, projects=registered_project_keys(_settings().home))
+
+    @app.post(
+        "/api/memory/import/claude/preview",
+        dependencies=[guard],
+        response_model=ClaudeImportPreviewOut,
+    )
+    def preview_claude_import(body: ClaudeImportPreviewIn) -> dict[str, Any]:
+        from chimera.memory.manager import _normalize
+
+        importer = _claude_importer(body.path)
+        result = importer.scan()
+        known = {_normalize(i.content) for i in _memory_manager(_settings()).store.all()}
+        return {
+            "path": str(importer.home),
+            "files": result.memory_files,
+            "candidates": [
+                {
+                    "content": item.content,
+                    "file": str(item.metadata.get("file", "")),
+                    "known": _normalize(item.content) in known,
+                    # Where the fact will apply, shown BEFORE the write: "everywhere" was only
+                    # visible as a badge after the import, when the fact was already being recalled.
+                    "project": item.project,
+                    "claude_project": str(item.metadata.get("claude_project", "")),
+                }
+                for item in importer.memory_items()
+            ],
+            "notes": result.notes,
+        }
+
+    @app.post(
+        "/api/memory/import/claude/apply",
+        dependencies=[guard],
+        response_model=ClaudeImportApplyOut,
+    )
+    def apply_claude_import(body: ClaudeImportApplyIn) -> dict[str, Any]:
+        importer = _claude_importer(body.path)
+        chosen = set(body.contents)
+        if not chosen:
+            raise HTTPException(status_code=400, detail="choose the facts to import")
+        candidates = set(importer.scan().candidates)
+        result = importer.apply(
+            _settings().home, memory_manager=_memory_manager(_settings()), only=chosen
+        )
+        counts = result.memory_merged or {}
+        return {
+            "written": sum(counts.values()),
+            "ignored": len(chosen - candidates),
+            "counts": counts,
+        }
+
+    @app.post(
+        "/api/memory/consolidate/preview",
+        dependencies=[guard],
+        response_model=ConsolidatePreviewOut,
+    )
+    def preview_consolidation(body: ConsolidatePreviewIn) -> dict[str, Any]:
+        settings = _settings()
+        groups = _memory_manager(settings).consolidation_groups(threshold=body.threshold)
+        return {
+            "groups": [
+                {
+                    "kind": group[0].kind,
+                    "project": group[0].project,
+                    "unverified": any(i.provenance == "tainted" for i in group),
+                    "items": [_item_dict(i) for i in group],
+                }
+                for group in groups
+            ],
+            "can_answer": bool(settings.can_answer()),
+        }
+
+    @app.post("/api/memory/consolidate", dependencies=[guard], response_model=ConsolidateApplyOut)
+    def apply_consolidation(body: ConsolidateApplyIn) -> dict[str, Any]:
+        """Merge the clusters the owner reviewed. The one memory route that calls a model.
+
+        Each merge is a model call, metered and written to the usage log as a row of its own —
+        the same accounting `chimera memory consolidate` keeps, so the Cost screen sees it.
+        """
+        from uuid import uuid4
+
+        from chimera.memory import consolidate as consolidation
+        from chimera.orchestration.metering import MeteredBackend
+        from chimera.providers import LLMGateway, MissingCredentialsError
+
+        reviewed = {frozenset(g) for g in body.groups if len(g) >= 2}
+        if not reviewed:
+            raise HTTPException(status_code=400, detail="choose the groups to merge")
+        settings = _settings()
+        if not settings.can_answer():
+            raise HTTPException(status_code=409, detail="no model is configured to write the merge")
+        mgr = _memory_manager(settings)
+        meter = MeteredBackend(LLMGateway(), label="consolidate")
+        usage_id = f"consolidate:{uuid4().hex[:12]}"
+        try:
+            outcome = mgr.consolidate_outcome(
+                consolidation.model_summarizer(meter), threshold=body.threshold, only=reviewed
+            )
+        except MissingCredentialsError as exc:
+            raise HTTPException(status_code=409, detail="no model is configured to write the merge") from exc
+        finally:
+            # On the way out whatever happened: a run that failed part-way paid for its merges.
+            _record_consolidation_spend(settings, meter, usage_id)
+        # Counted from what the merge DID, not from which reviewed groups still matched: a group the
+        # model answered with nothing is left as it was, and was reported "merged" — for a call
+        # that was paid for and changed nothing.
+        return {
+            "merged": outcome.merged,
+            "skipped": outcome.blank,
+            "stale": len(reviewed) - outcome.merged - outcome.blank,
+            "removed": outcome.removed,
+            "usd": meter.usd,
+        }
+
     # ---- Skills -----------------------------------------------------------------------------------
     @app.get("/api/skills", dependencies=[guard], response_model=SkillsOut)
     def list_skills() -> dict[str, Any]:
@@ -403,6 +780,68 @@ def register_features(
 
         return [BundleOut(**b.to_dict()).model_dump() for b in installed_bundles(_settings().home)]
 
+    @app.get("/api/skills/effective", dependencies=[guard], response_model=EffectiveSkillsOut)
+    def effective_skills(project: str = "") -> dict[str, Any]:
+        """What a run started now would be told about skills, read from the code that tells it.
+
+        "Mine" was spread over three panels — learned cards, the library, the catalogue — and none
+        of them answered the one question that matters when a run behaves oddly: what did the agent
+        actually get? The bundle text is `prompt_block`, the function the agent itself calls, so the
+        screen cannot show a list the prompt does not carry. Cards are task-dependent: a run reads
+        at most `cards_k` of the eligible ones, and only with reading on — which is off by default,
+        and said so here rather than left for a count of zero to suggest otherwise.
+
+        ``project`` is the folder a run would start in. When its pack applies (study 29, P7.6) the
+        bundles are narrowed exactly as an app run there is narrowed — the same two functions
+        `assemble_registry` calls. The Skills screen itself sends no project (it belongs to none),
+        so it shows the whole home and says so; and built-in skills, retrieved per task by
+        `Agent._skill_context`, are not listed here, because which ones match depends on the task.
+        """
+        from chimera.core.project_pack import applied_pack, bundle_filter
+        from chimera.skills.bundles import active, installed, prompt_block
+
+        settings = _settings()
+        home = settings.home
+        only = bundle_filter(applied_pack(settings, project.strip() or None))
+        cards_read = bool(getattr(settings, "skill_cards", False))
+        cards = [c.name for c in _skill_store(settings).retrievable()] if cards_read else []
+        return EffectiveSkillsOut(
+            bundles=[
+                EffectiveBundleOut(
+                    name=b.name, description=b.description, ref=b.ref, committed_at=b.committed_at
+                )
+                for b in active(home)
+                if only is None or b.name in only
+            ],
+            bundle_text=prompt_block(home, only=only),
+            reconfirm=[b.name for b in installed(home) if b.reconfirm],
+            cards_read=cards_read,
+            cards=cards,
+            cards_k=int(getattr(settings, "skill_cards_k", 0)) if cards_read else 0,
+        ).model_dump()
+
+    @app.get(
+        "/api/skills/bundles/{name}/update", dependencies=[guard], response_model=BundleUpdateOut
+    )
+    def check_bundle_update(name: str) -> dict[str, Any]:
+        """Ask the skill's source whether its directory changed since it was installed.
+
+        One request to the host install already uses, made only when a person clicks. It changes
+        nothing: updating is `POST /api/skills/catalog/{name}/install?force=true`, which lands the
+        new files `pending` like any install — new instructions are a new decision.
+        """
+        from chimera.skills.bundles import BundleError, check_update
+        from chimera.skills.catalog import find
+
+        entry = find(name)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"no skill named {name!r} in the catalogue")
+        try:
+            result = check_update(entry, _settings().home)
+        except BundleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return BundleUpdateOut(**result.to_dict()).model_dump()
+
     @app.post("/api/skills/catalog/{name}/install", dependencies=[guard], response_model=BundleOut)
     def install_bundle(name: str, force: bool = False) -> dict[str, Any]:
         """Download one skill from its source repository. Runs nothing, and enables nothing.
@@ -424,6 +863,102 @@ def register_features(
             # The message is written to be read by a person: which limit, which file, which host.
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return BundleOut(**record.to_dict()).model_dump()
+
+    # On its own router only for the route class: the cross-site and size checks have to run before
+    # the body is parsed, and a route class is the one place that happens. Included right after, so
+    # the route keeps its place in the table and in the OpenAPI document.
+    def _named_origins() -> list[str]:
+        raw = str(getattr(_settings(), "allowed_origins", "") or "")
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
+    from chimera.skills.bundles import MAX_TOTAL_BYTES as _MAX_SKILL_BYTES
+
+    # The files may total the skill limit; the rest is multipart framing — a few hundred bytes of
+    # headers per part, at most 200 files — and the `paths` field. One megabyte covers it many
+    # times over and still stops a body that is plainly not a skill.
+    uploads = APIRouter(route_class=_upload_route(_named_origins, _MAX_SKILL_BYTES + 1024 * 1024))
+
+    @uploads.post("/api/skills/import", dependencies=[guard], response_model=BundleOut)
+    async def import_skill(
+        files: list[UploadFile] = _SKILL_FILES,
+        paths: list[str] = _SKILL_PATHS,
+        replace: bool = False,
+    ) -> dict[str, Any]:
+        """Add a skill that is in no catalogue — the owner's own, or one found somewhere.
+
+        Lands `pending` and `tainted` whatever its file declares — the rule a card imported by path
+        follows for its labels: handing a file to the app is choosing to send it, not vouching for
+        what it says. Its instructions reach no prompt until the owner switches it on; after that,
+        `tainted` means what `skill_view` reads from it is marked untrusted and its description
+        enters the prompt quoted and attributed to its author (`bundles._context_line`).
+        Every limit the catalogue install has applies, and an archive is read as hostile input —
+        see `chimera/skills/bundle_upload.py`. 409 when the name is taken and `replace` was not
+        asked for, so the screen can offer the replacement instead of only reporting a failure.
+        """
+        from chimera.skills.bundle_upload import import_upload
+        from chimera.skills.bundles import MAX_TOTAL_BYTES, BundleError, BundleExists, SwapNotUndone
+
+        named = len(paths) == len(files)
+        received: list[tuple[str, bytes]] = []
+        total = 0
+        for index, upload in enumerate(files):
+            # Bounded per read: the whole skill may not exceed this, so no one file may either. This
+            # is the bound on the FILES; the bound on the body — the one that runs before anything
+            # is spooled — is the route class's Content-Length check above.
+            data = await upload.read(MAX_TOTAL_BYTES + 1)
+            total += len(data)
+            if total > MAX_TOTAL_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"the upload is larger than the {MAX_TOTAL_BYTES // 1024 // 1024}MB limit",
+                )
+            received.append(((paths[index] if named else upload.filename) or "SKILL.md", data))
+        label = received[0][0].split("/", 1)[0] if received else ""
+        try:
+            record = await run_in_threadpool(
+                import_upload, received, _settings().home, replace=replace, label=label
+            )
+        except BundleExists as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except BundleError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except SwapNotUndone as exc:
+            # Before the generic answer below, which would say the old version is unchanged.
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"could not write the skill to disk ({exc.strerror}), and could not put the "
+                    f"previous version of {exc.name!r} back either — it is kept aside, out of the "
+                    "list, and is restored the next time a skill with that name is uploaded"
+                ),
+            ) from exc
+        except OSError as exc:
+            # The disk said no — on Windows most often a scanner holding a file that was just
+            # written. A sentence instead of a bare 500; `_swap_into` has already put any previous
+            # version back.
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    f"could not write the skill to disk ({exc.strerror or type(exc).__name__}) — "
+                    "anything installed before is unchanged; try again"
+                ),
+            ) from exc
+        return BundleOut(**record.to_dict()).model_dump()
+
+    app.include_router(uploads)
+
+    @app.get(
+        "/api/skills/bundles/{name}/skill-md", dependencies=[guard], response_model=BundleTextOut
+    )
+    def read_bundle_text(name: str) -> dict[str, Any]:
+        """The SKILL.md of an installed skill, as plain text — what the switch would consent to."""
+        from chimera.skills.bundle_upload import read_skill_md
+
+        found = read_skill_md(name, _settings().home)
+        if found is None:
+            raise HTTPException(status_code=404, detail="no such installed bundle")
+        text, truncated = found
+        return {"name": name, "text": text, "truncated": truncated}
 
     @app.post("/api/skills/bundles/{name}/status", dependencies=[guard], response_model=BundleOut)
     def set_bundle_status(name: str, body: BundleStatusIn) -> dict[str, Any]:

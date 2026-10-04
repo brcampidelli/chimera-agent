@@ -184,6 +184,10 @@ class StdioMCPSession:
         self._serve_future: Any = None
         self._connect_error: Exception | None = None
         self._ready = threading.Event()
+        # The task running `_serve`, and whether close() has been asked for: what close() needs to
+        # stop a session that never became ready (see close()).
+        self._serve_task: Any = None
+        self._closing = False
 
     def start(self) -> StdioMCPSession:
         import asyncio
@@ -209,10 +213,18 @@ class StdioMCPSession:
         self._thread.start()
         # The session lives entirely inside _serve (one task) so the stdio client's
         # anyio cancel scopes are entered and exited in the same task.
-        self._serve_future = asyncio.run_coroutine_threadsafe(self._serve(), self._loop)
+        self._serve_future = asyncio.run_coroutine_threadsafe(self._run_serve(), self._loop)
+        # A start that fails closes what it started, HERE rather than in each caller. The server has
+        # already been spawned by the time the wait gives up, and a caller that writes
+        # `StdioMCPSession(...).start()` never holds the session it would have to close: the probe
+        # learned to wrap it in try/finally, and the pool, autoload and connect_stdio did not, so a
+        # bridge waiting on a browser sign-in outlived a timed-out boot connect for the life of the
+        # app. Closing on a connect error too stops the loop thread the failure left running.
         if not self._ready.wait(timeout=self.connect_timeout):
+            self.close()
             raise TimeoutError(f"MCP server '{self.command}' did not become ready")
         if self._connect_error is not None:
+            self.close()
             raise self._connect_error
         return self
 
@@ -221,6 +233,16 @@ class StdioMCPSession:
 
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
+
+    async def _run_serve(self) -> None:
+        import asyncio
+
+        # Recorded so close() can cancel a connect that is still in progress. A close that lands
+        # before this task first runs finds no task to cancel, so it leaves `_closing` instead.
+        self._serve_task = asyncio.current_task()
+        if self._closing:
+            return
+        await self._serve()
 
     async def _serve(self) -> None:
         import asyncio
@@ -276,8 +298,17 @@ class StdioMCPSession:
 
     def close(self) -> None:
         # Signal _serve to exit; its AsyncExitStack then unwinds in its own task.
-        if self._loop is not None and self._stop_event is not None:
-            self._loop.call_soon_threadsafe(self._stop_event.set)
+        #
+        # Setting the stop event is enough only for a session that got as far as waiting on it. One
+        # that timed out in start() is still inside the handshake (`initialize`, or a bridge waiting
+        # for a browser sign-in), the event is never awaited, and the old close() waited ten
+        # seconds and stopped the loop under it: the task was left suspended, its stdio_client never
+        # exited, and the server's process stayed alive until the app closed. A Test that timed out
+        # left one of those behind per click. So a session that is not ready is CANCELLED, which
+        # unwinds the same AsyncExitStack from wherever the handshake was, and that is what ends the
+        # subprocess.
+        if self._loop is not None:
+            self._loop.call_soon_threadsafe(self._shutdown)
         if self._serve_future is not None:
             from contextlib import suppress
 
@@ -285,6 +316,14 @@ class StdioMCPSession:
                 self._serve_future.result(timeout=10)
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._loop.stop)
+
+    def _shutdown(self) -> None:
+        """Runs ON the loop: ask a ready session to stop, and cancel one still connecting."""
+        self._closing = True
+        if self._stop_event is not None:
+            self._stop_event.set()
+        if not self._ready.is_set() and self._serve_task is not None:
+            self._serve_task.cancel()
 
 
 def connect_stdio(
