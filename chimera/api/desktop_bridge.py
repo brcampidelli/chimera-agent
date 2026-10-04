@@ -663,6 +663,24 @@ def register_bridge_api(
                     "through the bridge",
                 )
 
+    def hidden_place(query: dict[str, Any], body: Any, path: str) -> bool:
+        """Whether a path a listing or a search returned is Chimera's `.env` or in its data folder.
+
+        Resolved the way the route resolved it: inside the workspace the call named, else the app's.
+        """
+        from chimera.core.own_files import is_own_env, within
+
+        if not path:
+            return False
+        fields = dict(query)
+        if isinstance(body, dict):
+            fields.update({k: v for k, v in body.items() if k not in fields})
+        explicit = fields.get("workspace")
+        base = Path(explicit if isinstance(explicit, str) and explicit.strip() else workspace)
+        target = base.expanduser() / path
+        roots = [Path(live_settings().home).expanduser(), bridge_path().parent.expanduser()]
+        return is_own_env(target) or any(within(target, r) for r in roots)
+
     def police(
         route_id: str,
         route: BridgeRoute,
@@ -903,7 +921,23 @@ def register_bridge_api(
             if req.route == "files.search" and isinstance(data, dict):
                 # A search is a read of every file it matches: the same rule as `files.read`.
                 hits = data.get("hits") or []
-                data["hits"] = [h for h in hits if not is_secret_file(str(h.get("path", "")))]
+                data["hits"] = [
+                    h
+                    for h in hits
+                    if not is_secret_file(str(h.get("path", "")))
+                    and not hidden_place(query, req.body, str(h.get("path", "")))
+                ]
+            if req.route in {"files.tree", "files.browse"} and isinstance(data, dict):
+                # A listing names what it lists. The app's own data folder and Chimera's `.env` are
+                # not the bridge's to see, so they are not named to it either (review of 2026-10-04,
+                # second round: a workspace that holds the install folder listed both).
+                entries = data.get("entries") or []
+                data["entries"] = [
+                    e
+                    for e in entries
+                    if not is_secret_file(str(e.get("name", "")))
+                    and not hidden_place(query, req.body, str(e.get("path", "")))
+                ]
             return {"route": req.route, "status": status, "data": scrub(data, hidden())}
 
         async def run(job: BridgeJob) -> None:

@@ -513,8 +513,9 @@ def wider_than(body: Any, *, reach: str, approval: str) -> list[str]:
     Equal or narrower passes: a client may ask for ``read_only``, or for approval ``always``, where
     the owner allows more. Wider is refused — a reach past the owner's, an approval looser than the
     owner's, host execution or a ``verify`` shell command where the owner's reach has no shell, and
-    ``auto_approve`` always (it answers gates without the person). A posture value this module does
-    not know is wider by definition.
+    ``auto_approve`` always (it answers gates without the person), and ``deliver_to`` always (the
+    webhook a scheduled job posts its answers to). A posture value this module does not know is
+    wider by definition.
     """
     found: set[str] = set()
     shell = reach == "workspace_shell"
@@ -536,6 +537,12 @@ def wider_than(body: Any, *, reach: str, approval: str) -> list[str]:
                     found.add(str(key))
                 elif key == "auto_approve" and _truthy(value):
                     found.add("auto_approve")
+                elif key == "deliver_to" and _truthy(value):
+                    # A scheduled job's answer posted to a webhook the CLIENT names: an outbound
+                    # channel for whatever the job reads, firing unattended. Where the owner's data
+                    # goes is the owner's (the approval webhook is owner-only for the same reason);
+                    # a job created through the bridge reports in the app (audit of 2026-10-04).
+                    found.add("deliver_to")
                 walk(value)
         elif isinstance(node, list):
             for item in node:

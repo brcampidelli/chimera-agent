@@ -2148,10 +2148,17 @@ def build_api_app(
             case_sensitive=req.case_sensitive,
             glob=req.glob,
         )
+        from chimera.core.own_files import protected_reason
+        from chimera.tools.workspace import chimera_home
+
+        home = chimera_home()
         return {
+            # A hit is a read of the line it shows: the same rule as `GET /api/fs/file`, which
+            # refuses Chimera's own `.env` and data folder for every caller.
             "hits": [
                 {"path": h.path, "line": h.line, "text": h.text, "start": h.start, "end": h.end}
                 for h in result.hits
+                if protected_reason(ws / h.path, home) is None
             ],
             "engine": result.engine,
             "capped": result.capped,
