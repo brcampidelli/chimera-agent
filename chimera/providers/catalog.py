@@ -142,8 +142,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/meta-llama/llama-3.3-70b-instruct", "weak", "Meta",
-        0.10, 0.32, tools=True, context_k=65,
-        notes="the paid variant; the :free one was withdrawn on 2026-08-18. Priced 0.71/0.71 here\n        until a live check on 2026-09-03 measured 0.10/0.32 — and the note that input and\n        output cost the same stopped being true with it. The window read 131k until the live\n        check on main turned red on 2026-10-01: the index still advertises 131,072, but the\n        provider it routes to serves 65,536, and the served figure is the one a turn can use",
+        0.22, 0.50, tools=True, context_k=65, also_seen=((0.10, 0.32),),
+        notes="the paid variant; the :free one was withdrawn on 2026-08-18. Priced 0.71/0.71 here\n        until a live check on 2026-09-03 measured 0.10/0.32 — and the note that input and\n        output cost the same stopped being true with it. The window read 131k until the live\n        check on main turned red on 2026-10-01: the index still advertises 131,072, but the\n        provider it routes to serves 65,536, and the served figure is the one a turn can use.\n        On 2026-10-04 the live check turned red again: the index quotes 0.22/0.50. The row\n        keeps the higher figure so a fallback never reads low; 0.10/0.32 stays in also_seen",
     ),
     CatalogEntry(
         "openrouter/openai/gpt-oss-20b", "weak", "OpenAI",
