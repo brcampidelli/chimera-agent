@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.64.3] - 2026-10-04
 ### Security
 
 - **Settings that widen what the agent reaches, or loosen a guard or a privacy fence, are the owner's alone** (#770,
