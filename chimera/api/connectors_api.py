@@ -90,6 +90,14 @@ def set_key(home: Path, name: str, value: str, env_path: Path | None = None) -> 
         raise store.ConnectorError("the key may not be empty")
     if any(c in candidate for c in "\r\n"):
         raise store.ConnectorError("the key may not contain a newline")
+    from chimera.api.key_vault import check_env_value
+
+    try:
+        # Every line-breaking character, not only \r and \n: the .env writer would otherwise be
+        # handed a value it refuses, after the checks above said yes.
+        check_env_value(cfg.key_env, candidate)
+    except ValueError as exc:
+        raise store.ConnectorError(str(exc)) from None
     if candidate.startswith("…") or set(candidate) <= {"*", "•", "·"}:
         raise store.ConnectorError("that looks like a masked hint, not a key")
     _write_env_var(env_path or Path(".env"), cfg.key_env, candidate)

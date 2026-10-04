@@ -93,8 +93,15 @@ console = Console()
 
 
 def _set_env_var(path: Path, key: str, value: str) -> None:
-    """Set KEY=value in a .env file, replacing the line if present, appending otherwise."""
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    """Set KEY=value in a .env file, replacing the line if present, appending otherwise.
+
+    Held to the same rule as every other writer of the file (`key_vault.check_env_value`), and the
+    file is split on newlines only, so a value cannot break out into a second assignment here either.
+    """
+    from chimera.api.key_vault import check_env_value, env_lines
+
+    check_env_value(key, value)
+    lines = env_lines(path.read_text(encoding="utf-8")) if path.exists() else []
     prefix = f"{key}="
     for i, line in enumerate(lines):
         if line.strip().startswith(prefix):

@@ -22,6 +22,7 @@ from typing import Any
 
 from chimera.api.key_vault import (
     SCREEN_STORABLE,
+    check_env_value,
     move_to_file,
     move_to_vault,
     vault_snapshot,
@@ -452,6 +453,7 @@ def pool_add(provider: str, key: str, *, env_path: Path | None = None) -> dict[s
         raise ValueError("key may not contain a comma — that is the separator between pool entries")
     if any(c in candidate for c in "\r\n"):
         raise ValueError("key may not contain a newline")
+    check_env_value("key", candidate)
     if candidate.startswith("…") or set(candidate) <= {"*", "•", "·"}:
         # A client echoing back what it displayed. Cheap to check, and it fails loudly here instead
         # of quietly replacing a working pool with its own mask.
@@ -1008,11 +1010,11 @@ def check_updates(updates: dict[str, str], *, workspace: Path | None = None) -> 
     rejected = [k for k in updates if not is_editable(k)]
     if rejected:
         raise ValueError(f"not editable: {', '.join(sorted(rejected))}")
-    # Allowlisting the KEY isn't enough: a newline in the VALUE would split into extra .env lines and
-    # inject arbitrary env vars (e.g. a provider key, or disabling the sandbox). Reject control chars.
+    # Allowlisting the KEY isn't enough: a line break in the VALUE would split into extra .env lines
+    # and inject arbitrary env vars (a provider key, the posture). Every character that breaks a line
+    # anywhere — not only \r and \n, see `key_vault.check_env_value` — and every control character.
     for key, value in updates.items():
-        if any(c in str(value) for c in "\r\n"):
-            raise ValueError(f"value for {key} may not contain a newline")
+        check_env_value(key, str(value))
     for key, value in updates.items():
         check = _VALUE_CHECKS.get(key)
         if check is not None:

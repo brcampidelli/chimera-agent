@@ -30,6 +30,7 @@ No function here returns a value. Names, never secrets — the same rule as `con
 
 from __future__ import annotations
 
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -69,6 +70,47 @@ def _entry_for(line: str, key: str) -> bool:
     return bool(sep) and name.strip() == key
 
 
+def _breaks_a_line(ch: str) -> bool:
+    """Whether ``ch`` may never sit inside a ``.env`` value.
+
+    Every control and format character, and both Unicode separators — and, whatever its category,
+    anything ``str.splitlines`` splits on (``\\x0b``, ``\\x0c``, ``\\x1c``-``\\x1e``, ``\\x85``,
+    ``\\u2028``, ``\\u2029`` besides ``\\r`` and ``\\n``). Until 2026-10-04 only ``\\r`` and ``\\n``
+    were refused, and this module re-read the file with ``splitlines``: a value carrying ``\\u2028``
+    was written as ONE line, read back as TWO, and the next save of any key rewrote the second half
+    as a real assignment — a model name smuggling ``CHIMERA_REACH=workspace_shell`` into the file.
+    """
+    return unicodedata.category(ch) in {"Cc", "Cf", "Zl", "Zp"} or len(f"x{ch}y".splitlines()) > 1
+
+
+def check_env_value(key: str, value: str) -> None:
+    """Refuse a value that could break out of its ``.env`` line. ``ValueError`` names the key.
+
+    The one test every write to ``.env`` passes through: :func:`set_env_entry` calls it on the line
+    it writes, so a caller that forgets to check first still cannot split the file, and
+    ``config_api.check_updates`` calls it up front so a save is refused before anything is written.
+    """
+    bad = sorted({f"U+{ord(ch):04X}" for ch in str(value) if _breaks_a_line(ch)})
+    if bad:
+        raise ValueError(
+            f"value for {key} may not contain a newline, another line break or a control character "
+            f"({', '.join(bad)})"
+        )
+
+
+def env_lines(text: str) -> list[str]:
+    """``.env`` text as its lines, split on ``\\n`` ONLY (a trailing ``\\r`` dropped).
+
+    Not ``str.splitlines``: that also splits on the Unicode separators above, so a file that held
+    one already would be cut in two on the next rewrite. python-dotenv reads lines on ``\\n``; the
+    writer has to see the same lines the reader does.
+    """
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()
+    return [line[:-1] if line.endswith("\r") else line for line in lines]
+
+
 def set_env_entry(path: Path, key: str, line: str, *, keep_export: bool = False) -> None:
     """Make ``line`` the only entry for ``key`` in ``.env``, atomically.
 
@@ -83,7 +125,8 @@ def set_env_entry(path: Path, key: str, line: str, *, keep_export: bool = False)
     variable exported, so that script never noticed; replacing the line in place must not change
     that. A marker is a comment and never takes it.
     """
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    check_env_value(key, line)
+    lines = env_lines(path.read_text(encoding="utf-8")) if path.exists() else []
     hits = [i for i, existing in enumerate(lines) if _entry_for(existing, key)]
     if hits:
         if keep_export and lines[hits[0]].lstrip().startswith("export "):
@@ -104,7 +147,7 @@ def remove_env_entry(path: Path, key: str) -> None:
         return
     lines = [
         line
-        for line in path.read_text(encoding="utf-8").splitlines()
+        for line in env_lines(path.read_text(encoding="utf-8"))
         if not _entry_for(line, key)
     ]
     tmp = path.parent / (path.name + ".tmp")
