@@ -115,6 +115,8 @@ from chimera.api.schemas import (
     SearchOut,
     SessionDetailOut,
     SessionMetaOut,
+    ShellPrefsIn,
+    ShellPrefsOut,
     SuggestionEventIn,
     SuggestionStatsOut,
     SystemOneModelsOut,
@@ -663,6 +665,40 @@ def build_api_app(
         The keeper's last decision, never a fresh one: the OS is touched only from the keeper's own
         thread (on Windows the hold belongs to the thread that set it)."""
         return keep_awake.state().to_dict()
+
+    # The tray's switches, from the Settings screen. The window has no IPC to the shell, so the
+    # shell hands this process the path of the file it reads and the file it reports in
+    # (`chimera/api/shell_prefs.py`); it takes a change in on its next tick, within seconds.
+    # Deliberately absent from the desktop bridge's table: these are the owner's window settings.
+    @app.get("/api/shell/prefs", dependencies=[guard], response_model=ShellPrefsOut)
+    def read_shell_prefs_endpoint() -> dict[str, Any]:
+        from chimera.api.shell_prefs import ShellPrefsBusy, read_shell_prefs
+
+        try:
+            return read_shell_prefs()
+        except ShellPrefsBusy as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.patch("/api/shell/prefs", dependencies=[guard], response_model=ShellPrefsOut)
+    def patch_shell_prefs_endpoint(body: ShellPrefsIn) -> dict[str, Any]:
+        from chimera.api.shell_prefs import (
+            ShellPrefsBusy,
+            ShellPrefsUnreadable,
+            ShellUnavailable,
+            write_shell_prefs,
+        )
+
+        changes = {k: v for k, v in body.model_dump().items() if v is not None}
+        try:
+            return write_shell_prefs(changes)
+        # 409: the request is fine and the state is not — no shell, or a file the shell refuses.
+        except (ShellUnavailable, ShellPrefsUnreadable) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        # 503: a lock another program held through every retry; the same request works in a moment.
+        except ShellPrefsBusy as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/api/config", dependencies=[guard], response_model=ConfigOut)
     def read_config_endpoint() -> dict[str, Any]:

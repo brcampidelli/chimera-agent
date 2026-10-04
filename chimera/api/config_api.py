@@ -99,6 +99,13 @@ _EDITABLE_SETTINGS = {
     # whether that still holds on battery. Read on the keeper's every tick, so no APPLIES_WHEN entry.
     "CHIMERA_KEEP_AWAKE",
     "CHIMERA_KEEP_AWAKE_ON_BATTERY",
+    # Archive a coding conversation nobody touched for this many days (`code_api`'s list, through
+    # `conversation_state.due_for_archive`). Shipped with no row, so the only way to turn it on was
+    # `.env`. Read on every look at the list, so no APPLIES_WHEN entry.
+    "CHIMERA_ARCHIVE_AFTER_DAYS",
+    # NOT here, by design: CHIMERA_APPROVE_VIA_CHAT. Answering a pending approval from a chat bot
+    # widens who can approve to whoever holds that channel, so turning it on stays a deliberate
+    # edit of `.env` by the owner — never a switch a screen (or the desktop bridge) can flip.
     "CHIMERA_APP_MESSAGING",  # auto-start messaging adapters in the desktop app at boot
     # Who may talk to each bot. Not secrets — platform ids — so they are read back in full, like the
     # egress list: a list the owner cannot read is a list they cannot correct, and the failure it
@@ -476,7 +483,13 @@ def read_config(settings: Settings) -> dict[str, Any]:
         "guard": {"chat": settings.guard_chat},
         "server": {"token_set": bool(settings.server_token)},
         "mcp": {"autoload": settings.mcp_autoload},
-        "automation": {"cron": settings.app_cron},
+        "automation": {
+            "cron": settings.app_cron,
+            # Whether a job's channel hears that the job could not run. On by default.
+            "notify_failures": settings.cron_notify_failures,
+        },
+        # `None` is never, the shipped state.
+        "conversations": {"archive_after_days": settings.archive_after_days},
         # Per platform, the ids allowed to talk to its bot; an empty list is "anyone", and the
         # Messaging card says so in those words rather than showing a blank field.
         "messaging": {
@@ -637,6 +650,28 @@ def _check_keep_awake(value: str) -> None:
         raise ValueError("CHIMERA_KEEP_AWAKE must be one of off, working, always")
 
 
+def _check_archive_after_days(value: str) -> None:
+    """Empty (never) or a positive number of days.
+
+    Zero is refused for the reason the daily cap refuses it: the rule reads ``if not after_days``,
+    so ``0`` would be saved, shown as a number, and archive nothing. A value that does not parse is
+    refused here even though ``Settings`` would survive it (it falls back to never with a warning in
+    a log): a screen that confirms a save which then does nothing is the failure this check exists
+    to stop.
+    """
+    text = value.strip()
+    if not text:
+        return
+    try:
+        days = float(text)
+    except ValueError as exc:
+        raise ValueError(f"CHIMERA_ARCHIVE_AFTER_DAYS must be a number of days, not {text!r}") from exc
+    if not math.isfinite(days) or days <= 0:
+        raise ValueError(
+            "CHIMERA_ARCHIVE_AFTER_DAYS must be more than zero; leave it empty to never archive"
+        )
+
+
 def _check_boolean(key: str) -> Callable[[str], None]:
     def check(value: str) -> None:
         if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
@@ -651,6 +686,9 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DAILY_USD_CAP": _check_daily_cap,
     "CHIMERA_KEEP_AWAKE": _check_keep_awake,
     "CHIMERA_KEEP_AWAKE_ON_BATTERY": _check_boolean("CHIMERA_KEEP_AWAKE_ON_BATTERY"),
+    "CHIMERA_ARCHIVE_AFTER_DAYS": _check_archive_after_days,
+    # A boolean the app would fail to start on if it were saved as anything else.
+    "CHIMERA_CRON_NOTIFY_FAILURES": _check_boolean("CHIMERA_CRON_NOTIFY_FAILURES"),
 }
 
 

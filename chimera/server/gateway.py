@@ -17,6 +17,7 @@ from typing import Any, Protocol
 
 from chimera.core.code_session import _accepts
 from chimera.interface import ChatSession, render
+from chimera.providers.failover import policy_block
 from chimera.telemetry import get_logger
 
 _log = get_logger("server.gateway")
@@ -172,7 +173,8 @@ class MessageGateway:
         self._max_turns = max_turns
         #: Append the turn's warnings, and why it was cut short, under the answer. On for a chat
         #: platform, where the reply is all the person sees. Off for the HTTP ``/chat`` route, whose
-        #: ``reply`` field a program reads as the answer.
+        #: ``reply`` field a program reads as the answer. The same switch decides whether a
+        #: content-policy refusal becomes a sentence in the reply (:meth:`on_message`).
         self._warnings_in_reply = warnings_in_reply
         #: Tell the model each turn which platform, chat and sender the message came from
         #: (:func:`channel_note`). On for a chat platform. Off for the HTTP ``/chat`` route, whose
@@ -196,7 +198,32 @@ class MessageGateway:
         return self._sessions[key]
 
     def on_message(self, message: InboundMessage) -> str:
-        """Route a message to its chat's session and return the reply."""
+        """Route a message to its chat's session and return the reply.
+
+        On a chat platform a content-policy refusal is answered with one sentence saying so (study
+        29 P5.7) — the model that refused, and that nothing was retried on another. It used to
+        escape as an exception, and the Discord adapter, which sends whatever this returns, sent
+        nothing: the message read as ignored. No offer to retry here: a chat cannot carry the
+        model picker, and choosing a model with weaker safeguards is the owner's call, not the
+        bot's. The HTTP ``/chat`` route keeps the exception, because a program reads its ``reply``
+        as the answer, and a refusal is not one.
+
+        Decided by ``warnings_in_reply``, which is on for the gateways ``serve`` builds for the
+        chat bots. The WhatsApp webhook is a chat too but is mounted on the HTTP server and shares
+        its gateway, so it answers a refusal itself (``WhatsAppWebhook.on_message``).
+        """
+        try:
+            return self._route(message)
+        except Exception as exc:
+            if not self._warnings_in_reply:
+                raise
+            block = policy_block(exc)
+            if block is None:
+                raise
+            _log.warning("content-policy refusal on %s: %s", message.key, exc)
+            return block.chat_sentence()
+
+    def _route(self, message: InboundMessage) -> str:
         if self._intercept is not None:
             # First, before `session_for`: an intercepted message must not even create a session.
             handled = self._intercept(message)

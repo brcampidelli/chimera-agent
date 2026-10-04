@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from chimera.providers.failover import policy_block
 from chimera.server.gateway import InboundMessage
 from chimera.telemetry import get_logger
 
@@ -135,7 +136,19 @@ class WhatsAppWebhook:
             # owner's money answering a stranger. The number is logged so the owner can add it.
             _log.debug("whatsapp: ignored a message from %s (not in the allowlist)", message.user)
             return 0
-        reply = self.route(message)
+        try:
+            reply = self.route(message)
+        except Exception as exc:
+            # A content-policy refusal is answered in the chat, as the bots answer one (study 29
+            # P5.7). It cannot be left to the gateway: this webhook shares the HTTP server's
+            # `MessageGateway`, built for `/chat`, where a refusal must stay an error because a
+            # program reads the reply as the answer. Here it escaped instead, Meta's POST failed,
+            # and the person on WhatsApp got nothing at all. Anything else still raises as before.
+            block = policy_block(exc)
+            if block is None:
+                raise
+            _log.warning("whatsapp: content-policy refusal for %s: %s", message.chat_id, exc)
+            reply = block.chat_sentence()
         if reply:
             self.sender.send(message.chat_id, reply)
         return 1

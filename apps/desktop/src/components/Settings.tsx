@@ -43,6 +43,9 @@ import { KeepAwakeCard } from "@/components/KeepAwakeCard";
 import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
 import { NotificationsCard } from "@/components/NotificationsCard";
+import { ShellCard } from "@/components/ShellCard";
+import { ConversationsCard } from "@/components/ConversationsCard";
+import { WeeklyReviewRow } from "@/components/WeeklyReviewRow";
 import { ModelPicker } from "@/components/code/ModelPicker";
 import { LANGS, useI18n, useT } from "@/lib/i18n";
 import type {
@@ -1164,6 +1167,15 @@ export function Settings({
 
                 <NotificationsCard />
 
+                {/* The tray's own switches (study 29, P2.2/P2.4/P2.6), which only its menu could
+                    change: written to the file the desktop shell reads, through the backend. */}
+                <ShellCard />
+
+                {/* Archiving idle conversations, which shipped with no row. */}
+                <ConversationsCard
+                  archiveAfterDays={c.conversations?.archive_after_days ?? null}
+                />
+
                 <IdentityCard />
 
                 <AutonomyCard c={c} save={save} />
@@ -1566,6 +1578,7 @@ export function Settings({
                   </Row>
                 </Card>
 
+                {/* No row for CHIMERA_APPROVE_VIA_CHAT, by design: approving from a chat channel widens who can approve, so enabling it stays a deliberate .env edit by the owner. */}
                 <Card title={t("settings.card.automation")}>
                   <Row
                     label={t("settings.row.appCron")}
@@ -1578,6 +1591,19 @@ export function Settings({
                       onChange={(v) => save({ CHIMERA_APP_CRON: String(v) })}
                     />
                   </Row>
+                  {/* On unless the owner turned it off; a server without the field is on. */}
+                  <Row
+                    label={t("settings.row.cronNotifyFailures")}
+                    hint={t("settings.hint.cronNotifyFailures")}
+                    applies={c.applies?.CHIMERA_CRON_NOTIFY_FAILURES}
+                    env="CHIMERA_CRON_NOTIFY_FAILURES"
+                  >
+                    <Toggle
+                      on={c.automation.notify_failures ?? true}
+                      onChange={(v) => save({ CHIMERA_CRON_NOTIFY_FAILURES: String(v) })}
+                    />
+                  </Row>
+                  <WeeklyReviewRow />
                 </Card>
 
                 {/* Beside the scheduler because a schedule is the work a sleeping laptop loses most

@@ -7,6 +7,7 @@ policy layer (allow/warn/block/review) on top.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,13 +68,15 @@ def resolve_for(tool: Any, path: str, *, verb: str) -> Path:
     """
     workspace: Path = tool.workspace
     try:
-        return resolve_in_workspace(workspace, path)
+        inside = resolve_in_workspace(workspace, path)
     except PathEscapesWorkspaceError:
         ask: AskOutside | None = getattr(tool, "ask_outside", None)
         if ask is None:
             raise
         root = workspace.resolve()
         candidate = (root / path).resolve()
+        # Before the question, not after it: a yes cannot grant this one (see SHELL_OWNED_ENV).
+        _refuse_shell_owned(candidate, verb)
         name = str(getattr(tool, "name", "") or "tool")
         question = BoundaryQuestion(
             reason=f"{verb} outside the project folder: {candidate} — the project is {root}",
@@ -84,6 +87,31 @@ def resolve_for(tool: Any, path: str, *, verb: str) -> Path:
         raise PathEscapesWorkspaceError(
             f"path {path!r} escapes workspace {root} — a person was asked and refused. Do not retry."
         ) from None
+    _refuse_shell_owned(inside, verb)
+    return inside
+
+
+#: The desktop shell's own files, by the variables the shell names them in when it starts the
+#: backend (`start_sidecar` in main.rs; read by `chimera/api/shell_prefs.py`). No tool writes or edits
+#: them — inside a workspace that happens to contain the app's folder, or outside one with a
+#: person's yes: one key there asks the operating system to start the app at sign-in, and the door
+#: to it is the Settings screen, behind the server's token. An approval card that says "write:
+#: …/shell-prefs.json" is not a question a person can be expected to read as "start this program
+#: every time I sign in". Reading them stays allowed; there is nothing secret in either.
+SHELL_OWNED_ENV = ("CHIMERA_SHELL_PREFS", "CHIMERA_SHELL_STATE")
+_READ_VERBS = frozenset({"read", "list", "search"})
+
+
+def _refuse_shell_owned(candidate: Path, verb: str) -> None:
+    if verb in _READ_VERBS:
+        return
+    for env in SHELL_OWNED_ENV:
+        owned = os.environ.get(env, "").strip()
+        if owned and Path(owned).resolve() == candidate:
+            raise PathEscapesWorkspaceError(
+                f"{candidate} belongs to the desktop app and no tool may {verb} it; its switches are "
+                "changed in Settings › General › Window and tray. Do not retry."
+            )
 
 
 def read_text_for_edit(path: Path) -> tuple[str, str]:

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 # --- health / sessions ----------------------------------------------------------------------------
 
@@ -647,6 +647,66 @@ class AutomationCfgOut(BaseModel):
     """
 
     cron: bool
+    notify_failures: bool = True
+    """``CHIMERA_CRON_NOTIFY_FAILURES``: whether a job's channel hears that the job could not run.
+    On by default, and a server without the field is on that default."""
+
+
+class ConversationsCfgOut(BaseModel):
+    """``CHIMERA_ARCHIVE_AFTER_DAYS``: archive a coding conversation left alone this many days.
+
+    ``None`` is never, the shipped state. Archiving is a timestamp beside the transcripts; the rule
+    never archives one with a turn running, a question waiting, unfinished background work or an
+    open share link (``chimera/api/conversation_state.py``)."""
+
+    archive_after_days: float | None = None
+
+
+class ShellPrefsOut(BaseModel):
+    """The desktop shell's own switches, as the shell reads them (``chimera/api/shell_prefs.py``).
+
+    ``available`` is false on a server the desktop app did not start: there is no tray to change.
+    ``start_at_sign_in`` is the operating system's answer as the shell last reported it, ``None``
+    while unknown; ``sign_in_requested`` is a change asked for and not yet carried out."""
+
+    available: bool
+    keep_in_tray: bool = False
+    call_attention: bool = True
+    quick_entry: bool = False
+    quick_entry_chord: str = ""
+    start_at_sign_in: bool | None = None
+    sign_in_requested: bool | None = None
+    problem: str = ""
+    """The tray's own problem line (a chord another program holds, a refused sign-in entry)."""
+    unreadable: bool = False
+    """The file does not parse, so the shell is on its defaults and a save is refused."""
+
+
+class ShellPrefsIn(BaseModel):
+    """The switches to change. An absent field is left as it is; the chord is not writable here."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    keep_in_tray: bool | None = None
+    call_attention: bool | None = None
+    quick_entry: bool | None = None
+    start_at_sign_in: bool | None = None
+
+
+class WeeklyReviewOut(BaseModel):
+    """The weekly-review job (``chimera/scheduler/weekly_review.py``) as the Settings row shows it.
+
+    ``proposed`` is false until the job exists. ``posts_to`` is the destination's host only — the
+    URL is a credential — and empty while the result goes to the results log alone."""
+
+    proposed: bool
+    job_id: str = ""
+    enabled: bool = False
+    posts_to: str = ""
+
+
+class WeeklyReviewIn(BaseModel):
+    enabled: bool
 
 
 class MessagingCfgOut(BaseModel):
@@ -773,6 +833,7 @@ class ConfigOut(BaseModel):
     server: ServerCfgOut
     mcp: McpCfgOut
     automation: AutomationCfgOut
+    conversations: ConversationsCfgOut = Field(default_factory=ConversationsCfgOut)
     messaging: MessagingCfgOut = Field(default_factory=MessagingCfgOut)
     guard: GuardCfgOut
     providers: list[ProviderOut]

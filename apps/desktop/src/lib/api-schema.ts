@@ -1206,6 +1206,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/cron/weekly-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Weekly Review */
+        get: operations["get_weekly_review_api_cron_weekly_review_get"];
+        /** Put Weekly Review */
+        put: operations["put_weekly_review_api_cron_weekly_review_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/cron/{job_id}": {
         parameters: {
             query?: never;
@@ -2875,6 +2893,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/shell/prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Shell Prefs Endpoint */
+        get: operations["read_shell_prefs_endpoint_api_shell_prefs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Shell Prefs Endpoint */
+        patch: operations["patch_shell_prefs_endpoint_api_shell_prefs_patch"];
+        trace?: never;
+    };
     "/api/skills": {
         parameters: {
             query?: never;
@@ -3788,6 +3824,11 @@ export interface components {
         AutomationCfgOut: {
             /** Cron */
             cron: boolean;
+            /**
+             * Notify Failures
+             * @default true
+             */
+            notify_failures: boolean;
         };
         /**
          * AutonomyCfgOut
@@ -4551,6 +4592,7 @@ export interface components {
              * @default false
              */
             repo_map: boolean;
+            retry_of?: components["schemas"]["PolicyRetry"] | null;
             roles?: components["schemas"]["RoleModels"] | null;
             /** Session Id */
             session_id?: string | null;
@@ -4659,6 +4701,7 @@ export interface components {
             bridge?: components["schemas"]["BridgeCfgOut"];
             browser?: components["schemas"]["BrowserCfgOut"];
             cache: components["schemas"]["CacheCfgOut"];
+            conversations?: components["schemas"]["ConversationsCfgOut"];
             decisions?: components["schemas"]["DecisionsCfgOut"];
             experimental?: components["schemas"]["ExperimentalCfgOut"];
             fusion?: components["schemas"]["FusionCfgOut"];
@@ -4700,6 +4743,18 @@ export interface components {
              * @default
              */
             path: string;
+        };
+        /**
+         * ConversationsCfgOut
+         * @description ``CHIMERA_ARCHIVE_AFTER_DAYS``: archive a coding conversation left alone this many days.
+         *
+         *     ``None`` is never, the shipped state. Archiving is a timestamp beside the transcripts; the rule
+         *     never archives one with a turn running, a question waiting, unfinished background work or an
+         *     open share link (``chimera/api/conversation_state.py``).
+         */
+        ConversationsCfgOut: {
+            /** Archive After Days */
+            archive_after_days?: number | null;
         };
         /** CrewDoneOut */
         CrewDoneOut: {
@@ -7189,6 +7244,25 @@ export interface components {
             /** Workspace */
             workspace?: string | null;
         };
+        /**
+         * PolicyRetry
+         * @description The refusal a turn is the owner's retry of (study 29 P5.7).
+         *
+         *     Sent by the error card's "Try with another model" and by nothing else. It changes nothing about
+         *     how the turn runs — the model is the request's ``model`` like any turn's — and exists for one
+         *     line of the receipt: "blocked on X, redone on Y by the owner's choice", so the conversation
+         *     keeps the fact that the answer under it came from a model the person CHOSE after a refusal,
+         *     not from the one the conversation was on.
+         *
+         *     It is the client's own account of the previous turn, recorded as that. Bounded because it is
+         *     stored and drawn; nothing reads it as a fact about the provider.
+         */
+        PolicyRetry: {
+            /** Blocked Model */
+            blocked_model: string;
+            /** Request Id */
+            request_id?: string | null;
+        };
         /** PoolAddIn */
         PoolAddIn: {
             /** Key */
@@ -7879,6 +7953,66 @@ export interface components {
             /** Shares */
             shares: components["schemas"]["ShareOut"][];
         };
+        /**
+         * ShellPrefsIn
+         * @description The switches to change. An absent field is left as it is; the chord is not writable here.
+         */
+        ShellPrefsIn: {
+            /** Call Attention */
+            call_attention?: boolean | null;
+            /** Keep In Tray */
+            keep_in_tray?: boolean | null;
+            /** Quick Entry */
+            quick_entry?: boolean | null;
+            /** Start At Sign In */
+            start_at_sign_in?: boolean | null;
+        };
+        /**
+         * ShellPrefsOut
+         * @description The desktop shell's own switches, as the shell reads them (``chimera/api/shell_prefs.py``).
+         *
+         *     ``available`` is false on a server the desktop app did not start: there is no tray to change.
+         *     ``start_at_sign_in`` is the operating system's answer as the shell last reported it, ``None``
+         *     while unknown; ``sign_in_requested`` is a change asked for and not yet carried out.
+         */
+        ShellPrefsOut: {
+            /** Available */
+            available: boolean;
+            /**
+             * Call Attention
+             * @default true
+             */
+            call_attention: boolean;
+            /**
+             * Keep In Tray
+             * @default false
+             */
+            keep_in_tray: boolean;
+            /**
+             * Problem
+             * @default
+             */
+            problem: string;
+            /**
+             * Quick Entry
+             * @default false
+             */
+            quick_entry: boolean;
+            /**
+             * Quick Entry Chord
+             * @default
+             */
+            quick_entry_chord: string;
+            /** Sign In Requested */
+            sign_in_requested?: boolean | null;
+            /** Start At Sign In */
+            start_at_sign_in?: boolean | null;
+            /**
+             * Unreadable
+             * @default false
+             */
+            unreadable: boolean;
+        };
         /** SkillStatOut */
         SkillStatOut: {
             /** Kind */
@@ -8419,6 +8553,37 @@ export interface components {
             model: string;
             /** Support */
             support: string;
+        };
+        /** WeeklyReviewIn */
+        WeeklyReviewIn: {
+            /** Enabled */
+            enabled: boolean;
+        };
+        /**
+         * WeeklyReviewOut
+         * @description The weekly-review job (``chimera/scheduler/weekly_review.py``) as the Settings row shows it.
+         *
+         *     ``proposed`` is false until the job exists. ``posts_to`` is the destination's host only — the
+         *     URL is a credential — and empty while the result goes to the results log alone.
+         */
+        WeeklyReviewOut: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
+            /**
+             * Job Id
+             * @default
+             */
+            job_id: string;
+            /**
+             * Posts To
+             * @default
+             */
+            posts_to: string;
+            /** Proposed */
+            proposed: boolean;
         };
         /** WorkActionOut */
         WorkActionOut: {
@@ -10500,6 +10665,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CronSilenceOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_weekly_review_api_cron_weekly_review_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyReviewOut"];
+                };
+            };
+        };
+    };
+    put_weekly_review_api_cron_weekly_review_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WeeklyReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyReviewOut"];
                 };
             };
             /** @description Validation Error */
@@ -13015,6 +13233,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_shell_prefs_endpoint_api_shell_prefs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellPrefsOut"];
+                };
+            };
+        };
+    };
+    patch_shell_prefs_endpoint_api_shell_prefs_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ShellPrefsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ShellPrefsOut"];
                 };
             };
             /** @description Validation Error */

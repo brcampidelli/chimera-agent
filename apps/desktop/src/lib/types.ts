@@ -72,6 +72,11 @@ export type PoolWrite = Schemas["PoolWriteOut"];
 export type AppConfig = Schemas["ConfigOut"];
 /** Whether the app holds the machine awake right now, and for what (`chimera/core/keep_awake.py`). */
 export type KeepAwakeState = Schemas["KeepAwakeOut"];
+/** The desktop shell's own switches (the tray's), as the shell reads them. */
+export type ShellPrefs = Schemas["ShellPrefsOut"];
+export type ShellPrefsChange = Schemas["ShellPrefsIn"];
+/** The weekly-review job, as its Settings row shows it. */
+export type WeeklyReview = Schemas["WeeklyReviewOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];

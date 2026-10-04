@@ -53,6 +53,8 @@ from chimera.api.schemas import (
     SpecWriteIn,
     SpecWriteOut,
     TaskCardOut,
+    WeeklyReviewIn,
+    WeeklyReviewOut,
 )
 from chimera.api.sse import SSE_RESPONSE
 from chimera.config import get_settings
@@ -604,6 +606,50 @@ def register_features(
             ],
             "grace_seconds": grace,
         }
+
+    # The weekly review's switch, for the Settings screen (`chimera/scheduler/weekly_review.py`).
+    # It existed only as `chimera report weekly` (propose) plus `chimera cron enable` (switch on),
+    # so a person who never opens a terminal could not have it. On proposes the job if it is not
+    # there yet and enables it; off disables it and never creates one. The destination stays the
+    # CLI's (`--deliver-to`): it is a credential, and only its host is shown here.
+    def _weekly_review_dict(job: Any) -> dict[str, Any]:
+        from chimera.scheduler.delivery import webhook_host_only
+
+        if job is None:
+            return {"proposed": False}
+        return {
+            "proposed": True,
+            "job_id": job.id,
+            "enabled": bool(job.enabled),
+            "posts_to": webhook_host_only(job.deliver_to) if job.deliver_to else "",
+        }
+
+    @app.get("/api/cron/weekly-review", dependencies=[guard], response_model=WeeklyReviewOut)
+    def get_weekly_review() -> dict[str, Any]:
+        from chimera.scheduler.weekly_review import find_proposal
+
+        return _weekly_review_dict(find_proposal(_cron_store(_settings()).list()))
+
+    @app.put("/api/cron/weekly-review", dependencies=[guard], response_model=WeeklyReviewOut)
+    def put_weekly_review(body: WeeklyReviewIn) -> dict[str, Any]:
+        from chimera.scheduler import Scheduler
+        from chimera.scheduler.weekly_review import find_proposal, propose
+
+        sched = Scheduler(_cron_store(_settings()))
+        job = find_proposal(sched.store.list())
+        if job is None and not body.enabled:
+            return _weekly_review_dict(None)
+        if job is None:
+            # The owner switched it on from the screen: a human-created job, not an agent proposal.
+            job, _created = propose(sched, now=time.time(), created_by="human")
+        if not body.enabled:
+            return _weekly_review_dict(sched.disable(job.id))
+        if job.created_by != "human":
+            # An agent proposal the owner just adopted from the screen becomes theirs — the same
+            # record the job would carry had they created it, so "who scheduled this" stays true.
+            job.created_by = "human"
+            sched.store.add(job)
+        return _weekly_review_dict(sched.enable(job.id, now=time.time()))
 
     @app.post("/api/cron", dependencies=[guard], response_model=CronJobOut)
     def create_cron(body: CronCreateIn) -> dict[str, Any]:
