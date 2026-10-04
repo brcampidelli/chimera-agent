@@ -67,6 +67,7 @@ from chimera.api.schemas import (
     DecisionLabelIn,
     DecisionLabelOut,
     DecisionsOut,
+    DeferSavingOut,
     DeletedOut,
     DiagnosticsOut,
     DoctorOut,
@@ -1113,6 +1114,27 @@ def build_api_app(
 
         tools = list_tools(default_registry(workspace))
         return {"tools": tools, "count": len(tools), "unavailable": unavailable({t["name"] for t in tools})}
+
+    @app.get("/api/tools/defer-saving", dependencies=[guard], response_model=DeferSavingOut)
+    def tools_defer_saving_endpoint() -> dict[str, Any]:
+        # What the two deferral switches would save on THIS install, in schema characters, beside
+        # the switches themselves. Read-only and spawn-free: the MCP half is measured on a pool a
+        # conversation already built, never connected here (`mcp_pool.built_pool`).
+        # Measured on the registry the app's CHAT declares, the surface this screen configures:
+        # with its guard on (the default) that conversation never has the execution tools, and a
+        # figure that counted `run_shell` as declared would describe a registry nobody gets.
+        from chimera.api.posture import chat_guard_denials
+        from chimera.tools.defer_saving import app_pool, saving_report
+
+        live = live_settings()
+        pool, state = app_pool(live)
+        return saving_report(
+            live,
+            workspace,
+            pool=pool,
+            mcp_state=state,
+            surface_denials=chat_guard_denials() if live.guard_chat else None,
+        )
 
     @app.get("/api/mcp", dependencies=[guard], response_model=McpServersOut)
     def mcp_list_endpoint() -> dict[str, Any]:

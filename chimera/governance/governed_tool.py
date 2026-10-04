@@ -27,6 +27,7 @@ from typing import Any
 from chimera.governance.approval import ApprovalLedger
 from chimera.governance.kernel import TrustKernel
 from chimera.governance.policy import Decision, Verdict
+from chimera.governance.proxy import see_through
 from chimera.tools.base import Tool, is_untrusted_output, refusal
 from chimera.tools.registry import ToolRegistry
 
@@ -194,7 +195,13 @@ def render_action(name: str, kwargs: dict[str, Any]) -> tuple[str, str]:
     The tool NAME leads the action. That was checked rather than assumed: all ten default rules are
     shell or credential signatures and not one of them mentions a tool, so putting the name on its
     own line costs no match today and keeps the judge told what was called.
+
+    A call through the deferral proxy is judged as the tool it runs
+    (:func:`~chimera.governance.proxy.see_through`): ``tool_call``'s ``arguments`` is a document key,
+    so without this the program a deferred ``execute_code`` runs left the command half whole, and
+    ``rm -rf /`` was ALLOW.
     """
+    name, kwargs = see_through(name, kwargs)
     command = "\n".join(
         [name, *(str(value) for key, value in kwargs.items() if not _is_document(key))]
     )
@@ -253,7 +260,10 @@ class GovernedTool(Tool):
         self.untrusted_output = is_untrusted_output(inner)
 
     def run(self, **kwargs: Any) -> str:
-        action, document = render_action(self.name, kwargs)
+        # The tool that will run, for the verdict AND the audit line: through the deferral proxy the
+        # line used to read `tool_call {'tool': 'execute_code', 'arguments': '<57 chars>'}`.
+        judged, judged_args = see_through(self.name, kwargs)
+        action, document = render_action(judged, judged_args)
         # The rules read both halves — command signatures against `action`, credential signatures
         # against both. The audit gets the elided rendering and neither half raw. Redaction alone was
         # not enough: it catches credential SHAPES, and the body of a private key has no shape — a
@@ -264,7 +274,7 @@ class GovernedTool(Tool):
         verdict = self.kernel.evaluate(
             action,
             context=self._context(),
-            record_as=f"{self.name} {elide_values(kwargs)}",
+            record_as=f"{judged} {elide_values(judged_args)}",
             document=document,
             lineage=self._lineage(),
         )

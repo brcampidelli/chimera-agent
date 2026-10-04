@@ -40,6 +40,7 @@ import { Decisions } from "@/components/Decisions";
 import { Usage } from "@/components/Usage";
 import { SystemOneCard } from "@/components/SystemOneCard";
 import { KeepAwakeCard } from "@/components/KeepAwakeCard";
+import { DeferSavingNote } from "@/components/DeferSavingNote";
 import { FoldersCard } from "@/components/FoldersCard";
 import { VoiceCard } from "@/components/VoiceCard";
 import { NotificationsCard } from "@/components/NotificationsCard";
@@ -417,6 +418,7 @@ function Row({
   applies,
   env,
   warn = false,
+  note,
   children,
 }: {
   label: string;
@@ -426,6 +428,8 @@ function Row({
   env?: string;
   /** The hint is a warning about what switching this on allows, not a description of it. */
   warn?: boolean;
+  /** A live line under the hint — a figure the server measured, not a sentence written in advance. */
+  note?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -437,6 +441,7 @@ function Row({
             {hint}
           </div>
         )}
+        {note}
         <AppliesNote when={applies} />
         <PinnedNote env={env} />
       </div>
@@ -1655,6 +1660,33 @@ export function Settings({
                       onChange={(v) =>
                         save({ CHIMERA_EXPLORER_CONTRACT: String(v) })
                       }
+                    />
+                  </Row>
+                  {/* Tools reached on demand. Off: the built-in bench was inconclusive and the MCP
+                half was never measured — the hints quote `bench/tool_defer/RESULT.md` and say so.
+                Under each, the token half as THIS install measures it, a loss included. */}
+                  <Row
+                    label={t("settings.row.deferTools")}
+                    hint={t("settings.hint.deferTools")}
+                    note={<DeferSavingNote half="builtin" />}
+                    applies={c.applies?.CHIMERA_DEFER_TOOLS}
+                    env="CHIMERA_DEFER_TOOLS"
+                  >
+                    <Toggle
+                      on={c.defer?.tools ?? false}
+                      onChange={(v) => save({ CHIMERA_DEFER_TOOLS: String(v) })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.mcpDefer")}
+                    hint={t("settings.hint.mcpDefer")}
+                    note={<DeferSavingNote half="mcp" />}
+                    applies={c.applies?.CHIMERA_MCP_DEFER}
+                    env="CHIMERA_MCP_DEFER"
+                  >
+                    <Toggle
+                      on={c.defer?.mcp ?? false}
+                      onChange={(v) => save({ CHIMERA_MCP_DEFER: String(v) })}
                     />
                   </Row>
                 </Card>

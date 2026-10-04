@@ -3197,6 +3197,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tools/defer-saving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tools Defer Saving Endpoint */
+        get: operations["tools_defer_saving_endpoint_api_tools_defer_saving_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/transcribe": {
         parameters: {
             query?: never;
@@ -4703,6 +4720,7 @@ export interface components {
             cache: components["schemas"]["CacheCfgOut"];
             conversations?: components["schemas"]["ConversationsCfgOut"];
             decisions?: components["schemas"]["DecisionsCfgOut"];
+            defer?: components["schemas"]["DeferCfgOut"];
             experimental?: components["schemas"]["ExperimentalCfgOut"];
             fusion?: components["schemas"]["FusionCfgOut"];
             guard: components["schemas"]["GuardCfgOut"];
@@ -5450,6 +5468,63 @@ export interface components {
             overhead_tokens: number;
             /** Specs */
             specs?: components["schemas"]["SubtaskOut"][];
+        };
+        /**
+         * DeferCfgOut
+         * @description The two deferral switches — tools reached on demand instead of declared on every step.
+         *
+         *     A block of their own rather than three more fields in ``experimental``: that one is the
+         *     study-25 set and is asserted as exactly those three. Both OFF by default (``chimera/config.py``
+         *     says why beside each), and a server that predates this block reads as both off, which is what
+         *     such a server does.
+         */
+        DeferCfgOut: {
+            /**
+             * Mcp
+             * @default false
+             */
+            mcp: boolean;
+            /**
+             * Tools
+             * @default false
+             */
+            tools: boolean;
+        };
+        /**
+         * DeferSavingHalfOut
+         * @description What deferral would do to one half of the schema, measured on this install.
+         *
+         *     Characters of JSON schema, not tokens: the ratio is what matters, and the two modules that
+         *     measure it chose characters to avoid a tokenizer dependency. ``saving_pct`` is NEGATIVE when the
+         *     three proxies cost more than the tools they replace, which below a handful of tools they do.
+         */
+        DeferSavingHalfOut: {
+            /** Declared Chars */
+            declared_chars: number;
+            /** Deferred */
+            deferred: number;
+            /** Deferred Chars */
+            deferred_chars: number;
+            /** Saving Pct */
+            saving_pct: number;
+            /** Tools */
+            tools: number;
+        };
+        /**
+         * DeferSavingOut
+         * @description ``GET /api/tools/defer-saving`` — the token half of the two deferral switches, measured here.
+         *
+         *     Only the token half. Whether a model still finds a deferred tool is the other half, and the
+         *     built-in bench was inconclusive on it (`bench/tool_defer/RESULT.md`).
+         */
+        DeferSavingOut: {
+            builtin: components["schemas"]["DeferSavingHalfOut"];
+            mcp?: components["schemas"]["DeferSavingHalfOut"] | null;
+            /**
+             * Mcp State
+             * @enum {string}
+             */
+            mcp_state: "measured" | "autoload_off" | "not_connected" | "no_servers" | "unavailable";
         };
         /**
          * DelegationSummaryOut
@@ -13671,6 +13746,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolsOut"];
+                };
+            };
+        };
+    };
+    tools_defer_saving_endpoint_api_tools_defer_saving_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeferSavingOut"];
                 };
             };
         };

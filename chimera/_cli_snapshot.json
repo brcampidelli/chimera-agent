@@ -6108,6 +6108,16 @@
           ],
           "required": false,
           "type": "str"
+        },
+        {
+          "help": "Report what CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save on this install.",
+          "kind": "option",
+          "name": "defer_saving",
+          "opts": [
+            "--defer-saving"
+          ],
+          "required": false,
+          "type": "boolean"
         }
       ],
       "path": "tools"

@@ -177,12 +177,11 @@ def _mount_mcp(registry: Any, settings: Settings) -> None:
     pool = mcp_pool.connectors(settings)
     if pool is None:
         return
-    if settings.mcp_defer:
-        from chimera.integrations.mcp_defer import register_deferred_mcp
+    from chimera.integrations.mcp_defer import mount
 
-        register_deferred_mcp(pool, registry)
-    else:
-        pool.into_tool_registry(registry)
+    # `mount` and not `register_deferred_mcp` directly: deferred, the server's names leave the
+    # registry before the fence below runs, so the proxy has to be handed the lists itself.
+    mount(pool, registry, settings)
 
 
 def build_right_hand(

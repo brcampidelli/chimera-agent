@@ -1595,6 +1595,7 @@ chimera tools
 | Option | | Default |
 | --- | --- | --- |
 | `--workspace`, `-w` |  | `'.'` |
+| `--defer-saving` | Report what CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save on this install. |  |
 
 ## transfer-gate
 

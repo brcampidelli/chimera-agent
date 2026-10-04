@@ -758,6 +758,21 @@ class ExperimentalCfgOut(BaseModel):
     explorer_contract: bool = False
 
 
+class DeferCfgOut(BaseModel):
+    """The two deferral switches — tools reached on demand instead of declared on every step.
+
+    A block of their own rather than three more fields in ``experimental``: that one is the
+    study-25 set and is asserted as exactly those three. Both OFF by default (``chimera/config.py``
+    says why beside each), and a server that predates this block reads as both off, which is what
+    such a server does.
+    """
+
+    #: Built-in tools beyond files/search/shell reached through `tool_list` (``CHIMERA_DEFER_TOOLS``).
+    tools: bool = False
+    #: MCP servers reached through `mcp_list` instead of declared (``CHIMERA_MCP_DEFER``).
+    mcp: bool = False
+
+
 class BridgeCfgOut(BaseModel):
     """The desktop bridge's two switches (``chimera/api/desktop_bridge.py``), both off by default.
 
@@ -825,6 +840,7 @@ class ConfigOut(BaseModel):
     sandbox: SandboxCfgOut
     browser: BrowserCfgOut = Field(default_factory=BrowserCfgOut)
     experimental: ExperimentalCfgOut = Field(default_factory=ExperimentalCfgOut)
+    defer: DeferCfgOut = Field(default_factory=DeferCfgOut)
     bridge: BridgeCfgOut = Field(default_factory=BridgeCfgOut)
     decisions: DecisionsCfgOut = Field(default_factory=DecisionsCfgOut)
     spend: SpendCfgOut = Field(default_factory=SpendCfgOut)
@@ -2363,6 +2379,36 @@ class UnavailableToolOut(BaseModel):
     """Every variable in ``variables`` can be saved from the Settings screen (``is_editable``). False
     for the SMTP/IMAP/ICS rows, which live in ``.env`` only — the screen must not send anyone to a
     field that does not exist. Defaults False so an older server never earns a "Settings" claim."""
+
+
+class DeferSavingHalfOut(BaseModel):
+    """What deferral would do to one half of the schema, measured on this install.
+
+    Characters of JSON schema, not tokens: the ratio is what matters, and the two modules that
+    measure it chose characters to avoid a tokenizer dependency. ``saving_pct`` is NEGATIVE when the
+    three proxies cost more than the tools they replace, which below a handful of tools they do.
+    """
+
+    tools: int
+    deferred: int
+    declared_chars: int
+    deferred_chars: int
+    saving_pct: float
+
+
+class DeferSavingOut(BaseModel):
+    """``GET /api/tools/defer-saving`` — the token half of the two deferral switches, measured here.
+
+    Only the token half. Whether a model still finds a deferred tool is the other half, and the
+    built-in bench was inconclusive on it (`bench/tool_defer/RESULT.md`).
+    """
+
+    builtin: DeferSavingHalfOut
+    mcp: DeferSavingHalfOut | None = None
+    #: Why ``mcp`` is null when it is: autoload off, servers not connected yet (they connect on the
+    #: first conversation, and this read never connects them), no server connected, or a connected
+    #: server failed to answer its tool listing (the built-in figure is still reported).
+    mcp_state: Literal["measured", "autoload_off", "not_connected", "no_servers", "unavailable"]
 
 
 class ToolsOut(BaseModel):

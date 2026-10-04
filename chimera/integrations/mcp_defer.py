@@ -217,6 +217,26 @@ def register_deferred_mcp(
     return len(catalogue.by_name)
 
 
+def mount(pool: Any, registry: ToolRegistry, settings: Any) -> None:
+    """Pour a connected pool into a chat registry — declared, or behind the three proxies.
+
+    The two chat surfaces (`chimera app`'s conversation and the terminal's right hand) mount MCP
+    BEFORE their deployment fence, which is right for the declared shape and wrong for the deferred
+    one: the fence matches registry names, and after deferral the server's names are not in the
+    registry. Both called ``register_deferred_mcp`` with no lists, so ``CHIMERA_TOOL_DENYLIST``
+    naming a server tool reported success while ``mcp_call`` still ran it. The Code turn never had
+    this hole — it hands the lists over itself (`code_api.assemble_registry`) — and that is the
+    shape copied here, so turning the switch on from the Settings screen cannot open it.
+    """
+    if not settings.mcp_defer:
+        pool.into_tool_registry(registry)
+        return
+    from chimera.api.posture import deployment_fence
+
+    denied, allowed = deployment_fence(settings)
+    register_deferred_mcp(pool, registry, denied=denied, allowed=allowed)
+
+
 def describe_saving(pool: Any) -> dict[str, int]:
     """What deferral would save on THIS machine's servers, in schema characters.
 

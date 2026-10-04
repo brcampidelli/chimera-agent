@@ -133,6 +133,20 @@ def deployment_posture(settings: Settings) -> ResolvedPosture:
     )
 
 
+def deployment_fence(settings: Settings) -> tuple[frozenset[str], frozenset[str] | None]:
+    """``(denied, allowed)`` as this deployment states them, for a proxy to carry.
+
+    The denials are the union of ``CHIMERA_TOOL_DENYLIST`` and the reach floor; the allowlist is
+    ``CHIMERA_TOOL_ALLOWLIST``, ``None`` when it states none. One function, because the deferral
+    proxies are registered where the restriction filter cannot see the names behind them, and each
+    of them has to be handed these lists explicitly — the chat surfaces were assembling the MCP proxy
+    with no list at all, so a denied server tool stayed reachable through ``mcp_call``.
+    """
+    denied = frozenset({*settings.tool_denylist, *deployment_posture(settings).deny_tools})
+    allowed = frozenset(settings.tool_allowlist) if settings.tool_allowlist else None
+    return denied, allowed
+
+
 #: Where the agent's writes can land.
 Writes = Literal["nothing", "workspace"]
 #: Where a shell command would actually execute — the fact, not the configuration.
@@ -265,6 +279,19 @@ def describe(
     )
 
 
+def chat_guard_denials() -> list[str]:
+    """The tools :func:`guard_chat_registry` takes away from the app's chat, by name.
+
+    A function of its own because a second reader needs the SAME list, and needs it before the guard
+    runs: with ``CHIMERA_DEFER_TOOLS`` on, the chat registry is deferred before this guard, so
+    ``execute_code`` and ``code_interpreter`` are already behind ``tool_call`` when the guard matches
+    names — it removed ``run_shell`` and left the other two reachable through the proxy. The
+    deferral is handed this list so its catalogue refuses them too. Two copies of "what the chat
+    guard denies" would agree until the day one of them changed.
+    """
+    return resolve(Posture(reach=DEFAULT_REACH, approval=DEFAULT_APPROVAL)).deny_tools
+
+
 def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None) -> tuple[Any, Any]:
     """Apply the coding turn's protections to the CHAT registry — deny by posture, then the ledger.
 
@@ -306,8 +333,9 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     from chimera.governance import TaintLedger, ledger_registry, restrict_registry
 
     resolved = resolve(Posture(reach=DEFAULT_REACH, approval=DEFAULT_APPROVAL))
-    if resolved.deny_tools:
-        registry = restrict_registry(registry, allow=None, deny=resolved.deny_tools)
+    denied = chat_guard_denials()
+    if denied:
+        registry = restrict_registry(registry, allow=None, deny=denied)
     # This used to read "the mode travels; the instruction cannot", and that sentence is why
     # `CHIMERA_TAINT_AUTHORITY` did nothing on this surface for as long as it existed: a ledger
     # nobody tells an instruction answers `unknown` for every fetch, and the narrowing treats

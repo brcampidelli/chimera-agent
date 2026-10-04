@@ -48,6 +48,7 @@ import type {
   ShellPrefs,
   ShellPrefsChange,
   WeeklyReview,
+  DeferSaving,
   LocalRuntimes,
   NetworkShare,
   ShareInfo,
@@ -288,6 +289,8 @@ export const labelDecision = (decisionId: string, event: boolean) =>
     body: JSON.stringify({ event }),
   });
 export const getTools = () => json<Tools>("/api/tools");
+// What CHIMERA_DEFER_TOOLS / CHIMERA_MCP_DEFER would save here. Read-only; never connects a server.
+export const getDeferSaving = () => json<DeferSaving>("/api/tools/defer-saving");
 
 // --- Filesystem (read-only tree + file viewer for the Code screen) ---
 // Both are path-scoped server-side to the workspace; a `..` escape is a 400, a binary/dir is an

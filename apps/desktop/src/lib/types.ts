@@ -77,6 +77,10 @@ export type ShellPrefs = Schemas["ShellPrefsOut"];
 export type ShellPrefsChange = Schemas["ShellPrefsIn"];
 /** The weekly-review job, as its Settings row shows it. */
 export type WeeklyReview = Schemas["WeeklyReviewOut"];
+/** What the two deferral switches would save on this install, measured by the server — and why the
+ *  MCP half is absent when it is. `saving_pct` is negative when deferral would cost more. */
+export type DeferSaving = Schemas["DeferSavingOut"];
+export type DeferSavingHalf = Schemas["DeferSavingHalfOut"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];

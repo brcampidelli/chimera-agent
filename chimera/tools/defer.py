@@ -56,6 +56,14 @@ CORE = frozenset(
     }
 )
 
+#: Already proxies, so never moved behind another one. The Code turn registers them after this runs
+#: and never met the question; the two chat surfaces mount MCP first, so with both switches on
+#: `mcp_list`/`mcp_describe`/`mcp_call` were swept into `tool_list` — a round trip to reach a round
+#: trip, which `code_api.assemble_registry` names as the thing its ordering exists to avoid. Kept
+#: as a rule here rather than an ordering there, because an ordering is one more caller away from
+#: being wrong again.
+_NEVER_DEFERRED = CORE | frozenset({"mcp_list", "mcp_describe", "mcp_call"})
+
 #: How many lines `tool_list` will print before it says it stopped.
 _MAX_LISTED = 60
 
@@ -216,12 +224,14 @@ def defer_builtins(
     core, which is a different thing from deferral not running, and an intervention that cannot tell
     those apart reads as "on and useless" when it was "on and there was nothing to do".
     """
-    deferidas = [t for t in registry.tools() if t.name not in CORE]
+    deferidas = [t for t in registry.tools() if t.name not in _NEVER_DEFERRED]
     if not deferidas:
         return registry, 0
 
     catalogo = _Deferred(deferidas, denied, allowed)
-    enxuto = restrict_registry(registry, allow=[n for n in registry.names() if n in CORE])
+    enxuto = restrict_registry(
+        registry, allow=[n for n in registry.names() if n in _NEVER_DEFERRED]
+    )
     for proxy in (ToolListTool(catalogo), ToolDescribeTool(catalogo), ToolCallTool(catalogo)):
         if proxy.name in enxuto:
             _log.warning("deferred tool %r collides with an existing tool — skipping", proxy.name)
@@ -243,8 +253,8 @@ def describe_saving(registry: ToolRegistry) -> dict[str, int]:
         return len(json.dumps(tool.to_openai_schema(), ensure_ascii=False))
 
     todas = list(registry.tools())
-    nucleo = [t for t in todas if t.name in CORE]
-    deferidas = [t for t in todas if t.name not in CORE]
+    nucleo = [t for t in todas if t.name in _NEVER_DEFERRED]
+    deferidas = [t for t in todas if t.name not in _NEVER_DEFERRED]
     vazio = _Deferred([], frozenset(), None)
     proxies: list[Tool] = [ToolListTool(vazio), ToolDescribeTool(vazio), ToolCallTool(vazio)]
     return {
