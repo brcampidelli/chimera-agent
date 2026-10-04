@@ -307,8 +307,16 @@ def test_the_command_says_a_hung_server_was_not_measured(
     result = CliRunner().invoke(app, ["tools", "--defer-saving", "--workspace", str(tmp_path)])
 
     assert result.exit_code == 0, result.output
-    assert "built-in:" in result.output
-    assert "did not answer its tool listing" in result.output
+    out = _unwrapped(result.output)
+    assert "built-in:" in out
+    assert "did not answer its tool listing" in out
+
+
+def _unwrapped(text: str) -> str:
+    """Rich hard-wraps at the console width, and under CliRunner that width is not the runner's:
+    80 columns on Linux with no terminal, 79 on Windows. One column moved the break into the middle
+    of "p = 0.125" on Linux only. Joining the pieces lets a phrase survive wherever the wrap falls."""
+    return " ".join(text.split())
 
 
 def test_the_command_reports_the_saving_for_a_machine_with_no_screen(tmp_path: Path) -> None:
@@ -317,11 +325,12 @@ def test_the_command_reports_the_saving_for_a_machine_with_no_screen(tmp_path: P
     result = CliRunner().invoke(app, ["tools", "--defer-saving", "--workspace", str(tmp_path)])
 
     assert result.exit_code == 0, result.output
-    assert "built-in:" in result.output
-    assert "CHIMERA_DEFER_TOOLS=off" in result.output
-    assert "MCP: not measured" in result.output
+    out = _unwrapped(result.output)
+    assert "built-in:" in out
+    assert "CHIMERA_DEFER_TOOLS=off" in out
+    assert "MCP: not measured" in out
     # The quality half is said every time, with the bench's own number.
-    assert "p = 0.125" in result.output
+    assert "p = 0.125" in out
 
 
 def test_the_command_does_not_connect_servers_while_autoload_is_off(
