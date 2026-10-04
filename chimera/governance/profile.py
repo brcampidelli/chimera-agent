@@ -384,6 +384,36 @@ def governed_profile(
 
     audit = AuditLog(home / "audit.jsonl")
 
+    # --- the owner's OpenAPI connectors (study 29, P7.5) ------------------------------------------
+    #
+    # Here, and not at each caller, because this is the one function every governed surface hands
+    # its fresh registry to — the cron, both bots, the MCP and A2A servers, the board's lanes — and
+    # `test_governed_surfaces` pins `default_registry(...)` as a DIRECT argument of this call, so a
+    # wrapper at each call site would be a second door past that gate. Above the fence below, so the
+    # deployment's lists reach these tools by name. No approver is handed over: none of these
+    # surfaces has a screen, so a connector's non-GET call is refused on all of them.
+    #
+    # Only the connectors the owner ALSO sent to these surfaces (`unattended`), and on a bot
+    # surface not even those while any configured bot answers anyone. The first version loaded
+    # every switched-on connector here: one switch on the Connections screen put the owner's
+    # private API, with the owner's key, in reach of whoever messaged an open bot — a reach the
+    # owner's MCP servers never had on these surfaces. And note what does NOT protect these
+    # tools here: on `off`, the shipped default, the return below comes before the taint ledger,
+    # so their answers are not fenced and do not mark the run.
+    from chimera.integrations.openapi_store import mount as mount_connectors
+    from chimera.integrations.openapi_store import unattended_surface_may_load
+
+    refused = unattended_surface_may_load(settings, surface)
+    if refused:
+        _log.warning("connectors: not loaded on %s — %s", surface, refused)
+    else:
+        try:
+            mount_connectors(registry, home, unattended=True)
+        except Exception as exc:  # noqa: BLE001 — a broken connector store must never cost a surface
+            _log.warning(
+                "connectors: not loaded on %s — %s", surface or "(unnamed)", type(exc).__name__
+            )
+
     # --- the explicit fence: applied whatever the mode -------------------------------------------
     #
     # This sits ABOVE the `off` return, and the distinction it draws is the whole point. An owner who

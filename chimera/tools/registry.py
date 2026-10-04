@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from chimera.telemetry import get_logger
@@ -23,6 +24,27 @@ class ToolRegistry:
 
     def __init__(self) -> None:
         self._tools: dict[str, Tool] = {}
+        #: The skill bundles a run built on this registry may be told about, when a project's pack
+        #: narrowed them (`chimera.core.project_pack`); ``None`` — every switched-on bundle —
+        #: otherwise. Set by the assembly that narrowed the TOOLS from the same pack, so the two
+        #: halves of one decision travel together instead of being decided twice from two roots.
+        self.bundle_only: frozenset[str] | None = None
+        #: The home those bundles are read from, when the assembly ran on settings of its own (an
+        #: app built with ``settings=``, a bench arm). ``None``: the process's settings. Stamped for
+        #: the same reason as ``bundle_only``: an agent that re-read the PROCESS settings listed
+        #: another home's bundles than the screen and the tools it ran with.
+        self.bundle_home: Path | None = None
+
+    @classmethod
+    def like(cls, source: object) -> ToolRegistry:
+        """An empty registry for a run DERIVED from ``source``'s: a role's subset, a subagent's,
+        a governed or ledgered wrapping. The tools are the caller's to choose; the skill scope is
+        not — a run narrowed further is still a run in the same project, and a wrapper that dropped
+        the scope would hand a subagent every bundle the pack kept out of its parent's prompt."""
+        out = cls()
+        out.bundle_only = getattr(source, "bundle_only", None)
+        out.bundle_home = getattr(source, "bundle_home", None)
+        return out
 
     def register(self, tool: Tool, *, replace: bool = False) -> None:
         if tool.name in self._tools and not replace:

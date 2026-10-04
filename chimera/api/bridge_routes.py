@@ -259,7 +259,8 @@ ROUTES: dict[str, BridgeRoute] = {
     "skills.bundle_status": _r(
         "POST",
         "/api/skills/bundles/{name}/status",
-        "Enable/disable. params: {name}; body: {enabled}",
+        "Switch a bundle off. params: {name}; body: {status: inactive}. Switching one on puts "
+        "its text in every prompt: that is approve.skill_bundle, with Full control.",
     ),
     "skills.bundle_delete": _r("DELETE", "/api/skills/bundles/{name}", "Remove. params: {name}"),
     "skills.library": _r("GET", "/api/skills/library", "The skill library."),
@@ -294,7 +295,9 @@ ROUTES: dict[str, BridgeRoute] = {
         "One job and a bounded slice of its log. params: {job_id, tail_lines?, head_lines?}",
     ),
     "shell_jobs.stop": _r(
-        "POST", "/api/jobs/{job_id}/cancel", "Kill a job and everything it started. params: {job_id}"
+        "POST",
+        "/api/jobs/{job_id}/cancel",
+        "Kill a job and everything it started. params: {job_id}",
     ),
     # --- cost, quality, health ---
     "insights.usage": _r("GET", "/api/usage", "Spend and tokens, by day, model and session."),
@@ -354,6 +357,19 @@ ROUTES: dict[str, BridgeRoute] = {
     ),
     "approve.skill": _r(
         "POST", "/api/skills/{name}/approve", "Approve a learned skill. params: {name}", tier="full"
+    ),
+    # Moved here from the `skills` area, and to Full: switching a bundle ON is approving a
+    # stranger's instructions into the prompt — the same decision `approve.skill` is for a learned
+    # card — and with skills now uploadable, a stranger nobody has vetted. In the operate tier a
+    # client could install a pending skill and switch it on in the next call, and "lands pending
+    # until the owner turns it on" would have held only on the owner's own screen. In this area
+    # because Full routes live in `approve` and `settings` only: one tool per area, one tier per tool.
+    "approve.skill_bundle": _r(
+        "POST",
+        "/api/skills/bundles/{name}/status",
+        "Switch an installed skill bundle on or off. params: {name}; "
+        "body: {status: active|inactive}",
+        tier="full",
     ),
     "approve.label_decision": _r(
         "POST",
@@ -445,6 +461,9 @@ GUARD_SETTINGS = frozenset(
         "CHIMERA_DECISION_MODEL",
         # The only brake on what unattended jobs spend (`chimera/scheduler/job_runner.py`).
         "CHIMERA_DAILY_USD_CAP",
+        # The project-pack switch narrows: on, an accepted pack takes skills, servers and tools
+        # away; switching it off hands them back (study 29, P7.6).
+        "CHIMERA_PROJECT_PACK",
     }
 )
 
@@ -459,14 +478,26 @@ REACH_SETTINGS = frozenset(
         "CHIMERA_BROWSER_SITES",
         "CHIMERA_BROWSER_LOCAL_PORTS",
         "CHIMERA_MCP_AUTOLOAD",
+        # Gives the agent `open_pull_request` (study 29, P8.1), a tool that publishes the owner's
+        # code to a remote: a client that could switch it on would widen where that code may go.
+        "CHIMERA_PULL_REQUESTS",
+        # The first segment of every branch a run makes (`<prefix>/attempt-…`, study 29, P8.2). It
+        # is also what the worktree cleanup force-deletes (`git branch -D <prefix>/attempt-*`,
+        # remembered across changes in `worktree-prefixes.txt`), and the name a pull request's
+        # branch carries to the remote: a client that could set it would choose which of the
+        # owner's branches the cleanup deletes, and what pattern the pushed branch matches there.
+        "CHIMERA_BRANCH_PREFIX",
     }
 )
 
 #: Who may reach the agent: whether the bots start with the app, and who each one answers. An empty
 #: list means ANYONE (`chimera/server/allowlist.py`), so clearing one is the widest edit there is.
+#: And what the bots carry out: the Discord attachment switch (study 29, P6.3) sends the files a turn
+#: wrote — the owner's — to a channel, so turning it on is the owner's alone.
 MESSAGING_SETTINGS = frozenset(
     {
         "CHIMERA_APP_MESSAGING",
+        "CHIMERA_DISCORD_ATTACH_FILES",
         "CHIMERA_DISCORD_ALLOWED_USERS",
         "CHIMERA_TELEGRAM_ALLOWED_USERS",
         "CHIMERA_SLACK_ALLOWED_USERS",
@@ -486,6 +517,10 @@ PRIVACY_SETTINGS = frozenset(
         "CHIMERA_API_BASE",
         "CHIMERA_OLLAMA_BASE_URL",
         "CHIMERA_LM_STUDIO_BASE_URL",
+        # Where the owner's keys live (study 29, P7.7). On, it only narrows where a key may be read
+        # from, but a client that could switch it off would send the next key the owner types into
+        # a plain-text file. Its name matches no credential pattern, so it has to be listed.
+        "CHIMERA_KEY_VAULT",
     }
 )
 
@@ -548,6 +583,17 @@ def is_secret_setting(name: str) -> bool:
         or provider_from_env_var(name) is not None
         or bool(_SECRET_NAME.search(name))
     )
+
+
+def switches_off(body: Any) -> bool:
+    """Whether a ``skills.bundle_status`` body can only switch a bundle OFF.
+
+    Exactly ``{"status": "inactive"}`` and nothing else: the route's own model defaults ``status``
+    to ``"active"``, so an empty body, a misspelled field or the old ``{enabled}`` shape all switch
+    a bundle ON, and only the one shape that cannot is let through that route. Switching ON goes
+    through ``approve.skill_bundle``, at Full control.
+    """
+    return isinstance(body, dict) and body == {"status": "inactive"}
 
 
 def full_only_keys_in(body: Any) -> list[str]:

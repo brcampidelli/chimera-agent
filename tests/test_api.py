@@ -1264,7 +1264,8 @@ def test_config_endpoint_shape(tmp_path: Any) -> None:
     # no provider entry ever carries a raw key field. `name` is the provider's routing slug
     # ("openrouter"), sent so a client asking a provider-scoped question — the model list the wizard
     # shows — does not re-derive it from the env var name and drift from the server's rule.
-    fields = {"env", "name", "label", "set", "hint", "llm", "model", "keys_url"}
+    # `in_vault` (study 29, P7.7) is WHERE the key lives — a boolean, never the value.
+    fields = {"env", "name", "label", "set", "hint", "llm", "model", "keys_url", "in_vault"}
     assert all(set(p) == fields for p in cfg["providers"])
 
 
@@ -1276,9 +1277,13 @@ def test_pool_endpoints_add_and_remove_without_ever_carrying_a_key_back(
     get_settings.cache_clear()
     client = _client(tmp_path)
 
+    # Still the whole answer, compared exactly: the two vault lists are names only (study 29, P7.7),
+    # empty here because the vault switch is off.
     assert client.post("/api/config/pool/openrouter", json={"key": "sk-or-first1111"}).json() == {
         "provider": "openrouter",
         "count": 1,
+        "in_vault": [],
+        "vault_fallback": [],
     }
     client.post("/api/config/pool/openrouter", json={"key": "sk-or-second2222"})
 

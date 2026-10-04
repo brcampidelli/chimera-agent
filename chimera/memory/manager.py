@@ -11,7 +11,8 @@ from __future__ import annotations
 import re
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Collection
+from dataclasses import dataclass
 
 from chimera.core.redact import redact
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
@@ -24,6 +25,19 @@ _log = get_logger("memory.manager")
 
 def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().lower())
+
+
+@dataclass(frozen=True)
+class ConsolidationOutcome:
+    """What a consolidation actually did, cluster by cluster."""
+
+    removed: int
+    """Net facts removed (each merged cluster of N leaves one)."""
+    merged: int
+    """Clusters merged into one fact."""
+    blank: int
+    """Clusters the summarizer was asked about and answered with nothing: left as they were, but the
+    call was made (and, with a model, paid for)."""
 
 
 class MemoryManager:
@@ -84,6 +98,22 @@ class MemoryManager:
         self.store.add(item)
         return item
 
+    def edit(self, item_id: str, content: str) -> MemoryItem:
+        """The owner rewriting one fact by hand. ``KeyError`` when it is gone, ``ValueError`` if blank.
+
+        Distinct from :meth:`update`, which ``remember`` uses after it has already masked the text:
+        an edit arrives straight from a text box, so it is masked here, on the same path every other
+        write takes — a key pasted into an edit would otherwise be the one way to store one.
+
+        The trust label is KEPT. Rewording a fact learned from untrusted content does not vet where
+        it came from, and a label that cleared on any keystroke would launder poison with a typo
+        fix. The owner who vouches for it can add it as their own fact and delete this one.
+        """
+        text = redact(content).strip()
+        if not text:
+            raise ValueError("a memory cannot be blank")
+        return self.update(item_id, text)
+
     def delete(self, item_id: str) -> None:
         self.store.remove(item_id)
 
@@ -142,9 +172,11 @@ class MemoryManager:
         for item in items:
             # Carry provenance through the merge: a tainted imported fact must NOT launder itself
             # to clean (the same guarantee remember() makes for a direct tainted UPDATE).
+            # And its project: an imported note about one repository filed with no project would be
+            # recalled in every conversation in every folder.
             op, _ = self.remember(
                 item.content, item.kind, key=item.key, source=item.source,
-                provenance=item.provenance,
+                provenance=item.provenance, project=item.project,
             )
             counts[op] += 1
         _log.debug("merged %d items: %s", len(items), counts)
@@ -179,38 +211,114 @@ class MemoryManager:
                 self.store.remove(item.id)
         return len(to_remove)
 
+    def _consolidation_clusters(
+        self, *, threshold: float, kinds: tuple[MemoryKind, ...]
+    ) -> list[list[MemoryItem]]:
+        """Clusters of two or more similar facts, never spanning two kinds or two projects.
+
+        Per project, and not across them, because the merged fact can only carry ONE ``project``.
+        Clustering across projects meant a fact about ``/repo/alpha`` and its near-twin about
+        ``/repo/beta`` came out as one fact filed under neither — ``project=None``, which recall reads
+        as "applies everywhere" — so a merge silently WIDENED what every conversation in every folder
+        is told. ``None`` is a project of its own here: the everywhere facts merge among themselves.
+        """
+        from chimera.memory.consolidate import cluster
+
+        groups: list[list[MemoryItem]] = []
+        for kind in kinds:
+            by_project: dict[str | None, list[MemoryItem]] = {}
+            for item in self.store.by_kind(kind):
+                by_project.setdefault(item.project, []).append(item)
+            for items in by_project.values():
+                groups += [g for g in cluster(items, threshold=threshold) if len(g) >= 2]
+        return groups
+
+    def consolidation_groups(
+        self,
+        *,
+        threshold: float = 0.5,
+        kinds: tuple[MemoryKind, ...] = ("semantic", "episodic"),
+    ) -> list[list[MemoryItem]]:
+        """The clusters :meth:`consolidate` WOULD merge — no model call, no write.
+
+        The same clustering ``consolidate`` runs, so what a preview shows is what an apply merges.
+        Free to compute (token Jaccard), which is the point: seeing what would be merged used to cost
+        a model call per cluster, because the only way to see it was to do it.
+        """
+        return self._consolidation_clusters(threshold=threshold, kinds=kinds)
+
     def consolidate(
         self,
         summarizer: object,
         *,
         threshold: float = 0.5,
         kinds: tuple[MemoryKind, ...] = ("semantic", "episodic"),
+        only: Collection[frozenset[str]] | None = None,
     ) -> int:
         """Merge clusters of similar memories into one summarised fact. Returns net reduction.
+
+        :meth:`consolidate_outcome` does the work and says how many clusters were merged and how
+        many came back blank; this keeps the one number most callers want.
+        """
+        return self.consolidate_outcome(summarizer, threshold=threshold, kinds=kinds, only=only).removed
+
+    def consolidate_outcome(
+        self,
+        summarizer: object,
+        *,
+        threshold: float = 0.5,
+        kinds: tuple[MemoryKind, ...] = ("semantic", "episodic"),
+        only: Collection[frozenset[str]] | None = None,
+    ) -> ConsolidationOutcome:
+        """Merge clusters of similar memories into one summarised fact, and count what happened.
 
         ``summarizer`` is a ``list[str] -> str`` callable (see :mod:`chimera.memory.consolidate`).
         A merge is a write — call it deliberately (e.g. from ``memory consolidate``), not on
         every turn.
-        """
-        from chimera.memory.consolidate import cluster
 
-        removed = 0
-        for kind in kinds:
-            for group in cluster(self.store.by_kind(kind), threshold=threshold):
-                if len(group) < 2:
-                    continue
-                summary = summarizer([item.content for item in group])  # type: ignore[operator]
-                if not summary.strip():
-                    continue
-                # Propagate the strongest provenance of the cluster: merging a tainted member into a
-                # summary must NOT launder it to clean (same guarantee remember/merge uphold).
-                prov = "tainted" if any(i.provenance == "tainted" for i in group) else "clean"
-                for item in group:
-                    self.store.remove(item.id)
-                self.add(summary, kind, source="chimera", provenance=prov)
-                removed += len(group) - 1
+        ``only`` restricts the merge to clusters the owner reviewed, each named by its exact set of
+        ids. A cluster that is no longer exactly that set — a member was deleted, or a new similar
+        fact joined it since the preview — is NOT merged: the owner approved merging those facts,
+        not whatever the clustering produces now. ``None`` merges every cluster, as before.
+
+        What the merged fact keeps from its members: their kind and their project (a cluster never
+        spans two of either), their key and their source when every member agrees on one, and the
+        strongest trust label. Only the text is new.
+        """
+        removed = merged = blank = 0
+        for group in self._consolidation_clusters(threshold=threshold, kinds=kinds):
+            if only is not None and frozenset(i.id for i in group) not in only:
+                continue
+            # Masked on the way OUT, to the summarizer: a stored fact can predate write-time masking
+            # (written before `redact` existed, edited in the store by hand, imported by an older
+            # version) — the reason the export re-masks too — and the summarizer is usually a remote
+            # model. A key in an old fact would otherwise be sent to a third party in the prompt.
+            summary = summarizer([redact(item.content) for item in group])  # type: ignore[operator]
+            # And on the way back IN: `add` does not mask, and a model can echo or reconstruct a
+            # secret it was shown, so the summary takes the path every other write takes.
+            text = redact(summary).strip()
+            if not text:
+                blank += 1
+                continue
+            # Propagate the strongest provenance of the cluster: merging a tainted member into a
+            # summary must NOT launder it to clean (same guarantee remember/merge uphold).
+            prov = "tainted" if any(i.provenance == "tainted" for i in group) else "clean"
+            keys = {i.key for i in group}
+            sources = {i.source for i in group}
+            for item in group:
+                self.store.remove(item.id)
+            self.add(
+                text,
+                group[0].kind,
+                key=keys.pop() if len(keys) == 1 else None,
+                source=sources.pop() if len(sources) == 1 else "chimera",
+                provenance=prov,
+                project=group[0].project,
+            )
+            removed += len(group) - 1
+            merged += 1
         _log.debug("consolidated: removed %d memories", removed)
-        return removed
+        return ConsolidationOutcome(removed=removed, merged=merged, blank=blank)
 
     def nudges(self, user_texts: list[str], *, max_suggestions: int = 3) -> list[str]:
         """Suggest persona facts to save from preferences stated in recent user messages.

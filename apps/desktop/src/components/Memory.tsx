@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, Search, Trash2, Plus } from "lucide-react";
+import { Brain, Search, Plus } from "lucide-react";
 import { addMemory, deleteMemory, getMemory, getMemoryLayers } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
+import { MemoryFactRow } from "@/components/MemoryFactRow";
+import { MemoryTools } from "@/components/MemoryTools";
 import { ErrorState } from "@/components/ui/async";
 import { useNum, useT, type TFunc } from "@/lib/i18n";
 import type { MemoryLayers } from "@/lib/types";
@@ -166,41 +168,11 @@ export function Memory({ embedded = false }: { embedded?: boolean } = {}) {
         ) : !facts.data || facts.data.length === 0 ? (
           <EmptyState text={term ? t("memory.emptySearch") : t("memory.empty")} />
         ) : (
-          facts.data.map((f) => (
-            <div key={f.id} className="group flex items-start gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm">{f.content}</div>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <Badge tone={f.kind === "persona" ? "accent" : "muted"}>{f.kind}</Badge>
-                  {f.provenance === "tainted" && <Badge tone="warn">{t("memory.unverified")}</Badge>}
-                  {/* Only the exception is labelled. What the agent learns is now saved into the
-                      folder it was learned in, so "this one applies everywhere" is the fact worth
-                      pointing at — a badge on every row would say the ordinary case out loud and
-                      bury the one that differs. The project's own name is not shown because this
-                      list is already the memory of the project you have open. */}
-                  {/* Falsy, not `=== null`. A store written before the field existed returns the
-                      fact with no `project` key at all, and strict equality read that as "scoped to
-                      some project" — the screen telling a different story about the same fact
-                      depending on when it was written. The backend already folds null and "" into
-                      the same answer; this matches it. */}
-                  {!f.project && (
-                    <Badge tone="accent" title={t("memory.everywhereHint")}>
-                      {t("memory.everywhere")}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-              <button
-                className="opacity-0 transition focus:opacity-100 group-hover:opacity-100"
-                title={t("common.delete")}
-                onClick={() => remove.mutate(f.id)}
-              >
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-bad" />
-              </button>
-            </div>
-          ))
+          facts.data.map((f) => <MemoryFactRow key={f.id} fact={f} onDelete={(id) => remove.mutate(id)} />)
         )}
       </Panel>
+
+      <MemoryTools />
     </Screen>
   );
 }

@@ -45,7 +45,10 @@ def test_the_card_reports_the_apps_bind_and_whether_the_network_reaches_it(
     client = _build(tmp_path, monkeypatch)
     app: Any = client.app
     app.state.bound_address = (host, 8765)
-    server = client.get("/api/security/access").json()["server"]
+    # Addressed as a browser on this machine addresses it. The test client's default Host,
+    # `testserver`, is a DNS name, and on a loopback bind the app refuses one (DNS rebinding,
+    # `chimera/api/host_guard.py`) — the card itself is not what that refusal is about.
+    server = client.get("/api/security/access", headers={"host": "127.0.0.1:8765"}).json()["server"]
     assert server == {"bind": host, "port": 8765, "network": network}
 
 

@@ -61,7 +61,16 @@ def test_each_catalogued_name_is_its_class_name() -> None:
 
 
 def test_only_a_setting_is_switchable_and_the_config_endpoint_accepts_exactly_those() -> None:
-    assert {"CHIMERA_EDIT_BATCH", "CHIMERA_TODO_LIST", "CHIMERA_DECIDE_TOOL"} == SWITCHABLE_SETTINGS
+    # The pin names each switch, so a new one is a decision made here and not a side effect.
+    # CHIMERA_CREATE_DOCUMENT (study 29, P6.2): writes only where write_file may, so it widens nothing
+    # and the desktop bridge may flip it like the other three.
+    # CHIMERA_PULL_REQUESTS joined with `open_pull_request` (study 29, P8.1): the owner's own screen
+    # may switch it like the others; the desktop bridge may not (`OWNER_ONLY_SETTINGS`), and
+    # every pull request still asks on a card whatever the switch says.
+    assert {
+        "CHIMERA_EDIT_BATCH", "CHIMERA_TODO_LIST", "CHIMERA_DECIDE_TOOL", "CHIMERA_CREATE_DOCUMENT",
+        "CHIMERA_PULL_REQUESTS",
+    } == SWITCHABLE_SETTINGS
     assert SWITCHABLE_SETTINGS <= ALLOWED_KEYS
     for tool in CONDITIONAL_TOOLS:
         assert tool.switchable is (tool.kind == "setting")

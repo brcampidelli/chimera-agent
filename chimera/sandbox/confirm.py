@@ -72,6 +72,13 @@ def _human_can_answer() -> bool:
     return bool(getattr(sys.stdin, "isatty", lambda: False)())
 
 
+def human_can_answer() -> bool:
+    """:func:`_human_can_answer`, for the approvers outside this module that must make the same call
+    (`approval.always_ask`). One rule, read in one place: two copies are how a gate and its refusal
+    end up disagreeing about whether anybody was there."""
+    return _human_can_answer()
+
+
 def sandbox_is_isolated(sandbox: object) -> bool:
     """True when the sandbox genuinely isolates from the host (so no host-exec confirm is needed).
 

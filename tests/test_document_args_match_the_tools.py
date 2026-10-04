@@ -45,6 +45,12 @@ from chimera.tools.base import Tool
 #: accident, which is the criterion `_DOCUMENT_ARGS` exists to serve.
 _IDENTIFIERS = frozenset({
     "action",
+    # `open_pull_request`: which branch it goes into, whether as a draft, and the title — the
+    # pull request's identity on an audit line, the way `subject` is an email's. Its `body` is the
+    # document, and is already one.
+    "base",
+    "draft",
+    "title",
     # `read_file`: which window of the file — two integers, no body.
     "start_line",
     "max_lines",

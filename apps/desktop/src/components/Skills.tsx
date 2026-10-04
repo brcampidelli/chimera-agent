@@ -14,6 +14,8 @@ import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel
 import { Dialog } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/async";
 import { SkillCatalog } from "@/components/SkillCatalog";
+import { SkillsActiveNow } from "@/components/SkillsActiveNow";
+import { SkillUpload } from "@/components/SkillUpload";
 import { useT } from "@/lib/i18n";
 import type { LibraryCard, SkillStat } from "@/lib/types";
 
@@ -102,6 +104,14 @@ function Library() {
                       {c.imported && <Badge tone="ok">{t("skills.imported")}</Badge>}
                     </div>
                     <div className="mt-0.5 text-xs text-muted-foreground">{c.description}</div>
+                    {/* The triggers on the row, not only inside the dialog: they are what decides
+                        whether a card is the one for the job, and opening twenty-three dialogs to
+                        compare them was the only way to read them side by side. */}
+                    {c.triggers.length > 0 ? (
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {t("skills.cardTriggers")}: {c.triggers.join(" · ")}
+                      </div>
+                    ) : null}
                   </button>
                   <div className="flex shrink-0 gap-2">
                     {c.imported ? null : (
@@ -157,7 +167,11 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
   const t = useT();
   const qc = useQueryClient();
   const skills = useQuery({ queryKey: ["skills"], queryFn: getSkills });
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["skills"] });
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: ["skills"] });
+    // The "active now" panel lists the eligible cards, and approving or retiring one changes it.
+    void qc.invalidateQueries({ queryKey: ["skills-effective"] });
+  };
   const approve = useMutation({ mutationFn: approveSkill, onSuccess: invalidate });
   const retire = useMutation({ mutationFn: retireSkill, onSuccess: invalidate });
 
@@ -166,6 +180,9 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
 
   return (
     <Screen title={t("skills.title")} icon={<Sparkles className="h-5 w-5" />} embedded={embedded}>
+      {/* First, because it is the answer the three panels below only add up to: what a run started
+          now is actually told. */}
+      <SkillsActiveNow />
       <Panel title={t("skills.learned")}>
         {skills.isError ? (
           <ErrorState error={skills.error} onRetry={() => skills.refetch()} />
@@ -243,6 +260,7 @@ export function Skills({ embedded = false }: { embedded?: boolean } = {}) {
         {t("skills.libraryBlurb")}
       </p>
       <Library />
+      <SkillUpload />
       <SkillCatalog />
     </Screen>
   );

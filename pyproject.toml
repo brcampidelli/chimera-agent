@@ -145,6 +145,15 @@ viz-vega = [
 documents = [
     "markitdown[docx,pptx,xlsx,pdf]>=0.1",
 ]
+# Document WRITING for the create_document tool: a declarative JSON spec (headings, paragraphs,
+# tables, sheets, slides) rendered to .docx/.xlsx/.pptx. Opt-in like its reading twin above; PDF needs
+# no extra (chimera/tools/pdf_writer.py is stdlib). All three are MIT and pure Python over lxml, and
+# openpyxl/python-pptx were already in the lock through markitdown — python-docx is the new name.
+documents-out = [
+    "python-docx>=1.1",
+    "openpyxl>=3.1",
+    "python-pptx>=1.0",
+]
 # Batteries-included: everything a general-purpose assistant needs in one install — messaging
 # adapters, MCP, documents (docx/pdf/xlsx→md), media download (yt-dlp; audio also needs ffmpeg on
 # PATH), local speech-to-text (faster-whisper), data analysis (pandas/scikit-learn) and charts
@@ -152,7 +161,7 @@ documents = [
 # multi-GB extras (`imagegen-local`, `train`) — install those explicitly if you have a GPU.
 # One command for "I want all the features": pip install 'chimera-agent[full]'.
 full = [
-    "chimera-agent[messaging,mcp,documents,media-dl,stt,data,viz,youtube,secrets]",
+    "chimera-agent[messaging,mcp,documents,documents-out,media-dl,stt,data,viz,youtube,secrets]",
 ]
 # Back-compat alias: the browser (playwright) is now a CORE dependency, so `pip install
 # 'chimera-agent[browser]'` still works but installs nothing extra. The Chromium binary is
@@ -208,6 +217,10 @@ dev = [
     # Mutation testing for the "if this is wrong, we're lying" modules — see MUTATION.md.
     # POSIX-only (it forks per mutant): on Windows run it under WSL. CI runs it on Linux.
     "mutmut>=3.3",
+    # The create_document tests OPEN what the tool wrote and read the cell, slide and paragraph
+    # back. Skipped when the libraries are absent, they would pass on every machine that never
+    # installed the extra — a suite that says nothing in the shape of a suite that passed.
+    "chimera-agent[documents-out]",
 ]
 
 [project.scripts]

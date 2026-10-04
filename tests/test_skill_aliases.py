@@ -8,6 +8,7 @@ about those.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -143,11 +144,19 @@ def test_browser_navigate_is_reported_missing_rather_than_half_answered() -> Non
 # --- reading an installed skill's own files -------------------------------------------------------
 
 
-def _bundle(root: Path, name: str = "demo") -> Path:
+def _bundle(root: Path, name: str = "demo", status: str = "active") -> Path:
+    # With its record, as every install writes one: `skill_view` reads only a bundle the owner
+    # switched on, so a fixture without `bundle.json` would be a skill nobody approved. An `active`
+    # one carries `switched_on_at`, as `bundles.set_status` writes it: an `active` without it was
+    # switched on while the switch reached no prompt, and reads as pending.
     skill = root / name
     (skill / "references").mkdir(parents=True)
     (skill / "SKILL.md").write_text("---\nname: demo\n---\nthe procedure", encoding="utf-8")
     (skill / "references" / "forms.md").write_text("the reference", encoding="utf-8")
+    record = {"name": name, "status": status}
+    if status == "active":
+        record["switched_on_at"] = "2026-10-03T00:00:00+00:00"
+    (skill / "bundle.json").write_text(json.dumps(record), encoding="utf-8")
     return skill
 
 
@@ -182,6 +191,37 @@ def test_skill_view_stays_inside_the_skill(args: dict[str, str], tmp_path: Path)
     # The arguments come from a model reading a stranger's instructions.
     assert out.startswith("error:")
     assert "not yours" not in out
+
+
+@pytest.mark.parametrize("status", ["pending", "inactive"])
+def test_skill_view_does_not_read_a_skill_the_owner_has_not_switched_on(
+    status: str, tmp_path: Path
+) -> None:
+    _bundle(tmp_path, status=status)
+
+    # The prompt line offers only the active bundles, but a name is guessable — and an uploaded
+    # skill's author is somebody nobody knows. "Reaches nothing until a person turns it on" has to
+    # hold for the tool that reads the files, not just for the line that names them.
+    out = SkillView(tmp_path).run(name="demo")
+    assert out.startswith("error:") and "the procedure" not in out
+
+
+def test_a_bundle_with_no_record_reads_as_switched_off(tmp_path: Path) -> None:
+    skill = _bundle(tmp_path)
+    (skill / "bundle.json").unlink()
+
+    # A directory somebody dropped in by hand carries nobody's approval.
+    assert SkillView(tmp_path).run(name="demo").startswith("error:")
+
+
+def test_skill_view_cannot_reach_a_sibling_whose_name_extends_this_one(tmp_path: Path) -> None:
+    _bundle(tmp_path, "demo")
+    sibling = _bundle(tmp_path, "demo2")
+    (sibling / "SKILL.md").write_text("the sibling's procedure", encoding="utf-8")
+
+    # `skills/demo` is a string prefix of `skills/demo2`, so a prefix test let this through.
+    out = SkillView(tmp_path).run(name="demo", file_path="../demo2/SKILL.md")
+    assert out.startswith("error:") and "sibling" not in out
 
 
 def test_what_a_skill_ships_is_treated_as_what_it_is(tmp_path: Path) -> None:

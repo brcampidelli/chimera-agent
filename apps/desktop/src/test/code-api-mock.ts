@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import type { CodeChartFrame } from "@/lib/chart/spec";
 import type {
   CodeApprovalEvent,
   CodeBrowserFrame,
@@ -42,6 +43,24 @@ export function makeCodeApiMock() {
     // "Not a repository" by default: nothing known, so no commit chip appears in a suite that is not
     // about it, and the call never resolves `undefined` into react-query.
     getGitUncommitted: vi.fn(async () => ({ is_repo: false, files: [] })),
+    // No origin by default: the Git panel's pull request card renders nothing, so a suite that is
+    // not about pull requests never sees it (study 29, P8.1).
+    getPullRequestReadiness: vi.fn(async () => ({
+      ready: false,
+      reason: "no_origin",
+      is_repo: true,
+      branch: "",
+      base: "",
+      head: "",
+      remote: "",
+      ahead: 0,
+      commits: [],
+      diffstat: "",
+      uncommitted: 0,
+      gh: false,
+      gh_signed_in: false,
+    })),
+    openPullRequest: vi.fn(),
     // Resolves an EMPTY conversation by default, not `undefined`: the replay path reads
     // `.exchanges` on whatever comes back, and a bare `vi.fn()` makes every suite that mounts the
     // conversation die on a property access that has nothing to do with what it is testing.
@@ -293,6 +312,8 @@ export function scriptTurn(
     todos?: { task: string; status: string }[][];
     /** Frames of the agent's browser, one per action, in order. */
     browser?: CodeBrowserFrame[];
+    /** Charts `render_chart` drew, in order (`chart_frame`). */
+    charts?: CodeChartFrame[];
     /** A question the turn parks on. `parked: true` leaves the stream open after it, which is what
      *  the server does — the tool call is blocked on a worker thread waiting for the answer, so a
      *  script that sent `done` straight after would be testing a turn that never actually paused. */
@@ -312,6 +333,7 @@ export function scriptTurn(
     // Each frame is the WHOLE list, so a script sends snapshots, not additions.
     for (const todo of script.todos ?? []) h.onTodo?.(todo);
     for (const frame of script.browser ?? []) h.onBrowser?.(frame);
+    for (const chart of script.charts ?? []) h.onChart?.(chart);
     if (script.error) {
       h.onError?.("boom");
       return;
@@ -354,7 +376,7 @@ export function treeWith(entries: FsNode[] = [fsNode()]): FsTree {
 /** A file read: clean + whole text by default. `truncated: true` (clipped at the read cap) or a
  *  non-empty `note` (binary/non-text) are the two honesty cases the viewer must refuse to edit. */
 export function fsFile(over: Partial<FsFile> = {}): FsFile {
-  return { path: "src/app.py", content: "print('hi')\n", note: "", truncated: false, ...over };
+  return { path: "src/app.py", content: "print('hi')\n", note: "", truncated: false, document: "", ...over };
 }
 
 export function gitStatus(over: Partial<GitStatus> = {}): GitStatus {

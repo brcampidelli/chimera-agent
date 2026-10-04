@@ -25,6 +25,11 @@ export type ChatTurn = Schemas["TurnOut"];
 export type MemoryItem = Schemas["MemoryItemOut"];
 export type MemoryLayers = Schemas["MemoryLayersOut"];
 export type MemoryProfile = Schemas["MemoryProfileOut"];
+export type MemoryExport = Schemas["MemoryExportOut"];
+export type ClaudeImportPreview = Schemas["ClaudeImportPreviewOut"];
+export type ClaudeImportApply = Schemas["ClaudeImportApplyOut"];
+export type ConsolidatePreview = Schemas["ConsolidatePreviewOut"];
+export type ConsolidateApply = Schemas["ConsolidateApplyOut"];
 export type SkillStat = Schemas["SkillStatOut"];
 /** The whole `GET /api/skills` body, from the generated schema rather than spelled out at
  *  the call site. A hand-written shape there silently stops at whatever the backend had the
@@ -40,6 +45,16 @@ export type LibraryCard = Schemas["LibraryCardOut"];
 export type CatalogEntry = Schemas["CatalogEntryOut"];
 /** One installed on this machine: a directory of somebody else's instructions and scripts. */
 export type SkillBundle = Schemas["BundleOut"];
+/** What a run started now is told about skills: the bundle block byte for byte as the prompt
+ *  carries it, and whether learned cards are read at all. */
+export type EffectiveSkills = Schemas["EffectiveSkillsOut"];
+/** The source's newest commit to one installed skill's directory, against the installed one. */
+export type BundleUpdate = Schemas["BundleUpdateOut"];
+/** A project's `.chimera/pack.json` held against the owner's settings: what it keeps, hides,
+ *  could not have (clamped), and whether it narrows runs in that folder right now. */
+export type ProjectPack = Schemas["ProjectPackOut"];
+/** An installed skill's SKILL.md as plain text — what switching it on would consent to. */
+export type SkillBundleText = Schemas["BundleTextOut"];
 /** A stored coding conversation's file, unparsed — the one view in which a damaged session
  *  looks damaged rather than empty. */
 export type CodeSessionRaw = Schemas["CodeSessionRawOut"];
@@ -73,6 +88,11 @@ export type ProviderCfg = Schemas["ProviderOut"];
 /** A provider's rotation pool. Carries hints and positions — never a key. */
 export type PoolCfg = Schemas["PoolOut"];
 export type PoolWrite = Schemas["PoolWriteOut"];
+/** What a settings save did — and, for a credential, whether it went to the OS vault or fell back
+ *  to `.env` because there is none (study 29, P7.7). Names only. */
+export type ConfigUpdated = Schemas["UpdatedOut"];
+/** A move of the keys between `.env` and the OS vault, by name. */
+export type VaultMove = Schemas["VaultMoveOut"];
 export type AppConfig = Schemas["ConfigOut"];
 /** Whether the app holds the machine awake right now, and for what (`chimera/core/keep_awake.py`). */
 export type KeepAwakeState = Schemas["KeepAwakeOut"];
@@ -91,6 +111,12 @@ export type StorageCategory = Schemas["StorageCategoryOut"];
 export type WorktreePrune = Schemas["WorktreePruneOut"];
 export type LogRotate = Schemas["LogRotateOut"];
 export type AppDiagnostics = Schemas["AppDiagnosticsOut"];
+/** An OpenAPI connector the owner added (study 29, P7.5). Its key is `key_set` + `key_hint` — the
+ *  last four characters at most — and never the value. */
+export type Connector = Schemas["ConnectorOut"];
+export type ConnectorOperation = Schemas["ConnectorOperationOut"];
+export type Connectors = Schemas["ConnectorsOut"];
+export type ConnectorPatch = Schemas["ConnectorPatchIn"];
 export type AgentIdentity = Schemas["AgentIdentityOut"];
 /** An agent you dispatch work to, as opposed to the one you converse with. */
 export type AgentDef = Schemas["AgentDefOut"];
@@ -141,6 +167,8 @@ export type GitUncommitted = Schemas["GitUncommittedOut"];
 export type GitFile = Schemas["GitFileOut"];
 export type GitDiff = Schemas["GitDiffOut"];
 export type GitCommitResult = Schemas["GitCommitOut"];
+export type PullRequestReadiness = Schemas["PullRequestReadinessOut"];
+export type PullRequestResult = Schemas["PullRequestOut"];
 export type GitRevertResult = Schemas["GitRevertOut"];
 export type GitInitResult = Schemas["GitInitOut"];
 export type InjectionReport = Schemas["InjectionReportOut"];

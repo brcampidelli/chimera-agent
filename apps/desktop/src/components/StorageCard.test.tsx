@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -109,9 +109,26 @@ describe("the storage card", () => {
 
     expect(await screen.findByText("The next worktree goes to: /tmp")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Worktree folder"), "D:\\wts");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    // This row's own Save: the card has two since the branch prefix joined it (study 29, P8.1).
+    const row = screen.getByLabelText("Worktree folder").closest("div")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Save" }));
 
     expect(onSave).toHaveBeenCalledWith({ CHIMERA_WORKTREE_DIR: "D:\\wts" });
+  });
+
+  it("saves the branch prefix, and offers no save while it is unchanged", async () => {
+    const onSave = vi.fn();
+    render(<StorageCard worktreeDir="" branchPrefix="chimera" onSave={onSave} />);
+
+    const field = await screen.findByLabelText("Branch prefix");
+    expect(field).toHaveValue("chimera");
+    const row = field.closest("div")!;
+    expect(within(row).getByRole("button", { name: "Save" })).toBeDisabled();
+    await userEvent.clear(field);
+    await userEvent.type(field, "team");
+    await userEvent.click(within(row).getByRole("button", { name: "Save" }));
+
+    expect(onSave).toHaveBeenCalledWith({ CHIMERA_BRANCH_PREFIX: "team" });
   });
 });
 

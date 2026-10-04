@@ -53,7 +53,7 @@ def restrict_registry(
     allow_set = None if allow is None else {name.strip() for name in allow if name.strip()}
     deny_set = {name.strip() for name in (deny or ()) if name.strip()}
 
-    kept = ToolRegistry()
+    kept = ToolRegistry.like(registry)
     excluded: list[str] = []
     for tool in registry.tools():
         permitted = (allow_set is None or tool.name in allow_set) and tool.name not in deny_set

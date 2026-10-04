@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="https://cdn.jsdelivr.net/npm/vega@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-lite@5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+</head>
+<body>
+  <div id="vis"></div>
+  <script type="application/json" id="chimera-chart-spec">{
+  "title": "Sales",
+  "data": {
+    "values": [
+      {
+        "a": "A",
+        "b": 5
+      },
+      {
+        "a": "B",
+        "b": 8
+      }
+    ]
+  },
+  "mark": "bar",
+  "encoding": {
+    "x": {
+      "field": "a",
+      "type": "nominal"
+    },
+    "y": {
+      "field": "b",
+      "type": "quantitative"
+    }
+  }
+}</script>
+  <script>
+    const spec = JSON.parse(document.getElementById('chimera-chart-spec').textContent);
+    vegaEmbed('#vis', spec).catch(console.error);
+  </script>
+</body>
+</html>

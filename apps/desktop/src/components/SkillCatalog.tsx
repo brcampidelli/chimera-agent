@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, ExternalLink, Package, Search, Trash2 } from "lucide-react";
+import { Download, ExternalLink, Package, RefreshCw, Search, Trash2 } from "lucide-react";
 
 import {
+  checkSkillBundleUpdate,
   getSkillBundles,
   getSkillCatalog,
   installSkillBundle,
@@ -12,8 +13,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge, Panel, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
+import { day, shortSha } from "@/components/SkillsActiveNow";
 import { useT } from "@/lib/i18n";
-import type { CatalogEntry } from "@/lib/types";
+import type { CatalogEntry, SkillBundle } from "@/lib/types";
 
 /**
  * Skills you can install — other people's, fetched from their repositories on request.
@@ -44,12 +46,75 @@ const TONES: Record<string, "ok" | "accent" | "warn" | "muted"> = {
   needs_adaptation: "muted",
 };
 
-function Row({ entry }: { entry: CatalogEntry }) {
+/** The ratings in the order a person reads them: works, then the caveats from cheapest to fix. */
+const RATINGS = [
+  "native",
+  "needs_setup",
+  "needs_service",
+  "needs_heavy",
+  "os_locked",
+  "needs_adaptation",
+] as const;
+
+/** States a row can be in. "none" is the not-installed row; the rest are a bundle's own status. */
+const STATES = ["none", "pending", "active", "inactive"] as const;
+
+/** Whether the source's copy of an installed skill is newer, asked only when a person clicks.
+ *  Updating is the install route with `force`, and it lands the skill switched off: the text is
+ *  new, and having read the old one is not having read this one. */
+function UpdateCheck({ name, onUpdated }: { name: string; onUpdated: () => void }) {
+  const t = useT();
+  const check = useMutation({ mutationFn: () => checkSkillBundleUpdate(name) });
+  const update = useMutation({
+    mutationFn: () => installSkillBundle(name, true),
+    onSuccess: () => {
+      check.reset();
+      onUpdated();
+    },
+  });
+  const found = check.data;
+  const failed = check.error ?? update.error;
+
+  return (
+    <div className="space-y-1">
+      {found ? (
+        <p className="text-xs text-muted-foreground">
+          {found.changed === false
+            ? t("catalog.update.same", { current: shortSha(found.current_ref) })
+            : t(found.changed ? "catalog.update.newer" : "catalog.update.unknown", {
+                latest: shortSha(found.latest_ref),
+                date: day(found.latest_date),
+                current: shortSha(found.current_ref),
+              })}
+        </p>
+      ) : null}
+      {failed ? (
+        <p className="text-xs text-bad-foreground">{failed instanceof Error ? failed.message : String(failed)}</p>
+      ) : null}
+      <div className="flex gap-2">
+        <Button size="sm" variant="ghost" disabled={check.isPending} onClick={() => check.mutate()}>
+          {check.isPending ? <Spinner /> : <RefreshCw className="h-4 w-4" />}
+          {t("catalog.update.check")}
+        </Button>
+        {found && found.changed !== false ? (
+          <Button size="sm" variant="outline" disabled={update.isPending} onClick={() => update.mutate()}>
+            {update.isPending ? <Spinner /> : <Download className="h-4 w-4" />}
+            {t("catalog.update.apply")}
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Row({ entry, bundle }: { entry: CatalogEntry; bundle?: SkillBundle }) {
   const t = useT();
   const client = useQueryClient();
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["skill-catalog"] });
     void client.invalidateQueries({ queryKey: ["skill-bundles"] });
+    // What reaches the prompt changes with every switch, install and update below.
+    void client.invalidateQueries({ queryKey: ["skills-effective"] });
   };
 
   const install = useMutation({ mutationFn: () => installSkillBundle(entry.name), onSuccess: refresh });
@@ -113,6 +178,18 @@ function Row({ entry }: { entry: CatalogEntry }) {
             <span className="font-mono">{entry.missing_tools.join(", ")}</span>
           </p>
         ) : null}
+        {bundle?.reconfirm ? (
+          <p className="text-xs text-warn-foreground">{t("catalog.reconfirm")}</p>
+        ) : null}
+        {bundle?.ref ? (
+          // Which bytes are on disk. The catalogue only names a branch; the install recorded the
+          // commit it resolved to, and that is what an update is measured against.
+          <p className="font-mono text-xs text-muted-foreground">
+            {t("skills.active.commit", { sha: shortSha(bundle.ref) })}
+            {bundle.committed_at ? ` · ${day(bundle.committed_at)}` : ""}
+          </p>
+        ) : null}
+        {state ? <UpdateCheck name={entry.name ?? ""} onUpdated={refresh} /> : null}
         {entry.author ? (
           // Several of these are ports of somebody else's work and say so upstream. Carrying the
           // field means the credit reaches a reader instead of stopping at the repository.
@@ -170,25 +247,43 @@ function Row({ entry }: { entry: CatalogEntry }) {
 export function SkillCatalog() {
   const t = useT();
   const [query, setQuery] = useState("");
+  // Filters and order are the reader's, so they live here and never reach the server: the
+  // catalogue is eighty rows that are already in hand.
+  const [rating, setRating] = useState<string>("");
+  const [stateFilter, setStateFilter] = useState<string>("");
+  const [order, setOrder] = useState<"topic" | "name">("topic");
   const catalog = useQuery({ queryKey: ["skill-catalog"], queryFn: getSkillCatalog });
-  // Fetched alongside so the list re-renders when a bundle is switched from anywhere else.
-  useQuery({ queryKey: ["skill-bundles"], queryFn: getSkillBundles });
+  // Fetched alongside so the list re-renders when a bundle is switched from anywhere else, and so
+  // an installed row can name the commit it came from.
+  const bundles = useQuery({ queryKey: ["skill-bundles"], queryFn: getSkillBundles });
+  const byName = useMemo(
+    () => new Map((bundles.data ?? []).map((b) => [b.name ?? "", b] as const)),
+    [bundles.data],
+  );
 
   const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matched = (catalog.data ?? []).filter(
       (e) =>
-        !needle ||
-        (e.name ?? "").toLowerCase().includes(needle) ||
-        (e.description ?? "").toLowerCase().includes(needle),
+        (!needle ||
+          (e.name ?? "").toLowerCase().includes(needle) ||
+          (e.description ?? "").toLowerCase().includes(needle)) &&
+        (!rating || (e.portability ?? "native") === rating) &&
+        (!stateFilter || (e.installed || "none") === stateFilter),
     );
+    if (order === "name") {
+      // One flat group: an alphabetical list split by topic is neither.
+      const flat = [...matched].sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+      return [["", flat]] as [string, CatalogEntry[]][];
+    }
     const byTopic = new Map<string, CatalogEntry[]>();
     for (const entry of matched) {
       const key = entry.topic || "other";
       byTopic.set(key, [...(byTopic.get(key) ?? []), entry]);
     }
     return [...byTopic.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [catalog.data, query]);
+  }, [catalog.data, query, rating, stateFilter, order]);
+  const shown = groups.reduce((n, [, entries]) => n + entries.length, 0);
 
   const installed = (catalog.data ?? []).filter((e) => e.installed).length;
 
@@ -226,16 +321,62 @@ export function SkillCatalog() {
         {t("catalog.provenance")}
       </p>
 
-      {groups.length === 0 ? (
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+        <label className="flex items-center gap-1">
+          {t("catalog.filter.portability")}
+          <select
+            className="field h-7 px-2 text-xs"
+            value={rating}
+            onChange={(event) => setRating(event.target.value)}
+          >
+            <option value="">{t("catalog.filter.all")}</option>
+            {RATINGS.map((r) => (
+              <option key={r} value={r}>
+                {t(`catalog.portability.${r}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1">
+          {t("catalog.filter.state")}
+          <select
+            className="field h-7 px-2 text-xs"
+            value={stateFilter}
+            onChange={(event) => setStateFilter(event.target.value)}
+          >
+            <option value="">{t("catalog.filter.all")}</option>
+            {STATES.map((s) => (
+              <option key={s} value={s}>
+                {s === "none" ? t("catalog.filter.notInstalled") : t(`catalog.state.${s}`)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-1">
+          {t("catalog.sort")}
+          <select
+            className="field h-7 px-2 text-xs"
+            value={order}
+            onChange={(event) => setOrder(event.target.value === "name" ? "name" : "topic")}
+          >
+            <option value="topic">{t("catalog.sort.topic")}</option>
+            <option value="name">{t("catalog.sort.name")}</option>
+          </select>
+        </label>
+      </div>
+
+      {shown === 0 ? (
         <p className="text-sm text-muted-foreground">{t("catalog.noMatch", { q: query })}</p>
       ) : (
         groups.map(([topic, entries]) => (
-          <section key={topic} className="mb-5">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {topic} <span className="font-normal">({entries.length})</span>
-            </h3>
+          <section key={topic || "all"} className="mb-5">
+            {topic ? (
+              <h3 className="mb-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {topic} <span className="font-normal">({entries.length})</span>
+              </h3>
+            ) : null}
             {entries.map((entry) => (
-              <Row key={entry.name} entry={entry} />
+              <Row key={entry.name} entry={entry} bundle={byName.get(entry.name ?? "")} />
             ))}
           </section>
         ))

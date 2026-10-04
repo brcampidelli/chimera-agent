@@ -31,7 +31,8 @@ class Role:
 
 def _restrict_tools(registry: ToolRegistry, allowed: list[str]) -> ToolRegistry:
     """A registry with only the ``allowed`` tools — fail-closed: an unknown name is simply absent."""
-    subset = ToolRegistry()
+    # `like`: a role narrowed further is still a run in the same project; the pack's skills travel.
+    subset = ToolRegistry.like(registry)
     allow = set(allowed)
     for tool in registry.tools():
         if tool.name in allow:

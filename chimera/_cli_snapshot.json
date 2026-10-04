@@ -413,6 +413,16 @@
           ],
           "required": false,
           "type": "boolean"
+        },
+        {
+          "help": "Print the whole question \u2014 the full action \u2014 and answer nothing.",
+          "kind": "option",
+          "name": "show",
+          "opts": [
+            "--show"
+          ],
+          "required": false,
+          "type": "boolean"
         }
       ],
       "path": "approve"
@@ -1715,7 +1725,7 @@
         },
         {
           "default": "'md'",
-          "help": "md | txt | html",
+          "help": "md | txt | html | docx | xlsx | pdf (the last three need --out)",
           "kind": "option",
           "name": "fmt",
           "opts": [
@@ -3335,9 +3345,49 @@
               ],
               "required": false,
               "type": "float"
+            },
+            {
+              "help": "Only list the clusters that would be merged (no model call, no write).",
+              "kind": "option",
+              "name": "dry_run",
+              "opts": [
+                "--dry-run"
+              ],
+              "required": false,
+              "type": "boolean"
             }
           ],
           "path": "memory consolidate"
+        },
+        {
+          "deprecated": false,
+          "help": "Export all memory as JSON or Markdown, locally. Secrets are masked; metadata is left out.",
+          "hidden": false,
+          "name": "export",
+          "params": [
+            {
+              "default": "'json'",
+              "help": "json | markdown",
+              "kind": "option",
+              "name": "fmt",
+              "opts": [
+                "--format"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Write to this file (default: print to stdout).",
+              "kind": "option",
+              "name": "out",
+              "opts": [
+                "--out"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "memory export"
         },
         {
           "deprecated": false,
@@ -3513,12 +3563,12 @@
     },
     {
       "deprecated": false,
-      "help": "Import config + skills from another agent; --apply also merges long-term memory.",
+      "help": "Import config + skills from another agent; --apply also merges long-term memory.\n\n``claude`` imports memory only (CLAUDE.md and memory/*.md), as unverified facts, never persona:\nthe dry-run lists every fact it would write.",
       "hidden": false,
       "name": "migrate",
       "params": [
         {
-          "help": "Source agent: hermes | openclaw.",
+          "help": "Source agent: hermes | openclaw | claude.",
           "kind": "argument",
           "name": "source",
           "opts": [
@@ -3528,7 +3578,7 @@
           "type": "str"
         },
         {
-          "help": "Path to the source agent's home directory.",
+          "help": "Path to the source agent's home directory (for claude: ~/.claude or a project).",
           "kind": "argument",
           "name": "path",
           "opts": [
@@ -4207,6 +4257,67 @@
       "commands": [
         {
           "deprecated": false,
+          "help": "Pull request watch: failing checks and new comments on your open pull requests, and failed runs\non the default branch \u2014 read with the GitHub CLI, never acted on.\n\nWithout `--print`/`--json` this registers the watch for WORKSPACE as an hourly job, DISABLED,\nonce per repository: it runs only after `chimera cron enable <id>`, posts only where\n`--deliver-to` says, and posts again only when the summary changes. Nothing is pushed, commented,\nmerged or re-run, and other people's comments are quoted inside the data fence, as data.",
+          "hidden": false,
+          "name": "pr-watch",
+          "params": [
+            {
+              "default": "'.'",
+              "help": "The repository to watch (a folder inside a git checkout whose origin is on GitHub).",
+              "kind": "option",
+              "name": "workspace",
+              "opts": [
+                "--workspace",
+                "-w"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "Look now and print the summary instead of proposing the job. Reads only; remembers nothing.",
+              "kind": "option",
+              "name": "print_now",
+              "opts": [
+                "--print"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Look now and print what was found as JSON. Reads only; remembers nothing.",
+              "kind": "option",
+              "name": "as_json",
+              "opts": [
+                "--json"
+              ],
+              "required": false,
+              "type": "boolean"
+            },
+            {
+              "help": "Chat webhook URL (Discord or Slack) the job posts to. Stored on the proposal; never printed in full.",
+              "kind": "option",
+              "name": "deliver_to",
+              "opts": [
+                "--deliver-to"
+              ],
+              "required": false,
+              "type": "str"
+            },
+            {
+              "help": "pt or en. Default: the owner's identity language (Portuguese unless it names another).",
+              "kind": "option",
+              "name": "lang",
+              "opts": [
+                "--lang"
+              ],
+              "required": false,
+              "type": "str"
+            }
+          ],
+          "path": "report pr-watch"
+        },
+        {
+          "deprecated": false,
           "help": "Weekly review: spend, runs, approvals and failing jobs over the last 7 days.\n\nEvery number is computed by code from the same logs the app's screens read (`usage.jsonl`,\n`runs.jsonl`, `approvals/history.jsonl`, `scheduler/jobs.json`); no model writes or restates\nany of them. Without `--print` this registers the weekly job \u2014 Mondays 09:00, DISABLED \u2014 once:\nit runs only after `chimera cron enable <id>`, and posts only where `--deliver-to` says.",
           "hidden": false,
           "name": "weekly",
@@ -4246,7 +4357,7 @@
         }
       ],
       "deprecated": false,
-      "help": "Reports counted by code from this home's own logs \u2014 no model call.",
+      "help": "Reports counted by code \u2014 from this home's own logs, or read with the GitHub CLI \u2014 no model call.",
       "hidden": false,
       "name": "report",
       "params": [],

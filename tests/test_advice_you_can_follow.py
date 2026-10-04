@@ -16,9 +16,15 @@ defect one level down: the OpenAPI→tool importer's only caller outside the tes
 schema-bench`, which counts schema tokens and registers nothing, so no surface lets anyone import a
 spec — and nothing would hand an imported tool one of these keys if it did. They are reserved slots,
 which is what `.env.example` already called Stability while the screen said "Stability (images)".
+
+Study 29, P7.5 built the missing half — Connections › OpenAPI turns a spec into tools, and a
+connector may read these three keys — so the labels point at the importer again, and the tests
+below check that the place they point to exists rather than that it does not.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 
@@ -113,25 +119,48 @@ def test_no_tool_module_secretly_reads_one_of_them() -> None:
         assert field not in read, f"{field} is implemented now — fix its label"
 
 
-def test_no_label_sends_the_user_to_an_importer_they_cannot_reach() -> None:
-    """The second promise, the one the first fix introduced.
+def test_a_reserved_label_points_at_an_importer_that_exists_and_can_read_the_key(
+    tmp_path: Path,
+) -> None:
+    """The second promise, made true rather than withdrawn (study 29, P7.5).
 
-    "import its OpenAPI spec" names an action, and there is nowhere to perform it: the importer's
-    only non-test caller is `schema-bench` (held by the test below). A reserved slot has to say it
-    is reserved, not describe a route.
+    This test used to assert that no label mentioned OpenAPI, because the importer had no caller
+    that gave the agent a tool. That premise is gone — Connections › OpenAPI adds a connector — so
+    the label points there again, and this checks the two halves the old label lacked: the route
+    the label sends the owner to exists, and a connector there may actually read this key.
     """
+    from typing import cast
+
+    from chimera.api.app import build_api_app
+    from chimera.integrations.openapi_store import allowed_key_envs
+    from chimera.interface import ChatSession
+    from chimera.interface.session import SupportsRun
+
+    app = build_api_app(
+        lambda: ChatSession(cast(SupportsRun, None)),
+        settings=Settings(CHIMERA_HOME=str(tmp_path / "home")),  # type: ignore[call-arg]
+        workspace=tmp_path,
+    )
+    routes = {
+        (method, getattr(route, "path", ""))
+        for route in app.routes
+        for method in getattr(route, "methods", set()) or set()
+    }
+    assert ("POST", "/api/connectors") in routes, "the label sends the owner to a screen with no door"
     for env in ("BRAVE_API_KEY", "SERPAPI_API_KEY", "STABILITY_API_KEY"):
         label = _TOOL_CREDENTIALS[env]
-        assert "reserved" in label, f"{env} buys nothing and the label does not say so"
-        assert "openapi" not in label.lower(), f"{env} points at an import nobody can perform"
+        assert "no built-in tool" in label, f"{env} still buys nothing on its own and must say so"
+        assert "OpenAPI" in label and "Connections" in label, f"{env} does not say where it is used"
+        assert env in allowed_key_envs("anything"), f"no connector may read {env}, so the label lies"
 
 
-def test_the_openapi_importer_still_has_no_caller_that_gives_the_agent_a_tool() -> None:
-    """The premise of the label above, checked rather than remembered.
+def test_the_openapi_importer_reaches_the_agent_only_through_the_owners_store() -> None:
+    """The importer's callers, checked rather than remembered.
 
-    Every call of `tools_from_openapi` under `chimera/` is found by parsing, and the one allowed
-    caller is `schema_bench`, which measures schema size. If someone wires an import into a screen
-    or a command, this fails — and the reserved labels may then honestly point at it again.
+    Two callers and no third: `schema_bench`, which measures schema size, and the store's
+    `connector_tools`, which builds tools only for connectors the owner added and switched on. A
+    call anywhere else would be a way to hand the agent a spec's tools that skips the owner, the
+    pinned snapshot and the GET-only rule — so it fails here first.
     """
     import ast
     from pathlib import Path
@@ -154,4 +183,7 @@ def test_the_openapi_importer_still_has_no_caller_that_gives_the_agent_a_tool() 
                     callers.add(f"{path.relative_to(root).as_posix()}::{func.name}")
 
     assert callers, "found no caller at all — the scan is inert, not the importer unused"
-    assert callers == {"cli/main.py::schema_bench"}, f"the importer is reachable now: {callers}"
+    assert callers == {
+        "cli/main.py::schema_bench",
+        "integrations/openapi_store.py::connector_tools",
+    }, f"the importer is reachable another way now: {callers}"

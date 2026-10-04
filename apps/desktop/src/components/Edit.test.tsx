@@ -63,8 +63,10 @@ function EditHost({ initial = null as string | null, opens = [] as string[] }) {
   );
 }
 
-function file(over: Partial<{ content: string; note: string; path: string; truncated: boolean }> = {}) {
-  return { content: "print('hi')\n", note: "", path: "src/app.py", truncated: false, ...over };
+function file(
+  over: Partial<{ content: string; note: string; path: string; truncated: boolean; document: string }> = {},
+) {
+  return { content: "print('hi')\n", note: "", path: "src/app.py", truncated: false, document: "", ...over };
 }
 
 /**
@@ -171,6 +173,32 @@ describe("Edit", () => {
     expect(await screen.findByText(/saving would delete the rest/i)).toBeInTheDocument();
     await waitFor(() => expect(view?.state.readOnly).toBe(true));
     expect(screen.getByText(/Read-only/i)).toBeInTheDocument();
+  });
+
+  it("refuses to edit a document shown as its text, so a save cannot replace the document", async () => {
+    // The adversarial review's case: a .docx arrived as MarkItDown's text with no note and not
+    // truncated, the tab let you fix a typo, and Ctrl+S wrote that text over the .docx.
+    vi.mocked(getFsFile).mockResolvedValue(
+      file({ path: "r.docx", content: "# Relatorio\n\ntexto\n", document: "docx" }),
+    );
+    const user = userEvent.setup();
+    renderWithProviders(<EditHost initial="r.docx" />);
+
+    await waitFor(() => expect(view?.state.readOnly).toBe(true));
+    expect(screen.getByText(/Read-only/i)).toBeInTheDocument();
+    type("fix ");
+    const save = await screen.findByRole("button", { name: /^Save$/ });
+    expect(save).toBeDisabled();
+    await user.keyboard("{Control>}s{/Control}");
+    await user.click(save);
+    expect(saveFile).not.toHaveBeenCalled();
+  });
+
+  it("refuses to edit a file the server could only describe in a note", async () => {
+    // "binary or non-text" comes with an EMPTY content; saving would replace the file with a draft.
+    vi.mocked(getFsFile).mockResolvedValue(file({ note: "binary or non-text", content: "" }));
+    renderWithProviders(<EditHost initial="src/app.py" />);
+    await waitFor(() => expect(view?.state.readOnly).toBe(true));
   });
 
   it("shows the server's note in the server's words", async () => {

@@ -83,7 +83,9 @@ FETCH_TOOLS = frozenset(
      "calendar_events", "browser", "scrape", "extract", "map", "crawl", "download_media"}
 )
 EXEC_TOOLS = frozenset({"run_shell", "execute_code", "code_interpreter"})
-WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch"})
+# `create_document` writes a file into the workspace exactly as `write_file` does, so it is one: a
+# read-only posture denies it (`api/posture.py` reads this set) and the ledger records the write.
+WRITE_TOOLS = frozenset({"write_file", "edit_file", "apply_patch", "edit_batch", "create_document"})
 READ_TOOLS = frozenset({"read_file", "read_document", "transcribe_audio"})
 # Non-idempotent external side effects: firing the SAME call twice does real double harm
 # (a duplicate email/message/payment). A retry loop must not re-execute these — see the

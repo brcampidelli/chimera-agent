@@ -944,16 +944,34 @@ class Agent:
         and an instruction in the system prompt has the standing of one the owner wrote.
         """
         try:
-            from chimera.settings import get_settings
-            from chimera.skills.bundles import context_lines
+            # `chimera.config`, not `chimera.settings`: the second module does not exist, and from
+            # the day bundles shipped (#141) until study 29 this import raised inside the `try`
+            # below, was logged at debug, and returned "". Every bundle an owner switched on was
+            # missing from every prompt, and nothing anywhere said so. The test that would have
+            # caught it compares the screen's text with this one byte for byte
+            # (`test_the_skills_screen_shows_what_the_prompt_carries.py`).
+            from chimera.config import get_settings
+            from chimera.skills.bundles import prompt_block
 
-            lines = context_lines(get_settings().home)
+            settings = get_settings()
+            # The block is assembled in one place, `prompt_block`, which is also what the Skills
+            # screen shows under "active now" (`GET /api/skills/effective`). Two renderings of the
+            # same list are two lists the day one of them changes. Narrowed by the project's pack
+            # (study 29, P7.6) only when the registry says so: the assembly that applied the pack
+            # to this run's servers and tools stamped its skills half there. Read from
+            # `project_root` instead, the skills were narrowed on surfaces whose tools were not
+            # (scheduled jobs, the terminal, the bots) and not narrowed where the tools were (a crew
+            # worker's worktree, a hierarchy worker with no root).
+            only = getattr(self.tools, "bundle_only", None)
+            # The home too: an app built with settings of its own (a bench arm, a test) assembled
+            # this registry from THOSE settings; the process's `.env` may name another home, and
+            # the prompt would then carry a list the screen (which reads the app's) never showed.
+            home = getattr(self.tools, "bundle_home", None) or settings.home
+            block = prompt_block(home, only=only)
         except Exception as exc:  # noqa: BLE001 -- same discipline as above
             _log.debug("bundle context skipped: %s", exc)
             return ""
-        if not lines:
-            return ""
-        return "\n\nInstalled skills you may use:\n" + "\n".join(lines)
+        return f"\n\n{block}" if block else ""
 
     def _project_context(self) -> str:
         """The workspace's own AGENTS.md, as a system-prompt block ("" when there is none).

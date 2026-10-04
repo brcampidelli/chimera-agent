@@ -84,6 +84,10 @@ CATALOG: tuple[Feature, ...] = (
     Feature("documents", "Read PDF/Word/Excel/… as text (read_document tool via MarkItDown)",
             dep="markitdown", extra="documents",
             how="pip install 'chimera-agent[documents]' — then: chimera run \"summarize report.pdf\""),
+    Feature("documents_out", "Write Word/Excel/PowerPoint from a declarative spec (create_document tool)",
+            dep="docx", extra="documents-out",
+            how="pip install 'chimera-agent[documents-out]', then switch create_document on "
+                "(CHIMERA_CREATE_DOCUMENT=1 or the Tools screen); PDF needs no extra"),
     Feature("media_download", "Download video/audio from YouTube + 1000+ sites (download_media tool)",
             dep="yt_dlp", extra="media-dl", bin="ffmpeg",
             how="pip install 'chimera-agent[media-dl]' + ffmpeg — then use the download_media tool"),

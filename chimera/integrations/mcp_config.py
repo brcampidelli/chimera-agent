@@ -17,6 +17,9 @@ subprocess and speak the async MCP handshake. Everything else in this module is 
 from __future__ import annotations
 
 import json
+import os
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -69,21 +72,104 @@ def save_servers(path: Path, servers: list[McpServerConfig]) -> None:
 
 
 def add_server(path: Path, cfg: McpServerConfig) -> list[McpServerConfig]:
-    """Add ``cfg`` to the store, REPLACING any existing server of the same name. Returns the new list."""
+    """Add ``cfg`` to the store, REPLACING any existing server of the same name. Returns the new list.
+
+    Forgets the remembered Test of that name (see :func:`forget_test`): a replacement may carry a new
+    token under the same key names, and the old token's result would otherwise be shown beside it.
+    """
     servers = [s for s in load_servers(path) if s.name != cfg.name]
     servers.append(cfg)
     save_servers(path, servers)
+    forget_test(path, cfg.name)
     return servers
 
 
 def remove_server(path: Path, name: str) -> bool:
-    """Remove the server named ``name``. Returns True if one was removed, False if none matched."""
+    """Remove the server named ``name``. Returns True if one was removed, False if none matched.
+
+    Forgets the remembered Test of that name either way, so a server added later under the same
+    name does not inherit a stranger's result.
+    """
     servers = load_servers(path)
     kept = [s for s in servers if s.name != name]
+    forget_test(path, name)
     if len(kept) == len(servers):
         return False
     save_servers(path, kept)
     return True
+
+
+# --- the remembered Test (mcp_tests.json) ------------------------------------------------------------
+#
+# The desktop app remembers the last Test of each server beside the store (see chimera.api.mcp_api,
+# which writes it). FORGETTING lives here, in the store, and not in the app's routes: when it lived
+# in the routes, `chimera mcp add sentry ... --env SENTRY_ACCESS_TOKEN=new` - a supported path, not a
+# hand edit - replaced the token and kept "last tested ok, 7 tools" beside it, because the record's
+# fingerprint leaves env VALUES out on purpose and only the app's add knew to drop it. Every writer
+# of mcp.json goes through add_server/remove_server, so that is where the record has to go.
+
+#: Beside ``mcp.json``, not inside it: the VPS and the CLI read ``mcp.json`` too, and a field they do
+#: not know about is a field one of them eventually drops or chokes on.
+TESTS_FILE = "mcp_tests.json"
+
+#: Every read-modify-write of the remembered tests goes through this. The app's test endpoint runs on
+#: a thread pool, so two Tests (or a Test and an Add) can interleave; without it each loads the file,
+#: changes its own record and saves, and the second save erases the first.
+TESTS_LOCK = threading.Lock()
+
+
+def tests_path_for(mcp_path: Path) -> Path:
+    """Where the remembered tests of the store at ``mcp_path`` live."""
+    return Path(mcp_path).parent / TESTS_FILE
+
+
+def load_test_records(path: Path) -> dict[str, dict[str, Any]]:
+    """The remembered tests at ``path``; missing or unreadable is ``{}``.
+
+    A memory of a test is a convenience; it must never be the reason the server list fails to load.
+    """
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def save_test_records(path: Path, tests: dict[str, dict[str, Any]]) -> None:
+    """Write ``tests`` to ``path`` atomically, through a temporary file of its OWN.
+
+    With one shared ``.tmp`` name, a second writer (the CLI, a second copy of the app, another
+    thread) truncates the first one's half-written file, and whichever renames second finds nothing.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(tests, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(text)
+        os.replace(tmp_name, path)
+    except BaseException:
+        Path(tmp_name).unlink(missing_ok=True)
+        raise
+
+
+def forget_test(mcp_path: Path, name: str) -> None:
+    """Drop the remembered Test of ``name`` from beside the store at ``mcp_path``.
+
+    Never raises for a disk that cannot be written: the server was already added or removed, and a
+    memory that could not be cleared must not turn that into a failure.
+    """
+    path = tests_path_for(mcp_path)
+    with TESTS_LOCK:
+        tests = load_test_records(path)
+        if name not in tests:
+            return
+        del tests[name]
+        try:
+            save_test_records(path, tests)
+        except OSError as exc:
+            _log.warning("could not forget the MCP test for %r: %s", name, type(exc).__name__)
 
 
 # --- live connect helpers (the only subprocess-spawning code in this module) -----------------------
@@ -101,8 +187,15 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
 
     session = StdioMCPSession(
         cfg.command, cfg.args or None, cfg.env or None, connect_timeout=connect_timeout
-    ).start()
+    )
+    # start() INSIDE the try. A start that times out has already spawned the server, and the
+    # process is still there waiting on its handshake; with start() outside, the finally never ran
+    # and every Test that timed out left one behind for the life of the app — for a bridge that
+    # signs in through the browser, holding a sign-in nobody would ever use. start() now closes a
+    # failed start itself (every caller needed it, and only this one had it); the finally stays for
+    # a start that succeeds and a tool listing that then fails. A second close is harmless.
     try:
+        session.start()
         connector = MCPConnector(cfg.name, session)
         return [{"name": tool.name, "description": tool.description} for tool in connector.tools()]
     finally:

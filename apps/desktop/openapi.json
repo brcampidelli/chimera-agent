@@ -1258,6 +1258,11 @@
             "title": "Host Exec",
             "type": "string"
           },
+          "pull_requests": {
+            "default": false,
+            "title": "Pull Requests",
+            "type": "boolean"
+          },
           "reach": {
             "default": "",
             "title": "Reach",
@@ -1515,6 +1520,33 @@
           "generated_for"
         ],
         "title": "BenchmarksOut",
+        "type": "object"
+      },
+      "Body_import_skill_api_skills_import_post": {
+        "properties": {
+          "files": {
+            "description": "One .zip, one SKILL.md, or every file of a skill folder.",
+            "items": {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "paths": {
+            "default": [],
+            "description": "For a folder: each file's path inside it, in the same order as `files`. A browser does not send a picked folder's structure in the file name, so it travels beside it.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Paths",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_import_skill_api_skills_import_post",
         "type": "object"
       },
       "Body_transcribe_audio_api_transcribe_post": {
@@ -1821,6 +1853,12 @@
       },
       "BundleOut": {
         "properties": {
+          "committed_at": {
+            "default": "",
+            "description": "When the commit in `ref` was made, as the source reported it at install.",
+            "title": "Committed At",
+            "type": "string"
+          },
           "description": {
             "default": "",
             "title": "Description",
@@ -1847,6 +1885,24 @@
             "default": "",
             "title": "Name",
             "type": "string"
+          },
+          "origin": {
+            "default": "catalog",
+            "description": "catalog | upload \u2014 how it arrived.",
+            "title": "Origin",
+            "type": "string"
+          },
+          "provenance": {
+            "default": "tainted",
+            "description": "Always tainted: every bundle is somebody else's text and scripts.",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "reconfirm": {
+            "default": false,
+            "description": "The bundle was switched on while a switched-on bundle reached no prompt; it reads as `pending` and reaches nothing until switched on again.",
+            "title": "Reconfirm",
+            "type": "boolean"
           },
           "ref": {
             "default": "",
@@ -1878,6 +1934,74 @@
           }
         },
         "title": "BundleStatusIn",
+        "type": "object"
+      },
+      "BundleTextOut": {
+        "description": "An installed skill's SKILL.md, as text, for the owner to read before switching it on.",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "truncated": {
+            "default": false,
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "text"
+        ],
+        "title": "BundleTextOut",
+        "type": "object"
+      },
+      "BundleUpdateOut": {
+        "properties": {
+          "changed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Whether that commit is newer than the installed one; null when unknowable.",
+            "title": "Changed"
+          },
+          "current_date": {
+            "default": "",
+            "title": "Current Date",
+            "type": "string"
+          },
+          "current_ref": {
+            "default": "",
+            "title": "Current Ref",
+            "type": "string"
+          },
+          "latest_date": {
+            "default": "",
+            "title": "Latest Date",
+            "type": "string"
+          },
+          "latest_ref": {
+            "default": "",
+            "description": "The newest commit that touched the skill's own directory.",
+            "title": "Latest Ref",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "title": "BundleUpdateOut",
         "type": "object"
       },
       "CacheCfgOut": {
@@ -2075,6 +2199,150 @@
           }
         },
         "title": "ClassifiedOut",
+        "type": "object"
+      },
+      "ClaudeImportApplyIn": {
+        "properties": {
+          "contents": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Contents",
+            "type": "array"
+          },
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          }
+        },
+        "title": "ClaudeImportApplyIn",
+        "type": "object"
+      },
+      "ClaudeImportApplyOut": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "ignored": {
+            "title": "Ignored",
+            "type": "integer"
+          },
+          "written": {
+            "title": "Written",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "written",
+          "ignored",
+          "counts"
+        ],
+        "title": "ClaudeImportApplyOut",
+        "type": "object"
+      },
+      "ClaudeImportCandidateOut": {
+        "properties": {
+          "claude_project": {
+            "default": "",
+            "title": "Claude Project",
+            "type": "string"
+          },
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "known": {
+            "default": false,
+            "title": "Known",
+            "type": "boolean"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          }
+        },
+        "required": [
+          "content",
+          "file"
+        ],
+        "title": "ClaudeImportCandidateOut",
+        "type": "object"
+      },
+      "ClaudeImportPreviewIn": {
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          }
+        },
+        "title": "ClaudeImportPreviewIn",
+        "type": "object"
+      },
+      "ClaudeImportPreviewOut": {
+        "description": "What an import WOULD write. Producing this writes nothing.",
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/ClaudeImportCandidateOut"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "files",
+          "candidates",
+          "notes"
+        ],
+        "title": "ClaudeImportPreviewOut",
         "type": "object"
       },
       "CodeExchangeOut": {
@@ -3050,6 +3318,9 @@
           "privacy": {
             "$ref": "#/components/schemas/PrivacyCfgOut"
           },
+          "project_pack": {
+            "$ref": "#/components/schemas/ProjectPackCfgOut"
+          },
           "providers": {
             "items": {
               "$ref": "#/components/schemas/ProviderOut"
@@ -3071,6 +3342,9 @@
           },
           "storage": {
             "$ref": "#/components/schemas/StorageCfgOut"
+          },
+          "vault": {
+            "$ref": "#/components/schemas/VaultCfgOut"
           }
         },
         "required": [
@@ -3145,6 +3419,448 @@
           }
         },
         "title": "ConflictOut",
+        "type": "object"
+      },
+      "ConnectorAddIn": {
+        "properties": {
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "source"
+        ],
+        "title": "ConnectorAddIn",
+        "type": "object"
+      },
+      "ConnectorKeyIn": {
+        "properties": {
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "title": "ConnectorKeyIn",
+        "type": "object"
+      },
+      "ConnectorOperationOut": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tool",
+          "method",
+          "path",
+          "summary",
+          "selected"
+        ],
+        "title": "ConnectorOperationOut",
+        "type": "object"
+      },
+      "ConnectorOut": {
+        "properties": {
+          "added_at": {
+            "title": "Added At",
+            "type": "string"
+          },
+          "allow_writes": {
+            "title": "Allow Writes",
+            "type": "boolean"
+          },
+          "base_url": {
+            "title": "Base Url",
+            "type": "string"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "key_env": {
+            "title": "Key Env",
+            "type": "string"
+          },
+          "key_envs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Envs",
+            "type": "array"
+          },
+          "key_hint": {
+            "title": "Key Hint",
+            "type": "string"
+          },
+          "key_in": {
+            "title": "Key In",
+            "type": "string"
+          },
+          "key_name": {
+            "title": "Key Name",
+            "type": "string"
+          },
+          "key_prefix": {
+            "title": "Key Prefix",
+            "type": "string"
+          },
+          "key_set": {
+            "title": "Key Set",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorOperationOut"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "problem": {
+            "title": "Problem",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "unattended": {
+            "title": "Unattended",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "source",
+          "base_url",
+          "enabled",
+          "allow_writes",
+          "unattended",
+          "key_env",
+          "key_envs",
+          "key_in",
+          "key_name",
+          "key_prefix",
+          "key_set",
+          "key_hint",
+          "added_at",
+          "operations",
+          "problem"
+        ],
+        "title": "ConnectorOut",
+        "type": "object"
+      },
+      "ConnectorPatchIn": {
+        "properties": {
+          "allow_writes": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allow Writes"
+          },
+          "base_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Url"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "key_env": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Env"
+          },
+          "key_in": {
+            "anyOf": [
+              {
+                "enum": [
+                  "header",
+                  "query"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key In"
+          },
+          "key_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Name"
+          },
+          "key_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Prefix"
+          },
+          "operations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operations"
+          },
+          "unattended": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unattended"
+          }
+        },
+        "title": "ConnectorPatchIn",
+        "type": "object"
+      },
+      "ConnectorsOut": {
+        "properties": {
+          "connectors": {
+            "items": {
+              "$ref": "#/components/schemas/ConnectorOut"
+            },
+            "title": "Connectors",
+            "type": "array"
+          },
+          "store": {
+            "title": "Store",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connectors",
+          "store"
+        ],
+        "title": "ConnectorsOut",
+        "type": "object"
+      },
+      "ConsolidateApplyIn": {
+        "properties": {
+          "groups": {
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "threshold": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.05,
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "title": "ConsolidateApplyIn",
+        "type": "object"
+      },
+      "ConsolidateApplyOut": {
+        "properties": {
+          "merged": {
+            "title": "Merged",
+            "type": "integer"
+          },
+          "removed": {
+            "title": "Removed",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "integer"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          }
+        },
+        "required": [
+          "merged",
+          "skipped",
+          "stale",
+          "removed",
+          "usd"
+        ],
+        "title": "ConsolidateApplyOut",
+        "type": "object"
+      },
+      "ConsolidateGroupOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/MemoryItemOut"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "unverified": {
+            "default": false,
+            "title": "Unverified",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "items"
+        ],
+        "title": "ConsolidateGroupOut",
+        "type": "object"
+      },
+      "ConsolidatePreviewIn": {
+        "properties": {
+          "threshold": {
+            "default": 0.5,
+            "maximum": 1.0,
+            "minimum": 0.05,
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "title": "ConsolidatePreviewIn",
+        "type": "object"
+      },
+      "ConsolidatePreviewOut": {
+        "description": "The clusters a consolidation would merge. Computed without a model call or a write.",
+        "properties": {
+          "can_answer": {
+            "title": "Can Answer",
+            "type": "boolean"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ConsolidateGroupOut"
+            },
+            "title": "Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups",
+          "can_answer"
+        ],
+        "title": "ConsolidatePreviewOut",
         "type": "object"
       },
       "ConversationsCfgOut": {
@@ -5236,6 +5952,79 @@
         "title": "EditorCapabilityOut",
         "type": "object"
       },
+      "EffectiveBundleOut": {
+        "properties": {
+          "committed_at": {
+            "default": "",
+            "title": "Committed At",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "default": "",
+            "title": "Name",
+            "type": "string"
+          },
+          "ref": {
+            "default": "",
+            "title": "Ref",
+            "type": "string"
+          }
+        },
+        "title": "EffectiveBundleOut",
+        "type": "object"
+      },
+      "EffectiveSkillsOut": {
+        "description": "What a run started now is told about skills \u2014 read from the code that tells it.",
+        "properties": {
+          "bundle_text": {
+            "default": "",
+            "description": "The installed-skills block byte for byte as a run's prompt carries it (`bundles.prompt_block`), or empty when no bundle is switched on.",
+            "title": "Bundle Text",
+            "type": "string"
+          },
+          "bundles": {
+            "items": {
+              "$ref": "#/components/schemas/EffectiveBundleOut"
+            },
+            "title": "Bundles",
+            "type": "array"
+          },
+          "cards": {
+            "description": "Learned cards the retriever may choose from (active and provisional). Which of them a run reads depends on its task, at most `cards_k` per run; empty when reading is off.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "cards_k": {
+            "default": 0,
+            "title": "Cards K",
+            "type": "integer"
+          },
+          "cards_read": {
+            "default": false,
+            "description": "`CHIMERA_SKILL_CARDS`. Off, no learned card reaches any prompt whatever its status.",
+            "title": "Cards Read",
+            "type": "boolean"
+          },
+          "reconfirm": {
+            "description": "Bundles switched on while a switched-on bundle reached no prompt (before study 29, P7.1). They reach nothing until switched on again, and are named here so the change is seen where the prompt's skills are.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Reconfirm",
+            "type": "array"
+          }
+        },
+        "title": "EffectiveSkillsOut",
+        "type": "object"
+      },
       "ExecCancelOut": {
         "description": "Whether a command was actually stopped.",
         "properties": {
@@ -5458,6 +6247,11 @@
         "properties": {
           "content": {
             "title": "Content",
+            "type": "string"
+          },
+          "document": {
+            "default": "",
+            "title": "Document",
             "type": "string"
           },
           "note": {
@@ -7558,6 +8352,11 @@
             "title": "Args",
             "type": "array"
           },
+          "auth": {
+            "default": "oauth",
+            "title": "Auth",
+            "type": "string"
+          },
           "available": {
             "title": "Available",
             "type": "boolean"
@@ -7655,6 +8454,11 @@
             "title": "Key",
             "type": "string"
           },
+          "pattern": {
+            "default": "",
+            "title": "Pattern",
+            "type": "string"
+          },
           "source": {
             "default": "",
             "title": "Source",
@@ -7681,6 +8485,30 @@
         "title": "McpCfgOut",
         "type": "object"
       },
+      "McpLastTestOut": {
+        "description": "The remembered outcome of the last Test of a server \u2014 history, not a live state.\n\nKept so the screen can say \"tested at 14:02, 4 tools\" after a relaunch. It must never be shown\nas \"connected\": a test from yesterday says nothing about whether the server starts today.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "tested_at": {
+            "title": "Tested At",
+            "type": "number"
+          },
+          "tool_count": {
+            "title": "Tool Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "tool_count",
+          "tested_at"
+        ],
+        "title": "McpLastTestOut",
+        "type": "object"
+      },
       "McpServerOut": {
         "properties": {
           "args": {
@@ -7700,6 +8528,16 @@
             },
             "title": "Env Keys",
             "type": "array"
+          },
+          "last_test": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpLastTestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "title": "Name",
@@ -7902,6 +8740,53 @@
           "remember_from_chat"
         ],
         "title": "MemoryCfgOut",
+        "type": "object"
+      },
+      "MemoryEdit": {
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "title": "MemoryEdit",
+        "type": "object"
+      },
+      "MemoryExportOut": {
+        "description": "The whole memory as one file's text. Built here, saved by the client: nothing is uploaded.\n\nSecrets are masked again on the way out and ``metadata`` is not included \u2014 see\n:mod:`chimera.memory.export` for why each.",
+        "properties": {
+          "content": {
+            "title": "Content",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "format": {
+            "title": "Format",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "filename",
+          "media_type",
+          "count",
+          "content"
+        ],
+        "title": "MemoryExportOut",
         "type": "object"
       },
       "MemoryItemOut": {
@@ -8122,6 +9007,11 @@
             },
             "title": "Configured",
             "type": "array"
+          },
+          "discord_attach_files": {
+            "default": false,
+            "title": "Discord Attach Files",
+            "type": "boolean"
           }
         },
         "title": "MessagingCfgOut",
@@ -8803,9 +9693,23 @@
             "title": "Count",
             "type": "integer"
           },
+          "in_vault": {
+            "items": {
+              "type": "string"
+            },
+            "title": "In Vault",
+            "type": "array"
+          },
           "provider": {
             "title": "Provider",
             "type": "string"
+          },
+          "vault_fallback": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vault Fallback",
+            "type": "array"
           }
         },
         "required": [
@@ -9119,6 +10023,175 @@
         "title": "ProjectDetailOut",
         "type": "object"
       },
+      "ProjectPackAcceptIn": {
+        "description": "Accept one folder's pack \u2014 the file whose SHA-256 the screen showed, and only that file.",
+        "properties": {
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "digest"
+        ],
+        "title": "ProjectPackAcceptIn",
+        "type": "object"
+      },
+      "ProjectPackCfgOut": {
+        "description": "``CHIMERA_PROJECT_PACK`` \u2014 whether a project's ``.chimera/pack.json`` may narrow a run.\n\nOff by default, and a server that predates the block reads as off, which is what it does.",
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "title": "ProjectPackCfgOut",
+        "type": "object"
+      },
+      "ProjectPackOut": {
+        "description": "One folder's ``.chimera/pack.json`` held against the owner's settings (study 29, P7.6).\n\nEverything a pack asks for is listed, including what it asked for and could not have: names it\nlists that are not switched on or not configured (clamped \u2014 never activated, never launched)\nand keys a pack cannot set (``ignored``). A pack only narrows, and the card is where that is\nseen rather than assumed.",
+        "properties": {
+          "accepted": {
+            "default": false,
+            "title": "Accepted",
+            "type": "boolean"
+          },
+          "applied": {
+            "default": false,
+            "title": "Applied",
+            "type": "boolean"
+          },
+          "changed": {
+            "default": false,
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "digest": {
+            "default": "",
+            "title": "Digest",
+            "type": "string"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          },
+          "held": {
+            "default": false,
+            "title": "Held",
+            "type": "boolean"
+          },
+          "ignored": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Ignored",
+            "type": "array"
+          },
+          "mcp": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mcp"
+          },
+          "mcp_hidden": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mcp Hidden",
+            "type": "array"
+          },
+          "mcp_kept": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mcp Kept",
+            "type": "array"
+          },
+          "mcp_not_configured": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mcp Not Configured",
+            "type": "array"
+          },
+          "present": {
+            "default": false,
+            "title": "Present",
+            "type": "boolean"
+          },
+          "skills": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Skills"
+          },
+          "skills_hidden": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skills Hidden",
+            "type": "array"
+          },
+          "skills_kept": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skills Kept",
+            "type": "array"
+          },
+          "skills_not_active": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skills Not Active",
+            "type": "array"
+          },
+          "tools_denied": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools Denied",
+            "type": "array"
+          },
+          "tools_deny": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools Deny",
+            "type": "array"
+          }
+        },
+        "title": "ProjectPackOut",
+        "type": "object"
+      },
       "ProjectStartIn": {
         "description": "Create a project from a spec.\n\n``spec`` is a PATH, not spec text. The spec is the acceptance authority \u2014 the only thing that\ndecides whether the project is done \u2014 so it belongs in the repository, versioned and reviewable,\nnot in a text box whose contents nobody else can see. Writing one is a job for the coding\nconversation; starting a project against it is this.",
         "properties": {
@@ -9246,6 +10319,11 @@
             "title": "Hint",
             "type": "string"
           },
+          "in_vault": {
+            "default": false,
+            "title": "In Vault",
+            "type": "boolean"
+          },
           "keys_url": {
             "default": "",
             "title": "Keys Url",
@@ -9282,6 +10360,204 @@
           "hint"
         ],
         "title": "ProviderOut",
+        "type": "object"
+      },
+      "PullRequestOut": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "output": {
+            "title": "Output",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "url",
+          "output",
+          "error"
+        ],
+        "title": "PullRequestOut",
+        "type": "object"
+      },
+      "PullRequestReadinessOut": {
+        "description": "What opening a pull request from the workspace would push, or the first reason it cannot.\n\n``reason`` is a word the screen translates (``chimera.core.pull_request.REASONS``); empty when\n``ready``. Nothing here is a credential: ``remote`` is origin's PUSH URL (where the push goes)\nwith any credential in it replaced by ``***``, and gh is asked for its exit code only.",
+        "properties": {
+          "ahead": {
+            "title": "Ahead",
+            "type": "integer"
+          },
+          "base": {
+            "title": "Base",
+            "type": "string"
+          },
+          "branch": {
+            "title": "Branch",
+            "type": "string"
+          },
+          "commits": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Commits",
+            "type": "array"
+          },
+          "diffstat": {
+            "title": "Diffstat",
+            "type": "string"
+          },
+          "gh": {
+            "title": "Gh",
+            "type": "boolean"
+          },
+          "gh_signed_in": {
+            "title": "Gh Signed In",
+            "type": "boolean"
+          },
+          "head": {
+            "title": "Head",
+            "type": "string"
+          },
+          "is_repo": {
+            "title": "Is Repo",
+            "type": "boolean"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "remote": {
+            "title": "Remote",
+            "type": "string"
+          },
+          "remote_head": {
+            "title": "Remote Head",
+            "type": "string"
+          },
+          "uncommitted": {
+            "title": "Uncommitted",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ready",
+          "reason",
+          "is_repo",
+          "branch",
+          "base",
+          "head",
+          "remote",
+          "remote_head",
+          "ahead",
+          "commits",
+          "diffstat",
+          "uncommitted",
+          "gh",
+          "gh_signed_in"
+        ],
+        "title": "PullRequestReadinessOut",
+        "type": "object"
+      },
+      "PullRequestRequest": {
+        "description": "Open a pull request from the workspace's branch \u2014 the Git panel's button, pressed by the owner.",
+        "properties": {
+          "base": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "body": {
+            "default": "",
+            "maxLength": 60000,
+            "title": "Body",
+            "type": "string"
+          },
+          "draft": {
+            "default": false,
+            "title": "Draft",
+            "type": "boolean"
+          },
+          "head": {
+            "maxLength": 64,
+            "minLength": 40,
+            "title": "Head",
+            "type": "string"
+          },
+          "remote": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote"
+          },
+          "remote_head": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remote Head"
+          },
+          "title": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          },
+          "workspace": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workspace"
+          }
+        },
+        "required": [
+          "title",
+          "head"
+        ],
+        "title": "PullRequestRequest",
         "type": "object"
       },
       "ReliabilityBinOut": {
@@ -10785,6 +12061,11 @@
       "StorageCfgOut": {
         "description": "``CHIMERA_WORKTREE_DIR`` as set; empty is the system temp folder (the default).",
         "properties": {
+          "branch_prefix": {
+            "default": "chimera",
+            "title": "Branch Prefix",
+            "type": "string"
+          },
           "worktree_dir": {
             "default": "",
             "title": "Worktree Dir",
@@ -11528,11 +12809,25 @@
       },
       "UpdatedOut": {
         "properties": {
+          "in_vault": {
+            "items": {
+              "type": "string"
+            },
+            "title": "In Vault",
+            "type": "array"
+          },
           "updated": {
             "items": {
               "type": "string"
             },
             "title": "Updated",
+            "type": "array"
+          },
+          "vault_fallback": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vault Fallback",
             "type": "array"
           }
         },
@@ -11793,6 +13088,83 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VaultCfgOut": {
+        "description": "Where the Settings screen saves a key \u2014 ``chimera/api/key_vault.py``.\n\n``enabled`` is the owner's switch (``CHIMERA_KEY_VAULT``, off by default). ``available`` is\nwhether this machine has a vault at all: false without the ``secrets`` extra, on a headless box,\nor in a build that could not bundle one \u2014 and then a save with the switch on goes to ``.env``\nand says so. ``keys`` are NAMES, asked of the vault only when the switch is on or ``.env`` marks\na key as moved, so an owner who never opted in gets no keychain access from this read.",
+        "properties": {
+          "available": {
+            "default": false,
+            "title": "Available",
+            "type": "boolean"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "keys": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Keys",
+            "type": "array"
+          }
+        },
+        "title": "VaultCfgOut",
+        "type": "object"
+      },
+      "VaultMoveIn": {
+        "description": "Which way to move the keys: ``vault`` (out of ``.env``) or ``file`` (back into it).",
+        "properties": {
+          "to": {
+            "enum": [
+              "vault",
+              "file"
+            ],
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
+        ],
+        "title": "VaultMoveIn",
+        "type": "object"
+      },
+      "VaultMoveOut": {
+        "description": "What a move did, by NAME. ``failed`` stayed where it was; ``skipped`` had a value in ``.env``\nalready, which is the one in force, so the vault copy was left alone rather than written over it.",
+        "properties": {
+          "failed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failed",
+            "type": "array"
+          },
+          "moved": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Moved",
+            "type": "array"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skipped",
+            "type": "array"
+          },
+          "too_large": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Too Large",
+            "type": "array"
+          }
+        },
+        "title": "VaultMoveOut",
         "type": "object"
       },
       "VersionOut": {
@@ -12812,6 +14184,123 @@
           }
         },
         "summary": "Chat Stream"
+      }
+    },
+    "/api/code/pack": {
+      "delete": {
+        "description": "Stop applying this folder's pack. The file stays; the owner's settings apply whole.",
+        "operationId": "revoke_code_pack_api_code_pack_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Code Pack"
+      },
+      "get": {
+        "description": "What this folder's pack asks for, what it would hide, and whether it applies now.",
+        "operationId": "get_code_pack_api_code_pack_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Code Pack"
+      }
+    },
+    "/api/code/pack/accept": {
+      "post": {
+        "description": "Let this folder's pack narrow runs here \u2014 the file the screen showed, by its digest.\n\nA file that changed between the screen reading it and this request is refused (409): the\nclick was about the bytes that were shown, and transferring it to new ones would be a\nconsent nobody gave. Accepting never widens anything; it is still the owner's, because the\nfile may come from someone else's repository.",
+        "operationId": "accept_code_pack_api_code_pack_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPackAcceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPackOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Code Pack"
       }
     },
     "/api/code/posture": {
@@ -14509,6 +15998,238 @@
         "summary": "Config Test Endpoint"
       }
     },
+    "/api/config/vault/move": {
+      "post": {
+        "operationId": "vault_move_endpoint_api_config_vault_move_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VaultMoveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VaultMoveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vault Move Endpoint"
+      }
+    },
+    "/api/connectors": {
+      "get": {
+        "description": "The configured connectors. File reads only \u2014 nothing is fetched or connected.",
+        "operationId": "connectors_list_endpoint_api_connectors_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Connectors List Endpoint"
+      },
+      "post": {
+        "description": "Fetch the spec once (SSRF-guarded), pin it, and record the connector switched OFF.",
+        "operationId": "connectors_add_endpoint_api_connectors_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorAddIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connectors Add Endpoint"
+      }
+    },
+    "/api/connectors/{name}": {
+      "delete": {
+        "description": "Forget the connector and its pinned spec. Its key stays in ``.env`` \u2014 a file the owner edits.",
+        "operationId": "connectors_remove_endpoint_api_connectors__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeletedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connectors Remove Endpoint"
+      },
+      "patch": {
+        "description": "Switch it on or off, allow changes, send it to the unattended surfaces, pick operations,\nor say how the key is sent.",
+        "operationId": "connectors_patch_endpoint_api_connectors__name__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorPatchIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connectors Patch Endpoint"
+      }
+    },
+    "/api/connectors/{name}/key": {
+      "put": {
+        "description": "Store the key in ``.env``. Write-only: the answer carries at most its last four characters.",
+        "operationId": "connectors_key_endpoint_api_connectors__name__key_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectorKeyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connectors Key Endpoint"
+      }
+    },
     "/api/cron": {
       "get": {
         "operationId": "list_cron_api_cron_get",
@@ -15588,6 +17309,104 @@
         "summary": "Git Init Endpoint"
       }
     },
+    "/api/git/pull-request": {
+      "get": {
+        "operationId": "git_pull_request_preview_api_git_pull_request_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Workspace"
+            }
+          },
+          {
+            "in": "query",
+            "name": "base",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Base"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullRequestReadinessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Pull Request Preview"
+      },
+      "post": {
+        "operationId": "git_pull_request_open_api_git_pull_request_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PullRequestRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PullRequestOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Git Pull Request Open"
+      }
+    },
     "/api/git/revert": {
       "post": {
         "operationId": "git_revert_endpoint_api_git_revert_post",
@@ -16545,6 +18364,199 @@
         "summary": "Add Memory"
       }
     },
+    "/api/memory/consolidate": {
+      "post": {
+        "description": "Merge the clusters the owner reviewed. The one memory route that calls a model.\n\nEach merge is a model call, metered and written to the usage log as a row of its own \u2014\nthe same accounting `chimera memory consolidate` keeps, so the Cost screen sees it.",
+        "operationId": "apply_consolidation_api_memory_consolidate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsolidateApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidateApplyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Consolidation"
+      }
+    },
+    "/api/memory/consolidate/preview": {
+      "post": {
+        "operationId": "preview_consolidation_api_memory_consolidate_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsolidatePreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsolidatePreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Consolidation"
+      }
+    },
+    "/api/memory/export": {
+      "get": {
+        "operationId": "export_memory_file_api_memory_export_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "json",
+              "title": "Format",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryExportOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Memory File"
+      }
+    },
+    "/api/memory/import/claude/apply": {
+      "post": {
+        "operationId": "apply_claude_import_api_memory_import_claude_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaudeImportApplyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeImportApplyOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Claude Import"
+      }
+    },
+    "/api/memory/import/claude/preview": {
+      "post": {
+        "operationId": "preview_claude_import_api_memory_import_claude_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaudeImportPreviewIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaudeImportPreviewOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Claude Import"
+      }
+    },
     "/api/memory/layers": {
       "get": {
         "operationId": "memory_layers_api_memory_layers_get",
@@ -16618,6 +18630,53 @@
           }
         },
         "summary": "Delete Memory"
+      },
+      "put": {
+        "operationId": "edit_memory_api_memory__item_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemoryEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemoryItemOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Memory"
       }
     },
     "/api/messaging": {
@@ -18077,6 +20136,46 @@
         "summary": "Delete Bundle"
       }
     },
+    "/api/skills/bundles/{name}/skill-md": {
+      "get": {
+        "description": "The SKILL.md of an installed skill, as plain text \u2014 what the switch would consent to.",
+        "operationId": "read_bundle_text_api_skills_bundles__name__skill_md_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleTextOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Bundle Text"
+      }
+    },
     "/api/skills/bundles/{name}/status": {
       "post": {
         "description": "Switch an installed bundle on or off, keeping it on disk either way.",
@@ -18125,6 +20224,46 @@
           }
         },
         "summary": "Set Bundle Status"
+      }
+    },
+    "/api/skills/bundles/{name}/update": {
+      "get": {
+        "description": "Ask the skill's source whether its directory changed since it was installed.\n\nOne request to the host install already uses, made only when a person clicks. It changes\nnothing: updating is `POST /api/skills/catalog/{name}/install?force=true`, which lands the\nnew files `pending` like any install \u2014 new instructions are a new decision.",
+        "operationId": "check_bundle_update_api_skills_bundles__name__update_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleUpdateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Bundle Update"
       }
     },
     "/api/skills/catalog": {
@@ -18198,6 +20337,98 @@
           }
         },
         "summary": "Install Bundle"
+      }
+    },
+    "/api/skills/effective": {
+      "get": {
+        "description": "What a run started now would be told about skills, read from the code that tells it.\n\n\"Mine\" was spread over three panels \u2014 learned cards, the library, the catalogue \u2014 and none\nof them answered the one question that matters when a run behaves oddly: what did the agent\nactually get? The bundle text is `prompt_block`, the function the agent itself calls, so the\nscreen cannot show a list the prompt does not carry. Cards are task-dependent: a run reads\nat most `cards_k` of the eligible ones, and only with reading on \u2014 which is off by default,\nand said so here rather than left for a count of zero to suggest otherwise.\n\n``project`` is the folder a run would start in. When its pack applies (study 29, P7.6) the\nbundles are narrowed exactly as an app run there is narrowed \u2014 the same two functions\n`assemble_registry` calls. The Skills screen itself sends no project (it belongs to none),\nso it shows the whole home and says so; and built-in skills, retrieved per task by\n`Agent._skill_context`, are not listed here, because which ones match depends on the task.",
+        "operationId": "effective_skills_api_skills_effective_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EffectiveSkillsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Effective Skills"
+      }
+    },
+    "/api/skills/import": {
+      "post": {
+        "description": "Add a skill that is in no catalogue \u2014 the owner's own, or one found somewhere.\n\nLands `pending` and `tainted` whatever its file declares \u2014 the rule a card imported by path\nfollows for its labels: handing a file to the app is choosing to send it, not vouching for\nwhat it says. Its instructions reach no prompt until the owner switches it on; after that,\n`tainted` means what `skill_view` reads from it is marked untrusted and its description\nenters the prompt quoted and attributed to its author (`bundles._context_line`).\nEvery limit the catalogue install has applies, and an archive is read as hostile input \u2014\nsee `chimera/skills/bundle_upload.py`. 409 when the name is taken and `replace` was not\nasked for, so the screen can offer the replacement instead of only reporting a failure.",
+        "operationId": "import_skill_api_skills_import_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "replace",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Replace",
+              "type": "boolean"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_skill_api_skills_import_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BundleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Import Skill"
       }
     },
     "/api/skills/library": {

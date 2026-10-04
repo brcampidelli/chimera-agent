@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ErrorState } from "@/components/ui/async";
 import { DiffView } from "@/components/code/DiffView";
 import { GitInitButton } from "@/components/code/GitInitButton";
+import { PullRequestCard } from "@/components/code/PullRequestCard";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,8 @@ export function GitPanel({ workspace }: { workspace: string }) {
         setMessage("");
         await qc.invalidateQueries({ queryKey: ["git-status", workspace] });
         void qc.invalidateQueries({ queryKey: ["fs-tree"] });
+        // A new commit changes what a pull request would carry.
+        void qc.invalidateQueries({ queryKey: ["pull-request", workspace] });
       } else {
         setCommitErr(true);
       }
@@ -281,6 +284,10 @@ export function GitPanel({ workspace }: { workspace: string }) {
           )}
         </div>
       ) : null}
+
+      {/* Below the changes, clean tree or not: a branch whose work is all committed is exactly the
+          one a pull request is for. Renders nothing without origin and the GitHub CLI. */}
+      {status?.is_repo ? <PullRequestCard workspace={workspace} /> : null}
 
       <p className="px-4 pb-2 text-xs text-muted-foreground">{t("code.git.gitNote")}</p>
     </section>

@@ -66,6 +66,12 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_BROWSER_SITES": ("example.com", ""),
     "CHIMERA_BROWSER_LOCAL_PORTS": ("", "5173"),
     "CHIMERA_MCP_AUTOLOAD": ("false", "true"),
+    # Study 29, phases 6-8: a tool that publishes the owner's code to a remote, and the branch
+    # prefix the worktree cleanup force-deletes under.
+    "CHIMERA_PULL_REQUESTS": ("false", "true"),
+    "CHIMERA_BRANCH_PREFIX": ("chimera", "feature"),
+    # The project pack narrows (P7.6): switching it off hands back what the pack took away.
+    "CHIMERA_PROJECT_PACK": ("true", "false"),
     # Who may reach the agent: an empty list is anyone.
     "CHIMERA_APP_MESSAGING": ("false", "true"),
     "CHIMERA_DISCORD_ALLOWED_USERS": ("111", ""),
@@ -73,12 +79,16 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_SLACK_ALLOWED_USERS": ("U333", ""),
     "CHIMERA_SIGNAL_ALLOWED_USERS": ("+15550000001", ""),
     "CHIMERA_WHATSAPP_ALLOWED_NUMBERS": ("+15550000002", ""),
+    # What the bots carry out: the files a turn wrote, sent to a Discord channel (P6.3).
+    "CHIMERA_DISCORD_ATTACH_FILES": ("false", "true"),
     # Where prompts may go (P5.6, and the three base URLs).
     "CHIMERA_OPENROUTER_DATA_COLLECTION": ("deny", "allow"),
     "CHIMERA_OPENROUTER_ZDR": ("true", "false"),
     "CHIMERA_API_BASE": ("", "https://api.example.invalid/v1"),
     "CHIMERA_OLLAMA_BASE_URL": ("http://127.0.0.1:11434", "http://ollama.example.invalid:11434"),
     "CHIMERA_LM_STUDIO_BASE_URL": ("http://127.0.0.1:1234/v1", "http://lms.example.invalid:1234/v1"),
+    # Where the owner's keys live (P7.7): off sends the next key typed into a plain-text file.
+    "CHIMERA_KEY_VAULT": ("true", "false"),
 }
 
 #: Every other editable setting, and why the bridge may keep writing it. None of these changes what a
@@ -132,6 +142,10 @@ BRIDGE_WRITABLE: frozenset[str] = frozenset(
         "CHIMERA_EDIT_BATCH",
         "CHIMERA_TODO_LIST",
         "CHIMERA_DECIDE_TOOL",
+        # `create_document` (P6.2) writes a Word, Excel, PowerPoint or PDF file only where
+        # `write_file` may — through `resolve_for` and the run's write region — runs nothing the
+        # model wrote and fetches nothing; the ledger counts it as a write tool like the others.
+        "CHIMERA_CREATE_DOCUMENT",
         # The sandbox's image: the container keeps its network, mounts and limits, which are set by
         # `chimera/sandbox/docker.py` and the owner's keys, not by the image.
         "CHIMERA_SANDBOX_IMAGE",

@@ -18,6 +18,11 @@ vi.mock("@/lib/api", () => ({
   installSkillBundle: vi.fn(),
   setSkillBundleStatus: vi.fn(),
   uninstallSkillBundle: vi.fn(),
+  checkSkillBundleUpdate: vi.fn(),
+  getEffectiveSkills: vi.fn(async () => ({ bundles: [], bundle_text: "", cards_read: false, cards: [], cards_k: 0 })),
+  // The upload panel sits on the same screen; nothing here presses its buttons.
+  importSkill: vi.fn(),
+  getSkillBundleText: vi.fn(),
 }));
 
 function stat(over: Record<string, unknown> = {}) {

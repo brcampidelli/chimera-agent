@@ -45,6 +45,7 @@ import { MaximizeButton } from "@/components/shell/Maximize";
 import { ComposerSettings } from "@/components/code/ComposerSettings";
 import { HtmlPreview } from "@/components/code/HtmlPreview";
 import { ProjectPicker } from "@/components/code/ProjectPicker";
+import { ProjectPackCard } from "@/components/code/ProjectPackCard";
 import { useRunSession } from "@/lib/run-session";
 import { useT } from "@/lib/i18n";
 import { useLayout } from "@/lib/layout/context";
@@ -202,7 +203,10 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
   const dirty = editing && draft !== loaded;
   // Only a clean, whole read is editable — a truncated (clipped at the read cap) or binary/non-text
   // file is not, since saving the shown text would overwrite the part we never loaded.
-  const editable = path !== null && !!q.data && !q.data.note && !q.data.truncated;
+  // A document's text preview is never editable either: saving it would replace the .docx with
+  // the text of the .docx.
+  const editable =
+    path !== null && !!q.data && !q.data.note && !q.data.truncated && !q.data.document;
 
   const html = useMemo(
     () => (q.data && q.data.content ? highlightFile(q.data.content, name) : ""),
@@ -297,6 +301,21 @@ function Viewer({ workspace, path }: { workspace: string; path: string | null })
             </div>
           ) : q.isError ? (
             <div className="px-4 py-6 text-sm text-bad-foreground">{t("code.fileError")}</div>
+          ) : q.data?.document ? (
+            // A PDF, Word, Excel or PowerPoint file, as its text — what `create_document` writes and
+            // what "Open beside" on a receipt opens. Labelled a preview because it is one: layout,
+            // images and formatting are not here, and a reader who took this for the file would be
+            // misled about what the owner is about to send someone.
+            <div className="p-4">
+              <p className="mb-2 text-xs text-muted-foreground">
+                {q.data.content
+                  ? t("code.documentPreview", { format: q.data.document.toUpperCase() })
+                  : t("code.documentNoPreview", { format: q.data.document.toUpperCase() })}
+              </p>
+              {q.data.content ? (
+                <pre className="whitespace-pre-wrap text-sm text-foreground">{q.data.content}</pre>
+              ) : null}
+            </div>
           ) : q.data?.note && path !== null && isImagePath(path) ? (
             <ImagePreview workspace={workspace} path={path} />
           ) : q.data?.note ? (
@@ -572,6 +591,10 @@ export function Code() {
           />
         </div>
       ) : null}
+      {/* The folder's own pack, when it has one (study 29, P7.6): what it keeps and hides here, and
+          whether it applies. Under the bar it qualifies rather than inside it, and absent for the
+          many folders without one. */}
+      {workspace ? <ProjectPackCard workspace={workspace} /> : null}
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         {showSessions && !viewerMax ? (
         <>

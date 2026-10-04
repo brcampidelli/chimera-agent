@@ -3,6 +3,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Code2, Eye } from "lucide-react";
 
 import { getFsFile } from "@/lib/api";
+import { chartSpecOf } from "@/lib/chart/page";
+import { reachesOutside } from "@/lib/chart/spec";
+import { ChartView } from "@/components/code/ChartView";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { focusRing } from "@/components/ui/focus";
@@ -39,9 +42,11 @@ export function inlineStyles(html: string, css: Map<string, string>): string {
 /** The preview frame's own policy. Its comment is the list of what loads; keep the two in step.
  *
  * The frame also inherits the app page's policy (`chimera/api/page_csp.py`), and both must allow a
- * request for it to happen — so this one only has to be the narrow half. What it permits is what
- * `render_chart` needs and nothing more: inline scripts and styles, Vega from jsDelivr, and the
- * `new Function` Vega compiles expressions with (measured in Edge: without it the chart is blank).
+ * request for it to happen — so this one only has to be the narrow half. What it permits is the
+ * page's own inline scripts and styles, and nothing from anywhere else. It used to let Vega in from
+ * jsDelivr and allow the `new Function` Vega compiles expressions with, for `render_chart`'s pages
+ * alone; those pages are now drawn by the app's own renderer from the spec they carry (`ChartView`,
+ * `lib/chart/page.ts`), so no previewed page needs another site's script or `eval` any more.
  * What it refuses is every way CSP can govern for a page to send something out on its own —
  * `fetch`/XHR/WebSocket (`connect-src`), images and fonts from a host (`img-src`/`font-src` take
  * only embedded bytes), frames, workers, plugins and forms. A self-navigation to another host is
@@ -52,13 +57,12 @@ export function inlineStyles(html: string, css: Map<string, string>): string {
  * `RTCPeerConnection` reached a STUN server over UDP and a TURN server over TCP — so a page can
  * still put data in a hostname (DNS) or hand it to a TURN server. Deleting `RTCPeerConnection`
  * from this frame would not close it either: a child `about:blank` frame gets a fresh realm with a
- * fresh constructor. `dns-prefetch` is outside CSP too, and jsDelivr serves any package a page
- * names. See `chimera/api/page_csp.py` for the measurement and the browser flag that would narrow
+ * fresh constructor. `dns-prefetch` is outside CSP too. See `chimera/api/page_csp.py` for the measurement and the browser flag that would narrow
  * (not close) the WebRTC half.
  */
 export const PREVIEW_CSP = [
   "default-src 'none'",
-  "script-src 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
+  "script-src 'unsafe-inline'",
   "style-src 'unsafe-inline'",
   "img-src data: blob:",
   "font-src data:",
@@ -148,10 +152,11 @@ export function siblingOf(pagePath: string, href: string): string {
  * The note used to say scripts and other sites' resources did not load. Neither was true: with no
  * policy anywhere, the frame ran scripts (it has `allow-scripts`) and fetched whatever the page
  * named — which is also how `render_chart` charts drew at all. The policy makes most of it true;
- * the sentence (same key, corrected in all ten languages) names the one exception charts need and
- * the channel no policy here governs (WebRTC and its DNS lookups), instead of promising a sealed
- * frame. An earlier draft of this change said "requests to other sites are blocked" outright,
- * which is the guard that affirms what the code does not do.
+ * the sentence (same key, corrected in all ten languages) names the channel no policy here governs
+ * (WebRTC and its DNS lookups), instead of promising a sealed frame. An earlier draft of this change
+ * said "requests to other sites are blocked" outright, which is the guard that affirms what the code
+ * does not do. It also named jsDelivr, the one site charts needed; since charts are drawn by the app
+ * (study 29, P6.1) no site is admitted, and the sentence says that instead.
  */
 export function HtmlPreview({ workspace, path, source }: {
   workspace: string;
@@ -161,10 +166,13 @@ export function HtmlPreview({ workspace, path, source }: {
   const t = useT();
   const [showing, setShowing] = useState(true);
 
+  // A page `render_chart` wrote is drawn from its spec rather than run: its own script loads Vega
+  // from a CDN the page policy no longer admits.
+  const chart = useMemo(() => chartSpecOf(source), [source]);
   const sheets = useMemo(() => localStylesheets(source), [source]);
   const q = useQuery({
     queryKey: ["html-preview-css", workspace, path, sheets.join("|")],
-    enabled: showing && sheets.length > 0,
+    enabled: showing && !chart && sheets.length > 0,
     queryFn: async () => {
       const pares = await Promise.all(
         sheets.map(async (href) => {
@@ -212,7 +220,20 @@ export function HtmlPreview({ workspace, path, source }: {
           <span className="text-xs text-muted-foreground">{t("code.preview.loadingCss")}</span>
         ) : null}
       </div>
-      {showing ? (
+      {showing && chart ? (
+        <>
+          <div className="min-h-0 flex-1 overflow-auto p-3">
+            {reachesOutside(chart) ? (
+              <p className="text-xs text-muted-foreground">{t("code.preview.chartExternal")}</p>
+            ) : (
+              <ChartView spec={chart} />
+            )}
+          </div>
+          <p className="border-t border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+            {t("code.preview.chartNote")}
+          </p>
+        </>
+      ) : showing ? (
         <>
           <iframe
             key={nonce}

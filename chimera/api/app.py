@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from chimera.api.benchmarks_api import benchmark_report
@@ -107,6 +107,8 @@ from chimera.api.schemas import (
     PlanOut,
     PoolAddIn,
     PoolWriteOut,
+    PullRequestOut,
+    PullRequestReadinessOut,
     RequirementOut,
     RequirementsOut,
     RequirementsRequest,
@@ -124,6 +126,8 @@ from chimera.api.schemas import (
     ToolsOut,
     UpdatedOut,
     UsageSummaryOut,
+    VaultMoveIn,
+    VaultMoveOut,
     VersionOut,
 )
 from chimera.api.sessions import SessionManager, SessionStore
@@ -264,6 +268,26 @@ class GitRevertRequest(BaseModel):
     """The workspace (repo) the revert is scoped to. None = the app's launch workspace."""
     paths: list[str]
     """The run's changed paths to discard (git-backed revert, scoped to these only)."""
+
+
+class PullRequestRequest(BaseModel):
+    """Open a pull request from the workspace's branch — the Git panel's button, pressed by the owner."""
+
+    workspace: str | None = None
+    title: str = Field(min_length=1, max_length=256)
+    body: str = Field(default="", max_length=60_000)
+    base: str | None = Field(default=None, max_length=255)
+    draft: bool = False
+    head: str = Field(min_length=40, max_length=64)
+    """The commit the owner was shown (``GET /api/git/pull-request``'s ``head``). It is what gets
+    pushed, by hash; a branch that moved since is refused rather than pushed at its new tip."""
+    remote: str | None = Field(default=None, max_length=4096)
+    """Where the owner was shown the push goes (``remote``). Given, a push URL that changed since is
+    refused. None (an older client) skips this one comparison; the push still goes to the URL read
+    at the moment of the press."""
+    remote_head: str | None = Field(default=None, max_length=64)
+    """The commit the owner was shown the branch is at on origin (``remote_head``; "" when it did
+    not exist). Given, a remote branch that changed since is refused rather than updated."""
 
 
 class GitUncommittedRequest(BaseModel):
@@ -654,6 +678,19 @@ def build_api_app(
             allow_methods=["*"],
             allow_headers=["*"],
         )
+    # DNS rebinding: a page re-points its own name to 127.0.0.1 and becomes, to the browser, the
+    # same origin as this API — no preflight, readable answers, and no token to stop it in the
+    # default setup. The one thing it cannot choose is the Host header, so on a loopback bind a Host
+    # that is a DNS name (other than `localhost` or one the operator named above) is refused for
+    # every route, the skill switch and the upload included. See `chimera/api/host_guard.py`.
+    from chimera.api.host_guard import LoopbackHostGuard, named_hostnames
+
+    trusted_names = named_hostnames(origins)
+    app.add_middleware(
+        LoopbackHostGuard,
+        bound=lambda: getattr(app.state, "bound_address", None),
+        named=lambda: trusted_names,
+    )
     # Added last, so it is the outermost of these and marks the CORS preflight too. Every response
     # says it came from Chimera, which is how the agent's browser recognises this API behind a
     # declared dev-server port that proxies to it (`chimera.core.listeners.INSTANCE_HEADER`).
@@ -739,6 +776,18 @@ def build_api_app(
             app.state.session_bus.end_guests()
             app.state.guest_server.stop()
         return result
+
+    # Moving the keys between `.env` and the OS vault, either way (study 29, P7.7). Not in the
+    # bridge's route table, so no client but the owner's own screen can reach it: the way back
+    # writes every key into a plain-text file. Names in, names out — never a value.
+    @app.post("/api/config/vault/move", dependencies=[guard], response_model=VaultMoveOut)
+    def vault_move_endpoint(body: VaultMoveIn) -> dict[str, Any]:
+        from chimera.api.config_api import vault_move
+
+        try:
+            return vault_move(body.to)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Pools are edited by OPERATION, not by value. `PATCH /api/config` writes a string, and a string
     # is exactly what a pool must not be edited as: the client would have to know every key to change
@@ -1946,7 +1995,7 @@ def build_api_app(
         # Editable-viewer save: atomic (temp+replace), newline-preserving, size-capped (1 MB). A path
         # escape or oversize content is a clean 400 — never a 500. Guarded + workspace-scoped, the same
         # capability the agent's WriteFileTool already has (localhost, bearer-guarded).
-        from chimera.api.fs_api import write_file
+        from chimera.api.fs_api import NotEditableTextError, write_file
         from chimera.tools.workspace import PathEscapesWorkspaceError
 
         ws = _resolve_fs_workspace(req.workspace)
@@ -1954,6 +2003,8 @@ def build_api_app(
             return write_file(ws, req.path, req.content)
         except PathEscapesWorkspaceError as exc:
             raise HTTPException(status_code=400, detail="invalid path") from exc
+        except NotEditableTextError as exc:  # a document or a binary: a text save would destroy it
+            raise HTTPException(status_code=400, detail="not an editable text file") from exc
         except ValueError as exc:  # content over the byte cap
             raise HTTPException(status_code=400, detail="content too large") from exc
 
@@ -2272,6 +2323,34 @@ def build_api_app(
 
         return git_revert_paths(_resolve_fs_workspace(req.workspace), req.paths)
 
+    @app.get("/api/git/pull-request", dependencies=[guard], response_model=PullRequestReadinessOut)
+    def git_pull_request_preview(workspace: str | None = None, base: str | None = None) -> dict[str, Any]:
+        # What the button would push, and why it cannot when it cannot (study 29, P8.1). Reads only;
+        # gh is asked for its exit code, never its text, so no account or token reaches the screen.
+        # Not a desktop-bridge route (`bridge_routes.ROUTES`): neither is the POST below.
+        from chimera.core.pull_request import readiness
+
+        return readiness(_resolve_fs_workspace(workspace), base=base).as_dict()
+
+    @app.post("/api/git/pull-request", dependencies=[guard], response_model=PullRequestOut)
+    def git_pull_request_open(req: PullRequestRequest) -> dict[str, Any]:
+        # The owner pressed "open" on the panel that showed them the branch, the commits and the
+        # diff: that press is the approval, and `head` pins it to the commit they saw. Every rule —
+        # never the default branch, never a force push, no shell — lives in `open_pull_request`, the
+        # same function the agent's tool calls after the owner's yes on its card.
+        from chimera.core.pull_request import open_pull_request
+
+        return open_pull_request(
+            _resolve_fs_workspace(req.workspace),
+            title=req.title,
+            body=req.body,
+            expect_head=req.head,
+            base=req.base,
+            draft=req.draft,
+            expect_remote=req.remote,
+            expect_remote_head=req.remote_head,
+        )
+
     @app.get("/api/sessions", dependencies=[guard], response_model=list[SessionMetaOut])
     def list_sessions() -> list[dict[str, Any]]:
         return [
@@ -2461,6 +2540,11 @@ def build_api_app(
     from chimera.api.storage_api import register_storage_api
 
     register_storage_api(app, guard, workspace, settings, live_settings=live_settings)
+    # /api/connectors — the OpenAPI connectors (study 29, P7.5). Unconditional, for the schema-dump
+    # reason above; and absent from the bridge's route table on purpose (see the module).
+    from chimera.api.connectors_api import register_connectors_api
+
+    register_connectors_api(app, guard, settings)
     # /v1/chat/completions — any OpenAI client or LLM benchmark harness can drive the agent loop.
     # Its OWN manager, over `openai_factory`: nobody is watching this endpoint, so an assembly that
     # stops to ask would be an assembly that refuses, and the app's screen must not be held to that.

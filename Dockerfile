@@ -19,7 +19,8 @@ WORKDIR /app
 COPY . /app
 
 # Install Chimera batteries-included: the `[full]` extra bundles the messaging adapters
-# (Discord/Slack), MCP, documents (docx/pdf/xlsx→md), media download (yt-dlp), speech-to-text
+# (Discord/Slack), MCP, documents (docx/pdf/xlsx→md, and back: `documents-out` for the
+# create_document tool), media download (yt-dlp), speech-to-text
 # (faster-whisper), data analysis (pandas/scikit-learn) and charts (matplotlib/seaborn/plotly),
 # plus YouTube transcripts — so every non-GPU feature works out of the box in this image. The
 # GPU-heavy extras (`imagegen-local`, `train`) stay opt-in. For a minimal image, use '.[messaging,mcp]'.

@@ -1,12 +1,13 @@
 import { useId, useState } from "react";
 
 import { Mcp } from "@/components/Mcp";
+import { OpenApiConnectors } from "@/components/OpenApiConnectors";
 import { Servers } from "@/components/Servers";
 import { Tools } from "@/components/Tools";
 import { Tabs, TabPanel } from "@/components/ui/tabs";
 import { useT } from "@/lib/i18n";
 
-type Tab = "chimera" | "servers" | "capabilities";
+type Tab = "chimera" | "servers" | "capabilities" | "openapi";
 
 /**
  * What the agent can reach.
@@ -29,6 +30,9 @@ export function Connections() {
     { value: "chimera" as const, label: t("settings.tab.server") },
     { value: "servers" as const, label: t("nav.mcp") },
     { value: "capabilities" as const, label: t("settings.tab.capabilities") },
+    // Beside the tool registry, because that is what a connector adds to: an HTTP API's spec,
+    // turned into tools only when the owner switches it on (study 29, P7.5).
+    { value: "openapi" as const, label: t("connectors.tab") },
   ];
 
   return (
@@ -39,6 +43,7 @@ export function Connections() {
           {tab === "chimera" && <Servers />}
           {tab === "servers" && <Mcp embedded />}
           {tab === "capabilities" && <Tools embedded />}
+          {tab === "openapi" && <OpenApiConnectors />}
         </TabPanel>
       </div>
     </div>

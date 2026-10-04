@@ -53,6 +53,42 @@ _IMAGE_MEDIA_TYPES: dict[str, str] = {
 }
 
 
+#: Documents the viewer shows as a TEXT preview (study 29, P6.3), keyed by suffix. ``create_document``
+#: writes these and the viewer answered "binary or non-text" about every one, so "Open beside" on a
+#: report would have opened a sentence saying it could not be shown. The preview is MarkItDown's text
+#: of the file, returned in ``content`` like any text file, with ``document`` naming the format so the
+#: viewer labels it a preview and never offers to edit it: saving that text would replace the .docx.
+_DOCUMENT_FORMATS: dict[str, str] = {".pdf": "pdf", ".docx": "docx", ".xlsx": "xlsx", ".pptx": "pptx"}
+#: The same ceiling as an image preview. Checked before conversion, for the reason `read_image` gives.
+_MAX_DOCUMENT_BYTES = 20_000_000
+
+
+def _document_text(path: Path) -> str:
+    """The document's text via MarkItDown (the `documents` extra). Raises ImportError without it."""
+    from chimera.tools.documents import _markitdown_convert  # the read_document tool's own seam
+
+    return _markitdown_convert(str(path))
+
+
+def _read_document(path: Path, rel: str, fmt: str) -> dict[str, Any]:
+    """A text preview of a document, or an empty one with a note saying why there is none."""
+    base: dict[str, Any] = {"path": rel, "content": "", "truncated": False, "document": fmt}
+    if path.stat().st_size > _MAX_DOCUMENT_BYTES:
+        return {**base, "note": "too large to preview"}
+    try:
+        text = _document_text(path)
+    except ImportError:
+        return {**base, "note": "previewing documents needs the 'documents' extra"}
+    except Exception:  # noqa: BLE001 — a document that will not convert is a note, never a 500
+        return {**base, "note": "could not be read as a document"}
+    truncated = len(text) > _MAX_READ_CHARS
+    return {**base, "content": text[:_MAX_READ_CHARS], "truncated": truncated, "note": ""}
+
+
+class NotEditableTextError(Exception):
+    """A document, or an existing file that is not UTF-8: a text save would destroy it (the endpoint: 400)."""
+
+
 class UnsupportedImageError(Exception):
     """The path is not on the image allowlist, so its bytes are not served (the endpoint: 415)."""
 
@@ -103,6 +139,9 @@ def read_file(workspace: Path, rel: str) -> dict[str, Any]:
         return {"path": rel, "content": "", "truncated": False, "note": "binary or non-text"}
     if not path.is_file():
         return {"path": rel, "content": "", "truncated": False, "note": "not found"}
+    fmt = _DOCUMENT_FORMATS.get(path.suffix.lower())
+    if fmt is not None:
+        return _read_document(path, rel, fmt)
     try:
         text = path.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
@@ -168,6 +207,13 @@ def write_file(
     """
     root = Path(workspace).resolve()
     path = resolve_in_workspace(root, rel)  # raises PathEscapesWorkspaceError on escape
+    # A save is TEXT. `read_file` hands a .docx/.pdf/.xlsx/.pptx back as MarkItDown's text of it, so
+    # a client that saves what it was shown would replace the document with its own preview; and an
+    # existing non-UTF-8 file was shown as empty, so saving would replace it with whatever was typed.
+    # Both are refused HERE rather than in one screen, so no client (the Edit tab, the Code viewer,
+    # the bridge's files.write) can do either.
+    if path.suffix.lower() in _DOCUMENT_FORMATS:
+        raise NotEditableTextError(f"{rel!r} is a {path.suffix} document, not a text file")
     text = content.replace("\r\n", "\n")  # normalize to \n (the invariant read_text_for_edit expects)
     body = text.encode("utf-8")
     if len(body) > max_bytes:
@@ -176,8 +222,8 @@ def write_file(
     if path.is_file():
         try:
             _, newline = read_text_for_edit(path)  # keep the file's own CRLF/LF convention
-        except UnicodeDecodeError:
-            newline = "\n"  # existing file isn't UTF-8 text; write plain \n
+        except UnicodeDecodeError as exc:
+            raise NotEditableTextError(f"{rel!r} is not a UTF-8 text file") from exc
     else:
         path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(path, text, newline=newline)

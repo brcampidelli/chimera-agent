@@ -134,7 +134,7 @@ def web_research_registry(source: ToolRegistry | None = None) -> ToolRegistry:
         if source is not None
         else _standalone_tools()
     )
-    registry = ToolRegistry()
+    registry = ToolRegistry.like(source)
     for tool in tools:
         registry.register(_Fenced(tool))
     return registry

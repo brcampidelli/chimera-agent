@@ -51,6 +51,10 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
     ConditionalTool("edit_batch", "setting", ("CHIMERA_EDIT_BATCH",), "chimera.tools.edit:EditBatchTool"),
     ConditionalTool("todo_write", "setting", ("CHIMERA_TODO_LIST",), "chimera.tools.todo:TodoWriteTool", default_on=True),
     ConditionalTool("decide", "setting", ("CHIMERA_DECIDE_TOOL",), "chimera.tools.decide:DecideTool"),
+    ConditionalTool(
+        "create_document", "setting", ("CHIMERA_CREATE_DOCUMENT",),
+        "chimera.tools.create_document:CreateDocumentTool",
+    ),
     ConditionalTool("web_search", "key", ("TAVILY_API_KEY",), "chimera.tools.web:WebSearchTool"),
     ConditionalTool("generate_image", "key", ("OPENAI_API_KEY",), "chimera.tools.media:ImageGenTool", requires="diffusers"),
     ConditionalTool("text_to_speech", "key", ("ELEVENLABS_API_KEY",), "chimera.tools.media:TextToSpeechTool"),
@@ -59,6 +63,12 @@ CONDITIONAL_TOOLS: tuple[ConditionalTool, ...] = (
     ConditionalTool("read_email", "key", ("CHIMERA_IMAP_HOST", "CHIMERA_IMAP_USER", "CHIMERA_IMAP_PASSWORD"), "chimera.tools.email:ReadEmailTool"),
     ConditionalTool("calendar_events", "key", ("CHIMERA_CALENDAR_ICS_URL",), "chimera.tools.calendar:CalendarEventsTool"),
     ConditionalTool("browser", "package", (), "chimera.tools.browser:BrowserTool", requires="playwright"),
+    # Every call asks the owner whatever this switch says (`tools/pull_request.py`); the switch only
+    # decides whether the agent may propose one. Owner-only: the desktop bridge cannot write it.
+    ConditionalTool(
+        "open_pull_request", "setting", ("CHIMERA_PULL_REQUESTS",),
+        "chimera.tools.pull_request:OpenPullRequestTool",
+    ),
 )
 """``generate_image`` and ``transcribe_audio`` light up with a key OR a local package; they are listed as
 ``key`` rows with the package named in ``requires``, because the key is the path most people take."""

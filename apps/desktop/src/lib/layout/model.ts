@@ -39,6 +39,7 @@ export type CardKind =
   | "todo"
   | "notices"
   | "browser"
+  | "chart"
   | "diff"
   | "verdict"
   | "receipt"
@@ -46,7 +47,7 @@ export type CardKind =
   | "error";
 
 export const CARD_KINDS: readonly CardKind[] = [
-  "tools", "todo", "notices", "browser", "diff", "verdict", "receipt", "approval", "error",
+  "tools", "todo", "notices", "browser", "chart", "diff", "verdict", "receipt", "approval", "error",
 ];
 
 interface PanelSpec {
