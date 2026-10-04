@@ -54,6 +54,255 @@
         "title": "AcceptanceOut",
         "type": "object"
       },
+      "AccessBridgeOut": {
+        "description": "The desktop bridge (``chimera/api/desktop_bridge.py``).",
+        "properties": {
+          "active": {
+            "default": false,
+            "title": "Active",
+            "type": "boolean"
+          },
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "hint": {
+            "default": "",
+            "title": "Hint",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          }
+        },
+        "title": "AccessBridgeOut",
+        "type": "object"
+      },
+      "AccessGuestDoorOut": {
+        "description": "The LAN listener that serves only the guest app (``guest_api.GuestServer``).",
+        "properties": {
+          "open": {
+            "default": false,
+            "title": "Open",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "urls": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Urls",
+            "type": "array"
+          }
+        },
+        "title": "AccessGuestDoorOut",
+        "type": "object"
+      },
+      "AccessLinkOut": {
+        "description": "One share link, named by everything except itself.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "expired": {
+            "default": false,
+            "title": "Expired",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "hint": {
+            "default": "",
+            "title": "Hint",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_title": {
+            "default": "",
+            "title": "Session Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "session_id",
+          "created_at"
+        ],
+        "title": "AccessLinkOut",
+        "type": "object"
+      },
+      "AccessOut": {
+        "properties": {
+          "bridge": {
+            "$ref": "#/components/schemas/AccessBridgeOut"
+          },
+          "guest_door": {
+            "$ref": "#/components/schemas/AccessGuestDoorOut"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/AccessLinkOut"
+            },
+            "title": "Links",
+            "type": "array"
+          },
+          "server": {
+            "$ref": "#/components/schemas/AccessServerOut"
+          },
+          "server_token": {
+            "$ref": "#/components/schemas/AccessServerTokenOut"
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/AccessSharingOut"
+          }
+        },
+        "required": [
+          "server",
+          "server_token",
+          "bridge",
+          "sharing",
+          "links",
+          "guest_door"
+        ],
+        "title": "AccessOut",
+        "type": "object"
+      },
+      "AccessRevokeOneOut": {
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "title": "AccessRevokeOneOut",
+        "type": "object"
+      },
+      "AccessRevokedOut": {
+        "properties": {
+          "revoked": {
+            "title": "Revoked",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "title": "AccessRevokedOut",
+        "type": "object"
+      },
+      "AccessServerOut": {
+        "description": "The app's own listener: where ``chimera desktop`` bound it.\n\n``chimera desktop --host 0.0.0.0`` is a supported option, and then the guest app mounted at\n``/guest`` on this listener answers the network with any share link \u2014 a network door the card\nused to call \"Closed\" because it looked only at the separate LAN listener.",
+        "properties": {
+          "bind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bind"
+          },
+          "network": {
+            "default": false,
+            "title": "Network",
+            "type": "boolean"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          }
+        },
+        "title": "AccessServerOut",
+        "type": "object"
+      },
+      "AccessServerTokenOut": {
+        "description": "The bearer every guarded route asks for. Whether it is set, and nothing of its value \u2014 the\nSettings row it is changed on reports it the same way (``ServerCfgOut.token_set``).",
+        "properties": {
+          "set": {
+            "default": false,
+            "title": "Set",
+            "type": "boolean"
+          }
+        },
+        "title": "AccessServerTokenOut",
+        "type": "object"
+      },
+      "AccessSharingOut": {
+        "description": "The two settings that narrow sharing (``CHIMERA_SHARING``, ``CHIMERA_SHARE_EXPIRY_HOURS``).",
+        "properties": {
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "expiry_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Hours"
+          }
+        },
+        "title": "AccessSharingOut",
+        "type": "object"
+      },
       "AgentDefOut": {
         "description": "One agent you can send work to \u2014 as distinct from the one you converse with.\n\nShares its field names with ``AgentIdentityOut`` on purpose: an agent is an agent, and the two\nshould be copyable between each other without a translation layer. What it adds is an ``id``\n(its handle, and the Kanban lane it answers on) and a tool allowlist.",
         "properties": {
@@ -2810,6 +3059,9 @@
           },
           "server": {
             "$ref": "#/components/schemas/ServerCfgOut"
+          },
+          "sharing": {
+            "$ref": "#/components/schemas/SharingCfgOut"
           },
           "spend": {
             "$ref": "#/components/schemas/SpendCfgOut"
@@ -9956,6 +10208,17 @@
             "title": "Created At",
             "type": "number"
           },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
           "label": {
             "default": "",
             "title": "Label",
@@ -10003,6 +10266,29 @@
           "shares"
         ],
         "title": "SharesOut",
+        "type": "object"
+      },
+      "SharingCfgOut": {
+        "description": "Whether conversations may be shared and how long a new link opens one (``CHIMERA_SHARING``,\n``CHIMERA_SHARE_EXPIRY_HOURS``). A server without the block is on the shipped default: sharing\non, links that never expire \u2014 what sharing did before either setting existed.",
+        "properties": {
+          "enabled": {
+            "default": true,
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "expiry_hours": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expiry Hours"
+          }
+        },
+        "title": "SharingCfgOut",
         "type": "object"
       },
       "ShellPrefsIn": {
@@ -17340,6 +17626,124 @@
           }
         },
         "summary": "Respond Run"
+      }
+    },
+    "/api/security/access": {
+      "get": {
+        "description": "Every way into this machine right now, with no secret in the answer.",
+        "operationId": "access_api_security_access_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Access"
+      }
+    },
+    "/api/security/access/bridge/rotate": {
+      "post": {
+        "description": "A new bridge token; the old one stops working now. 409 while the bridge is off.",
+        "operationId": "rotate_bridge_api_security_access_bridge_rotate_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessBridgeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Rotate Bridge"
+      }
+    },
+    "/api/security/access/links": {
+      "delete": {
+        "description": "Every link, or every link of one conversation when ``session_id`` names it.",
+        "operationId": "revoke_links_api_security_access_links_delete",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "session_id",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRevokedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Links"
+      }
+    },
+    "/api/security/access/links/{link_id}": {
+      "delete": {
+        "operationId": "revoke_link_api_security_access_links__link_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "link_id",
+            "required": true,
+            "schema": {
+              "title": "Link Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessRevokeOneOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Link"
       }
     },
     "/api/sessions": {

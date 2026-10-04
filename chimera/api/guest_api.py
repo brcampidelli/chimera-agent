@@ -39,6 +39,9 @@ from chimera.telemetry import get_logger
 
 _log = get_logger("api.guest")
 
+#: What the owner's routes answer while ``CHIMERA_SHARING`` is off: the setting and where it lives.
+SHARING_OFF = "sharing is off (Settings › Sharing)"
+
 #: The name a subscriber who gave none is listed under. Presence is for people, and "someone" is
 #: what an unnamed window honestly is.
 ANONYMOUS = "someone"
@@ -59,6 +62,8 @@ class ShareOut(BaseModel):
     session_id: str
     created_at: float
     label: str = ""
+    #: When the link stops opening the conversation (Unix time); None is never.
+    expires_at: float | None = None
     #: A link a guest can open, when the network door is open; otherwise None — a link that goes
     #: nowhere would be worse than no link.
     url: str | None = None
@@ -96,40 +101,81 @@ class GuestTurnIn(BaseModel):
 # --- the network door -----------------------------------------------------------------------
 
 
+#: The key the LAN door puts in every request's scope, holding the :class:`GuestServer` itself, so
+#: a guest route can tell which door a request came through — and a stream that came through this
+#: one can stop the moment it closes. Absent on the owner's ``/guest`` mount.
+DOOR_SCOPE_KEY = "chimera.guest_door"
+
+#: The ``door`` a subscriber that came in through the LAN listener is filed under on the bus.
+LAN_DOOR = "lan"
+
+#: How long a closing door waits for a connection to finish before cancelling it. A live stream never
+#: finishes on its own, and uvicorn's default is to wait forever — which is how "Close" held the
+#: Settings save for five seconds and then reported a door shut that was still streaming.
+GRACE_SECONDS = 1
+
+#: How long ``stop`` waits for the listener's thread. Past the grace above; the door is reported
+#: open for as long as the thread lives, so a slow close is shown as open, never as shut.
+STOP_WAIT_SECONDS = 3.0
+
+
 class GuestServer:
     """The LAN listener: one uvicorn server on its own thread, serving only the guest app.
 
     Bound and LISTENING before the thread starts, for the reason the app's own socket is
     (`_bind_app_socket`): a link handed out the moment this returns must connect on the first try.
+
+    ``open`` is true for as long as a guest can be connected through it — listening, or closed to
+    new connections and still finishing one — so the card never calls a door shut that is still
+    carrying a conversation. ``listening`` is whether a new connection would be accepted.
     """
 
-    def __init__(self, app: FastAPI) -> None:
+    def __init__(self, app: FastAPI, *, before_close: Callable[[], object] | None = None) -> None:
         self._app = app
+        self._before_close = before_close
         self._lock = threading.Lock()
         self._server: Any = None
         self._thread: threading.Thread | None = None
         self._port: int | None = None
+        self._closing = False
 
     @property
     def open(self) -> bool:
-        return self._thread is not None and self._thread.is_alive()
+        thread = self._thread
+        return thread is not None and thread.is_alive()
+
+    @property
+    def listening(self) -> bool:
+        return self.open and not self._closing
 
     @property
     def port(self) -> int | None:
         return self._port if self.open else None
 
     def urls(self, token: str | None = None) -> list[str]:
-        if not self.open or self._port is None:
+        if not self.listening or self._port is None:
             return []
         query = f"?t={token}" if token else ""
         return [f"http://{address}:{self._port}/{query}" for address in lan_addresses()]
+
+    async def _through_door(self, scope: Any, receive: Any, send: Any) -> None:
+        """The guest app, with this door named in the scope of every request it serves."""
+        if scope.get("type") in ("http", "websocket"):
+            scope = {**scope, DOOR_SCOPE_KEY: self}
+        await self._app(scope, receive, send)
 
     def start(self, port: int = 0, *, host: str = "0.0.0.0") -> int:
         """Open the door. Idempotent: an open listener stays as it is and reports its port."""
         import uvicorn
 
         with self._lock:
-            if self.open and self._port is not None:
+            if self.open and self._closing and self._thread is not None:
+                # The last close is still finishing a connection; a second listener beside it
+                # would be two doors reported as one.
+                self._thread.join(timeout=STOP_WAIT_SECONDS)
+                if self._thread.is_alive():
+                    raise OSError("the previous listener is still closing")
+            if self.listening and self._port is not None:
                 return self._port
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -146,26 +192,68 @@ class GuestServer:
             from chimera.core.listeners import claim
 
             claim(bound)
-            server = uvicorn.Server(uvicorn.Config(self._app, log_level="warning"))
+            # `interface` named: uvicorn guesses ASGI2 for a bound method and calls it with the
+            # scope alone, which answered every request through the door with a 500.
+            config = uvicorn.Config(
+                self._through_door,
+                interface="asgi3",
+                log_level="warning",
+                timeout_graceful_shutdown=GRACE_SECONDS,
+            )
+            server = uvicorn.Server(config)
             thread = threading.Thread(
                 target=server.run, kwargs={"sockets": [sock]}, name="chimera-guest", daemon=True
             )
             thread.start()
             self._server, self._thread, self._port = server, thread, bound
+            self._closing = False
             return bound
 
     def stop(self) -> None:
+        """Close the door, and every connection through it.
+
+        The streams that came through this door are ended first (``before_close``), so their
+        connections finish on their own; uvicorn's grace is the backstop for anything that does
+        not, and each stream also checks ``listening`` before every frame. The state is cleared only
+        once the thread has gone: until then the door is ``open``, because it is."""
         with self._lock:
             server, thread = self._server, self._thread
-            self._server = self._thread = None
-            self._port = None
+            if thread is None:
+                return
+            self._closing = True
+        if self._before_close is not None:
+            try:
+                self._before_close()
+            except Exception as exc:  # noqa: BLE001 -- closing the listener matters more
+                _log.warning("could not end the guest streams before closing the door: %s", exc)
         if server is not None:
             server.should_exit = True
-        if thread is not None:
-            thread.join(timeout=5)
+        thread.join(timeout=STOP_WAIT_SECONDS)
+        with self._lock:
+            if self._thread is thread and not thread.is_alive():
+                self._server = self._thread = None
+                self._port = None
+                self._closing = False
 
 
 # --- the guest app ----------------------------------------------------------------------------
+
+
+#: Read on every request: whether the owner allows sharing right now (``CHIMERA_SHARING``).
+SharingOn = Callable[[], bool]
+
+#: Raised, word for word, for every way a share token fails to open a conversation — unknown,
+#: revoked, expired, or sharing switched off. One answer, so a guest probing the door learns nothing
+#: about which of the four it hit.
+CLOSED = "this link no longer opens a conversation"
+
+
+def _always_on() -> bool:
+    return True
+
+
+def _no_expiry() -> float | None:
+    return None
 
 
 def build_guest_app(
@@ -176,6 +264,7 @@ def build_guest_app(
     session_workspace: Callable[[str], str],
     start_turn: Callable[..., Any],
     static_dir: Path | None = None,
+    sharing_on: SharingOn = _always_on,
 ) -> FastAPI:
     """The four routes a share token opens, and the page that uses them.
 
@@ -192,15 +281,22 @@ def build_guest_app(
 
     guest.add_middleware(MarkResponses)
     _mount_guest_page(guest, static_dir)
+    # A revoke, from any route, ends the streams the removed links opened at that moment. Each
+    # stream also re-checks its link before every frame (`live` below), which is what keeps a frame
+    # from reaching a revoked guest; this is what keeps the connection from idling on until then.
+    store.on_revoke(lambda gone: bus.end_guests({share.id for share in gone}))
 
     def share_of(request: Request) -> Share:
         header = request.headers.get("authorization", "")
         token = header[len("Bearer ") :] if header.startswith("Bearer ") else ""
         # `EventSource` cannot set a header, so the live stream takes the token in the query.
         token = token or str(request.query_params.get("t") or "")
-        share = store.resolve(token)
+        # The switch first: with sharing off no link opens, whatever it is. The links are not
+        # deleted — the owner may turn sharing back on — but until then they are inert, which is
+        # what "off" has to mean for a door that is also mounted on the owner's own server.
+        share = store.resolve(token) if sharing_on() else None
         if share is None:
-            raise HTTPException(status_code=401, detail="this link no longer opens a conversation")
+            raise HTTPException(status_code=401, detail=CLOSED)
         return share
 
     # One dependency object, built once — the shape ruff asks for (B008) and the one `guard` has.
@@ -229,7 +325,29 @@ def build_guest_app(
     async def live(
         request: Request, since: int = 0, name: str = "", share: Share = opened
     ) -> EventSourceResponse:
-        return live_stream(bus, share.session_id, since=since, name=_clean_name(name), request=request)
+        token = share.token
+        # Which door: the LAN listener names itself in the scope; the owner's /guest mount does not.
+        door: GuestServer | None = request.scope.get(DOOR_SCOPE_KEY)
+
+        # `opened` admitted this stream once, when it connected. A stream lives for as long as the
+        # guest keeps the tab open — hours — and every one of the owner's controls (revoke, sharing
+        # off, an expiry, closing the door it came through) is a promise about what the link opens
+        # from that moment on. So the question is asked again before every frame and heartbeat.
+        def still_open() -> bool:
+            if door is not None and not door.listening:
+                return False
+            return sharing_on() and store.resolve(token) is not None
+
+        return live_stream(
+            bus,
+            share.session_id,
+            since=since,
+            name=_clean_name(name),
+            request=request,
+            still_open=still_open,
+            share_id=share.id,
+            door=LAN_DOOR if door is not None else "",
+        )
 
     @guest.post("/api/turn", responses=SSE_RESPONSE)
     async def turn(body: GuestTurnIn, share: Share = opened) -> Any:
@@ -282,6 +400,10 @@ def _mount_guest_page(guest: FastAPI, static_dir: Path | None) -> None:
         return FileResponse(icon)
 
 
+def _open_always() -> bool:
+    return True
+
+
 async def live_frames(
     bus: SessionBus,
     session_id: str,
@@ -290,28 +412,43 @@ async def live_frames(
     name: str,
     disconnected: Callable[[], Awaitable[bool]],
     heartbeat_seconds: float = 15,
+    still_open: Callable[[], bool] = _open_always,
+    share_id: str = "",
+    door: str = "",
 ) -> AsyncIterator[dict[str, str]]:
     """Replay what the viewer missed, then everything as it happens, until they leave.
 
     One implementation for the guest and the owner: the frames are the same, the presence list is
     the same, and the only difference between the two is which door they came through. Subscribed
     for exactly as long as the iteration runs — the presence list is who is iterating.
+
+    ``still_open`` is asked before every frame and every heartbeat, and the stream ends the first
+    time it says no: a guest's link can be revoked, expire, or have sharing switched off under it
+    while the stream is open, and the stream was admitted only once, when it connected. The owner's
+    window passes nothing — its door is the server token, checked per request. ``share_id`` names
+    the link a guest came in with, so a revoke can end exactly its streams (`SessionBus.end_guests`).
     """
     loop = asyncio.get_running_loop()
-    sub = bus.subscribe(session_id, name=name, loop=loop)
+    sub = bus.subscribe(session_id, name=name, loop=loop, share_id=share_id, door=door)
     try:
         for frame in bus.replay(session_id, since):
+            if not still_open():
+                return
             yield {"event": frame["event"], "data": json.dumps(frame)}
         while True:
-            if await disconnected():
+            if await disconnected() or not still_open():
                 break
             try:
                 item = await asyncio.wait_for(sub.queue.get(), timeout=heartbeat_seconds)
             except TimeoutError:
+                # Asked here too: an idle stream is exactly the one an expiry has to reach, and a
+                # heartbeat is what would otherwise keep it open past the hour forever.
+                if not still_open():
+                    break
                 # A heartbeat, so a proxy between the two never decides the stream is dead.
                 yield {"event": "heartbeat", "data": "{}"}
                 continue
-            if item is None:
+            if item is None or not still_open():
                 break
             yield {"event": item["event"], "data": json.dumps(item)}
     finally:
@@ -319,10 +456,27 @@ async def live_frames(
 
 
 def live_stream(
-    bus: SessionBus, session_id: str, *, since: int, name: str, request: Request
+    bus: SessionBus,
+    session_id: str,
+    *,
+    since: int,
+    name: str,
+    request: Request,
+    still_open: Callable[[], bool] = _open_always,
+    share_id: str = "",
+    door: str = "",
 ) -> EventSourceResponse:
     return EventSourceResponse(
-        live_frames(bus, session_id, since=since, name=name, disconnected=request.is_disconnected)
+        live_frames(
+            bus,
+            session_id,
+            since=since,
+            name=name,
+            disconnected=request.is_disconnected,
+            still_open=still_open,
+            share_id=share_id,
+            door=door,
+        )
     )
 
 
@@ -338,10 +492,19 @@ def register_sharing_api(
     guest: FastAPI,
     session_exists: Callable[[str], bool],
     server: GuestServer | None = None,
+    sharing_on: SharingOn = _always_on,
+    expires_in: Callable[[], float | None] = _no_expiry,
 ) -> GuestServer:
     """Mount the owner's sharing routes and the guest app under ``/guest``; return the network
-    listener so the app can close it on shutdown."""
-    door = server or GuestServer(guest)
+    listener so the app can close it on shutdown.
+
+    ``sharing_on`` and ``expires_in`` are read on every request, from the settings the Settings
+    screen writes: whether a link may be made or the door opened at all, and how many seconds a new
+    link opens its conversation for (None = never). Both only narrow; their defaults are what this
+    did before either existed."""
+    # Closing the door ends the streams that came through it before the listener is told to stop,
+    # so their connections finish instead of waiting out the listener's grace.
+    door = server or GuestServer(guest, before_close=lambda: bus.end_guests(door=LAN_DOOR))
     app.mount("/guest", guest)
 
     def _out(share: Share) -> dict[str, Any]:
@@ -351,15 +514,19 @@ def register_sharing_api(
             "session_id": share.session_id,
             "created_at": share.created_at,
             "label": share.label,
+            "expires_at": share.expires_at,
             "url": urls[0] if urls else None,
         }
 
     @app.post("/api/code/sessions/{session_id}/share", dependencies=[guard], response_model=ShareOut)
     def share_session(session_id: str, body: ShareIn | None = None) -> dict[str, Any]:
         """A new token for this conversation. One per person, so one can be revoked alone."""
+        if not sharing_on():
+            raise HTTPException(status_code=403, detail=SHARING_OFF)
         if not session_exists(session_id):
             raise HTTPException(status_code=404, detail="no such conversation")
-        return _out(store.mint(session_id, label=(body.label if body else "")))
+        share = store.mint(session_id, label=(body.label if body else ""), expires_in=expires_in())
+        return _out(share)
 
     @app.get("/api/code/sessions/{session_id}/shares", dependencies=[guard], response_model=SharesOut)
     def list_shares(session_id: str) -> dict[str, Any]:
@@ -367,8 +534,13 @@ def register_sharing_api(
 
     @app.delete("/api/code/sessions/{session_id}/shares/{token}", dependencies=[guard])
     def revoke_share(session_id: str, token: str) -> dict[str, bool]:
-        share = store.resolve(token)
-        if share is None or share.session_id != session_id:
+        # Any link of this conversation, expired included — revoking one that already stopped
+        # opening is how the owner clears it from the list, and `resolve` would refuse to find it.
+        share = next(
+            (s for s in store.for_session(session_id, include_expired=True) if s.token == token),
+            None,
+        )
+        if share is None:
             return {"ok": False}
         return {"ok": store.revoke(token)}
 
@@ -390,6 +562,8 @@ def register_sharing_api(
     @app.post("/api/code/share/network", dependencies=[guard], response_model=NetworkShareOut)
     def network_open(body: NetworkShareIn | None = None) -> dict[str, Any]:
         """Open the LAN door: the guest app, and only it, on every interface."""
+        if not sharing_on():
+            raise HTTPException(status_code=403, detail=SHARING_OFF)
         try:
             door.start(body.port if body else 0)
         except OSError as exc:
@@ -400,6 +574,8 @@ def register_sharing_api(
     @app.delete("/api/code/share/network", dependencies=[guard], response_model=NetworkShareOut)
     def network_close() -> dict[str, Any]:
         door.stop()
-        return {"open": False, "port": None, "urls": []}
+        # What the door IS after the close, not what was asked: a connection that outlived the
+        # wait keeps it reported open (`GuestServer.open`), and the screen says so.
+        return {"open": door.open, "port": door.port, "urls": door.urls()}
 
     return door

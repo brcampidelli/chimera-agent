@@ -13,12 +13,13 @@ vi.mock("@/lib/api", () => ({
   getApprovals: vi.fn(async () => []),
   answerApproval: vi.fn(async () => ({ ok: true })),
   // Governance is mounted in the last test, to measure that it no longer owns a timer of its own.
-  // These four are the rest of what that screen asks for; an undefined answer leaves each panel in
+  // These five are the rest of what that screen asks for; an undefined answer leaves each panel in
   // its loading state, which is fine for a test that only counts calls to `getApprovals`.
   getConfig: vi.fn(async () => ({ autonomy: { governance: "off" } })),
   getGovernanceAudit: vi.fn(),
   getGovernanceInjection: vi.fn(),
   getSandboxState: vi.fn(),
+  getAccess: vi.fn(),
   // The conversations the sidebar lists: where a question's origin line reads its title.
   listCodeSessions: vi.fn(async () => [
     { id: "s-shop", title: "Clean the build", workspace: "/p/shop", turns: 1, updated_at: 0 },

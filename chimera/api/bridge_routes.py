@@ -418,6 +418,12 @@ FULL_ONLY_BODY_KEYS = frozenset(
 #: that could write them could widen its own access.
 BRIDGE_SETTINGS = frozenset({"CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL"})
 
+#: Settings only the owner writes, full control or not: the bridge's own switches, and the two that
+#: narrow sharing. Each of the sharing pair only narrows from the screen, but a client that could
+#: write it could undo the owner's narrowing — turn sharing back on, or make new links never
+#: expire — and so open a door the owner had shut.
+OWNER_ONLY_SETTINGS = BRIDGE_SETTINGS | frozenset({"CHIMERA_SHARING", "CHIMERA_SHARE_EXPIRY_HOURS"})
+
 _SECRET_NAME = re.compile(
     r"(API_?KEY|_KEYS$|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|WEBHOOK)", re.IGNORECASE
 )
