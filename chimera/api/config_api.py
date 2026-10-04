@@ -23,6 +23,7 @@ from typing import Any
 from chimera.config import Settings, get_settings, pinned_by_environment
 from chimera.memory.backend import resolve_memory_backend
 from chimera.providers.catalog import PROVIDERS
+from chimera.providers.privacy import privacy_snapshot
 
 # Credential env-vars (secret) and the non-secret settings the UI may edit. Anything outside this set
 # is rejected by patch_config, so the endpoint can't be used to write arbitrary .env lines.
@@ -203,6 +204,11 @@ _EDITABLE_SETTINGS = {
     # turn, so it applies from the next question. The threshold stays in `.env`: 0.8 is the
     # registered number, and a slider would invite moving it without a measurement.
     "CHIMERA_VERIFIED_ANSWERS",
+    # What an OpenRouter route may do with a prompt (study 29, P5.6). Both narrow the routes that may
+    # answer, so they ship off; editable because a privacy choice only reachable in `.env` is one the
+    # owner of the desktop app cannot make. Read per call by the gateway, so no APPLIES_WHEN entry.
+    "CHIMERA_OPENROUTER_DATA_COLLECTION",
+    "CHIMERA_OPENROUTER_ZDR",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -459,7 +465,7 @@ def read_config(settings: Settings) -> dict[str, Any]:
 
     # Imported here: `chimera.server` pulls in every adapter and the HTTP server, which a settings
     # read has no other reason to load.
-    from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_ids
+    from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_ids, bot_configured
 
     return {
         "models": {
@@ -591,7 +597,15 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "allowed_users": {
                 platform: allowed_ids(settings, platform) for platform in ALLOWLIST_FIELDS
             },
+            # The platforms whose bot has what it needs to start, so an empty list can be read as
+            # "anyone" only where a bot exists. Booleans, never the tokens.
+            "configured": [
+                platform for platform in ALLOWLIST_FIELDS if bot_configured(settings, platform)
+            ],
         },
+        # Who receives a prompt and what the OpenRouter route may keep — the Security screen's
+        # privacy card. See `chimera/providers/privacy.py`.
+        "privacy": privacy_snapshot(settings),
         "providers": providers,
         "pools": pools,
         # Keys absent here apply to the next call; see APPLIES_WHEN.
@@ -835,6 +849,13 @@ def _check_sandbox_network(value: str) -> None:
         raise ValueError("CHIMERA_SANDBOX_NETWORK must be none or bridge")
 
 
+def _check_data_collection(value: str) -> None:
+    # Refused here rather than read as `deny` by the settings validator: that fallback exists for a
+    # hand-edited `.env`, and a screen that offers two words has no business saving a third.
+    if value.strip().lower() not in ("allow", "deny"):
+        raise ValueError("CHIMERA_OPENROUTER_DATA_COLLECTION must be allow or deny")
+
+
 def _check_boolean(key: str) -> Callable[[str], None]:
     def check(value: str) -> None:
         if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
@@ -862,6 +883,8 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_SANDBOX_NETWORK": _check_sandbox_network,
     "CHIMERA_SHARING": _check_boolean("CHIMERA_SHARING"),
     "CHIMERA_SHARE_EXPIRY_HOURS": _check_share_expiry,
+    "CHIMERA_OPENROUTER_DATA_COLLECTION": _check_data_collection,
+    "CHIMERA_OPENROUTER_ZDR": _check_boolean("CHIMERA_OPENROUTER_ZDR"),
 }
 
 

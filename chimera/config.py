@@ -590,6 +590,28 @@ class Settings(BaseSettings):
     # wearing the manipulation's name. OpenRouter only: other providers may reject the field.
     provider_order: str = Field(default="", validation_alias="CHIMERA_PROVIDER_ORDER")
 
+    # What an OpenRouter route may do with the prompt (study 29, P5.6). OpenRouter forwards a request
+    # to whichever upstream provider serves the model, and some of those providers keep prompts or
+    # train on them; nothing in this project could ask for otherwise, so the VPS's default route sent
+    # every turn, memory recall included, under whatever the cheapest route's policy happened to be.
+    #
+    # `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` sends `provider.data_collection: "deny"` (only routes
+    # that do not store or train on the data may serve it); `CHIMERA_OPENROUTER_ZDR=true` sends
+    # `provider.zdr: true` (only zero-data-retention endpoints). Both ship OFF — `allow`/false send
+    # NOTHING, so a default request is byte-identical to the one before this setting existed — because
+    # each one narrows the routes that may answer: a model whose every route keeps data stops being
+    # reachable, and what is left may be slower. The plan's measurement (for the mandate's models,
+    # how many lose every route and the latency of what remains) has not been taken; until it is,
+    # turning these on is the owner's trade to make, not a default.
+    #
+    # Only `openrouter/` routes carry them; other providers do not know the field. The Decisions API
+    # backend (`chimera/decisions/openrouter.py`) is a separate endpoint and does not send them — the
+    # privacy card on the Security screen says so when that backend is the one configured.
+    openrouter_data_collection: Literal["allow", "deny"] = Field(
+        default="allow", validation_alias="CHIMERA_OPENROUTER_DATA_COLLECTION"
+    )
+    openrouter_zdr: bool = Field(default=False, validation_alias="CHIMERA_OPENROUTER_ZDR")
+
     # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
     # the command pick the first model measured as a reviewer whose family differs from the
     # author's (`MEASURED_REVIEWERS` in `chimera/review/family.py`, chosen by `bench/review_reviewer`),
@@ -1321,6 +1343,28 @@ class Settings(BaseSettings):
                 word,
             )
         return "off"
+
+    @field_validator("openrouter_data_collection", mode="before")
+    @classmethod
+    def _data_collection_word(cls, value: object) -> object:
+        """Empty is unset (`allow`); anything else that is not `allow` is read as `deny`, warned.
+
+        The opposite direction from `keep_awake`'s fallback, on purpose. `allow` is the default, so
+        the only reason anyone writes this line is to ask for `deny`; a typo (`deney`, `no`) falling
+        back to `allow` would send prompts to routes that keep them while the owner believes they
+        asked for the opposite — a failure nobody would ever see. Falling back to `deny` can only
+        cost a route, and a route that fails says so on the receipt."""
+        if not isinstance(value, str):
+            return value
+        word = value.strip().lower()
+        if word in ("", "allow"):
+            return "allow"
+        if word != "deny":
+            _log.warning(
+                "CHIMERA_OPENROUTER_DATA_COLLECTION=%r is not allow or deny; reading it as 'deny'.",
+                word,
+            )
+        return "deny"
 
     @field_validator("daily_usd_cap", mode="before")
     @classmethod

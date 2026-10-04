@@ -725,6 +725,9 @@ class MessagingCfgOut(BaseModel):
     """
 
     allowed_users: dict[str, list[str]] = Field(default_factory=dict)
+    configured: list[str] = Field(default_factory=list)
+    """The platforms whose bot has what it needs to start (``allowlist.bot_configured``). A server
+    that predates the field omits it, and the card then treats every platform as connected."""
 
 
 class GuardCfgOut(BaseModel):
@@ -862,6 +865,40 @@ class KeepAwakeOut(BaseModel):
     on_battery_allowed: bool = False
 
 
+class PromptRouteOut(BaseModel):
+    """One provider a configured model role would send a prompt to (``prompt_routes``)."""
+
+    provider: str
+    local: bool = False
+    """A keyless runtime whose URL is a loopback address — the prompt stays on this machine."""
+    host: str = ""
+    """For a keyless-runtime prefix (``ollama_chat/``, ``lm_studio/``…) that is NOT local: the host it
+    is sent to (Ollama Cloud, a remote server). Empty for a local or a hosted provider."""
+    roles: list[str] = Field(default_factory=list)
+    """``default``, ``weak``, ``fusion_judge``, ``embeddings``, ``decisions``… — why it is listed."""
+
+
+class PrivacyCfgOut(BaseModel):
+    """The Security screen's privacy card (``chimera/providers/privacy.py``). Read-only facts plus
+    the two OpenRouter switches; a server without the block is on the shipped defaults, which send
+    nothing."""
+
+    openrouter_data_collection: str = "allow"
+    """``allow`` (the default: nothing sent) or ``deny`` (only routes that keep no prompts)."""
+    openrouter_zdr: bool = False
+    routes: list[PromptRouteOut] = Field(default_factory=list)
+    telemetry: bool = False
+    """Whether anything is exported: OpenTelemetry asked for (``CHIMERA_OTEL`` or
+    ``OTEL_EXPORTER_OTLP_ENDPOINT``) AND the ``[otel]`` extra installed."""
+    telemetry_requested: bool = False
+    """Whether it was asked for, installed or not — so "requested, nothing exported" can be said."""
+    unscoped: list[str] = Field(default_factory=list)
+    """Surfaces that reach OpenRouter WITHOUT the preference above, so the card can say so instead of
+    letting ``deny`` read as covering every call: ``decisions`` (the Decisions API is the chosen
+    backend) or ``decisions_fallback`` (it stands behind the local verifier — verified answers on,
+    ``local_logprob``, an OpenRouter key)."""
+
+
 class ConfigOut(BaseModel):
     models: ModelsCfgOut
     fusion: FusionCfgOut = Field(default_factory=FusionCfgOut)
@@ -883,6 +920,7 @@ class ConfigOut(BaseModel):
     automation: AutomationCfgOut
     conversations: ConversationsCfgOut = Field(default_factory=ConversationsCfgOut)
     messaging: MessagingCfgOut = Field(default_factory=MessagingCfgOut)
+    privacy: PrivacyCfgOut = Field(default_factory=PrivacyCfgOut)
     guard: GuardCfgOut
     providers: list[ProviderOut]
     pools: list[PoolOut] = Field(default_factory=list)

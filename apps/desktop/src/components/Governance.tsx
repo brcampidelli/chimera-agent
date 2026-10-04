@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import { AccessCard } from "@/components/AccessCard";
 import { ApprovalCard } from "@/components/code/ApprovalCard";
+import { PrivacyPanel } from "@/components/PrivacyPanel";
 import { Badge, EmptyState, Panel, Screen, Spinner } from "@/components/ui/panel";
 import { ErrorState } from "@/components/ui/async";
 import { useT, type TFunc } from "@/lib/i18n";
@@ -385,6 +386,12 @@ export function Governance({
             ))}
           </div>
         </Panel>
+      ) : null}
+
+      {/* Rendered only when the server reports the block: a server that predates it has no route
+          list to show, and an empty card would read as "nobody receives your prompts". */}
+      {config.data?.privacy ? (
+        <PrivacyPanel privacy={config.data.privacy} config={config.data} t={t} />
       ) : null}
 
       {audit.isError ? (

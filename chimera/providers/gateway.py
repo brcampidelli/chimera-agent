@@ -36,6 +36,7 @@ from chimera.providers.failover import (
     rate_limit_origin,
     trace_of,
 )
+from chimera.providers.privacy import PRIVACY_FIELDS, openrouter_privacy
 from chimera.providers.prompt_cache import apply_cache_control
 from chimera.providers.thinking import ThinkFilter, strip_think
 from chimera.telemetry import get_logger
@@ -224,11 +225,24 @@ def _call_kwargs(provider: dict[str, Any], caller: dict[str, Any]) -> dict[str, 
     so a bench pinning a provider through ``extra_body`` lost ``reasoning`` and a configured
     ``provider_order`` lost its pin the moment the caller added anything of its own. The caller still
     wins on a key both set; only the keys it did not name survive now.
+
+    The OpenRouter ``provider`` object is NOT merged key by key: a caller that names it (every bench
+    pins its route that way) gets exactly its own route, as before — the owner's
+    ``CHIMERA_PROVIDER_ORDER`` (``order`` + ``allow_fallbacks: false``) leaking into a caller's
+    ``only`` pin produced a route outside the pin, "No endpoints found" or a different route than the
+    bench pre-registered, with no error anywhere. Only the privacy preference (:data:`PRIVACY_FIELDS`)
+    is carried under the caller's pin, because it must not depend on the caller remembering it; a
+    privacy key the caller names still wins.
     """
     merged = dict(provider, **caller)
     ours, theirs = provider.get("extra_body"), caller.get("extra_body")
     if isinstance(ours, dict) and isinstance(theirs, dict):
-        merged["extra_body"] = {**ours, **theirs}
+        body = {**ours, **theirs}
+        route_ours, route_theirs = ours.get("provider"), theirs.get("provider")
+        if isinstance(route_ours, dict) and isinstance(route_theirs, dict):
+            kept = {key: route_ours[key] for key in PRIVACY_FIELDS if key in route_ours}
+            body["provider"] = {**kept, **route_theirs}
+        merged["extra_body"] = body
     return merged
 
 
@@ -587,6 +601,12 @@ class LLMGateway:
         if order:
             # `allow_fallbacks: false` is not decoration — see `Settings.provider_order`.
             kwargs["extra_body"] = {"provider": {"order": order, "allow_fallbacks": False}}
+        privacy = openrouter_privacy(self.settings) if resolved.startswith("openrouter/") else {}
+        if privacy:
+            # Into the SAME `provider` object as a pin, never beside it: OpenRouter reads one routing
+            # object, and a pinned route that keeps data must be refused under `deny`, not served.
+            body = kwargs.setdefault("extra_body", {})
+            body["provider"] = {**body.get("provider", {}), **privacy}
         if thinking is False and resolved.startswith("openrouter/"):
             kwargs.setdefault("extra_body", {})["reasoning"] = {"enabled": False}
         return kwargs
@@ -874,7 +894,10 @@ class LLMGateway:
         resolved = self._resolve_model(model)
         self._require_credentials(resolved)
         max_tokens = self._bounded(max_tokens, resolved)
-        call_kwargs = _call_kwargs(self._provider_kwargs(), kwargs)
+        # `resolved` handed on: without it a route-scoped field (the OpenRouter privacy preference)
+        # could never reach the streaming primitive, and the live terminal and A2A streams would go
+        # out without the `deny` the owner set.
+        call_kwargs = _call_kwargs(self._provider_kwargs(resolved), kwargs)
         keys = self._key_order(resolved.split("/", 1)[0])
         if keys:
             call_kwargs["api_key"] = keys[0]
@@ -1079,7 +1102,9 @@ class LLMGateway:
             return []
         resolved = model or self.settings.embed_model
         self._require_credentials(resolved)
-        call_kwargs = self._provider_kwargs()
+        # `resolved` handed on for the same reason as in `stream`: memory text sent for embedding is
+        # the owner's data too, and the privacy preference is route-scoped.
+        call_kwargs = self._provider_kwargs(resolved)
         provider = resolved.split("/", 1)[0]
         keys = self._key_order(provider)
         if keys:

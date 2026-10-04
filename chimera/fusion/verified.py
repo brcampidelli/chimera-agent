@@ -428,11 +428,38 @@ def escalation_model(settings: Any) -> str:
     return str(settings.tier_ladder().top)
 
 
+def decisions_api_use(settings: Any) -> Literal["", "chosen", "fallback"]:
+    """Whether OpenRouter's Decisions API can receive a turn's text, and why.
+
+    ``"chosen"`` when it is the configured backend — every decision surface (the verifier, the
+    ``decide`` tool, ``/api/decide``, the governance band) posts there. ``"fallback"`` when it is NOT
+    chosen but :func:`build_verifier` still puts it behind the local verifier: verified answers on,
+    the default ``local_logprob`` backend, and an OpenRouter key — the VPS's shape, where an absent
+    Ollama sends every grounded turn's sources there. ``""`` otherwise.
+
+    One function, read by ``build_verifier`` and by the privacy card (`chimera/providers/privacy.py`),
+    because that endpoint does not carry the owner's OpenRouter privacy preference: a card that
+    decided this on its own said nothing reaches it while the fallback did.
+    """
+    from chimera.decisions.factory import openrouter_key_set
+
+    backend = (getattr(settings, "decision_backend", "") or "local_logprob").strip()
+    if backend == "openrouter_decisions":
+        return "chosen"
+    if (
+        backend == "local_logprob"
+        and bool(getattr(settings, "verified_answers", True))
+        and openrouter_key_set(settings)
+    ):
+        return "fallback"
+    return ""
+
+
 def build_verifier(settings: Any, *, gateway: Any | None = None) -> GroundedVerifier | None:
     """The verifier the settings describe, or ``None`` when ``CHIMERA_VERIFIED_ANSWERS`` is off."""
     if not bool(getattr(settings, "verified_answers", True)):
         return None
-    from chimera.decisions.factory import build_decider, openrouter_key_set
+    from chimera.decisions.factory import build_decider
 
     threshold = float(getattr(settings, "verified_answers_threshold", DEFAULT_THRESHOLD))
     backend = (settings.decision_backend or "local_logprob").strip()
@@ -452,7 +479,8 @@ def build_verifier(settings: Any, *, gateway: Any | None = None) -> GroundedVeri
         base = str(settings.ollama_base_url)
         model = decider.backend.model
         chain.append(DecisionSlot(decider, probe=lambda: local_probe(base, model)))
-    if openrouter_key_set(settings):
+    # The privacy card reads the same predicate, so it cannot say this fallback sends nothing.
+    if decisions_api_use(settings) == "fallback":
         chain.append(DecisionSlot(_jev_decider(settings)))
     chain.append(LexicalSlot())
     return GroundedVerifier(chain, threshold=threshold)
