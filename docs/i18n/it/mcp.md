@@ -1,5 +1,5 @@
 ---
-source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
+source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
 ---
 
 # Connettere server MCP
@@ -151,6 +151,13 @@ non può rispondere a quella scheda per nessuna via; se l'impostazione è cambia
 approvazione, non viene applicato nulla. E concedere i comandi a una cartella, eseguire un comando
 nel Runner, avviare un bot di messaggistica e salvare un agente con i suoi permessi sugli strumenti
 sono rifiutati del tutto attraverso il ponte: li fai tu nell'app.
+
+E un'esecuzione avviata da Claude, con qualunque interruttore, usa i modelli che hai configurato e
+non arriva più lontano della postura che hai configurato. Una richiesta che indica un modello, un
+piano dei ruoli, un profilo, un panel di fusione o un altro agente viene rifiutata; così come una
+postura più ampia — più portata, approvazioni più lasche, esecuzione sull'host o un comando `verify`
+dove non hai concesso la shell, o l'approvazione automatica. Chiedere a un'esecuzione di fare meno
+(sola lettura, o approvare sempre) è consentito.
 
 Ciò che nessun interruttore consente: leggere o scrivere una chiave API, un token o un webhook.
 Le modifiche alle impostazioni rifiutano i nomi di credenziali, le rotte che portano chiavi o

@@ -59,6 +59,7 @@ from chimera.api.bridge_discovery import (
     write_discovery,
 )
 from chimera.api.bridge_routes import (
+    DESCRIBE_ONLY_ROUTES,
     OWNER_DECISION_ROUTES,
     OWNER_ONLY_SETTINGS,
     ROUTES,
@@ -66,11 +67,12 @@ from chimera.api.bridge_routes import (
     VIA_BRIDGE_SCOPE_KEY,
     BridgeRoute,
     Tier,
-    full_only_keys_in,
     is_secret_file,
     is_secret_setting,
+    model_choices_in,
     scrub,
     switches_off,
+    wider_than,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -668,7 +670,7 @@ def register_bridge_api(
         tier: Tier,
         params: dict[str, Any] | None = None,
     ) -> Any:
-        """Refuse what the caller's tier may not do; set the owner's posture on an operate run."""
+        """Refuse what no tier may do, or a widening; give a run that names no posture the owner's."""
         if route_id == "settings.edit":
             if not isinstance(body, dict) or not body:
                 raise HTTPException(status_code=400, detail="body must be {ENV_NAME: value}")
@@ -716,12 +718,26 @@ def register_bridge_api(
                 detail='skills.bundle_status only switches a bundle off ({"status": "inactive"}); '
                 "switching one on is approve.skill_bundle, which needs Full control in Settings",
             )
-        if tier != "full":
-            widening = full_only_keys_in(body)
-            if widening:
+        if route_id not in DESCRIBE_ONLY_ROUTES:
+            # Every tier, Full control included (the owner's decisions of 2026-10-04). Which model
+            # answers is the owner's: a run the bridge starts uses the configured models.
+            chosen = model_choices_in(body)
+            if chosen:
                 raise HTTPException(
                     status_code=403,
-                    detail=f"needs Full control in Settings: {', '.join(widening)}",
+                    detail="which model answers is the owner's decision, made in the app: a run the "
+                    "bridge starts uses the configured models; not accepted through the bridge: "
+                    + ", ".join(chosen),
+                )
+            # And how far a run reaches: equal to the owner's posture, or narrower — never wider.
+            reach, approval = owner_posture(body)
+            wider = wider_than(body, reach=reach, approval=approval)
+            if wider:
+                raise HTTPException(
+                    status_code=403,
+                    detail="the posture is the owner's decision, made in the app: a run the bridge "
+                    f"starts may not reach further than the owner's ({reach}, approval {approval}); "
+                    "not accepted through the bridge: " + ", ".join(wider),
                 )
         # `not body.get`, not `"posture" not in body`: an explicit `null` posture means NO posture —
         # nothing denied, no pause — which is wider than any corner an owner could have chosen.
@@ -730,29 +746,36 @@ def register_bridge_api(
             # (or the stock pair) and shell only where the owner granted shell everywhere. The server
             # applies the configured posture as a floor regardless; sending it keeps the posture line
             # honest about the run that is happening.
-            settings = live_settings()
-            reach = (
-                settings.reach
-                if settings.reach in {"read_only", "workspace", "workspace_shell"}
-                else "workspace"
-            )
-            approval = (
-                settings.approval
-                if settings.approval in {"always", "suspicious", "never"}
-                else "suspicious"
-            )
-            # The folder's own grant, read from the same record the turn is held to — what the
-            # Code screen does with its switch. It RAISES `workspace` and nothing else: an owner
-            # who set `read_only` meant it, and the server applies that floor regardless.
-            folder = body.get("workspace")
-            if reach == "workspace" and isinstance(folder, str) and folder.strip():
-                from chimera.api.code_api import server_grants_shell
-
-                if server_grants_shell(settings, Path(folder).expanduser()):
-                    reach = "workspace_shell"
+            reach, approval = owner_posture(body)
             body = {**body, "posture": {"reach": reach, "approval": approval}}
             body.setdefault("allow_host_exec", reach == "workspace_shell")
         return body
+
+    def owner_posture(body: Any) -> tuple[str, str]:
+        """The posture the owner configured for a run in ``body``'s folder: reach and approval.
+
+        The folder's own grant is read from the same record the turn is held to — what the Code
+        screen does with its switch. It RAISES `workspace` and nothing else: an owner who set
+        `read_only` meant it, and the server applies that floor regardless.
+        """
+        settings = live_settings()
+        reach = (
+            settings.reach
+            if settings.reach in {"read_only", "workspace", "workspace_shell"}
+            else "workspace"
+        )
+        approval = (
+            settings.approval
+            if settings.approval in {"always", "suspicious", "never"}
+            else "suspicious"
+        )
+        folder = body.get("workspace") if isinstance(body, dict) else None
+        if reach == "workspace" and isinstance(folder, str) and folder.strip():
+            from chimera.api.code_api import server_grants_shell
+
+            if server_grants_shell(settings, Path(folder).expanduser()):
+                reach = "workspace_shell"
+        return reach, approval
 
     def suggest_settings(body: dict[str, Any]) -> dict[str, Any]:
         """Leave the owner a card for a change to the settings the bridge may only suggest.

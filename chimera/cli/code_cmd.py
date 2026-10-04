@@ -374,12 +374,13 @@ def code_resume(
     message: str = typer.Option(
         None, "--message", "-m", help="Send this one message and exit. Omit to keep talking."
     ),
-    model: str = typer.Option(None, "--model", help="Model for these turns; omit for the default."),
 ) -> None:
     """Continue a desktop Code conversation here; the app runs the turn and shows it too.
 
     Needs the app open with Settings > "Allow Claude to operate this app" on. Approval questions are
-    printed; answering them here also needs "Full control", otherwise answer them in the app.
+    printed; answering them here also needs "Full control", otherwise answer them in the app. The
+    turns run on the models configured in the app: the bridge this command speaks through takes no
+    model choice.
     """
     code = _client()
     ask: Ask = _ask_stdin
@@ -409,8 +410,9 @@ def code_resume(
         body: dict[str, Any] = {"message": text, "session_id": target}
         if workspace:
             body["workspace"] = workspace
-        if model:
-            body["model"] = model
+        # No `model`: since 2026-10-04 which model answers is the owner's decision in the app, and
+        # the bridge refuses a turn that names one, at every tier. The option that sent it is gone
+        # rather than left to fail on every use.
         try:
             outcome = follow_turn(code, body, ask)
         except AppUnavailable as exc:

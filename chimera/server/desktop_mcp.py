@@ -162,26 +162,29 @@ class DesktopMCP:
                 "type": "string",
                 "description": "Project folder; omit for the app's own.",
             },
-            "model": {
-                "type": "string",
-                "description": "Model for this turn; omit for the default.",
-            },
             "wait_seconds": {
                 "type": "number",
                 "description": "How long to wait before returning what happened so far (max 300).",
                 "default": 60,
             },
         }
-        extra = ""
+        # Every tier: the turn runs on the owner's models and reaches no further than the owner's
+        # posture (the owner's decisions of 2026-10-04). Full control may still NARROW a turn.
+        extra = (
+            " The turn runs on the models the owner configured and under the owner's posture; "
+            "neither can be changed or widened from here."
+        )
         if full:
             props["posture"] = {
                 "type": "object",
-                "description": "Full control only: {reach: read_only|workspace|workspace_shell, "
-                "approval: always|suspicious|never}. Omit for the owner's configured posture.",
+                "description": "Full control only, and only to NARROW: {reach: read_only|workspace|"
+                "workspace_shell, approval: always|suspicious|never}, no wider than the owner's "
+                "configured posture (a wider one is refused). Omit for the owner's posture.",
             }
-            props["allow_host_exec"] = {"type": "boolean"}
-        else:
-            extra = " The turn runs under the owner's configured posture; you cannot widen it."
+            props["allow_host_exec"] = {
+                "type": "boolean",
+                "description": "Accepted only where the owner's posture already runs commands.",
+            }
         return {
             "name": "desktop_send",
             "description": (
@@ -288,7 +291,7 @@ class DesktopMCP:
         if name == "desktop_send":
             body = {
                 k: arguments[k]
-                for k in ("message", "session_id", "workspace", "model")
+                for k in ("message", "session_id", "workspace")
                 if arguments.get(k) not in (None, "")
             }
             if full:

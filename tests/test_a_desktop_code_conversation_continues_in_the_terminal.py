@@ -143,13 +143,14 @@ def test_resume_continues_that_conversation_in_its_own_project_folder(
     conversation under no project — a resume that silently moves the work."""
     bridge = FakeBridge(first=_done("ok"))
 
-    _run(monkeypatch, bridge, ["resume", "a1b2", "-m", "next step", "--model", "m/x"])
+    _run(monkeypatch, bridge, ["resume", "a1b2", "-m", "next step"])
 
+    # No model: the turn runs on the app's configured models (the owner's decision of 2026-10-04;
+    # the bridge refuses a turn that names one, so `--model` was removed).
     assert bridge.body_of("conversations.send") == {
         "message": "next step",
         "session_id": SESSION["id"],
         "workspace": SESSION["workspace"],
-        "model": "m/x",
     }
 
 

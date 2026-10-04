@@ -141,6 +141,12 @@ before you approve, nothing is applied. And granting a folder its commands, runn
 the Runner, starting a messaging bot and saving an agent with its tool grants are refused
 through the bridge altogether: you do them in the app.
 
+And a run Claude starts, under either switch, runs on the models you configured and reaches no
+further than the posture you configured. A request that names a model, a role plan, a profile, a
+fusion panel or another agent is refused; so is a wider posture — more reach, looser approvals,
+host execution or a `verify` command where you granted no shell, or auto-approval. Asking a run to
+do less (read only, or approvals always) is allowed.
+
 What neither switch allows: reading or writing an API key, token or webhook. Settings
 edits refuse credential names, the routes that carry keys or share links are not reachable,
 credential files (`.env`, private keys) cannot be read, written or searched, and every

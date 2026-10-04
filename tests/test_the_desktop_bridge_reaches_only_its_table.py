@@ -413,18 +413,27 @@ def test_an_operate_body_cannot_widen_the_run(
     assert seen == []
 
 
-def test_with_full_control_the_client_may_set_the_posture(
+def test_with_full_control_the_client_may_narrow_the_posture_and_never_widen_it(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Until 2026-10-04 this test asserted the opposite: Full control could send any posture, host
+    execution included. The owner decided that a run the bridge starts reaches no further than his
+    own posture at ANY tier; narrower is still the client's to ask for. The whole rule is held in
+    `test_a_run_the_bridge_starts_runs_on_the_owners_models_and_posture.py`."""
     app = _app(tmp_path, monkeypatch, full=True)
     seen = _capture_route(app, monkeypatch)
     wide = {"reach": "workspace_shell", "approval": "never"}
+    narrow = {"reach": "read_only", "approval": "always"}
 
     with TestClient(app) as client:
-        _call(
+        refused = _call(
             client, app, "test.seams", body={"task": "x", "posture": wide, "allow_host_exec": True}
         )
-    assert seen[0]["posture"] == wide and seen[0]["allow_host_exec"] is True
+        narrowed = _call(client, app, "test.seams", body={"task": "x", "posture": narrow})
+    assert refused.status_code == 403
+    assert "the posture is the owner's decision" in refused.json()["detail"]
+    assert narrowed.status_code == 200
+    assert [body["posture"] for body in seen] == [narrow]
 
 
 # ---- folder grants (study 29, P4.3) ---------------------------------------------------------------

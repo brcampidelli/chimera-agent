@@ -1,5 +1,5 @@
 ---
-source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
+source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
 ---
 
 # Podłączanie serwerów MCP
@@ -148,6 +148,13 @@ odpowiedzieć na tę kartę żadną drogą; jeśli ustawienie zmieniło się prz
 nic nie zostaje zastosowane. A nadanie folderowi prawa do poleceń, uruchomienie polecenia w
 Runnerze, start bota komunikatora i zapisanie agenta z jego uprawnieniami do narzędzi są przez
 most całkowicie odrzucane: robisz to w aplikacji.
+
+A uruchomienie, które rozpoczyna Claude, przy każdym przełączniku działa na modelach, które
+ustawiłeś, i nie sięga dalej niż ustawiona przez ciebie postawa. Prośba, która wskazuje model, plan
+ról, profil, panel fuzji albo innego agenta, jest odrzucana; tak samo szersza postawa — większy
+zasięg, luźniejsze zatwierdzanie, wykonanie na hoście lub polecenie `verify` tam, gdzie nie dałeś
+powłoki, albo automatyczne zatwierdzanie. Poproszenie, by uruchomienie robiło mniej (tylko odczyt
+albo zawsze pytaj), jest dozwolone.
 
 Czego nie pozwala żaden przełącznik: czytać ani zapisywać klucza API, tokenu czy webhooka.
 Edycje ustawień odrzucają nazwy poświadczeń, trasy niosące klucze lub linki udostępniania są

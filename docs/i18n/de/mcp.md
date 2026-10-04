@@ -1,5 +1,5 @@
 ---
-source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
+source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
 ---
 
 # MCP-Server verbinden
@@ -150,6 +150,13 @@ Claude kann diese Karte auf keinem Weg beantworten; hat sich die Einstellung vor
 geändert, wird nichts übernommen. Einem Ordner Befehle erlauben, einen Befehl im Runner ausführen,
 einen Messaging-Bot starten und einen Agenten mit seinen Tool-Rechten speichern lehnt die Brücke
 ganz ab: Das machst du in der App.
+
+Und ein Lauf, den Claude startet, läuft unter beiden Schaltern mit den Modellen, die du eingestellt
+hast, und reicht nicht weiter als deine eingestellte Haltung. Eine Anfrage, die ein Modell, einen
+Rollenplan, ein Profil, ein Fusions-Panel oder einen anderen Agenten nennt, wird abgelehnt; ebenso
+eine weitere Haltung — mehr Reichweite, lockerere Freigaben, Ausführung auf dem Host oder ein
+`verify`-Befehl, wo du keine Shell erlaubt hast, oder automatische Freigabe. Einen Lauf um weniger zu
+bitten (nur lesen, oder immer fragen) ist erlaubt.
 
 Was kein Schalter erlaubt: einen API-Schlüssel, ein Token oder einen Webhook lesen oder
 schreiben. Einstellungsänderungen lehnen Namen von Zugangsdaten ab, die Routen mit Schlüsseln

@@ -1,5 +1,5 @@
 ---
-source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
+source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
 ---
 
 # Conectando servidores MCP
@@ -148,6 +148,13 @@ configuração, para você aprovar ou recusar ali. O Claude não consegue respon
 nenhum caminho; se a configuração mudou antes da sua aprovação, nada é aplicado. E liberar
 comandos numa pasta, rodar um comando no Runner, iniciar um bot de mensagens e salvar um agente
 com as permissões de ferramentas dele são recusados de vez pela ponte: isso você faz no app.
+
+E uma execução que o Claude inicia, com qualquer uma das chaves, roda nos modelos que você
+configurou e não vai além da postura que você configurou. Um pedido que indique um modelo, um plano
+de papéis, um perfil, um painel de fusão ou outro agente é recusado; também uma postura mais ampla —
+mais alcance, aprovações mais frouxas, execução no host ou um comando `verify` onde você não liberou
+shell, ou aprovação automática. Pedir que uma execução faça menos (só leitura, ou aprovar sempre) é
+permitido.
 
 O que nenhuma das chaves permite: ler ou gravar uma chave de API, token ou webhook. Edições de
 configuração recusam nomes de credenciais, as rotas que carregam chaves ou links de

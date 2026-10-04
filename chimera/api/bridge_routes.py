@@ -8,7 +8,9 @@ it cannot be reached through the bridge, however the request is phrased.
 Two tiers, because the owner asked for two switches:
 
 * ``operate`` — what the screens do: conversations, runs, boards, memory, files, git. Runs started
-  this way carry the owner's configured posture, and a body that tries to widen it is refused.
+  this way carry the owner's configured posture and models, and a body that tries to widen the one
+  or choose the other is refused — at this tier and at the next (:func:`wider_than`,
+  :func:`model_choices_in`).
 * ``full`` — what the screens reserve for the person: answering approvals, editing the settings
   that are not the owner's, replacing the agent's identity. Listed and served only when the second
   switch is on.
@@ -132,7 +134,7 @@ ROUTES: dict[str, BridgeRoute] = {
     "runs.start": _r(
         "POST",
         "/api/runs",
-        "Start a run. body: {task, workspace?, model?, max_attempts?}",
+        "Start a run on the owner's models and posture. body: {task, workspace?, max_attempts?}",
         stream=True,
         seams=True,
     ),
@@ -439,13 +441,108 @@ OWNER_DECISION_ROUTES: dict[str, str] = {
     ),
 }
 
-#: Body fields that widen what a run may do. In the operate tier a body carrying any of them with a
-#: truthy value is refused: ``verify`` and ``provider_command`` are shell commands, ``provider`` hands
-#: the workspace to another agent with its own tools, ``auto_approve`` answers a project's gates
-#: without the person, and ``posture``/``allow_host_exec`` are the posture itself.
+#: Body fields that widen what a run may do: ``verify`` and ``provider_command`` are shell commands,
+#: ``provider`` hands the workspace to another agent with its own tools, ``auto_approve`` answers a
+#: project's gates without the person, and ``posture``/``allow_host_exec`` are the posture itself.
+#: Until 2026-10-04 they were refused below Full control and accepted at it. Since then no tier
+#: widens: :func:`model_choices_in` refuses ``provider``/``provider_command`` everywhere, and
+#: :func:`wider_than` accepts the rest only when they are no wider than the owner's posture.
 FULL_ONLY_BODY_KEYS = frozenset(
     {"posture", "allow_host_exec", "provider", "provider_command", "verify", "auto_approve"}
 )
+
+#: Body fields that choose which model (or which outside agent) does the work. The owner's decision
+#: of 2026-10-04: a run, turn, chat or batch the bridge starts uses the CONFIGURED models, at every
+#: tier — the model choices are the owner's to write (`SUGGESTABLE_SETTINGS`), and a per-run field
+#: that picked one would be the same choice made one run at a time. The audit of every body the
+#: bridge forwards (CodeTurnRequest, RunRequest, AgentsRequest, CrewRunIn, LifecycleRunIn,
+#: HierarchyRunIn, KanbanRunIn, ChatRequest, and the CodeSeams they share) found these:
+MODEL_CHOICE_KEYS = frozenset(
+    {
+        "model",  # the turn's, run's, batch's or board's model
+        "roles",  # the role plan: explore/plan/edit/review models, fused plan and review
+        "profile",  # the economy/balanced/max preset, which picks the role models
+        "fuse",  # whether a panel of models answers
+        "fusion_panel",
+        "fusion_judge",
+        "fusion_synthesizer",
+        "cascade",  # weak -> mid -> fusion routing for the run
+        "verifier_model",  # the hierarchy's verifier
+        "provider",  # another agent (an outside CLI) instead of Chimera's models
+        "provider_command",
+        "retry_of",  # "redone on another model by the owner's choice" - the owner's sentence
+    }
+)
+
+#: Routes whose body only DESCRIBES (what posture would mean, which models a profile would give):
+#: they start nothing, so naming a model or a posture there chooses nothing. And the settings
+#: edit, whose keys are setting names and is policed on its own.
+DESCRIBE_ONLY_ROUTES = frozenset({"app.posture", "app.roles", "settings.edit"})
+
+_REACH_ORDER = {"read_only": 0, "workspace": 1, "workspace_shell": 2}
+_APPROVAL_STRICTNESS = {"never": 0, "suspicious": 1, "always": 2}
+#: What a posture object means for a field it leaves out (`chimera/api/posture.py`).
+_POSTURE_DEFAULTS = {"reach": "workspace", "approval": "suspicious"}
+
+
+def _truthy(value: Any) -> bool:
+    return value not in (None, False, "", [], {})
+
+
+def model_choices_in(body: Any) -> list[str]:
+    """Every model-choosing field carried with a value, anywhere in ``body``, sorted."""
+    found: set[str] = set()
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key in MODEL_CHOICE_KEYS and _truthy(value):
+                    found.add(str(key))
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(body)
+    return sorted(found)
+
+
+def wider_than(body: Any, *, reach: str, approval: str) -> list[str]:
+    """Every field of ``body`` that would make a run reach further than the owner's posture.
+
+    Equal or narrower passes: a client may ask for ``read_only``, or for approval ``always``, where
+    the owner allows more. Wider is refused — a reach past the owner's, an approval looser than the
+    owner's, host execution or a ``verify`` shell command where the owner's reach has no shell, and
+    ``auto_approve`` always (it answers gates without the person). A posture value this module does
+    not know is wider by definition.
+    """
+    found: set[str] = set()
+    shell = reach == "workspace_shell"
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "posture" and _truthy(value):
+                    if not isinstance(value, dict):
+                        found.add("posture")
+                    else:
+                        r = str(value.get("reach") or _POSTURE_DEFAULTS["reach"])
+                        a = str(value.get("approval") or _POSTURE_DEFAULTS["approval"])
+                        if _REACH_ORDER.get(r, 99) > _REACH_ORDER.get(reach, -1):
+                            found.add("posture.reach")
+                        if _APPROVAL_STRICTNESS.get(a, -1) < _APPROVAL_STRICTNESS.get(approval, 99):
+                            found.add("posture.approval")
+                elif key in {"allow_host_exec", "verify"} and _truthy(value) and not shell:
+                    found.add(str(key))
+                elif key == "auto_approve" and _truthy(value):
+                    found.add("auto_approve")
+                walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(body)
+    return sorted(found)
 
 #: The two switches themselves. Never editable through the bridge, full control or not: a client
 #: that could write them could widen its own access.

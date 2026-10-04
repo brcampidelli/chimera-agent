@@ -1,5 +1,5 @@
 ---
-source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
+source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
 ---
 
 # Connecter des serveurs MCP
@@ -153,6 +153,13 @@ répondre à cette carte par aucune voie ; si le réglage a changé avant votre 
 n'est appliqué. Et autoriser les commandes dans un dossier, lancer une commande dans le Runner,
 démarrer un bot de messagerie et enregistrer un agent avec ses droits d'outils sont refusés
 entièrement par le pont : vous les faites dans l'app.
+
+Et une exécution lancée par Claude, quel que soit l'interrupteur, utilise les modèles que vous
+avez configurés et ne va pas plus loin que la posture que vous avez configurée. Une demande qui
+nomme un modèle, un plan de rôles, un profil, un panel de fusion ou un autre agent est refusée ; de
+même une posture plus large — plus de portée, des approbations plus lâches, l'exécution sur l'hôte
+ou une commande `verify` là où vous n'avez accordé aucun shell, ou l'approbation automatique.
+Demander à une exécution d'en faire moins (lecture seule, ou approbation toujours) est permis.
 
 Ce qu'aucun interrupteur ne permet : lire ou écrire une clé d'API, un jeton ou un webhook. Les
 modifications de réglages refusent les noms d'identifiants, les routes qui portent des clés ou

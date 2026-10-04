@@ -843,7 +843,7 @@
         },
         {
           "deprecated": false,
-          "help": "Continue a desktop Code conversation here; the app runs the turn and shows it too.\n\nNeeds the app open with Settings > \"Allow Claude to operate this app\" on. Approval questions are\nprinted; answering them here also needs \"Full control\", otherwise answer them in the app.",
+          "help": "Continue a desktop Code conversation here; the app runs the turn and shows it too.\n\nNeeds the app open with Settings > \"Allow Claude to operate this app\" on. Approval questions are\nprinted; answering them here also needs \"Full control\", otherwise answer them in the app. The\nturns run on the models configured in the app: the bridge this command speaks through takes no\nmodel choice.",
           "hidden": false,
           "name": "resume",
           "params": [
@@ -864,16 +864,6 @@
               "opts": [
                 "--message",
                 "-m"
-              ],
-              "required": false,
-              "type": "str"
-            },
-            {
-              "help": "Model for these turns; omit for the default.",
-              "kind": "option",
-              "name": "model",
-              "opts": [
-                "--model"
               ],
               "required": false,
               "type": "str"

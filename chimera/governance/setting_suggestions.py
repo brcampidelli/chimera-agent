@@ -18,9 +18,15 @@ route calls :func:`resolve` (`POST /api/approvals/{id}` without the bridge's sco
 `chimera/api/app.py`). `pending.answer` and `pending.answer_with_code` refuse a suggestion outright,
 so the chat bot's one-time codes, ``chimera approve --yes`` and a file dropped into the directory
 all resolve nothing. Whoever can make the app's own handler believe it is the owner's screen can
-still approve — which is to say the owner, or code running as the owner on this machine: a
-full-control client that starts a run with shell reach and no approvals can already edit ``.env``
-itself, and no card can close that; the posture can.
+still approve — which is to say the owner, or code running as the owner on this machine. The
+bridge itself is not that code any more: since 2026-10-04 a run it starts reaches no further than
+the owner's own posture at any tier (`bridge_routes.wider_than`), so it cannot widen a turn to a
+shell and approvals ``never`` to edit ``.env`` itself, and the agent's write tools refuse
+Chimera's own ``.env`` and data folder in any case (`chimera/core/own_files.py`). What stays open
+is what the owner's posture already allows a run to do, and any local process that reads the
+app's page: the desktop app starts without ``CHIMERA_SERVER_TOKEN`` and ``GET /`` hands the token
+to any loopback client, so "the owner's surface" is, today, any process of the owner's account
+that asks — pre-existing, and outside this module.
 
 **It is checked again when it is applied.** Approval can come a day later. The value is re-run
 through every check a save goes through (:func:`chimera.api.config_api.check_updates`), and the

@@ -1,5 +1,5 @@
 ---
-source_sha256: 8d58c911516554ef6b8021e3d94ff098d8b6ae874cf981bf2ebadc7a0c15f2a2
+source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
 ---
 
 # Conectando servidores MCP
@@ -150,6 +150,13 @@ por ninguna vía; si el ajuste cambió antes de que apruebes, no se aplica nada.
 comandos a una carpeta, ejecutar un comando en el Runner, iniciar un bot de mensajería y guardar
 un agente con sus permisos de herramientas se rechazan del todo a través del puente: los haces tú
 en la app.
+
+Y una ejecución que Claude inicia, con cualquiera de los interruptores, usa los modelos que
+configuraste y no llega más lejos que la postura que configuraste. Se rechaza una petición que nombre
+un modelo, un plan de roles, un perfil, un panel de fusión u otro agente; y también una postura más
+amplia — más alcance, aprobaciones más laxas, ejecución en el host o un comando `verify` donde no
+concediste shell, o la aprobación automática. Pedir que una ejecución haga menos (solo lectura, o
+aprobar siempre) está permitido.
 
 Lo que ningún interruptor permite: leer o escribir una clave de API, un token o un webhook. Las
 ediciones de ajustes rechazan nombres de credenciales, las rutas que llevan claves o enlaces
