@@ -1485,6 +1485,31 @@
             "default": true,
             "title": "Headless",
             "type": "boolean"
+          },
+          "invalid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invalid"
+          },
+          "local_ports": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Local Ports",
+            "type": "array"
+          },
+          "sites": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sites",
+            "type": "array"
           }
         },
         "title": "BrowserCfgOut",

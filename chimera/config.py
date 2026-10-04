@@ -322,6 +322,19 @@ class Settings(BaseSettings):
     # walls on the in-sample set and 9/15 on a fresh one — not fit, so still off. Its named gaps: a
     # widget drawn just after `load`, and block pages that carry no challenge marker.
     browser_situation: bool = Field(default=False, validation_alias="CHIMERA_BROWSER_SITUATION")
+    # Where the browser may go (study 29, P5.2; `chimera/tools/browser_reach.py`). Both EMPTY by
+    # default, and empty is exactly the browser that shipped before them: any public site, no loopback.
+    # `CHIMERA_BROWSER_SITES` (hosts and `*.domain`, comma-separated) only narrows: a top-level page
+    # off the list asks a person on the Code screen and in the app's chat (the card both already
+    # draw), and is refused where nobody can be asked: the CLI, the TUI, the bots, an unguarded chat.
+    # `CHIMERA_BROWSER_LOCAL_PORTS` widens by one thing: localhost / 127.0.0.1 / [::1] on a port
+    # listed here, so the agent can look at the dev server it is changing — never a port Chimera
+    # itself serves on (the app's API answers approvals), never a private network or metadata.
+    # Unmeasured: the plan asks for a small pre-registered bench ("verify a UI change on a local app")
+    # before the local ports are suggested to anyone. It is not written or run (it needs paid calls),
+    # so both stay off and the Settings rows say what each one does, not that it helps.
+    browser_sites: str = Field(default="", validation_alias="CHIMERA_BROWSER_SITES")
+    browser_local_ports: str = Field(default="", validation_alias="CHIMERA_BROWSER_LOCAL_PORTS")
 
     # --- The desktop bridge: may an MCP client (Claude Code / Claude Desktop, through
     # `chimera mcp desktop`) operate this running app? Both OFF by default, and the second means

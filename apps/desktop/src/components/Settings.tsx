@@ -1543,6 +1543,44 @@ export function Settings({
                       }
                     />
                   </Row>
+                  {/* Where that browser may go (study 29, P5.2). Both empty by default, which is the
+              browser as it always was. The values are shown as written, not masked: they are the
+              owner's own statements, and a list that cannot be read back cannot be corrected. The
+              server refuses a value it would not read (a URL in the site list, Chimera's own port
+              in the ports), so a typo is an error here rather than a list that matches nothing. */}
+                  <Row
+                    label={t("settings.row.browserSites")}
+                    hint={t("settings.hint.browserSites")}
+                    applies={c.applies?.CHIMERA_BROWSER_SITES}
+                    env="CHIMERA_BROWSER_SITES"
+                  >
+                    <TextField
+                      value={(c.browser?.sites ?? []).join(", ")}
+                      placeholder="github.com, *.github.com"
+                      onSave={(v) => save({ CHIMERA_BROWSER_SITES: v })}
+                    />
+                  </Row>
+                  <Row
+                    label={t("settings.row.browserLocalPorts")}
+                    hint={t("settings.hint.browserLocalPorts")}
+                    applies={c.applies?.CHIMERA_BROWSER_LOCAL_PORTS}
+                    env="CHIMERA_BROWSER_LOCAL_PORTS"
+                    warn
+                  >
+                    <TextField
+                      value={(c.browser?.local_ports ?? []).join(", ")}
+                      placeholder="3000, 8080"
+                      onSave={(v) => save({ CHIMERA_BROWSER_LOCAL_PORTS: v })}
+                    />
+                  </Row>
+                  {/* A hand-edited `.env` value that does not parse leaves the browser out of every
+              conversation. The two rows above would then read empty — "any public site" — so the
+              server's reason is shown here, in its own words (it names the key and the entry). */}
+                  {c.browser?.invalid ? (
+                    <p role="alert" className="text-xs text-bad-foreground">
+                      {t("settings.browserReach.invalid", { error: c.browser.invalid })}
+                    </p>
+                  ) : null}
                   {/* The switch the posture line names when it reports a conversation as unguarded. Off
               by default (`chimera/config.py`: `guard_chat: bool = Field(default=False)`), which is
               a real exposure and the reason the posture line has to say so.

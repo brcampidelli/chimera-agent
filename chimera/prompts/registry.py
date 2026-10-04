@@ -472,6 +472,10 @@ SECTIONS: tuple[PromptSection, ...] = (
 #: in the test cannot be satisfied by quietly adding a name here.
 NOT_PROMPTS: dict[str, str] = {
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
+    "chimera.core.listeners:INSTANCE_HEADER": (
+        "an HTTP response header name (X-Chimera-Instance) the listeners send and the browser's "
+        "loopback check looks for; no model reads it"
+    ),
     "chimera.migration.base:_MEMORY_NOTE": "a CLI message printed by `chimera migrate`",
     "chimera.server.desktop_mcp:DATA_NOTE": (
         "part of the MCP tool descriptions `chimera mcp desktop` lists to an EXTERNAL client "

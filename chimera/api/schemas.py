@@ -742,6 +742,14 @@ class BrowserCfgOut(BaseModel):
     """
 
     headless: bool = True
+    #: ``CHIMERA_BROWSER_SITES``, parsed: hosts and ``*.domain`` entries. Empty = any public site.
+    sites: list[str] = Field(default_factory=list)
+    #: ``CHIMERA_BROWSER_LOCAL_PORTS``, parsed. Empty = no loopback at all, as before study 29 P5.2.
+    local_ports: list[int] = Field(default_factory=list)
+    #: Why the two lists above cannot be read, when ``.env`` holds a value that does not parse (a
+    #: hand edit; the screen refuses one). Then the browser is left out of EVERY conversation, which
+    #: the empty lists alone would misreport as "any public site". None when both parse.
+    invalid: str | None = None
 
 
 class ExperimentalCfgOut(BaseModel):

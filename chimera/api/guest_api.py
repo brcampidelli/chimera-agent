@@ -141,6 +141,11 @@ class GuestServer:
                 sock.bind((host, 0))  # the asked-for port is taken: any free one, reported back
             sock.listen(128)
             bound = int(sock.getsockname()[1])
+            # On 0.0.0.0 and tokenless by default: reachable on loopback too, so the browser's
+            # declared local ports must never include it (`chimera.core.listeners`).
+            from chimera.core.listeners import claim
+
+            claim(bound)
             server = uvicorn.Server(uvicorn.Config(self._app, log_level="warning"))
             thread = threading.Thread(
                 target=server.run, kwargs={"sockets": [sock]}, name="chimera-guest", daemon=True
@@ -181,6 +186,11 @@ def build_guest_app(
     the page for a loopback client — and its ``assets/`` beside it.
     """
     guest = FastAPI(title="Chimera — shared conversation", docs_url=None, redoc_url=None)
+    # Tokenless on loopback by default, like the owner's API: marked so the agent's browser refuses
+    # it behind a declared port that relays to it (`chimera.core.listeners.INSTANCE_HEADER`).
+    from chimera.core.listeners import MarkResponses
+
+    guest.add_middleware(MarkResponses)
     _mount_guest_page(guest, static_dir)
 
     def share_of(request: Request) -> Share:

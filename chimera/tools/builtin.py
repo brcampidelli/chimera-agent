@@ -249,12 +249,26 @@ def default_registry(
             from chimera.tools.browser_situation import BrowserSituation
 
             situation = BrowserSituation()
+        # Study 29, P5.2: the owner's site list and declared local ports. None when both are empty,
+        # which keeps the browser exactly as it was. A value `.env` holds that does not parse (the
+        # Settings screen refuses one, a hand edit may not) is not guessed at: the browser is left
+        # out of the registry and the log says why, rather than run wider or narrower than written.
+        from chimera.tools.browser_reach import BrowserReach
+
+        try:
+            reach = BrowserReach.from_settings(settings)
+        except ValueError as exc:
+            from chimera.telemetry import get_logger
+
+            get_logger("tools.builtin").warning("browser not registered: %s", exc)
+            return registry
         registry.register(
             BrowserTool(
                 headless=settings.browser_headless,
                 workspace=workspace,
                 write_region=write_region,
                 situation=situation,
+                reach=reach,
             )
         )
     return registry

@@ -33,6 +33,7 @@ from chimera.tools.workspace import resolve_for
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 if TYPE_CHECKING:
+    from chimera.tools.browser_reach import BrowserReach
     from chimera.tools.browser_situation import BrowserSituation
 
 _log = get_logger("tools.browser")
@@ -110,10 +111,12 @@ def _driver_env() -> dict[str, str]:
     return dict(get_driver_env())
 
 
-def _new_playwright_driver(headless: bool) -> BrowserDriver:
+def _new_playwright_driver(headless: bool, reach: BrowserReach | None = None) -> BrowserDriver:
     from chimera.tools.browser_playwright import PlaywrightDriver  # imports playwright (a core dep)
 
-    return PlaywrightDriver(headless=headless)
+    if reach is None:
+        return PlaywrightDriver(headless=headless)
+    return PlaywrightDriver(headless=headless, reach=reach)
 
 
 @dataclass
@@ -337,11 +340,17 @@ class BrowserTool(Tool):
         write_region: WriteRegion | None = None,
         viewport_first: bool = False,
         situation: BrowserSituation | None = None,
+        reach: BrowserReach | None = None,
     ) -> None:
         # Study 25, S11 (`chimera.tools.browser_situation`): every action through the situation's
         # harness half — a page that needs the person hands over, a private store is refused. None,
         # the default, and the dispatch below is exactly what it was.
         self.situation = situation
+        # Study 29, P5.2 (`chimera.tools.browser_reach`): the owner's site list and declared local
+        # ports, one object shared with the driver so a navigate target and every request after it
+        # are judged by the same predicate. None, the default and the case with both settings empty,
+        # keeps `check_url` here and `is_safe_url` in the driver, exactly as before.
+        self.reach = reach
         # The driver is built lazily on first use so importing this tool never needs Playwright.
         self._driver = driver
         self._own_driver = driver is None
@@ -385,7 +394,7 @@ class BrowserTool(Tool):
         if self._driver is not None:
             return self._driver
         try:
-            self._driver = _new_playwright_driver(self._headless)  # constructing it imports playwright
+            self._driver = self._new_driver()  # constructing it imports playwright
         except ImportError:
             return None  # playwright package missing — a broken install (it's a core dependency)
         except Exception as exc:  # noqa: BLE001 — most likely the Chromium binary isn't downloaded yet
@@ -399,8 +408,54 @@ class BrowserTool(Tool):
                 # replace the first dropped Playwright's own message — the only line naming the
                 # cause — and left "exit status 2" with no remedy.
                 raise RuntimeError(f"{exc}; {install_exc}. {_CHROMIUM_HINT}") from exc
-            self._driver = _new_playwright_driver(self._headless)  # …then retry
+            self._driver = self._new_driver()  # …then retry
         return self._driver
+
+    def _new_driver(self) -> BrowserDriver:
+        if self.reach is None:
+            return _new_playwright_driver(self._headless)
+        return _new_playwright_driver(self._headless, reach=self.reach)
+
+    def _check_target(self, url: str) -> None:
+        """Raise ValueError when the browser may not open ``url`` (study 29, P5.2).
+
+        Without a reach this is ``check_url``, as it always was. With one, the reach's own check (the
+        floor, plus a declared local port), and then its site list: a host the list does not name is
+        a question for the person when this surface can ask one (``ask_outside``: the approver the
+        Code turn hands every tool with a workspace when a screen is bound, and the one the app's
+        guarded chat hands the browser), and a refusal when not.
+        """
+        from chimera.scrape.ssrf import check_url
+
+        if self.reach is None:
+            check_url(url)
+            return
+        self.reach.check(url)
+        if self.reach.listed(url):
+            return
+        from urllib.parse import urlparse
+
+        from chimera.tools.workspace import AskOutside, BoundaryQuestion
+
+        host = (urlparse(url).hostname or "").rstrip(".")
+        ask: AskOutside | None = getattr(self, "ask_outside", None)
+        if ask is None:
+            raise ValueError(
+                f"{host} is not on the browser's site list (CHIMERA_BROWSER_SITES) and nobody here "
+                "can approve it. Do not retry."
+            )
+        question = BoundaryQuestion(
+            reason=(
+                f"open a site outside the browser's site list: {host} (the list is "
+                f"{', '.join(self.reach.sites)})"
+            ),
+            action=f"browser: {url}",
+        )
+        if not ask(question):
+            raise ValueError(
+                f"{host} is not on the browser's site list; a person was asked and refused. Do not retry."
+            )
+        self.reach.approve(url)
 
     def run(self, **kwargs: Any) -> str:
         action = str(kwargs.get("action", "")).strip()
@@ -425,21 +480,20 @@ class BrowserTool(Tool):
     def _dispatch(self, action: str, driver: BrowserDriver, kwargs: dict[str, Any]) -> str:
         # SSRF guard: a navigate target is a model-/content-supplied URL, so re-check every hop the
         # same way http_get/download do — reject non-http(s) and hosts that resolve to private IPs.
-        from chimera.scrape.ssrf import check_url
-
+        # `_check_target` is `check_url` unless the owner configured the browser's reach.
         try:
             if action == "navigate":
                 url = str(kwargs.get("url", "")).strip()
                 if not url:
                     return "error: navigate needs a url"
-                check_url(url)
+                self._check_target(url)
                 return self._render(driver.navigate(url))
             if action == "read":
                 return self._render(driver.read())
             if action == "read_text":
                 url = str(kwargs.get("url", "")).strip()
                 if url:
-                    check_url(url)
+                    self._check_target(url)
                     driver.navigate(url)
                 html = driver.page_html()
                 markdown = _html_to_markdown(html)  # None when the 'documents' extra is absent
@@ -451,7 +505,7 @@ class BrowserTool(Tool):
                 url = str(kwargs.get("url", "")).strip()
                 loaded: list[Element] | None = None
                 if url:
-                    check_url(url)
+                    self._check_target(url)
                     loaded = driver.navigate(url)
                 found = find_in_text(driver.page_text(), query)
                 if not self.viewport_first:
@@ -491,7 +545,7 @@ class BrowserTool(Tool):
                 path = str(target)
                 url = str(kwargs.get("url", "")).strip()
                 if url:
-                    check_url(url)
+                    self._check_target(url)
                     driver.navigate(url)
                 driver.screenshot(path)
                 # An honest confirmation — the PNG is a real capture of whatever page is loaded.
