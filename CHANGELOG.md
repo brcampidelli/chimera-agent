@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Security
 
 - **Settings that widen what the agent reaches, or loosen a guard or a privacy fence, are the owner's alone** (#770,
-  #771). Through the desktop bridge's `settings.edit`, a client at full control could set its own posture
+  #772). Through the desktop bridge's `settings.edit`, a client at full control could set its own posture
   (`CHIMERA_REACH`, `CHIMERA_APPROVAL`, `CHIMERA_HOST_EXEC`), switch the trust kernel or the chat guard off, empty the
   tool denylist or a bot's allowlist, or point `CHIMERA_API_BASE`, which travels with the provider key, at a host of
   its choosing. The whole editable allowlist (69 keys) was audited: 31 are refused through the bridge, the owner's own
@@ -16,13 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `CHIMERA_DISCORD_ATTACH_FILES`, `CHIMERA_PROJECT_PACK`, `CHIMERA_KEY_VAULT`, `CHIMERA_PULL_REQUESTS` and
   `CHIMERA_BRANCH_PREFIX` to the owner's side; `CHIMERA_CREATE_DOCUMENT`, the model choices and `CHIMERA_APP_CRON`
   stay writable, a judgment call stated in the commit.
-- **The app page no longer admits a CDN or `eval`** (#771). Its `script-src` carried `https://cdn.jsdelivr.net` and
+- **The app page no longer admits a CDN or `eval`** (#772). Its `script-src` carried `https://cdn.jsdelivr.net` and
   `'unsafe-eval'` for one kind of page, `render_chart`'s, and `'unsafe-eval'` applied to the page that holds the bearer
   token. Charts are now drawn by the app's own Vega (see Added), so the app page allows `'self' 'unsafe-inline'` and
   the HTML preview `'unsafe-inline'`. The cost: a page the agent writes that loads a library from jsDelivr (Chart.js,
   say) no longer runs in the preview; opened in a browser it does, and the preview's note says so. Measured in the
   browser pane's Chromium, not in the real WebView2.
-- **A page that rebinds its DNS name to 127.0.0.1 is not this app's page** (#771). While the app listens on loopback,
+- **A page that rebinds its DNS name to 127.0.0.1 is not this app's page** (#772). While the app listens on loopback,
   a request whose `Host` is not `localhost`, a loopback address or a host named in `CHIMERA_ALLOWED_ORIGINS` is refused
   on every route (403; a WebSocket is closed). Without it, a page at a rebound name was same-origin to the browser and,
   with no `CHIMERA_SERVER_TOKEN` (the desktop default), could upload a skill and switch it on. A LAN bind is left
@@ -33,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   now ends the streams that came through it first, and until its listener is gone the card reports it open, not shut.
   A token with a character outside ASCII answers 401 instead of 500, and a link with an expiry is written where an
   older version cannot load it as one that never expires.
-- **The pull request card shows where the push really goes, and every surface shows the whole card** (#771).
+- **The pull request card shows where the push really goes, and every surface shows the whole card** (#772).
   - **Destination:** the card showed origin's fetch URL while `git push` went to its push URL (`pushurl`,
     `pushInsteadOf`). It now shows the push URL, pushes to that literal URL, refuses one that is another repository,
     and refuses a destination that changed while the question waited. A branch that already exists on the remote is
@@ -43,13 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   - **Whole card:** the channel, the terminal and `chimera approve --list` cut it at 300 or 120 characters, so a
     description could be approved unseen. A card asked every time is now delivered whole, split into messages on a
     channel; `chimera approve <id> --show` prints it, answers nothing, and writes control characters out.
-- **A connector call reaches only the URL the owner configured** (#771). A call that can change data follows no
+- **A connector call reaches only the URL the owner configured** (#772). A call that can change data follows no
   redirect (a 307 had re-sent an approved POST, body and all, to another host) and is sent once, never retried; a GET
   follows one only inside the configured origin and base path, and a `.` or `..` path parameter cannot climb out of
   it. The approval card shows the query and the body being sent. The key's variable is
   `CHIMERA_CONNECTOR_<NAME>_API_KEY`, a name shell children drop and the redaction masks, and an echoed key is masked
   in its percent-encoded spellings and before the 20,000-character cut.
-- **A skill reaches a prompt only through the owner's switch** (#771).
+- **A skill reaches a prompt only through the owner's switch** (#772).
   - The desktop bridge's operate tier could switch a downloaded bundle on (the route defaulted to `active`). It can now
     only switch one off; switching on is `approve.skill_bundle`, at full control.
   - `skill_view` read any installed bundle, switched on or not, and `../demo2/SKILL.md` read a sibling. It now reads
@@ -153,58 +153,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   whether a local runtime really stays on this machine, telemetry and who may talk to each bot, and names the Decisions
   API, which does not carry the preference. Both ship off: they narrow which routes may answer, and the measurement of
   how many of the mandate's models lose every route (P5.6) needs paid calls and was not taken.
-- **A chart the agent draws appears in the conversation** (#771), drawn by the app's own Vega with expressions
+- **A chart the agent draws appears in the conversation** (#772), drawn by the app's own Vega with expressions
   interpreted rather than compiled, every load refused, and the chart's events kept inside its own element. A spec
   that names a URL, is over 128 KB or would make up more than 50,000 rows is not drawn (a worker checks, within 3 s,
   what the spec cannot state); the file is still written. The viewer draws `render_chart` pages the same way. New
   dependencies, pinned exactly: vega 6.4.0, vega-lite 6.4.3 and vega-interpreter 2.3.2 (BSD-3-Clause), in a chunk of
   about 271 KB gzipped loaded on the first chart, never from a CDN.
-- **`create_document` writes Word, Excel, PowerPoint and PDF from a declarative spec** (#771). The model writes data
+- **`create_document` writes Word, Excel, PowerPoint and PDF from a declarative spec** (#772). The model writes data
   and fixed renderers write the file, through the same gate as `write_file`; every spreadsheet string is stored as
   text, so a cell starting with `=` is not a formula. PDF needs no dependency (characters outside Windows-1252 are
   written as `?` and counted); the others come from a new `documents-out` extra (python-docx 1.2.0 is new to the lock;
   openpyxl and python-pptx were already there), in `[full]` and in the desktop build. `chimera deliver --format
   docx|xlsx|pdf` converts the model's Markdown the same way. Off by default (`CHIMERA_CREATE_DOCUMENT`).
-- **Open what a turn wrote beside the conversation, and the Discord bot can attach it** (#771). The receipt offers
+- **Open what a turn wrote beside the conversation, and the Discord bot can attach it** (#772). The receipt offers
   "Open <name> beside" for a chart, page, image or document the turn produced, and the viewer shows an office document
   or PDF as a read-only text preview. `CHIMERA_DISCORD_ATTACH_FILES` (off, owner-only) attaches only files that turn's
   own writers reported, of allowlisted types, 8 MB each and four a reply, and refuses to arm while
   `CHIMERA_DISCORD_ALLOWED_USERS` is empty.
-- **"Active now" on the Skills screen, and a project pack that only narrows** (#771). The panel shows, byte for byte,
+- **"Active now" on the Skills screen, and a project pack that only narrows** (#772). The panel shows, byte for byte,
   the skill text the prompt carries, and an update check compares the skill folder's files at the source. A folder's
   `.chimera/pack.json` can keep only some skills and MCP servers and deny tools, never grant anything. It applies only
   with `CHIMERA_PROJECT_PACK` on (off, owner-only) and after the owner accepts those exact bytes, and a changed file
   keeps the accepted version applying. Chat surfaces without a project folder are not narrowed, and the pre-registered
   bench (`bench/project_pack`) has not run.
-- **Upload a skill of your own** (#771) from the Skills screen, as a `.zip`, a `SKILL.md` or a folder. It always lands
+- **Upload a skill of your own** (#772) from the Skills screen, as a `.zip`, a `SKILL.md` or a folder. It always lands
   pending and tainted whatever its frontmatter says, the archive is read as hostile input (paths, links, sizes, YAML
   aliases, file types), and its description enters the prompt quoted as its author's words. Its switch stays disabled
   until its SKILL.md has been read on screen.
-- **Four verified MCP catalogue entries, and the last Test is remembered** (#771). Stripe (remote, an Agent key in a
+- **Four verified MCP catalogue entries, and the last Test is remembered** (#772). Stripe (remote, an Agent key in a
   header, read permissions), Notion, Sentry (its read-only `inspect` skill) and Hostinger (the VPS group alone), each
   pinned to the version that was read. A row shows when it was last tested, as history; "connected" still means a Test
   in this session. "Add and test" says it runs the package on this computer; a key entry cannot be saved without its
   key in the declared form; the catalogue can be searched and filtered by runner.
-- **Memory: edit a fact in place, export, import from Claude, and preview a merge for free** (#771). An edit keeps the
+- **Memory: edit a fact in place, export, import from Claude, and preview a merge for free** (#772). An edit keeps the
   fact's trust label and masks keys; an export (JSON or Markdown) masks again and leaves metadata out. The Claude import
   reads `CLAUDE.md` and memory notes, never `settings.json`, as tainted facts filed under the matching registered
   folder, with nothing ticked by default. The merge preview spends nothing, and only the groups ticked are merged.
-- **OpenAPI connectors on the Connections screen** (#771). A spec becomes `api_<connector>_<op>` tools, pinned when
+- **OpenAPI connectors on the Connections screen** (#772). A spec becomes `api_<connector>_<op>` tools, pinned when
   added and never re-fetched, GET only unless the connector's "allow changes" is on, and then every call is a question
   to the owner. Answers are untrusted output. A connector loads on the Code screen and in the app's chat; the bots,
   cron and servers load it only when the owner sends it there, and no bot surface loads one while any bot has an empty
   allowlist; a guest's turn loads none. Nothing loads until the owner adds a connector and switches it on.
-- **Keys typed in Settings can live in the OS vault** (#771), behind `CHIMERA_KEY_VAULT` (off, owner-only). Each key is
+- **Keys typed in Settings can live in the OS vault** (#772), behind `CHIMERA_KEY_VAULT` (off, owner-only). Each key is
   read back from the vault before its `.env` line becomes a comment, a refusal fails the save instead of falling back
   to plain text, and keys move either way by name. The server token stays in `.env`, where the tray reads it. The
   frozen desktop build now bundles `keyring` and reads only the keys its `.env` marks. A round trip in a real release
   build on a real keychain was not measured.
-- **`open_pull_request`, asked every time** (#771), behind `CHIMERA_PULL_REQUESTS` (off, owner-only). Every call is a
+- **`open_pull_request`, asked every time** (#772), behind `CHIMERA_PULL_REQUESTS` (off, owner-only). Every call is a
   question only a person can answer, even under `CHIMERA_APPROVAL_MODE=allow`; it never pushes the default branch or
   forces, and pushes the commit reviewed, by hash. The Git panel gets "Open pull request…" when origin and a signed-in
   `gh` are there. `CHIMERA_BRANCH_PREFIX` (default `chimera`) names run branches, and the cleanup sweeps every prefix
   ever used.
-- **pr-watch, a read-only pull request watch** (#771). `chimera report pr-watch` proposes an hourly job, disabled, that
+- **pr-watch, a read-only pull request watch** (#772). `chimera report pr-watch` proposes an hourly job, disabled, that
   reports the failing checks, new comments and reviews of the owner's pull requests and the default-branch runs that
   failed, with no model and no spend. Other people's words arrive fenced, sanitised and with control characters
   written out. The fix level (try a fix behind the verify gate) is not built.
@@ -212,7 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - **Skill bundles switched on now reach the prompt, and those switched on before this release wait for a new switch**
-  (#771). An import of a module that does not exist had left every bundle's prompt line empty since bundles shipped
+  (#772). An import of a module that does not exist had left every bundle's prompt line empty since bundles shipped
   (#141): the switch read "on" and the agent was never told. With that fixed, a switch thrown when it did nothing is
   not taken as consent: a bundle marked active without a record of the switch reads as pending, the Skills screen and
   `chimera skills-bundles` name it, and the owner's next switch sends it.
@@ -227,15 +227,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Starting a run in one repository no longer deletes another repository's live worktree** (#770). The boot-time
   cleanup removed every `chimera-wt-*` folder older than an hour in the shared temp folder, whichever repository's run
   was working in it. It now removes only folders no repository knows.
-- **The editor cannot save over a file it could not show as text** (#771). An existing file that is not UTF-8 was shown
+- **The editor cannot save over a file it could not show as text** (#772). An existing file that is not UTF-8 was shown
   empty, and a save replaced it with the draft; the write route now refuses it, and a document's text preview, from
   every client.
-- **A duplicated key in `.env` saved from Settings takes effect** (#771). The save replaced only the first `KEY=` line
+- **A duplicated key in `.env` saved from Settings takes effect** (#772). The save replaced only the first `KEY=` line
   while dotenv reads the last; every assignment is replaced now, and an `export` stays on its line.
-- **Merging memory facts keeps each fact's project and masks what it sends** (#771). `memory consolidate` grouped facts
+- **Merging memory facts keeps each fact's project and masks what it sends** (#772). `memory consolidate` grouped facts
   across projects and wrote the merged fact for every folder, sent old facts to the model unmasked and stored the reply
   unmasked. Imported facts lost their project too.
-- **An MCP server that fails to start is closed** (#771). A start that timed out (a browser sign-in waiting, say) left
+- **An MCP server that fails to start is closed** (#772). A start that timed out (a browser sign-in waiting, say) left
   the server's process alive for the rest of the app, from a Test, the pool or autoload alike.
 - **A failed turn's OS notification no longer carries the error text** (#761). A shadowed parameter put a provider's or
   a tool's words on the OS surface instead of the request.
