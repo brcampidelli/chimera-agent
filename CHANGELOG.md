@@ -5,6 +5,246 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Security
+
+- **Settings that widen what the agent reaches, or loosen a guard or a privacy fence, are the owner's alone** (#770,
+  #771). Through the desktop bridge's `settings.edit`, a client at full control could set its own posture
+  (`CHIMERA_REACH`, `CHIMERA_APPROVAL`, `CHIMERA_HOST_EXEC`), switch the trust kernel or the chat guard off, empty the
+  tool denylist or a bot's allowlist, or point `CHIMERA_API_BASE`, which travels with the provider key, at a host of
+  its choosing. The whole editable allowlist (69 keys) was audited: 31 are refused through the bridge, the owner's own
+  Settings screen saves them as before, and a test makes every new setting pick a side. Phases 6-8 add
+  `CHIMERA_DISCORD_ATTACH_FILES`, `CHIMERA_PROJECT_PACK`, `CHIMERA_KEY_VAULT`, `CHIMERA_PULL_REQUESTS` and
+  `CHIMERA_BRANCH_PREFIX` to the owner's side; `CHIMERA_CREATE_DOCUMENT`, the model choices and `CHIMERA_APP_CRON`
+  stay writable, a judgment call stated in the commit.
+- **The app page no longer admits a CDN or `eval`** (#771). Its `script-src` carried `https://cdn.jsdelivr.net` and
+  `'unsafe-eval'` for one kind of page, `render_chart`'s, and `'unsafe-eval'` applied to the page that holds the bearer
+  token. Charts are now drawn by the app's own Vega (see Added), so the app page allows `'self' 'unsafe-inline'` and
+  the HTML preview `'unsafe-inline'`. The cost: a page the agent writes that loads a library from jsDelivr (Chart.js,
+  say) no longer runs in the preview; opened in a browser it does, and the preview's note says so. Measured in the
+  browser pane's Chromium, not in the real WebView2.
+- **A page that rebinds its DNS name to 127.0.0.1 is not this app's page** (#771). While the app listens on loopback,
+  a request whose `Host` is not `localhost`, a loopback address or a host named in `CHIMERA_ALLOWED_ORIGINS` is refused
+  on every route (403; a WebSocket is closed). Without it, a page at a rebound name was same-origin to the browser and,
+  with no `CHIMERA_SERVER_TOKEN` (the desktop default), could upload a skill and switch it on. A LAN bind is left
+  alone; the skill upload also refuses a cross-site `Origin` or `Sec-Fetch-Site` on any bind.
+- **Revoking a share link, its expiry, or switching sharing off now ends a guest's open stream** (#770). The link was
+  checked once, when the stream connected, so a guest who kept the tab open went on receiving the conversation after
+  "Revoke all" or sharing off, on the owner's `/guest` mount and on the network door alike. Closing the network door
+  now ends the streams that came through it first, and until its listener is gone the card reports it open, not shut.
+  A token with a character outside ASCII answers 401 instead of 500, and a link with an expiry is written where an
+  older version cannot load it as one that never expires.
+- **The pull request card shows where the push really goes, and every surface shows the whole card** (#771).
+  - **Destination:** the card showed origin's fetch URL while `git push` went to its push URL (`pushurl`,
+    `pushInsteadOf`). It now shows the push URL, pushes to that literal URL, refuses one that is another repository,
+    and refuses a destination that changed while the question waited. A branch that already exists on the remote is
+    named as an update, and `main` and `master` are refused whatever the default branch is.
+  - **Nothing of the workspace runs:** no `pre-push` or `reference-transaction` hook, no `core.fsmonitor`, no external
+    diff, and a `gh` sitting in the working folder is never the one started.
+  - **Whole card:** the channel, the terminal and `chimera approve --list` cut it at 300 or 120 characters, so a
+    description could be approved unseen. A card asked every time is now delivered whole, split into messages on a
+    channel; `chimera approve <id> --show` prints it, answers nothing, and writes control characters out.
+- **A connector call reaches only the URL the owner configured** (#771). A call that can change data follows no
+  redirect (a 307 had re-sent an approved POST, body and all, to another host) and is sent once, never retried; a GET
+  follows one only inside the configured origin and base path, and a `.` or `..` path parameter cannot climb out of
+  it. The approval card shows the query and the body being sent. The key's variable is
+  `CHIMERA_CONNECTOR_<NAME>_API_KEY`, a name shell children drop and the redaction masks, and an echoed key is masked
+  in its percent-encoded spellings and before the 20,000-character cut.
+- **A skill reaches a prompt only through the owner's switch** (#771).
+  - The desktop bridge's operate tier could switch a downloaded bundle on (the route defaulted to `active`). It can now
+    only switch one off; switching on is `approve.skill_bundle`, at full control.
+  - `skill_view` read any installed bundle, switched on or not, and `../demo2/SKILL.md` read a sibling. It now reads
+    only a bundle whose record says `active`, inside its own folder.
+  - On Windows, `DELETE /api/skills/bundles/C%3A` resolved to the skills folder itself and deleted every installed
+    skill. A bundle name is held to the name rule before it becomes a path.
+- **A tool behind `tool_call` is judged as itself** (#769). With `CHIMERA_DEFER_TOOLS` on, the trust kernel, the taint
+  ledger and the reach floor judged the proxy, not the tool: `execute_code` running `rm -rf /` was BLOCK declared and
+  ALLOW deferred, and a `read_only` reach or the chat guard left `execute_code` reachable through the catalogue. The
+  inner call is now read everywhere a name decides, and the deferred catalogue applies the same fence. With
+  `CHIMERA_MCP_DEFER` on, the two chat surfaces mounted MCP before the denylist, so a denylisted server tool still ran
+  through `mcp_call`. Both switches were reachable only through `.env` until now.
+- **The per-folder command grant lives on the server, and a request is held to it** (#764). "The agent may run
+  commands in this folder" was a claim inside each request, kept in the webview's storage, so the claim was the grant
+  for any caller. It is now a record in the project registry, set from the new Folders card in Settings (which also
+  pins and hides folders) or by the bridge at full control; a request without it runs as `workspace`. Old browser-side
+  grants are carried over once. Without `CHIMERA_SERVER_TOKEN` any local process can still call the grant route, like
+  every other route; what changed is that a request no longer carries the grant.
+- **The browser's address check reads numeric hosts as Chromium does** (#769). `2130706433`, `0177.0.0.1`, `0x7f.1`
+  and `127.1` went to the platform's resolver, which reads them differently per OS (refused on Windows by luck). A
+  host whose last label is numeric and is not a canonical address is now refused before any resolver.
+
+### Added
+
+- **`chimera code list` and `chimera code resume <id>` continue a desktop Code conversation from the terminal**
+  (#757). They go through the desktop bridge, so the turn runs in the app, under the owner's posture, in the same
+  conversation and folder the screen shows. An approval prints as a card and is answered from the terminal only with
+  full control, otherwise in the app. Reaching an app on another machine is left out.
+- **Voice pace and a voice language of its own, and hold Ctrl+Shift+Space to dictate** (#758). The Voice card offers
+  0.8x to 1.5x and a language apart from the interface's, which the voices listed, the voice mode and the transcription
+  hint follow. Holding the chord (Cmd+Shift+Space on a Mac) records while the composer is visible and transcribes on
+  release. Defaults are today's: 1x and the interface's language.
+- **Keep running in the tray, start at sign-in, flash for approvals, and a quick-entry shortcut** (#759). Closing the
+  window can leave the backend, its schedules and bots running, with a tooltip of running turns, today's spend (UTC)
+  and approvals waiting; start at sign-in launches hidden (on Windows, in the install folder, where `.env` is read);
+  the taskbar flashes once per new approval while the window is unfocused; and a global chord brings the Code screen
+  forward. The flash ships on; tray, sign-in and the shortcut ship off. New Rust dependencies: `tauri-plugin-autostart`
+  ~2.5.1 and `tauri-plugin-global-shortcut` ~2.3.2; the page still gets no IPC. The manual cycle on a real build
+  (hide, reopen, reboot, a chord taken by another app) was not run.
+- **A weekly review counted by code** (#760). `chimera report weekly` proposes a job, disabled, that each Monday puts
+  spend, "was it worth it", approval answers and failing jobs side by side, each figure from the same function its
+  screen calls, with no model and no spend. It runs only after `chimera cron enable` or the switch in Settings >
+  Automation (#766); a missing source is named, never read as zero.
+- **A Notifications card** (#761): turn end (optionally only past N seconds), an approval waiting, and a schedule that
+  started failing, with one notice when it recovers. All ship off; switching one on asks the OS for permission from
+  that click. A notice names the conversation or the job, never the command or the error text, and comes only while
+  the window it concerns is not being looked at.
+- **Each Code conversation says what it needs, and can be archived** (#762). The sidebar marks a conversation waiting
+  for the owner, running, failed, or with edits not yet seen, from facts the server records, and offers a "Waiting for
+  you" filter. Archiving touches no transcript or folder and is refused while something runs or waits. Automatic
+  archiving (`CHIMERA_ARCHIVE_AFTER_DAYS`) ships off.
+- **Appearance settings** (#763): theme (System can be chosen again), motion, text size, conversation width, interface
+  and code fonts, and compact or detailed card presets that never minimise an approval, a spend warning or an error.
+  The motion preference had no caller until now. The OpenDyslexic face ships with the app under its SIL OFL 1.1
+  licence (about 107 KB of installer); the code fonts are not shipped and are marked when missing. Every default
+  stamps nothing. Large text in the smallest window has not been checked in the real WebView2.
+- **Keep the computer awake while there is work, and a screen for the daily cap** (#765). `CHIMERA_KEEP_AWAKE` (`off`,
+  the default; `working`; `always`) holds idle sleep during a Code turn, a background work, a run or a job due within
+  ten minutes, on Windows and on Linux with a graphical session; macOS says "unsupported". A closed lid still sleeps.
+  `CHIMERA_DAILY_USD_CAP` gets a row on Cost & Usage that says it brakes scheduled tasks only, in UTC days, and a value
+  saved there brakes the running daemon.
+- **Every switch of the batch has a row in Settings** (#766): Window and tray (the four tray switches, written to the
+  shell's own file and taken in within a few seconds), Conversations (automatic archiving), the cron failure notice and
+  the weekly review. `CHIMERA_APPROVE_VIA_CHAT` stays a `.env` edit on purpose, and the API refuses it; the
+  quick-entry chord stays a hand edit. The agent's file tools now refuse to write the shell's preference files; a
+  shell command still can, as it can write any file the owner can.
+- **Next-step suggestions under the answer, and an output style per conversation** (#768). Up to three chips, read off
+  facts of the turn (a failed check, an open task item, files git still reports as changed), fill the box and send
+  nothing; how often they are picked and sent is counted on Settings, by kind only. The style (standard, concise,
+  explanatory) adds one fixed, versioned suffix to the system prompt; Standard sends byte for byte what was sent
+  before, and no style changes the tools or the posture.
+- **Tool deferral on the Settings screen, off, with the saving measured beside it** (#769). `CHIMERA_DEFER_TOOLS` and
+  `CHIMERA_MCP_DEFER` get switches that show what this install would save (`GET /api/tools/defer-saving`,
+  `chimera tools --defer-saving`); on the stock registry, built-in schemas fall from 16,178 to 6,305 characters per
+  step. Both stay off: the bench finished 18/30 tasks declared against 15/30 deferred (McNemar p = 0.125,
+  inconclusive) with 26% fewer prompt tokens per completed task, and it measured built-in tools only.
+- **The agent's browser can be held to a site list and can open declared local ports** (#769).
+  `CHIMERA_BROWSER_SITES` only narrows: a navigation off the list asks the owner on the Code screen and in the app's
+  chat, and is refused where nobody can be asked. `CHIMERA_BROWSER_LOCAL_PORTS` opens `localhost` on the declared ports
+  only, never a port Chimera serves on or a server that relays to one (asked per request), and only for the agent's
+  own navigation or the dev app's own pages. Both are empty by default and nothing suggests them: the pre-registered
+  bench (P5.2) needs paid calls and was not run.
+- **Storage and Diagnostics cards** (#770). Disk by category, with "not measured" instead of zero for what could not
+  be read; a prune that removes only worktrees whose run is provably gone, and a log rotation, both behind a second
+  press. `CHIMERA_WORKTREE_DIR` moves run worktrees off the system temp folder (empty keeps temp). Diagnostics shows
+  versions, paths and the last crash report with known credential formats removed, and asks for the text to be
+  reviewed before it is posted. `chimera doctor` prints the same storage rows.
+- **A row for the sandbox's network, and Settings says what a command can reach** (#770). `CHIMERA_SANDBOX_NETWORK`
+  (`none`, the default, or `bridge`; `host` is refused) can be switched only where Docker answers; elsewhere a sentence
+  says the OS sandbox blocks the network, or that nothing isolates this machine. A save applies at once to new
+  commands, workflows and the verifier, while an open conversation keeps its network. A "Python for code" row names
+  the interpreter `execute_code` runs on this machine.
+- **Every way into this machine on one card, and two settings that narrow sharing** (#770). The Security screen lists
+  the server token, the desktop bridge (with a button for a new token), every share link of every conversation, the
+  network door, and whether the app itself listens on the network, never showing a whole token. `CHIMERA_SHARING=false`
+  stops every link and the network door (kept; they work again when it is back on), and `CHIMERA_SHARE_EXPIRY_HOURS`
+  stamps an expiry on new links. Both default to today's behaviour and only the owner can change them.
+- **An OpenRouter route can be told what it may keep, and a Privacy card says who reads your prompts** (#770).
+  `CHIMERA_OPENROUTER_DATA_COLLECTION=deny` and `CHIMERA_OPENROUTER_ZDR=true` ride on every OpenRouter call, streams and
+  embeddings included; a misspelt value reads as `deny`. The card lists every provider each configured role sends to,
+  whether a local runtime really stays on this machine, telemetry and who may talk to each bot, and names the Decisions
+  API, which does not carry the preference. Both ship off: they narrow which routes may answer, and the measurement of
+  how many of the mandate's models lose every route (P5.6) needs paid calls and was not taken.
+- **A chart the agent draws appears in the conversation** (#771), drawn by the app's own Vega with expressions
+  interpreted rather than compiled, every load refused, and the chart's events kept inside its own element. A spec
+  that names a URL, is over 128 KB or would make up more than 50,000 rows is not drawn (a worker checks, within 3 s,
+  what the spec cannot state); the file is still written. The viewer draws `render_chart` pages the same way. New
+  dependencies, pinned exactly: vega 6.4.0, vega-lite 6.4.3 and vega-interpreter 2.3.2 (BSD-3-Clause), in a chunk of
+  about 271 KB gzipped loaded on the first chart, never from a CDN.
+- **`create_document` writes Word, Excel, PowerPoint and PDF from a declarative spec** (#771). The model writes data
+  and fixed renderers write the file, through the same gate as `write_file`; every spreadsheet string is stored as
+  text, so a cell starting with `=` is not a formula. PDF needs no dependency (characters outside Windows-1252 are
+  written as `?` and counted); the others come from a new `documents-out` extra (python-docx 1.2.0 is new to the lock;
+  openpyxl and python-pptx were already there), in `[full]` and in the desktop build. `chimera deliver --format
+  docx|xlsx|pdf` converts the model's Markdown the same way. Off by default (`CHIMERA_CREATE_DOCUMENT`).
+- **Open what a turn wrote beside the conversation, and the Discord bot can attach it** (#771). The receipt offers
+  "Open <name> beside" for a chart, page, image or document the turn produced, and the viewer shows an office document
+  or PDF as a read-only text preview. `CHIMERA_DISCORD_ATTACH_FILES` (off, owner-only) attaches only files that turn's
+  own writers reported, of allowlisted types, 8 MB each and four a reply, and refuses to arm while
+  `CHIMERA_DISCORD_ALLOWED_USERS` is empty.
+- **"Active now" on the Skills screen, and a project pack that only narrows** (#771). The panel shows, byte for byte,
+  the skill text the prompt carries, and an update check compares the skill folder's files at the source. A folder's
+  `.chimera/pack.json` can keep only some skills and MCP servers and deny tools, never grant anything. It applies only
+  with `CHIMERA_PROJECT_PACK` on (off, owner-only) and after the owner accepts those exact bytes, and a changed file
+  keeps the accepted version applying. Chat surfaces without a project folder are not narrowed, and the pre-registered
+  bench (`bench/project_pack`) has not run.
+- **Upload a skill of your own** (#771) from the Skills screen, as a `.zip`, a `SKILL.md` or a folder. It always lands
+  pending and tainted whatever its frontmatter says, the archive is read as hostile input (paths, links, sizes, YAML
+  aliases, file types), and its description enters the prompt quoted as its author's words. Its switch stays disabled
+  until its SKILL.md has been read on screen.
+- **Four verified MCP catalogue entries, and the last Test is remembered** (#771). Stripe (remote, an Agent key in a
+  header, read permissions), Notion, Sentry (its read-only `inspect` skill) and Hostinger (the VPS group alone), each
+  pinned to the version that was read. A row shows when it was last tested, as history; "connected" still means a Test
+  in this session. "Add and test" says it runs the package on this computer; a key entry cannot be saved without its
+  key in the declared form; the catalogue can be searched and filtered by runner.
+- **Memory: edit a fact in place, export, import from Claude, and preview a merge for free** (#771). An edit keeps the
+  fact's trust label and masks keys; an export (JSON or Markdown) masks again and leaves metadata out. The Claude import
+  reads `CLAUDE.md` and memory notes, never `settings.json`, as tainted facts filed under the matching registered
+  folder, with nothing ticked by default. The merge preview spends nothing, and only the groups ticked are merged.
+- **OpenAPI connectors on the Connections screen** (#771). A spec becomes `api_<connector>_<op>` tools, pinned when
+  added and never re-fetched, GET only unless the connector's "allow changes" is on, and then every call is a question
+  to the owner. Answers are untrusted output. A connector loads on the Code screen and in the app's chat; the bots,
+  cron and servers load it only when the owner sends it there, and no bot surface loads one while any bot has an empty
+  allowlist; a guest's turn loads none. Nothing loads until the owner adds a connector and switches it on.
+- **Keys typed in Settings can live in the OS vault** (#771), behind `CHIMERA_KEY_VAULT` (off, owner-only). Each key is
+  read back from the vault before its `.env` line becomes a comment, a refusal fails the save instead of falling back
+  to plain text, and keys move either way by name. The server token stays in `.env`, where the tray reads it. The
+  frozen desktop build now bundles `keyring` and reads only the keys its `.env` marks. A round trip in a real release
+  build on a real keychain was not measured.
+- **`open_pull_request`, asked every time** (#771), behind `CHIMERA_PULL_REQUESTS` (off, owner-only). Every call is a
+  question only a person can answer, even under `CHIMERA_APPROVAL_MODE=allow`; it never pushes the default branch or
+  forces, and pushes the commit reviewed, by hash. The Git panel gets "Open pull request…" when origin and a signed-in
+  `gh` are there. `CHIMERA_BRANCH_PREFIX` (default `chimera`) names run branches, and the cleanup sweeps every prefix
+  ever used.
+- **pr-watch, a read-only pull request watch** (#771). `chimera report pr-watch` proposes an hourly job, disabled, that
+  reports the failing checks, new comments and reviews of the owner's pull requests and the default-branch runs that
+  failed, with no model and no spend. Other people's words arrive fenced, sanitised and with control characters
+  written out. The fix level (try a fix behind the verify gate) is not built.
+
+### Changed
+
+- **Skill bundles switched on now reach the prompt, and those switched on before this release wait for a new switch**
+  (#771). An import of a module that does not exist had left every bundle's prompt line empty since bundles shipped
+  (#141): the switch read "on" and the agent was never told. With that fixed, a switch thrown when it did nothing is
+  not taken as consent: a bundle marked active without a record of the switch reads as pending, the Skills screen and
+  `chimera skills-bundles` name it, and the owner's next switch sends it.
+- **A content-policy refusal names its model, and only the owner tries another** (#767). The error card shows the
+  model, the route and the provider's request id, says nothing was retried, and offers "Try with another model" in
+  place of "Try again"; the retry runs on the one model picked, never fused or external, and asks first if the pick is
+  the model that refused. The receipt records it. A chat bot, WhatsApp included, answers a refusal with one sentence
+  instead of silence. Nothing falls back on its own, as before.
+
+### Fixed
+
+- **Starting a run in one repository no longer deletes another repository's live worktree** (#770). The boot-time
+  cleanup removed every `chimera-wt-*` folder older than an hour in the shared temp folder, whichever repository's run
+  was working in it. It now removes only folders no repository knows.
+- **The editor cannot save over a file it could not show as text** (#771). An existing file that is not UTF-8 was shown
+  empty, and a save replaced it with the draft; the write route now refuses it, and a document's text preview, from
+  every client.
+- **A duplicated key in `.env` saved from Settings takes effect** (#771). The save replaced only the first `KEY=` line
+  while dotenv reads the last; every assignment is replaced now, and an `export` stays on its line.
+- **Merging memory facts keeps each fact's project and masks what it sends** (#771). `memory consolidate` grouped facts
+  across projects and wrote the merged fact for every folder, sent old facts to the model unmasked and stored the reply
+  unmasked. Imported facts lost their project too.
+- **An MCP server that fails to start is closed** (#771). A start that timed out (a browser sign-in waiting, say) left
+  the server's process alive for the rest of the app, from a Test, the pool or autoload alike.
+- **A failed turn's OS notification no longer carries the error text** (#761). A shadowed parameter put a provider's or
+  a tool's words on the OS surface instead of the request.
+- **A braked scheduled job is reported as switched off** (#761): `GET /api/cron` now sends `disabled_by`, which the
+  engine wrote and the route dropped.
+- **The Sandbox select shows `auto`** (#770), the shipped default. It offered only `local` and `docker`, showed "local"
+  for a sandbox that was not, and `auto` could not be chosen back.
+- **After a refused navigation the browser's next page loads** (#769). Chromium's own move to an error page
+  interrupted the next navigation, so every refusal cost the page after it.
 
 ## [0.64.2] - 2026-10-03
 ### Security
