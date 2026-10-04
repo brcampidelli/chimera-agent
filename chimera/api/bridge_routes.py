@@ -364,7 +364,9 @@ ROUTES: dict[str, BridgeRoute] = {
     "settings.edit": _r(
         "PATCH",
         "/api/config",
-        "Edit settings: body {ENV_NAME: value}. Credentials are refused.",
+        "Edit settings: body {ENV_NAME: value}. Credentials are refused, and so are the owner's "
+        "settings: posture, guards, approvals, where the agent may reach, who may reach it, and where "
+        "prompts may go.",
         tier="full",
     ),
     "settings.instructions": _r(
@@ -418,11 +420,91 @@ FULL_ONLY_BODY_KEYS = frozenset(
 #: that could write them could widen its own access.
 BRIDGE_SETTINGS = frozenset({"CHIMERA_DESKTOP_BRIDGE", "CHIMERA_DESKTOP_BRIDGE_FULL"})
 
-#: Settings only the owner writes, full control or not: the bridge's own switches, and the two that
-#: narrow sharing. Each of the sharing pair only narrows from the screen, but a client that could
-#: write it could undo the owner's narrowing — turn sharing back on, or make new links never
-#: expire — and so open a door the owner had shut.
-OWNER_ONLY_SETTINGS = BRIDGE_SETTINGS | frozenset({"CHIMERA_SHARING", "CHIMERA_SHARE_EXPIRY_HOURS"})
+#: The two that narrow sharing. Each only narrows from the screen, but a client that could write it
+#: could undo the owner's narrowing — turn sharing back on, or make new links never expire — and so
+#: open a door the owner had shut.
+SHARING_SETTINGS = frozenset({"CHIMERA_SHARING", "CHIMERA_SHARE_EXPIRY_HOURS"})
+
+#: What a run may do, and what stands between it and doing it: the posture, the trust kernel and its
+#: denylist, the chat's guard, and everything that answers or routes an approval. The decision pair
+#: is here because it IS the governance band's instrument (`chimera/governance/band.py`): a model
+#: the band has no calibration map for is read as a prior and thresholds nothing, so swapping it
+#: switches the band off without touching `CHIMERA_GOVERNANCE`. The webhook is also refused by its
+#: name's shape (:func:`is_secret_setting`); it is listed for what it does — whoever receives the
+#: question answers it — so the refusal does not depend on a regular expression.
+GUARD_SETTINGS = frozenset(
+    {
+        "CHIMERA_REACH",
+        "CHIMERA_APPROVAL",
+        "CHIMERA_HOST_EXEC",
+        "CHIMERA_GOVERNANCE",
+        "CHIMERA_TOOL_DENYLIST",
+        "CHIMERA_GUARD_CHAT",
+        "CHIMERA_APPROVAL_WEBHOOK",
+        "CHIMERA_DECISION_BACKEND",
+        "CHIMERA_DECISION_MODEL",
+        # The only brake on what unattended jobs spend (`chimera/scheduler/job_runner.py`).
+        "CHIMERA_DAILY_USD_CAP",
+    }
+)
+
+#: Where the agent may reach: the sandbox and its network, the hosts a run holding untrusted content
+#: may still send a query-string GET to, the browser's sites and local ports (emptying the site list WIDENS it to any public
+#: site), and the MCP servers loaded into every registry at boot.
+REACH_SETTINGS = frozenset(
+    {
+        "CHIMERA_SANDBOX",
+        "CHIMERA_SANDBOX_NETWORK",
+        "CHIMERA_EGRESS_ALLOW",
+        "CHIMERA_BROWSER_SITES",
+        "CHIMERA_BROWSER_LOCAL_PORTS",
+        "CHIMERA_MCP_AUTOLOAD",
+    }
+)
+
+#: Who may reach the agent: whether the bots start with the app, and who each one answers. An empty
+#: list means ANYONE (`chimera/server/allowlist.py`), so clearing one is the widest edit there is.
+MESSAGING_SETTINGS = frozenset(
+    {
+        "CHIMERA_APP_MESSAGING",
+        "CHIMERA_DISCORD_ALLOWED_USERS",
+        "CHIMERA_TELEGRAM_ALLOWED_USERS",
+        "CHIMERA_SLACK_ALLOWED_USERS",
+        "CHIMERA_SIGNAL_ALLOWED_USERS",
+        "CHIMERA_WHATSAPP_ALLOWED_NUMBERS",
+    }
+)
+
+#: Where prompts may go. OpenRouter's two privacy fences (`allow` / `false` loosen them), and the
+#: three base URLs: `CHIMERA_API_BASE` is sent on every call WITH the provider's key, so pointing it
+#: elsewhere hands over the key and every prompt; the two local runtimes' URLs turn a model the
+#: owner chose for staying on this machine into one that does not.
+PRIVACY_SETTINGS = frozenset(
+    {
+        "CHIMERA_OPENROUTER_DATA_COLLECTION",
+        "CHIMERA_OPENROUTER_ZDR",
+        "CHIMERA_API_BASE",
+        "CHIMERA_OLLAMA_BASE_URL",
+        "CHIMERA_LM_STUDIO_BASE_URL",
+    }
+)
+
+#: Settings only the owner writes, full control or not. The rule is the project's: whatever WIDENS
+#: what the agent can reach, loosens a guard or a privacy fence, or changes who answers an approval
+#: is the owner's decision — a client that could write one could widen its own access, or undo a
+#: narrowing the owner chose. Full control is for operating the app, not for setting its limits.
+#: Every other editable setting (models, caches, memory, scheduling, display, the tool switches
+#: that stay inside the reach above) stays writable: `tests/
+#: test_the_bridge_may_not_write_the_settings_that_set_its_limits.py` holds the whole allowlist
+#: classified, so a new setting cannot arrive unclassified.
+OWNER_ONLY_SETTINGS = (
+    BRIDGE_SETTINGS
+    | SHARING_SETTINGS
+    | GUARD_SETTINGS
+    | REACH_SETTINGS
+    | MESSAGING_SETTINGS
+    | PRIVACY_SETTINGS
+)
 
 _SECRET_NAME = re.compile(
     r"(API_?KEY|_KEYS$|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PRIVATE|WEBHOOK)", re.IGNORECASE
