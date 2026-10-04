@@ -640,6 +640,10 @@ PRIVACY_SETTINGS = frozenset(
         # from, but a client that could switch it off would send the next key the owner types into
         # a plain-text file. Its name matches no credential pattern, so it has to be listed.
         "CHIMERA_KEY_VAULT",
+        # Whether the agent's read tools may read Chimera's own `.env` and so put the provider keys
+        # in front of the model (owner's decision, 2026-10-04). Off narrows; a client that could
+        # write it could turn it back on.
+        "CHIMERA_AGENT_READS_OWN_ENV",
     }
 )
 

@@ -246,6 +246,9 @@ _EDITABLE_SETTINGS = {
     # direction sends the next key typed here back into a plain-text file. Read at every save, so
     # no APPLIES_WHEN entry.
     "CHIMERA_KEY_VAULT",
+    # Whether the agent's read tools may read Chimera's own `.env` (owner's decision, 2026-10-04).
+    # On by default. Owner-only (`bridge_routes.PRIVACY_SETTINGS`): on is the direction that loosens.
+    "CHIMERA_AGENT_READS_OWN_ENV",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -977,6 +980,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_OPENROUTER_DATA_COLLECTION": _check_data_collection,
     "CHIMERA_OPENROUTER_ZDR": _check_boolean("CHIMERA_OPENROUTER_ZDR"),
     "CHIMERA_KEY_VAULT": _check_boolean("CHIMERA_KEY_VAULT"),
+    "CHIMERA_AGENT_READS_OWN_ENV": _check_boolean("CHIMERA_AGENT_READS_OWN_ENV"),
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }

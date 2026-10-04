@@ -231,6 +231,8 @@ def privacy_snapshot(settings: Settings) -> dict[str, Any]:
     return {
         "openrouter_data_collection": settings.openrouter_data_collection,
         "openrouter_zdr": settings.openrouter_zdr,
+        # Whether the agent's read tools may read Chimera's own `.env` (its keys reach the model).
+        "agent_reads_own_env": bool(settings.agent_reads_own_env),
         "routes": prompt_routes(settings),
         # The exporter turns on from either switch AND only with the `[otel]` extra installed
         # (`chimera/obs.py: configure_otel` logs "tracing stays off" without it). `telemetry` is what

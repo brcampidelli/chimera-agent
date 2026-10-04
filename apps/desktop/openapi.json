@@ -9937,6 +9937,11 @@
       "PrivacyCfgOut": {
         "description": "The Security screen's privacy card (``chimera/providers/privacy.py``). Read-only facts plus\nthe two OpenRouter switches; a server without the block is on the shipped defaults, which send\nnothing.",
         "properties": {
+          "agent_reads_own_env": {
+            "default": true,
+            "title": "Agent Reads Own Env",
+            "type": "boolean"
+          },
           "openrouter_data_collection": {
             "default": "allow",
             "title": "Openrouter Data Collection",

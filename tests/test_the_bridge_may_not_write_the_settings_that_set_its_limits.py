@@ -93,6 +93,9 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_LM_STUDIO_BASE_URL": ("http://127.0.0.1:1234/v1", "http://lms.example.invalid:1234/v1"),
     # Where the owner's keys live (P7.7): off sends the next key typed into a plain-text file.
     "CHIMERA_KEY_VAULT": ("true", "false"),
+    # Whether the agent's read tools may read Chimera's own .env (owner's decision, 2026-10-04):
+    # on puts the provider keys within the model's reach, so a client may not turn it back on.
+    "CHIMERA_AGENT_READS_OWN_ENV": ("false", "true"),
 }
 
 #: The settings the bridge may only SUGGEST (owner's decision, 2026-10-04): which model or route a

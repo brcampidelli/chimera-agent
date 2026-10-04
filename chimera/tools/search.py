@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.files import _WorkspaceTool
-from chimera.tools.workspace import resolve_for, shown_path
+from chimera.tools.workspace import hides_own_env, resolve_for, shown_path
 
 _IGNORE_DIRS = frozenset(
     {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
@@ -84,6 +84,8 @@ class GrepTool(_WorkspaceTool):
         for file in files:
             if glob and not file.match(str(glob)):
                 continue
+            if hides_own_env(file):
+                continue  # Chimera's own .env, kept from the agent by the owner
             try:
                 if file.stat().st_size > _MAX_FILE_BYTES:
                     continue
@@ -123,6 +125,8 @@ class GlobTool(_WorkspaceTool):
             # Resolve and require the real path to stay under the workspace root before emitting it.
             resolved = path.resolve()
             if resolved != root and root not in resolved.parents:
+                continue
+            if hides_own_env(resolved):
                 continue
             if resolved.is_file():
                 out.append(resolved.relative_to(root).as_posix())

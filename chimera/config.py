@@ -666,6 +666,16 @@ class Settings(BaseSettings):
     # (`bridge_routes.OWNER_ONLY_SETTINGS`), because its other direction puts keys back in the file.
     key_vault: bool = Field(default=False, validation_alias="CHIMERA_KEY_VAULT")
 
+    # Whether the agent's READ tools may read Chimera's own `.env` - the file the Settings screen
+    # saves provider keys into (owner's decision, 2026-10-04). ON by default, which is how it always
+    # was: an owner who asks the agent to look at the install folder gets the file. When on, the
+    # keys in it can reach the model and its provider; off, read_file, grep, glob, list_dir, the
+    # document reader and the explorer refuse or hide that one file (`chimera/tools/workspace.py`),
+    # recognised by identity so no other spelling of it gets through. Other projects' `.env` files
+    # are untouched. Owner-only: the bridge refuses it (`bridge_routes.PRIVACY_SETTINGS`), since
+    # turning it back on loosens privacy. Read per tool call, so it applies from the next one.
+    agent_reads_own_env: bool = Field(default=True, validation_alias="CHIMERA_AGENT_READS_OWN_ENV")
+
     # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
     # the command pick the first model measured as a reviewer whose family differs from the
     # author's (`MEASURED_REVIEWERS` in `chimera/review/family.py`, chosen by `bench/review_reviewer`),

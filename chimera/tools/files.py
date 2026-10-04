@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from chimera.tools.base import Tool
-from chimera.tools.workspace import atomic_write_text, resolve_for, shown_path
+from chimera.tools.workspace import atomic_write_text, hides_own_env, resolve_for, shown_path
 from chimera.tools.write_region import WriteRegion, refuse_write
 
 _MAX_READ_CHARS = 20_000
@@ -264,5 +264,11 @@ class ListDirTool(_WorkspaceTool):
         path = resolve_for(self, str(kwargs.get("path", ".")), verb="list")
         if not path.is_dir():
             return f"error: not a directory: {kwargs.get('path', '.')}"
-        entries = sorted(f"{p.name}/" if p.is_dir() else p.name for p in path.iterdir())
+        entries = sorted(
+            f"{p.name}/" if p.is_dir() else p.name
+            for p in path.iterdir()
+            # Chimera's own .env, when the owner keeps it from the agent's read tools: not even its
+            # name, so a listing is not an invitation to try another spelling.
+            if not hides_own_env(p)
+        )
         return "\n".join(entries) if entries else "(empty)"

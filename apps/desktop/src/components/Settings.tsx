@@ -1658,6 +1658,19 @@ export function Settings({
                       onChange={(v) => save({ CHIMERA_OPENROUTER_ZDR: String(v) })}
                     />
                   </Row>
+                  {/* Whether the agent's read tools may read Chimera's own `.env` (owner's
+                    decision, 2026-10-04). On by default, as it always was; the hint says what that
+                    means in plain words, because the keys there would reach the model. */}
+                  <Row
+                    label={t("settings.row.agentReadsOwnEnv")}
+                    hint={t("settings.hint.agentReadsOwnEnv")}
+                    env="CHIMERA_AGENT_READS_OWN_ENV"
+                  >
+                    <Toggle
+                      on={c.privacy?.agent_reads_own_env ?? true}
+                      onChange={(v) => save({ CHIMERA_AGENT_READS_OWN_ENV: String(v) })}
+                    />
+                  </Row>
                 </Card>
 
                 <Card title={t("settings.card.apiKeys")}>

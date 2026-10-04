@@ -8651,6 +8651,11 @@ export interface components {
          */
         PrivacyCfgOut: {
             /**
+             * Agent Reads Own Env
+             * @default true
+             */
+            agent_reads_own_env: boolean;
+            /**
              * Openrouter Data Collection
              * @default allow
              */

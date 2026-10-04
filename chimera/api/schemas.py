@@ -958,6 +958,10 @@ class PrivacyCfgOut(BaseModel):
     openrouter_data_collection: str = "allow"
     """``allow`` (the default: nothing sent) or ``deny`` (only routes that keep no prompts)."""
     openrouter_zdr: bool = False
+    agent_reads_own_env: bool = True
+    """Whether the agent's read tools may read Chimera's own ``.env`` (``CHIMERA_AGENT_READS_OWN_ENV``,
+    on by default). On, the provider keys saved there can reach the model; off, that one file is
+    refused or hidden by every read tool."""
     routes: list[PromptRouteOut] = Field(default_factory=list)
     telemetry: bool = False
     """Whether anything is exported: OpenTelemetry asked for (``CHIMERA_OTEL`` or

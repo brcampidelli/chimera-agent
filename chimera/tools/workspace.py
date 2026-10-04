@@ -35,6 +35,41 @@ def chimera_home() -> Path | None:
         return None
 
 
+def own_env_readable() -> bool:
+    """Whether the owner lets the agent's read tools read Chimera's own ``.env``.
+
+    ``CHIMERA_AGENT_READS_OWN_ENV``, on by default (the owner's decision of 2026-10-04). Read at
+    every call, so a change applies from the next tool call. Settings that cannot be read leave the
+    default.
+    """
+    try:
+        from chimera.config import get_settings
+
+        return bool(get_settings().agent_reads_own_env)
+    except Exception:  # noqa: BLE001 — a guard must not crash a tool; the default is the answer
+        return True
+
+
+def hides_own_env(path: Path) -> bool:
+    """Whether a read tool must leave ``path`` out: it is Chimera's own ``.env`` and the owner has
+    switched the agent's reading of it off. Recognised by identity (`chimera/core/own_files.py`), so
+    ``ENV~1``, ``.env `` and ``.env::$DATA`` are the same file here."""
+    if own_env_readable():
+        return False
+    from chimera.core.own_files import is_own_env
+
+    return is_own_env(path)
+
+
+def refuse_own_env_read(candidate: Path) -> None:
+    """Refuse a read of Chimera's own ``.env`` when the owner has switched that off."""
+    if hides_own_env(candidate):
+        raise ProtectedPathError(
+            f"{candidate} is Chimera's own .env, and the owner keeps it from the agent's read "
+            "tools (Settings › Security › Privacy). Do not retry."
+        )
+
+
 def refuse_own_files(candidate: Path, verb: str) -> None:
     """Refuse ``candidate`` when it is Chimera's own ``.env`` or inside its data folder.
 
@@ -137,6 +172,11 @@ _READ_VERBS = frozenset({"read", "list", "search"})
 
 def _refuse_shell_owned(candidate: Path, verb: str) -> None:
     if verb in _READ_VERBS:
+        # Reading: only Chimera's own `.env`, and only when the owner switched that off. A listing
+        # or a search ROOTED at a folder is not refused for holding it; the tools leave the file
+        # out of what they return (`hides_own_env`).
+        if verb == "read":
+            refuse_own_env_read(candidate)
         return
     # Chimera's own `.env` and data folder, for every write a tool makes — inside the workspace or
     # outside it with a person's yes, which cannot grant this one either.
