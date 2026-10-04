@@ -121,6 +121,12 @@ _EDITABLE_SETTINGS = {
     "CHIMERA_GUARD_CHAT",  # assemble the chat agent with the coding turn's denylist + taint ledger
     "CHIMERA_SANDBOX",
     "CHIMERA_SANDBOX_IMAGE",
+    # The docker sandbox's network: `none` (the default) or `bridge`. It existed, was read by
+    # `get_sandbox`, and had no row — so a task that needs `pip install` inside the container had
+    # no way to get it but a file the app never mentions. Saved values are checked
+    # (`_check_sandbox_network`): anything but the two the factory understands would be stored,
+    # shown, and silently read as `none`.
+    "CHIMERA_SANDBOX_NETWORK",
     # Watch the page the agent is on. The setting was written, wired and reachable only by editing
     # `.env`: `default_registry` has always passed `settings.browser_headless` to the browser tool,
     # and `PATCH /api/config` has always refused the key. So the one way to see what the agent is
@@ -226,6 +232,11 @@ def is_editable(key: str) -> bool:
 #: gateway and the request handlers read through instead of holding a boot-time snapshot.
 NEXT_CONVERSATION = "next_conversation"
 NEXT_LAUNCH = "next_launch"
+#: Two moments at once: what builds its sandbox per use (a `!` command, a workflow or cron shell
+#: step, the verifier) takes the new value immediately, while an open conversation keeps the tools
+#: it was built with. Saying only "next conversation" would describe the side that WIDENS access as
+#: later than it is.
+COMMANDS_NOW = "commands_now"
 APPLIES_WHEN: dict[str, str] = {
     # Decided when a conversation is built (`factory()` in `chimera app`), so an open conversation
     # keeps the behaviour it started with — deliberately: changing a running chat's guard or backend
@@ -252,6 +263,13 @@ APPLIES_WHEN: dict[str, str] = {
     # is the scope that is true on both; an open chat keeps the tool list it started with.
     "CHIMERA_DEFER_TOOLS": NEXT_CONVERSATION,
     "CHIMERA_MCP_DEFER": NEXT_CONVERSATION,
+    # Read at two points. `default_registry` builds the chat's shell and code tools, each with its
+    # own sandbox object (`get_sandbox()` in `chimera/tools/builtin.py`), so an open chat keeps the
+    # network its tools were built with; a Code turn builds them afresh. But three callers build the
+    # sandbox on every use and so take a save at once: the user's `!` command
+    # (`api/exec_stream.py`), a workflow or cron shell step (`workflow/executors.py`, unattended),
+    # and the verifier (`core/verify.py`). Hence COMMANDS_NOW, not NEXT_CONVERSATION.
+    "CHIMERA_SANDBOX_NETWORK": COMMANDS_NOW,
     # The governance band builds its decider once per assembly (`governance/band.py::build_band`), so
     # a chat already running keeps the instrument it started with; the next one reads the new pair.
     # `POST /api/decide` and the `decide` tool rebuild on the next call.
@@ -432,6 +450,8 @@ def read_config(settings: Settings) -> dict[str, Any]:
         )
     ladder = settings.tier_ladder()
     pools = read_pools(settings)
+    from chimera.sandbox import sandbox_network
+
     # Imported here: `chimera.server` pulls in every adapter and the HTTP server, which a settings
     # read has no other reason to load.
     from chimera.server.allowlist import ALLOWLIST_FIELDS, allowed_ids
@@ -476,11 +496,18 @@ def read_config(settings: Settings) -> dict[str, Any]:
             "embed_model": settings.embed_model,
         },
         "cache": {"completion": settings.cache, "prompt": settings.prompt_cache},
-        "sandbox": {"mode": settings.sandbox, "image": settings.sandbox_image},
-        # The site list and the declared ports as written, not a mask: statements the owner made and
-        # has to be able to read back. A value `.env` holds that does not parse leaves the lists
-        # empty AND says why in `invalid`: empty alone would read "any public site" for a browser
-        # that is left out of every conversation (`default_registry`).
+        "sandbox": {
+            "mode": settings.sandbox,
+            "image": settings.sandbox_image,
+            # As the factory reads it, not as typed: `get_sandbox` opens the bridge for `bridge` and
+            # for nothing else, so a hand-edited `.env` holding anything else is `none` in fact and
+            # must not be shown as something else on the row that edits it.
+            "network": sandbox_network(settings),
+            # The one exception to that network, read where it acts (`core/verify.py`): the verifier
+            # rebuilds a container with the network on, and under a kernel sandbox runs a command
+            # the user typed on the host. A row reading "no network" has to be able to say so.
+            "verify_network": settings.verify_network,
+        },
         "browser": {
             "headless": settings.browser_headless,
             **_browser_reach_lists(settings),
@@ -573,6 +600,7 @@ def doctor(settings: Settings) -> dict[str, Any]:
     """A config-health snapshot (no live provider pings): which providers have keys, the model ladder."""
     from chimera.acp.agents import available_agents
     from chimera.providers.discovery import is_local_model
+    from chimera.tools.code import host_python_report
 
     ladder = settings.tier_ladder()
     return {
@@ -595,6 +623,11 @@ def doctor(settings: Settings) -> dict[str, Any]:
         # a downloaded app is the exact place where "it should be installed" stops being evidence,
         # and the answer a new user needs is "what do I install", not "something is unavailable".
         "editor": editor_capabilities(settings),
+        # Which Python `execute_code` runs on THIS machine. In the frozen desktop build there is no
+        # interpreter of its own, so it is whatever PATH holds, or none — and a snippet that cannot
+        # start reads in a transcript like a model that wrote bad code. Saying which one is what
+        # tells the two apart.
+        "code_python": host_python_report(),
     }
 
 
@@ -763,6 +796,18 @@ def _check_worktree_dir(value: str, workspace: Path | None = None) -> None:
             )
 
 
+def _check_sandbox_network(value: str) -> None:
+    """``none`` or ``bridge``, and nothing else.
+
+    ``get_sandbox`` reads anything but ``bridge`` as ``none``, so a stray value would not open the
+    network — it would be saved, shown on the row as if it meant something, and do nothing. And the
+    one docker value it would be natural to try, ``host``, is the one that must never be accepted:
+    it shares this machine's network stack with the container, which is no boundary at all.
+    """
+    if value.strip().lower() not in ("none", "bridge"):
+        raise ValueError("CHIMERA_SANDBOX_NETWORK must be none or bridge")
+
+
 def _check_boolean(key: str) -> Callable[[str], None]:
     def check(value: str) -> None:
         if value.strip().lower() not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
@@ -787,6 +832,7 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DEFER_TOOLS": _check_boolean("CHIMERA_DEFER_TOOLS"),
     "CHIMERA_MCP_DEFER": _check_boolean("CHIMERA_MCP_DEFER"),
     # CHIMERA_WORKTREE_DIR is checked in `patch_config` itself: its check needs the workspace.
+    "CHIMERA_SANDBOX_NETWORK": _check_sandbox_network,
 }
 
 

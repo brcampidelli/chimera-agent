@@ -2056,6 +2056,40 @@
         "title": "CodeProjectOut",
         "type": "object"
       },
+      "CodePythonOut": {
+        "description": "The interpreter ``execute_code`` uses when a snippet runs on this machine.\n\nThe frozen desktop build has no interpreter of its own, so it is whatever PATH holds, or none;\nwithout this, a snippet that could not start reads in a transcript like a model that wrote bad\ncode. Only the host half: whether a container answers instead is ``/api/governance/sandbox``.",
+        "properties": {
+          "frozen": {
+            "default": false,
+            "title": "Frozen",
+            "type": "boolean"
+          },
+          "looked_for": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Looked For",
+            "type": "array"
+          },
+          "path": {
+            "default": "",
+            "title": "Path",
+            "type": "string"
+          },
+          "source": {
+            "default": "missing",
+            "enum": [
+              "interpreter",
+              "path",
+              "missing"
+            ],
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "title": "CodePythonOut",
+        "type": "object"
+      },
       "CodeSessionArchiveOut": {
         "description": "A conversation after archiving or bringing it back: ``archived_at`` is None once it is back.\n\nArchiving touches no file, folder or worktree \u2014 it is a timestamp beside the transcripts. A\nrefusal is a 409 with the reason (a turn running, a question waiting), an unknown id a 404.",
         "properties": {
@@ -4827,6 +4861,16 @@
             "default": false,
             "title": "Can Answer",
             "type": "boolean"
+          },
+          "code_python": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CodePythonOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "configured_providers": {
             "items": {
@@ -9636,6 +9680,20 @@
           "mode": {
             "title": "Mode",
             "type": "string"
+          },
+          "network": {
+            "default": "none",
+            "enum": [
+              "none",
+              "bridge"
+            ],
+            "title": "Network",
+            "type": "string"
+          },
+          "verify_network": {
+            "default": false,
+            "title": "Verify Network",
+            "type": "boolean"
           }
         },
         "required": [
@@ -9659,6 +9717,16 @@
           "isolated": {
             "title": "Isolated",
             "type": "boolean"
+          },
+          "network": {
+            "default": "host",
+            "enum": [
+              "none",
+              "bridge",
+              "host"
+            ],
+            "title": "Network",
+            "type": "string"
           },
           "platform": {
             "default": "",
