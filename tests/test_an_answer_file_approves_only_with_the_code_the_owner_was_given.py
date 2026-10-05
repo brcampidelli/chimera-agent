@@ -206,8 +206,11 @@ def test_the_delivered_message_carries_the_whole_approve_line(tmp_path: Path) ->
 
 
 def test_with_no_screen_and_no_channel_the_code_goes_to_the_askers_own_stderr(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # A TERMINAL's stderr: redirected to a file it would be readable by the agent's shell, and the
+    # code is withheld there (tests/test_where_the_code_was_shown_is_said_and_any_code_is_recorded.py).
+    monkeypatch.setattr(pending, "_stderr_is_a_terminal", lambda: True)
     result: list[bool] = []
     thread = threading.Thread(
         target=lambda: result.append(

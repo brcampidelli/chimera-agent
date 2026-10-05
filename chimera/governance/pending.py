@@ -406,7 +406,11 @@ def answer_with_code(
         if not isinstance(expires_at, (int, float)) or agora >= float(expires_at):
             return "expired"
         expected = _code_in_memory(request_id)
-        if expected is not None and not hmac.compare_digest(expected, str(code)):
+        # Bytes, not str: `compare_digest` on two str raises TypeError for any non-ASCII character,
+        # and the code here is text somebody typed into a chat.
+        if expected is not None and not hmac.compare_digest(
+            expected.encode("utf-8"), str(code).encode("utf-8")
+        ):
             return "wrong_code"
         data["code_used_at"] = agora
         try:
@@ -445,6 +449,46 @@ def split_for_channel(text: str, limit: int = DELIVERY_PART_CHARS) -> list[str]:
     if current is not None:
         parts.append(current)
     return parts
+
+
+#: Where a question's code was shown (:func:`code_shown`): in the delivered message, on the asking
+#: process's terminal, only on the asking app's screen (whose card answers from memory and never
+#: shows it), or nowhere at all.
+CODE_IN_MESSAGE = "message"
+CODE_ON_TERMINAL = "terminal"
+CODE_ON_SCREEN_ONLY = "screen"
+CODE_NOWHERE = "nowhere"
+
+
+def _stderr_is_a_terminal() -> bool:
+    try:
+        return bool(sys.stderr.isatty())
+    except (AttributeError, ValueError, OSError):
+        return False
+
+
+def _where_the_code_goes(deliver: Any, on_asked: Any) -> str:
+    if deliver is not None:
+        return CODE_IN_MESSAGE
+    if on_asked is not None:
+        return CODE_ON_SCREEN_ONLY
+    return CODE_ON_TERMINAL if _stderr_is_a_terminal() else CODE_NOWHERE
+
+
+def code_shown(home: Path, request_id: str) -> str:
+    """Where the owner was shown ``request_id``'s code, or "" when the question does not say.
+
+    Read by ``chimera approve`` to say why ``--yes`` cannot work for a question whose code was shown
+    only on the app's card, or nowhere. Advisory: the file is writable by the agent, and nothing
+    approves on the strength of this field — a wrong value costs a misleading hint, not a yes.
+    """
+    if not _REQUEST_ID.fullmatch(request_id or ""):
+        return ""
+    try:
+        data = json.loads((_dir(home) / f"{request_id}.ask.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return ""
+    return str(data.get("code_shown") or "") if isinstance(data, dict) else ""
 
 
 def ask_durably(
@@ -520,14 +564,21 @@ def ask_durably(
     # The owner's code (study 30, S30-30): every question has one, an approval must carry it, and it
     # lives in this process's memory and in what is shown to the owner — never in a file. It is
     # shown only in the delivered text (or, with no screen and no channel, on this process's
-    # stderr) — never on the announcement, the card, `GET /api/approvals` or the record line, which
-    # are all places a model can end up reading.
+    # stderr, and only when that is a terminal: redirected to a log it is a file like any other)
+    # — never on the announcement, the card, `GET /api/approvals` or the record line, which are all
+    # places a model can end up reading. A question asked by a screen with no channel has its code
+    # in memory only: it is approved on that screen's card, and `chimera approve` says so.
     code = new_code()
     # The same code answers from the chat bot (study 29, P3.3), offered only when the text channel
     # says it can carry one: `approval.deliverer_for` marks the owner's webhook with
     # `offers_chat_code` when CHIMERA_APPROVE_VIA_CHAT is on and some bot has an allowlist. A chat
     # line shown where no bot would accept it would be an instruction that cannot work.
     chat = deliver is not None and bool(getattr(deliver, "offers_chat_code", False))
+    # Where the code will be shown, decided BEFORE the question is written so the file can say it
+    # (:func:`code_shown`). `chimera approve` reads it to tell a person the truth about a question
+    # whose code went nowhere they can read: before this it sent them looking in "the message that
+    # asked" for an app question that had no message and printed no code.
+    shown = _where_the_code_goes(deliver, on_asked)
     try:
         directory.mkdir(parents=True, exist_ok=True)
         sweep(home)
@@ -547,6 +598,9 @@ def ask_durably(
                     # Which turn asked, on the QUESTION too, not only on the record line: the list of
                     # waiting questions reads it back to say which conversation and project each is.
                     **({"run_id": str(named["run_id"])} if named.get("run_id") else {}),
+                    # Where the owner was shown the code — a place, never the code. Advisory only:
+                    # the agent can rewrite this file, and nothing here approves anything.
+                    "code_shown": shown,
                     # That the chat may answer with the code, and until when. Only when the
                     # deliverer says the chat can carry an answer back — see `chat` above. The code
                     # itself is NOT here, not even hashed (`_code_hash` says why).
@@ -579,15 +633,22 @@ def ask_durably(
     _remember_code(request_id, code)
     approve_line = f"chimera approve {request_id} --yes --code {code}"
 
-    if deliver is None and on_asked is None:
-        # Nobody will be sent this and no screen shows it: the code goes where this process's own
-        # output goes — the terminal that started it, the daemon's log — not to a file the agent's
-        # tools reach. Without it nobody could approve from another terminal. A screen answers in
+    if shown in (CODE_ON_TERMINAL, CODE_NOWHERE):
+        # Nobody will be sent this and no screen shows it. The code goes to this process's stderr
+        # only when that is a TERMINAL: stderr redirected to a file (`serve --cron >> serve.log
+        # 2>&1`, a supervisor's log) is a file, and a second run in the same daemon can `cat` it
+        # while this one waits — the bypass the code exists to close. Not a terminal: the line is
+        # printed with the code withheld, and the question can only be refused or left to time out;
+        # approving from elsewhere needs a channel (CHIMERA_APPROVAL_WEBHOOK). A screen answers in
         # this process (`answer` reads the code from memory) and needs no code.
+        shown_line = approve_line if shown == CODE_ON_TERMINAL else (
+            f"(not shown: this process's output is not a terminal; set CHIMERA_APPROVAL_WEBHOOK "
+            f"to approve from elsewhere) — chimera approve {request_id} --yes --code <code>"
+        )
         with contextlib.suppress(Exception):
             print(
                 f"Chimera is waiting for a decision ({request_id}): "
-                f"{reason or 'review required'}\n  approve: {approve_line}\n"
+                f"{reason or 'review required'}\n  approve: {shown_line}\n"
                 f"  refuse:  chimera approve {request_id} --no",
                 file=sys.stderr,
                 flush=True,
@@ -677,7 +738,12 @@ def _wait_for_answer(
                 answered_at = float(dados.get("answered_at") or 0.0) or None
                 via = str(dados.get("via") or "")
                 outcome = "approved" if decidido else "refused"
-                if decidido and not hmac.compare_digest(str(dados.get("code") or ""), code):
+                # Bytes, not str: on two str `compare_digest` raises TypeError for any non-ASCII
+                # character, and a TypeError leaving here would skip the record and the cleanup —
+                # the "one attempt, recorded" rule would not hold for `--code é`.
+                if decidido and not hmac.compare_digest(
+                    str(dados.get("code") or "").encode("utf-8"), code.encode("utf-8")
+                ):
                     # Whoever can write a file wrote this; the owner was given the code. One
                     # attempt: honouring a second would turn six digits into a loop.
                     _log.warning(
@@ -686,7 +752,7 @@ def _wait_for_answer(
                     )
                     decidido = False
                     outcome = "unverified"
-            except (OSError, ValueError, AttributeError):
+            except (OSError, ValueError, AttributeError, TypeError):
                 decidido = False
                 outcome = "unreadable"
             _record(
