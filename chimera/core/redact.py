@@ -6,13 +6,18 @@ bearer token — and the trace is a file that lives for weeks on a machine nobod
 
 **What this guarantees, and what it does not.** It guarantees that a secret *this process knows about*
 never reaches the file *verbatim*: every environment value whose variable name looks like a
-credential is replaced, as a literal string, wherever it appears. That is the whole of the guarantee.
-An encoded copy of the same secret (base64, hex, ASCII codes, split across lines, reversed) is a
-different string and passes through. The model can produce one: 7 of 9 frontier models disguised a
-credential to "help" another agent, and a monitor that did not know the credential missed most of
-the encodings (arXiv 2609.39050). This text once called the literal match "a complete guarantee over
-the set that matters most"; it is complete only over verbatim echo (study 30, S30-21(c)). Matching
-the encoded forms of each known secret is open, not done.
+credential is replaced, as a literal string, wherever it appears — and so are the encodings of it
+that a model reaches for unprompted (7 of 9 frontier models disguised a credential to "help" another
+agent, and a monitor that did not know the credential missed most of them; arXiv 2609.39050). This
+module DOES know the credential, so it computes them: base64 (standard and URL-safe, alone or inside
+a longer blob at any byte offset, less at most one partial character at each end of the run), hex in
+either case, decimal character codes, ``\\x``/``0x`` escapes, the reversed string, and the
+percent-encoded one (study 30, S30-32; `bench/encoded_secrets` measured every form at 100% and zero
+false positives over 7,240 texts that carry no secret). That list is the whole of the guarantee. A
+secret split across lines, ROT13'd, compressed, keyed or encoded twice still passes through — the
+same corpus measures those at 0%, and says so rather than leaving it out. This text once called the
+literal match "a complete guarantee over the set that matters most" (study 30, S30-21(c)); it never
+was, and the list above is not either.
 
 It does **not** guarantee that no secret ever survives. A token minted at runtime by a remote API, a
 password typed into a prompt, a key in a file the agent read — none of those are in the environment
@@ -23,8 +28,11 @@ which is why it is also size-capped and rotated rather than kept forever.
 
 from __future__ import annotations
 
+import base64
 import os
 import re
+from functools import lru_cache
+from urllib.parse import quote, quote_plus
 
 #: What makes a variable NAME a credential. One list, one meaning of "secret", and it lives here
 #: rather than in the sandbox because this is the module the meaning belongs to — the sandbox strips
@@ -116,18 +124,114 @@ def known_secrets() -> list[str]:
     return sorted(set(found), key=len, reverse=True)
 
 
+#: Whether :func:`redact` also masks the encoded forms of each known secret (study 30, S30-32).
+#: Decided by `bench/encoded_secrets` against the rule registered before it ran (ON only with zero
+#: false positives); a test holds this equal to that run's decision, so changing it means re-running
+#: the corpus, not editing a constant.
+MASK_ENCODED = True
+
+#: Characters between two character codes: `115, 107`, `115 107`, `[115,107]`, `0x73;0x6b`. Decimal
+#: codes need at least one — `115107` is not two codes, it is a number — while `\x73\x6b` has none.
+_CODE_SEP = r"[\s,;]+"
+_ESCAPE_SEP = r"[\s,;]*"
+
+
+def _b64_fragments(raw: bytes, *, urlsafe: bool) -> list[str]:
+    """The base64 characters that carry ONLY bits of ``raw``, at each of the three alignments.
+
+    A secret inside a longer encoded blob — ``base64(user:secret)``, a JSON body, a file — starts at
+    a byte offset the encoder never aligned for it, so its standalone base64 is not a substring of
+    the blob. Encoding it behind k = 0, 1, 2 zero bytes and keeping the characters whose six bits
+    all come from the secret gives the run that IS in the blob, whatever the offset. The one or two
+    characters cut at each end carry at most four bits of the first and last byte.
+    """
+    encode = base64.urlsafe_b64encode if urlsafe else base64.b64encode
+    out = []
+    for k in range(3):
+        enc = encode(b"\0" * k + raw).decode("ascii")
+        start = -(-8 * k // 6)  # ceil: the first character with no bit of the zero prefix
+        end = 8 * (k + len(raw)) // 6  # floor: the last character with no bit of the padding
+        out.append(enc[start:end])
+    return out
+
+
+def _encoded_literals(secret: str) -> set[str]:
+    """The encoded forms of one secret that are fixed strings."""
+    raw = secret.encode("utf-8")
+    return {
+        base64.b64encode(raw).decode("ascii"),
+        base64.urlsafe_b64encode(raw).decode("ascii"),
+        *_b64_fragments(raw, urlsafe=False),
+        *_b64_fragments(raw, urlsafe=True),
+        secret[::-1],
+        quote(secret, safe=""),
+        quote_plus(secret, safe=""),
+    }
+
+
+def _encoded_patterns(secret: str) -> list[str]:
+    """The encoded forms of one secret that vary in case or separator, as regex sources."""
+    raw = secret.encode("utf-8")
+    return [
+        "(?i:" + re.escape(raw.hex()) + ")",
+        # Decimal codes, digits not adjacent so `115` is never the tail of `2115`.
+        r"(?<!\d)" + _CODE_SEP.join(str(b) for b in raw) + r"(?!\d)",
+        # `\x73\x6b...` escapes and `0x73, 0x6b, ...` lists.
+        "(?i:" + r"(?:\\x|0x)" + (_ESCAPE_SEP + r"(?:\\x|0x)").join(f"{b:02x}" for b in raw) + r"(?![0-9a-f]))",
+    ]
+
+
+@lru_cache(maxsize=8)
+def _encoded(secrets: tuple[str, ...]) -> tuple[tuple[str, ...], re.Pattern[str] | None]:
+    """Every encoded form of a SET of secrets, computed once per set.
+
+    Keyed on the whole set, not on each secret: :func:`known_secrets` returns the same list on
+    every call, so one entry serves a process, and the patterns are ONE compiled alternation. The
+    first version cached per secret with a bound of 128 and compiled each pattern apart — 200
+    secrets thrashed both that cache and `re`'s own, and every call recompiled hundreds of
+    patterns (the bench corpus is what found it).
+    """
+    literals: set[str] = set()
+    sources: list[str] = []
+    for secret in secrets:
+        literals |= _encoded_literals(secret)
+        sources += _encoded_patterns(secret)
+    literals -= set(secrets)  # the verbatim pass already took them
+    # Longest first across ALL secrets, the rule `known_secrets` keeps for the verbatim pass: a
+    # short fragment replaced first would leave the rest of a longer one readable.
+    ordered = tuple(sorted((x for x in literals if len(x) >= _MIN_SECRET_LEN), key=len, reverse=True))
+    return ordered, (re.compile("|".join(sources)) if sources else None)
+
+
+def mask_known(text: str, secrets: list[str], *, encoded: bool = True) -> str:
+    """The known-secret net alone: each value verbatim, then (``encoded``) its encoded forms.
+
+    Separate from :func:`redact` so `bench/encoded_secrets` can read the encoded pass as the
+    difference between ``encoded=False`` and ``encoded=True`` on the same text.
+    """
+    for secret in secrets:
+        text = text.replace(secret, MASK)
+    if not encoded or not secrets:
+        return text
+    literals, pattern = _encoded(tuple(secrets))
+    for literal in literals:
+        text = text.replace(literal, MASK)
+    if pattern is not None:
+        text = pattern.sub(MASK, text)
+    return text
+
+
 def redact(text: str) -> str:
     """Replace known secrets, structurally-placed secrets, and credential-shaped strings.
 
     Three nets, in order of confidence. The environment values are a guarantee against their verbatim
-    copies (not their encoded ones: see the module docstring); the places are structural and need no
+    copies and the encoded forms the module docstring lists (no others); the places are structural and need no
     knowledge of the value; the shapes are a guess at the string and are deliberately the narrowest
     of the three.
     """
     if not text:
         return text
-    for secret in known_secrets():
-        text = text.replace(secret, MASK)
+    text = mask_known(text, known_secrets(), encoded=MASK_ENCODED)
     for pattern in _PLACES:
         # The surrounding context is kept and only the captured value replaced. A line that reads
         # `[redacted]` and nothing else cannot be diagnosed, which defeats the file's purpose.

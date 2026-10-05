@@ -19,7 +19,10 @@ memory of it.
 **The net** is `chimera.core.redact`, the one that already keeps secrets out of the trace. Three
 layers, in order of confidence:
 1. every environment value whose variable *name* looks like a credential (`*API_KEY*`, `*SECRET*`,
-   `*TOKEN*`, `*PASSWORD*`, `*CREDENTIAL*`, `*PRIVATE_KEY*`) is replaced verbatim wherever it appears;
+   `*TOKEN*`, `*PASSWORD*`, `*CREDENTIAL*`, `*PRIVATE_KEY*`) is replaced verbatim wherever it appears,
+   and so are its base64, hex, character-code, escaped, reversed and percent-encoded copies
+   (`bench/encoded_secrets`: every form caught, no false positive in 7,240 texts); a copy split
+   across lines, ROT13'd or encoded twice is not;
 2. secrets given away by *where* they sit: URL userinfo, a query parameter named like a credential,
    an `Authorization` header, a cookie, a database DSN, a webhook path;
 3. narrow key shapes (`sk-…`, `ghp_…`, JWTs and a few others).

@@ -1,0 +1,326 @@
+{
+  "seed": 20261005,
+  "base_commit": "ff1f983e",
+  "secrets": 200,
+  "texts": 13234,
+  "control": {
+    "old_equals_off_breaks": 0,
+    "literal_masked": {
+      "off": 400,
+      "on": 400
+    },
+    "literal_n": 400
+  },
+  "masked": {
+    "b64": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "b64_unpadded": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "b64_urlsafe": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "b64_in_blob_1": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "b64_in_blob_2": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "b64_in_blob_3": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "hex": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "hex_upper": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "dec_comma": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "dec_space": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "x_escapes": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "reversed": {
+      "masked": 400,
+      "n": 400,
+      "rate": 1.0,
+      "wilson95": [
+        0.9905,
+        1.0
+      ],
+      "misses_by_shape": {
+        "alnum": 0,
+        "separated": 0,
+        "hex": 0,
+        "mixed": 0
+      }
+    },
+    "percent": {
+      "masked": 94,
+      "n": 94,
+      "rate": 1.0,
+      "wilson95": [
+        0.9607,
+        1.0
+      ],
+      "misses_by_shape": {
+        "mixed": 0
+      }
+    },
+    "split_lines": {
+      "masked": 0,
+      "n": 400,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0095
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "hex": 100,
+        "mixed": 100
+      }
+    },
+    "rot13": {
+      "masked": 0,
+      "n": 300,
+      "rate": 0.0,
+      "wilson95": [
+        0.0,
+        0.0126
+      ],
+      "misses_by_shape": {
+        "alnum": 100,
+        "separated": 100,
+        "mixed": 100
+      }
+    }
+  },
+  "false_positives": {
+    "b64_random_300": {
+      "fp": 0,
+      "n": 400
+    },
+    "codes_random_16": {
+      "fp": 0,
+      "n": 400
+    },
+    "near_miss_b64": {
+      "fp": 0,
+      "n": 400
+    },
+    "near_miss_hex": {
+      "fp": 0,
+      "n": 400
+    },
+    "ordinary": {
+      "fp": 0,
+      "n": 40
+    },
+    "other_b64": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_b64_in_blob_1": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_b64_in_blob_2": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_b64_in_blob_3": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_b64_unpadded": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_b64_urlsafe": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_dec_comma": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_dec_space": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_hex": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_hex_upper": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_reversed": {
+      "fp": 0,
+      "n": 400
+    },
+    "other_x_escapes": {
+      "fp": 0,
+      "n": 400
+    },
+    "sha256_of_secret": {
+      "fp": 0,
+      "n": 400
+    },
+    "uuid": {
+      "fp": 0,
+      "n": 400
+    }
+  },
+  "false_positives_total": {
+    "fp": 0,
+    "n": 7240,
+    "wilson95_upper": 0.00053
+  },
+  "cost_us_median_10kB_3_secrets": {
+    "off": 1273.1,
+    "on": 1842.3
+  },
+  "decision": "ON",
+  "covered_below_99": []
+}
