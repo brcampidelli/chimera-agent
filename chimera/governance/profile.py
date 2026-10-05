@@ -352,6 +352,36 @@ def govern_step(
     return GovernanceStep(registry, approvals, approve, resolved)
 
 
+def owner_hooks(
+    registry: Any,
+    *,
+    settings: Settings,
+    audit: AuditLog,
+    approve: Callable[..., bool] | None = None,
+    taint: Callable[[str, str], object] | None = None,
+) -> Any:
+    """The owner's hooks around a kernel some caller built WITHOUT :func:`govern_step`.
+
+    ``chimera agent --guard`` and a standalone ``chimera solve --guard`` wrap ``govern_registry``
+    directly, so the hooks installed inside ``govern_step`` never reached them: an owner with a
+    ``pre_tool`` deny on ``git push`` saw the push run under ``--guard`` with no receipt and no
+    warning, while the threat model said a guarded run carried the hooks. This is the same
+    ``apply_hooks`` call, placed where those two callers can reach it. ``approve`` is the caller's
+    own approver when it has one; otherwise the owner's, built the way ``govern_step`` builds it
+    for ``off`` and ``observe`` — never an approve-everything one.
+    """
+    if not getattr(settings, "hooks", False):
+        return registry
+    from chimera.governance import ApprovalLedger
+    from chimera.governance.hooks import apply_hooks
+
+    if approve is None:
+        approve = _owner_approver(
+            settings, ApprovalLedger(), attended=True, home=None, screen=None
+        )[0]
+    return apply_hooks(registry, settings=settings, audit=audit, approve=approve, taint=taint)
+
+
 def governed_profile(
     registry: Any,
     *,

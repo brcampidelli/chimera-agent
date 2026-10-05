@@ -1248,9 +1248,14 @@ def agent(
         )
         if guard:
             from chimera.governance import AuditLog, TrustKernel, govern_registry
+            from chimera.governance.profile import owner_hooks
 
-            kernel = TrustKernel(audit=AuditLog(get_settings().home / "audit.jsonl"))
+            run_audit = AuditLog(get_settings().home / "audit.jsonl")
+            kernel = TrustKernel(audit=run_audit)
             registry = govern_registry(registry, kernel)
+            # The owner's hooks, which `govern_step` installs and this direct kernel used to skip:
+            # a guarded run carries them like every other guarded surface.
+            registry = owner_hooks(registry, settings=get_settings(), audit=run_audit)
         runner = Agent(
             backend, registry,
             attended(AgentConfig(
@@ -5125,11 +5130,22 @@ def solve(
             ).registry
         elif guard:
             from chimera.governance import TrustKernel, govern_registry
+            from chimera.governance.profile import owner_hooks
 
+            solve_audit = AuditLog(settings.home / "audit.jsonl")
             registry = govern_registry(
-                registry,
-                TrustKernel(audit=AuditLog(settings.home / "audit.jsonl")),
-                approve=approve,
+                registry, TrustKernel(audit=solve_audit), approve=approve
+            )
+
+            def hook_taint(source: str, text: str) -> object:
+                # The ledger is built just below, outside the hooks; read at call time so what a
+                # shell hook says still taints this run, as it does inside `govern_step`.
+                return ledger.record_fetch(source, text) if ledger is not None else None
+
+            # The owner's hooks: a solve outside a conversation never reached `govern_step`, so a
+            # `pre_tool` deny the owner wrote did not stop it.
+            registry = owner_hooks(
+                registry, settings=settings, audit=solve_audit, approve=approve, taint=hook_taint
             )
         ledger = None
         if taint:
