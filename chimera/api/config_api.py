@@ -205,10 +205,13 @@ _EDITABLE_SETTINGS = {
     # would make the blunt answer the only discoverable one.
     "CHIMERA_EGRESS_ALLOW",
     # Study 30, S30-27 and S30-28: two governance rules that ship off until their benches recommend
-    # them (`bench/exfil_url`, `bench/shell_fetch`). Editable for the reason the experimental group
-    # is: a switch only `.env` can reach is a choice only people who read the source can make. Both
-    # only add questions, and both are owner-only (`bridge_routes.GUARD_SETTINGS`): switching one
-    # off is the direction that widens.
+    # them (`bench/exfil_url`, `bench/shell_fetch`). Writable through `PATCH /config` only, for now:
+    # `GET /config` does not report them and the Settings screen has no control, so today they are
+    # still a choice for someone who reads the source — an earlier version of this comment claimed
+    # the opposite (study 30 review). A read-side field and a control need new i18n keys in every
+    # language and a regenerated schema, which belongs with the change that recommends a default,
+    # not with the change that only adds the rules. Both only add questions, and both are
+    # owner-only (`bridge_routes.GUARD_SETTINGS`): switching one off is the direction that widens.
     "CHIMERA_EXFIL_HOST_PATH",
     "CHIMERA_SHELL_FETCH_GUARD",
     # The Experimental group: three study-25 modules whose measurements did not recommend them, so
