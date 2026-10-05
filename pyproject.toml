@@ -326,6 +326,7 @@ only_mutate = [
 pytest_add_cli_args_test_selection = [
     "tests/test_paired.py",       # -> chimera/eval/paired.py
     "tests/test_run_paired.py",   # -> chimera/eval/paired.py (CLI path)
+    "tests/test_the_paired_interval_covers_the_difference.py",  # -> chimera/eval/paired.py (coverage)
     "tests/test_proportions.py",  # -> chimera/eval/proportions.py
     "tests/test_version_api.py",  # -> chimera/api/version_api.py
     "tests/test_verify.py",       # -> chimera/core/verify.py

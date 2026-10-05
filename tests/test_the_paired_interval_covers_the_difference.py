@@ -1,0 +1,76 @@
+"""The paired interval must cover the difference it reports — the property it existed for.
+
+`PairedResult.diff_ci` used to be a Wilson interval on the share of discordant pairs the treatment
+won, scaled by the OBSERVED ``m/n``. That scale is itself an estimate, and treating it as known
+throws its uncertainty away: in a seeded simulation the interval covered the true difference
+41-88% of the time whenever there was a real difference to cover, and at 95% nominal. It also
+returned a zero-width ``(0.0, 0.0)`` whenever the arms happened to agree on every pair — certainty
+from four items — and called four discordant pairs to none "significant", where the exact McNemar
+p-value is 0.125. The test of "is there any difference" was roughly calibrated; the interval it
+printed, which RESULTS files quote and compare to margins, was not.
+"""
+
+from __future__ import annotations
+
+import random
+
+import pytest
+
+from chimera.eval.paired import compare_paired
+from chimera.eval.proportions import mcnemar_exact
+
+
+def _table(rng: random.Random, n: int, p_both: float, p_base_only: float, p_treat_only: float) -> tuple[list[bool], list[bool]]:
+    base: list[bool] = []
+    treat: list[bool] = []
+    for _ in range(n):
+        u = rng.random()
+        if u < p_both:
+            base.append(True), treat.append(True)
+        elif u < p_both + p_base_only:
+            base.append(True), treat.append(False)
+        elif u < p_both + p_base_only + p_treat_only:
+            base.append(False), treat.append(True)
+        else:
+            base.append(False), treat.append(False)
+    return base, treat
+
+
+@pytest.mark.parametrize(
+    ("n", "p_both", "p_base_only", "p_treat_only"),
+    [
+        (25, 0.6, 0.0, 0.2),  # a one-sided lift on a small bench: the old interval covered 58%
+        (50, 0.5, 0.02, 0.3),  # a large lift: 65%
+        (100, 0.3, 0.05, 0.2),  # a moderate lift at n=100: 86%
+        (200, 0.3, 0.02, 0.4),  # more data does not fix it — the bias is in the method: 66%
+    ],
+)
+def test_the_paired_interval_covers_a_real_difference_at_its_nominal_rate(
+    n: int, p_both: float, p_base_only: float, p_treat_only: float
+) -> None:
+    rng = random.Random(n * 7 + 1)
+    truth = p_treat_only - p_base_only
+    draws = 800
+    covered = 0
+    for _ in range(draws):
+        base, treat = _table(rng, n, p_both, p_base_only, p_treat_only)
+        low, high = compare_paired(base, treat).diff_ci
+        covered += low <= truth <= high
+    assert covered / draws >= 0.93
+
+
+def test_four_discordant_pairs_to_none_is_not_called_significant() -> None:
+    # 8 both-pass, 8 both-fail, 4 treatment-only: the exact test says p = 0.125.
+    base = [True] * 8 + [False] * 8 + [False] * 4
+    treat = [True] * 8 + [False] * 8 + [True] * 4
+    result = compare_paired(base, treat)
+    assert mcnemar_exact(result.baseline_only, result.treatment_only) == 0.125
+    assert result.significant is False
+    low, high = result.diff_ci
+    assert low < 0 < high
+
+
+def test_agreement_on_four_pairs_is_not_a_zero_width_interval() -> None:
+    same = [True, False, True, False]
+    low, high = compare_paired(same, list(same)).diff_ci
+    assert low < -0.1 and high > 0.1

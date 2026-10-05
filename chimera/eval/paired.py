@@ -7,10 +7,17 @@ checkpoint" trick, exposed as :meth:`chimera.core.runstate.RunCheckpointer.fork`
 that differs is the policy, so the comparison is *paired*: concordant pairs (both pass, both fail)
 carry no signal and only the discordant pairs do.
 
-This is McNemar's test with a Wilson interval on the discordant pairs. It is honest and it is
-*tighter*: conditioning on the discordant count removes the agreement noise the unpaired interval
-still pays for, so a real lift can clear zero at a sample size where Newcombe cannot. Same honesty
-rule: "significant" only when the difference CI excludes zero. Pure Python.
+The interval is Bonett-Price's adjusted Wald interval for a paired difference
+(:func:`chimera.eval.proportions.bonett_price_paired`), and it is tighter than the unpaired one for
+the honest reason: the concordant pairs move both arms together, so their agreement is not counted
+as noise twice. Same honesty rule: "significant" only when the difference CI excludes zero.
+
+⚠️ Until study 30 (S30-34) the interval here was a Wilson interval on the share of discordant pairs
+the treatment won, scaled by the observed ``m/n`` as if that share were known. It was narrower than
+it had any right to be: 41-88% coverage of a real difference at a nominal 95%
+(`tests/test_the_paired_interval_covers_the_difference.py`), a zero-width interval whenever the arms
+agreed on every pair, and "significant" at four discordant pairs to none, where the exact McNemar
+p-value is 0.125. Published intervals computed the old way are re-read in `bench/interval_reread`.
 """
 
 from __future__ import annotations
@@ -19,7 +26,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TypeVar
 
-from chimera.eval.anytime import wilson_bounds
+from chimera.eval.proportions import bonett_price_paired
 
 T = TypeVar("T")
 
@@ -59,21 +66,13 @@ class PairedResult:
 
     @property
     def diff_ci(self) -> tuple[float, float]:
-        """95% CI for the paired difference, via a Wilson interval on the discordant pairs.
+        """95% CI for ``treatment − baseline``, Bonett-Price on the paired table.
 
-        Among the ``m`` discordant pairs, the treatment wins a fraction ``q = c/m``; McNemar tests
-        ``q == 0.5``. A Wilson CI ``(ql, qu)`` on ``q`` maps to the difference through
-        ``delta = (m/n)·(2q − 1)`` (monotonic), which conditions out the concordant agreement —
-        that is why it is narrower than the unpaired Newcombe interval on the same data.
+        It keeps the uncertainty in how many pairs disagree, which the conditional interval this
+        replaced did not (see the module docstring), so arms that agreed on every pair still get an
+        interval of honest width instead of ``(0.0, 0.0)``. ``(-1.0, 1.0)`` with no pairs.
         """
-        m = self.discordant
-        if self.n == 0:
-            return (-1.0, 1.0)
-        if m == 0:
-            return (0.0, 0.0)  # arms agreed on every pair — zero observed difference, no signal
-        ql, qu = wilson_bounds(self.treatment_only, m)
-        scale = m / self.n
-        return (scale * (2 * ql - 1), scale * (2 * qu - 1))
+        return bonett_price_paired(self.baseline_only, self.treatment_only, self.n)
 
     @property
     def significant(self) -> bool:

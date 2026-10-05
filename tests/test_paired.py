@@ -23,26 +23,36 @@ def test_only_discordant_pairs_carry_signal() -> None:
 
 
 def test_paired_tightens_to_significance_where_unpaired_cannot() -> None:
-    """The killer property: same data, paired excludes 0 while unpaired Newcombe does not."""
-    # 8 both-pass, 8 both-fail, 4 treatment-only wins, 0 baseline-only.
-    base = [True] * 8 + [False] * 8 + [False] * 4
-    treat = [True] * 8 + [False] * 8 + [True] * 4
-    assert len(base) == len(treat) == 20
+    """The killer property: same data, paired excludes 0 while unpaired Newcombe does not.
 
-    unpaired = compare_ab(base, treat)  # marginals 12/20 vs 8/20
+    Rewritten in study 30 (S30-34). The old version used 4 treatment-only pairs to none, which the
+    exact McNemar test puts at p = 0.125: the property it "showed" was the old interval's
+    undercoverage, not pairing. Six to none (exact p = 0.031) shows the real property.
+    """
+    # 8 both-pass, 8 both-fail, 6 treatment-only wins, 0 baseline-only.
+    base = [True] * 8 + [False] * 8 + [False] * 6
+    treat = [True] * 8 + [False] * 8 + [True] * 6
+    assert len(base) == len(treat) == 22
+
+    unpaired = compare_ab(base, treat)  # marginals 14/22 vs 8/22
     assert unpaired.significant is False  # Newcombe CI includes 0 at this n
 
     paired = compare_paired(base, treat)
-    assert paired.significant is True  # conditioning on the 4 discordant pairs clears zero
+    assert paired.significant is True  # the concordant pairs are not counted as noise twice
     lo, _ = paired.diff_ci
     assert lo > 0
+    assert paired.diff_ci[1] - lo < unpaired.diff_ci[1] - unpaired.diff_ci[0]
 
 
 def test_no_discordant_pairs_is_not_significant() -> None:
+    """Rewritten in study 30: this asserted ``diff_ci == (0.0, 0.0)`` — a zero-width interval, i.e.
+    certainty that the arms are identical, from four pairs. Agreement on four pairs is an
+    observed difference of zero with a wide interval around it."""
     same = [True, False, True, False]
     r = compare_paired(same, list(same))
     assert r.discordant == 0
-    assert r.diff_ci == (0.0, 0.0)
+    lo, hi = r.diff_ci
+    assert lo == -hi and hi > 0.1
     assert r.significant is False
 
 
@@ -126,21 +136,22 @@ def test_run_paired_experiment_defaults_and_forwards_the_arm_names() -> None:
 
 
 def test_format_report_renders_the_paired_numbers_and_a_significant_verdict() -> None:
-    # 8 both-pass, 8 both-fail, 4 treatment-only wins → baseline 40%, treatment 60%, delta +20%.
-    base = [True] * 8 + [False] * 8 + [False] * 4
-    treat = [True] * 8 + [False] * 8 + [True] * 4
+    # 8 both-pass, 8 both-fail, 6 treatment-only wins → baseline 36.4%, treatment 63.6%, delta +27.3%.
+    # (Was 4 treatment-only wins on 20 — not significant by the exact test; see the test above.)
+    base = [True] * 8 + [False] * 8 + [False] * 6
+    treat = [True] * 8 + [False] * 8 + [True] * 6
     result = compare_paired(base, treat, baseline_name="v1", treatment_name="v2")
     lines = format_report(result).split("\n")
 
     assert len(lines) == 5  # one line per fact — no narrative
     assert lines[0].startswith("v1")
-    assert "40.0%" in lines[0] and "(20 paired trials)" in lines[0]
+    assert "36.4%" in lines[0] and "(22 paired trials)" in lines[0]
     assert lines[1].startswith("v2")
-    assert "60.0%" in lines[1]
-    assert lines[2].startswith("paired delta") and "+20.0%" in lines[2] and "95% CI" in lines[2]
+    assert "63.6%" in lines[1]
+    assert lines[2].startswith("paired delta") and "+27.3%" in lines[2] and "95% CI" in lines[2]
     # The discordant line names which arm won which pairs — concordant pairs are called out as noise.
     assert lines[3] == (
-        "discordant pairs       v2 +4 / v1 +0  (concordant carry no signal)"
+        "discordant pairs       v2 +6 / v1 +0  (concordant carry no signal)"
     )
     assert lines[4] == "verdict                significant (CI excludes 0)"
 
