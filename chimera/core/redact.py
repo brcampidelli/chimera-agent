@@ -347,9 +347,12 @@ def mask_known(text: str, secrets: list[str], *, encoded: bool = True) -> str:
     """
     for secret in secrets:
         text = text.replace(secret, MASK)
-    if not encoded or not secrets:
+    # The length floor `known_secrets` applies, applied here too: a caller may pass a short value
+    # (a test token, a pin), and the hex of three characters sits inside any long enough hex dump.
+    long_enough = tuple(s for s in secrets if len(s) >= _MIN_SECRET_LEN)
+    if not encoded or not long_enough:
         return text
-    literals, needles = _encoded(tuple(secrets))
+    literals, needles = _encoded(long_enough)
     for literal in literals:
         text = text.replace(literal, MASK)
     for family, found in needles.items():
