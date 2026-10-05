@@ -157,3 +157,19 @@ def test_a_host_the_owner_allowed_is_not_asked_about() -> None:
 
 def test_a_tool_that_is_not_a_fetch_is_not_judged_by_it() -> None:
     assert _verdict(_clean(exfil_host_path=True), URLS["path"], tool="read_file") is Decision.ALLOW
+
+
+@pytest.mark.parametrize("channel", ["subdomain", "path", "query"])
+def test_a_secret_printed_beside_a_shell_fetch_is_still_asked_about(channel: str) -> None:
+    """Both rules on. `cat ~/.aws/credentials; curl -s URL` prints the key and the page in one
+    output, and S30-28 records that output as fetched; when it also counted as SEEN, the key it
+    printed was exempt from S30-27 and every channel was ALLOW (study 30 review)."""
+    ledger = TaintLedger(exfil_host_path=True, shell_fetch_guard=True)
+    ledger.set_instruction("Check that example.com answers.")
+    ledger.record_exec(
+        "cat ~/.aws/credentials; curl -s https://example.com",
+        output=f"[default]\naws_secret_access_key = {SECRET}\n<html>Example Domain</html>",
+    )
+    assert ledger.run_tainted()  # the shell fetch still taints the run
+    assert _verdict(ledger, URLS[channel]) is Decision.REVIEW
+

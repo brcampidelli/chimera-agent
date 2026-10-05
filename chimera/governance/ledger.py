@@ -594,7 +594,8 @@ class TaintLedger:
         return requested_by
 
     def record_fetch(
-        self, source: str, content: str = "", *, requested_by: str | None = None
+        self, source: str, content: str = "", *, requested_by: str | None = None,
+        seen: bool = True,
     ) -> str:
         """Record an external fetch; its source and content become tainted. Returns the hash.
 
@@ -602,6 +603,12 @@ class TaintLedger:
         one production caller, ``ledger_tool``, passes the URL or the path the tool fetched, so a
         page or a file the user named in the instruction reads ``user``. Tainted either way —
         authority is not trust, and the content is still external.
+
+        ``seen`` is whether ``content`` may exempt a value from :meth:`unseen_data_in_url`. False
+        for a shell fetch (:meth:`record_exec`): a command's output is not only what it fetched —
+        `cat ~/.aws/credentials; curl -s URL` prints the key and the page together, and nothing in
+        the output says which line came from where. Counting it as seen let a local secret through
+        S30-27 the moment S30-28 was on (study 30 review).
         """
         digest = _hash(content) if content else ""
         source = (source or "external").strip()
@@ -611,7 +618,7 @@ class TaintLedger:
             self._tainted.add(digest)
         if content:
             self._snippets.append(content[: self.snippet_chars])
-            if self.exfil_host_path:
+            if self.exfil_host_path and seen:
                 self._fetched_runs.update(run.lower() for run in _DATA_RUN.findall(content))
         self._add(
             "fetch", source, tainted=True, detail=f"sha256:{digest}" if digest else "",
@@ -647,12 +654,15 @@ class TaintLedger:
         the flow snippets, so written into a script it is a self-modifying write. A cloned
         repository's files are not tracked one by one — the run is tainted, which is what arms the
         narrowing; a file read from the clone later is not itself a tainted path.
+
+        The output is tainted but never *seen* in the S30-27 sense (``seen=False``): it may hold
+        whatever else the command printed, a local secret included.
         """
         _, refs = self._content_is_tainted(command)
         event = self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
         if self.shell_fetch_guard:
             for source in _shell_fetch_sources(command):
-                self.record_fetch(source, content=output)
+                self.record_fetch(source, content=output, seen=False)
                 output = ""  # one command's output belongs to one fetch, not to each source again
         return event
 
