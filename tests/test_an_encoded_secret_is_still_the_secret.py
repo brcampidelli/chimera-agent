@@ -122,14 +122,19 @@ def test_what_is_still_not_covered_is_stated_by_a_test(known: str) -> None:
 
 def test_the_default_is_the_one_the_registered_corpus_decided() -> None:
     import json
+    import re
     from pathlib import Path
 
     import chimera.core.redact as module
 
-    results = sorted((Path(__file__).resolve().parents[1] / "bench" / "encoded_secrets" / "results").glob("*.json"))
-    assert results, "the corpus has not been run: the default has no measurement behind it"
-    decision = json.loads(results[-1].read_text(encoding="utf-8"))["decision"]
-    assert module.MASK_ENCODED is (decision == "ON")
+    bench = Path(__file__).resolve().parents[1] / "bench" / "encoded_secrets"
+    written = re.search(r"^## Decision: \*\*(ON|OFF)\*\*", (bench / "RESULTS.md").read_text(encoding="utf-8"), re.M)
+    assert written, "RESULTS.md states no decision: the default has no measurement behind it"
+    assert module.MASK_ENCODED is (written.group(1) == "ON")
+    # The run's own file, where the tree carries it (some gates copy the repository without results).
+    runs = sorted((bench / "results").glob("*.json"))
+    if runs:
+        assert json.loads(runs[-1].read_text(encoding="utf-8"))["decision"] == written.group(1)
 
 
 def test_a_short_value_still_masks_nothing(monkeypatch: Any) -> None:

@@ -13,6 +13,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
@@ -21,6 +23,8 @@ from chimera.decisions.maps import SHIPPED_MAPS  # noqa: E402
 
 
 def _fitted() -> dict[str, float]:
+    if not bench.FITTED_ROWS.exists():
+        pytest.skip("the fitted rows are not in this tree (they land with bench/jev_decisions results)")
     out = {}
     for line in bench.FITTED_ROWS.read_text(encoding="utf-8").splitlines():
         if line.strip():
