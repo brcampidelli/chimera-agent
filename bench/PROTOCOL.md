@@ -251,8 +251,9 @@ A bootstrap may still appear **beside** a closed-form interval, labelled as a cr
 N = 100 where the registration says why. It does not decide. And the drift this rule ends is
 measured: three of six copies of Newcombe's paired interval had dropped his continuity correction to
 phi and printed **0.0182–0.2892** on his own worked example, where the paper prints 0.0112–0.2954.
-`bench/interval_reread` re-reads every published verdict that used the old methods and lists what
-moved.
+`bench/interval_reread` re-read 56 published intervals printed by the retired methods: all 56
+reproduced first, two crossed their criterion — the `harness_bench` checklist × tercile interaction
+(correction published there) and `learning_lift` run 6's "significant" transfer, already retracted.
 
 ## 12. "No difference" is a claim with a margin, declared before the run
 
