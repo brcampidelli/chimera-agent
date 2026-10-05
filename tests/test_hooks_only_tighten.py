@@ -349,6 +349,27 @@ def test_a_broken_hooks_file_refuses_every_call_instead_of_running_without_it(
     assert inner.calls == []
 
 
+def test_a_broken_hooks_file_is_written_to_the_audit_when_it_starts_refusing(
+    tmp_path: Path,
+) -> None:
+    """A7 for the broken file: every call is refused, and the refusal path writes no receipt, so
+    without a `load` line the Security screen showed no hook activity while every cron job and bot
+    run was refused. One line per assembly names the error and the file's digest."""
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / HOOKS_FILE_NAME).write_text('{"hooks": [{"allow": true}]}', encoding="utf-8")
+    settings = SimpleNamespace(hooks=True, hooks_host_exec=False, home=home)
+    audit = AuditLog(tmp_path / "audit.jsonl")
+    apply_hooks(_registry(_Recorder()), settings=settings, audit=audit, approve=None)
+    lines = [json.loads(x) for x in (tmp_path / "audit.jsonl").read_text("utf-8").splitlines()]
+    loads = [x for x in lines if x["type"] == "hook" and x["event"] == "load"]
+    assert len(loads) == 1
+    assert loads[0]["applied"] == "deny" and loads[0]["error"]
+    assert loads[0]["config_sha256"] == hashlib.sha256(
+        (home / HOOKS_FILE_NAME).read_bytes()
+    ).hexdigest()
+
+
 # --- A8: failures --------------------------------------------------------------------------------
 
 
@@ -416,6 +437,42 @@ def test_govern_step_installs_the_owners_hooks_in_every_mode_and_never_answers_w
         )
         assert _is_refusal(step.registry.get("run_shell").run(command="ls"))
         assert inner.calls == []
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("mode", ["off", "observe", "enforce"])
+def test_a_hooks_ask_reaches_the_owners_approver_in_every_mode_and_a_yes_lets_the_call_run(
+    mode: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The positive half of the test above. Under `deny`, "the owner's approver" and "no approver"
+    both refuse, so that test cannot tell them apart: here the owner's approver is a screen that
+    records the question and says yes. It must be asked, with the hook's own rule, and the call
+    must then run. A hook falling back to `observe`'s approve-everything, or to nobody, would
+    leave the screen unasked."""
+    from chimera.governance.profile import govern_step
+
+    home = tmp_path / "home"
+    _write(home, {"id": "ask", "event": "pre_tool", "decision": "ask"})
+    monkeypatch.setenv("CHIMERA_HOME", str(home))
+    monkeypatch.setenv("CHIMERA_HOOKS", "true")
+    monkeypatch.setenv("CHIMERA_APPROVAL_MODE", "ask")
+    get_settings.cache_clear()
+    asked: list[str] = []
+
+    def screen(verdict: Any, _action: Any = None) -> bool:
+        asked.append(str(getattr(verdict, "rule", "")))
+        return True
+
+    try:
+        inner = _Recorder()
+        step = govern_step(
+            _registry(inner), settings=get_settings(), audit=AuditLog(tmp_path / "a.jsonl"),
+            mode=mode, surface="test", screen=screen,
+        )
+        assert step.registry.get("run_shell").run(command="ls") == "ran"
+        assert "hook:ask" in asked
+        assert inner.calls == [{"command": "ls"}]
     finally:
         get_settings.cache_clear()
 

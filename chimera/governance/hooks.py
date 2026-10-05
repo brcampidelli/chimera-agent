@@ -522,6 +522,12 @@ def apply_hooks(
             audit.record("hook", {"hook": "", "event": "load", "applied": NONE,
                                   "error": f"hooks are on and {config.path} has no hooks"})
         return registry
+    if config.error and audit is not None:
+        # A7: every call on this assembly is about to be refused for this reason, and the refusal
+        # path writes nothing — so without this line the Security screen showed no hook activity
+        # while every cron job and bot run was being refused. One line per assembly, like `load`.
+        audit.record("hook", {"hook": "", "event": "load", "applied": DENY,
+                              "error": config.error, "config_sha256": config.sha256})
     if sandbox is None:
         from chimera.sandbox import get_sandbox
 
