@@ -37,9 +37,10 @@
 #
 # The three in 59b05e5 are tests still on main: their tree versions were rewritten in the same
 # change that added these lines (a digest, a split literal, a value built at run time), so the
-# fingerprints cover the history only. 957ff40 is on the branch `bench/study24-browser-reads`, whose
-# work reached main squashed (#566) with a placeholder instead; the full-history scan still reads the
-# branch, and deleting it would retire that line.
+# fingerprints cover the history only. 957ff40 is NOT on main: it lives on the branch
+# `bench/study24-browser-reads`, which the full-history scan reads because it scans every ref. That
+# branch is not the one #566 merged (that was `-v2`) and may hold unmerged work, so it stays; this
+# entry, not a deleted ref, is what keeps the finding quiet. main's copy of the file has a placeholder.
 59b05e5ac5b670d1b01a319126f4c050dce861ea:tests/test_every_way_into_this_machine_is_on_one_card.py:generic-api-key:47
 59b05e5ac5b670d1b01a319126f4c050dce861ea:tests/test_the_privacy_card_says_who_reads_your_prompts.py:generic-api-key:173
 59b05e5ac5b670d1b01a319126f4c050dce861ea:tests/test_the_storage_and_diagnostics_routes_ask_before_removing_and_scrub_what_they_show.py:gcp-api-key:238

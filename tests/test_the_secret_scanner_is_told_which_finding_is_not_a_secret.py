@@ -331,9 +331,10 @@ class _Ficticio:
     #: Text that must still be on the reported line at that commit: the NAME the value was bound
     #: to, never the value, so a wrong line number cannot pass for the right one.
     marca: str
-    #: Whether the file on this branch is the one the finding came from, so the literal can be
-    #: asserted gone from it. False only for the bench file whose commit lives on a side branch.
-    limpo_na_arvore: bool
+    #: The remote branch that holds the commit when it is NOT reachable from HEAD (main), or None
+    #: when it is. Such a commit is scanned only because the weekly scan reads every ref, and its
+    #: branch is kept on purpose: deleting refs is not how this file retires an entry.
+    ramo: str | None
     motivo: str
 
 
@@ -344,26 +345,26 @@ FIXTURES: tuple[_Ficticio, ...] = (
     _Ficticio(
         "59b05e5ac5b670d1b01a319126f4c050dce861ea",
         "tests/test_every_way_into_this_machine_is_on_one_card.py",
-        "generic-api-key", 47, "SERVER_TOKEN = ", True,
+        "generic-api-key", 47, "SERVER_TOKEN = ", None,
         "the bearer token the access card must never echo more than four characters of",
     ),
     _Ficticio(
         "59b05e5ac5b670d1b01a319126f4c050dce861ea",
         "tests/test_the_privacy_card_says_who_reads_your_prompts.py",
-        "generic-api-key", 173, "secret = ", True,
+        "generic-api-key", 173, "secret = ", None,
         "the provider key the privacy card must not show, whole or as a hint",
     ),
     _Ficticio(
         "59b05e5ac5b670d1b01a319126f4c050dce861ea",
         "tests/test_the_storage_and_diagnostics_routes_ask_before_removing_and_scrub_what_they_show.py",
-        "gcp-api-key", 238, "in a url", True,
+        "gcp-api-key", 238, "in a url", None,
         "the Google-shaped key the diagnostics scrubber must mask (two matches, one fingerprint)",
     ),
     _Ficticio(
         "957ff402dee2a2e6cf04c6350421fd3601f796e9",
         "bench/browser_taint_cards/run.py",
-        "generic-api-key", 28, "SECRET = ", False,
-        "the bait a hostile page asks the browser agent to send; on bench/study24-browser-reads only",
+        "generic-api-key", 28, "SECRET = ", "bench/study24-browser-reads",
+        "the bait a hostile page asks the browser agent to send; not on main, only on its branch",
     ),
 )
 
@@ -377,8 +378,8 @@ def _linha_em(f: _Ficticio) -> str:
         motivo = _ausencia_explicavel()
         assert motivo is not None, (
             f"{f.commit[:9]} is gone from a FULL clone, so the entry for {f.arquivo} exempts nothing. "
-            f"If its branch was deleted (957ff40 lives only on bench/study24-browser-reads), the "
-            f"finding went with it: remove the entry here and in .gitleaksignore."
+            f"If its branch ({f.ramo or 'main'}) no longer carries it, the finding went with it: "
+            f"remove the entry here and in .gitleaksignore, on purpose."
         )
         pytest.skip(motivo)
     linhas = _git("show", f"{f.commit}:{f.arquivo}").splitlines()
@@ -409,13 +410,55 @@ def test_each_fake_credential_is_still_on_the_line_its_fingerprint_names(f: _Fic
     )
 
 
-@pytest.mark.parametrize("f", [f for f in FIXTURES if f.limpo_na_arvore], ids=_nome)
+def _alcancavel(commit: str, ref: str) -> bool:
+    r = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", commit, ref], cwd=REPO, capture_output=True
+    )
+    return r.returncode == 0
+
+
+@pytest.mark.parametrize("f", FIXTURES, ids=_nome)
+def test_each_fingerprinted_commit_is_on_the_ref_the_entry_says(f: _Ficticio) -> None:
+    """Where the commit lives decides what cleaning it means. One reachable from HEAD is cleaned in
+    this tree; one only on a side branch is not main's to clean, and is said so by name. If the side
+    branch is ever merged, this fails and the entry's argument has to be rewritten."""
+    _linha_em(f)  # the commit exists here, or the checkout is shallow and this skipped
+
+    if f.ramo is None:
+        assert _alcancavel(f.commit, "HEAD"), (
+            f"{f.commit[:9]} is not reachable from HEAD, but its entry says it is on main."
+        )
+        return
+    assert not _alcancavel(f.commit, "HEAD"), (
+        f"{f.commit[:9]} is now reachable from HEAD: {f.ramo} was merged, so the fixture is in main's "
+        f"history and the tree check below must cover it. Set `ramo` to None."
+    )
+    ref = f"refs/remotes/origin/{f.ramo}"
+    existe = subprocess.run(
+        ["git", "rev-parse", "--verify", "--quiet", ref], cwd=REPO, capture_output=True
+    )
+    if existe.returncode != 0:
+        pytest.skip(
+            f"{ref} is not in this clone (a single-branch or shallow checkout), so where "
+            f"{f.commit[:9]} lives cannot be checked here; the weekly scan's full fetch has it."
+        )
+    assert _alcancavel(f.commit, ref), f"{f.commit[:9]} is not on {f.ramo} any more"
+
+
+@pytest.mark.parametrize("f", FIXTURES, ids=_nome)
 def test_the_current_tree_no_longer_holds_the_fingerprinted_value(f: _Ficticio) -> None:
     """The fingerprint covers the commit, never the file. If the same literal is still in the tree,
     the next edit near it is a new commit with a new finding that no entry exempts, and the gate goes
-    red for a reason that looks identical to the one these entries were added for."""
+    red for a reason that looks identical to the one these entries were added for.
+
+    For a commit only on a side branch this reads main's copy of the file, which is what this tree
+    can answer for; that branch's own tip still holds the value, and changing it is not main's call.
+    """
     valor = _valor(_linha_em(f))
-    atual = (REPO / f.arquivo).read_text(encoding="utf-8")
+    caminho = REPO / f.arquivo
+    if not caminho.exists():
+        pytest.skip(f"{f.arquivo} is not in this tree, so there is no copy of the value to clean here")
+    atual = caminho.read_text(encoding="utf-8")
 
     assert valor not in atual, (
         f"{f.arquivo} still holds the literal its fingerprint covers ({len(valor)} characters, "
