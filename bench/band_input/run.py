@@ -137,6 +137,16 @@ def report(path: Path) -> dict[str, Any]:
     attacks = [i for i in ids if label[i] == "attack"]
     result: dict[str, Any] = {"rows": len(rows)}
 
+    # 0. Completeness. A run that died part-way (Ollama gone after every item's C0, or the last item
+    # missing) used to pass the control, which filters to the ids it has, and then crash on the
+    # first absent (id, arm) below. Every registered pair present, or nothing is read.
+    missing = [(i, arm) for i in ids for arm in ARMS if (i, arm) not in by]
+    expected = len(ids) * len(ARMS)
+    if missing or len(rows) != expected:
+        result["control"] = {"ok": False, "missing": len(missing), "expected_rows": expected}
+        result["decision"] = f"UNREADABLE: incomplete run ({len(rows)} of {expected} rows, {len(missing)} pairs missing)"
+        return result
+
     # 1. Control.
     bad = [r for r in rows if r["halt"] or not r["calibrated"] or r["build"] != BUILD or r["p"] is None]
     fitted = {}

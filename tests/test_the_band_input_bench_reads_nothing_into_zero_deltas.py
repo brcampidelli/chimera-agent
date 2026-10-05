@@ -81,3 +81,18 @@ def test_arms_are_not_read_when_the_control_did_not_reproduce_the_fitted_rows(tm
     assert not result["control"]["ok"]
     assert result["decision"].startswith("UNREADABLE")
     assert "arms" not in result
+
+
+@pytest.mark.parametrize("cut", ["last-item", "all-but-C0"], ids=["last-item-missing", "died-after-C0"])
+def test_an_incomplete_run_reads_as_unreadable_and_never_crashes(tmp_path: Path, cut: str) -> None:
+    # A run that died part-way passed the control (which reads only the ids it has) and then
+    # crashed with KeyError on the first absent (id, arm). It is a run nobody can read, and says so.
+    path = _rows(tmp_path)
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    last = rows[-1]["id"]
+    kept = [r for r in rows if (r["id"] != last if cut == "last-item" else r["arm"] == "C0")]
+    path.write_text("\n".join(json.dumps(r) for r in kept) + "\n", encoding="utf-8")
+    result = bench.report(path)
+    assert result["decision"].startswith("UNREADABLE: incomplete run")
+    assert not result["control"]["ok"]
+    assert "arms" not in result
