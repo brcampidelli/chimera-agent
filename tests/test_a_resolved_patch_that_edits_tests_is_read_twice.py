@@ -17,6 +17,15 @@ from pathlib import Path
 import pytest
 
 _AUDIT = Path(__file__).resolve().parent.parent / "bench" / "swe_bench" / "audit.py"
+_RESULTS = _AUDIT.parent / "results"
+
+# The run artefacts are committed, so CI reads them; a copy of the tree made without
+# `bench/*/results` (the WSL gate does this) must skip rather than fail, as for every other bench.
+needs_results = pytest.mark.skipif(
+    not (_RESULTS / "run3" / "chimera-baseline.run3_baseline.json").exists()
+    or not any((_RESULTS / "run3" / "logs").glob("*/*/*/*/eval.sh")),
+    reason="bench/swe_bench/results (reports and eval logs) is not in this tree",
+)
 
 
 def _audit():
@@ -160,6 +169,7 @@ def test_a_report_that_resolves_an_instance_nobody_predicted_aborts(tmp_path: Pa
         )
 
 
+@needs_results
 def test_the_raw_reports_reproduce_every_published_delta_and_ci():
     """The §2aa control: the readings are only worth reading if the as-graded one IS the table."""
     audit = _audit()
@@ -167,6 +177,7 @@ def test_the_raw_reports_reproduce_every_published_delta_and_ci():
     assert audit.check_control(audited) == []
 
 
+@needs_results
 def test_a_control_that_does_not_reproduce_is_reported_not_passed():
     audit = _audit()
     audited = {key: audit.audit_arm(arm) for key, arm in audit.ARMS.items()}
@@ -178,6 +189,7 @@ def test_a_control_that_does_not_reproduce_is_reported_not_passed():
     assert any(f.startswith("pooled:") for f in failures)
 
 
+@needs_results
 def test_the_test_editing_resolutions_the_critic_listed_are_the_ones_found():
     """Study 30's critic listed five; the audit must find exactly those, no more and no fewer."""
     audit = _audit()
