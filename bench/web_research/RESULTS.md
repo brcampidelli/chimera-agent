@@ -106,3 +106,11 @@ and present state were not exercised by stable questions, as registered.
 - Whether a harder bench (one where the plain loop cites unread pages often) would separate the arms.
   The instrument could only show a large effect from a baseline below 90%, and this baseline was not
   below 90%.
+
+## Addendum, 2026-10-05: URL-valid but content-invalid citations (study 30, S30-38)
+
+Registered in `bench/study30_reanalyses/PREREGISTRATION.md`; details in
+`bench/study30_reanalyses/RESULTS.md` §4. Turns whose every cited URL was read but no cited page holds
+the claimed answer: **A 0/66, B 0/67**. The URL check never passed a citation that failed the content
+check, so no span-level check is built. The reverse is common: 9 of the 10 turns it flags cite a page
+that does hold the answer. `holders` is page-level, so 0 is a floor on span-level invalidity.

@@ -230,3 +230,11 @@ tasks have more documents on average (14 with two, 13 with three, 3 with four).
 **What this cannot show.** Thirty tasks of one kind — planted figures under a heading, the same
 filler — and one weak backbone; the flip rate says a task on this backbone is a coin with a bias,
 and three runs per task read the bias, not the coin.
+
+## Addendum, 2026-10-05: delegation adherence (study 30, S30-38)
+
+Registered in `bench/study30_reanalyses/PREREGISTRATION.md`; details in
+`bench/study30_reanalyses/RESULTS.md` §3. All 784 stored rows make exactly the designed number of calls,
+and all 151 `hierarchy_no_synth` answers carry one section per document. That is adherence **by
+construction** — the harness fans out one worker per document and no model declares a plan — so these
+rows cannot say whether a manager delegates what it declared.

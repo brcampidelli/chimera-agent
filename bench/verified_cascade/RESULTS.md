@@ -94,3 +94,11 @@ Following the owner's rule (a flag the measurement recommends becomes the defaul
 - make the third outcome (sources don't cover it) ship the decline rather than hand off, because that is the variant with 16 hand-offs.
 
 That code does not exist yet. This run measured the policy on logged calls.
+
+## Addendum, 2026-10-05: confident accepts per construction (study 30, S30-38)
+
+Registered in `bench/study30_reanalyses/PREREGISTRATION.md`; full table in
+`bench/study30_reanalyses/RESULTS.md` §2. On the 686 unsupported constructions, accepts at p ≥ 0.9:
+**Jev 5/686, all `fabricated`**; **local 127/686**, carried by `extra` (reference plus one sentence
+from another file, **89/144**) and `num` (11/29). The shipped default reads with the local verifier, so
+its confident failure is specific: a right answer padded with one unsupported sentence usually passes.
