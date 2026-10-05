@@ -422,13 +422,18 @@ def test_auto_detect_stdin_without_isatty_is_treated_as_headless(
         pass
 
     monkeypatch.setattr(confirm_mod.sys, "stdin", _NoIsatty())
+    # If the missing-isatty default flipped to True we would resolve to the interactive `_prompt`,
+    # which ALSO returns False without a TTY — so the return value alone cannot tell the two gates
+    # apart. This used to say `assert gate is not confirm_mod._prompt`, which became vacuous the day
+    # the gate was wrapped by `_skip_what_only_reads`: the wrapper is never `_prompt`, so the line
+    # passed against the broken default too (the 2026-10-05 mutation run: `lambda: False` ->
+    # `lambda: True` survived). Asked by behaviour instead: the interactive prompt is never reached.
+    perguntado: list[str] = []
+    monkeypatch.setattr(confirm_mod, "_prompt", lambda cmd: perguntado.append(cmd) or True)
     gate = resolve_host_exec_confirm(_Settings("local", "ask"))
     assert gate is not None
-    assert gate("echo hi") is False
-    # Identity matters here for the same reason as in the deny test: if the missing-isatty default
-    # flipped to True we would resolve to the interactive `_prompt`, which ALSO returns False
-    # without a TTY — so only checking the return value would pass against the wrong gate.
-    assert gate is not confirm_mod._prompt
+    assert gate("rm -rf /tmp/x") is False
+    assert perguntado == []
 
 
 def test_sandbox_without_is_isolated_is_treated_as_host(tmp_path: Path) -> None:
@@ -441,3 +446,175 @@ def test_sandbox_without_is_isolated_is_treated_as_host(tmp_path: Path) -> None:
 
     tool = RunShellTool(tmp_path, _Bare(), confirm=lambda _cmd: False)
     assert "declined" in tool.run(command="echo hi").lower()  # host → gated, no AttributeError
+
+
+# --- What the scheduled mutation run of 2026-10-05 found still alive in this module ---------------
+# The tests above were written when `_prompt` asked inline. Since `_answer_or_refuse` moved the
+# question onto a side thread, a failure raised by `confirm` is swallowed THERE, so
+# test_prompt_fails_safe_when_it_cannot_ask no longer reaches `_prompt`'s own `except`: that branch —
+# the one that decides what happens when the warning itself cannot be shown — had no test, and
+# `return False` -> `return True` survived. The code was right; nothing would have noticed it going
+# wrong. These tests pin each behaviour by what it does, never by its wording.
+
+
+def test_prompt_refuses_when_the_warning_itself_cannot_be_shown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A console that cannot be written to (closed, broken pipe, an encoding that cannot carry the
+    # warning sign) fails BEFORE the question is asked. The person never saw the command, so there
+    # is nothing they could have approved: refuse.
+    import typer
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    perguntado: list[object] = []
+
+    def _broken(*_a: object, **_k: object) -> None:
+        raise OSError("the console went away")
+
+    monkeypatch.setattr(typer, "echo", _broken)
+    monkeypatch.setattr(typer, "secho", _broken)
+    monkeypatch.setattr(typer, "confirm", lambda *a, **k: perguntado.append(a) or True)
+    assert confirm_mod._prompt("rm -rf /tmp/x") is False
+    assert perguntado == []  # refused without asking, not asked and then overruled
+
+
+def test_prompt_asks_a_question_not_an_empty_line(monkeypatch: pytest.MonkeyPatch) -> None:
+    # The real `typer.confirm` needs its text: called without it, it raises, the side thread
+    # swallows that, and EVERY prompt refuses without ever being drawn. A stand-in that accepts
+    # anything hid that (mutant: the question argument dropped). The wording is free; its presence
+    # is not.
+    import typer
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    asked: list[tuple[object, ...]] = []
+    monkeypatch.setattr(typer, "echo", lambda *a, **k: None)
+    monkeypatch.setattr(typer, "secho", lambda *a, **k: None)
+    monkeypatch.setattr(typer, "confirm", lambda *a, **k: asked.append(a) or True)
+    assert confirm_mod._prompt("rm -rf /tmp/x") is True
+    assert len(asked) == 1
+    assert asked[0] and isinstance(asked[0][0], str) and asked[0][0].strip()
+
+
+def test_the_question_waits_on_a_daemon_thread_with_a_findable_name() -> None:
+    # Daemon, because the prompt it waits on may never return (a console with no window): a
+    # non-daemon waiter would keep the process from exiting long after the refusal. The name is what
+    # a person diagnosing a hang finds in a thread dump; it is an identifier, not prose.
+    import threading
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    seen: list[threading.Thread] = []
+
+    def ask() -> bool:
+        seen.append(threading.current_thread())
+        return True
+
+    assert confirm_mod._answer_or_refuse(ask, "cmd") is True
+    assert seen and seen[0] is not threading.main_thread()
+    assert seen[0].daemon is True
+    assert seen[0].name == "host-exec-confirm"
+
+
+def test_an_unanswered_question_is_refused_when_the_timeout_runs_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The backstop: a prompt nobody can see never returns and never raises. Without the bounded
+    # join the request thread waits forever, cancel included. Run the call itself on a thread so a
+    # regression shows up as this test failing, not as the suite hanging.
+    import threading
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod, "PROMPT_TIMEOUT_SECONDS", 0.05)
+    release = threading.Event()
+    result: list[bool] = []
+    caller = threading.Thread(
+        target=lambda: result.append(confirm_mod._answer_or_refuse(release.wait, "cmd")),
+        daemon=True,
+    )
+    caller.start()
+    caller.join(5.0)
+    release.set()  # let the abandoned waiter finish either way
+    assert not caller.is_alive(), "the confirm waited past its timeout"
+    assert result == [False]
+
+
+def test_a_question_that_raises_is_refused_without_an_unhandled_thread_exception(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # An exception on the side thread never reaches the caller's `except`; it has to be swallowed
+    # where it happens. If it is not, the answer is still a refusal — but Python prints the
+    # traceback of an unhandled thread exception onto the very terminal the person is reading.
+    import threading
+
+    import chimera.sandbox.confirm as confirm_mod
+
+    unhandled: list[object] = []
+    monkeypatch.setattr(threading, "excepthook", lambda args: unhandled.append(args.exc_value))
+
+    def ask() -> bool:
+        raise RuntimeError("no tty")
+
+    assert confirm_mod._answer_or_refuse(ask, "cmd") is False
+    assert unhandled == []
+
+
+def test_a_declared_surface_has_no_human_even_with_a_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The windowless console of the desktop sidecar reports a terminal and has nobody behind it. A
+    # declaration beats the file descriptor, and the first declaration is the one that stays.
+    import chimera.sandbox.confirm as confirm_mod
+
+    monkeypatch.setattr(confirm_mod, "_no_human_surface", None)
+    monkeypatch.setattr(confirm_mod.sys, "stdin", _FakeStdin(tty=True))
+    assert confirm_mod._human_can_answer() is True
+
+    confirm_mod.declare_no_human_here("sidecar")
+    confirm_mod.declare_no_human_here("someone-else")
+    assert confirm_mod._no_human_surface == "sidecar"
+    assert confirm_mod._human_can_answer() is False
+    assert confirm_mod.human_can_answer() is False
+
+    perguntado: list[str] = []
+    monkeypatch.setattr(confirm_mod, "_prompt", lambda cmd: perguntado.append(cmd) or True)
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"))
+    assert gate is not None
+    assert gate("rm -rf /tmp/x") is False
+    assert perguntado == []
+
+
+def test_a_surface_that_brings_its_own_question_is_the_one_asked() -> None:
+    # `ask=` is how the TUI draws the question in its own modal. The gate must hand the command to
+    # THAT callback and return its answer — in both directions, so neither a constant True nor a
+    # constant False passes.
+    for answer in (True, False):
+        asked: list[str] = []
+
+        def ask(cmd: str, _answer: bool = answer, _asked: list[str] = asked) -> bool:
+            _asked.append(cmd)
+            return _answer
+
+        gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=False, ask=ask)
+        assert gate is not None
+        assert gate("rm -rf /tmp/x") is answer
+        assert asked == ["rm -rf /tmp/x"]
+
+
+def test_a_command_proved_to_read_only_is_approved_without_asking() -> None:
+    # `ask` exists to put DECISIONS in front of a person; `ls` is not one. The wrapper must approve
+    # it itself and never reach the asker — and still hand a writing command over.
+    asked: list[str] = []
+
+    def ask(cmd: str) -> bool:
+        asked.append(cmd)
+        return False
+
+    gate = resolve_host_exec_confirm(_Settings("local", "ask"), interactive=False, ask=ask)
+    assert gate is not None
+    assert gate("ls") is True
+    assert asked == []
+    assert gate("rm -rf /tmp/x") is False
+    assert asked == ["rm -rf /tmp/x"]
