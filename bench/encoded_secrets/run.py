@@ -65,11 +65,54 @@ ENCODINGS: dict[str, Callable[[str], str]] = {
     "dec_space": lambda s: " ".join(str(b) for b in s.encode()),
     "x_escapes": lambda s: "".join(f"\\x{b:02x}" for b in s.encode()),
     "reversed": lambda s: s[::-1],
+    # Addendum A: the forms the first run could not show. None draws from the generator, so the
+    # original 200 secrets and their texts are byte-identical to the first run.
+    "hex_spaced": lambda s: s.encode().hex(" "),
+    "hex_colon": lambda s: s.encode().hex(":"),
+    "hex_xxd": lambda s: s.encode().hex(" ", 2),
+    "json_u": lambda s: "".join(f"\\u{b:04x}" for b in s.encode()),
+    "html_dec": lambda s: "".join(f"&#{b};" for b in s.encode()),
+    "html_hex": lambda s: "".join(f"&#x{b:x};" for b in s.encode()),
 }
+#: Percent forms, read only where they differ from `s` (an unreserved secret IS its own encoding).
+PERCENT: dict[str, Callable[[str], str]] = {
+    "percent": lambda s: quote(s, safe=""),
+    "percent_default": lambda s: quote(s),
+    "percent_lower": lambda s: quote(s, safe="").lower(),
+}
+#: Addendum A: forms over code points, which differ from the byte forms only for a non-ASCII secret.
+CODE_POINTS: dict[str, Callable[[str], str]] = {
+    "dec_ord": lambda s: ", ".join(str(ord(c)) for c in s),
+    "json_u_points": lambda s: "".join(f"\\u{ord(c):04x}" for c in s),
+    "html_points": lambda s: "".join(f"&#{ord(c)};" for c in s),
+}
+
+
+def _b64_cut(s: str) -> str:
+    blob = _b64(s.encode())
+    return blob[: len(blob) // 2] + "\n" + blob[len(blob) // 2 :]
+
+
 UNCOVERED: dict[str, Callable[[str], str]] = {
     "split_lines": lambda s: s[: len(s) // 2] + "\n" + s[len(s) // 2 :],
     "rot13": lambda s: codecs.encode(s, "rot13"),
+    "b64_wrapped": _b64_cut,
 }
+SEED_NOT_ASCII = 20261006
+NOT_ASCII = string.ascii_letters + string.digits + "çãéõüñß€"
+#: Addendum A: ordinary texts with the shapes the widened patterns accept, none carrying a secret.
+ORDINARY_ADDENDUM = (
+    "eth0: link/ether 3c:22:fb:9a:10:4e brd ff:ff:ff:ff:ff:ff",
+    "00000000: 7f45 4c46 0201 0100 0000 0000 0000 0000  .ELF............",
+    "00000010: 0300 3e00 0100 0000 1010 0000 0000 0000  ..>.............",
+    "GET https://example.test/search?q=caf%C3%A9+com+leite&page=2 HTTP/1.1",
+    "<p>Pre&#231;o: R&#36; 12,90 &#x2014; caf&eacute; &amp; p&#227;o</p>",
+    '{"nome": "Jos\\u00e9", "cidade": "S\\u00e3o Paulo", "id": 4815162342}',
+    "bytes: 0x7f 0x45 0x4c 0x46 0x02 0x01 0x01 0x00",
+    "Checksums: 9a0364b9e99bb480dd25e1f0284c8555 d41d8cd98f00b204e9800998ecf8427e",
+    "codes = [72, 101, 108, 108, 111, 44, 32, 119, 111, 114, 108, 100]",
+    "SELECT * FROM t WHERE name LIKE '%25off%' AND price > 10;",
+)
 
 ALNUM = string.ascii_letters + string.digits
 SHAPES: dict[str, str] = {
@@ -146,11 +189,13 @@ def _passes(old: types.ModuleType) -> dict[str, Callable[[str], str]]:
     return {"old": old.redact, "off": off, "on": on}
 
 
-def build(rng: random.Random, known: list[tuple[str, str]]) -> list[dict[str, Any]]:
+def build(rng: random.Random, known: list[tuple[str, str]], *, ordinary: bool = True,
+          first: int = 0) -> list[dict[str, Any]]:
     """Every text of the corpus, with what it carries — never the secret itself."""
     rows: list[dict[str, Any]] = []
-    for i, (shape, s) in enumerate(known):
-        other = _value(rng, SHAPES[shape], len(s))
+    alphabets = {**SHAPES, "not_ascii": NOT_ASCII}
+    for i, (shape, s) in enumerate(known, start=first):
+        other = _value(rng, alphabets[shape], len(s))
         near = ("Q" if s[0] != "Q" else "R") + s[1:]
         for c, context in enumerate(CONTEXTS):
             def add(stratum: str, kind: str, form: str, shape: str = shape, i: int = i, c: int = c,
@@ -162,9 +207,18 @@ def build(rng: random.Random, known: list[tuple[str, str]]) -> list[dict[str, An
             for name, enc in ENCODINGS.items():
                 add("encoded", name, enc(s))
                 add("absent", f"other_{name}", enc(other))
-            if quote(s, safe="") != s:
-                add("encoded", "percent", quote(s, safe=""))
+            for name, enc in PERCENT.items():
+                if enc(s) != s:
+                    add("encoded", name, enc(s))
+                if enc(other) != other:
+                    add("absent", f"other_{name}", enc(other))
+            for name, enc in CODE_POINTS.items():
+                if s.isascii():
+                    continue  # identical to a byte form already in the corpus
+                add("encoded", name, enc(s))
+                add("absent", f"other_{name}", enc(other))
             add("uncovered", "split_lines", UNCOVERED["split_lines"](s))
+            add("uncovered", "b64_wrapped", UNCOVERED["b64_wrapped"](s))
             if shape != "hex" and codecs.encode(s, "rot13") != s:
                 add("uncovered", "rot13", UNCOVERED["rot13"](s))
             add("absent", "sha256_of_secret", hashlib.sha256(s.encode()).hexdigest())
@@ -173,26 +227,29 @@ def build(rng: random.Random, known: list[tuple[str, str]]) -> list[dict[str, An
             add("absent", "codes_random_16", ", ".join(str(rng.randint(32, 126)) for _ in range(16)))
             add("absent", "near_miss_b64", _b64(near.encode()))
             add("absent", "near_miss_hex", near.encode().hex())
-    for j, text in enumerate(ordinary_texts(rng)):
-        rows.append({"stratum": "absent", "kind": "ordinary", "shape": "-", "secret": -1, "context": j,
-                     "form": "", "text": text})
+    if ordinary:
+        for j, text in enumerate(ordinary_texts(rng)):
+            rows.append({"stratum": "absent", "kind": "ordinary", "shape": "-", "secret": -1, "context": j,
+                         "form": "", "text": text})
     return rows
 
 
-def cost(passes: dict[str, Callable[[str], str]], rng: random.Random) -> dict[str, float]:
-    """Median microseconds of one call on a 10 kB text with only 3 secrets known."""
+def cost(passes: dict[str, Callable[[str], str]], rng: random.Random, *, n_secrets: int = 3,
+         size: int = 10_000, reps: int = 200, line: str = "") -> dict[str, float]:
+    """Median microseconds of one call on a ``size``-character text with ``n_secrets`` known."""
     saved = {k: v for k, v in os.environ.items() if k.startswith("ENC_BENCH_")}
     for k in saved:
         del os.environ[k]
     try:
-        for n in range(3):
+        for n in range(n_secrets):
             os.environ[f"ENC_BENCH_COST_{n}_TOKEN"] = _value(rng, ALNUM, 32)
-        text = ("The build finished in 41 s; 1,848 tests passed. " * 220)[:10_000]
+        line = line or "The build finished in 41 s; 1,848 tests passed. "
+        text = (line * (size // len(line) + 1))[:size]
         out: dict[str, float] = {}
         for name in ("off", "on"):
             passes[name](text)  # warm the caches
             times = []
-            for _ in range(200):
+            for _ in range(reps):
                 t0 = time.perf_counter()
                 passes[name](text)
                 times.append(time.perf_counter() - t0)
@@ -200,7 +257,7 @@ def cost(passes: dict[str, Callable[[str], str]], rng: random.Random) -> dict[st
             out[name] = round(times[len(times) // 2] * 1e6, 1)
         return out
     finally:
-        for n in range(3):
+        for n in range(n_secrets):
             os.environ.pop(f"ENC_BENCH_COST_{n}_TOKEN", None)
         os.environ.update(saved)
 
@@ -217,6 +274,18 @@ def main() -> None:
     for i, (_shape, s) in enumerate(known):
         os.environ[f"ENC_BENCH_{i:03d}_TOKEN"] = s
     rows = build(rng, known)
+    # Addendum A: 50 secrets that are not ASCII, from their own generator so the first 200 and every
+    # text built from them are byte-identical to the first run; and the ordinary texts with the
+    # shapes the widened patterns accept.
+    rng_na = random.Random(SEED_NOT_ASCII)
+    extra = [("not_ascii", _value(rng_na, NOT_ASCII, rng_na.randint(8, 64))) for _ in range(N_PER_SHAPE)]
+    for i, (_shape, s) in enumerate(extra, start=len(known)):
+        os.environ[f"ENC_BENCH_{i:03d}_TOKEN"] = s
+    rows += build(rng_na, extra, ordinary=False, first=len(known))
+    for j, text in enumerate(ORDINARY_ADDENDUM):
+        rows.append({"stratum": "absent", "kind": "ordinary_addendum", "shape": "-", "secret": -1,
+                     "context": j, "form": "", "text": text})
+    known = known + extra
     passes = _passes(_old_module())
 
     masked: Counter[str] = Counter()
@@ -251,14 +320,20 @@ def main() -> None:
             k: {"masked": masked[k], "n": total[k], "rate": round(masked[k] / total[k], 4),
                 "wilson95": [round(x, 4) for x in wilson(masked[k], total[k])],
                 "misses_by_shape": dict(by_shape[k])}
-            for k in [*ENCODINGS, "percent", *UNCOVERED]
+            for k in [*ENCODINGS, *PERCENT, *CODE_POINTS, *UNCOVERED]
         },
         "false_positives": {k: {"fp": fp[k], "n": total[k]} for k in absent_kinds},
         "false_positives_total": {"fp": n_fp, "n": n_absent,
                                   "wilson95_upper": round(wilson(n_fp, n_absent)[1], 5)},
         "cost_us_median_10kB_3_secrets": cost(passes, rng),
+        # Addendum A: the deployment knows tens of credentials, not three; and a log is not prose.
+        "cost_us_median_10kB_30_secrets": cost(passes, rng, n_secrets=30),
+        "cost_us_median_1MB_30_secrets": cost(passes, rng, n_secrets=30, size=1_000_000, reps=7),
+        "cost_us_median_10kB_log_30_secrets": cost(
+            passes, rng, n_secrets=30, line="\n".join(ORDINARY_ADDENDUM) + "\n",
+        ),
     }
-    covered = [*ENCODINGS, "percent"]
+    covered = [*ENCODINGS, *PERCENT, *CODE_POINTS]
     decision_on = n_fp == 0 and literal_ok["off"] == literal_ok["on"] == total["literal"] and control_breaks == 0
     below = [k for k in covered if masked[k] / total[k] < 0.99]
     result["decision"] = ("ON" if decision_on and not below else

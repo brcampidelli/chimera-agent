@@ -101,3 +101,44 @@ as it is) and **on**. The reading is the difference.
   S30-21(c).
 * A covered form below 99% is a defect, fixed and re-run before the decision is read; the run that
   found it is kept in `results/` beside the one that did not.
+
+## Addendum A — the forms the first run could not show (2026-10-05, before re-running)
+
+An adversarial review of the change found that the run above was **circular for percent-encoding**:
+the corpus generated the `percent` form with `quote(s, safe="")`, the same call the implementation
+matched as a literal, so 94/94 could not show that `quote(s)` with its default `safe="/"` — the most
+common call — or lower-case escapes passed intact. It also found forms of the families the docstring
+claims that neither the code nor the corpus covered: hex with separators (`bytes.hex(" ")`,
+`bytes.hex(":")`, `xxd` groups), JSON `\u0070` and HTML `&#112;` / `&#x70;` escapes, and a non-ASCII
+secret written as code points (`ord()`) rather than UTF-8 bytes. All were verified to leak before
+the code was changed. A refutation is only as good as what the corpus could show (§2q), so the
+corpus grows before the decision is read again. The first run's file stays in `results/` beside the
+new one.
+
+**Added to the encoded stratum**, for every original secret, in both contexts (the original 200
+secrets and every original text are unchanged: the additions draw nothing from the seeded generator):
+`hex_spaced` (`bytes.hex(" ")`), `hex_colon` (`bytes.hex(":")`), `hex_xxd` (`bytes.hex(" ", 2)`),
+`json_u` (`\uNNNN` per byte), `html_dec` (`&#N;`), `html_hex` (`&#xN;`); and, where they differ from
+`s`, `percent_default` (`quote(s)`) and `percent_lower` (`quote(s, safe="").lower()`). Each of these
+encodings is also applied to the absent stratum's different value, for false positives.
+
+**A fifth shape, not ASCII** — 50 secrets from a separate generator, `random.Random(20261006)`, so the
+first 200 are untouched: alphanumeric plus `çãéõüñß€` (two- and three-byte UTF-8), lengths 8 to 64.
+They get every form above, plus three over code points: `dec_ord` (`ord()` codes, comma-separated),
+`json_u_points` (`\uNNNN` per character), `html_points` (`&#N;` per character); and the full absent
+stratum.
+
+**Added to the uncovered stratum:** `b64_wrapped`, the base64 of `s` with a newline at its midpoint
+(what wrapping at 76 columns does to a secret it cuts). Predicted masked: 0.
+
+**Added to the absent stratum:** 10 fixed ordinary texts carrying the shapes the new patterns accept
+— a MAC address, an `xxd` dump line, a URL with `%20` and `+`, HTML with numeric entities, JSON with
+`\u00e9` — none carrying a secret.
+
+**Cost**, reported, not gated: the median call on 10 kB with 3 known secrets (as before), and on 10 kB
+and 1 MB with 30 known secrets (the review measured ~7x on 1 MB at 30, which the 3-secret number did
+not represent).
+
+**Predictions and decision: unchanged** — every covered form, old and new, ≥ 99%; uncovered 0%;
+false positives 0 across the whole absent stratum; literal control intact; the same rule decides ON
+or OFF.
