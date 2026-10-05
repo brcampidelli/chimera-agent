@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.64.4] - 2026-10-04
 ### Security
 
 - **A value saved to `.env` reads back as exactly that value, through every writer** (#775). This holds whether or not
