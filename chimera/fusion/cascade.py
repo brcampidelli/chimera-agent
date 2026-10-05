@@ -188,7 +188,7 @@ class CascadeBackend:
         self, record: RouteRecord, messages: list[MessageLike], max_tokens: int | None
     ) -> CompletionResult | None:
         """Weak tier with k-sample majority; None = didn't stick, climb to mid."""
-        from chimera.fusion.consistency import majority
+        from chimera.fusion.consistency import majority, vote_text
 
         k = max(1, self.config.agreement_k)
         samples = [
@@ -202,8 +202,10 @@ class CascadeBackend:
         for sample in samples:
             self._log_hop(record, "weak", self.config.weak, sample)
         if k > 1:
+            # A sample cut off at the ceiling is not a vote: identical truncations used to "agree"
+            # and then passed the default gate, which only asks for non-empty text.
             winner = majority(
-                [s.content for s in samples], threshold=self.config.agreement_threshold
+                [vote_text(s) for s in samples], threshold=self.config.agreement_threshold
             )
             record.agreement = 1.0 if winner is not None else 0.0
             if winner is None:
@@ -218,6 +220,10 @@ class CascadeBackend:
                 return consensus.model_copy(update={
                     "prompt_tokens": _sum_usage(samples, "prompt_tokens"),
                     "completion_tokens": _sum_usage(samples, "completion_tokens"),
+                    # And their cache share: the receipt discounts only the cache tokens it is told
+                    # about, so k summed prompts beside ONE sample's reads bill k-1 reads at 1x.
+                    "cache_read_tokens": _sum_usage(samples, "cache_read_tokens"),
+                    "cache_write_tokens": _sum_usage(samples, "cache_write_tokens"),
                 })
             return None
         if self.gate(samples[0]):

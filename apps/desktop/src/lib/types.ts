@@ -219,6 +219,8 @@ export interface FusionStage {
 export interface FusionMeta {
   kind: "fusion";
   aggregation: string;
+  /** Set when `aggregation` is "fallback": the stage that failed, so the answer is a panel answer. */
+  fallback_stage?: "judge" | "synth" | null;
   early_stopped: boolean;
   diversity: number | null;
   panel: FusionPanelEntry[];

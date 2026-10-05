@@ -703,7 +703,7 @@ def register_orchestration_api(
 
     def _build(req: HierarchyRunIn | HierarchyPreviewIn, **extra: Any) -> Any:
         from chimera.evolution import build_evolution_context
-        from chimera.fusion import FusionEngine
+        from chimera.fusion.factory import fusion_engine
         from chimera.orchestration.artifacts import ArtifactStore
         from chimera.orchestration.budget import (
             EffortPolicy,
@@ -742,7 +742,9 @@ def register_orchestration_api(
             # Only when asked for. Fusion at synthesis is already conditional on the envelopes
             # actually conflicting; this is the outer switch, and a caller who turned it off
             # should not pay for a panel.
-            fusion=FusionEngine(capped) if fuse else None,
+            # From the same `live` settings as the ladder above, through the factory: a bare
+            # engine convened the frontier default panel whatever cost mode built that ladder.
+            fusion=fusion_engine(capped, live) if fuse else None,
             receipts_path=Path(live.home) / "delegations.jsonl",
             config=HierarchyConfig(
                 max_workers=max(1, min(_MAX_WORKERS, req.max_workers)),

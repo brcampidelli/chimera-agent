@@ -54,6 +54,17 @@ than a reason to change the trigger now. The measurement is: **at what context l
 start getting the task wrong?** A trigger set from that number is a trigger about the model; a
 trigger set from the vendor's advertised maximum is a trigger about the marketing.
 
+> **Amendment, 2026-10-04 (study 30, S30-22(a) and (f)).** Counter-evidence to the hypothesis above,
+> kept beside it rather than in place of it. Over 10,664 trajectories and 9 models, success followed
+> a geometric law in the number of STEPS, and bounding the context window made the decay steeper,
+> not flatter (logit slope -0.69 against -0.44, p = 3e-6; arXiv 2609.01660). Their bounding is a
+> window restriction, not a summarising compaction, so it does not decide this trigger either way;
+> it says the measurement asked for above has to be paired (same tasks, trigger at the useful window
+> against trigger at the advertised one) and has to read step count as a covariate. Separately, and
+> weaker: VISTA (arXiv 2610.02200) gained on ARC-AGI-3 games from lossless memory plus a tool to
+> inspect it (70.05 -> 94.10, one run per configuration). That is an untested hypothesis for a
+> "retrievable compacted history" arm, recorded here so it is not mistaken for a correction.
+
 ## The summariser ships, off
 
 `chimera/core/summarise.py` is written and tested — a rule-form summariser built on the split the two

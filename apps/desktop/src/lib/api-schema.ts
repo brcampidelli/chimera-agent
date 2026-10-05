@@ -4469,6 +4469,8 @@ export interface components {
             diff_summary: string;
             /** Diffs */
             diffs: components["schemas"]["FileDiffOut"][];
+            /** Dropped Tool Calls */
+            dropped_tool_calls?: number | null;
             /** Evidence */
             evidence: string;
             /** Feedback */
@@ -4486,6 +4488,8 @@ export interface components {
              * @default
              */
             system_sha: string;
+            /** Truncated Steps */
+            truncated_steps?: number | null;
             /** Verified */
             verified: boolean;
             /** Verify Output */

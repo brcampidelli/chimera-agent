@@ -121,6 +121,23 @@ def _system_sha(agent_result: Any) -> str:
     return str(getattr(getattr(agent_result, "steplog", None), "system_sha", "") or "")
 
 
+def _cut_counts(agent_result: Any) -> tuple[int | None, int | None]:
+    """``(truncated_steps, dropped_tool_calls)`` off the worker's own step log — read, never
+    re-derived, for the reason :func:`_system_sha` gives.
+
+    Each count is ``None`` when the step log does not carry it — no step log at all, or a
+    duck-typed one without the field. ``None`` is "not recorded", which is what :class:`Attempt`
+    promises; defaulting a missing field to 0 would write a clean zero nobody measured.
+    """
+    steplog = getattr(agent_result, "steplog", None)
+    return _count_or_none(steplog, "truncated_steps"), _count_or_none(steplog, "dropped_tool_calls")
+
+
+def _count_or_none(steplog: Any, field: str) -> int | None:
+    value = getattr(steplog, field, None)
+    return None if value is None else int(value)
+
+
 def _side_effects(steplog: Any) -> list[str]:
     """Which out-of-checkout side-effect tools this attempt actually called, in first-call order.
 
@@ -375,6 +392,11 @@ class Attempt:
     #: because one attempt is one agent run, which composes its system message afresh: a behaviour
     #: change between two attempts, or two runs, can then be traced to a change in the instructions.
     system_sha: str = ""
+    #: How many of the worker's model calls the provider cut at the output ceiling, and how many
+    #: tool calls the gateway dropped for unparseable arguments — read off its step log (study 30,
+    #: S30-09). ``None`` when the worker reported no step log, which is "not recorded", not "clean".
+    truncated_steps: int | None = None
+    dropped_tool_calls: int | None = None
 
 
 @dataclass
@@ -1279,6 +1301,7 @@ class AutonomousAgent:
             # knows, and re-deriving it here would be a second place for the two to disagree.
             attempt.run_id = str(getattr(agent_result, 'run_id', '') or '')
             attempt.system_sha = _system_sha(agent_result)
+            attempt.truncated_steps, attempt.dropped_tool_calls = _cut_counts(agent_result)
             # What the attempt DID, read off the same result as the id above and for the same
             # reason: the worker is what knows, and re-deriving it here would be a second place for
             # the two to disagree.
@@ -1621,6 +1644,7 @@ class AutonomousAgent:
         parcial.run_id = str(getattr(agent_result, "run_id", "") or "")
         # A cut-short attempt still sent its instructions, and was paid for under them.
         parcial.system_sha = _system_sha(agent_result)
+        parcial.truncated_steps, parcial.dropped_tool_calls = _cut_counts(agent_result)
         parcial.evidence = "none"
         if snapshot is not None and self.guard is not None:
             # Measured, not assumed, and the same call the verified path makes. `diff_productive:
@@ -1861,6 +1885,19 @@ class AutonomousAgent:
                 workspace=str(self.workspace) if self.workspace else "",
                 delivered_matches_verified=self._delivered_matches_verified(result),
             )
+            # An anchor for the audit log: its size and newest digest as this run ends, kept in a
+            # file other than the log. The chain inside the log cannot see its newest entries being
+            # deleted; the Security screen compares the log against the newest anchor it finds.
+            # The log is `<home>/audit.jsonl` beside `<home>/runs.jsonl`; a receipt written
+            # elsewhere (a `--runs` override, a test) finds none there and carries no anchor —
+            # absent, never an anchor to the wrong file. Nor one that blesses a log cut since an
+            # earlier anchor: `anchor_to_record` repeats the anchor that no longer holds.
+            from chimera.governance.audit import anchor_to_record
+
+            home = self.run_log.parent
+            anchor = anchor_to_record(home / "audit.jsonl", home)
+            if anchor is not None:
+                receipt = receipt.model_copy(update=anchor.fields())
             append_run(self.run_log, receipt)
         except Exception as exc:  # noqa: BLE001 — receipt persistence is best-effort, never fatal
             _log.warning("run receipt failed to persist (%s: %s); writing a minimal row instead",

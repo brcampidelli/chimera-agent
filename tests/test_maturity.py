@@ -35,13 +35,27 @@ def test_scores_proven_and_missing() -> None:
 
 def test_levels_by_threshold() -> None:
     full = score([Surface("s", [Coverage("x", "", "t1")])], present={"t1"})
-    assert full.surfaces[0].level == "GA"
+    assert full.surfaces[0].level == "present"
     empty = score([Surface("s", [Coverage("x", "", "t1"), Coverage("y", "", "t2")])], present=set())
-    assert empty.surfaces[0].level == "Alpha"
+    assert empty.surfaces[0].level == "sparse"
     half = score(
         [Surface("s", [Coverage("x", "", "t1"), Coverage("y", "", "t2")])], present={"t1"}
     )
-    assert half.surfaces[0].level == "Beta"  # exactly 50%
+    assert half.surfaces[0].level == "partial"  # exactly 50%
+
+
+def test_a_full_score_is_not_called_a_release_grade() -> None:
+    """Every input here is a file NAME. A band called "GA" read as "generally available", a claim
+    about the product that a glob of test-file names cannot carry: a test that exists can fail, be
+    skipped, or test something else. The band now names what was counted, and the rendering says so.
+    """
+    card = score(_TOY, present={"test_one", "test_two", "test_three"})
+    out = format_scorecard(card)
+
+    assert {card.level, *(s.level for s in card.surfaces)} == {"present"}
+    for release_word in ("GA", "Beta", "Alpha"):
+        assert release_word not in out
+    assert "test file" in out
 
 
 def test_weakest_surface_is_the_objective() -> None:
@@ -53,7 +67,7 @@ def test_weakest_surface_is_the_objective() -> None:
 def test_weakest_is_none_when_complete() -> None:
     card = score(_TOY, present={"test_one", "test_two", "test_three"})
     assert card.weakest() is None
-    assert card.ratio == 1.0 and card.level == "GA"
+    assert card.ratio == 1.0 and card.level == "present"
 
 
 def test_evidence_from_tests_globs_stems(tmp_path: Path) -> None:
@@ -78,7 +92,8 @@ def test_default_taxonomy_scores_against_the_real_repo() -> None:
     # Every coverage-ID in the shipped taxonomy points at a test that actually exists.
     all_missing = [m for s in card.surfaces for m in s.missing]
     assert all_missing == [], f"taxonomy references non-existent tests: {all_missing}"
-    assert card.level == "GA"  # the project is mature; the scorecard should say so honestly
+    # Every coverage-ID has its test file. That is all this proves: presence, not passing.
+    assert card.level == "present"
 
 
 def test_taxonomy_ids_are_unique() -> None:

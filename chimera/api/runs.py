@@ -132,6 +132,12 @@ class AttemptReceipt(BaseModel):
     #: reported none, and for every receipt written before this field existed — "not recorded", not
     #: "no prompt". Two attempts with different values were not given the same instructions.
     system_sha: str = ""
+    #: How many of this attempt's model calls were cut at the output ceiling, and how many tool
+    #: calls were dropped for arguments that did not parse (study 30, S30-09). Record-only: a cut
+    #: turn used to reach this file looking exactly like a finished one. ``None`` on rows written
+    #: before the fields existed — "not recorded", which is not a clean zero.
+    truncated_steps: int | None = None
+    dropped_tool_calls: int | None = None
 
 
 class RunReceipt(BaseModel):
@@ -217,6 +223,21 @@ class RunReceipt(BaseModel):
     #: low, and always too low in the direction that flatters whichever configuration used a free
     #: tier. See :func:`total_usd`.
     usd: float | None = None
+
+    audit_count: int | None = None
+    """How many entries ``audit.jsonl`` held when this receipt was written; ``None`` when there was
+    no chained log beside it (or the receipt predates the field).
+
+    With ``audit_head``, an anchor for the audit log kept outside it. The chain inside the log
+    catches an edit in the middle and cannot catch the newest entries being deleted: every surviving
+    link still holds. The Security screen compares the log against the newest anchor it can find.
+    Filled by ``AutonomousAgent._persist_receipt``, the one writer of full receipts. Not here
+    in ``append_run``: an import of the governance package from this module moved
+    ``chimera/core/autonomous.py`` out of the repo map's default budget (a near-tie at the edge,
+    caught by ``tests/test_repomap_ranking.py``), and the caller already knows where it writes."""
+
+    audit_head: str = ""
+    """``hash`` of the newest audit entry when this receipt was written. See ``audit_count``."""
 
 
 def total_usd(attempts: Sequence[AttemptReceipt | Attempt]) -> float | None:
@@ -324,6 +345,8 @@ def build_receipt(
             failure_class=str(getattr(a, "failure_class", "") or ""),
             failure_evidence=str(getattr(a, "failure_evidence", "") or "")[:500],
             system_sha=str(getattr(a, "system_sha", "") or ""),
+            truncated_steps=getattr(a, "truncated_steps", None),
+            dropped_tool_calls=getattr(a, "dropped_tool_calls", None),
         )
         for a in result.attempts
     ]

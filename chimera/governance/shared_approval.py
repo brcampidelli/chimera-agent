@@ -14,13 +14,29 @@ Two things happen here and only the first is obvious:
 **One prompt at a time.** A lock around the ask, so output never interleaves. This alone fixes the
 unreadable case, and it does it whether or not the decisions are reused.
 
-**One answer, reused.** The verdict is cached by the action as it was DESCRIBED — which is exactly
-the sentence the person read. A worker asking about a different action gets a different key and a
-fresh question. Reusing a *refusal* is uncontroversial; reusing an *approval* is the deliberate
-part, and the argument is that the alternative is worse: a person who has just approved
-`run_shell: npm test` for worker A, asked again for the identical action by worker B a second
+**One answer, reused.** The verdict is cached by the PROPOSAL: the reason the call was questioned,
+plus the whole call (the tool, every argument uncut, documents included) and the run's taint epoch
+(:func:`~chimera.governance.ledger.proposal_of`). A worker asking about anything else gets a
+different key and a fresh question. Reusing a *refusal* is uncontroversial; reusing an *approval* is
+the deliberate part, and the argument is that the alternative is worse: a person who has just
+approved `run_shell: npm test` for worker A, asked again for the identical call by worker B a second
 later, is being asked to confirm something they cannot distinguish from what they already answered.
 That is how a prompt stops being read.
+
+Until study 30 (S30-04) this docstring said "a worker asking about a different action gets a
+different key", and in the one-argument form — the only form a `LedgeredTool` asks in, so the only
+one a crew run ever used — that was false: the key was the REASON alone, and the narrowing reason
+does not contain the command. Approving `run_shell: npm test` released every other narrowed shell
+command of the run without a question (arXiv 2609.38983, *Approval Laundering*). Narrower versions
+of the same defect: the action was cut at 300 characters, an email's body was never in it, and
+nothing the run read after the yes changed the key. `tests/test_one_run_one_question.py` only ever
+asked in the two-argument form, whose key did carry the action;
+`tests/test_an_approval_answers_only_the_proposal_it_was_shown.py` asks in the form a crew uses.
+
+The two-argument form, ``(verdict, action)``, is the kernel's (`GovernedTool`). Its action is the
+whole rendered command, never an excerpt, but a document argument is judged separately and is not
+in it. No caller wraps a `GovernedTool` in this class today (a crew wires `ledger_registry` only);
+one that does inherits that gap unless its verdict carries a ``proposal``, which is read here too.
 
 The cache is per RUN, because that is what a `SharedApprovals` instance is. Nothing here persists.
 """
@@ -37,17 +53,19 @@ _log = get_logger("governance.shared_approval")
 
 
 def _key(*args: Any) -> str:
-    """The identity of a decision: the action as described, plus the reason it was questioned.
+    """The identity of a decision: the reason it was questioned, plus the proposal itself.
 
-    Both, not just the action. The same command can be questioned for different reasons — a policy
+    Both, not just the proposal. The same command can be questioned for different reasons — a policy
     rule on one call and taint narrowing on the next — and an approval given for one is not an
-    answer to the other.
+    answer to the other. The proposal is the ``proposal`` digest the asker attached when there is one
+    (the whole call plus the taint epoch), and the action as shown either way, so an asker that
+    attaches nothing still gets one question per distinct card rather than one per reason.
     """
-    if len(args) == 2:
-        verdict, action = args
-        return f"{getattr(verdict, 'reason', '') or ''}\x00{action}"
-    assessment = args[0] if args else None
-    return f"{getattr(assessment, 'reason', '') or ''}\x00"
+    head = args[0] if args else None
+    reason = str(getattr(head, "reason", "") or "")
+    proposal = str(getattr(head, "proposal", "") or "")
+    action = str(args[1]) if len(args) == 2 else str(getattr(head, "action", "") or "")
+    return f"{reason}\x00{action}\x00{proposal}"
 
 
 class SharedApprovals:
@@ -74,7 +92,9 @@ class SharedApprovals:
                 # both miss, both prompt, and produce the interleaved output this exists to stop.
                 if chave in self._decided:
                     decidido = self._decided[chave]
-                    _log.debug("reusing this run's answer (%s): %s", decidido, chave.split("\x00")[-1][:80])
+                    _log.debug(
+                        "reusing this run's answer (%s): %s", decidido, chave.split("\x00")[1][:80]
+                    )
                     return decidido
                 decidido = bool(self._approver(*args))
                 self._decided[chave] = decidido

@@ -23,7 +23,7 @@ def test_build_snapshot_shape_and_bounds() -> None:
     assert snap["surfaces"], "the taxonomy has surfaces, so the snapshot must too"
     for s in snap["surfaces"]:
         assert 0 <= s["proven"] <= s["total"]
-        assert s["level"] in {"GA", "Beta", "Alpha"}
+        assert s["level"] in {"present", "partial", "sparse"}
         assert isinstance(s["missing"], list)
     # weakest is None (all proven) or a {name, ratio} dict — never anything else.
     assert snap["weakest"] is None or set(snap["weakest"]) == {"name", "ratio"}
@@ -38,7 +38,7 @@ def test_maturity_report_live_on_this_repo() -> None:
     assert report["source"] == "live"
     assert report["total"] > 0
     assert 0 <= report["proven"] <= report["total"]
-    assert report["level"] in {"GA", "Beta", "Alpha"}
+    assert report["level"] in {"present", "partial", "sparse"}
 
 
 def test_maturity_report_falls_back_to_snapshot(tmp_path: Path) -> None:
@@ -51,9 +51,9 @@ def test_maturity_report_falls_back_to_snapshot(tmp_path: Path) -> None:
         "proven": 3,
         "total": 5,
         "ratio": 0.6,
-        "level": "Beta",
+        "level": "partial",
         "surfaces": [
-            {"name": "fusion", "proven": 3, "total": 5, "ratio": 0.6, "level": "Beta", "missing": ["x"]}
+            {"name": "fusion", "proven": 3, "total": 5, "ratio": 0.6, "level": "partial", "missing": ["x"]}
         ],
         "weakest": {"name": "fusion", "ratio": 0.6},
         "generated_for": "9.9.9",

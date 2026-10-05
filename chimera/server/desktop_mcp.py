@@ -401,6 +401,10 @@ class DesktopMCP:
                     "prompt_tokens",
                     "completion_tokens",
                     "system_sha",
+                    # A cut turn and dropped tool calls (study 30, S30-09): without them a client
+                    # reading this summary sees a cut turn exactly like a finished one.
+                    "truncated_steps",
+                    "dropped_tool_calls",
                     "stopped_reason",
                     "steps",
                     "tool_names",

@@ -41,6 +41,12 @@ decision-first — no reasoning trace, by design (arXiv 2601.13284: the token af
 do arithmetic over a policy it has to read. That is what the instrument is and what it costs; the fix, if one is
 wanted, is a different backend for those questions, not a tweak to this one.
 
+> *Open, needs measurement (added 2026-10-04, study 30 S30-17).* The readout, not only the backend, is a live
+> alternative explanation: a training-free readout through prefix-free numeric ids (prefilled `Best answer: [`)
+> scored 81.4% / ECE 0.057 on these same 231 items with Qwen3.5-4B (arXiv 2610.02076). That is a different model
+> from our `qwen3:4b`, so nothing above is retracted; the conclusion is provisional until that readout is run on
+> `qwen3:4b` here (US$ 0), and the result is published either way.
+
 **24 items had no reading, and 9 of them had the right label written.** All 24 wrote a label the schema allows;
 the backend refused to read it because two options share their first token (`deny_…`, `sep_…`,
 `pay_subject_to_…`) — and in `coding` / `coding_agent` one option is a prefix of the other, so neither can ever
@@ -48,6 +54,11 @@ be read (study 21 A4). 20 of the 24 are on the hard tier, whose labels are long 
 registered, they are wrong. Counting the written label (exploratory, not the result): 152/231 = 0.658. **This is
 a fact about the product:** a `Choice` whose options collide on the first token is unreadable by the local
 backend, and the linter does not say so today.
+
+> *Open, needs measurement (added 2026-10-04, study 30 S30-17).* "A fact about the product" holds for the readout
+> the product ships, which reads the first token of a written label. Numeric or single-token position labels
+> remove these collisions by construction (arXiv 2610.02076, 2610.00831); whether they do so on `qwen3:4b` without
+> costing accuracy elsewhere is unmeasured.
 
 **The linter would refuse 49 of the 231 questions** — someone else's questions, bypassed for the measurement;
 reported because it is a fact about the linter, not about the model.

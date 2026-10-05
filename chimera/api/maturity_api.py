@@ -10,10 +10,11 @@
   so a pip-installed app has no live evidence to glob; the snapshot is the honest stand-in and carries
   its own ``generated_for`` version so the UI can date it.
 - **unavailable** — else (no live dir and no readable snapshot) it returns a zeroed, ``available=False``
-  payload. Never a fabricated all-Alpha 0/N scorecard.
+  payload. Never a fabricated all-sparse 0/N scorecard.
 
 HONESTY: a "proven" coverage-ID means a test file with that stem EXISTS, not that it passes — this is
-coverage/evidence presence, a drift flag, not a correctness claim. No benchmark performance numbers are
+coverage/evidence presence, a drift flag, not a correctness claim. The ``level`` band says so in its
+own name (present / partial / sparse); it was once "GA", which a file glob cannot earn. No benchmark performance numbers are
 computed or returned here.
 """
 
@@ -46,14 +47,14 @@ def _first_live_tests_dir(candidates: list[Path]) -> Path | None:
 
 
 def _unavailable(reason: str) -> dict[str, Any]:
-    """A zeroed, honest ``available=False`` payload — never a fabricated all-Alpha scorecard."""
+    """A zeroed, honest ``available=False`` payload — never a fabricated all-sparse scorecard."""
     return {
         "available": False,
         "source": None,
         "proven": 0,
         "total": 0,
         "ratio": 0.0,
-        "level": "Alpha",
+        "level": "sparse",
         "surfaces": [],
         "weakest": None,
         "generated_for": None,

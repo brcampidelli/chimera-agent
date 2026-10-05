@@ -166,6 +166,13 @@ class RunState:
     #: here first and ``run`` leaves it alone. Anything else that prompts an agent with an assembled
     #: string owes this field the request that string was assembled FROM.
     #:
+    #: "Right for a chat turn" has a limit (open, needs measurement; study 30, S30-22(b)). In a
+    #: multi-turn chat the string is the CURRENT turn, so when the request was made earlier and this
+    #: turn says "yes, go ahead", the request is not what gets restored. arXiv 2609.38372 saw that
+    #: class: in all 11 runs whose compaction fired, the customer's request, which came after a
+    #: greeting, was deleted at the first compaction, and pinning the opening messages did not save
+    #: it. A multi-turn compaction probe (US$ 0) comes before choosing a fix.
+    #:
     #: Two independent papers measure this failure class (arXiv 2608.11242: compactors retain 17%
     #: of injected session constraints; 2608.11392: rule-form items survive a compaction far better
     #: than facts). Our system message already survives verbatim, which is the half those papers

@@ -2898,16 +2898,18 @@ def _build_solve_agent(
     planner_backend: SupportsComplete = gateway
     escalate_backend: SupportsComplete | None = None
     if req.cascade:
-        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion.factory import fusion_engine
 
         backend = _api_cascade_backend(gateway, settings)
         escalate_backend = RoutedBackend(
-            gateway, FusionEngine(gateway), RoutingPolicy(mode="always")
+            gateway, fusion_engine(gateway), RoutingPolicy(mode="always")
         )
     elif req.fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion.factory import fusion_engine
 
-        engine = FusionEngine(gateway)
+        engine = fusion_engine(gateway)
         backend = RoutedBackend(gateway, engine)
         # Observed-difficulty escalation: a retry (the task already proved hard) fuses always.
         escalate_backend = RoutedBackend(gateway, engine, RoutingPolicy(mode="always"))

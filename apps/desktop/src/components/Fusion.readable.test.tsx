@@ -73,4 +73,14 @@ describe("the fusion breakdown", () => {
     expect(screen.getByText("error")).toBeInTheDocument();
     expect(screen.getByText("rate limited")).toBeInTheDocument();
   });
+
+  it("says so when the answer is a panel answer because aggregation failed", () => {
+    // Study 30 (S30-02): a judge or synthesiser failure now keeps the panel's answer instead of
+    // losing it, and the wire says `aggregation: "fallback"`. Without a dictionary entry that would
+    // render the raw key, and a reader would take a panel answer for a synthesis.
+    renderWithProviders(
+      <Fusion report={report({ aggregation: "fallback", fallback_stage: "judge" })} />,
+    );
+    expect(screen.getByText("panel answer (aggregation failed)")).toBeInTheDocument();
+  });
 });

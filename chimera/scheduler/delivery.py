@@ -185,6 +185,18 @@ def make_deliver(
         # as a decision that never had anything to decide.
         if motivo and job.deliver_to:
             record["skipped"] = motivo
+        # An anchor for the audit log: its size and newest digest as this job ends. The log is
+        # `<home>/audit.jsonl` and this file is `<home>/scheduler/cron_results.jsonl`. The VPS
+        # writes a line here on every tick, so this is the anchor that stays freshest on a host
+        # nobody is watching — and the newest audit entries are the ones a cover-up deletes. For the
+        # same reason a tick must not anchor a log that was cut since an earlier anchor: it would
+        # bless the cut within one tick. `anchor_to_record` repeats the anchor that no longer holds.
+        from chimera.governance.audit import anchor_to_record
+
+        home = results_path.parent.parent
+        anchor = anchor_to_record(home / "audit.jsonl", home)
+        if anchor is not None:
+            record.update(anchor.fields())
         with results_path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record, ensure_ascii=False) + "\n")
 

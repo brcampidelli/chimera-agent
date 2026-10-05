@@ -78,6 +78,23 @@ STALE_SECONDS = 24 * 3600.0
 DELIVERY_PART_CHARS = 1800
 
 
+#: How much of an action a terminal prompt or a delivered message shows when it is not asked to
+#: show the whole (`whole_action`). The app's card always shows the whole.
+SHOWN_ACTION_CHARS = 300
+
+
+def shown_action(action: str, limit: int = SHOWN_ACTION_CHARS) -> str:
+    """``action`` cut to ``limit`` characters, with the cut SAID.
+
+    The cut used to be silent: ``action[:300]``, and a command whose dangerous part came after
+    character 300 was approved by a person who saw a harmless opening and had no way to know there
+    was more (study 30, S30-04). The person can still say no to what they cannot see; now they know.
+    """
+    if len(action) <= limit:
+        return action
+    return f"{action[:limit]}… [{len(action) - limit} more characters not shown here]"
+
+
 def _dir(home: Path) -> Path:
     return Path(home) / "approvals"
 
@@ -250,11 +267,16 @@ def _code_hash(request_id: str, code: str) -> str:
     hand out the code. Not a defence against whoever can READ `<home>/approvals/`: a six-digit space
     falls to a loop — and whoever can read that directory can write an answer file there anyway.
 
-    That reader includes the local agent itself when it has ``run_shell``: the code is a secret
-    from the strangers who can message the bot, not from the model. What keeps the model from
-    approving is the sender check — only a listed person, never a bot, can answer from the chat —
-    and an agent that asks the owner to "paste this line" is still asking the owner to decide, so
-    the delivered text says what the line does. An HMAC would not change this: its key would have
+    That reader included the local agent itself when it had ``run_shell``: the code is a secret
+    from the strangers who can message the bot, not from the model. Since study 30 the agent's
+    shell and code tools refuse any command that names this folder, a question or answer file, the
+    approval route or ``chimera approve`` (`chimera/core/queue_fence.py`), and the write tools
+    refuse the folder by file identity (#775); a program that assembles the path at run time is the
+    gap that fence records and does not close.
+
+    What keeps the model from approving through the chat is the sender check — only a listed
+    person, never a bot, can answer from the chat — and an agent that asks the owner to "paste this
+    line" is still asking the owner to decide, so the delivered text says what the line does. An HMAC would not change this: its key would have
     to live where the asker and the bot (two processes) can both read it, i.e. on the same disk.
     """
     return hashlib.sha256(f"{request_id}:{code}".encode()).hexdigest()
@@ -510,7 +532,7 @@ def ask_durably(
             # The answer lines LAST, so they arrive after everything the answer is about.
             parts = split_for_channel(f"{head}Action:\n{action}\n\n{how}")
         else:
-            parts = [f"{head}Action: {action[:300]}\n\n{how}"]
+            parts = [f"{head}Action: {shown_action(action)}\n\n{how}"]
         for number, part in enumerate(parts, start=1):
             try:
                 deliver(part if len(parts) == 1 else f"({number}/{len(parts)}) {part}")

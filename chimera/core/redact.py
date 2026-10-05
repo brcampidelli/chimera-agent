@@ -5,9 +5,14 @@ talk to a broker, a database and a payment processor, so the text is exactly the
 bearer token — and the trace is a file that lives for weeks on a machine nobody logs into.
 
 **What this guarantees, and what it does not.** It guarantees that a secret *this process knows about*
-never reaches the file: every environment value whose variable name looks like a credential is
-replaced verbatim wherever it appears. That is a complete guarantee over the set that matters most,
-because those are the strings the agent could plausibly echo.
+never reaches the file *verbatim*: every environment value whose variable name looks like a
+credential is replaced, as a literal string, wherever it appears. That is the whole of the guarantee.
+An encoded copy of the same secret (base64, hex, ASCII codes, split across lines, reversed) is a
+different string and passes through. The model can produce one: 7 of 9 frontier models disguised a
+credential to "help" another agent, and a monitor that did not know the credential missed most of
+the encodings (arXiv 2609.39050). This text once called the literal match "a complete guarantee over
+the set that matters most"; it is complete only over verbatim echo (study 30, S30-21(c)). Matching
+the encoded forms of each known secret is open, not done.
 
 It does **not** guarantee that no secret ever survives. A token minted at runtime by a remote API, a
 password typed into a prompt, a key in a file the agent read — none of those are in the environment
@@ -114,9 +119,10 @@ def known_secrets() -> list[str]:
 def redact(text: str) -> str:
     """Replace known secrets, structurally-placed secrets, and credential-shaped strings.
 
-    Three nets, in order of confidence. The environment values are a guarantee over the set that
-    matters most; the places are structural and need no knowledge of the value; the shapes are a
-    guess at the string and are deliberately the narrowest of the three.
+    Three nets, in order of confidence. The environment values are a guarantee against their verbatim
+    copies (not their encoded ones: see the module docstring); the places are structural and need no
+    knowledge of the value; the shapes are a guess at the string and are deliberately the narrowest
+    of the three.
     """
     if not text:
         return text

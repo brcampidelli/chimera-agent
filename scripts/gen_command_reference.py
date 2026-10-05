@@ -29,7 +29,8 @@ Generated from the CLI itself, so it cannot describe a command that does not exi
 does. Thirty-three of these appeared in no README and no doc before this page; a reference written
 by hand fixes that once and then goes stale in silence, which is the failure worth designing out.
 
-Run `chimera <command> --help` for the full text of any entry.
+Subcommands of a group are listed under their full path (`agents list`, `cron add`). Run
+`chimera <command> --help` for the full text of any entry.
 
 """
 
@@ -63,11 +64,25 @@ def _arguments(command: dict) -> list[tuple[str, str]]:
     ]
 
 
+def _visible(node: dict) -> list[dict]:
+    """Every visible command under `node`, at any depth.
+
+    A group (`agents`, `cron`, ...) keeps its subcommands under its own "commands" key, and their
+    `path` is already the full one (`agents list`). Reading only the top level dropped all 73 of
+    them from the page, and the drift test could not see it, because it compares the page with this
+    function's own output. A hidden group hides everything under it.
+    """
+    found: list[dict] = []
+    for command in node.get("commands") or []:
+        if command.get("hidden"):
+            continue
+        found.append(command)
+        found.extend(_visible(command))
+    return found
+
+
 def render(snapshot: dict) -> str:
-    commands = sorted(
-        (c for c in snapshot["commands"] if not c.get("hidden")),
-        key=lambda c: str(c["path"]),
-    )
+    commands = sorted(_visible(snapshot), key=lambda c: str(c["path"]))
     out = [HEADER, "| Command | What it does |", "| --- | --- |"]
     for command in commands:
         anchor = str(command["path"]).replace(" ", "-")
@@ -103,8 +118,9 @@ def render(snapshot: dict) -> str:
 
 def main() -> None:
     text = render(json.loads(SNAPSHOT.read_text(encoding="utf-8")))
-    OUT.write_text(text, encoding="utf-8")
-    print(f"{OUT.relative_to(ROOT)}: {text.count(chr(10) + '## ')} commands")
+    # LF on every OS: the file is committed, and a Windows run would otherwise rewrite each line.
+    OUT.write_text(text, encoding="utf-8", newline="\n")
+    print(f"{OUT.relative_to(ROOT)}: {text.count(chr(10) + '## ')} commands and subcommands")
 
 
 if __name__ == "__main__":

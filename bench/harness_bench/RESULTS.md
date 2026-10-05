@@ -106,6 +106,14 @@ replication could change this paragraph, and it is priced below.
   outcome-faithfulness, not prose quality.
 - **A null on the outcome is not "the scaffolding never helps"** — it is "on this model and this task
   class it did not, at a measurable cost," which is exactly the case for turning it off here.
+- *Added 2026-10-04 (study 30, S30-20).* External evidence that the scope matters: planning added
+  +11.6 points on a weak model and about nothing on strong ones (arXiv 2609.20804), and one harness
+  change moved two models in opposite directions (57.1 -> 30.2 and 49.2 -> 60.3; arXiv 2610.00917).
+  So "simplify" is not extended to the local routes (gemma-4-12B, qwen3:4b) without measuring them;
+  the prompt registry now labels these nulls "measured on deepseek-v3.2". Open, needs measurement:
+  a per-task arm selection replayed on this data (STITCH, arXiv 2609.38912) was reported by the
+  study-30 sweep as a null against bare, but that replay is not in this repository and its numbers
+  are not published here until it is.
 
 ## Read by declared partitions — study 19, item A2 (2026-09-15)
 

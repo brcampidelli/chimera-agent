@@ -17,7 +17,7 @@ from __future__ import annotations
 import difflib
 from typing import Any
 
-from chimera.fusion.engine import _normalize_ws
+from chimera.fusion.engine import FusionFailed, _normalize_ws
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -39,11 +39,30 @@ def _last_user_text(messages: list[MessageLike]) -> str:
     return ""
 
 
+def vote_text(result: CompletionResult) -> str:
+    """What one sample contributes to a vote: its text, or ``""`` when it was cut off.
+
+    A reply that stopped at the output ceiling (``finish_reason == "length"``) did not answer, and
+    two replies cut off at the same point can be word-for-word identical — a reasoning model that
+    spends the budget on the same opening does exactly that. Mapped to ``""`` it still counts in
+    the denominator of :func:`majority` (it was asked) but can never be part of the winning cluster.
+    """
+    if str(getattr(result, "finish_reason", "") or "") == "length":
+        return ""
+    return result.content or ""
+
+
 def _cluster(answers: list[str], threshold: float) -> list[list[int]]:
-    """Greedily group answer indices by text similarity (>= ``threshold`` to a cluster head)."""
+    """Greedily group answer indices by text similarity (>= ``threshold`` to a cluster head).
+
+    An empty answer joins no cluster and heads none. ``SequenceMatcher("", "").ratio()`` is 1.0,
+    so without this two blank replies were a perfect match and formed a "majority" of nothing.
+    """
     norms = [_normalize_ws(a) for a in answers]
     clusters: list[list[int]] = []
     for i, norm in enumerate(norms):
+        if not norm:
+            continue
         for cluster in clusters:
             head = norms[cluster[0]]
             if difflib.SequenceMatcher(None, head, norm).ratio() >= threshold:
@@ -62,10 +81,14 @@ def majority(answers: list[str], *, threshold: float = 0.85) -> str | None:
     the rest scattered) does NOT win — a 40% cluster is weak agreement and synthesis is the honest
     fallback. A strict majority also can't tie, so this subsumes the old distinct/tie guards. The
     representative is the longest member of the winning cluster (usually the most complete phrasing).
+    Empty answers count toward "the samples" but never toward a cluster, so they can only make a
+    majority harder to reach — pass truncated replies through :func:`vote_text` for the same reason.
     """
     if not answers:
         return None
     clusters = _cluster(answers, threshold)
+    if not clusters:
+        return None  # every answer was empty: there is nothing to agree on
     top = max(clusters, key=len)
     if len(top) < 2 or len(top) * 2 <= len(answers):
         return None  # no cluster holds a strict majority of the samples
@@ -117,14 +140,17 @@ class SelfConsistency:
             for _ in range(self.n)
         ]
         answers = [s.content for s in samples]
+        votes = [vote_text(s) for s in samples]
         # Verifier selection (Weaver-lite): pick the best-scored candidate rather than the most
         # agreed-on one — verification lifts a weak generator past what it merely agrees with.
         if self.selector is not None:
             chosen_answer = self.selector.select(_last_user_text(messages), answers).answer
             return self._result(chosen_answer, samples)
-        winner = majority(answers, threshold=self.threshold)
+        winner = majority(votes, threshold=self.threshold)
         if winner is not None:
             return self._result(winner, samples)
+        if not any(v.strip() for v in votes):
+            return self._unvoted(samples)
         _log.debug("self-consistency: no majority over %d samples; synthesizing", self.n)
         synth = self._synthesize(messages, answers, chosen, max_tokens)
         return self._result(synth.content, [*samples, synth])
@@ -138,6 +164,37 @@ class SelfConsistency:
             Message(role="user", content=f"Candidate answers:\n\n{candidates}"),
         ]
         return self.backend.complete(prompt, model=model, temperature=0.2, max_tokens=max_tokens)
+
+    def _unvoted(self, samples: list[CompletionResult]) -> CompletionResult:
+        """No sample is a usable vote: say so instead of synthesising from nothing.
+
+        The synthesiser used to be handed ``Candidate 1:`` followed by blanks and its reply shipped as
+        ``model="self-consistency"`` — one model answering alone, labelled as an aggregate of N, the
+        case S30-02 made a declared failure in fusion. With no text at all that is
+        :class:`FusionFailed`. With text that was only ever cut off, the first such sample comes back
+        as itself: its own model and ``finish_reason``, the tokens of all N, and
+        ``route_meta["aggregation"] == "none"`` so nobody reads it as a consensus.
+        """
+        cut = next((s for s in samples if (s.content or "").strip()), None)
+        if cut is None:
+            reasons = ", ".join(str(getattr(s, "finish_reason", "") or "none reported") for s in samples)
+            raise FusionFailed(
+                f"no self-consistency sample produced an answer ({len(samples)} empty; finish_reason: {reasons})"
+            )
+        _log.warning("self-consistency: all %d samples were cut off; returning one unvoted", self.n)
+        merged = self._result(cut.content, samples)
+        return cut.model_copy(
+            update={
+                "prompt_tokens": merged.prompt_tokens,
+                "completion_tokens": merged.completion_tokens,
+                "route_meta": {
+                    **(cut.route_meta or {}),
+                    "kind": "self-consistency",
+                    "aggregation": "none",
+                    "reason": "every sample was cut off at the output ceiling",
+                },
+            }
+        )
 
     @staticmethod
     def _result(content: str, samples: list[CompletionResult]) -> CompletionResult:

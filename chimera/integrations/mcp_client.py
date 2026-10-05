@@ -11,6 +11,7 @@ Two layers:
 
 from __future__ import annotations
 
+import json
 import re
 import threading
 from collections.abc import Callable
@@ -149,12 +150,90 @@ class MCPConnector(Connector):
         return tools
 
 
+#: How much of a server-chosen label (a MIME type, a URI, a name) goes into a placeholder. These are
+#: the server's strings, so they are bounded like any other; a URI longer than this is still named.
+_LABEL_CHARS = 200
+
+
+def _label(value: Any) -> str:
+    return str(value or "")[:_LABEL_CHARS]
+
+
+def _b64_bytes(data: Any) -> int:
+    """The decoded size of a base64 payload, computed from its length; nothing is decoded.
+
+    Whitespace is not data: MIME-style base64 breaks a line every 76 characters, and counting the
+    newlines overstated a 3 000-byte image as about 3 029 bytes.
+    """
+    text = "".join(str(data or "").split())
+    return max(len(text) * 3 // 4 - text[-2:].count("="), 0)
+
+
+def _block_to_text(block: Any) -> tuple[str, bool]:
+    """One content block as text the model can read, and whether it was a text block.
+
+    Never ``str(block)``. That was the old fallback for every block without a ``text``, and on a
+    pydantic block it is the repr: an image arrived as its whole base64 payload — tokens the model
+    cannot read, and a screenshot is hundreds of thousands of them — and a resource arrived buried
+    in field names. A block we do not know is named by its type, because its fields are the
+    server's and we have no idea which of them is a payload.
+    """
+    kind = getattr(block, "type", None)
+    text = getattr(block, "text", None)
+    if isinstance(text, str) and kind in (None, "text"):
+        return text, True
+    if kind in ("image", "audio"):
+        return f"[{kind} {_label(getattr(block, 'mimeType', ''))}, "\
+               f"{_b64_bytes(getattr(block, 'data', ''))} bytes]", False
+    if kind == "resource":
+        resource = getattr(block, "resource", None)
+        uri = _label(getattr(resource, "uri", ""))
+        body = getattr(resource, "text", None)
+        if isinstance(body, str):
+            return f"[resource {uri}]\n{body}", False
+        return (f"[resource {uri} {_label(getattr(resource, 'mimeType', ''))}, "
+                f"{_b64_bytes(getattr(resource, 'blob', ''))} bytes]"), False
+    if kind == "resource_link":
+        return f"[resource link {_label(getattr(block, 'uri', ''))} "\
+               f"({_label(getattr(block, 'name', ''))})]", False
+    return f"[{_label(kind) or 'unknown'} content, not shown]", False
+
+
+def _serialised_in(structured: Any, texts: list[str]) -> bool:
+    """Whether one of the text blocks already IS ``structured``, serialised.
+
+    Compared as parsed JSON, so key order and spacing do not matter. Anything that does not parse
+    (a human summary such as "Done, 3 rows", an empty block) is not the serialisation.
+    """
+    for text in texts:
+        try:
+            if json.loads(text) == structured:
+                return True
+        except ValueError:  # JSONDecodeError is a ValueError
+            continue
+    return False
+
+
 def _content_to_text(result: Any) -> str:
-    """Flatten an MCP CallToolResult's content blocks into text."""
+    """Flatten an MCP CallToolResult into the text the model reads.
+
+    ``structuredContent`` is appended unless a text block already carries it serialised. The spec
+    asks a server that returns structured content to send it in a text block as well, and when it
+    does, appending it again would hand the model the same answer twice. Not every server does:
+    some send a human summary ("Done, 3 rows") as the text and the rows only as structured content,
+    and dropping the structured content whenever any text came hid the rows from the model. With
+    no content at all, the old code returned an empty string for a tool that had answered.
+    """
     parts: list[str] = []
+    texts: list[str] = []
     for block in getattr(result, "content", []) or []:
-        text = getattr(block, "text", None)
-        parts.append(text if isinstance(text, str) else str(block))
+        part, is_text = _block_to_text(block)
+        parts.append(part)
+        if is_text:
+            texts.append(part)
+    structured = getattr(result, "structuredContent", None)
+    if structured is not None and not _serialised_in(structured, texts):
+        parts.append(json.dumps(structured, ensure_ascii=False, default=str))
     return "\n".join(parts)
 
 
@@ -259,6 +338,10 @@ class StdioMCPSession:
                 )
                 read, write = await stack.enter_async_context(stdio_client(params))
                 self._session = await stack.enter_async_context(ClientSession(read, write))
+                # The InitializeResult (and its server `instructions`) is dropped on purpose: it is
+                # untrusted server text and nothing fences it as data. Not a boundary, though — the
+                # same server's tool descriptions reach the model unfenced in list_tools(). Recorded
+                # in docs/mcp.md (study 30, S30-21(h)); passing it fenced under taint is open.
                 await self._session.initialize()
                 _log.debug("MCP stdio session connected: %s", self.command)
                 self._ready.set()

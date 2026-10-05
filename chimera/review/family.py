@@ -2,9 +2,21 @@
 
 `chimera.api.roles.review_model_for` already refuses to let the reviewer be the *same model* as the
 editor. That is the weaker half of the rule. Two models from one vendor share training data, tuning
-and taste, so a sibling agrees with the author for the same reasons the author was wrong, and
-self-preference in LLM judges is one of the two biases that replicate (study 25 §2.9). Different
-model, same family, is still grading your own homework.
+and taste, so a sibling tends to miss what the author missed.
+
+Why another family, stated as narrowly as the evidence allows (study 30, S30-16). This module once
+said self-preference in LLM judges "replicates" (study 25 §2.9). That is contested: the largest
+public reanalysis finds no own-model premium (pooled +0.019, 95% CI -0.008 to 0.046, with a negative
+same-vendor term; arXiv 2610.00369), and a cross-model reviewer scored no better than a fresh
+session of the same model (adj. p = 1.00; arXiv 2610.01471). What that second paper did find is
+error coverage: reviewers of different models miss different things (Jaccard 41.2%), so a second
+review from another model adds more than a second review from the same one (56.7% vs 42.7%, Holm
+p = 0.006) — though not significantly more than two top-tier reviews. The rule now rests on that
+coverage argument alone, and it is itself only partly supported. This repository has not tested the
+rule: `bench/review_reviewer` chose WHICH reviewer of another family to use (recall 39/40 seeded
+reviews, 20 diffs x 2, = 97.5% for the chosen one against 34/40 = 85.0% for the reference), and by
+its own pre-registration ("What this cannot show") no diff there was written by a reviewer model, so
+it compares reviewers and says nothing about a reviewer grading its own family.
 
 A slug names a route, not a family: ``openrouter/deepseek/deepseek-v4-flash`` and
 ``deepseek/deepseek-chat`` are one family behind two providers. :func:`model_family` reads the

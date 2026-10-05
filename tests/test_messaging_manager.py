@@ -180,8 +180,13 @@ def test_governance_off_still_leaves_the_bot_usable(tmp_path: Path) -> None:
 
 
 def test_the_send_tool_survives_a_denylist_aimed_at_everything_else(tmp_path: Path) -> None:
-    """`send_message` is registered AFTER the profile, deliberately — same order as the CLI. A bot
-    that can read but cannot answer is a bot that looks online and is not."""
+    """`send_message` is exempt from the owner's fence — same as the CLI. A bot that can read but
+    cannot answer is a bot that looks online and is not.
+
+    This used to say it was registered AFTER the profile, and that was how the exemption was built;
+    it also put the tool outside the kernel and the taint ledger. It is now a `voice` tool of
+    `governed_profile` — after the fence, before the wrappers — so this assertion holds unchanged
+    and `test_a_bots_voice_is_governed_like_its_other_tools.py` holds the other half."""
     settings = Settings(
         CHIMERA_HOME=str(tmp_path),
         CHIMERA_DISCORD_BOT_TOKEN="t",

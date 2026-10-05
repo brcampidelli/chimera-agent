@@ -1,5 +1,5 @@
 ---
-source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
+source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
 ---
 
 # 在服务器（VPS）上部署 Chimera
@@ -251,10 +251,7 @@ CHIMERA_ALLOWED_ORIGINS=http://127.0.0.1:45813
 
 ## 6. 诚实的现状说明
 
-Chimera 目前处于 **alpha** 阶段。它可以完成部署并正常运行，cron 守护进程也让它具备了主动行为
-能力——但目前还**没有生产环境的实际运行里程**。请先从低风险的定时任务开始，密切关注 `logs`，
-并在处理任何涉及真实系统的任务时，牢记这些治理护栏（`solve` 上的 `--guard`、
-`CHIMERA_SANDBOX=docker`）。
+Chimera 目前处于 **alpha** 阶段。它可以完成部署并正常运行，cron 守护进程也让它具备了主动行为能力。它的生产运行里程只有**一个部署**：作者自己的 VPS，自 2026 年 7 月起全天候运行定时任务和一个 Discord 机器人。这是真实使用，而不是一个集群，也没有经历过你的工作负载。请先从低风险的定时任务开始，密切关注 `logs`，并在处理任何涉及真实系统的任务时，牢记这些治理护栏（`solve` 上的 `--guard`、`CHIMERA_SANDBOX=docker`）。
 
 ## 这些页面发布在哪里
 

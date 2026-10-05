@@ -157,6 +157,14 @@ Capability narrowing and taint stay the boundary, as the tree already says (#487
 
 - **What the literature measured:**
   - Position bias and self-preference replicate.
+    *[Amended 2026-10-04, study 30 S30-16: self-preference is **contested**, not replicated. arXiv
+    2610.00369 reanalyses 21,828 trials and finds no own-model premium (+0.019, 95% CI -0.008 to
+    0.046); arXiv 2610.01471 finds the cross-model gain is error coverage, not a better single review.
+    The plan's cross-family reviewer rule now rests only on that error-coverage argument, itself
+    partly supported. `bench/review_reviewer` chose WHICH cross-family reviewer to use (39/40 seeded
+    reviews, 20 diffs x 2); by its own pre-registration ("What this cannot show") it does not test the
+    rule, because no diff there was written by a reviewer model. The original sentence is kept above
+    as written.]*
   - A judge can have test-retest reliability above 0.95 and still show position bias above 0.10 (2606.19544).
   - Reference-guided grading cut math-grading failures from 70% to 15%.
   - Thinking-mode judges gain about 10 pp at under 2× compute.

@@ -7,7 +7,10 @@ each piece of it answers a measured failure of a single judge:
   to report only what matters filters silently; here every drop is recorded with its reason.
 - **The filter is the cautious one.** `bench/review_judge` measured the stricter rubric out of
   sample at +4.5 points of precision for −35.9 points of recall on correct comments.
-- **The reviewer is from another family** (:mod:`.family`), because self-preference replicates.
+- **The reviewer is from another family** (:mod:`.family`), for error coverage: different models
+  miss different defects (arXiv 2610.01471). It once said "because self-preference replicates";
+  that is contested (arXiv 2610.00369 finds no own-model premium), and the reviewer itself was
+  chosen by `bench/review_reviewer`, not by that argument.
 - **Findings first, P0–P3, each with ``file:line``, evidence and consequence**; "no findings" is
   said in words, with the residual risks and untested paths, and kept apart from a review that
   could not be completed (:mod:`.report`).

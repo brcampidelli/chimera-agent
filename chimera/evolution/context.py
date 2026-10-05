@@ -141,6 +141,11 @@ def build_evolution_context(
             "(CHIMERA_SKILL_CARDS=0). Set CHIMERA_MINT_UNREADABLE_SKILLS=1 to collect anyway."
         )
     if evolve_skills and mint:
+        # The proposing panel is the one fusion convenes, not `settings.fusion_panel`: unset, that
+        # field is the frontier default, so a cheap-cost-mode `solve --fuse` asked Opus + GPT-5.5 +
+        # Gemini for skill proposals after the fusion itself had moved to the user's ladder.
+        from chimera.fusion.factory import fusion_config
+
         auto_evolver = AutoSkillEvolver(
             SkillEvolver(gateway, model),
             SkillStore(home / "skills.json"),
@@ -150,7 +155,7 @@ def build_evolution_context(
             collective=(
                 CollectiveSkillEvolver(
                     gateway,
-                    settings.fusion_panel,
+                    fusion_config(settings).panel,
                     transfer_models=settings.transfer_panel,
                     validator=SkillValidator(),
                 )

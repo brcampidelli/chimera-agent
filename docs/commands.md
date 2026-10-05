@@ -6,7 +6,8 @@ Generated from the CLI itself, so it cannot describe a command that does not exi
 does. Thirty-three of these appeared in no README and no doc before this page; a reference written
 by hand fixes that once and then goes stale in silence, which is the failure worth designing out.
 
-Run `chimera <command> --help` for the full text of any entry.
+Subcommands of a group are listed under their full path (`agents list`, `cron add`). Run
+`chimera <command> --help` for the full text of any entry.
 
 
 | Command | What it does |
@@ -15,6 +16,9 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`acp`](#acp) | Serve Chimera to an editor over the Agent Client Protocol (stdio). |
 | [`agent`](#agent) | Run the ReAct agent loop with native tools. Requires a provider key. |
 | [`agents`](#agents) | The agents you dispatch work to — as distinct from the one you converse with. |
+| [`agents list`](#agents-list) | Show the registry. |
+| [`agents rm`](#agents-rm) | Forget an agent. Cards already filed under its lane are left exactly where they are. |
+| [`agents set`](#agents-set) | Add an agent, or replace the one with this id. |
 | [`app`](#app) | Run the Chimera Desktop app: the HTTP+SSE API + the built React UI (needs the 'desktop' extra). |
 | [`approve`](#approve) | Answer a decision the agent is waiting on, from anywhere. |
 | [`assist`](#assist) | Your daily-driver assistant: cheap by default, escalates when it must. |
@@ -24,18 +28,42 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`cascade-bench`](#cascade-bench) | Four-arm bench: weak-only vs mid-only vs cascade vs fusion. Calls real models. |
 | [`chat`](#chat) | Interactive multi-turn chat — your terminal right-hand. Requires a key. |
 | [`code`](#code) | Continue a desktop Code conversation from this terminal, through the running app. |
+| [`code list`](#code-list) | The desktop app's Code conversations, newest first, with the id `resume` takes. |
+| [`code resume`](#code-resume) | Continue a desktop Code conversation here; the app runs the turn and shows it too. |
 | [`context-curve`](#context-curve) | Did runs carrying more context do worse? Measured on THIS machine's own logs. |
 | [`crew`](#crew) | Run a multi-agent crew on a task (Tier 3). Requires a provider key. |
 | [`crew-isolated`](#crew-isolated) | Tier-3: tool-using workers attempt ONE task, each in its own git worktree, verify-gated. |
 | [`cron`](#cron) | Manage scheduled jobs (crons and event SOPs). |
+| [`cron add`](#cron-add) | Add a cron, event- or webhook-triggered job. |
+| [`cron disable`](#cron-disable) | Disable a job without deleting it. |
+| [`cron doctor`](#cron-doctor) | Ask the schedule what it is not telling you: what never ran, and what ran and lost. |
+| [`cron enable`](#cron-enable) | Enable a job (e.g. an agent-proposed one) and schedule its next run. |
+| [`cron fire`](#cron-fire) | Run every job registered for an event. |
+| [`cron kill`](#cron-kill) | Stop a job's running (or next) dispatch — one run, not the schedule. |
+| [`cron learn`](#cron-learn) | Propose crons from recurring tasks and create the ones you confirm. |
+| [`cron list`](#cron-list) | List scheduled jobs. |
+| [`cron remove`](#cron-remove) | Remove a scheduled job by id. |
 | [`decide`](#decide) | Ask typed questions — yes/no, a choice, a score — and get probabilities back. |
 | [`decisions`](#decisions) | Typed decisions: which model answers them, the log of what they answered, labels, a report and a refit. |
+| [`decisions label`](#decisions-label) | Say what was true for one answer. A later label for the same id replaces an earlier one. |
+| [`decisions log`](#decisions-log) | The latest answers, newest last, with their label when one was given. |
+| [`decisions models`](#decisions-models) | The System One models OpenRouter lists, which one is active, and which carry a calibration map. |
+| [`decisions refit`](#decisions-refit) | Fit this deployment's own map on its labelled answers — pooled with the shipped rows while it |
+| [`decisions report`](#decisions-report) | What the log holds: availability, the review budget, label coverage, and — where labels exist — |
+| [`decisions use`](#decisions-use) | Choose the backend (and model) that answers typed decisions — written to ``.env`` in this folder, |
 | [`delegations`](#delegations) | Measured vs counterfactual across delegations — what the hierarchy actually saved. |
 | [`deliver`](#deliver) | Deliverable Mode: produce a polished, self-contained artifact. Requires a key. |
 | [`doctor`](#doctor) | Check the environment and configuration. With --fix, repair safe setup issues. |
 | [`drift`](#drift) | Drift gate: check the workspace against a spec (Spec Growth). Exit 1 on drift. |
 | [`evoclaw`](#evoclaw) | Stress-test continuous-evolution degradation: naive vs guarded. Requires a key. |
 | [`evolve`](#evolve) | Opt-in model evolution (curate trajectories -> LoRA/DPO recipe). |
+| [`evolve export`](#evolve-export) | Export a curated SFT or DPO dataset from trajectories. |
+| [`evolve guard`](#evolve-guard) | Watch evolution health; retract the most recent skill on a SIGNIFICANT regression (M19-A6). |
+| [`evolve recipe`](#evolve-recipe) | Emit a runnable LoRA training recipe (train.py + README + requirements). |
+| [`evolve refine`](#evolve-refine) | GEPA-refine a skill from verified trajectories, gated on non-regressing transfer (M19-A5). |
+| [`evolve rft`](#evolve-rft) | One rejection-sampling fine-tuning round, gated by an honest A/B on two bench result files. |
+| [`evolve status`](#evolve-status) | Show how much training signal the collected trajectories hold. |
+| [`evolve tune`](#evolve-tune) | Self-optimize the agent spec (OpenJarvis meta-search) against the daily scenarios. |
 | [`explore`](#explore) | Locate relevant code via the isolated Context Explorer subagent (FastContext-style). |
 | [`features`](#features) | Show optional capabilities and what each needs (a key or a dependency). |
 | [`find`](#find) | Search a repository by what code DOES, not by the string it contains. |
@@ -46,24 +74,67 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`hierarchy-bench`](#hierarchy-bench) | Paired A/B: single-agent (all docs inline) vs the hierarchy (one worker per doc). Calls real models. |
 | [`init`](#init) | First-run setup: create .env, set a provider key, and point you at a real example. |
 | [`kanban`](#kanban) | Task board with worker lanes (backlog/doing/review/done). |
+| [`kanban add`](#kanban-add) | Add a card to the backlog. |
+| [`kanban board`](#kanban-board) | Show the board, column by column. |
+| [`kanban learn`](#kanban-learn) | Turn recurring tasks (from the experience buffer) into backlog cards. |
+| [`kanban move`](#kanban-move) | Move a card to another column. |
+| [`kanban rm`](#kanban-rm) | Remove a card. |
+| [`kanban run`](#kanban-run) | Dispatch backlog cards through their lanes (solve/crew). Requires a key. |
 | [`lifecycle`](#lifecycle) | SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key. |
-| [`maturity`](#maturity) | Render the maturity scorecard: surfaces × coverage-IDs proven by real tests. |
+| [`maturity`](#maturity) | Render the maturity scorecard: which coverage-IDs have their test file (presence, not passing). |
 | [`mcp`](#mcp) | Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of truth. |
+| [`mcp add`](#mcp-add) | Add (or replace-by-name) an MCP server. Persists to .chimera/mcp.json — no connect. |
+| [`mcp desktop`](#mcp-desktop) | Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop). |
+| [`mcp list`](#mcp-list) | List configured MCP servers (name, command + args, env key names). No connect. |
+| [`mcp remove`](#mcp-remove) | Remove a configured MCP server by name. |
+| [`mcp test`](#mcp-test) | Live-connect a configured server and print the tools it exposes (or a clear error). |
 | [`measure`](#measure) | Run the rulers this project measures itself with. |
+| [`measure rag`](#measure-rag) | Recall@k of each retriever over a real folder — lexical, and vector when an embedder is set. |
+| [`measure reranker`](#measure-reranker) | Leave-one-out AUC of the success reranker — does it discriminate, or is it noise? |
 | [`memory`](#memory) | Curated long-term memory. |
+| [`memory add`](#memory-add) | Remember a fact (ADD / UPDATE / NOOP, deduped). |
+| [`memory consolidate`](#memory-consolidate) | Merge clusters of similar memories into one LLM-summarised fact (opt-in write). |
+| [`memory export`](#memory-export) | Export all memory as JSON or Markdown, locally. Secrets are masked; metadata is left out. |
+| [`memory graph`](#memory-graph) | Build an entity-relation graph from long-term memory and show it. |
+| [`memory list`](#memory-list) | List all memory items. |
+| [`memory profile`](#memory-profile) | Show the consolidated cross-session user profile (persona facts). |
+| [`memory prune`](#memory-prune) | Prune low-value memory under a budget. Dry-run by default; persona/profile facts are never pruned. |
+| [`memory search`](#memory-search) | Search memory (keyword). |
 | [`memory-bench`](#memory-bench) | Measure recall@k as memory grows — lexical vs paraphrase. |
 | [`memory-poison`](#memory-poison) | Ablate the memory-poisoning defenses: what reaches a LATER run's prompt, and unmarked. |
 | [`meta`](#meta) | Meta-agent: design a specialized agent blueprint for a task. Requires a key. |
 | [`migrate`](#migrate) | Import config + skills from another agent; --apply also merges long-term memory. |
 | [`models`](#models) | Model assignment: tier ladder (weak/mid/top), cost mode, and the multi-vendor catalog. |
+| [`models catalog`](#models-catalog) | Browse the curated multi-vendor catalog (suggestions — any slug works). |
+| [`models set`](#models-set) | Pin a tier to a model (or set the cost mode). Explicit pins always beat the mode. |
 | [`orchestrate`](#orchestrate) | Hierarchical run: top model decomposes/synthesizes, budgeted mid workers execute. |
 | [`pet`](#pet) | Your virtual companion — a chimera that needs care. |
+| [`pet feed`](#pet-feed) | Feed it (raises fullness). |
+| [`pet new`](#pet-new) | Adopt a fresh companion (resets stats). |
+| [`pet play`](#pet-play) | Play with it (raises happiness; costs energy + a little fullness). |
+| [`pet rest`](#pet-rest) | Let it rest (restores energy). |
+| [`pet status`](#pet-status) | Check on your companion (stats drift while you're away). |
 | [`playbook`](#playbook) | ACE strategy playbook — incremental, delta-curated guidance for the agent. |
+| [`playbook add`](#playbook-add) | Manually add a bullet (a near-duplicate reinforces the existing one). |
+| [`playbook curate`](#playbook-curate) | Reflect on a run outcome and apply incremental deltas (add/reinforce/deprecate). |
+| [`playbook refine`](#playbook-refine) | Grow-and-refine: merge duplicate bullets and cap the size (deprecates the weakest). |
+| [`playbook show`](#playbook-show) | Print the current active playbook (top strategies by score). |
 | [`probe-select`](#probe-select) | PROBE best-arm identification with a cheap-proxy control variate (M18-5). |
 | [`profile`](#profile) | Persistent user profile — the assistant's stable, cacheable preamble. |
+| [`profile forget`](#profile-forget) | Remove a stored fact. |
+| [`profile set`](#profile-set) | Add a profile fact (name replaces; the list kinds append with dedup). |
+| [`profile show`](#profile-show) | Show the stored profile and the exact preamble sessions will receive. |
 | [`project`](#project) | Run a project start-to-finish against a Spec (drift = acceptance authority). |
+| [`project approve`](#project-approve) | Approve the initial plan (default) or a paused high-risk card, then continue. |
+| [`project deny`](#project-deny) | Reject a paused high-risk card (parks it for review, escalates to a human). |
+| [`project run`](#project-run) | Continue running a paused/escalated project (re-attempts a soft rail-stop). |
+| [`project start`](#project-start) | Create a project from a spec and run it until it aligns or a rail stops it. |
+| [`project status`](#project-status) | Show a project's status and its board. |
+| [`project step`](#project-step) | Run exactly one iteration (cron-able). |
 | [`redteam`](#redteam) | Red-team the injection defenses: attack success rate with vs without them. |
 | [`report`](#report) | Reports counted by code — from this home's own logs, or read with the GitHub CLI — no model call. |
+| [`report pr-watch`](#report-pr-watch) | Pull request watch: failing checks and new comments on your open pull requests, and failed runs |
+| [`report weekly`](#report-weekly) | Weekly review: spend, runs, approvals and failing jobs over the last 7 days. |
 | [`review`](#review) | [experimental] Review a change: findings first, P0 to P3, from a model of another family. |
 | [`rubric-grade`](#rubric-grade) | Grade an answer against an authorable rubric — weighted criteria with a required-criterion veto. |
 | [`run`](#run) | Run a single-shot Tier-1 completion (no fusion). Requires a provider key. |
@@ -71,6 +142,9 @@ Run `chimera <command> --help` for the full text of any entry.
 | [`scenarios`](#scenarios) | Run the daily right-hand scenario suite through a real chat session (live). Requires a key. |
 | [`schema-bench`](#schema-bench) | Measure tool-schema token cost, full vs compacted (advertise-time). No model calls. |
 | [`secrets`](#secrets) | Keep provider keys in the OS vault instead of a file. |
+| [`secrets list`](#secrets-list) | What the OS vault holds — names only, never values. |
+| [`secrets rm`](#secrets-rm) | Remove one credential from the OS vault. |
+| [`secrets set`](#secrets-set) | Put one credential in the OS vault. |
 | [`serve`](#serve) | Run the messaging gateway on HTTP, Discord, Telegram, Slack or Signal. Requires a key. |
 | [`sessions`](#sessions) | List the conversations ``chimera chat`` and ``chimera tui`` have saved, under ``<home>/sessions``. |
 | [`skillcard-bench`](#skillcard-bench) | A/B reasoning with vs without injected TRS skill cards. Calls real models. |
@@ -163,6 +237,48 @@ The agents you dispatch work to — as distinct from the one you converse with.
 ```bash
 chimera agents
 ```
+
+## agents list
+
+Show the registry.
+
+```bash
+chimera agents list
+```
+
+## agents rm
+
+Forget an agent. Cards already filed under its lane are left exactly where they are.
+
+```bash
+chimera agents rm AGENT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `AGENT_ID` | The agent to forget. |
+
+## agents set
+
+Add an agent, or replace the one with this id.
+
+Replace rather than merge, matching the API: a partial write that kept what you left out would
+make clearing a pinned model impossible.
+
+```bash
+chimera agents set AGENT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `AGENT_ID` | Its handle: a lowercase slug. Also its Kanban lane. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--name` | What to call it on screen. | `''` |
+| `--instructions` | Its role, in your words. | `''` |
+| `--model` | Pin a model; empty inherits the ladder. | `''` |
+| `--tools` | Comma-separated allowlist; empty means NO restriction. | `''` |
 
 ## app
 
@@ -369,6 +485,39 @@ Continue a desktop Code conversation from this terminal, through the running app
 chimera code
 ```
 
+## code list
+
+The desktop app's Code conversations, newest first, with the id `resume` takes.
+
+```bash
+chimera code list
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--limit`, `-n` | How many conversations, newest first. | `20` |
+
+## code resume
+
+Continue a desktop Code conversation here; the app runs the turn and shows it too.
+
+Needs the app open with Settings > "Allow Claude to operate this app" on. Approval questions are
+printed; answering them here also needs "Full control", otherwise answer them in the app. The
+turns run on the models configured in the app: the bridge this command speaks through takes no
+model choice.
+
+```bash
+chimera code resume SESSION_ID
+```
+
+| Argument | |
+| --- | --- |
+| `SESSION_ID` | The conversation's id (or a prefix only it has). |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--message`, `-m` | Send this one message and exit. Omit to keep talking. |  |
+
 ## context-curve
 
 Did runs carrying more context do worse? Measured on THIS machine's own logs.
@@ -444,6 +593,161 @@ Manage scheduled jobs (crons and event SOPs).
 chimera cron
 ```
 
+## cron add
+
+Add a cron, event- or webhook-triggered job.
+
+`--verify` is what turns a scheduled job into a run the harness governs. `CronJob` has carried
+the field since the harness landed and nothing could write it — not this command, not the HTTP
+route — so for every user the gate was permanently unarmed.
+
+```bash
+chimera cron add NAME SCHEDULE ACTION
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | A human-readable name. |
+| `SCHEDULE` | Cron expression, or an event/webhook name. |
+| `ACTION` | What to do (task description / skill). |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--event` | Treat SCHEDULE as an event name. |  |
+| `--webhook` | Fire on POST /webhook/<SCHEDULE> (needs 'chimera serve'). |  |
+| `--verify` | Gate: shell command run in the job's folder after the dispatch (exit 0 to keep the work, non-zero to revert it). Empty = no gate, which is the previous behaviour. | `''` |
+| `--max-attempts` | Attempts per dispatch. Worth raising only with --verify: without a gate nothing can tell a failed attempt from a finished one. | `1` |
+| `--notify` | When the answer is posted to the job's destination: always (every answer except the job's own 'nothing new' reply), on_change (skip an answer identical to the last one delivered), or failures_only. The result file gets every answer either way. Not with --webhook: a webhook job answers through the chat gateway. | `'always'` |
+| `--tools` | Comma-separated tools this job may use; the rest are removed from its registry. Omit for every tool (the previous behaviour). Refused with --webhook: a webhook job runs through the chat gateway, which does not apply the list. |  |
+| `--deliver-to` | Chat webhook URL (Discord or Slack) the job's answers are posted to, per --notify; a run that could not run or finish is announced there too. The URL is a credential and is never printed in full. Refused with --webhook: that job answers through the chat gateway. |  |
+
+## cron disable
+
+Disable a job without deleting it.
+
+```bash
+chimera cron disable JOB_ID
+```
+
+| Argument | |
+| --- | --- |
+| `JOB_ID` | The job id to disable. |
+
+## cron doctor
+
+Ask the schedule what it is not telling you: what never ran, and what ran and lost.
+
+Every other honesty mechanism here sits downstream of a run having happened. This is the one
+question about the run that did not — and about the one that happens on time, forever, and
+fails every time, which looks healthier than the first from any field that existed before.
+
+It is a question, not a watcher: nothing notices while this process is down, for the same
+reason a crashed process cannot log its own crash. What it gives you is an honest answer the
+moment you ask.
+
+```bash
+chimera cron doctor
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--grace` | How late a job may be before it counts as missed. | `10.0` |
+| `--check` | Exit 1 when a job is late or failing, so a watcher outside Chimera alerts only then. |  |
+
+## cron enable
+
+Enable a job (e.g. an agent-proposed one) and schedule its next run.
+
+```bash
+chimera cron enable JOB_ID
+```
+
+| Argument | |
+| --- | --- |
+| `JOB_ID` | The job id to enable. |
+
+## cron fire
+
+Run every job registered for an event.
+
+Event jobs had no dispatcher. `cron add --event deploy` accepted the job and `cron list` showed
+it enabled, but nothing in the package ever called `fire_event` — so the job simply never ran,
+and its silence was indistinguishable from that of a job whose time had not come. The cron
+trigger has the daemon and the webhook trigger has the webhook server; this is the third one's.
+
+Meant to be called from wherever the event actually happens — a git hook, a deploy step, a CI
+job. Dispatch is the same one the daemon uses, so a fired job behaves exactly like a scheduled
+one: same agent, same spend caps, same receipt.
+
+```bash
+chimera cron fire EVENT
+```
+
+| Argument | |
+| --- | --- |
+| `EVENT` | The event name to fire (as given to `cron add --event`). |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--model`, `-m` | Model for the dispatched jobs. |  |
+| `--max-steps` | Max tool-calling steps per job. | `6` |
+| `--workspace`, `-w` | Workspace root for tools. | `'.'` |
+
+## cron kill
+
+Stop a job's running (or next) dispatch — one run, not the schedule.
+
+`disable` takes the job off the clock; `kill` answers the other question: the job is running
+RIGHT NOW and must stop. The daemon's worker polls the flag between steps, the dispatch it
+stops deletes it, and the run ends `cancelled` — which counts as neither a failure nor a
+success, so a kill cannot ride the failure counter into the brake.
+
+```bash
+chimera cron kill JOB_ID
+```
+
+| Argument | |
+| --- | --- |
+| `JOB_ID` | The job id to stop. |
+
+## cron learn
+
+Propose crons from recurring tasks and create the ones you confirm.
+
+Each proposal is shown for explicit confirmation (the human-in-the-loop approval
+that keeps automation creation under control); confirmed jobs are validated and
+created enabled. ``--yes`` confirms all (use deliberately).
+
+```bash
+chimera cron learn
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--min` | Min repeats to propose. | `3` |
+| `--schedule` | Override the suggested cron schedule. |  |
+| `--yes`, `-y` | Create every proposal without prompting. |  |
+
+## cron list
+
+List scheduled jobs.
+
+```bash
+chimera cron list
+```
+
+## cron remove
+
+Remove a scheduled job by id.
+
+```bash
+chimera cron remove JOB_ID
+```
+
+| Argument | |
+| --- | --- |
+| `JOB_ID` | The job id to remove. |
+
 ## decide
 
 Ask typed questions — yes/no, a choice, a score — and get probabilities back.
@@ -482,6 +786,81 @@ Typed decisions: which model answers them, the log of what they answered, labels
 ```bash
 chimera decisions
 ```
+
+## decisions label
+
+Say what was true for one answer. A later label for the same id replaces an earlier one.
+
+```bash
+chimera decisions label ENTRY_ID
+```
+
+| Argument | |
+| --- | --- |
+| `ENTRY_ID` | The id from `chimera decisions log` or the approval card. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--yes`, `-y` | The question's event happened (governance: it WAS dangerous). |  |
+| `--no`, `-n` | It did not (governance: it was NOT dangerous). |  |
+| `--note` | Why, for whoever reads the label later. | `''` |
+
+## decisions log
+
+The latest answers, newest last, with their label when one was given.
+
+```bash
+chimera decisions log
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--limit`, `-n` | How many of the latest answers. | `20` |
+| `--unlabelled` | Only answers without a label. |  |
+
+## decisions models
+
+The System One models OpenRouter lists, which one is active, and which carry a calibration map.
+
+```bash
+chimera decisions models
+```
+
+## decisions refit
+
+Fit this deployment's own map on its labelled answers — pooled with the shipped rows while it
+has fewer than 20 labels of a class. Prints before writing; writes only with --write.
+
+```bash
+chimera decisions refit
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--write` | Save the refitted maps to <home>/decisions/maps.json. |  |
+
+## decisions report
+
+What the log holds: availability, the review budget, label coverage, and — where labels exist —
+catch and false refusal at the REVIEW threshold.
+
+```bash
+chimera decisions report
+```
+
+## decisions use
+
+Choose the backend (and model) that answers typed decisions — written to ``.env`` in this folder,
+the same pair and the same check as the desktop's System One card.
+
+```bash
+chimera decisions use BACKEND [MODEL]
+```
+
+| Argument | |
+| --- | --- |
+| `BACKEND` | local_logprob | hosted_verbalized | openrouter_decisions |
+| `MODEL` | Empty = the backend's measured default. For openrouter_decisions, a listed slug. |
 
 ## delegations
 
@@ -572,6 +951,132 @@ Opt-in model evolution (curate trajectories -> LoRA/DPO recipe).
 ```bash
 chimera evolve
 ```
+
+## evolve export
+
+Export a curated SFT or DPO dataset from trajectories.
+
+```bash
+chimera evolve export
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--out` | Output JSONL path. |  |
+| `--format` | sft | dpo | `'sft'` |
+| `--traj` | Trajectory JSONL (default: <home>/trajectories.jsonl). |  |
+| `--min-reward` | Drop examples below this reward. | `0.0` |
+| `--no-dedup` | Keep duplicate examples. |  |
+| `--min-margin` | DPO: min reward margin chosen − rejected. | `0.0` |
+| `--min-steps` | Recipe: keep only traces with >= N steps. | `0` |
+| `--diverse` | Recipe: at most one SFT example per task. |  |
+| `--min-process` | Keep only traces whose step-following score >= this (SkillCoach). |  |
+
+## evolve guard
+
+Watch evolution health; retract the most recent skill on a SIGNIFICANT regression (M19-A6).
+
+```bash
+chimera evolve guard
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--limit` | Limit demo tasks (0 = all). | `0` |
+| `--model`, `-m` | Override the model slug. |  |
+| `--cost-drift-tol` | Also roll back if second-half mean cost exceeds first by more than this. |  |
+| `--apply` | Retire the most recent skill IF a SIGNIFICANT regression is measured. |  |
+
+## evolve recipe
+
+Emit a runnable LoRA training recipe (train.py + README + requirements).
+
+```bash
+chimera evolve recipe
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--out` | Directory for the training recipe. |  |
+| `--format` | sft | dpo | `'sft'` |
+| `--base-model` |  | `'meta-llama/Llama-3.1-8B-Instruct'` |
+| `--dataset` | Dataset filename the script reads. | `'dataset.jsonl'` |
+
+## evolve refine
+
+GEPA-refine a skill from verified trajectories, gated on non-regressing transfer (M19-A5).
+
+```bash
+chimera evolve refine SKILL_NAME
+```
+
+| Argument | |
+| --- | --- |
+| `SKILL_NAME` | Name of the learned skill to refine. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--traj` | Trajectory JSONL (default: <home>/trajectories.jsonl). |  |
+| `--model`, `-m` | Override the model. |  |
+| `--budget` | GEPA rollout budget. | `20` |
+| `--min-reward` | Only mine trajectories at/above this reward (1.0 = verified). | `1.0` |
+| `--apply` | Persist the refined skill IF it passes the transfer gate. |  |
+
+## evolve rft
+
+One rejection-sampling fine-tuning round, gated by an honest A/B on two bench result files.
+
+Rejection-samples the collected trajectories (successes at/above the reward bar), then promotes
+the round ONLY if the candidate beats the baseline with a confidence interval that excludes zero
+— no lift, no promotion, no training on noise. Artifacts are withheld for an unpromoted round
+unless ``--force``. Feed ``--baseline``/``--candidate`` the pass/fail lists two bench runs produce.
+
+```bash
+chimera evolve rft
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--baseline` | JSON list of baseline bench pass/fail. |  |
+| `--candidate` | JSON list of candidate bench pass/fail. |  |
+| `--traj` | Trajectory JSONL (default: <home>/trajectories.jsonl). |  |
+| `--min-reward` | Rejection-sampling reward bar. | `0.5` |
+| `--min-examples` | Accepted examples needed to gate. | `30` |
+| `--top-k` | Keep at most this many accepted per prompt (0 = all). | `0` |
+| `--out` | If promoted, write dataset + recipe here. |  |
+| `--force` | Export even if the round is not promoted. |  |
+
+## evolve status
+
+Show how much training signal the collected trajectories hold.
+
+```bash
+chimera evolve status
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--traj` | Trajectory JSONL (default: <home>/trajectories.jsonl). |  |
+| `--min-reward` | Drop examples below this reward. | `0.0` |
+| `--min-examples` | Examples needed before training is worth it. | `30` |
+
+## evolve tune
+
+Self-optimize the agent spec (OpenJarvis meta-search) against the daily scenarios.
+
+Each round a model proposes a coordinated edit to the spec; the candidate is scored on
+the daily scenarios and kept only on non-regression. Uses real model calls.
+
+```bash
+chimera evolve tune
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--rounds` | Meta-search rounds. | `2` |
+| `--model` | Base model for the spec. |  |
+| `--max-steps` | Initial runtime step budget. | `8` |
+| `--k` | Suite runs per candidate — one samples, two alert, three decide. Multiplies cost. | `3` |
 
 ## explore
 
@@ -749,6 +1254,89 @@ Task board with worker lanes (backlog/doing/review/done).
 chimera kanban
 ```
 
+## kanban add
+
+Add a card to the backlog.
+
+```bash
+chimera kanban add TITLE
+```
+
+| Argument | |
+| --- | --- |
+| `TITLE` | Short card title. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--action`, `-a` | Task text to run (defaults to title). |  |
+| `--lane`, `-l` | Who works it: solve | crew | the id of one of your agents (`chimera agents`). | `'solve'` |
+| `--verify` | Verify command for the solve lane (exit 0). |  |
+
+## kanban board
+
+Show the board, column by column.
+
+```bash
+chimera kanban board
+```
+
+## kanban learn
+
+Turn recurring tasks (from the experience buffer) into backlog cards.
+
+Uses the cron-learner's recurrence detector; each card is confirmed (or --yes), and
+a task already on the board is skipped — so re-running is safe.
+
+```bash
+chimera kanban learn
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--min` | Min repeats to turn into a card. | `3` |
+| `--lane`, `-l` | Lane for the created cards. | `'solve'` |
+| `--yes`, `-y` | Add every card without prompting. |  |
+
+## kanban move
+
+Move a card to another column.
+
+```bash
+chimera kanban move CARD_ID COLUMN
+```
+
+| Argument | |
+| --- | --- |
+| `CARD_ID` | Card id. |
+| `COLUMN` | backlog | doing | review | done. |
+
+## kanban rm
+
+Remove a card.
+
+```bash
+chimera kanban rm CARD_ID
+```
+
+| Argument | |
+| --- | --- |
+| `CARD_ID` | Card id. |
+
+## kanban run
+
+Dispatch backlog cards through their lanes (solve/crew). Requires a key.
+
+```bash
+chimera kanban run
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--limit`, `-n` | Max backlog cards to dispatch. |  |
+| `--workspace`, `-w` | Workspace for the solve lane. | `'.'` |
+| `--model`, `-m` | Override the model slug. |  |
+| `--workers`, `-j` | Work this many cards at once, each in its own git worktree. | `1` |
+
 ## lifecycle
 
 SDLC crew: plan -> build -> test -> review with verify-or-revert. Requires a key.
@@ -770,7 +1358,7 @@ chimera lifecycle TASK
 
 ## maturity
 
-Render the maturity scorecard: surfaces × coverage-IDs proven by real tests.
+Render the maturity scorecard: which coverage-IDs have their test file (presence, not passing).
 
 ```bash
 chimera maturity
@@ -788,6 +1376,75 @@ Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of
 chimera mcp
 ```
 
+## mcp add
+
+Add (or replace-by-name) an MCP server. Persists to .chimera/mcp.json — no connect.
+
+```bash
+chimera mcp add NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | A unique name for the server (namespaces its tools). |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--command`, `-c` | The launch command (e.g. npx, uvx, python). |  |
+| `--arg`, `-a` | A command argument (repeatable). |  |
+| `--env`, `-e` | An env var as K=V (repeatable). |  |
+
+## mcp desktop
+
+Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop).
+
+Needs the app open with Settings > "Allow Claude to operate this app" on; the tools then call
+the app's local bridge. Register it with: claude mcp add chimera-desktop -- chimera mcp desktop
+
+```bash
+chimera mcp desktop
+```
+
+## mcp list
+
+List configured MCP servers (name, command + args, env key names). No connect.
+
+```bash
+chimera mcp list
+```
+
+## mcp remove
+
+Remove a configured MCP server by name.
+
+```bash
+chimera mcp remove NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The server name to remove. |
+
+## mcp test
+
+Live-connect a configured server and print the tools it exposes (or a clear error).
+
+This is the ONLY MCP subcommand that connects (spawns the server + runs the async handshake). It
+is the sole honest proof a server is reachable. Needs the 'mcp' extra and the server's own runtime
+(e.g. Node for an npx server).
+
+```bash
+chimera mcp test NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The configured server to live-test. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--timeout` | Connect timeout in seconds. | `12.0` |
+
 ## measure
 
 Run the rulers this project measures itself with.
@@ -796,6 +1453,58 @@ Run the rulers this project measures itself with.
 chimera measure
 ```
 
+## measure rag
+
+Recall@k of each retriever over a real folder — lexical, and vector when an embedder is set.
+
+This is the measurement `chimera/rag/__init__.py` names when it says the retriever's existence
+is not a claim that it helps. That sentence pointed at a module you could not run: `rag_bench`
+had no caller outside its own test and was not exported from `chimera.eval`.
+
+Without `--semantic` no embedder is passed, so the vector and hybrid figures come back as None
+rather than zero — an embedder that was never called did not fail, and printing 0.0 invites the
+wrong conclusion.
+
+With it, the run that `bench/rag/RESULTS.md` reports is reproducible from the CLI rather than
+from a script somebody has to write. It costs an embedding pass over the corpus: about two cents
+for this repository's 3,459 chunks and 400 probes, and the figure it produces belongs to the
+embedder that produced it — vector spaces do not convert between models.
+
+```bash
+chimera measure rag ROOT
+```
+
+| Argument | |
+| --- | --- |
+| `ROOT` | Folder to index and probe. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--k` | Retrieve this many chunks per probe. | `10` |
+| `--max-probes` | Cap the probe count; each one is a query. | `200` |
+| `--semantic` | Measure the vector and hybrid arms too. Costs money. |  |
+
+## measure reranker
+
+Leave-one-out AUC of the success reranker — does it discriminate, or is it noise?
+
+`chimera/evolution/reranker.py` says to measure with this BEFORE putting the reranker in a hot
+path. It was prose pointing at an unreachable module.
+
+AUC of 0.5 is a coin flip. A reranker at 0.5 is not a weak reranker, it is not a reranker.
+
+```bash
+chimera measure reranker CORPUS
+```
+
+| Argument | |
+| --- | --- |
+| `CORPUS` | JSONL of {query, text, success} records. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--k` | Rank cut-off for the leave-one-out scoring. | `5` |
+
 ## memory
 
 Curated long-term memory.
@@ -803,6 +1512,106 @@ Curated long-term memory.
 ```bash
 chimera memory
 ```
+
+## memory add
+
+Remember a fact (ADD / UPDATE / NOOP, deduped).
+
+```bash
+chimera memory add CONTENT
+```
+
+| Argument | |
+| --- | --- |
+| `CONTENT` | The fact to remember. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--key` | Optional dedup key. |  |
+| `--persona` | Store as a persona fact (part of the cross-session profile). |  |
+
+## memory consolidate
+
+Merge clusters of similar memories into one LLM-summarised fact (opt-in write).
+
+```bash
+chimera memory consolidate
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--threshold` | Similarity (Jaccard) to cluster facts; lower = merges more. | `0.5` |
+| `--dry-run` | Only list the clusters that would be merged (no model call, no write). |  |
+
+## memory export
+
+Export all memory as JSON or Markdown, locally. Secrets are masked; metadata is left out.
+
+```bash
+chimera memory export
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--format` | json | markdown | `'json'` |
+| `--out` | Write to this file (default: print to stdout). |  |
+
+## memory graph
+
+Build an entity-relation graph from long-term memory and show it.
+
+```bash
+chimera memory graph
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--entity`, `-e` | Show relations for one entity. |  |
+
+## memory list
+
+List all memory items.
+
+```bash
+chimera memory list
+```
+
+## memory profile
+
+Show the consolidated cross-session user profile (persona facts).
+
+```bash
+chimera memory profile
+```
+
+## memory prune
+
+Prune low-value memory under a budget. Dry-run by default; persona/profile facts are never pruned.
+
+```bash
+chimera memory prune
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--max` | Keep the N highest-value memories. | `50` |
+| `--apply` | Actually delete. Default is a dry-run preview (no data lost). |  |
+
+## memory search
+
+Search memory (keyword).
+
+```bash
+chimera memory search QUERY
+```
+
+| Argument | |
+| --- | --- |
+| `QUERY` | Search query. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--k` | Max results. | `5` |
 
 ## memory-bench
 
@@ -887,6 +1696,32 @@ Model assignment: tier ladder (weak/mid/top), cost mode, and the multi-vendor ca
 chimera models
 ```
 
+## models catalog
+
+Browse the curated multi-vendor catalog (suggestions — any slug works).
+
+```bash
+chimera models catalog
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--tier` | Filter: weak, mid, or top. |  |
+| `--vendor` | Filter by vendor substring. |  |
+
+## models set
+
+Pin a tier to a model (or set the cost mode). Explicit pins always beat the mode.
+
+```bash
+chimera models set ROLE VALUE
+```
+
+| Argument | |
+| --- | --- |
+| `ROLE` | weak | mid | top (alias: orchestrator) | mode |
+| `VALUE` | A model slug (any vendor), 'auto' to unpin, or a cost mode for 'mode'. |
+
 ## orchestrate
 
 Hierarchical run: top model decomposes/synthesizes, budgeted mid workers execute.
@@ -918,12 +1753,103 @@ Your virtual companion — a chimera that needs care.
 chimera pet
 ```
 
+## pet feed
+
+Feed it (raises fullness).
+
+```bash
+chimera pet feed
+```
+
+## pet new
+
+Adopt a fresh companion (resets stats).
+
+```bash
+chimera pet new
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--name` | Companion name. | `'Chimi'` |
+| `--species` | Companion species. | `'chimera'` |
+
+## pet play
+
+Play with it (raises happiness; costs energy + a little fullness).
+
+```bash
+chimera pet play
+```
+
+## pet rest
+
+Let it rest (restores energy).
+
+```bash
+chimera pet rest
+```
+
+## pet status
+
+Check on your companion (stats drift while you're away).
+
+```bash
+chimera pet status
+```
+
 ## playbook
 
 ACE strategy playbook — incremental, delta-curated guidance for the agent.
 
 ```bash
 chimera playbook
+```
+
+## playbook add
+
+Manually add a bullet (a near-duplicate reinforces the existing one).
+
+```bash
+chimera playbook add CONTENT
+```
+
+| Argument | |
+| --- | --- |
+| `CONTENT` | The strategy/pitfall bullet to add. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--section` | strategy | pitfall | check. | `'strategy'` |
+
+## playbook curate
+
+Reflect on a run outcome and apply incremental deltas (add/reinforce/deprecate).
+
+```bash
+chimera playbook curate
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--task` | The task the outcome is for. |  |
+| `--outcome` | What happened (success/failure + details). |  |
+| `--model` | Model slug for the reflect+curate call. |  |
+
+## playbook refine
+
+Grow-and-refine: merge duplicate bullets and cap the size (deprecates the weakest).
+
+```bash
+chimera playbook refine
+```
+
+## playbook show
+
+Print the current active playbook (top strategies by score).
+
+```bash
+chimera playbook show
 ```
 
 ## probe-select
@@ -958,6 +1884,39 @@ Persistent user profile — the assistant's stable, cacheable preamble.
 chimera profile
 ```
 
+## profile forget
+
+Remove a stored fact.
+
+```bash
+chimera profile forget VALUE
+```
+
+| Argument | |
+| --- | --- |
+| `VALUE` | The exact fact to remove (or 'name' to clear the name). |
+
+## profile set
+
+Add a profile fact (name replaces; the list kinds append with dedup).
+
+```bash
+chimera profile set KIND VALUE
+```
+
+| Argument | |
+| --- | --- |
+| `KIND` | name | preference | project | context |
+| `VALUE` | The fact to store. |
+
+## profile show
+
+Show the stored profile and the exact preamble sessions will receive.
+
+```bash
+chimera profile show
+```
+
 ## project
 
 Run a project start-to-finish against a Spec (drift = acceptance authority).
@@ -965,6 +1924,102 @@ Run a project start-to-finish against a Spec (drift = acceptance authority).
 ```bash
 chimera project
 ```
+
+## project approve
+
+Approve the initial plan (default) or a paused high-risk card, then continue.
+
+```bash
+chimera project approve PROJECT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `PROJECT_ID` | Project id. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--card` | Approve a specific high-risk card instead of the plan. |  |
+| `--model`, `-m` | Override the solve model. |  |
+
+## project deny
+
+Reject a paused high-risk card (parks it for review, escalates to a human).
+
+```bash
+chimera project deny PROJECT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `PROJECT_ID` | Project id. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--card` | The high-risk card to reject. |  |
+
+## project run
+
+Continue running a paused/escalated project (re-attempts a soft rail-stop).
+
+```bash
+chimera project run PROJECT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `PROJECT_ID` | Project id. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--model`, `-m` | Override the solve model. |  |
+
+## project start
+
+Create a project from a spec and run it until it aligns or a rail stops it.
+
+```bash
+chimera project start SPEC
+```
+
+| Argument | |
+| --- | --- |
+| `SPEC` | Spec YAML (the acceptance authority). |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--workspace`, `-w` | Project workspace root. | `'.'` |
+| `--model`, `-m` | Override the solve model. |  |
+| `--max-iterations` | Hard rail on card runs. | `20` |
+| `--yes`, `-y` | Skip the initial plan-approval pause (auto-approve). |  |
+
+## project status
+
+Show a project's status and its board.
+
+```bash
+chimera project status PROJECT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `PROJECT_ID` | Project id. |
+
+## project step
+
+Run exactly one iteration (cron-able).
+
+```bash
+chimera project step PROJECT_ID
+```
+
+| Argument | |
+| --- | --- |
+| `PROJECT_ID` | Project id. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--model`, `-m` | Override the solve model. |  |
 
 ## redteam
 
@@ -984,6 +2039,47 @@ Reports counted by code — from this home's own logs, or read with the GitHub C
 ```bash
 chimera report
 ```
+
+## report pr-watch
+
+Pull request watch: failing checks and new comments on your open pull requests, and failed runs
+on the default branch — read with the GitHub CLI, never acted on.
+
+Without `--print`/`--json` this registers the watch for WORKSPACE as an hourly job, DISABLED,
+once per repository: it runs only after `chimera cron enable <id>`, posts only where
+`--deliver-to` says, and posts again only when the summary changes. Nothing is pushed, commented,
+merged or re-run, and other people's comments are quoted inside the data fence, as data.
+
+```bash
+chimera report pr-watch
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--workspace`, `-w` | The repository to watch (a folder inside a git checkout whose origin is on GitHub). | `'.'` |
+| `--print` | Look now and print the summary instead of proposing the job. Reads only; remembers nothing. |  |
+| `--json` | Look now and print what was found as JSON. Reads only; remembers nothing. |  |
+| `--deliver-to` | Chat webhook URL (Discord or Slack) the job posts to. Stored on the proposal; never printed in full. |  |
+| `--lang` | pt or en. Default: the owner's identity language (Portuguese unless it names another). |  |
+
+## report weekly
+
+Weekly review: spend, runs, approvals and failing jobs over the last 7 days.
+
+Every number is computed by code from the same logs the app's screens read (`usage.jsonl`,
+`runs.jsonl`, `approvals/history.jsonl`, `scheduler/jobs.json`); no model writes or restates
+any of them. Without `--print` this registers the weekly job — Mondays 09:00, DISABLED — once:
+it runs only after `chimera cron enable <id>`, and posts only where `--deliver-to` says.
+
+```bash
+chimera report weekly
+```
+
+| Option | | Default |
+| --- | --- | --- |
+| `--print` | Print the last 7 days' review now instead of proposing the weekly job. Reads only. |  |
+| `--deliver-to` | Chat webhook URL (Discord or Slack) the weekly job posts to. Stored on the proposal; never printed in full. |  |
+| `--lang` | pt or en. Default: the owner's identity language (Portuguese unless it names another). |  |
 
 ## review
 
@@ -1130,6 +2226,49 @@ Keep provider keys in the OS vault instead of a file.
 ```bash
 chimera secrets
 ```
+
+## secrets list
+
+What the OS vault holds — names only, never values.
+
+Printing a secret would put it in this terminal's scrollback, in any screenshot of it, and in
+whatever recorded the session, which undoes the reason for having a vault.
+
+```bash
+chimera secrets list
+```
+
+## secrets rm
+
+Remove one credential from the OS vault.
+
+```bash
+chimera secrets rm NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The credential to forget. |
+
+## secrets set
+
+Put one credential in the OS vault.
+
+Prompted without echo by default, and that is not politeness: a key typed as an argument lands
+in the shell history of every machine it is typed on, which is the kind of file this command
+exists to stop using.
+
+```bash
+chimera secrets set NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | e.g. OPENROUTER_API_KEY |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--value` | Omit to be prompted without echo. |  |
 
 ## serve
 

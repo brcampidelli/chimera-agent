@@ -183,32 +183,14 @@ def fusion_for_role(gateway: object, settings: Settings) -> object:
     check is ``model_fields_set``, which distinguishes "explicitly provided" from "happens to equal
     the default" — the distinction that made this bug invisible in the first place.
     """
-    from chimera.fusion.engine import FusionConfig, FusionEngine
-    from chimera.providers.catalog import resolve_tiers
+    # The panel logic lives in `chimera.fusion.factory`, which every CLI and API surface now goes
+    # through. It used to be written out here field by field, and that copy left out `blind_panel`:
+    # `CHIMERA_FUSION_BLIND_PANEL=false` was ignored on every role and cascade path. The factory
+    # builds the behaviour fields with `FusionConfig.from_settings(settings)` — the settings we were
+    # HANDED, never the process-global ones, so a test's Settings still applies.
+    from chimera.fusion.factory import fusion_engine
 
-    # Built from the settings we were HANDED, not via FusionConfig.from_settings(), which reads the
-    # process-global get_settings(). Mixing the two would take behaviour from one object and models
-    # from another — the same class of split-brain that produced the bug this function exists to fix,
-    # and untestable besides, since a test's Settings would silently not apply.
-    config = FusionConfig(
-        panel=list(settings.fusion_panel),
-        judge=settings.fusion_judge,
-        synthesizer=settings.fusion_synthesizer,
-        mode="selective" if settings.fusion_mode == "selective" else "full",
-        probe_k=settings.fusion_probe_k,
-        agreement_threshold=settings.fusion_agreement_threshold,
-        task_typed=settings.fusion_task_typed,
-        panel_temperatures=list(settings.fusion_panel_temperatures),
-    )
-    if "fusion_panel" not in getattr(settings, "model_fields_set", set()):
-        ladder = resolve_tiers(settings)  # type: ignore[arg-type]
-        # dict.fromkeys: dedupe while keeping order. A cost mode can point two tiers at the same
-        # model (``cheap`` sets mid == top), and a panel that asks one model the same question twice
-        # is paying twice for one opinion and calling the agreement a signal.
-        config.panel = list(dict.fromkeys([ladder.top, ladder.mid, ladder.weak]))
-        config.judge = ladder.top
-        config.synthesizer = ladder.top
-    return FusionEngine(gateway, config)  # type: ignore[arg-type]
+    return fusion_engine(gateway, settings)
 
 
 def review_model_for(plan: RolePlan) -> str | None:

@@ -87,6 +87,12 @@ class CatalogEntry:
     in `tests/test_catalog_is_live.py` reddens when the ceiling pins a row to one route again;
     the probe and its rows are in `bench/route_ceiling/`."""
 
+    cache_read_per_m: float | None = None
+    """USD per 1M prompt-cache READS; None = not recorded, and a receipt then prices a read at the
+    input rate. Filled only where the provider published it — never a multiplier assumed per row."""
+    cache_write_per_m: float | None = None
+    """USD per 1M prompt-cache WRITES; None = not recorded (priced at the input rate, a floor)."""
+
 
 
 def price_is_known(entry: CatalogEntry, live_input_per_m: float, *, tolerance: float = 0.5) -> bool:
@@ -257,7 +263,7 @@ CATALOG: tuple[CatalogEntry, ...] = (
     ),
     CatalogEntry(
         "openrouter/openai/gpt-6-sol", "top", "OpenAI",
-        2.00, 10.00, tools=True, context_k=1050,
+        2.00, 10.00, tools=True, context_k=1050, cache_read_per_m=0.20,
         notes="the cost-efficient high end of the GPT-6 line (below Astra, above Luna), released 2026-09-22 and priced off the index the same day: 2.00/10.00 with cache read at 0.20. The window read 1100k here until 2026-09-24; the provider serves 1,050,000, and a row that promises more than is served would let a prompt be sized past the real limit. Added because `bench/tool_router` needs it as its third executor and a model with no price cannot run under a dollar cap at all — `--max-usd` refuses fail-closed, which is correct and is why the row exists rather than the cap being removed. Unmeasured in this repo",
     ),
     CatalogEntry(
@@ -273,7 +279,8 @@ CATALOG: tuple[CatalogEntry, ...] = (
     CatalogEntry(
         "openrouter/anthropic/claude-opus-5", "top", "Anthropic",
         5.00, 25.00, tools=True, context_k=1000,
-        notes="frontier; replaces claude-opus-4-8, withdrawn on 2026-08-18",
+        cache_read_per_m=0.50, cache_write_per_m=6.25,
+        notes="frontier; replaces claude-opus-4-8, withdrawn on 2026-08-18. Cache read 0.50 and write 6.25 as the OpenRouter index publishes them for this slug (input_cache_read / input_cache_write, read 2026-10-05) — Anthropic's 0.1x / 1.25x of input, confirmed at the source rather than applied here",
     ),
     CatalogEntry(
         "openrouter/qwen/qwen3-max", "top", "Qwen (Alibaba)",
@@ -535,4 +542,12 @@ def register_catalog_prices() -> None:
             # Register the slug tail (after the provider prefix) so substring
             # matching hits regardless of the openrouter/ prefix.
             pattern = entry.slug.split("/", 1)[-1]
-            set_price(pattern, ModelPrice(entry.input_per_m, entry.output_per_m))
+            set_price(
+                pattern,
+                ModelPrice(
+                    entry.input_per_m,
+                    entry.output_per_m,
+                    cache_read_per_m=entry.cache_read_per_m,
+                    cache_write_per_m=entry.cache_write_per_m,
+                ),
+            )

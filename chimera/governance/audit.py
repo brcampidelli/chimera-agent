@@ -3,17 +3,28 @@
 Entries are **hash-chained**: each one carries the digest of the entry before it, and its own digest
 over that. Append-only was previously a convention — the file was ordered by a ``seq`` counter and
 nothing else, so anyone who could edit the file could rewrite history and leave no trace. A chain
-turns that into a detectable event: changing, reordering, or deleting any entry breaks every digest
-from that point on, and :meth:`AuditLog.verify` says exactly where.
+turns that into a detectable event: changing, reordering, or deleting an entry that still has a
+successor breaks the link from that point on, and :meth:`AuditLog.verify` says exactly where.
 
 What this does and does not buy you, stated plainly:
 
 - It **detects** tampering of a log you still hold. It does not **prevent** it.
+- Deleting the NEWEST entries breaks nothing. This docstring used to say "deleting any entry breaks
+  every digest from that point on", and for the tail that was false: drop the last three lines and
+  every surviving link still holds. Reproduced: six entries cut to three, ``verify()`` answered
+  ``ok=True, checked=3`` — and the newest entries are exactly the ones an incident would make
+  somebody delete. The chain alone cannot see a missing END, only a missing middle.
 - An attacker who can rewrite the whole file can also recompute the whole chain. The chain raises the
-  bar from "edit one line" to "forge every entry after it"; pinning the head digest somewhere the
-  attacker does not control (a receipt, another host) is what closes that gap.
-- Entries written before this change carry no digest. :meth:`verify` reports them as *unchained*
-  rather than as tampered — an honest "cannot say", not a false pass.
+  bar from "edit one line" to "forge every entry after it".
+- Both gaps close only against a record of the head kept OUTSIDE the log. :func:`anchor_of` gives the
+  ``(count, head)`` pair; it is written onto every run receipt (``runs.jsonl``) and every cron result
+  line, and ``verify(anchor=...)`` reports *truncated* or *rewritten since the anchor*. Those files
+  sit in the same home directory, so this raises the bar to "edit three files consistently"; it is
+  not an anchor on a host the attacker does not control, and nothing here pretends otherwise.
+- Entries written before chaining existed carry no digest. :meth:`verify` reports them as *unchained*
+  rather than as tampered — an honest "cannot say", not a false pass. That allowance covers a PREFIX
+  only: an unchained entry after a chained one is a break, or stripping ``hash`` from an edited entry
+  would turn tampering into "legacy".
 
 A chain also has to survive **two writers**, and it did not. The head digest and the entry count
 were read once per :class:`AuditLog` and advanced only in memory, so two instances over one file
@@ -37,6 +48,7 @@ import logging
 import os
 import threading
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -206,6 +218,151 @@ def _last_entry(path: Path) -> dict[str, Any] | None:
     return None
 
 
+@dataclass(frozen=True)
+class AuditAnchor:
+    """The log's size and newest digest at one moment, kept somewhere other than the log."""
+
+    count: int
+    """Entries the log held, i.e. the ``seq`` the next entry would get."""
+    head: str
+    """``hash`` of the newest entry at that moment."""
+
+    def fields(self) -> dict[str, Any]:
+        """The two keys a receipt or a cron result line carries."""
+        return {"audit_count": self.count, "audit_head": self.head}
+
+    @classmethod
+    def from_record(cls, record: Any) -> AuditAnchor | None:
+        """Read an anchor back off a receipt or result line; ``None`` when it carries none.
+
+        Defensive on purpose: these lines come from files that predate the fields, and a line
+        that does not hold a well-formed anchor is a line with no anchor, never a crash.
+        """
+        if not isinstance(record, dict):
+            return None
+        count, head = record.get("audit_count"), record.get("audit_head")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            return None
+        if not isinstance(head, str) or len(head) != len(GENESIS) or head == GENESIS:
+            return None
+        return cls(count, head)
+
+
+def anchor_of(path: Path) -> AuditAnchor | None:
+    """The anchor for the log at ``path`` as it stands on disk, read from its tail only.
+
+    ``None`` when there is nothing to vouch for: no file, an empty one, or a newest line that is torn
+    or carries no digest. An anchor to GENESIS would assert "this log was empty", which is a claim
+    the next legitimate append contradicts at once.
+
+    Cheap enough for the paths that call it — one per run receipt, one per cron result — because it
+    reads the end of the file the way :meth:`AuditLog.record` does, never the whole of it.
+    """
+    last = _last_entry(Path(path))
+    if last is None:
+        return None
+    head = last.get("hash")
+    if not isinstance(head, str) or not head:
+        return None
+    seq = last.get("seq")
+    count = seq + 1 if isinstance(seq, int) and not isinstance(seq, bool) else _line_count(Path(path))
+    return AuditAnchor(count, head)
+
+
+#: How much of each anchor-bearing file's END to read. A receipt embeds diffs and runs to tens of
+#: KB, so this is sized to hold several of the newest; an anchor older than the window is not read.
+ANCHOR_TAIL_BYTES = 512 * 1024
+
+
+def recorded_anchors(home: Path) -> list[AuditAnchor]:
+    """Every anchor in the tail of ``runs.jsonl`` and ``scheduler/cron_results.jsonl``, strongest first.
+
+    ALL of them, not the newest line of each file. Only the newest was read, and the newest is
+    written by the next ordinary append (a cron tick, a finished run) from the log as it stands on
+    disk. Cut the log after an anchor, wait one tick, and that tick anchored the cut log: the
+    Security screen went from "truncated" back to "ok" with nobody touching either anchor file.
+    Measured on six entries cut to three: ``ok=False``, one ``deliver()``, ``ok=True, checked=3``.
+    The log only grows, so EVERY head ever anchored must still be in it; checking all of them is
+    what keeps an earlier anchor from being outvoted by a later one.
+
+    Only the tail of each file is read: both grow for the life of the install. Empty when neither
+    carries an anchor, which leaves the check exactly as it was before anchors existed.
+    """
+    from chimera.scheduler.results import _tail_lines
+
+    found: dict[AuditAnchor, None] = {}  # ordered and de-duplicated: cron lines repeat an anchor
+    for source in (Path(home) / "runs.jsonl", Path(home) / "scheduler" / "cron_results.jsonl"):
+        try:
+            lines = _tail_lines(source, ANCHOR_TAIL_BYTES)
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                anchor = AuditAnchor.from_record(json.loads(line))
+            except ValueError:
+                continue
+            if anchor is not None:
+                found[anchor] = None
+    return sorted(found, key=lambda anchor: anchor.count, reverse=True)
+
+
+#: How every chained line ends: ``record()`` writes ``hash`` last, through json.dumps' default
+#: separators, so the head is the 64 characters before the closing quote and brace.
+_HEAD_MARK = b'"hash": "'
+_HEAD_LINE_TAIL = len(_HEAD_MARK) + len(GENESIS) + len(b'"}')
+
+
+def _heads_on_disk(path: Path) -> set[str]:
+    """The ``hash`` of every line in the log, read off the END of each line without parsing it.
+
+    The anchor writers call this on every cron tick and every receipt, over a file that only grows;
+    a byte comparison per line keeps that a scan rather than a parse. A nested ``"hash"`` inside a
+    payload cannot be mistaken for the entry's own: the entry's own is the last key on the line. A
+    line written some other way contributes no head, which can only make the writer repeat an
+    older anchor, never invent one.
+    """
+    heads: set[str] = set()
+    mark_start = -_HEAD_LINE_TAIL
+    mark_end = mark_start + len(_HEAD_MARK)
+    try:
+        with Path(path).open("rb") as handle:
+            for raw in handle:
+                line = raw.rstrip()
+                if len(line) < _HEAD_LINE_TAIL or not line.endswith(b'"}'):
+                    continue
+                if line[mark_start:mark_end] == _HEAD_MARK:
+                    heads.add(line[mark_end:-2].decode("ascii", "replace"))
+    except OSError:
+        return set()
+    return heads
+
+
+def anchor_to_record(log_path: Path, home: Path) -> AuditAnchor | None:
+    """The anchor a receipt or a cron line should carry now, never one that blesses a cut.
+
+    :func:`anchor_of` alone answers "what does the log look like now", and writing that answer
+    after somebody cut the log is the log vouching for its own truncation. So the anchors already
+    recorded under ``home`` are checked first: if any of their heads is gone from the log, THAT
+    anchor is written again instead of a new one. The break then rides forward on every later tick
+    rather than lasting until the next one.
+
+    Recorded anchors are read BEFORE the log. The log only grows, so whatever another writer
+    anchored before this read is in the file by the time it is scanned; in the other order an
+    anchor written in between could name a head this scan never saw, and an honest log would be
+    reported as cut.
+
+    Costs one byte scan of the log per call (:func:`_heads_on_disk`): a call per cron tick and per
+    run receipt, never per audit append.
+    """
+    priors = recorded_anchors(home)
+    if priors:
+        heads = _heads_on_disk(log_path)
+        for prior in priors:  # strongest first: the anchor that says the most about what was lost
+            if prior.head not in heads:
+                return prior
+    return anchor_of(log_path)
+
+
 class AuditLog:
     """An append-only, hash-chained JSONL audit trail."""
 
@@ -232,8 +389,8 @@ class AuditLog:
             # than as tampering.
             return _line_count(self.path), GENESIS
         seq = last.get("seq")
-        # `seq` is not reserved — only `prev` and `hash` are written after the payload, so a payload
-        # carrying its own "seq" overwrites it. Counting the lines is the honest answer when one has.
+        # `record()` writes `seq` back over a payload's own, but lines written before it did may
+        # carry a payload's "seq", or none. Counting the lines is the honest answer then.
         if isinstance(seq, int) and not isinstance(seq, bool):
             count = seq + 1
         else:
@@ -277,6 +434,10 @@ class AuditLog:
                     )
                 seq, prev = self._tail_state()
                 entry: dict[str, Any] = {"seq": seq, "type": event_type, **_redacted(payload)}
+                # `seq` is put back after the payload: a payload carrying its own "seq" replaced it,
+                # and the anchors count entries from the newest `seq`. The key keeps its first
+                # position, so the line reads the same; only a forged value is undone.
+                entry["seq"] = seq
                 # Chain fields are written last on purpose: a payload cannot overwrite them.
                 entry["prev"] = prev
                 entry["hash"] = _digest(entry)
@@ -310,11 +471,30 @@ class AuditLog:
                 _log.warning("unreadable audit line %d in %s", numero, self.path)
         return saida
 
-    def verify(self, entries: list[dict[str, Any]] | None = None) -> ChainCheck:
+    def verify(
+        self,
+        entries: list[dict[str, Any]] | None = None,
+        *,
+        anchor: AuditAnchor | None = None,
+        anchors: Sequence[AuditAnchor] = (),
+    ) -> ChainCheck:
         """Walk the chain and report the first break.
 
-        A legacy entry (no ``hash``) is counted as *unchained* and skipped rather than failed — the
-        log cannot vouch for what predates the chain, and saying so is more useful than a false pass.
+        A legacy entry (no ``hash``) BEFORE the first chained one is counted as *unchained* and
+        skipped rather than failed — the log cannot vouch for what predates the chain, and saying so
+        is more useful than a false pass. AFTER the first chained entry the same shape is a break.
+        Treating it as legacy there reset the chain to GENESIS and returned ``ok``, so editing entry
+        k and deleting ``hash``/``prev`` from k onward verified as "ok, N unchained legacy entries":
+        the allowance for history older than the chain was a way to launder history newer than it.
+        No writer produces that shape — :meth:`record` always writes both fields.
+
+        ``anchor`` and ``anchors`` are :class:`AuditAnchor` records kept outside this file. Without
+        them a log missing its newest entries verifies clean, because every link that survived
+        still holds. With them, EVERY anchored head must still be one of the chain's digests: if
+        one is not, the log is *truncated* (fewer entries than were anchored) or *rewritten*
+        (re-chained after an edit that reached back past the anchor). All of them, not the newest:
+        a newer anchor may have been taken from the log after it was cut. Entries appended after
+        an anchor are fine — the log only grows.
 
         ``entries`` lets a caller that has already read the file pass what it read, instead of
         re-reading a log that grows for the life of the install.
@@ -322,9 +502,14 @@ class AuditLog:
         entries = self.entries() if entries is None else entries
         prev_hash = GENESIS
         checked = unchained = 0
+        seen: set[str] = set()
         for index, entry in enumerate(entries):
             stored = entry.get("hash")
             if not isinstance(stored, str) or not stored:
+                if checked:
+                    return ChainCheck(
+                        False, checked, unchained, index, "unchained entry after the chain began"
+                    )
                 unchained += 1
                 prev_hash = GENESIS  # the chain restarts after a gap it cannot span
                 continue
@@ -334,12 +519,29 @@ class AuditLog:
                 return ChainCheck(False, checked, unchained, index, "entry content does not match its digest")
             checked += 1
             prev_hash = stored
+            seen.add(stored)
+        pinned = [*anchors, *([anchor] if anchor is not None else [])]
+        # Strongest first, so a break is reported against the anchor that says the most was lost.
+        for held in sorted(pinned, key=lambda a: a.count, reverse=True):
+            if held.head in seen:
+                continue
+            if len(entries) < held.count:
+                reason = (
+                    f"truncated since anchor: {held.count} entries were anchored, "
+                    f"the log holds {len(entries)}"
+                )
+                return ChainCheck(False, checked, unchained, len(entries), reason)
+            reason = "rewritten since anchor: the anchored head digest is no longer in the chain"
+            # Where the anchored entry should sit; the walk itself found nothing wrong, so this is
+            # the best position there is to point at — inside the log, since this branch only runs
+            # when the log holds at least `count` entries.
+            return ChainCheck(False, checked, unchained, held.count - 1, reason)
         reason = "ok" if not unchained else f"ok, {unchained} unchained legacy entr{'y' if unchained == 1 else 'ies'}"
         return ChainCheck(True, checked, unchained, None, reason)
 
     @property
     def head(self) -> str:
-        """Digest of the newest entry — pin this externally to detect a wholesale rewrite."""
+        """Digest of the newest entry as this instance last saw it; :func:`anchor_of` reads the disk."""
         return self._head
 
     def __len__(self) -> int:

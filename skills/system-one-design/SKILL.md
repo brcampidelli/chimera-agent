@@ -28,13 +28,19 @@ question is asked of hundreds of items. That is a typed decision wearing a chat 
 2. One condition per question. "Is it an error and from the database?" is two questions; ask both and
    combine the answers in code, where the rule is visible.
 3. Give options names that do not carry the verdict (not "yes", "safe", "pass") and put the meaning
-   in the criteria. A catch-all option ("other") is where an unsure reading goes — give it a narrow
-   criterion or leave it out. Make the options' first words differ: a local model reads the label
+   in the criteria. A catch-all option ("other") is unreliable in both directions — measure it on
+   your items, give it a narrow criterion, or replace it with a `noul` per candidate when rejection
+   matters. Make the options' first words differ: a local model reads the label
    from its first token, so `coding` and `coding_agent` can never be told apart (24 of 231 public
    JevBench items went unread this way).
    On the catch-all, measured on 1,000 commit subjects: a broad "other" took 78% of the items
    that belonged to a named option and a narrow one 58%; leaving it out lifted named-class F1
    from 0.24 to 0.43, at the price that items truly outside the set land on a named option.
+   The catch-all fails in either direction, by model and task: here it absorbed items it should
+   not have, while a hosted decision model picked "None/Other" for only 7% of items whose right
+   answer was missing (arXiv 2609.39496). When rejecting matters, ask a `noul` per candidate (99%
+   rejected there) or set a threshold on the catch-all's probability from labelled examples (79%
+   rejected, 97% of answerable items kept).
 4. Show the model the thing being judged, alone: not the tool output around it, not a sentence that
    argues for an answer.
 5. Pick any threshold from labelled examples, never from a guess, and keep the number beside the

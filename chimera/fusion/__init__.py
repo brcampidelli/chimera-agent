@@ -8,6 +8,7 @@ from chimera.fusion.consistency import SelfConsistency, majority
 from chimera.fusion.engine import (
     FusionConfig,
     FusionEngine,
+    FusionFailed,
     FusionTrace,
     PanelResponse,
     StageUsage,
@@ -29,6 +30,7 @@ from chimera.fusion.verifier_select import Scorer, Selection, VerifierSelector, 
 
 __all__ = [
     "FusionEngine",
+    "FusionFailed",
     "FusionConfig",
     "FusionTrace",
     "PanelResponse",

@@ -1,5 +1,5 @@
 ---
-source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
+source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
 ---
 
 # Distribuire Chimera su un server (VPS)
@@ -270,10 +270,12 @@ vuota.
 
 ## 6. Stato onesto
 
-Chimera è in **alpha**. Questo si distribuisce e gira, e il daemon cron lo rende proattivo — ma
-non ha ancora **chilometraggio di produzione**. Inizia con cron a basso rischio, osserva i `logs`,
-e tieni presenti le salvaguardie di governance (`--guard` su `solve`, `CHIMERA_SANDBOX=docker`)
-per tutto ciò che tocca sistemi reali.
+Chimera è in **alpha**. Questo si distribuisce e gira, e il daemon cron lo rende proattivo. Il suo
+chilometraggio di produzione è **un solo deployment**: il VPS dell'autore, che esegue cron e un bot
+Discord giorno e notte da luglio 2026. È uso reale, non una flotta, e non ha incontrato il tuo
+carico di lavoro. Inizia con cron a basso rischio, osserva i `logs`, e tieni presenti le
+salvaguardie di governance (`--guard` su `solve`, `CHIMERA_SANDBOX=docker`) per tutto ciò che tocca
+sistemi reali.
 
 ## Dove vengono pubblicate queste pagine
 

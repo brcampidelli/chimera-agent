@@ -4,7 +4,9 @@ A routing document. It is short on purpose — it tells you where the real rules
 few that have bitten us hard enough to be worth repeating.
 
 Chimera is a Python agent framework (`chimera/`) with a Tauri + React desktop app
-(`apps/desktop/`). ~41k lines of source, ~25k lines of tests, 1848 tests, mypy strict.
+(`apps/desktop/`). ~128k lines of Python source, ~146k lines of Python tests, ~7,700 test functions
+(counted on 2026-10-04 over `git ls-files`, before parametrisation), mypy strict. The figure here once
+read 41k / 1848 and stayed for months after it stopped being true; re-count rather than trust it.
 
 ---
 

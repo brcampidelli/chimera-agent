@@ -24,6 +24,7 @@ import os
 import platform
 import sys
 from collections.abc import Callable
+from contextvars import ContextVar
 from datetime import UTC
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -674,9 +675,14 @@ def _render_models() -> None:
     table.add_row("tier: weak", _mark("weak", ladder.weak))
     table.add_row("tier: mid", _mark("mid", ladder.mid))
     table.add_row("tier: top (orchestrator)", _mark("top", ladder.top))
-    table.add_row("fusion panel", "\n".join(settings.fusion_panel))
-    table.add_row("fusion judge", settings.fusion_judge)
-    table.add_row("fusion synthesizer", settings.fusion_synthesizer)
+    # The cast `--fuse` convenes, which is the ladder unless a panel was named — not the raw
+    # `CHIMERA_FUSION_PANEL`, whose frontier default no product surface convenes any more.
+    from chimera.fusion.factory import fusion_config
+
+    fused = fusion_config(settings)
+    table.add_row("fusion panel", "\n".join(fused.panel))
+    table.add_row("fusion judge", fused.judge)
+    table.add_row("fusion synthesizer", fused.synthesizer)
     console.print(table)
     console.print(
         "[dim]Any LiteLLM/OpenRouter slug fits any role — pin with "
@@ -1116,7 +1122,9 @@ def run(
     except MissingCredentialsError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
-    console.print(answer)
+    # Escaped, as on every command that prints a model's text: `console` parses markup, and a
+    # reply containing `[/]` raised MarkupError after the call had been paid for.
+    console.print(escape(str(answer)))
 
 
 @app.command()
@@ -1149,9 +1157,9 @@ def deliver(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse:
-        from chimera.fusion import FusionEngine
+        from chimera.fusion.factory import fusion_engine
 
-        backend = FusionEngine(gateway)
+        backend = fusion_engine(gateway)
     try:
         document = produce_deliverable(backend, request, fmt=fmt, model=model)
     except MissingCredentialsError as exc:
@@ -1163,7 +1171,7 @@ def deliver(
         Path(out).write_text(document, encoding="utf-8")
         console.print(f"[green]wrote[/green] {out} [dim]({len(document)} chars)[/dim]")
     else:
-        console.print(document)
+        console.print(escape(str(document)))
 
 
 def _unused_markdown_path(out: Path) -> Path:
@@ -1230,9 +1238,10 @@ def agent(
         gateway = LLMGateway()
         backend: SupportsComplete = gateway
         if fuse:
-            from chimera.fusion import FusionEngine, RoutedBackend
+            from chimera.fusion import RoutedBackend
+            from chimera.fusion.factory import fusion_engine
 
-            backend = RoutedBackend(gateway, FusionEngine(gateway))
+            backend = RoutedBackend(gateway, fusion_engine(gateway))
         registry = default_registry(Path(workspace))
         registry = _apply_tool_allowlist(
             registry, allow=allow_tools, deny=deny_tools, settings=get_settings()
@@ -1260,7 +1269,7 @@ def agent(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    console.print(result.answer)
+    console.print(escape(str(result.answer)))
     console.print(
         f"[dim]({result.stopped_reason}, {result.steps} steps, "
         f"{result.tool_calls_made} tool calls)[/dim]"
@@ -1670,6 +1679,15 @@ def _check_max_usd(max_usd: float | None) -> None:
         )
 
 
+#: The conversation a ``/solve`` was typed in, while that run is in flight — its governed stack
+#: (:class:`~chimera.cli.right_hand.RightHand`), or None for a plain ``chimera solve``. A context
+#: variable rather than a ``solve`` parameter: the approver and the ledger are live objects a
+#: command line cannot carry. See ``_solve_from_conversation``.
+_CONVERSATION_GOVERNANCE: ContextVar[Any] = ContextVar(
+    "chimera_conversation_governance", default=None
+)
+
+
 def _solve_defaults() -> dict[str, Any]:
     """Every parameter ``chimera solve`` takes, with its REAL default value.
 
@@ -1717,6 +1735,7 @@ def _solve_from_conversation(
     model: str | None,
     write_region: str | None,
     budget: Any = None,
+    hand: Any = None,
 ) -> Any:
     """Hand one task to the verified loop and come back. Returns the run, or None if it never ran.
 
@@ -1734,6 +1753,16 @@ def _solve_from_conversation(
     Never automatic: it runs only when a person types ``/solve``. It says what it is about to do
     before it does it, because unlike a chat turn this one edits files and can spend several
     attempts' worth of money.
+
+    ``hand`` is the conversation's governed stack (:class:`~chimera.cli.right_hand.RightHand`), and
+    the loop runs under it: the conversation's own taint ledger and approver, the owner's
+    ``CHIMERA_REACH`` floor, and the trust kernel exactly when the conversation has one (its
+    ``CHIMERA_GOVERNANCE`` mode, ``observe`` staying observe) — the same posture, not a stricter one. Without it this overrode only
+    task, workspace, model, region and ceiling, so the loop ran on ``solve``'s defaults —
+    ``guard=False``, ``taint=False``, no floor — and a governed conversation had an ungoverned exit
+    one slash command away. The approver and the ledger travel through ``_CONVERSATION_GOVERNANCE``
+    rather than as ``solve`` options: they are live objects a command line cannot carry, and a
+    hidden option would still change the command's published signature.
     """
     from chimera.api.runs import total_usd
 
@@ -1756,6 +1785,12 @@ def _solve_from_conversation(
         # typed twice would get the full allowance twice and the ceiling would not be one.
         max_usd=(budget.remaining if budget is not None else None),
     )
+    if hand is not None:
+        # The conversation's posture, not a stricter one: its taint ledger is always on, its kernel
+        # only when CHIMERA_GOVERNANCE is observe/enforce. Forcing `guard=True` under `off` (the
+        # default) put BLOCK/REVIEW in front of actions the conversation runs unasked — under a pipe
+        # its deny approver turned them into refusals that exist only inside `/solve`.
+        args.update(guard=getattr(hand, "governance_mode", "off") != "off", taint=True)
     attempts = args["max_attempts"]
     console.print(
         f"[yellow]→ handing this to the verified loop[/yellow] [dim](the same one "
@@ -1766,6 +1801,7 @@ def _solve_from_conversation(
     )
     console.print(f"[dim]task: {escape(task)}[/dim]")
     result: Any = None
+    token = _CONVERSATION_GOVERNANCE.set(hand)
     try:
         result = solve(**args)
     except SolveFailed as failed:
@@ -1777,6 +1813,8 @@ def _solve_from_conversation(
     except KeyboardInterrupt:
         console.print("\n[dim]interrupted — the run was stopped[/dim]")
         return None
+    finally:
+        _CONVERSATION_GOVERNANCE.reset(token)
     if budget is not None and result is not None:
         # Priced from the attempts, which is the same number `solve` just printed. `total_usd`
         # answers None when a leg had no price, and `charge` treats that the way an unpriced call is
@@ -1794,6 +1832,7 @@ def _run_solve_command(
     agent: Any,
     write_region: str | None,
     budget: Any = None,
+    hand: Any = None,
 ) -> None:
     """``/solve`` in a REPL: pick the task, run the verified loop, put its answer in the thread.
 
@@ -1823,6 +1862,7 @@ def _run_solve_command(
         model=agent.config.model,
         write_region=write_region,
         budget=budget,
+        hand=hand,
     )
     if result is None:
         return
@@ -1858,7 +1898,7 @@ def _run_task_command(
     panel plus a judge plus a synthesizer multiplies the cost of the thing that exists to be used
     sparingly, and the person who wants context asks normally.
     """
-    from chimera.fusion import FusionEngine
+    from chimera.fusion.factory import fusion_engine
     from chimera.interface import render
     from chimera.interface.session import CLEAN, ChatTurn, TurnReport
     from chimera.orchestration.receipts import price_completion
@@ -1872,7 +1912,7 @@ def _run_task_command(
         return
     try:
         with console.status("[dim]full-power (fusion)…[/dim]"):
-            fused = FusionEngine(gateway).complete([{"role": "user", "content": task_text}])
+            fused = fusion_engine(gateway).complete([{"role": "user", "content": task_text}])
     except KeyboardInterrupt:
         console.print("\n[dim]interrupted — the turn was dropped[/dim]")
         return
@@ -2013,9 +2053,10 @@ def chat(
             backend = gateway
             _pinned_notice(model)
     elif fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import RoutedBackend
+        from chimera.fusion.factory import fusion_engine
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        backend = RoutedBackend(gateway, fusion_engine(gateway))
     # The same stack the API path assembles, and until now the thing this surface had none of: a
     # write region, the deployment fence, the owner's reach floor, the trust kernel, a taint ledger
     # and an approver that can actually be answered. Measured before it was argued about — 7 of 7
@@ -2149,6 +2190,7 @@ def chat(
                 agent=agent,
                 write_region=write_region,
                 budget=budget,
+                hand=hand,
             )
             _persist_turn(manager, active)
             continue
@@ -2385,6 +2427,7 @@ def assist(
                 agent=agent,
                 write_region=write_region,
                 budget=budget,
+                hand=hand,
             )
             continue
         if head == "/model":
@@ -2561,9 +2604,10 @@ def tui(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import RoutedBackend
+        from chimera.fusion.factory import fusion_engine
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        backend = RoutedBackend(gateway, fusion_engine(gateway))
     # Built before the app that will draw its questions, because the tools that consult it are built
     # before the session that the app is constructed around. `ChimeraTUI.on_mount` binds it.
     gate = ModalGate()
@@ -2698,9 +2742,10 @@ def serve(
     llm = LLMGateway()
     backend: SupportsComplete = llm
     if fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import RoutedBackend
+        from chimera.fusion.factory import fusion_engine
 
-        backend = RoutedBackend(llm, FusionEngine(llm))
+        backend = RoutedBackend(llm, fusion_engine(llm))
 
     workspace_path = Path(workspace)
 
@@ -2747,9 +2792,9 @@ def serve(
             home=settings.home,
             surface="serve",
             on_ledger=_hold,
+            # Inside the kernel and the ledger, outside the fence — see `governed_profile`'s `voice`.
+            voice=[http_send_tool] if http_send_tool is not None else [],
         )
-        if http_send_tool is not None:
-            registry.register(http_send_tool)
         runner = Agent(
             backend,
             registry,
@@ -2999,11 +3044,12 @@ def desktop_app(
     threading.Thread(target=warm_price_cache, args=(settings,), daemon=True).start()
 
     llm = LLMGateway()
-    from chimera.fusion import FusionEngine, RoutedBackend
+    from chimera.fusion import RoutedBackend
+    from chimera.fusion.factory import fusion_engine
 
     # Always available for the per-turn "Fuse this turn" toggle (cheap to construct; runs only on
     # request). Reused as the fusion arm of RoutedBackend when the whole session runs under --fuse.
-    fuse_backend = FusionEngine(llm)
+    fuse_backend = fusion_engine(llm)
     def session_backend() -> SupportsComplete:
         """The backend for ONE conversation, decided when that conversation is built.
 
@@ -3562,7 +3608,7 @@ def _serve_mcp(
     import sys
 
     from chimera.core import Agent, AgentConfig, AutonomousAgent, AutonomousConfig
-    from chimera.fusion import FusionEngine
+    from chimera.fusion.factory import fusion_engine
     from chimera.providers import Message
     from chimera.server import ChimeraMCP
     from chimera.tools import default_registry
@@ -3592,7 +3638,7 @@ def _serve_mcp(
         return auto.run(task).answer or "(no answer)"
 
     def _fuse(prompt: str) -> str:
-        return FusionEngine(gateway).run([Message(role="user", content=prompt)]).final
+        return fusion_engine(gateway).run([Message(role="user", content=prompt)]).final
 
     def _search(query: str, k: int) -> list[str]:
         return [item.content for item in _memory_manager().search(query, k=k)]
@@ -3708,8 +3754,12 @@ def _serve_platform(
             home=get_settings().home,
             surface="platform",
             on_ledger=_hold,
+            # The bot's voice: exempt from the owner's fence (a denylist aimed at the shell must not
+            # silence the bot) but inside the kernel and the taint ledger, which registering it
+            # after this call skipped — so a turn that had read an attacker's page could still send
+            # anything to any chat id.
+            voice=[send_tool],
         )
-        registry.register(send_tool)
         runner = Agent(
             backend, registry,
             # A person is waiting on the other end of the chat, as at the terminal: see `attended`.
@@ -3918,7 +3968,7 @@ def fuse(
     ),
 ) -> None:
     """Run a prompt through the LLM-Fusion engine (panel -> judge -> synthesizer)."""
-    from chimera.fusion import FusionConfig, FusionEngine
+    from chimera.fusion import FusionEngine, FusionFailed
     from chimera.providers import LLMGateway, Message, MissingCredentialsError
 
     # --best-of N: self-consistency over a single model — cheaper than the full panel when you
@@ -3931,36 +3981,59 @@ def fuse(
             selector = VerifierSelector([llm_scorer(gw, model)]) if verify_select else None
             sc = SelfConsistency(gw, n=best_of, model=model, selector=selector)
             result = sc.complete([Message(role="user", content=prompt)])
-        except MissingCredentialsError as exc:
+        except (MissingCredentialsError, FusionFailed) as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(code=1) from exc
-        console.print(result.content)
+        console.print(escape(str(result.content)))
         sc_total = (result.prompt_tokens or 0) + (result.completion_tokens or 0)
         if sc_total:
             console.print(f"[dim]self-consistency over {best_of} samples · total tokens: {sc_total}[/dim]")
         return
 
-    config = FusionConfig.from_settings()
+    # The factory, not `FusionConfig.from_settings()`: the bare builder reads CHIMERA_FUSION_PANEL,
+    # whose default is three frontier models, so `chimera fuse` convened Opus + GPT-5.5 + Gemini under
+    # every cost mode while `chimera models` named the ladder as "the cast --fuse convenes".
+    from chimera.fusion.factory import fusion_config
+
+    config = fusion_config(get_settings())
     if selective is not None:
         config.mode = "selective" if selective else "full"
 
     try:
         engine = FusionEngine(LLMGateway(), config)
         trace = engine.run([Message(role="user", content=prompt)])
-    except MissingCredentialsError as exc:
+    except (MissingCredentialsError, FusionFailed) as exc:
+        # FusionFailed: every panelist errored or came back blank, so there is nothing to fuse.
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
     total = trace.total_tokens()
+    # A fallback is one panelist's answer, not a fusion: the desktop badges it, and the terminal has
+    # to say it too, or a judge outage reads as a fused result. The reason is already redacted.
+    fell_back = trace.aggregation == "fallback"
+    if fell_back:
+        console.print(
+            f"[yellow]fusion {trace.fallback_stage} failed ({escape(trace.fallback_reason)}); "
+            "this is a panel answer, not a fused one[/yellow]"
+        )
+    final_title = (
+        "[bold yellow]panel answer (aggregation failed)[/bold yellow]"
+        if fell_back
+        else "[bold green]final[/bold green]"
+    )
     if show_panel:
         for response in trace.panel:
             body = response.error or response.content
-            console.print(Panel(body, title=f"panel: {response.model}", title_align="left"))
+            # Panel(str) parses Rich markup like console.print does, so "[/]" in model text is the
+            # same MarkupError the plain prints were fixed for — after the whole fusion was paid for.
+            console.print(Panel(escape(str(body)), title=f"panel: {response.model}", title_align="left"))
         if trace.early_stopped:
             console.print("[dim]probe models agreed — skipped the rest of the panel + judge[/dim]")
+        elif fell_back and not trace.judge_analysis:
+            console.print("[dim]judge: no analysis (see the warning above)[/dim]")
         else:
-            console.print(Panel(trace.judge_analysis, title="judge", title_align="left"))
-        console.print(Panel(trace.final, title="[bold green]final[/bold green]", title_align="left"))
+            console.print(Panel(escape(str(trace.judge_analysis)), title="judge", title_align="left"))
+        console.print(Panel(escape(str(trace.final)), title=final_title, title_align="left"))
         if total is not None:
             by = trace.by_stage()
             rows = "  ".join(
@@ -3970,7 +4043,7 @@ def fuse(
             )
             console.print(f"[dim]tokens in/out — {rows}  ·  total {total}[/dim]")
     else:
-        console.print(trace.final)
+        console.print(escape(str(trace.final)))
         if total is not None:
             note = " (early-stopped)" if trace.early_stopped else ""
             console.print(f"[dim]fusion total tokens: {total}{note}[/dim]")
@@ -3998,7 +4071,7 @@ def fuse(
 def maturity(
     tests_dir: str = typer.Option("tests", "--tests", help="Path to the tests directory (the evidence base)."),
 ) -> None:
-    """Render the maturity scorecard: surfaces × coverage-IDs proven by real tests."""
+    """Render the maturity scorecard: which coverage-IDs have their test file (presence, not passing)."""
     from chimera.eval.maturity import format_scorecard, score_repo
 
     card = score_repo(Path(tests_dir))
@@ -4085,7 +4158,7 @@ def orchestrate(
     (the evidence says multi-agent loses there); the fallback is logged with its
     counterfactual so `chimera delegations` shows the decision.
     """
-    from chimera.fusion import FusionEngine
+    from chimera.fusion.factory import fusion_engine
     from chimera.orchestration.artifacts import ArtifactStore
     from chimera.orchestration.budget import EffortPolicy
     from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
@@ -4107,7 +4180,7 @@ def orchestrate(
         top_model=ladder.top,
         store=ArtifactStore(Path(settings.home) / "artifacts"),
         verifier_model=verify_model,
-        fusion=FusionEngine(gateway),
+        fusion=fusion_engine(gateway),
         receipts_path=Path(settings.home) / "delegations.jsonl",
         config=HierarchyConfig(
             max_workers=max_workers,
@@ -4131,7 +4204,7 @@ def orchestrate(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    console.print(result.answer)
+    console.print(escape(str(result.answer)))
     tag = "[yellow]fell back to single-agent[/yellow]" if result.fell_back else (
         f"[green]{len(result.envelopes)} worker(s)[/green]"
     )
@@ -4156,7 +4229,7 @@ def brief(
     receipts land in <home>/delegations.jsonl — `chimera delegations` shows what
     the brief cost vs the inline counterfactual, measured.
     """
-    from chimera.fusion import FusionEngine
+    from chimera.fusion.factory import fusion_engine
     from chimera.orchestration.artifacts import ArtifactStore
     from chimera.orchestration.brief import brief_task, load_brief, specs_from_brief
     from chimera.orchestration.hierarchy import HierarchicalOrchestrator, HierarchyConfig
@@ -4182,7 +4255,7 @@ def brief(
         mid_model=ladder.mid,
         top_model=ladder.top,
         store=ArtifactStore(Path(settings.home) / "artifacts"),
-        fusion=FusionEngine(gateway),
+        fusion=fusion_engine(gateway),
         receipts_path=Path(settings.home) / "delegations.jsonl",
         config=HierarchyConfig(max_workers=max_workers),
         # M19-A4: a recipe brief is a production path — read recalled facts + record the run.
@@ -4903,16 +4976,18 @@ def solve(
     # Takes precedence over --fuse (the cascade already has fusion as its top rung).
     if cascade or settings.cascade:
         backend = _cascade_backend(gateway, settings)
-        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion.factory import fusion_engine
 
-        escalate_backend = RoutedBackend(gateway, FusionEngine(gateway), RoutingPolicy(mode="always"))
+        escalate_backend = RoutedBackend(gateway, fusion_engine(gateway), RoutingPolicy(mode="always"))
     # --fuse (explicit) or CHIMERA_AUTO_FUSE (production default) both route the worker
     # through the cost-aware router, so deep/error-sensitive turns fuse and cheap/tool
     # turns stay single-model.
     elif fuse or settings.auto_fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend, RoutingPolicy
+        from chimera.fusion import RoutedBackend, RoutingPolicy
+        from chimera.fusion.factory import fusion_engine
 
-        engine = FusionEngine(gateway)
+        engine = fusion_engine(gateway)
         # --agreement K: sample K cheap answers per turn; disagreement escalates to fusion
         # (a free confidence signal). K=1 (default) keeps the a-priori routing unchanged.
         backend = RoutedBackend(gateway, engine, agreement_k=agreement)
@@ -4930,7 +5005,11 @@ def solve(
     # fusion over a multi-model panel — true for BOTH --fuse and --cascade (the cascade's top rung is
     # the same fusion panel). Share the gate instead of tying it to --fuse alone (P2-cascade), so a
     # cascade run keeps the most transferable proposal across the panel, not a single-model one.
-    panel_evolution = (fuse or cascade or settings.cascade) and len(settings.fusion_panel) >= 2
+    # Counted on the panel fusion actually convenes (the ladder unless one was named), the same one
+    # `build_evolution_context` hands the collective evolver — not on the raw frontier default.
+    from chimera.fusion.factory import fusion_config
+
+    panel_evolution = (fuse or cascade or settings.cascade) and len(fusion_config(settings).panel) >= 2
 
     # ACE playbook (--playbook): load the stored playbook once so it is injected into the run
     # and curated back afterwards. Kept outside _run_solve so the worktree path doesn't shadow it.
@@ -4953,7 +5032,11 @@ def solve(
     # not allowed to do — which is the one fact this whole mechanism exists to keep.
     from chimera.governance import ApprovalLedger, approver_for
 
-    approvals = ApprovalLedger()
+    # A `/solve` typed in a governed conversation runs under that conversation's stack — its
+    # ledger, its approver, its record of answers, its reach floor — not under defaults the person
+    # never chose for it. None for a plain `chimera solve`, which keeps every default it had.
+    inherited = _CONVERSATION_GOVERNANCE.get()
+    approvals = inherited.approvals if inherited is not None else ApprovalLedger()
 
     def _run_solve(ws: Path) -> AutonomousResult:
         from chimera.tools.write_region import WriteRegion
@@ -5010,7 +5093,36 @@ def solve(
         # a destructive migration, before touching RLS") had nothing to confirm with. Silence still
         # refuses; the question just gets asked now.
         approve = approver_for(settings.approval_mode, approvals, home=settings.home)
-        if guard:
+        if inherited is not None:
+            # The person at the keyboard, through the channel the conversation already uses — the
+            # REPL's prompt — rather than a question written to disk inside their own turn.
+            approve = inherited.approve or approve
+            # The owner's floor, as `build_right_hand` applies it to the conversation. After the
+            # explorer and the subagent are registered, so neither can carry a floored name back in.
+            from chimera.api.posture import deployment_posture
+            from chimera.governance import restrict_registry
+
+            floor = deployment_posture(settings).deny_tools
+            if floor:
+                registry = restrict_registry(registry, allow=None, deny=floor)
+        if guard and inherited is not None:
+            # The kernel the conversation runs under, assembled by the same call with the same
+            # arguments `build_right_hand` uses: the deployment's mode (observe keeps its
+            # allow-and-record approver instead of becoming enforce through the REPL's prompt), the
+            # REVIEW band when it is on, and the conversation's ledger lineage so a precedent set
+            # while the session was clean does not answer once it has read something untrusted.
+            from chimera.governance.profile import govern_step
+
+            registry = govern_step(
+                registry,
+                settings=settings,
+                audit=AuditLog(settings.home / "audit.jsonl"),
+                surface="solve",
+                attended=True,
+                audit_allows=False,
+                lineage=inherited.ledger.lineage,
+            ).registry
+        elif guard:
             from chimera.governance import TrustKernel, govern_registry
 
             registry = govern_registry(
@@ -5024,9 +5136,16 @@ def solve(
             # capability ledger, and escalates execution/self-mod on tainted input to review.
             from chimera.governance import TaintLedger, ledger_registry
 
-            ledger = TaintLedger(
-                authority=settings.taint_authority,
-                egress_allow=settings.egress_allow.split(","),
+            # The conversation's own ledger when there is one: it already knows what this session
+            # read, and a page fetched three turns ago is no less untrusted because the person
+            # typed `/solve` since.
+            ledger = (
+                inherited.ledger
+                if inherited is not None
+                else TaintLedger(
+                    authority=settings.taint_authority,
+                    egress_allow=settings.egress_allow.split(","),
+                )
             )
             # The user's own words, so a fetch of a page or a file the task names is recorded as
             # the user's request — the signal `CHIMERA_TAINT_AUTHORITY=authority` reads, and every
@@ -5042,7 +5161,9 @@ def solve(
                 # 24, M2); a solve under cron or a pipe sends and records, rather than waiting on a
                 # durable question the owner never asked for.
                 ask_unseen_recipients=(
-                    (settings.approval_mode or "ask").strip().lower() == "ask"
+                    bool(inherited.attended)
+                    if inherited is not None
+                    else (settings.approval_mode or "ask").strip().lower() == "ask"
                     and not nobody_is_at_a_terminal()
                 ),
             )
@@ -5235,7 +5356,7 @@ def solve(
 
     from chimera.api.runs import cost_per_accepted_change
 
-    console.print(result.answer)
+    console.print(escape(str(result.answer)))
     status = "[green]success[/green]" if result.success else "[red]failed[/red]"
     if getattr(result, "ending", "") == "handover":
         # Not a failure, and not done either: the page needs the person (study 25, S11). The exit
@@ -5417,9 +5538,10 @@ def solve_batch(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse or settings.auto_fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import RoutedBackend
+        from chimera.fusion.factory import fusion_engine
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        backend = RoutedBackend(gateway, fusion_engine(gateway))
 
     # Per-worker capability ledgers, so the aggregate cross-agent monitor can see the whole fan-out
     # (a split exfiltration — one worker fetches untrusted, another sinks it — lives BETWEEN workers,
@@ -5579,9 +5701,10 @@ def crew_isolated(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse or settings.auto_fuse:
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import RoutedBackend
+        from chimera.fusion.factory import fusion_engine
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        backend = RoutedBackend(gateway, fusion_engine(gateway))
 
     # Per-worker capability ledgers for the aggregate cross-agent monitor — always on for fan-out
     # (pure observability; --taint additionally arms each worker's adaptive allowlist). ONE shared
@@ -5671,7 +5794,7 @@ def crew_isolated(
     elif result.reverify:
         console.print(f"[dim]--verify on the merged workspace: {result.reverify}[/dim]")
     if result.summary:
-        console.print(Panel(result.summary, title="unified report", border_style="cyan"))
+        console.print(Panel(escape(str(result.summary)), title="unified report", border_style="cyan"))
     colluded = _report_collusion(ledgers)
     if colluded and taint:
         console.print("[red]cross-agent collusion under --taint — exiting non-zero for review.[/red]")
@@ -9370,9 +9493,10 @@ def crew(
     gateway = LLMGateway()
     backend: SupportsComplete = gateway
     if fuse or settings.auto_fuse:  # explicit --fuse or the CHIMERA_AUTO_FUSE default
-        from chimera.fusion import FusionEngine, RoutedBackend
+        from chimera.fusion import RoutedBackend
+        from chimera.fusion.factory import fusion_engine
 
-        backend = RoutedBackend(gateway, FusionEngine(gateway))
+        backend = RoutedBackend(gateway, fusion_engine(gateway))
 
     if mode == "supervisor":
         supervisor = RoleAgent(
@@ -9388,7 +9512,7 @@ def crew(
     else:
         result = demo_crew(backend).run(task)
 
-    console.print(result.answer)
+    console.print(escape(str(result.answer)))
     console.print(f"[dim]({mode} crew, {len(result.transcript)} agent messages)[/dim]")
 
 

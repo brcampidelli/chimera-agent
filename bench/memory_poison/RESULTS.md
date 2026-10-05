@@ -65,6 +65,11 @@ question, with its own pre-registration, before anything is deleted.**
 - **One install's data** for the offline check, on one day; 0 of 24 is a statement about those 24.
 - **It does not measure how a model acts on a labelled poison** — only whether the label is there.
   A `[unverified]` tag the model ignores is not a defence, and this corpus cannot see that.
+  *[Amended 2026-10-04, study 30 S30-21(g): so "unmarked 0%" is a fact about the label, not about
+  what the agent does. External evidence that the gap is real: ZoneClaw (arXiv 2610.00450) keeps the
+  provenance but copies the observation into memory with authority in its "w/o Gatekeeper" ablation,
+  and attacks then succeed 15–21 times in 30. Here, recalling a tainted fact does not arm the taint
+  ledger either. An action-level measurement is open; the registered numbers stand.]*
 - **Nothing about the semantic recall path** (`CHIMERA_SEMANTIC_MEMORY`, off by default): the gate's
   `is_clean` is the injection-only admission for facts recalled by a path other than keyword
   similarity, and it is exercised by no row here.

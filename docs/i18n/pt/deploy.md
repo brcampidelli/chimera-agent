@@ -1,5 +1,5 @@
 ---
-source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
+source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
 ---
 
 # Implantando o Chimera em um servidor (VPS)
@@ -269,10 +269,12 @@ não um vazio.
 
 ## 6. Status honesto
 
-O Chimera está em **alpha**. Isso implanta e roda, e o daemon de cron o torna proativo — mas ele
-ainda **não tem quilometragem de produção**. Comece com crons de baixo risco, observe os `logs`, e
-mantenha as salvaguardas de governança (`--guard` no `solve`, `CHIMERA_SANDBOX=docker`) em mente
-para qualquer coisa que toque sistemas reais.
+O Chimera está em **alpha**. Isso implanta e roda, e o daemon de cron o torna proativo. Sua
+quilometragem de produção é **uma implantação**: o VPS do próprio autor, rodando crons e um bot do
+Discord o dia inteiro desde julho de 2026. É uso real, não uma frota, e não passou pela sua carga de
+trabalho. Comece com crons de baixo risco, observe os `logs`, e mantenha as salvaguardas de
+governança (`--guard` no `solve`, `CHIMERA_SANDBOX=docker`) em mente para tudo que toca sistemas
+reais.
 
 ## Onde estas páginas são publicadas
 

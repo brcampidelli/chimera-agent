@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any
 
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
+from chimera.tools.clip import clip_output, keep_tail_enabled
+from chimera.tools.workspace import queue_refusal
 
 if TYPE_CHECKING:
     from chimera.core.jobs import JobRegistry
@@ -151,6 +153,12 @@ class RunShellTool(Tool):
         cwd = self._resolve_cwd(kwargs.get("cwd"))
         if isinstance(cwd, str):  # escape error
             return cwd
+        # Before the host-exec question and before anything runs, in every sandbox: an isolated
+        # container may still mount the data folder, and a command that answers a question must not
+        # become a question the person is asked about instead.
+        fenced = queue_refusal(self.name, command, cwd)
+        if fenced is not None:
+            return fenced
         sandbox = self._sandbox or LocalSandbox()
         if (
             self._confirm is not None
@@ -186,7 +194,7 @@ class RunShellTool(Tool):
                     "job_status shows how it is going."
                 )
             return f"error: command timed out after {timeout}s"
-        out = result.output
-        if len(out) > _MAX_OUTPUT_CHARS:
-            out = out[:_MAX_OUTPUT_CHARS] + f"\n... [truncated, {len(out)} chars total]"
+        # The verdict of a command is at its end (pytest's FAILED summary, a traceback's last line);
+        # keeping it is opt-in until measured — see chimera.tools.clip.
+        out = clip_output(result.output, _MAX_OUTPUT_CHARS, keep_tail=keep_tail_enabled())
         return f"[exit {result.exit_code}]\n{out}".rstrip()

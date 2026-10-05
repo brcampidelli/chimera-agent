@@ -13,7 +13,11 @@ This registry is the whole. Each entry names:
 - which layer of the stack it belongs to;
 - the situations (S1–S15 of the plan) that send it;
 - what is known about it: `measured`, `null` (measured, and it did nothing) or `unmeasured`, and
-  the bench or run that says so.
+  the bench or run that says so. A `null` names the model it was null ON ("measured on
+  deepseek-v3.2"): each came from a one-model bench, harness effects flip sign across models (arXiv
+  2610.00917) and scaffolding that does nothing on a strong model can lift a weak one (arXiv
+  2609.20804). So a null here is no reason to drop a prompt for gemma-4-12B or qwen3:4b, which
+  nobody measured (study 30, S30-20).
 
 **The strings stay where they are.** The plan said the prompts would move into this package. They
 did not, deliberately. Each of them carries, in a comment beside it, the measurement that justified
@@ -206,7 +210,9 @@ SECTIONS: tuple[PromptSection, ...] = (
     _i("loop.skills_block", "chimera.skills.retrieval:skills_context_block", "volatile", _ALL),
     _i("loop.bundles_block", "chimera.core.agent:Agent._bundle_context", "volatile", _ALL),
     _c("loop.cards_instruction", "chimera.evolution.card_retrieval:_INSTRUCTION", "volatile",
-       ("S1", "S2"), "null", "bench/skillcard (66.7→83.3%, n=12; kept off)"),
+       ("S1", "S2"), "null",
+       "bench/skillcard (66.7→83.3%, n=12; kept off); measured on mistral-small-3.2-24b (n=12) "
+       "and deepseek-chat-v3.1 (n=24, +12.5 pp, CI crosses 0)"),
     _i("loop.cards_block", "chimera.evolution.card_retrieval:cards_context_block", "volatile",
        ("S1", "S2")),
     _i("loop.project_instructions", "chimera.core.agents_md:load_agent_instructions", "project", _ALL),
@@ -267,7 +273,7 @@ SECTIONS: tuple[PromptSection, ...] = (
     _c("plan.gate", "chimera.api.plan_gate:_PLAN_GATE_SYSTEM", "call", ("S2", "S14"), "unmeasured"),
     _i("plan.approved_note", "chimera.api.plan_gate:as_system_note", "volatile", ("S2", "S14")),
     _c("plan.planner", "chimera.core.planner:_PLANNER_SYSTEM", "call", ("S1", "S14"), "null",
-       "bench/harness_bench arm C (+0.003, inside SD 0.073)"),
+       "bench/harness_bench arm C (+0.003, inside SD 0.073); measured on deepseek-v3.2, 23 tasks"),
     # ---- terminal chat, Discord, webhooks ------------------------------------------------------
     _i("chat.layout", "chimera.interface.session:ChatSession._assemble", "volatile", ("S3", "S10")),
     _i("chat.history_messages", "chimera.interface.session:_as_messages", "volatile",
@@ -285,21 +291,24 @@ SECTIONS: tuple[PromptSection, ...] = (
     # ---- autonomous solve ----------------------------------------------------------------------
     _i("solve.compose", "chimera.core.autonomous:AutonomousAgent._compose", "volatile", ("S1", "S5")),
     _i("solve.context_blocks", "chimera.core.autonomous:AutonomousAgent.run", "volatile", ("S1",),
-       "null", "bench/harness_bench: repo-map −0.012, checklist +0.005, planner +0.003 (SD 0.073)"),
+       "null",
+       "bench/harness_bench: repo-map −0.012, checklist +0.005, planner +0.003 (SD 0.073); "
+       "measured on deepseek-v3.2, 23 tasks"),
     _i("solve.feedback_fragments", "chimera.core.autonomous:AutonomousAgent.run", "turn", ("S1",)),
     _c("solve.diff_feedback_header", "chimera.core.autonomous:_DIFF_FEEDBACK_HEADER", "turn", ("S1",),
-       "null", "bench/retry_lift (closed without proof: +6% and −4%)"),
+       "null", "bench/retry_lift (closed without proof: +6% and −4%); measured on mistral-small-3.2-24b"),
     _i("solve.recovery_briefs", "chimera.core.failure_class:targeted_feedback", "turn", ("S1",),
-       "null", "bench/retry_lift"),
+       "null", "bench/retry_lift; measured on mistral-small-3.2-24b"),
     _c("solve.manager", "chimera.core.supervisor:_MANAGER_SYSTEM", "call", ("S1", "S15"), "measured",
        "bench/manager_p (prose only: approves 5/246); bench/manager_diff (TPR 0.19, FPR 0.01)"),
     _i("solve.rubric_judge", "chimera.eval.rubric:model_judge", "call", ("S1", "S8")),
     _c("solve.strong_verify", "chimera.core.strong_verify:_VERIFY_SYSTEM", "call", ("S1", "S8"),
-       "null", "bench/verifier_by_uncertainty: fired 0 of 385"),
+       "null",
+       "bench/verifier_by_uncertainty: fired 0 of 385; measured on deepseek-v3.2 (harness_bench solves)"),
     _c("solve.checklist_extract", "chimera.core.checklist:_EXTRACT_SYSTEM", "call", ("S1", "S8"),
-       "null", "bench/harness_bench"),
+       "null", "bench/harness_bench; measured on deepseek-v3.2, 23 tasks"),
     _c("solve.checklist_grade", "chimera.core.checklist:_GRADE_SYSTEM", "call", ("S1", "S8"), "null",
-       "bench/harness_bench"),
+       "bench/harness_bench; measured on deepseek-v3.2, 23 tasks"),
     _c("solve.spec_test", "chimera.core.spec_test:_GEN_SYSTEM", "call", ("S1", "S8"), "measured",
        "bench/spec_test_vacuity (48% pass on buggy code); bench/test_gate_two_sided"),
     _c("solve.progress_ledger", "chimera.core.ledger:_LEDGER_SYSTEM", "call", ("S1",), "unmeasured"),
@@ -439,13 +448,13 @@ SECTIONS: tuple[PromptSection, ...] = (
        "chimera.tools.browser_situation:private_store_refusal", "tool", ("S11",)),
     # ---- self-evolution ------------------------------------------------------------------------
     _c("evolution.propose", "chimera.evolution.evolver:_PROPOSE_SYSTEM", "call", ("S13",), "null",
-       "bench/learning_lift"),
+       "bench/learning_lift; measured on mistral-small-3.2-24b"),
     _c("evolution.propose_antipattern", "chimera.evolution.evolver:_PROPOSE_ANTIPATTERN_SYSTEM",
-       "call", ("S13",), "null", "bench/learning_lift"),
+       "call", ("S13",), "null", "bench/learning_lift; measured on mistral-small-3.2-24b"),
     _c("evolution.refine", "chimera.evolution.evolver:_REFINE_SYSTEM", "call", ("S13",), "null",
-       "bench/learning_lift"),
+       "bench/learning_lift; measured on mistral-small-3.2-24b"),
     _c("evolution.distill", "chimera.evolution.evolver:_DISTILL_SYSTEM", "call", ("S13",), "null",
-       "bench/learning_lift"),
+       "bench/learning_lift; measured on mistral-small-3.2-24b"),
     _c("evolution.gepa_execute", "chimera.evolution.gepa:_EXECUTE_SYSTEM", "call", ("S13",),
        "unmeasured"),
     _c("evolution.gepa_reflect", "chimera.evolution.gepa:_REFLECT_SYSTEM", "call", ("S13",),

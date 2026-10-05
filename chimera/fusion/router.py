@@ -21,6 +21,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+from chimera.core.redact import redact
+from chimera.fusion.engine import FusionFailed
 from chimera.providers.gateway import CompletionResult, Message, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 
@@ -189,20 +191,42 @@ class RoutedBackend:
         # check on its result fails, re-escalate this turn to fusion rather than accept it.
         # Guard: if agreement escalation ALREADY produced a fusion result, don't fuse a second,
         # redundant time — that would silently double the cost of the "cost-aware" router.
+        # An escalation that already failed is not retried here either: a second fusion call
+        # would fail the same way and pay for the panel twice.
         if (
             self.escalate_on_fail is not None
             and result.model != "fusion"
+            and "escalation_failed" not in (result.route_meta or {})
             and not self.escalate_on_fail(result)
         ):
             _log.debug("single result failed verification; re-escalating turn to fusion")
-            return self.fusion.complete(messages, temperature=temperature)
+            return self._escalate(messages, keep=result, temperature=temperature)
         return result
+
+    def _escalate(
+        self, messages: list[MessageLike], *, keep: CompletionResult, temperature: float = 0.3
+    ) -> CompletionResult:
+        """Escalate to fusion, and fall back to ``keep`` when fusion has no answer to give.
+
+        Escalation is a second opinion on an answer the router already holds. Fusion raising
+        :class:`FusionFailed` (every panelist errored or came back blank) used to kill the turn with
+        that answer in hand — the rule S30-02 gave fusion itself, a failure never loses the answer,
+        applies to its caller too. ``route_meta["escalation_failed"]`` says the escalation was tried
+        and why it came back empty-handed. A spend ceiling or a missing key is not a FusionFailed
+        and still propagates.
+        """
+        try:
+            return self.fusion.complete(messages, temperature=temperature)
+        except FusionFailed as exc:
+            _log.warning("escalation to fusion failed (%s); keeping the single-model answer", exc)
+            meta = {**(keep.route_meta or {}), "escalation_failed": redact(str(exc))[:200]}
+            return keep.model_copy(update={"route_meta": meta})
 
     def _agree_or_escalate(
         self, messages: list[MessageLike], model: str | None, max_tokens: int | None
     ) -> CompletionResult:
         """Sample K cheap answers; return the consensus, or escalate to fusion on disagreement."""
-        from chimera.fusion.consistency import majority
+        from chimera.fusion.consistency import majority, vote_text
 
         samples = [
             self.single.complete(
@@ -210,13 +234,30 @@ class RoutedBackend:
             )
             for _ in range(self.agreement_k)
         ]
-        winner = majority([s.content for s in samples], threshold=self.agreement_threshold)
+        # A sample cut off at the ceiling is not a vote: identical truncations used to "agree".
+        winner = majority([vote_text(s) for s in samples], threshold=self.agreement_threshold)
         if winner is None:
             _log.debug("low agreement over %d samples; escalating turn to fusion", self.agreement_k)
-            return self.fusion.complete(messages, temperature=0.3)
+            # If fusion fails, the first sample with any text is still an answer; all K were paid for.
+            keep = next((s for s in samples if (s.content or "").strip()), samples[0])
+            return self._escalate(
+                messages,
+                keep=keep.model_copy(
+                    update={
+                        "prompt_tokens": _sum_tokens(samples, "prompt_tokens"),
+                        "completion_tokens": _sum_tokens(samples, "completion_tokens"),
+                    }
+                ),
+            )
         return CompletionResult(
             content=winner,
             model="agreement",
             prompt_tokens=_sum_tokens(samples, "prompt_tokens"),
             completion_tokens=_sum_tokens(samples, "completion_tokens"),
+            # Carried over, not rebuilt as clean. A result assembled from the samples used to drop
+            # both, so a cut sample reached the step log as a finished turn (study 30, S30-09).
+            # `any`, not the winner's alone: `majority` returns the longest member of a cluster of
+            # near-duplicates, and which sample that text came from is not recoverable here.
+            truncated=any(bool(getattr(s, "truncated", False)) for s in samples),
+            dropped_tool_calls=sum(int(getattr(s, "dropped_tool_calls", 0) or 0) for s in samples),
         )

@@ -1,11 +1,11 @@
 {
   "generated_for": "0.64.4",
-  "level": "GA",
+  "level": "present",
   "proven": 37,
   "ratio": 1.0,
   "surfaces": [
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "fusion",
       "proven": 5,
@@ -13,7 +13,7 @@
       "total": 5
     },
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "evolution",
       "proven": 8,
@@ -21,7 +21,7 @@
       "total": 8
     },
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "governance",
       "proven": 7,
@@ -29,7 +29,7 @@
       "total": 7
     },
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "memory",
       "proven": 4,
@@ -37,7 +37,7 @@
       "total": 4
     },
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "benchmarks",
       "proven": 5,
@@ -45,7 +45,7 @@
       "total": 5
     },
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "resilience",
       "proven": 6,
@@ -53,7 +53,7 @@
       "total": 6
     },
     {
-      "level": "GA",
+      "level": "present",
       "missing": [],
       "name": "interop",
       "proven": 2,

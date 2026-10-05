@@ -3,8 +3,15 @@
 Runs the same task through a *panel* of models, has a *judge* model produce a
 structured analysis of their answers (consensus, contradictions, partial coverage,
 unique insights, blind spots), then a *synthesizer* writes the final answer grounded
-in that analysis. The lift comes from the synthesis step itself, not only model
-diversity (per OpenRouter Fusion's findings).
+in that analysis.
+
+Whether the synthesis step adds anything is a hypothesis this repository has not measured.
+OpenRouter Fusion reported a lift from it; our own paired test (``bench/fusion_paired``) sat at
+ceiling and could not show one, and ``docs/multi-agent-policy.md`` lists "does fusion beat one model
+at equal budget?" as not measured. Outside work points the other way: 2609.31563 found the best pool
+below its strongest member (83.2% against 86.8%, 10 of 10 splits), and 2609.34496 found the final
+answer rarely beats the best proposal. Read fusion as a way to get several answers and a
+reconciliation, not as a measured gain.
 
 ``FusionEngine`` implements :class:`~chimera.providers.gateway.SupportsComplete`, so
 it is a drop-in *reasoning* backend anywhere a model is expected. It does not do
@@ -17,7 +24,7 @@ from __future__ import annotations
 import difflib
 import random
 import threading
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -60,6 +67,16 @@ def _normalize_ws(text: str) -> str:
     return " ".join(text.split()).lower()
 
 
+class FusionFailed(RuntimeError):
+    """Fusion has no answer it can stand behind: no panelist produced any text.
+
+    Raised instead of synthesising. With every panelist errored or blank there is nothing to fuse
+    and nothing to fall back to, and what used to happen (the judge handed a canned "no answers"
+    line, the synthesiser then answering on its own) was one unpanelled model labelled ``fusion``.
+    A caller sees this exactly as it would see a single model's provider error.
+    """
+
+
 @dataclass
 class PanelResponse:
     """One panel model's answer (or its error)."""
@@ -69,6 +86,28 @@ class PanelResponse:
     error: str | None = None
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+    finish_reason: str = ""
+    """Verbatim from the provider; ``length`` means the answer was cut off at the output ceiling."""
+    exc: BaseException | None = field(default=None, repr=False, compare=False)
+    """The exception behind ``error``, kept so a stop the caller asked for keeps its type.
+
+    ``error`` is redacted text for the trace. A spend ceiling or a missing key turned into text and
+    then into :class:`FusionFailed` would no longer match the caller's ``except SpendExceeded``."""
+
+    def answered(self) -> bool:
+        """True when this panelist produced an answer that can be compared with another one.
+
+        Not an error, not blank, and not cut off at the ceiling. A reasoning model that spends its
+        whole budget thinking comes back ``content=""``/``finish_reason="length"``, and two of those
+        are a perfect text match — which is how two empty probes used to "agree".
+        """
+        return self.has_text() and self.finish_reason != "length"
+
+    def has_text(self) -> bool:
+        """True when this panelist returned something to read, even if it was cut off."""
+        return self.error is None and bool(self.content.strip())
 
 
 @dataclass
@@ -79,6 +118,17 @@ class StageUsage:
     model: str
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    # Carried so a fused turn is priced like a single call: the cache share of each stage's prompt
+    # at its own rate. Without them every stage billed its whole prompt at the input rate.
+    cache_read_tokens: int | None = None
+    cache_write_tokens: int | None = None
+
+
+def _stage_usage(stage: Literal["judge", "synth"], result: CompletionResult) -> StageUsage:
+    return StageUsage(
+        stage, result.model, result.prompt_tokens, result.completion_tokens,
+        result.cache_read_tokens, result.cache_write_tokens,
+    )
 
 
 @dataclass
@@ -90,9 +140,14 @@ class FusionTrace:
     final: str
     usage: list[StageUsage] = field(default_factory=list)
     early_stopped: bool = False  # selective mode: probe agreed, panel+judge short-circuited
-    aggregation: Literal["synth", "vote"] = (
-        "synth"  # task-typed routing: synthesize vs majority-vote
+    aggregation: Literal["synth", "vote", "fallback"] = (
+        "synth"  # task-typed routing: synthesize vs majority-vote; fallback = a stage failed
     )
+    fallback_stage: Literal["judge", "synth"] | None = None
+    """When ``aggregation == "fallback"``: the stage that failed (raised, or came back empty after
+    its retry), so the answer shipped is a panel answer rather than a synthesis."""
+    fallback_reason: str = ""
+    """What that stage said, redacted and bounded like a panel error; empty on a normal run."""
     finish_reasons: dict[str, str] = field(default_factory=dict)
     """`finish_reason` of the judge and synthesiser calls, verbatim from the provider, by stage
     (``judge`` / ``synth``); a stage that was retried after an empty reply carries a second key,
@@ -114,12 +169,18 @@ class FusionTrace:
         axis (MALLM / blind-panel, arXiv 2607.05477 + 2607.02507).
 
         The fusion panel is blind by construction — each model answers the same prompt with no sight of
-        the others (:meth:`FusionEngine._run_panel`), so its answers are independent. This quantifies how
-        much that independence *paid off*: high diversity means the panel brought genuinely different
-        perspectives (synthesis has material to work with); low diversity means it converged (agreement —
-        the cheap early-stop / vote territory). ``None`` with fewer than two successful answers.
+        the others (:meth:`FusionEngine._run_panel`). That makes the calls separate, not the answers
+        independent: models trained on overlapping data err together, and ``bench/panel_correlation``
+        measured ICC(1) +0.527 on three frontier models over AIME, so three members carried 1.46
+        effective votes, not three. This number is lexical dissimilarity, and high diversity means the
+        texts differ, not that their errors do; low diversity means it converged (agreement — the cheap
+        early-stop / vote territory). ``None`` with fewer than two answers to compare.
+
+        Only answers count (:meth:`PanelResponse.answered`): two blank replies are a perfect text
+        match, and a blank beside a real answer is maximal "disagreement" — neither says anything
+        about whether the panel converged, which is the same defect S30-01 removed from ``_agree``.
         """
-        texts = [_normalize_ws(r.content) for r in self.panel if r.error is None]
+        texts = [_normalize_ws(r.content) for r in self.panel if r.answered()]
         if len(texts) < 2:
             return None
         dissims = [
@@ -242,8 +303,14 @@ class FusionConfig:
         return self.panel_temperatures[self.panel.index(model) % len(self.panel_temperatures)]
 
     @classmethod
-    def from_settings(cls) -> FusionConfig:
-        s = get_settings()
+    def from_settings(cls, settings: Any = None) -> FusionConfig:
+        """Every fusion field the settings carry, from ``settings`` or the process-wide instance.
+
+        The models here are ``CHIMERA_FUSION_PANEL`` and friends verbatim — the frontier default when
+        nobody set them. A caller that is choosing a panel for a user wants
+        :func:`chimera.fusion.factory.fusion_config`, which draws it from the user's tier ladder.
+        """
+        s = settings if settings is not None else get_settings()
         mode: Literal["full", "selective"] = "selective" if s.fusion_mode == "selective" else "full"
         return cls(
             panel=list(s.fusion_panel),
@@ -323,16 +390,87 @@ def _conversation_text(messages: list[MessageLike]) -> str:
     return "\n".join(lines)
 
 
+@dataclass
+class _Settled:
+    """How a panel became one answer: the stage results, and the failed stage if it fell back."""
+
+    analysis: str
+    final: str
+    aggregation: Literal["synth", "vote", "fallback"]
+    judge: CompletionResult | None = None
+    synth: CompletionResult | None = None
+    shown: list[int] | None = None
+    fallback_stage: Literal["judge", "synth"] | None = None
+    fallback_reason: str = ""
+
+
+def _must_propagate(exc: BaseException) -> bool:
+    """True for a failure that is a stop, not a fault: the run's spend or token ceiling, or no key.
+
+    ``SpendCappedBackend`` raises :class:`SpendExceeded` because the person set a ceiling and the run
+    reached it; ``orchestration_api`` catches exactly that type to say so. A missing or rejected key
+    fails every call the same way, every time. Neither is the judge "failing" in the sense the panel
+    fallback exists for, and swallowing them turned a working cap into a reported success and a
+    configuration error into a silent single-panelist answer on every turn.
+    """
+    # Imported here: ``chimera.orchestration`` imports the fusion package on its way in.
+    from chimera.orchestration.budget import BudgetExceeded
+    from chimera.providers.gateway import MissingCredentialsError
+
+    return isinstance(exc, (BudgetExceeded, MissingCredentialsError))
+
+
+def _require_text(panel: list[PanelResponse]) -> None:
+    """Raise :class:`FusionFailed` when no panelist produced any text: there is nothing to fuse.
+
+    If a panelist stopped on a ceiling or a missing key, that exception is raised instead, with its
+    own type: the panel came back empty because the run was told to stop, not because fusion failed.
+    """
+    if any(r.has_text() for r in panel):
+        return
+    stop = next((r.exc for r in panel if r.exc is not None and _must_propagate(r.exc)), None)
+    if stop is not None:
+        raise stop
+    why = "; ".join(
+        f"{r.model}: {r.error}"
+        if r.error is not None
+        else f"{r.model}: empty reply (finish_reason={r.finish_reason or 'none reported'})"
+        for r in panel
+    )
+    raise FusionFailed(f"no panel model produced an answer ({why or 'the panel is empty'})")
+
+
+def _stage_error(exc: BaseException) -> str:
+    """A judge or synthesiser exception as the trace keeps it: redacted and bounded, like a panel error."""
+    return redact(f"{type(exc).__name__}: {exc}")[:200]
+
+
+def _empty_reason(result: CompletionResult) -> str:
+    reason = str(getattr(result, "finish_reason", "") or "") or "none reported"
+    return f"empty reply after one retry (finish_reason={reason})"
+
+
 class FusionEngine:
     """Orchestrates panel -> judge -> synthesizer over a model backend."""
 
-    def __init__(self, backend: SupportsComplete, config: FusionConfig | None = None) -> None:
+    def __init__(
+        self,
+        backend: SupportsComplete,
+        config: FusionConfig | None = None,
+        *,
+        source: Callable[[], FusionConfig] | None = None,
+    ) -> None:
         self.backend = backend
         # Pinned when the caller supplied one, and that is load-bearing: `_cast_for_turn` overlays
         # the request's own cast, `fusion_for_role` builds a role's panel, and a bench comparing two
         # casts is asking for exactly this. Everything else re-reads at the start of a run.
         self._pinned = config
-        self.config = config or FusionConfig.from_settings()
+        # What an unpinned engine re-reads. The default is the raw settings — the frontier panel
+        # unless one was named — so every product surface passes the factory's ladder-aware source
+        # instead (`chimera.fusion.factory.fusion_engine`); a bare engine is left for benches that
+        # measure the default panel on purpose.
+        self._source: Callable[[], FusionConfig] = source or FusionConfig.from_settings
+        self.config = config or self._source()
         # Guards the re-read below. The app hands ONE engine to every surface, so two fused turns
         # can be inside `run` at once.
         self._lock = threading.Lock()
@@ -356,7 +494,7 @@ class FusionEngine:
         """
         with self._lock:
             if self._pinned is None and self._in_flight == 0:
-                self.config = FusionConfig.from_settings()
+                self.config = self._source()
             self._in_flight += 1
         try:
             yield
@@ -373,15 +511,20 @@ class FusionEngine:
     def _run_full(self, messages: list[MessageLike]) -> FusionTrace:
         _log.debug("fusion engaged: %d-model panel -> judge -> synthesizer", len(self.config.panel))
         panel = self._run_panel(messages)
-        analysis, final, aggregation, judge, synth, shown = self._aggregate(messages, panel)
+        return self._trace(panel, self._settle(messages, panel))
+
+    def _trace(self, panel: list[PanelResponse], settled: _Settled, *, early: bool = False) -> FusionTrace:
         trace = FusionTrace(
             panel=panel,
-            judge_analysis=analysis,
-            final=final,
-            usage=self._collect_usage(panel, judge, synth),
-            aggregation=aggregation,
-            shown_order=shown,
-            finish_reasons=_finish_reasons(judge, synth),
+            judge_analysis=settled.analysis,
+            final=settled.final,
+            usage=self._collect_usage(panel, settled.judge, settled.synth),
+            early_stopped=early,
+            aggregation=settled.aggregation,
+            shown_order=settled.shown,
+            finish_reasons=_finish_reasons(settled.judge, settled.synth),
+            fallback_stage=settled.fallback_stage,
+            fallback_reason=settled.fallback_reason,
         )
         self._log_usage(trace)
         return trace
@@ -403,23 +546,108 @@ class FusionEngine:
         or synthesizer call — the majority answer *is* the final); otherwise runs the judge ->
         synthesizer path. The vote branch is conservative: it needs ≥2 successful panel answers and a
         real majority cluster, else it falls through to synthesis (today's behaviour).
+
+        This is the raw stage: a judge or synthesiser error propagates, which is what the judge
+        benches (`bench/judge_blind*`) retry on. A run goes through :meth:`_settle`, which keeps
+        the panel when a stage fails.
         """
-        ok = [r for r in panel if r.error is None]
-        if self.config.task_typed and len(ok) >= 2:
-            from chimera.fusion.task_type import classify_task_type
-
-            if classify_task_type(messages) == "logic":
-                from chimera.fusion.consistency import majority
-
-                winner = majority([r.content for r in ok], threshold=self.config.vote_threshold)
-                if winner is not None:
-                    _log.debug(
-                        "fusion task-typed: logic task with panel majority -> vote (skipped judge+synth)"
-                    )
-                    return "", winner, "vote", None, None, None
+        winner = self._vote(messages, panel)
+        if winner is not None:
+            _log.debug("fusion task-typed: logic task with panel majority -> vote (skipped judge+synth)")
+            return "", winner, "vote", None, None, None
         judge, shown = self._run_judge(messages, panel)
         synth = self._run_synth(messages, judge.content)
         return judge.content, synth.content, "synth", judge, synth, shown
+
+    def _vote(self, messages: list[MessageLike], panel: list[PanelResponse]) -> str | None:
+        """The task-typed vote, when it applies and the panel reached a clear majority."""
+        ok = [r for r in panel if r.error is None]
+        if not (self.config.task_typed and len(ok) >= 2):
+            return None
+        from chimera.fusion.task_type import classify_task_type
+
+        if classify_task_type(messages) != "logic":
+            return None
+        from chimera.fusion.consistency import majority
+
+        # A blank or cut-off answer was asked but did not vote: "" keeps it in the denominator and
+        # out of every cluster, so it can only make a majority harder.
+        votes = [r.content if r.answered() else "" for r in ok]
+        return majority(votes, threshold=self.config.vote_threshold)
+
+    def _settle(self, messages: list[MessageLike], panel: list[PanelResponse]) -> _Settled:
+        """:meth:`_aggregate` for a real run: a judge or synthesiser failure keeps the panel.
+
+        ``_aggregate`` raises whatever a stage raises, and the judge benches rely on that: they
+        retry the whole aggregation on a provider error. A user's turn has no such loop. Before
+        this, a judge 429 threw away every panel answer already paid for, and a synthesiser empty
+        after its retry shipped ``final=""``. ``verified.py`` already states the rule (a verifier
+        failure never loses the answer) and this is that rule for fusion; 2610.01110 measured
+        keeping an available candidate when judging fails at 61/500 submissions recovered for no
+        extra cost.
+        """
+        _require_text(panel)
+        winner = self._vote(messages, panel)
+        if winner is not None:
+            _log.debug("fusion task-typed: logic task with panel majority -> vote (skipped judge+synth)")
+            return _Settled("", winner, "vote")
+        try:
+            judge, shown = self._run_judge(messages, panel)
+        except Exception as exc:  # noqa: BLE001 - a judge failure must not lose the panel
+            if _must_propagate(exc):
+                raise
+            return self._fallback(panel, "judge", _stage_error(exc))
+        if not judge.content.strip():
+            return self._fallback(panel, "judge", _empty_reason(judge), judge=judge, shown=shown)
+        try:
+            synth = self._run_synth(messages, judge.content)
+        except Exception as exc:  # noqa: BLE001 - same rule for the synthesiser
+            if _must_propagate(exc):
+                raise
+            return self._fallback(panel, "synth", _stage_error(exc), judge=judge, shown=shown)
+        if not synth.content.strip():
+            return self._fallback(
+                panel, "synth", _empty_reason(synth), judge=judge, synth=synth, shown=shown
+            )
+        return _Settled(judge.content, synth.content, "synth", judge, synth, shown)
+
+    def _fallback(
+        self,
+        panel: list[PanelResponse],
+        stage: Literal["judge", "synth"],
+        reason: str,
+        *,
+        judge: CompletionResult | None = None,
+        synth: CompletionResult | None = None,
+        shown: list[int] | None = None,
+    ) -> _Settled:
+        """The panel's own answer when aggregation failed: its majority, else the first that answered.
+
+        The majority uses the vote threshold and the vote's rule (a blank or cut-off answer never
+        wins). Without one, the first complete answer in panel order; only if none was complete,
+        the first with any text. :func:`_require_text` has already ruled out a panel with nothing
+        in it, so this always returns text.
+        """
+        from chimera.fusion.consistency import majority
+
+        _log.warning("fusion %s failed (%s); shipping a panel answer instead", stage, reason)
+        ok = [r for r in panel if r.error is None]
+        votes = [r.content if r.answered() else "" for r in ok]
+        final = majority(votes, threshold=self.config.vote_threshold)
+        if final is None:
+            final = next((r.content for r in ok if r.answered()), None) or next(
+                r.content for r in ok if r.has_text()
+            )
+        return _Settled(
+            judge.content if judge is not None else "",
+            final,
+            "fallback",
+            judge,
+            synth,
+            shown,
+            fallback_stage=stage,
+            fallback_reason=reason,
+        )
 
     def _bounded_call(
         self, messages: list[MessageLike], *, model: str, temperature: float, budget: int, stage: str
@@ -444,43 +672,39 @@ class FusionEngine:
 
         Agreement is a cheap local text-similarity check (no extra model call), so a
         disagreeing turn costs exactly the same as full fusion while an agreeing turn
-        skips the rest of the panel and the judge. The synthesis step is always kept —
-        it is where the lift comes from.
+        skips the rest of the panel and the judge. The synthesis step is always kept, so
+        the early stop changes the cost and not the shape of the answer (whether that step
+        adds anything is unmeasured here; see the module docstring).
         """
         k = max(2, min(self.config.probe_k, len(self.config.panel)))
         probe = self._run_panel(messages, self.config.panel[:k])
         ok = [r for r in probe if r.error is None]
         if len(ok) >= 2 and self._agree(ok):
             _log.debug("fusion early-stop: %d probe models agreed", len(ok))
-            agreed, shown = self._run_synth_agreed(messages, ok)
-            trace = FusionTrace(
-                panel=probe,
-                judge_analysis="",
-                final=agreed.content,
-                usage=self._collect_usage(probe, None, agreed),
-                early_stopped=True,
-                shown_order=shown,
-                finish_reasons=_finish_reasons(None, agreed),
-            )
-            self._log_usage(trace)
-            return trace
+            try:
+                agreed, shown = self._run_synth_agreed(messages, ok)
+            except Exception as exc:  # noqa: BLE001 - the agreeing probe is still an answer
+                if _must_propagate(exc):
+                    raise
+                return self._trace(probe, self._fallback(probe, "synth", _stage_error(exc)), early=True)
+            if not agreed.content.strip():
+                settled = self._fallback(probe, "synth", _empty_reason(agreed), synth=agreed, shown=shown)
+                return self._trace(probe, settled, early=True)
+            return self._trace(probe, _Settled("", agreed.content, "synth", None, agreed, shown), early=True)
         rest = self._run_panel(messages, self.config.panel[k:])
         panel = probe + rest
-        analysis, final, aggregation, judge, synth, shown = self._aggregate(messages, panel)
-        trace = FusionTrace(
-            panel=panel,
-            judge_analysis=analysis,
-            final=final,
-            usage=self._collect_usage(panel, judge, synth),
-            aggregation=aggregation,
-            shown_order=shown,
-            finish_reasons=_finish_reasons(judge, synth),
-        )
-        self._log_usage(trace)
-        return trace
+        return self._trace(panel, self._settle(messages, panel))
 
     def _agree(self, responses: list[PanelResponse]) -> bool:
-        """True when every pair of probe answers is at least ``agreement_threshold`` similar."""
+        """True when every pair of probe answers is at least ``agreement_threshold`` similar.
+
+        Only answers can agree. ``SequenceMatcher(None, "", "").ratio()`` is 1.0, so two blank
+        probes used to be a perfect match and skip the panel and the judge; a replay of
+        ``bench/judge_blind_hard`` stopped early on 8 of 50 problems this way, all 8 on empty pairs.
+        A blank, errored or cut-off probe means the check has nothing to compare — escalate.
+        """
+        if not all(r.answered() for r in responses):
+            return False
         texts = [_normalize_ws(r.content) for r in responses]
         ratios = [
             difflib.SequenceMatcher(None, a, b).ratio()
@@ -530,6 +754,8 @@ class FusionEngine:
         route_meta = {
             "kind": "fusion",
             "aggregation": trace.aggregation,
+            "fallback_stage": trace.fallback_stage,
+            "fallback_reason": trace.fallback_reason,
             "early_stopped": trace.early_stopped,
             "diversity": trace.panel_diversity(),
             "panel": [
@@ -539,6 +765,7 @@ class FusionEngine:
                     "error": r.error,
                     "prompt_tokens": r.prompt_tokens,
                     "completion_tokens": r.completion_tokens,
+                    "finish_reason": r.finish_reason,
                     "temperature": self.config.temperature_for(r.model),
                 }
                 for r in trace.panel
@@ -552,6 +779,8 @@ class FusionEngine:
                     "model": u.model,
                     "prompt_tokens": u.prompt_tokens,
                     "completion_tokens": u.completion_tokens,
+                    "cache_read_tokens": u.cache_read_tokens,
+                    "cache_write_tokens": u.cache_write_tokens,
                 }
                 for u in trace.usage
             ],
@@ -581,6 +810,9 @@ class FusionEngine:
                     content=result.content,
                     prompt_tokens=result.prompt_tokens,
                     completion_tokens=result.completion_tokens,
+                    finish_reason=str(getattr(result, "finish_reason", "") or ""),
+                    cache_read_tokens=result.cache_read_tokens,
+                    cache_write_tokens=result.cache_write_tokens,
                 )
             except Exception as exc:  # one model failing must not sink the panel
                 _log.warning("panel model %s failed: %s", model, exc)
@@ -592,7 +824,7 @@ class FusionEngine:
                 # Kept as text rather than reduced to a category: which model said what is the reason
                 # anyone reads a fusion trace, and `FailoverReason` alone would flatten five distinct
                 # failures into one word. The first 200 characters carry the sentence that matters.
-                return PanelResponse(model=model, error=redact(str(exc))[:200])
+                return PanelResponse(model=model, error=redact(str(exc))[:200], exc=exc)
 
         workers = max(1, min(self.config.max_workers, len(panel_models)))
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -622,12 +854,8 @@ class FusionEngine:
     def _run_judge(
         self, messages: list[MessageLike], panel: list[PanelResponse]
     ) -> tuple[CompletionResult, list[int] | None]:
+        _require_text(panel)  # a judge is never asked to analyse an empty panel
         answers, shown = self._present(panel)
-        if not answers:
-            return (
-                CompletionResult(content="No panel answers were produced.", model=self.config.judge),
-                shown,
-            )
         user = f"Task and context:\n{_conversation_text(messages)}\n\nCandidate answers:\n{answers}"
         result = self._bounded_call(
             [Message(role="system", content=_JUDGE_SYSTEM), Message(role="user", content=user)],
@@ -673,18 +901,17 @@ class FusionEngine:
         synth: CompletionResult | None,
     ) -> list[StageUsage]:
         usage: list[StageUsage] = [
-            StageUsage("panel", r.model, r.prompt_tokens, r.completion_tokens)
+            StageUsage(
+                "panel", r.model, r.prompt_tokens, r.completion_tokens,
+                r.cache_read_tokens, r.cache_write_tokens,
+            )
             for r in panel
             if r.error is None
         ]
         if judge is not None:
-            usage.append(
-                StageUsage("judge", judge.model, judge.prompt_tokens, judge.completion_tokens)
-            )
+            usage.append(_stage_usage("judge", judge))
         if synth is not None:
-            usage.append(
-                StageUsage("synth", synth.model, synth.prompt_tokens, synth.completion_tokens)
-            )
+            usage.append(_stage_usage("synth", synth))
         return usage
 
     def _log_usage(self, trace: FusionTrace) -> None:

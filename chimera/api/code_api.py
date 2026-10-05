@@ -2699,6 +2699,10 @@ def register_code_api(
                         # context is not in it — it changes every turn, and a hash of it would
                         # differ between two turns given the same instructions (study 25, wave 0).
                         "system_sha": result.steplog.system_sha,
+                        # A cut turn, and tool calls dropped for arguments that did not parse — both
+                        # used to arrive here as a normal turn (study 30, S30-09). Record-only.
+                        "truncated_steps": result.steplog.truncated_steps,
+                        "dropped_tool_calls": result.steplog.dropped_tool_calls,
                         "route_meta": result.route_meta,
                         # Did this turn read anything untrusted? A turn steered by a planted
                         # instruction used to be indistinguishable from one that was not.

@@ -99,7 +99,9 @@ def _install_fusion(monkeypatch: pytest.MonkeyPatch, *, tokens: int = 1000) -> l
                 completion_tokens=0,
             )
 
-    monkeypatch.setattr("chimera.fusion.FusionEngine", Fake)
+    # The factory is what every surface builds its engine through (`chimera.fusion.factory`), so
+    # its binding is the seam; patching the package attribute would no longer reach `/task`.
+    monkeypatch.setattr("chimera.fusion.factory.FusionEngine", Fake)
     return asked
 
 

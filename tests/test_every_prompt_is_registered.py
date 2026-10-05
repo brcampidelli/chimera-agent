@@ -75,6 +75,38 @@ def test_a_claim_about_evidence_names_the_evidence() -> None:
             assert s.evidence.strip(), f"{s.id} is {s.status} but names no bench, test or run"
 
 
+def test_a_null_names_the_model_it_was_null_on() -> None:
+    """`null` is a result on one model, and the label has to say which.
+
+    Every null here came from a bench run on a single model (deepseek-v3.2 for `harness_bench`,
+    mistral-small-3.2-24b for the learning and retry benches). Harness effects flip sign across
+    models (arXiv 2610.00917: one harness change took one model from 57.1 to 30.2 and another from
+    49.2 to 60.3), and a planner that did nothing on a strong model added 11.6 points on a weak one
+    (arXiv 2609.20804). An unscoped "null" reads as "this prompt does nothing", which is the
+    sentence that gets a prompt deleted for a model nobody measured.
+    """
+    unscoped = [
+        s.id for s in SECTIONS
+        if s.status == "null" and not re.search(r"\bmeasured on \S+", s.evidence)
+    ]
+    assert not unscoped, f"null with no model scope ('measured on <model>'): {unscoped}"
+
+
+def test_a_null_measured_on_two_models_names_both() -> None:
+    # The regex above passes on any word after "measured on", so it cannot catch a scope that is
+    # too narrow. bench/skillcard ran on two models (mistral-small-3.2-24b, n=12; and
+    # deepseek-chat-v3.1, n=24, +12.5 pp, discordant pairs 3-0, CI crossing 0) and read the effect
+    # as "never negative ... across two models". A label naming only the first tells a reader the
+    # null covers one model.
+    results = (Path(__file__).resolve().parents[1] / "bench/skillcard/RESULTS.md").read_text(
+        encoding="utf-8"
+    )
+    assert "deepseek/deepseek-chat-v3.1" in results and "mistral-small-3.2-24b" in results
+    cards = next(s for s in SECTIONS if s.id == "loop.cards_instruction")
+    assert "mistral-small-3.2-24b" in cards.evidence
+    assert "deepseek-chat-v3.1" in cards.evidence
+
+
 def test_every_pointer_still_resolves() -> None:
     for s in SECTIONS:
         s.resolve()  # raises on a stale module or attribute

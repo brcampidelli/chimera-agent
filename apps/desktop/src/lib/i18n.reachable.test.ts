@@ -66,6 +66,9 @@ const DYNAMIC = [
   // layer's own `no_container`.
   "governance.sandbox.why.",
   "lifecycle.stage.",
+  // `` t(`maturity.band.${level}`) `` — the Maturity screen names the band the scorecard sends
+  // (`present`, `partial`, `sparse`: how many test FILES exist, `chimera/eval/maturity.py`).
+  "maturity.band.",
   "runs.reqs.kind.",
   "lifecycle.status.",
   "model.reason.",

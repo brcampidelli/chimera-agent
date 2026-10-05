@@ -238,7 +238,9 @@ def test_taskforce_does_not_run_the_task_command(monkeypatch: pytest.MonkeyPatch
             fused.append(messages)
             raise AssertionError("fusion ran for /taskforce")
 
-    monkeypatch.setattr("chimera.fusion.FusionEngine", NeverFuse)
+    # Patched where the CLI builds engines from (`chimera.fusion.factory`); the package attribute
+    # is no longer on that path, and a patch there would leave this guard watching nothing.
+    monkeypatch.setattr("chimera.fusion.factory.FusionEngine", NeverFuse)
     made = install_session(monkeypatch)
     result = runner.invoke(app, ["assist", "--no-memory"], input="/taskforce\n/exit\n")
     assert result.exit_code == 0, result.output

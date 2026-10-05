@@ -1134,6 +1134,17 @@
             "title": "Diffs",
             "type": "array"
           },
+          "dropped_tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dropped Tool Calls"
+          },
           "evidence": {
             "title": "Evidence",
             "type": "string"
@@ -1165,6 +1176,17 @@
             "default": "",
             "title": "System Sha",
             "type": "string"
+          },
+          "truncated_steps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Truncated Steps"
           },
           "verified": {
             "title": "Verified",

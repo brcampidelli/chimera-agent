@@ -165,6 +165,15 @@ class CompletionResult(BaseModel):
     for an empty-argument failure, or for "describing a plan instead of acting", when the sentence
     was severed mid-word."""
 
+    dropped_tool_calls: int = 0
+    """How many tool calls the provider sent that were DROPPED because their argument string did
+    not parse — usually the half-written call a cut (:attr:`truncated`) leaves behind.
+
+    The drop is right (a call with half its arguments is a call we did not receive), but without
+    this count it was invisible: ``tool_calls`` is ``None`` both when every call was dropped and
+    when the model asked for none, and the loop reads ``None`` as a final answer. Counted so the
+    step log and the receipts can say what was lost (study 30, S30-09); 0 on every other reply."""
+
     reasoning: str = Field(default="", repr=False, exclude=True)
     """The model's reasoning, as the route returned it beside the answer. Never the answer.
 
@@ -740,6 +749,10 @@ class LLMGateway:
                         and result.tool_calls is None
                         and result.content  # never cache an empty-content result (one malformed
                         # response would otherwise serve "" forever for this key at $0)
+                        and not result.truncated  # nor a cut one: the entry keeps no
+                        # finish_reason, so the hit would come back as a FINISHED answer — the
+                        # silent normal turn study 30 (S30-09) closed in the loop — and serve the
+                        # same cut text for this key forever.
                         and candidate == resolved
                     ):
                         cache.put(
@@ -840,6 +853,36 @@ class LLMGateway:
             messages.append(Message(role="system", content=system))
         messages.append(Message(role="user", content=prompt))
         return self.complete(messages, model=model).content
+
+    def planned_call(
+        self, model: str | None = None, max_tokens: int | None = None
+    ) -> tuple[str, int | None]:
+        """The model a call with these arguments goes to first, and the most it may write.
+
+        Exactly what :meth:`complete` resolves before it calls, exposed so a spend ceiling can
+        reserve a call's worst case without guessing the default model or the completion ceiling
+        (:class:`~chimera.orchestration.budget.SpendCappedBackend`). ``None`` as the bound means
+        the provider's own ceiling, which nobody here can price.
+        """
+        resolved = self._resolve_model(model)
+        return resolved, self._bounded(max_tokens, resolved)
+
+    def planned_calls(
+        self, model: str | None = None, max_tokens: int | None = None
+    ) -> list[tuple[str, int | None]]:
+        """Every model :meth:`complete` may answer on, in order, each with its own completion bound.
+
+        :meth:`planned_call` names only the primary, and a spend ceiling that reserves for the
+        primary alone under-reserves whenever a fallback costs more: a ``:free`` or local primary
+        prices at $0, so a fan-out reserved nothing and every thread was admitted, then answered on
+        a paid fallback (10 admitted against a $1 cap, $10 spent, measured with a fake backend).
+        Same walk and same per-candidate bound as :meth:`complete`, so the two cannot disagree.
+        """
+        resolved = self._resolve_model(model)
+        return [
+            (candidate, self._bounded(max_tokens, candidate))
+            for candidate in self._model_candidates(resolved)
+        ]
 
     def _bounded(self, max_tokens: int | None, model: str = "") -> int | None:
         """The caller's `max_tokens`, or the deployment's completion ceiling when the caller set none.
@@ -1017,7 +1060,7 @@ class LLMGateway:
                 if on_delta is not None:
                     on_delta(tail)
         text, thought = "".join(content), "".join(reasoning)
-        tool_calls = _finalize_stream_tool_calls(tool_acc)
+        tool_calls, dropped = _finalize_stream_tool_calls_counted(tool_acc)
         # The same rule as the batch path, over the whole stream: the reasoning deltas were never
         # shown (`on_delta` gets content only), so a stream that carried nothing else ends empty.
         filed = _answer_filed_as_reasoning(text, thought, finish_reason, tool_calls)
@@ -1033,6 +1076,7 @@ class LLMGateway:
             cache_write_tokens=usage.get("cache_write_tokens"),
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
+            dropped_tool_calls=dropped,
             provider=provider,
             generation_id=generation_id,
             reasoning=thought,
@@ -1117,6 +1161,7 @@ class LLMGateway:
         content = ""
         reasoning = ""
         tool_calls: list[ToolCall] | None = None
+        dropped = 0
         prompt_tokens: int | None = None
         completion_tokens: int | None = None
         finish_reason = _delta_finish_reason(response)  # same shape on a batch choice
@@ -1126,7 +1171,7 @@ class LLMGateway:
             # streaming. Same function as the streaming path — two implementations of one rule is
             # how one of them quietly stops handling code fences.
             content = strip_think(message.content or "")
-            tool_calls = LLMGateway._parse_tool_calls(message)
+            tool_calls, dropped = LLMGateway._parse_tool_calls_counted(message)
             reasoning = _reasoning_of(message)
         except (AttributeError, IndexError, TypeError):
             _log.warning("could not extract content from response for model=%s", model)
@@ -1157,6 +1202,7 @@ class LLMGateway:
             cache_write_tokens=cache_write_tokens,
             finish_reason=finish_reason,
             truncated=finish_reason == "length",
+            dropped_tool_calls=dropped,
             provider=provider,
             generation_id=generation_id,
             reasoning=reasoning,
@@ -1207,21 +1253,30 @@ class LLMGateway:
         # Anthropic (via litellm): cache_read_input_tokens / cache_creation_input_tokens.
         read = getattr(usage, "cache_read_input_tokens", None)
         write = getattr(usage, "cache_creation_input_tokens", None)
-        # OpenAI-style: prompt_tokens_details.cached_tokens (read only, no write line).
-        if read is None:
+        # OpenAI-style: prompt_tokens_details.cached_tokens, and — on OpenRouter, the default route —
+        # prompt_tokens_details.cache_write_tokens. The write line was once assumed not to exist on
+        # this shape, so every write on the default route was recorded as None and never priced.
+        if read is None or write is None:
             details = getattr(usage, "prompt_tokens_details", None)
             if details is not None:
-                read = getattr(details, "cached_tokens", None)
-                if read is None and isinstance(details, dict):
-                    read = details.get("cached_tokens")
+                if read is None:
+                    read = _detail(details, "cached_tokens")
+                if write is None:
+                    write = _detail(details, "cache_write_tokens")
         return read, write
 
     @staticmethod
     def _parse_tool_calls(message: Any) -> list[ToolCall] | None:
+        return LLMGateway._parse_tool_calls_counted(message)[0]
+
+    @staticmethod
+    def _parse_tool_calls_counted(message: Any) -> tuple[list[ToolCall] | None, int]:
+        """The parsed calls, and how many were dropped for an argument string that did not parse."""
         raw_calls = getattr(message, "tool_calls", None)
         if not raw_calls:
-            return None
+            return None, 0
         parsed: list[ToolCall] = []
+        dropped = 0
         for call in raw_calls:
             fn = getattr(call, "function", None)
             if fn is None:
@@ -1239,13 +1294,14 @@ class LLMGateway:
                     # became a call with no arguments, which ran, failed, and was counted against the
                     # model as a repeat. An unparseable argument string is a call we did not receive.
                     _log.warning("dropping tool call with unparseable arguments: %r", raw_args)
+                    dropped += 1
                     continue
             elif isinstance(raw_args, dict):
                 arguments = raw_args
             parsed.append(
                 ToolCall(id=getattr(call, "id", "") or "", name=fn.name, arguments=arguments)
             )
-        return parsed or None
+        return parsed or None, dropped
 
 
 def _delta_text(chunk: Any) -> str:
@@ -1365,9 +1421,18 @@ def _delta_finish_reason(chunk: Any) -> str:
 
 def _finalize_stream_tool_calls(acc: dict[int, dict[str, Any]]) -> list[ToolCall] | None:
     """Turn accumulated tool-call fragments into ``ToolCall``s (JSON-parsing the arguments)."""
+    return _finalize_stream_tool_calls_counted(acc)[0]
+
+
+def _finalize_stream_tool_calls_counted(
+    acc: dict[int, dict[str, Any]],
+) -> tuple[list[ToolCall] | None, int]:
+    """:func:`_finalize_stream_tool_calls`, plus how many calls were dropped for unparseable
+    arguments — the same count the batch path keeps, so a streamed turn is not the blind one."""
     if not acc:
-        return None
+        return None, 0
     calls: list[ToolCall] = []
+    dropped = 0
     for index in sorted(acc):
         slot = acc[index]
         if not slot.get("name"):
@@ -1383,9 +1448,18 @@ def _finalize_stream_tool_calls(acc: dict[int, dict[str, Any]]) -> list[ToolCall
                 # Same rule as the batch path, and the duplication is why it needed saying twice:
                 # a half-received argument string is a call we did not get, not a call with none.
                 _log.warning("dropping streamed tool call with unparseable arguments: %r", raw)
+                dropped += 1
                 continue
         calls.append(ToolCall(id=slot.get("id") or "", name=slot["name"], arguments=arguments))
-    return calls or None
+    return calls or None, dropped
+
+
+def _detail(details: Any, name: str) -> int | None:
+    """One field of a usage-details block, which arrives as an object from LiteLLM or a dict raw."""
+    value = getattr(details, name, None)
+    if value is None and isinstance(details, dict):
+        value = details.get(name)
+    return value if isinstance(value, int) else None
 
 
 def _accumulate_stream_usage(chunk: Any, state: dict[str, int | None]) -> None:

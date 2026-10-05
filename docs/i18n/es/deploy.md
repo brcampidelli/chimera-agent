@@ -1,5 +1,5 @@
 ---
-source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
+source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
 ---
 
 # Desplegar Chimera en un servidor (VPS)
@@ -274,10 +274,12 @@ habitación más pequeña, no una vacía.
 
 ## 6. Estado honesto
 
-Chimera está en **alpha**. Esto se despliega y funciona, y el demonio de cron lo hace proactivo
-— pero todavía **no tiene kilometraje en producción**. Empieza con crons de bajo riesgo, observa
-los `logs`, y ten presentes las salvaguardas de gobernanza (`--guard` en `solve`,
-`CHIMERA_SANDBOX=docker`) para cualquier cosa que toque sistemas reales.
+Chimera está en **alpha**. Esto se despliega y funciona, y el demonio de cron lo hace proactivo. Su
+kilometraje en producción es **un solo despliegue**: el VPS del propio autor, que ejecuta crons y un
+bot de Discord las 24 horas desde julio de 2026. Es uso real, no una flota, y no ha visto tu carga
+de trabajo. Empieza con crons de bajo riesgo, observa los `logs`, y ten presentes las salvaguardas
+de gobernanza (`--guard` en `solve`, `CHIMERA_SANDBOX=docker`) para todo lo que toque sistemas
+reales.
 
 ## Dónde se publican estas páginas
 

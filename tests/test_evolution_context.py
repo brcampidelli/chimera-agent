@@ -164,3 +164,35 @@ def test_record_external_writes_experience_but_never_credits_card_telemetry(tmp_
 def test_record_external_is_safe_without_seams() -> None:
     # a bare context (no experience, no cards) must not raise
     EvolutionContext().record_external("t", "a", success=False)
+
+
+def test_collective_proposals_come_from_the_ladder_under_a_cheap_cost_mode(tmp_path: Path) -> None:
+    """The collective evolver asked ``settings.fusion_panel`` — unset, the frontier default — for a
+    proposal per model, so ``solve --fuse`` under ``CHIMERA_COST_MODE=cheap`` billed Opus + GPT-5.5 +
+    Gemini for skill proposals after fusion itself had moved to the ladder. It must use the panel
+    fusion convenes."""
+    from chimera.config import _DEFAULT_PANEL
+    from chimera.fusion.factory import fusion_config
+
+    settings = _settings(CHIMERA_COST_MODE="cheap", CHIMERA_SKILL_CARDS="1")
+    ctx = build_evolution_context(
+        settings, _FakeGateway(), "m", home=tmp_path, panel_evolution=True
+    )
+
+    assert isinstance(ctx.auto_evolver, AutoSkillEvolver)
+    collective = ctx.auto_evolver.collective
+    assert collective is not None
+    assert collective.panel_models == fusion_config(settings).panel
+    assert not set(_DEFAULT_PANEL) & set(collective.panel_models)
+
+
+def test_a_named_fusion_panel_still_proposes(tmp_path: Path) -> None:
+    settings = _settings(
+        CHIMERA_COST_MODE="cheap", CHIMERA_SKILL_CARDS="1", CHIMERA_FUSION_PANEL="vendor/a,vendor/b"
+    )
+    ctx = build_evolution_context(
+        settings, _FakeGateway(), "m", home=tmp_path, panel_evolution=True
+    )
+
+    assert ctx.auto_evolver is not None and ctx.auto_evolver.collective is not None
+    assert ctx.auto_evolver.collective.panel_models == ["vendor/a", "vendor/b"]

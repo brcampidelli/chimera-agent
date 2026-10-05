@@ -19,6 +19,15 @@ tested it on **41 instances whose outcomes we had never seen**, changing nothing
 run 2's (baseline 34.1% vs 42.1%). Neither out-of-sample run is individually significant; the pooled
 n=60 is, and it was pre-registered as **secondary** precisely because it mixes seen with unseen data.
 
+> **Caveats added 2026-10-04 (study 30, S30-22(e)); no number above changes.** Two things this table
+> cannot rule out, both reported outside this repository. (1) **Contamination:** SWE-bench Verified
+> is public, and models have been shown to name the files to edit from the issue text alone,
+> without the repository (arXiv 2506.12286), which inflates both arms; a paired delta is less exposed
+> than an absolute rate, but a scaffold that helps a model recall could look like one that helps it
+> reason. (2) **Single-run spread:** repeated runs of the same agent on the same instances have been
+> reported to differ by 2.2-6.0 points (arXiv 2602.07150). Each row here is one run per arm, so a
+> difference of that size between rows is inside what a re-run alone could produce.
+
 ---
 
 ## Run 3: the out-of-sample replication

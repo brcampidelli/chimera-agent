@@ -8,7 +8,7 @@ nothing is invented.
 Running ``python -m chimera.eval.maturity_snapshot`` writes ``chimera/_maturity_snapshot.json`` from
 the repo's own ``tests/`` dir. That file is the SHIPPED FALLBACK: the ``tests/`` dir is not packaged in
 the pip wheel, so a pip-installed ``chimera app`` reads this snapshot instead of globbing an empty dir
-(which would misleadingly report everything Alpha 0/N). The write is byte-stable (sorted keys, 2-space
+(which would misleadingly report everything sparse 0/N). The write is byte-stable (sorted keys, 2-space
 indent, trailing newline) so regenerating it produces a clean diff.
 """
 

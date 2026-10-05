@@ -21,12 +21,17 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from chimera.sandbox.confirm import sandbox_is_isolated
 from chimera.tools.base import Tool
+from chimera.tools.clip import clip_output, keep_tail_enabled
+from chimera.tools.workspace import queue_refusal
 
 if TYPE_CHECKING:
     from chimera.sandbox.base import Sandbox
     from chimera.sandbox.confirm import HostExecConfirm
 
 _MAX_OUTPUT_CHARS = 20_000
+#: The most of ``code_interpreter``'s output an exception line may take. It is kept whole below this
+#: and clipped above it, so a ``ValueError`` carrying a 50k repr cannot push the printed output out.
+_MAX_EXC_LINE_CHARS = 2_000
 _DEFAULT_TIMEOUT = 30
 
 #: The names looked up on PATH when this process's own interpreter cannot run a script, in order.
@@ -196,6 +201,10 @@ class CodeInterpreterTool(Tool):
 
     def run(self, **kwargs: Any) -> str:
         code = str(kwargs["code"])
+        # In THIS process: the queue's own functions are an import away, not only its folder.
+        fenced = queue_refusal(self.name, code, Path.cwd())
+        if fenced is not None:
+            return fenced
         if self._confirm is not None:
             # No is_isolated() escape: exec() runs in THIS process, so it is always host execution.
             summary = code.strip().splitlines()[0][:120] if code.strip() else "(empty)"
@@ -208,10 +217,19 @@ class CodeInterpreterTool(Tool):
             with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
                 exec(compile(code, "<code_interpreter>", "exec"), self._namespace)  # noqa: S102
         except Exception as exc:  # noqa: BLE001 - report any error as output, never crash
-            out = f"{buffer.getvalue()}\n{type(exc).__name__}: {exc}".strip()
-            return out[:_MAX_OUTPUT_CHARS]
+            # This was `out[:_MAX_OUTPUT_CHARS]`, with no marker: the only tool that cut its output
+            # in silence, so 20 000 characters read as a complete answer. Clipping the whole
+            # `buffer + exception` head-only then cut the other way: the marker said "clipped" and
+            # the exception line, last by construction, was the part that went, so the model was
+            # never told the code had raised. The exception line is clipped on its own (a huge
+            # message must not crowd out the buffer) and always kept; the printed output gets the
+            # room that is left, head-only. Under the cap the result is byte-identical to before.
+            exc_line = clip_output(f"{type(exc).__name__}: {exc}", _MAX_EXC_LINE_CHARS)
+            room = max(_MAX_OUTPUT_CHARS - len(exc_line) - 1, 0)
+            printed = clip_output(buffer.getvalue(), room)
+            return f"{printed}\n{exc_line}".strip()
         out = buffer.getvalue().strip()
-        return (out or "(no output)")[:_MAX_OUTPUT_CHARS]
+        return clip_output(out or "(no output)", _MAX_OUTPUT_CHARS)
 
 
 class ExecuteCodeTool(Tool):
@@ -249,6 +267,9 @@ class ExecuteCodeTool(Tool):
         from chimera.sandbox import LocalSandbox
 
         code = str(kwargs["code"])
+        fenced = queue_refusal(self.name, code, self.workspace)
+        if fenced is not None:
+            return fenced
         timeout = int(kwargs.get("timeout") or _DEFAULT_TIMEOUT)
         sandbox = self._sandbox or LocalSandbox()
         if self._confirm is not None and not sandbox_is_isolated(sandbox):
@@ -269,7 +290,7 @@ class ExecuteCodeTool(Tool):
             script.unlink(missing_ok=True)
         if result.timed_out:
             return f"error: code timed out after {timeout}s"
-        out = result.output
-        if len(out) > _MAX_OUTPUT_CHARS:
-            out = out[:_MAX_OUTPUT_CHARS] + f"\n... [truncated, {len(out)} chars total]"
+        # The verdict of a command is at its end (pytest's FAILED summary, a traceback's last line);
+        # keeping it is opt-in until measured — see chimera.tools.clip.
+        out = clip_output(result.output, _MAX_OUTPUT_CHARS, keep_tail=keep_tail_enabled())
         return f"[exit {result.exit_code}]\n{out}".rstrip()

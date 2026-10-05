@@ -25,7 +25,7 @@ from typing import Any
 
 from chimera.config import Settings, get_settings
 from chimera.eval.injection import default_attacks, run_redteam
-from chimera.governance.audit import AuditLog
+from chimera.governance.audit import AuditLog, recorded_anchors
 
 
 def run_injection_suite(settings: Settings | None = None) -> dict[str, Any]:
@@ -148,10 +148,16 @@ def read_audit(path: Path, *, limit: int = 200) -> tuple[list[dict[str, Any]], d
 
     Verified from the entries already read rather than by re-reading: this file grows for the life
     of the install, and reading it twice to answer one question is a cost that arrives later.
+
+    And verified against every anchor kept outside the log (:func:`recorded_anchors`). Without them
+    this reported ``ok`` for a log whose newest entries had been deleted — the chain cannot see a
+    missing end — even though the module that writes the chain said pinning the head was what
+    closed that gap. It was pinned nowhere. Checked against only the NEWEST anchor, it reported
+    ``ok`` again one cron tick after the cut, because that tick had anchored the cut log.
     """
     log = AuditLog(Path(path))
     entries = log.entries()
-    check = log.verify(entries)
+    check = log.verify(entries, anchors=recorded_anchors(Path(path).parent))
     chain = {
         "ok": check.ok,
         "checked": check.checked,

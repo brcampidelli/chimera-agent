@@ -366,6 +366,25 @@ def _browser_reach_lists(settings: Settings) -> dict[str, Any]:
     return {"sites": sites, "local_ports": ports, "invalid": "; ".join(errors) or None}
 
 
+def _fusion_block(settings: Any) -> dict[str, Any]:
+    """The cast a fused turn on this machine will actually convene, as the factory builds it.
+
+    Not ``settings.fusion_panel``: unless the owner named a panel, every engine draws it from the
+    tier ladder (``chimera.fusion.factory``), and the desktop seeds its "standing cast" from this
+    block. Reporting the raw setting would name three frontier models that no turn convenes.
+    """
+    from chimera.fusion.factory import fusion_config
+
+    config = fusion_config(settings)
+    return {
+        "panel": list(config.panel),
+        "judge": config.judge,
+        "synthesizer": config.synthesizer,
+        "mode": settings.fusion_mode,
+        "kinship": _fusion_kinship(list(config.panel), config.judge),
+    }
+
+
 def _fusion_kinship(panel: list[str], judge: str) -> dict[str, Any]:
     """How independent the judge is from the panel it grades — the engine's own answer.
 
@@ -550,15 +569,7 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
         # Panel -> judge -> synthesizer, and how independent the judge actually is from the panel it
         # grades. `role_kinship` is reported rather than enforced: a user with one provider key has
         # no way to avoid overlap, and a labelled receipt beats a refusal they cannot act on.
-        "fusion": {
-            "panel": list(settings.fusion_panel),
-            "judge": settings.fusion_judge,
-            "synthesizer": settings.fusion_synthesizer,
-            "mode": settings.fusion_mode,
-            "kinship": _fusion_kinship(
-                list(settings.fusion_panel), settings.fusion_judge
-            ),
-        },
+        "fusion": _fusion_block(settings),
         "memory": {
             # Resolved, so the screen names the store the turns actually read — `sqlite` on the
             # default, `json` when the owner chose it or the build has no FTS5.
@@ -745,7 +756,10 @@ def pricing_capability(settings: Settings) -> dict[str, object]:
     # no list price is exactly as capable of making the total unknowable as the default model is —
     # and probing only the default reported "priced" for the most expensive turn the app can run.
     model = settings.default_model
-    cast = [m for m in (*settings.fusion_panel, settings.fusion_judge, settings.fusion_synthesizer) if m]
+    from chimera.fusion.factory import fusion_config
+
+    fused = fusion_config(settings)  # the cast the Fuse button convenes, not the raw setting
+    cast = [m for m in (*fused.panel, fused.judge, fused.synthesizer) if m]
     unpriced = [m for m in dict.fromkeys([model, *cast]) if m and resolve_price(m) is None]
     priced = not unpriced
     named = ", ".join(unpriced)

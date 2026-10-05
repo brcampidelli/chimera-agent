@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+from chimera.core.redact import redact
 from chimera.governance.policy import Decision
 from chimera.governance.proxy import see_through
 from chimera.governance.recipient import addresses_in
@@ -67,15 +68,26 @@ class SharedTaint:
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self._tainted = False
+        self._epoch = 0
 
-    def publish_tainted(self) -> None:
+    def publish_tainted(self, *, new_facts: bool = True) -> None:
+        """Mark the fan-out tainted; ``new_facts`` also moves :attr:`epoch` (see there)."""
         with self._lock:
             self._tainted = True
+            if new_facts:
+                self._epoch += 1
 
     @property
     def tainted(self) -> bool:
         with self._lock:
             return self._tainted
+
+    @property
+    def epoch(self) -> int:
+        """How many untrusted things the whole fan-out has taken in so far: the run-wide half of
+        :attr:`TaintLedger.taint_epoch`, which a shared approval is bound to."""
+        with self._lock:
+            return self._epoch
 
 # Tool-name → capability-kind classification. Overridable, but these are the built-ins.
 FETCH_TOOLS = frozenset(
@@ -213,6 +225,68 @@ def _first(args: Mapping[str, Any], keys: Iterable[str]) -> str:
     return ""
 
 
+#: How much of an argument other than the call's target a question shows whole. A longer one is
+#: shown by its opening, its length and a digest: enough to tell two of them apart on the card,
+#: which the old card could not do at all (it named the recipient of an email and never its body).
+SHOWN_ARG_CHARS = 1500
+_SHOWN_ARG_HEAD = 600
+
+
+def describe_call(tool: str, args: Mapping[str, Any], target: str = "") -> str:
+    """What a person approving this call is shown: ``<tool>: <target>``, then every other argument.
+
+    The target (the command, path, URL or recipient) is shown WHOLE. It used to be cut at 300
+    characters, which made a command that differed only after that point indistinguishable on the
+    card from the one before it (study 30, S30-04). Every other argument follows on its own line,
+    documents included, each whole up to :data:`SHOWN_ARG_CHARS` and past that as its opening plus
+    ``(N chars in all, sha256:...)``. The first line keeps the shape it had, so every reader that
+    takes the tool from it (``approval._facts_of``) reads the same thing.
+
+    Every value is passed through :func:`_masked` before it is shown. Showing every argument put the
+    body of an email, a file's content and a request's headers on the card, and the card travels: to
+    the chat channel, and to ``<home>/approvals/<id>.ask.json``, whether or not the owner says yes
+    (S30-04 review). A key the agent read from ``.env`` is ``[redacted]`` there. The length and the
+    digest are of the value as it is, and :func:`proposal_of` keys on the raw arguments, so two calls
+    that differ only in a secret are still two questions — the card says where the mask is.
+    """
+    lines = [f"{tool}: {_masked(target)}" if target else tool]
+    shown_target = False
+    for key, value in args.items():
+        if value is None or value == "":
+            continue
+        raw = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, default=str)
+        if not shown_target and target and raw == target:
+            shown_target = True  # already on the first line
+            continue
+        # Masked BEFORE the cut, so a secret straddling the cut point cannot leave half of itself.
+        text = _masked(raw)
+        if len(raw) > SHOWN_ARG_CHARS:
+            digest = hashlib.sha256(raw.encode("utf-8", "replace")).hexdigest()[:16]
+            text = f"{text[:_SHOWN_ARG_HEAD]}… ({len(raw)} chars in all, sha256:{digest})"
+        lines.append(f"  {key}: {text}")
+    return "\n".join(lines)
+
+
+def _masked(text: str) -> str:
+    """``text`` as a person's card may carry it: secrets this process knows, and the shapes and
+    places `chimera.core.redact` recognises, replaced by ``[redacted]``."""
+    return redact(text)
+
+
+def proposal_of(tool: str, args: Mapping[str, Any], epoch: int) -> str:
+    """The identity of a proposal: the tool, every argument whole, and the run's taint epoch.
+
+    What a shared approval is keyed on (`shared_approval.py`). Everything the call will do is in
+    it, documents included and nothing cut, so an answer covers this call and no other; and the
+    epoch is in it, so a yes given before the run took in something new does not answer the same
+    call after. A digest rather than the text: the key is compared, never shown.
+    """
+    canonical = json.dumps(
+        {"tool": tool, "args": args, "epoch": epoch}, sort_keys=True, ensure_ascii=False, default=str
+    )
+    return hashlib.sha256(canonical.encode("utf-8", "replace")).hexdigest()
+
+
 @dataclass
 class CapabilityEvent:
     """One recorded capability use in a run (the replayable unit)."""
@@ -266,6 +340,10 @@ class SequenceAssessment:
     """Where the taint came from — each ``<ref> (<who asked>)``, oldest first."""
     span: str = ""
     """The tainted text found inside the action itself, when the escalation is a content flow."""
+    proposal: str = ""
+    """:func:`proposal_of` the call being asked about: what a shared approval is keyed on. Empty on
+    an assessment nobody asks about and on one built outside a ledger (a test, an older caller); the
+    key then falls back to the action as shown."""
 
 
 class TaintLedger:
@@ -313,6 +391,8 @@ class TaintLedger:
         # lock around that pair, and nothing else: the sets and lists above are appended, never
         # read-modify-written, and CPython's GIL keeps each append whole.
         self._events_lock = threading.Lock()
+        # Untrusted things this ledger has taken in; see `taint_epoch`.
+        self._epoch = 0
 
     # --- recording -------------------------------------------------------------------
 
@@ -323,11 +403,29 @@ class TaintLedger:
                 len(self.events), kind, ref, tainted, detail, provenance or [], requested_by
             )
             self.events.append(event)
+            # An escalation is the ledger noting that a question is being ASKED, not something the
+            # run took in. Counting it would make every identical ask a "new" question, since the
+            # step-1 path records the escalation just before it asks.
+            new_facts = tainted and kind != "escalation"
+            if new_facts:
+                self._epoch += 1
         if tainted and self._shared is not None:
             # Publish to siblings the instant this run consumes untrusted content, so their narrowing
             # arms before they can sink it — the live half of the cross-agent gate.
-            self._shared.publish_tainted()
+            self._shared.publish_tainted(new_facts=new_facts)
         return event
+
+    @property
+    def taint_epoch(self) -> int:
+        """How many untrusted things the run has taken in: fetches, tainted reads, writes, execs.
+
+        Read across the fan-out when the ledger shares a :class:`SharedTaint` (every worker's
+        count), else this ledger's own. It only grows, and it is part of a shared approval's key
+        (:func:`proposal_of`): a person's yes was given under the facts of that moment, and a
+        tainted write since then (the file the approved command is about to run, now carrying
+        fetched text) is different facts.
+        """
+        return self._shared.epoch if self._shared is not None else self._epoch
 
     def _label(self, requested_by: str | None, target: str) -> str:
         """An explicit label, checked; else the one derived from the instruction."""
@@ -648,9 +746,10 @@ def assess_action(
                 f"executes an artifact derived from untrusted input ({', '.join(refs)}) — "
                 f"the command contains text from {'; '.join(sources) or 'an untrusted read'}",
                 refs,
-                action=f"{tool_name}: {_excerpt(command, 300)}",
+                action=describe_call(tool_name, args, command),
                 sources=sources,
                 span=span,
+                proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
     if tool_name in write_tools:
         path = _first(args, _PATH_KEYS)
@@ -663,9 +762,10 @@ def assess_action(
                 f"writes untrusted content into an executable/interpreted file {path!r} ({', '.join(refs)}) — "
                 f"the content comes from {'; '.join(sources) or 'an untrusted read'}",
                 refs,
-                action=f"{tool_name}: {path}",
+                action=describe_call(tool_name, args, path),
                 sources=sources,
                 span=span,
+                proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
     if tool_name in fetch_tools and ledger.run_tainted():
         # The exfiltration that got through every configuration: `http_get` is a fetch tool, so the
@@ -694,8 +794,9 @@ def assess_action(
                 f"content from {'; '.join(sources) or 'an untrusted read'} — a GET can carry data out "
                 f"as easily as a POST",
                 [],
-                action=f"{tool_name}: {_excerpt(url, 300)}",
+                action=describe_call(tool_name, args, url),
                 sources=sources,
                 span=_excerpt(parts.query),
+                proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
     return SequenceAssessment(False, Decision.ALLOW)

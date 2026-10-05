@@ -33,6 +33,47 @@ class ModelPrice:
 
     input_per_m: float
     output_per_m: float
+    cache_read_per_m: float | None = None
+    """What a prompt-cache HIT costs. None = nobody told us, and then the read is priced at
+    ``input_per_m`` — the figure every receipt used before, never a multiplier made up here."""
+    cache_write_per_m: float | None = None
+    """What a prompt-cache WRITE costs (Anthropic: 1.25x input for the five-minute kind). None =
+    unknown, priced at ``input_per_m``, which is a floor: no provider bills a write below input."""
+
+
+def cost_usd(
+    price: ModelPrice,
+    prompt_tokens: int | None,
+    completion_tokens: int | None,
+    *,
+    cache_read_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
+) -> float:
+    """Dollars for one call, with the prompt's cache share at its own rates.
+
+    Cache tokens are a PART of ``prompt_tokens``, not an addition to it: LiteLLM's Anthropic adapter
+    adds ``cache_read_input_tokens`` and ``cache_creation_input_tokens`` into ``prompt_tokens``, and
+    the OpenAI shape reports ``cached_tokens`` as a subset of it. Every pricer used to bill the
+    whole prompt at the input rate, which over-stated a read (~0.1x) and under-stated a write
+    (1.25x) — wrong in both directions at once.
+
+    Clamped to the prompt, on purpose: the gateway's own response cache answers with
+    ``prompt_tokens=0`` and the original count under ``cache_read_tokens``, a call nobody billed.
+    More cache tokens than the prompt holds were not charged by any provider, so they cost nothing.
+    """
+    prompt = max(0, prompt_tokens or 0)
+    read = min(max(0, cache_read_tokens or 0), prompt)
+    write = min(max(0, cache_write_tokens or 0), prompt - read)
+    fresh = prompt - read - write
+    read_rate = price.input_per_m if price.cache_read_per_m is None else price.cache_read_per_m
+    write_rate = price.input_per_m if price.cache_write_per_m is None else price.cache_write_per_m
+    usd = (
+        fresh * price.input_per_m
+        + read * read_rate
+        + write * write_rate
+        + max(0, completion_tokens or 0) * price.output_per_m
+    ) / 1_000_000
+    return round(usd, 6)
 
 
 #: A free-tier slug bills nothing, and that is a measurement rather than a default.
@@ -51,8 +92,10 @@ _FREE_TIER = ModelPrice(0.0, 0.0)
 _PRICES: list[tuple[str, ModelPrice]] = [
     ("deepseek-r1", ModelPrice(0.55, 2.19)),
     ("deepseek-reasoner", ModelPrice(0.55, 2.19)),
-    ("claude-sonnet", ModelPrice(3.0, 15.0)),
-    ("claude-haiku", ModelPrice(0.80, 4.0)),
+    # Anthropic publishes cache reads at 0.1x input and five-minute writes at 1.25x; the breakpoints
+    # `providers.prompt_cache` sets are the default five-minute kind.
+    ("claude-sonnet", ModelPrice(3.0, 15.0, cache_read_per_m=0.30, cache_write_per_m=3.75)),
+    ("claude-haiku", ModelPrice(0.80, 4.0, cache_read_per_m=0.08, cache_write_per_m=1.0)),
     ("gpt-4o-mini", ModelPrice(0.15, 0.60)),
     ("gpt-4o", ModelPrice(2.50, 10.0)),
     ("gemini-flash", ModelPrice(0.075, 0.30)),
@@ -132,6 +175,8 @@ def resolve_price(model: str) -> ModelPrice | None:
        fetches (see :func:`chimera.providers.listing.known_price`). This is why the default model
        stopped reporting "price unknown": the table below is hand-maintained and knew about twenty
        families, while the index knows four hundred models and is refreshed by using the app.
+       Its cache rates win too; where it has none, the table's are used only from a row at the
+       same input/output price (an index file written before cache rates were parsed has none).
     4. **The table by family substring** — the original behaviour, unchanged, and still the answer
        for every model the index has never seen (a local gateway, a vendor not on OpenRouter). The
        shipped catalogue is folded in here, once, on the first lookup.
@@ -144,7 +189,7 @@ def resolve_price(model: str) -> ModelPrice | None:
     family, and worse evidence than a price a human typed for that one model.
     """
     from chimera.providers.gateway import _is_local_model
-    from chimera.providers.listing import known_price
+    from chimera.providers.listing import known_cache_price, known_price
 
     _ensure_catalog_registered()
     norm = model.lower()
@@ -158,13 +203,22 @@ def resolve_price(model: str) -> ModelPrice | None:
     if ":free" in norm:
         return _FREE_TIER
 
+    family = next((price for pattern, price in _PRICES if pattern in norm), None)
     live = known_price(model)
     if live is not None:
-        return ModelPrice(live[0], live[1])
+        read, write = known_cache_price(model)
+        # An index row with no cache rate is usually a file written before the parser read them
+        # (`model-prices.json` outlives upgrades), not a provider saying "no cache". The table may
+        # know the rate — but only borrow it from a row at the SAME input/output price: a family
+        # substring at another price point is a guess about another model, and its cache rate
+        # would be priced against an input rate it was never published beside.
+        if family is not None and (family.input_per_m, family.output_per_m) == live:
+            read = family.cache_read_per_m if read is None else read
+            write = family.cache_write_per_m if write is None else write
+        return ModelPrice(live[0], live[1], cache_read_per_m=read, cache_write_per_m=write)
 
-    for pattern, price in _PRICES:
-        if pattern in norm:
-            return price
+    if family is not None:
+        return family
     # After the table, not before: an explicit `set_price` for a local model must still win.
     if _is_local_model(norm):
         return _LOCAL_ZERO
@@ -193,8 +247,11 @@ def price_stage(usage: StageUsage) -> StageCost:
             # Same honesty rule as an unknown model — a missing number never masquerades as $0.
             usd = None
         else:
-            pt, ct = usage.prompt_tokens or 0, usage.completion_tokens or 0
-            usd = round(pt / 1_000_000 * price.input_per_m + ct / 1_000_000 * price.output_per_m, 6)
+            usd = cost_usd(
+                price, usage.prompt_tokens, usage.completion_tokens,
+                cache_read_tokens=usage.cache_read_tokens,
+                cache_write_tokens=usage.cache_write_tokens,
+            )
     return StageCost(usage.stage, usage.model, usage.prompt_tokens, usage.completion_tokens, usd)
 
 
@@ -205,6 +262,10 @@ class FusionReceipt:
     stages: list[StageCost] = field(default_factory=list)
     early_stopped: bool = False
     passed: bool | None = None  # optional quality signal (did the fused answer succeed?)
+    aggregation: str = "synth"
+    """How the answer was reached, as on the trace: synth | vote | fallback."""
+    fallback_stage: str | None = None
+    """On a fallback, the stage that failed (judge / synth): the answer is a panel answer."""
 
     @property
     def total_usd(self) -> float | None:
@@ -228,6 +289,8 @@ class FusionReceipt:
         return {
             "stages": [asdict(s) for s in self.stages],
             "early_stopped": self.early_stopped,
+            "aggregation": self.aggregation,
+            "fallback_stage": self.fallback_stage,
             "passed": self.passed,
             "total_usd": self.total_usd,
             "total_tokens": self.total_tokens,
@@ -240,6 +303,8 @@ def receipt_from_trace(trace: FusionTrace, *, passed: bool | None = None) -> Fus
         stages=[price_stage(u) for u in trace.usage],
         early_stopped=trace.early_stopped,
         passed=passed,
+        aggregation=trace.aggregation,
+        fallback_stage=trace.fallback_stage,
     )
 
 

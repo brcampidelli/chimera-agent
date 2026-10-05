@@ -1,5 +1,5 @@
 ---
-source_sha256: c73f68312c5dfb6d24b93ad1f38139e01ba17dbacbada481f2c89bcc033a27af
+source_sha256: 63cbbf513063787c57907cafa18608070d3fe5f9db85dd1558a1c42d2dbe652a
 ---
 
 # Chimera auf einem Server (VPS) deployen
@@ -278,10 +278,12 @@ ist ein kleinerer Raum, kein leerer.
 
 ## 6. Ehrlicher Status
 
-Chimera ist **Alpha**. Das hier deployt und läuft, und der Cron-Daemon macht es proaktiv — aber
-es hat noch **keine Produktionslaufleistung**. Mit risikoarmen Crons anfangen, `logs`
-beobachten und die Governance-Leitplanken (`--guard` bei `solve`, `CHIMERA_SANDBOX=docker`) für
-alles im Hinterkopf behalten, was echte Systeme berührt.
+Chimera ist **Alpha**. Das hier deployt und läuft, und der Cron-Daemon macht es proaktiv. Seine
+Produktionslaufleistung ist **ein einziges Deployment**: der eigene VPS des Autors, der seit Juli
+2026 rund um die Uhr Crons und einen Discord-Bot betreibt. Das ist echter Einsatz, keine Flotte, und
+er hat Ihre Arbeitslast nicht gesehen. Mit risikoarmen Crons anfangen, `logs` beobachten und die
+Governance-Leitplanken (`--guard` bei `solve`, `CHIMERA_SANDBOX=docker`) für alles im Blick
+behalten, was echte Systeme berührt.
 
 ## Wo diese Seiten veröffentlicht werden
 

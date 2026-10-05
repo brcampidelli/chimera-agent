@@ -30,6 +30,8 @@ from chimera.governance.ledger import (
     _excerpt,
     _first,
     assess_action,
+    describe_call,
+    proposal_of,
 )
 from chimera.governance.policy import Decision
 from chimera.governance.proxy import see_through
@@ -292,14 +294,17 @@ class LedgeredTool(Tool):
                 _first(args, _COMMAND_KEYS) or _first(args, _PATH_KEYS)
                 or _first(args, _URL_KEYS) or _first(args, ("to", "recipient", "channel", "chat_id"))
             )
-            action = f"{name}: {_excerpt(target, 300)}" if target else name
+            # The whole call, not a 300-character excerpt of one argument: the card is what the
+            # person approves, and the key below is what the approval is then reused for.
+            action = describe_call(name, args, target)
             if self.audit is not None:
                 self.audit.record(
                     "taint_narrowed",
                     {"tool": name, "reason": reason, "action": action, "sources": sources},
                 )
             assessment = SequenceAssessment(
-                True, Decision.REVIEW, reason, action=action, sources=sources
+                True, Decision.REVIEW, reason, action=action, sources=sources,
+                proposal=proposal_of(name, args, self.ledger.taint_epoch),
             )
             approved = self.approve(assessment) if self.approve else False
             if not approved:
@@ -332,7 +337,7 @@ class LedgeredTool(Tool):
 
         # 1a. A recipient nobody mentioned (M2), when no card above already carried the note.
         if unseen:
-            refused = self._ask_about_recipients(name, unseen, asked=asked)
+            refused = self._ask_about_recipients(name, unseen, asked=asked, args=args)
             if refused is not None:
                 return refused
 
@@ -403,7 +408,9 @@ class LedgeredTool(Tool):
             "of refusing), or, on a deployment that must act on its own, CHIMERA_TAINT_NARROW=0."
         )
 
-    def _ask_about_recipients(self, name: str, unseen: list[str], *, asked: bool) -> str | None:
+    def _ask_about_recipients(
+        self, name: str, unseen: list[str], *, asked: bool, args: Mapping[str, Any] | None = None
+    ) -> str | None:
         """Record a send to an address the run was never shown, and ask when this surface can.
 
         Returns the refusal when a person said no, else None. ``asked`` means a card for this same
@@ -421,8 +428,11 @@ class LedgeredTool(Tool):
             f"{name} to {', '.join(unseen)}: this address never appeared in the conversation "
             "or in anything this run read"
         )
+        call = dict(args or {})
         assessment = SequenceAssessment(
-            True, Decision.REVIEW, reason, action=f"{name}: {', '.join(unseen)}"
+            True, Decision.REVIEW, reason,
+            action=describe_call(name, call, ", ".join(unseen)),
+            proposal=proposal_of(name, call, self.ledger.taint_epoch),
         )
         if self.approve(assessment):
             return None

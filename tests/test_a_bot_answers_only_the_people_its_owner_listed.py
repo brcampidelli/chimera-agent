@@ -9,7 +9,8 @@ hand — the one path no deployment takes. So these tests go through the constru
 environment, the way a `.env` sets the list.
 
 An empty list still means "anyone": that is the owner's decision, because refusing everyone would
-silence the production bot on upgrade. What these pin is that it is no longer silent.
+silence a bot already deployed on that default (the author's own ran on it until 0.64.2 set an
+allowlist). What these pin is that it is no longer silent.
 """
 
 from __future__ import annotations

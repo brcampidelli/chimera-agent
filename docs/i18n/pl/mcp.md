@@ -1,5 +1,5 @@
 ---
-source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
+source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
 ---
 
 # Podłączanie serwerów MCP
@@ -77,6 +77,14 @@ Narzędzia MCP są zwykłymi obiektami `Tool`, więc wszystko się komponuje:
   rejestrowane; zauważ, że dziś tylko narzędzia wymienione w `FETCH_TOOLS` są auto-klasyfikowane,
   więc traktuj treść MCP jako niezaufaną i preferuj uruchamianie z semantyką `--taint --guard`,
   gdy serwer pobiera dane zewnętrzne.
+- **`instructions` serwera** — tekst, który serwer zwraca przy `initialize`, jest odrzucany, celowo:
+  to niezaufany tekst serwera i nic nie oznacza go jako danych, tak jak oznaczany jest ogrodzony
+  odczyt. Kosztem jest to, że wskazówki użycia serwera nigdy nie docierają do modelu; host, który je
+  przekazuje, też nie powinien na nich polegać (arXiv 2608.08467: przy dostępnym narzędziu
+  wyszukiwania 9 z 24 modeli spadło poniżej 15% na zapytaniach umieszczonych w instrukcjach
+  serwera). Przekazywanie ich jako ogrodzonych danych pod taintem jest otwarte, nie zrobione. Odrzucenie ich **nie** jest granicą wobec tekstu pisanego przez serwer:
+  nazwy i opisy narzędzi tego samego serwera docierają do modelu tak, jak serwer je napisał, bez
+  ogrodzenia; serwer, który podłączasz, to serwer, którego słowa czyta model.
 
 ## Chimera *jako* serwer MCP
 

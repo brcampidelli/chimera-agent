@@ -70,6 +70,14 @@ MCP tools are ordinary `Tool` objects, so everything composes:
   that only tools named in `FETCH_TOOLS` are auto-classified today, so treat MCP content
   as untrusted and prefer running with `--taint --guard` semantics when the server pulls
   external data.
+- **Server `instructions`** — the text a server returns from `initialize` is dropped, by decision:
+  it is untrusted server text, and nothing marks it as data the way a fenced fetch is marked. The
+  cost is that a server's usage guidance never reaches the model; a host that does pass it on should
+  not count on it either (arXiv 2608.08467: with a search tool available, 9 of 24 models fell below
+  15% on lookups placed in server instructions). Passing it as fenced data under taint is open, not
+  done. Dropping it is **not** a boundary against server-written text: the same server's tool names
+  and descriptions reach the model as the server wrote them, unfenced, so a server you connect is a
+  server whose words the model reads.
 
 ## Chimera *as* an MCP server
 

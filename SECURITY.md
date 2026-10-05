@@ -126,7 +126,11 @@ environment** when you grant autonomy:
   edit surface) before they are kept; learned skills are prompt templates, not executable code.
 - **Verify-or-revert** — autonomous changes are snapshotted and reverted if verification fails.
 - **Human-in-the-loop** — agent-proposed crons are created **disabled**, pending approval.
-- **Audit log** — governance decisions and evolution changes are recorded.
+- **Audit log** — governance decisions and evolution changes are recorded. That record, like the
+  step log and the run receipts, is written by the harness itself: it is **testimony, not
+  evidence**. The hash chain catches a later edit of the file; it cannot catch a harness that wrote
+  a false or incomplete entry in the first place, which takes a second, independent writer read
+  against it (arXiv 2609.32495). No such writer exists here yet.
 
 Treat secrets as server-only. **The default `auto` sandbox asks the kernel to hold the boundary**
 — Seatbelt on macOS, bubblewrap on Linux — with the network off and writes confined to the working

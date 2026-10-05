@@ -22,8 +22,15 @@ will never touch, and the closest-wins rule would be meaningless once everything
 and a repository can be one the user cloned an hour ago. A file that says "you may run commands on
 the host" is a sentence in a document, not a permission — capability comes from the sandbox and the
 approval policy, which come from the user. This module cannot enforce that on its own; it states it
-in the injected block so the model is told, and the enforcement lives where it always did, in the
-registry and the gates.
+in the injected block so the model is told.
+
+What the gates do and do not do here, said plainly (study 30, S30-21(e)). The registry and the
+gates enforce what the USER granted, whatever the file says — that half holds. They do not treat the
+file as untrusted input: reading it does not arm the taint ledger, so a run in a repository cloned an
+hour ago starts clean and the narrowing that follows a fetched page never applies. And a restriction
+the file states ("never touch X") is advice to the model, enforced by nothing. Repository rule files
+are an injection carrier in the literature (arXiv 2609.39678 detects all 314 AIShellJack inputs);
+arming the ledger for an AGENTS.md from a repository the owner did not write is open, test first.
 """
 
 from __future__ import annotations

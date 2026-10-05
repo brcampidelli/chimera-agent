@@ -170,3 +170,13 @@ closing messages name their own commands more often than their hosts' generic su
 * The subagent case (edits made by a delegate): our `spawn_subagent` transcripts are not folded in
   in this bench; if the corpus contains subagent turns they are labelled but reported separately,
   not pooled.
+
+## Amendment, 2026-10-04 (study 30, S30-22(c)) — appended; nothing above changes
+
+This registration measures discrimination only and makes no behavioural claim, and that stands.
+What is added is a requirement on the enforce bench it defers to: any claim that VERIFY *works*
+needs a **timing-matched sham arm** (a nudge at the same moments that carries no run facts). In a
+randomised five-arm experiment, generic "verify" or "reconsider" nudges scored 39-43% against 39%
+with no nudge and 36% for a timing-matched sham, while state-specific policies scored 61% (FIRE,
+arXiv 2609.26048). Our nudge carries run facts, so FIRE's generic arms do not predict its result;
+they show that without a sham arm a timing effect and a content effect cannot be told apart.

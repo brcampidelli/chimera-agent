@@ -118,10 +118,17 @@ function Benchmarks({ t }: { t: TFunc }) {
   );
 }
 
-/** Maturity band → tone: GA is good, Beta is accent, Alpha (and anything unknown) is a warning. */
+/** Band → tone. The band counts test FILES that exist (present / partial / sparse), not a release
+ *  grade: it once read "GA", which a glob of file names cannot earn. Anything unknown is a warning. */
 type Tone = "ok" | "accent" | "warn";
 const levelTone = (level: string): Tone =>
-  level === "GA" ? "ok" : level === "Beta" ? "accent" : "warn";
+  level === "present" ? "ok" : level === "partial" ? "accent" : "warn";
+
+/** The band in the reader's language; an unknown band (an older backend) is shown as sent. */
+const levelText = (level: string, t: TFunc): string =>
+  level === "present" || level === "partial" || level === "sparse"
+    ? t(`maturity.band.${level}`)
+    : level;
 
 /** A compact stat tile (label + value), mirrors Usage.tsx / Governance.tsx. */
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
@@ -155,7 +162,7 @@ function SurfaceRow({
           {weakest && <Badge tone="warn">{t("maturity.weakest")}</Badge>}
         </span>
         <span className="flex shrink-0 items-center gap-2">
-          <Badge tone={levelTone(row.level)}>{row.level}</Badge>
+          <Badge tone={levelTone(row.level)}>{levelText(row.level, t)}</Badge>
           <span className="font-mono text-xs text-muted-foreground">
             {row.proven}/{row.total} ({pct(row.ratio)})
           </span>
@@ -220,7 +227,7 @@ export function Maturity() {
               {t("maturity.level")}
             </span>
             <span>
-              <Badge tone={levelTone(data.level)}>{data.level}</Badge>
+              <Badge tone={levelTone(data.level)}>{levelText(data.level, t)}</Badge>
             </span>
           </div>
           <Tile label={t("maturity.coverage")} value={pct(data.ratio)} />

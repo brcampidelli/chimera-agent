@@ -94,6 +94,10 @@ class ModelOption:
     free: bool = False
     #: Present in Chimera's curated catalogue, i.e. a model this project has actually run.
     recommended: bool = False
+    #: USD per 1M prompt-cache reads / writes, as the provider publishes them. None = not said, and
+    #: then a receipt prices the cache share at the input rate rather than at a guessed multiplier.
+    cache_read_per_m: float | None = None
+    cache_write_per_m: float | None = None
 
 
 @dataclass(frozen=True)
@@ -169,6 +173,10 @@ def _openrouter_option(entry: dict[str, Any]) -> ModelOption | None:
         tools=tools,
         vision=vision,
         free=model_id.endswith(":free") or (input_per_m == 0.0 and output_per_m == 0.0),
+        # Published beside the input price for every model that caches, and never read until a
+        # receipt needed them: without them a cache read was billed as a fresh token.
+        cache_read_per_m=_price_per_million(pricing.get("input_cache_read")),
+        cache_write_per_m=_price_per_million(pricing.get("input_cache_write")),
     )
 
 
@@ -433,6 +441,9 @@ class Remembered:
     #: because a context overflow maps to ABORT with no recovery. The provider says the number;
     #: not writing it down was the only reason it was unknown.
     context_k: int | None = None
+    #: USD per 1M prompt-cache reads / writes. None = the provider did not publish one.
+    cache_read_per_m: float | None = None
+    cache_write_per_m: float | None = None
 
 
 # (path, mtime, table). Keyed by path and mtime so a test that repoints CHIMERA_HOME, or a fetch that
@@ -471,6 +482,8 @@ def remember_models(models: Sequence[ModelOption], *, home: Path | None = None) 
             "vision": m.vision,
             "tools": m.tools,
             "context_k": m.context_k,
+            "cache_read": m.cache_read_per_m,
+            "cache_write": m.cache_write_per_m,
         }
         for m in models
     }
@@ -516,6 +529,8 @@ def _remembered(slug: str) -> Remembered | None:
                         value.get("vision") if isinstance(value.get("vision"), bool) else None,
                         value.get("tools") if isinstance(value.get("tools"), bool) else None,
                         value.get("context_k") if isinstance(value.get("context_k"), int) else None,
+                        _as_price(value.get("cache_read")),
+                        _as_price(value.get("cache_write")),
                     )
             for key, value in (raw.get("prices") or {}).items():  # the 0.48.0rc2 shape
                 if isinstance(value, list) and len(value) == 2 and str(key) not in table:
@@ -540,6 +555,18 @@ def known_price(slug: str) -> tuple[float, float] | None:
     if found is None or found.input_per_m is None or found.output_per_m is None:
         return None
     return (found.input_per_m, found.output_per_m)
+
+
+def known_cache_price(slug: str) -> tuple[float | None, float | None]:
+    """USD per 1M prompt-cache (read, write) for this EXACT slug; each None when never published.
+
+    Separate from :func:`known_price` rather than widening its tuple: a model can be priced with no
+    cache rate at all, and that must stay "priced, cache rate unknown", not "unpriced".
+    """
+    found = _remembered(slug)
+    if found is None:
+        return (None, None)
+    return (found.cache_read_per_m, found.cache_write_per_m)
 
 
 def known_window(slug: str) -> int | None:

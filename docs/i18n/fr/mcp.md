@@ -1,5 +1,5 @@
 ---
-source_sha256: d22206c6ec0698203967231fc3c0f48518dfe6d9338bd8f49c273feafa6ae093
+source_sha256: 4cc077a31d33ce57587458b8be1da859727059cc64519adda181acb8ee7fda3d
 ---
 
 # Connecter des serveurs MCP
@@ -78,6 +78,15 @@ Les outils MCP sont des objets `Tool` ordinaires, donc tout se compose :
   récupérations MCP sont enregistrées ; notez que seuls les outils nommés dans `FETCH_TOOLS` sont
   aujourd'hui auto-classifiés, donc traitez le contenu MCP comme non fiable et préférez tourner
   avec la sémantique `--taint --guard` quand le serveur récupère des données externes.
+- **`instructions` du serveur** — le texte qu'un serveur renvoie à `initialize` est écarté, par
+  décision : c'est du texte de serveur non fiable, et rien ne le marque comme donnée comme l'est une
+  lecture clôturée. Le prix est que les consignes d'usage d'un serveur n'atteignent jamais le modèle
+  ; un hôte qui les transmet ne devrait pas non plus compter dessus (arXiv 2608.08467 : avec un
+  outil de recherche disponible, 9 modèles sur 24 sont tombés sous 15 % sur des recherches placées
+  dans les instructions du serveur). Les transmettre comme données clôturées sous taint reste
+  ouvert, pas fait. Les écarter n'est **pas** une frontière contre le texte écrit par le serveur : les
+  noms et descriptions d'outils du même serveur atteignent le modèle tels que le serveur les a
+  écrits, sans clôture ; un serveur que vous connectez est un serveur dont le modèle lit les mots.
 
 ## Chimera *en tant que* serveur MCP
 

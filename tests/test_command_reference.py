@@ -62,3 +62,56 @@ def test_an_option_appears_with_its_real_flags() -> None:
     # instructions turned on.
     agent = page[page.index("\n## agent\n") : page.index("\n## agents\n")]
     assert "`--guard`" in agent
+
+
+def _every_command(node: dict) -> list[dict]:
+    """Walk the snapshot tree. A group's subcommands live under its own "commands" key."""
+    found: list[dict] = []
+    for command in node.get("commands") or []:
+        found.append(command)
+        found.extend(_every_command(command))
+    return found
+
+
+def test_every_nested_subcommand_is_on_the_page() -> None:
+    """`chimera agents list` is a command a user types; the page has to name it.
+
+    The generator once walked only the top level of the snapshot, so the 73 subcommands of the 16
+    groups (`agents list`, `cron add`, ...) were on no page at all, while the first test above stayed
+    green: it compares the page with the generator's own output, and both left them out. Walking the
+    tree here, independently of `render`, is what makes a skipped level visible.
+    """
+    snapshot = json.loads(gen.SNAPSHOT.read_text(encoding="utf-8"))
+    page = gen.OUT.read_text(encoding="utf-8")
+
+    nested = [
+        c["path"]
+        for top in snapshot["commands"]
+        if not top.get("hidden")
+        for c in _every_command(top)
+        if not c.get("hidden")
+    ]
+    assert len(nested) > 50, f"only {len(nested)} nested commands — did the snapshot shape change?"
+    missing = [name for name in nested if f"\n## {name}\n" not in page]
+    assert not missing, f"subcommands the CLI has and the page does not: {missing[:10]}"
+
+
+def test_a_hidden_subcommand_stays_off_the_page() -> None:
+    snapshot = json.loads(gen.SNAPSHOT.read_text(encoding="utf-8"))
+    fake = {
+        **snapshot,
+        "commands": [
+            {
+                "path": "grp",
+                "name": "grp",
+                "commands": [
+                    {"path": "grp shown", "name": "shown"},
+                    {"path": "grp secret", "name": "secret", "hidden": True},
+                ],
+            }
+        ],
+    }
+
+    page = gen.render(fake)
+    assert "## grp shown" in page
+    assert "## grp secret" not in page

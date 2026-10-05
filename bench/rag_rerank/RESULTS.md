@@ -52,6 +52,10 @@ Where the 59 losses come from: the target sat at a median rank **4** of the 30 (
 ## 6. What this cannot show, and one apparatus note (§2q)
 
 - `bge-m3` / a cross-encoder — not run.
+- *Added 2026-10-04 (study 30, S30-22(d)).* External support for running that arm, not a
+  correction of this one: in biomedical QA (n = 1,000) a domain-trained cross-encoder (MedCPT) over
+  hybrid retrieval raised Hit@10 from 46.6% to 60.6%, while answer correctness moved only 44.8% to
+  48.6% (arXiv 2610.01324). This null stays scoped to the Noul reranker.
 - Probes are first docstring lines on one Python corpus (`bench/rag` §"one kind of question").
 - Whether the same Noul with the *full* chunk (the state cut at 1,500 characters) or a different question ("does this chunk contain the symbol named…") would do better — a different instrument, its own registration.
 - The first run of this bench died after the embedding pass because the bench directory was moved while it ran (a `mv` of mine, checking an unrelated test). US$ 0.02 wasted; recorded so the cost line is honest. The rule that follows is in memory: the tree of a running bench is not touched.

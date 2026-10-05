@@ -125,6 +125,16 @@ class StepRecord:
     #: a batch that was run together from one that merely could have been: an intervention that
     #: acts must say how often it acted.
     ran_together: int = 0
+    #: The provider stopped this call because it ran out of room (``finish_reason == "length"``),
+    #: not because the model was done. Recorded, not acted on: the loop still treats the step as it
+    #: always has, and this is what lets a census over traces say how often that was a cut turn
+    #: passing as a finished one (study 30, S30-09).
+    truncated: bool = False
+    #: Tool calls the gateway dropped from this step because their arguments did not parse —
+    #: typically the half-written call a cut leaves. A step whose every call was dropped reaches
+    #: the loop with no call at all and is read as the final answer; this is the only record that
+    #: anything was asked for.
+    dropped_tool_calls: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -137,6 +147,8 @@ class StepRecord:
             "provider": self.provider,
             "generation_id": self.generation_id,
             "ran_together": self.ran_together,
+            "truncated": self.truncated,
+            "dropped_tool_calls": self.dropped_tool_calls,
             "content": self.content,
             "compacted": self.compacted,
             "tools": [
@@ -168,6 +180,16 @@ class StepLog:
         decides whether raising ``max_steps`` is safe or is the thing that will break the run.
         """
         return max((s.prompt_tokens for s in self.steps), default=0)
+
+    @property
+    def truncated_steps(self) -> int:
+        """How many of this run's model calls the provider cut at the output ceiling."""
+        return sum(1 for s in self.steps if s.truncated)
+
+    @property
+    def dropped_tool_calls(self) -> int:
+        """How many tool calls the gateway dropped across the run for unparseable arguments."""
+        return sum(s.dropped_tool_calls for s in self.steps)
 
     @property
     def compactions(self) -> int:
@@ -301,6 +323,8 @@ class StepLog:
                 None if self.cache_hit_rate is None else round(self.cache_hit_rate, 3)
             ),
             "compactions": self.compactions,
+            "truncated_steps": self.truncated_steps,
+            "dropped_tool_calls": self.dropped_tool_calls,
             # In the trace itself, so a run is self-describing: whoever reads this back should not
             # have to re-derive by hand whether the trajectory was still going somewhere.
             "drift": self.drift.as_dict(),

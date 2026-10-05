@@ -3,14 +3,20 @@
 OpenClaw scores its own maturity with a taxonomy of surfaces × coverage-IDs tied to QA evidence, so
 "is this done?" becomes an auditable rubric instead of a vibe. This is the Chimera version: each
 surface (fusion, evolution, governance, memory, benchmarks, resilience, interop) declares the
-capabilities that define it, and each capability's **evidence is a real test** — proven iff that
-test exists. The result is machine-derived (glob the tests dir), not a self-assessment, and doubles
+capabilities that define it, and each capability's evidence is a named test file — counted as
+"proven" iff that file exists. The result is machine-derived (glob the tests dir), and doubles
 as a per-surface objective function for the evolution loop: the weakest surface / the missing
 coverage-IDs are exactly what to shore up next.
 
-Honesty note: a passing *test presence* is a proxy for "covered", not proof of correctness — a
-renamed or deleted test correctly shows up as a coverage gap. That is the point; the scorecard flags
-drift rather than hiding it.
+What it counts, and only that: for each coverage-ID, whether a test FILE with the named stem exists.
+Not whether it passes, not whether it tests the capability, not any bench outcome. A renamed or
+deleted test shows up as a gap, which is the drift this is good for.
+
+The bands were once called Alpha / Beta / GA. "GA" reads as "generally available", a claim about the
+product that a glob of file names cannot carry, and it was what the desktop Maturity screen showed for
+every surface. The bands now name what was counted: ``present`` (>=90% of the surface's coverage-IDs
+have their test file), ``partial`` (>=50%), ``sparse`` (below). Whether a surface actually delivers is
+read in ``bench/*/RESULTS.md``, not here (study 30, S30-15).
 """
 
 from __future__ import annotations
@@ -25,7 +31,7 @@ class Coverage:
 
     id: str
     description: str
-    evidence: str  # a test-file stem (e.g. "test_diff_gate") whose presence proves this capability
+    evidence: str  # a test-file stem (e.g. "test_diff_gate"); only its presence is checked
 
 
 @dataclass
@@ -34,6 +40,11 @@ class Surface:
 
     name: str
     coverage: list[Coverage] = field(default_factory=list)
+
+
+def _band(ratio: float) -> str:
+    """The share of coverage-IDs whose test file exists, as a word. Not a release grade."""
+    return "present" if ratio >= 0.9 else "partial" if ratio >= 0.5 else "sparse"
 
 
 @dataclass
@@ -51,9 +62,8 @@ class SurfaceScore:
 
     @property
     def level(self) -> str:
-        """Alpha (<50%) / Beta (50–90%) / GA (≥90%) — the OpenClaw-style maturity band."""
-        r = self.ratio
-        return "GA" if r >= 0.9 else "Beta" if r >= 0.5 else "Alpha"
+        """present (>=90%) / partial (>=50%) / sparse — a band over test-file presence, not a grade."""
+        return _band(self.ratio)
 
 
 @dataclass
@@ -76,8 +86,7 @@ class Scorecard:
 
     @property
     def level(self) -> str:
-        r = self.ratio
-        return "GA" if r >= 0.9 else "Beta" if r >= 0.5 else "Alpha"
+        return _band(self.ratio)
 
     def weakest(self) -> SurfaceScore | None:
         """The surface with the lowest coverage — the evolution loop's next objective."""
@@ -164,7 +173,12 @@ def score_repo(tests_dir: Path, taxonomy: list[Surface] | None = None) -> Scorec
 
 def format_scorecard(card: Scorecard) -> str:
     """A compact human-readable rendering for the CLI."""
-    lines = [f"Chimera maturity: {card.proven}/{card.total} coverage-IDs proven — {card.level} ({card.ratio:.0%})", ""]
+    lines = [
+        f"Chimera maturity: {card.proven}/{card.total} coverage-IDs have their test file — "
+        f"{card.level} ({card.ratio:.0%})",
+        "  (counts test files that exist, not tests that pass or bench results)",
+        "",
+    ]
     for s in sorted(card.surfaces, key=lambda x: x.ratio):
         bar = f"{s.proven}/{s.total}"
         gap = f"   missing: {', '.join(s.missing)}" if s.missing else ""

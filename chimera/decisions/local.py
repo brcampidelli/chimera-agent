@@ -117,6 +117,21 @@ class LocalLogprobBackend:
         return self.system_text(question) + "\n---\n" + self.user_suffix(question) + "\n---\n" + json.dumps(self.schema(question), sort_keys=True)
 
     def body(self, state: str, question: Choice) -> dict[str, Any]:
+        """The request. ``state`` goes in as given: it is NOT passed through
+        :func:`chimera.governance.sanitize.sanitize_untrusted`, so a chat-template token inside it
+        (``<|im_start|>``, ``</think>``, DeepSeek's ``<｜User｜>``) reaches the model as written, and
+        Qwen tokenizers stayed 84.7% forgeable even with the split-special-tokens flag on (arXiv
+        2609.16984); the local default is qwen3:4b. Left as it is on purpose
+        for now: the shipped map was fitted on raw state, so sanitising would change the instrument
+        it calibrates. It matters wherever a caller feeds text it did not write, and there are three:
+        the REVIEW band (off by default), which sends an action the agent wrote; the agent-callable
+        ``decide`` tool (``CHIMERA_DECIDE_TOOL``, off by default), whose purpose is to classify text
+        the agent already holds, fetched pages included; and verified answers
+        (:func:`chimera.fusion.verified.grounded_state`, ON by default), whose ``answer`` field is
+        model output and goes in unsanitised — its excerpts come from attachments, which were
+        sanitised when they were saved. Open, needs measurement (study 30, S30-21(d)): each caller's
+        numbers with sanitised state, before sanitising is switched on or the band is.
+        """
         return {
             "model": self.model, "think": False, "stream": False, "logprobs": True, "top_logprobs": TOP_LOGPROBS,
             "format": self.schema(question), "options": {"temperature": 0, "num_predict": NUM_PREDICT, "num_ctx": NUM_CTX},

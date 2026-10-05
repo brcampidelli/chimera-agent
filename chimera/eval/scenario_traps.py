@@ -58,6 +58,15 @@ __all__ = ["trap_scenarios"]
 #: What ``ReadFileTool`` appends when it hands back less than the whole file
 #: (``chimera/tools/files.py``). Matched as a substring, and never reconstructed with a length —
 #: the length is the thing that varies.
+#:
+#: It is matched in ANY observation, not only ``read_file``'s: ``run_shell`` and ``execute_code``
+#: have always written it, and since study 30 (S30-11) ``code_interpreter`` does too (it used to cut
+#: in silence). That moved this ruler: an agent that printed a >20k file through
+#: ``code_interpreter`` used to pass the truncation trap vacuously, and now meets it and needs a
+#: SECOND_LOOK. A baseline recorded before that change is not comparable to a run after it
+#: (lessons §2g). Remeasure the baseline on the same code with ``CHIMERA_EXEC_OUTPUT_TAIL`` off
+#: before reading the flag's effect. Restricting the match to ``READ_CLASS_TOOLS`` would not undo
+#: it, because ``code_interpreter`` is one of them.
 TRUNCATION_MARK = "[truncated,"
 
 #: Tools that can retrieve what a truncated read did not: they are not subject to

@@ -86,6 +86,26 @@ def refuse_own_files(candidate: Path, verb: str) -> None:
         raise ProtectedPathError(f"no tool may {verb} {candidate}: {reason}. Do not retry.")
 
 
+def queue_refusal(tool: str, text: str, cwd: Path) -> str | None:
+    """The refusal for a command or program that reaches the approval queue, else None.
+
+    For ``run_shell``, ``execute_code`` and ``code_interpreter``, every turn and every posture: the
+    write tools are kept out of ``<home>/approvals`` by :func:`refuse_own_files`, and these three
+    could write there anyway, or run ``chimera approve`` (`chimera/core/queue_fence.py`).
+    """
+    from chimera.core.queue_fence import reaches_queue
+    from chimera.tools.base import refusal
+
+    why = reaches_queue(text, home=chimera_home(), cwd=cwd)
+    if why is None:
+        return None
+    return refusal(
+        f"[approval queue: {tool} did NOT run — {why}.] A question waiting for a person is "
+        "answered by that person (`chimera approve`, the app's card or the chat), never by the "
+        "agent. Do not retry, and do not report this as done."
+    )
+
+
 def resolve_in_workspace(workspace: Path, path: str) -> Path:
     """Resolve ``path`` against ``workspace`` and ensure it stays inside it.
 

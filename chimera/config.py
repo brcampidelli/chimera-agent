@@ -709,9 +709,9 @@ class Settings(BaseSettings):
     # Signal number or uuid, a WhatsApp number). Empty = anyone, which is what every bot did before
     # these existed: the adapters have taken an allowlist since they shipped and no construction
     # path ever filled it, so a bot answered whoever reached it, with the owner's tools and the
-    # owner's spend. Empty stays "anyone" rather than "nobody" because the owner's production bot
-    # runs on exactly that default, and refusing everyone would silence it on upgrade; `chimera
-    # serve` and the Settings card say so loudly instead. Read when a bot is built, so a change
+    # owner's spend. Empty stays "anyone" rather than "nobody" because a bot already deployed on
+    # that default would go silent on upgrade (the author's own ran on it until 0.64.2 set an
+    # allowlist); `chimera serve` and the Settings card say so loudly instead. Read when a bot is built, so a change
     # applies at the next launch.
     discord_allowed_users: Annotated[list[str], NoDecode] = Field(
         default_factory=list, validation_alias="CHIMERA_DISCORD_ALLOWED_USERS"

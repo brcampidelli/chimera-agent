@@ -110,10 +110,23 @@ class RightHand:
 
     workspace: Path
 
+    #: The approver the kernel and the ledger consult — the person at this keyboard (or the TUI's
+    #: modal), with every answer recorded in :attr:`approvals`. Held so ``/solve`` can hand the
+    #: verified loop the SAME one: a loop that built its own would ask through a different channel
+    #: (a durable question on disk) and record the answers in a ledger this conversation never reads.
+    approve: Any = None
+
     #: True when an approver that can actually say yes was wired. False under a pipe, where
     #: ``approver_for`` degrades to deny — reported rather than inferred, because "refused" and
     #: "refused because nobody could be asked" are different sentences for the person reading them.
     attended: bool = False
+
+    #: The trust kernel's mode on this conversation (``off``/``observe``/``enforce``), as
+    #: ``govern_step`` resolved it. Held so ``/solve`` installs a kernel exactly when the conversation
+    #: has one: under ``off`` (the default) the conversation runs with NO kernel, and a loop that
+    #: forced one on would refuse, inside the person's own ``/solve``, actions their conversation
+    #: performs without a question — stricter than the posture it claims to inherit.
+    governance_mode: str = "off"
 
     #: How many verdicts had been recorded when the last turn ended, so `turn_verdicts` is a pure
     #: subtraction. Two counters rather than a slice of two lists: `ApprovalLedger` keeps `granted`
@@ -333,5 +346,7 @@ def build_right_hand(
         ledger=ledger,
         approvals=approvals,
         workspace=ws,
+        approve=approve,
         attended=attended,
+        governance_mode=step.mode,
     )

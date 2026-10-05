@@ -62,7 +62,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 from chimera.telemetry import get_logger
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterable
     from pathlib import Path
 
     from chimera.config import Settings
@@ -319,6 +319,7 @@ def governed_profile(
     instruction: str | None = None,
     workspace: Path | None = None,
     on_ledger: Callable[[TaintLedger], None] | None = None,
+    voice: Iterable[Any] = (),
 ) -> tuple[Any, Any]:
     """Wrap ``registry`` in the deployment's governance. Returns ``(registry, approvals)``.
 
@@ -383,6 +384,20 @@ def governed_profile(
     from chimera.governance.ledger_tool import ledger_registry
 
     audit = AuditLog(home / "audit.jsonl")
+    # ``voice`` is the tools a surface exists to have — a bot's ``send_message`` — handed in rather
+    # than registered on the result. They are registered AFTER the explicit fence below and BEFORE
+    # the kernel and the ledger, which is the one position that keeps both halves of a decision the
+    # three bot surfaces each made by registering after this function returned: a denylist aimed at
+    # the shell must not take the bot's voice away (still true — the fence never sees them), but
+    # "after the profile" also meant after the taint ledger, so the one tool that sends text to an
+    # ARBITRARY chat was the one tool the narrowing never held once a turn had read an attacker's page.
+    #
+    # Scope, said here because the commit title that introduced this did not: "inside the kernel and
+    # the ledger" holds under observe/enforce only. Under `off` — the default, and the VPS by the
+    # owner's decision — the `return` after `govern_step` hands back the fenced registry with no
+    # kernel and no ledger at all, so a voice tool is exactly as ungoverned as every other tool and a
+    # tainted send is neither narrowed nor recorded. Recording under `off` would be new behaviour on a
+    # mode the owner chose to keep silent, not this fix, and is left to that decision.
 
     # --- the owner's OpenAPI connectors (study 29, P7.5) ------------------------------------------
     #
@@ -447,6 +462,8 @@ def governed_profile(
     if allow_names is not None or deny_names:
         registry = restrict_registry(registry, allow=allow_names, deny=deny_names, audit=audit)
         _log.info("tool fence applied on %s", surface or "(unnamed surface)")
+    for tool in voice:
+        registry.register(tool)
 
     # --- the inferential machinery: still staged behind observe/enforce ---------------------------
     #

@@ -4,7 +4,16 @@ from __future__ import annotations
 
 from typing import Any
 
-from chimera.fusion import FusionConfig, FusionEngine, PanelResponse, RoutedBackend, RoutingPolicy
+import pytest
+
+from chimera.fusion import (
+    FusionConfig,
+    FusionEngine,
+    FusionFailed,
+    PanelResponse,
+    RoutedBackend,
+    RoutingPolicy,
+)
 from chimera.providers import CompletionResult
 
 CONFIG = FusionConfig(panel=["m1", "m2"], judge="judge", synthesizer="synth")
@@ -98,9 +107,12 @@ def test_fusion_tolerates_one_panel_failure() -> None:
 
 
 def test_fusion_all_panel_fail() -> None:
-    trace = FusionEngine(FakeBackend({"m1", "m2"}), CONFIG).run([{"role": "user", "content": "hi"}])
-    assert "No panel answers" in trace.judge_analysis
-    assert trace.final == "FINAL"
+    # This used to assert final == "FINAL": the synthesiser answering a panel of zero answers. That
+    # is one unpanelled model labelled "fusion", so it is now a declared failure (study 30, S30-02).
+    backend = FakeBackend({"m1", "m2"})
+    with pytest.raises(FusionFailed, match="no panel model produced an answer"):
+        FusionEngine(backend, CONFIG).run([{"role": "user", "content": "hi"}])
+    assert "judge" not in backend.calls and "synth" not in backend.calls
 
 
 SELECTIVE = FusionConfig(

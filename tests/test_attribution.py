@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
 from typing import Any
 
-from chimera.evolution import Fault, attribute, localize_fault, qualify
+import chimera.evolution as evolution
+from chimera.evolution import Fault, attribute, localize_fault
+from chimera.evolution import attribution as attribution_module
 
 
 def _assistant_call(tool: str) -> dict[str, Any]:
@@ -50,7 +54,16 @@ def test_attribute_returns_none_without_overlap() -> None:
     assert attribute(fault, {"alpha": "beta gamma"}) is None
 
 
-def test_qualify_accepts_only_non_regression() -> None:
-    assert qualify(0.5, 0.7) is True
-    assert qualify(0.5, 0.5) is True
-    assert qualify(0.7, 0.5) is False
+def test_no_qualification_gate_exists_that_nothing_calls() -> None:
+    # `qualify()` was documented as the gate that rejects a misdirected revision, exported, and
+    # called only by this file (study 30, S30-21(k)). A gate with no production caller is a
+    # guarantee in prose. So: either it exists AND something under chimera/ calls it, or it does
+    # not exist. Today it does not; reintroducing it without a caller turns this red.
+    package = Path(attribution_module.__file__).resolve().parents[1]
+    defined = hasattr(attribution_module, "qualify") or "qualify" in evolution.__all__
+    callers = [
+        path for path in package.rglob("*.py")
+        if path.name != "attribution.py"
+        and re.search(r"qualify\(", path.read_text(encoding="utf-8"))
+    ]
+    assert not defined or callers, "qualify() is exported but no production code calls it"

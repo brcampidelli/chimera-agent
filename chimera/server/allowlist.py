@@ -7,8 +7,9 @@ owner's spend, and nothing anywhere said so. Two construction paths (the CLI and
 :class:`~chimera.server.manager.MessagingManager`) reading the same settings is how they drift, so
 both ask here.
 
-An empty list keeps meaning "anyone". That is the owner's call, not this module's: the production
-bot runs on exactly that default, and turning it into "nobody" would silence it on upgrade. What
+An empty list keeps meaning "anyone". That is the owner's call, not this module's: a bot already
+deployed on that default (the author's own ran on it until 0.64.2 set an allowlist) would go silent
+on upgrade if it turned into "nobody". What
 changes is that the open state is no longer silent — :func:`open_bot_warning` is the sentence both
 paths print, and the Settings card shows the same fact.
 """

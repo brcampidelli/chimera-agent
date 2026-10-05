@@ -93,7 +93,11 @@ function FusionBreakdown({ meta, t }: { meta: FusionMeta; t: TFunc }) {
             {/* How the panel's answers became one: synthesized, or decided by majority. Another
                 wire value that was being shown as a word — `aggregation` is a Literal the engine
                 routes on, and "synth" is not a thing a reader is supposed to know. */}
-            <Badge tone="muted">{t(`fusion.aggregation.${meta.aggregation}`)}</Badge>
+            {/* "fallback": the judge or synthesiser failed and the answer shown is a panel answer,
+                not a synthesis. Not an error, but not what the fused label promises either. */}
+            <Badge tone={meta.aggregation === "fallback" ? "warn" : "muted"}>
+              {t(`fusion.aggregation.${meta.aggregation}`)}
+            </Badge>
             {meta.early_stopped ? <Badge tone="accent">{t("fusion.earlyStopped")}</Badge> : null}
             {diversity ? (
               <Badge tone="muted">

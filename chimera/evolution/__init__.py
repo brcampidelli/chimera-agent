@@ -4,7 +4,7 @@ Includes the experience buffer (failures as negative examples). The core of atta
 continuous-evolution degradation. The buffer ships in M3; the full engine in M4.
 """
 
-from chimera.evolution.attribution import Fault, attribute, localize_fault, qualify
+from chimera.evolution.attribution import Fault, attribute, localize_fault
 from chimera.evolution.auto_evolve import AutoSkillEvolver
 from chimera.evolution.card_retrieval import CardIndex, CardRetriever, cards_context_block
 from chimera.evolution.collective import CollectiveSkillEvolver
@@ -83,7 +83,6 @@ __all__ = [
     "Fault",
     "localize_fault",
     "attribute",
-    "qualify",
     "StagnationDetector",
     "StagnationReport",
     "pearson",

@@ -303,7 +303,12 @@ def test_the_announcer_the_session_carries_is_the_one_the_approver_holds(
         "write_file is restricted after this run consumed untrusted content from "
     )
     assert ATTACK_PAGE in drawn[0].reason
-    assert drawn[0].action == "write_file: asked.txt"
+    # The headline is the tool and the path, and the lines under it are the rest of the call: the
+    # card used to stop at the path, so the person approved a write without seeing what it wrote
+    # (study 30, S30-04). The body is short here, so it is shown whole.
+    headline, *rest = drawn[0].action.split("\n")
+    assert headline == "write_file: asked.txt"
+    assert rest == ["  content: hello"]
     assert drawn[0].decision == "review"
     assert "needs review" not in result, "the answer from the screen did not reach the approver"
 

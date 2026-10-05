@@ -24,7 +24,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from chimera.fusion.receipts import resolve_price
+from chimera.fusion.receipts import cost_usd, resolve_price
 from chimera.orchestration.spec import TaskSpec
 from chimera.telemetry import get_logger
 
@@ -69,17 +69,41 @@ def estimate_tokens(text: str) -> int:
 
 
 def price_delegation(
-    model: str, prompt_tokens: int | None, completion_tokens: int | None
+    model: str,
+    prompt_tokens: int | None,
+    completion_tokens: int | None,
+    *,
+    cache_read_tokens: int | None = None,
+    cache_write_tokens: int | None = None,
 ) -> float | None:
-    """USD at the model's own list rate; None when the price is unknown (never guessed)."""
+    """USD at the model's own list rate; None when the price is unknown (never guessed).
+
+    The prompt's cache share is priced at the model's cache rates (see
+    :func:`chimera.fusion.receipts.cost_usd`): a read is cheaper than a fresh token, a write dearer.
+    """
     price = resolve_price(model)
     if price is None:
         return None
-    pt, ct = prompt_tokens or 0, completion_tokens or 0
-    return round(pt / 1_000_000 * price.input_per_m + ct / 1_000_000 * price.output_per_m, 6)
+    return cost_usd(
+        price,
+        prompt_tokens,
+        completion_tokens,
+        cache_read_tokens=cache_read_tokens,
+        cache_write_tokens=cache_write_tokens,
+    )
 
 
-def _price_one(model: str, prompt: object, completion: object) -> float | None:
+def _as_count(value: object) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def _price_one(
+    model: str,
+    prompt: object,
+    completion: object,
+    cache_read: object = None,
+    cache_write: object = None,
+) -> float | None:
     """One call/stage at its model's rate. None when the price — or the usage — is unknown.
 
     A priced model that reported NO usage costs an *unknown* amount, not zero. That rule already
@@ -91,9 +115,13 @@ def _price_one(model: str, prompt: object, completion: object) -> float | None:
         return None
     if prompt is None and completion is None and resolve_price(model) is not None:
         return None
-    pt = prompt if isinstance(prompt, int) else None
-    ct = completion if isinstance(completion, int) else None
-    return price_delegation(model, pt, ct)
+    return price_delegation(
+        model,
+        _as_count(prompt),
+        _as_count(completion),
+        cache_read_tokens=_as_count(cache_read),
+        cache_write_tokens=_as_count(cache_write),
+    )
 
 
 def _stages_of(result: object) -> list[dict[str, object]]:
@@ -133,7 +161,13 @@ def price_completion(result: object) -> CompletionCost:
         total = 0.0
         for stage in stages:
             model = str(stage.get("model") or "")
-            usd = _price_one(model, stage.get("prompt_tokens"), stage.get("completion_tokens"))
+            usd = _price_one(
+                model,
+                stage.get("prompt_tokens"),
+                stage.get("completion_tokens"),
+                stage.get("cache_read_tokens"),
+                stage.get("cache_write_tokens"),
+            )
             if usd is None:
                 unpriced = unpriced or (model or "(unnamed model)")
                 continue
@@ -142,7 +176,11 @@ def price_completion(result: object) -> CompletionCost:
 
     model = str(getattr(result, "model", "") or "")
     usd = _price_one(
-        model, getattr(result, "prompt_tokens", None), getattr(result, "completion_tokens", None)
+        model,
+        getattr(result, "prompt_tokens", None),
+        getattr(result, "completion_tokens", None),
+        getattr(result, "cache_read_tokens", None),
+        getattr(result, "cache_write_tokens", None),
     )
     if usd is None:
         return CompletionCost(0.0, model or "(unnamed model)")
@@ -221,7 +259,13 @@ def make_receipt(
         model=model,
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
-        usd=price_delegation(model, prompt_tokens, completion_tokens),
+        usd=price_delegation(
+            model,
+            prompt_tokens,
+            completion_tokens,
+            cache_read_tokens=cache_read_tokens,
+            cache_write_tokens=cache_write_tokens,
+        ),
         tokens_estimated=tokens_estimated,
         counterfactual_tokens=counterfactual_tokens,
         counterfactual_usd=counterfactual_usd,

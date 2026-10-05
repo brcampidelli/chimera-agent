@@ -2189,6 +2189,12 @@ class AttemptReceiptOut(BaseModel):
     On the wire so a change in what a run did can be set beside a change in what it was told: two
     attempts with different values were not given the same instructions, whatever else they
     share."""
+    truncated_steps: int | None = None
+    """How many of this attempt's model calls the provider cut at the output ceiling. ``null`` on
+    a receipt written before the field existed — not recorded, which is not zero."""
+    dropped_tool_calls: int | None = None
+    """Tool calls the gateway dropped from this attempt because their arguments did not parse. A
+    step whose every call was dropped reads as a final answer; this says something was asked for."""
 
 
 class RunReceiptOut(BaseModel):
@@ -2756,7 +2762,7 @@ class AuditEventOut(BaseModel):
 class AuditChainOut(BaseModel):
     """Whether the log's own tamper-evidence holds. Reported because nothing used to ask."""
 
-    ok: bool  # False ONLY for a link that is actually broken — never for an empty or legacy log
+    ok: bool  # False for a broken link, or a log short of / rewritten past its anchor — never for empty or legacy
     checked: int  # entries whose digest was verified
     unchained: int  # legacy entries with no digest: cannot be verified either way, never "failed"
     broken_at: int | None  # index of the first entry that does not hold
@@ -2929,7 +2935,7 @@ class MaturitySurfaceOut(BaseModel):
     proven: int  # coverage-IDs whose evidence test-file exists (presence, NOT that it passes)
     total: int  # coverage-IDs that constitute the surface
     ratio: float  # proven/total, 0..1
-    level: str  # GA (>=0.9) / Beta (>=0.5) / Alpha — the maturity band
+    level: str  # present (>=0.9) / partial (>=0.5) / sparse — share of test FILES present, not a grade
     missing: list[str]  # coverage-IDs with no evidence test-file yet (the honest gap)
 
 

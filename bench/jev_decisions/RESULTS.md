@@ -333,6 +333,11 @@ decision head trained on a fixed order should do. **Consequence, as registered:*
 already excludes a reordered question, so a reordered question gets no map until one is fitted on it —
 and the local arm's map must not be applied to a reversed instrument.
 
+> *Open, needs measurement (added 2026-10-04, study 30 S30-17).* The flips are a fact about this readout. AnyJev
+> (arXiv 2610.00831) removes order flips training-free with single-token labels, a label-prior correction and
+> averaging over cyclic rotations (20-option flip rate 0.33 -> 0.14-0.18). Whether that holds on our local arm is
+> unmeasured; until it is, order pinning stays the remedy and is not shown to be the only one.
+
 ### B1(b) — another item's state
 
 | arm | shuffled AUROC | items whose p moved | prediction |

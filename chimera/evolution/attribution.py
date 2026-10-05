@@ -7,8 +7,16 @@ This module attributes a failure to the **first actionable fault step** instead:
   an agent transcript and the tool that produced it.
 - :func:`attribute` (the *Linker*) assigns responsibility to the candidate skill whose
   text overlaps the fault most.
-- :func:`qualify` (the *Qualification* gate) accepts a revision only if it does not
-  regress (Δ ≥ 0) — so a misdirected revision is rejected, not kept.
+
+The paper's third piece, a *Qualification* gate, is deliberately absent. It used to be here as
+``qualify(before, after) -> after >= before``: documented as the gate that rejects a misdirected
+revision, exported, and called by nothing outside its own test (study 30, S30-21(k)). A gate nobody
+calls reads to a contributor as a guarantee the evolution loop has. And Δ ≥ 0 is the wrong rule even
+where it would be called: two runs of one revision differ by noise, so Δ ≥ 0 keeps a revision on a
+coin flip, and an acceptance loop that admits any non-negative Δ ratchets noise in (arXiv
+2609.24972). The acceptance gates this project has live in :mod:`.auto_evolve` (the governance
+check and the smoke test, plus the opt-in holdout and Wilson-bound modes); a gain-above-noise rule
+for revisions is open, not done.
 
 Operates on the agent transcript shape (role/content/tool_calls dicts), so it is fully
 deterministic and testable without a model.
@@ -61,7 +69,3 @@ def attribute(fault: Fault, candidates: dict[str, str]) -> str | None:
             best_score, best = score, name
     return best
 
-
-def qualify(before_score: float, after_score: float) -> bool:
-    """Accept a revision only if it does not regress (Δ ≥ 0)."""
-    return after_score >= before_score

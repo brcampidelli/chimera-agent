@@ -1309,6 +1309,13 @@ class Agent:
                 generation_id=getattr(result, "generation_id", "") or "",
                 content=clip(result.content or "", 400),
                 elapsed_ms=call_ms,
+                # Record-only (study 30, S30-09). The gateway knew both facts and the loop never
+                # read them, so a cut turn — or a step whose every call was dropped, which reaches
+                # the check below with no call and ends the run as an "answer" — went to the trace
+                # and the receipt as a normal one. `getattr`: several backends return duck-typed
+                # results, and a missing field is "nothing reported", not a crash.
+                truncated=bool(getattr(result, "truncated", False)),
+                dropped_tool_calls=int(getattr(result, "dropped_tool_calls", 0) or 0),
             )
             steplog.add(record)
             # Compaction is decided AFTER the call, on the provider's real count for the prompt we

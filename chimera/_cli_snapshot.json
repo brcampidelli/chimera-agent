@@ -3042,7 +3042,7 @@
     },
     {
       "deprecated": false,
-      "help": "Render the maturity scorecard: surfaces \u00d7 coverage-IDs proven by real tests.",
+      "help": "Render the maturity scorecard: which coverage-IDs have their test file (presence, not passing).",
       "hidden": false,
       "name": "maturity",
       "params": [

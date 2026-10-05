@@ -267,8 +267,10 @@ app at the private address. The token still matters — a tailnet is a smaller r
 
 ## 6. Honest status
 
-Chimera is **alpha**. This deploys and runs, and the cron daemon makes it proactive — but it
-has **no production mileage** yet. Start with low-stakes crons, watch `logs`, and keep the
+Chimera is **alpha**. This deploys and runs, and the cron daemon makes it proactive. Its
+production mileage is **one deployment**: the author's own VPS, running crons and a Discord bot
+around the clock since July 2026. That is real use, not a fleet, and it has not met your workload.
+Start with low-stakes crons, watch `logs`, and keep the
 governance guardrails (`--guard` on `solve`, `CHIMERA_SANDBOX=docker`) in mind for anything
 that touches real systems.
 
