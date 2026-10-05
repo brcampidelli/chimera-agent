@@ -2885,6 +2885,29 @@ class McpLastTestOut(BaseModel):
     tested_at: float  # unix seconds
 
 
+class McpManifestChangeOut(BaseModel):
+    """One tool whose advertised description or parameters differ from what the owner approved."""
+
+    tool: str
+    change: str  # "added", "removed" or "changed"
+    description_changed: bool
+    schema_changed: bool  # the input schema, where parameter descriptions live
+    old_description: str  # "" for an added tool
+    new_description: str  # "" for a removed tool
+    # Codes for phrases in the NEW description that try to steer tool choice (see McpToolOut.cues).
+    cues: list[str] = Field(default_factory=list)
+
+
+class McpManifestHeldOut(BaseModel):
+    """A server held from every mount because its tools changed since they were approved.
+
+    Study 30, S30-24. The diff is what the owner approves with POST /api/mcp/{name}/approve-manifest.
+    """
+
+    changes: list[McpManifestChangeOut]
+    seen_at: float  # unix seconds — when the changed listing was first seen
+
+
 class McpServerOut(BaseModel):
     name: str
     command: str
@@ -2892,6 +2915,8 @@ class McpServerOut(BaseModel):
     env_keys: list[str]  # env variable NAMES only — the secret VALUES are never returned
     # Null when never tested, or when the config changed since (an edit forgets the old result).
     last_test: McpLastTestOut | None = None
+    # Null unless this server's tools changed since they were approved; then no run receives it.
+    manifest_held: McpManifestHeldOut | None = None
 
 
 class McpServersOut(BaseModel):
@@ -2902,6 +2927,9 @@ class McpServersOut(BaseModel):
 class McpToolOut(BaseModel):
     name: str
     description: str
+    # Codes for phrases in the description that try to steer which tool the model picks:
+    # "imperative", "exclusivity", "override", "emphasis". An annotation for the owner, never a gate.
+    cues: list[str] = Field(default_factory=list)
 
 
 class McpTestOut(BaseModel):
@@ -2913,8 +2941,9 @@ class McpTestOut(BaseModel):
     # started now gets none of these tools; null means the answer could not be read.
     reaches_agent: bool | None = None
     # WHY not, as an enum the app translates: "autoload_off" (the toggle is off, so no run is given
-    # these tools) or "added_after_connect" (the servers are connected once per process and this one
-    # arrived later, so it needs a restart). The remedies differ, which is why one flag is not
+    # these tools), "added_after_connect" (the servers are connected once per process and this one
+    # arrived later, so it needs a restart) or "manifest_held" (its tools changed since they were
+    # approved, and it is held until the owner approves the change). The remedies differ, which is why one flag is not
     # enough. An enum rather than a sentence because the app ships in ten languages. Null whenever
     # `reaches_agent` is not False.
     reaches_agent_reason: str | None = None

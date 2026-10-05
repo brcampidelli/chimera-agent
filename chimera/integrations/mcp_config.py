@@ -25,6 +25,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from chimera.integrations.mcp_pins import forget_pin
 from chimera.telemetry import get_logger
 
 _log = get_logger("integrations.mcp_config")
@@ -76,11 +77,14 @@ def add_server(path: Path, cfg: McpServerConfig) -> list[McpServerConfig]:
 
     Forgets the remembered Test of that name (see :func:`forget_test`): a replacement may carry a new
     token under the same key names, and the old token's result would otherwise be shown beside it.
+    Forgets its approved tool manifest too (:func:`chimera.integrations.mcp_pins.forget_pin`): the
+    owner is configuring a server, and its next mount is first sight again.
     """
     servers = [s for s in load_servers(path) if s.name != cfg.name]
     servers.append(cfg)
     save_servers(path, servers)
     forget_test(path, cfg.name)
+    forget_pin(path, cfg.name)
     return servers
 
 
@@ -93,6 +97,7 @@ def remove_server(path: Path, name: str) -> bool:
     servers = load_servers(path)
     kept = [s for s in servers if s.name != name]
     forget_test(path, name)
+    forget_pin(path, name)
     if len(kept) == len(servers):
         return False
     save_servers(path, kept)
@@ -203,7 +208,11 @@ def probe_tools(cfg: McpServerConfig, *, connect_timeout: float = 10.0) -> list[
 
 
 def autoload_into_registry(
-    registry: Any, servers: list[McpServerConfig], *, connect_timeout: float = 10.0
+    registry: Any,
+    servers: list[McpServerConfig],
+    *,
+    connect_timeout: float = 10.0,
+    mcp_path: Path | None = None,
 ) -> int:
     """Connect every server in ``servers`` and pour its tools into ``registry``. Returns the tool count.
 
@@ -211,8 +220,15 @@ def autoload_into_registry(
     server logs a warning and is skipped — it must never break agent boot). The connected sessions are
     left OPEN on purpose: the registered tools call back into them at run time. Names are namespaced
     ``<server>_<tool>`` so a remote server can't shadow a builtin (see ConnectorRegistry).
+
+    With ``mcp_path`` — the store the servers came from — each server goes through the same manifest
+    gate as the shared pool (:func:`chimera.integrations.mcp_pool.pinned_session`): one whose tools
+    changed since they were approved is held. Without it there is no pin file to compare against;
+    no shipped surface calls this function (they all mount through the pool), so the parameter is
+    for a caller that holds a store, and the pool is the place the gate is enforced.
     """
     from chimera.integrations import ConnectorRegistry, MCPConnector, StdioMCPSession
+    from chimera.integrations.mcp_pool import pinned_session
 
     connectors = ConnectorRegistry()
     for cfg in servers:
@@ -220,7 +236,12 @@ def autoload_into_registry(
             session = StdioMCPSession(
                 cfg.command, cfg.args or None, cfg.env or None, connect_timeout=connect_timeout
             ).start()
-            connectors.register(MCPConnector(cfg.name, session, name_prefix=f"{cfg.name}_"))
+            mounted: Any = session
+            if mcp_path is not None:
+                mounted = pinned_session(mcp_path, cfg.name, session)
+                if mounted is None:
+                    continue
+            connectors.register(MCPConnector(cfg.name, mounted, name_prefix=f"{cfg.name}_"))
         except Exception as exc:  # noqa: BLE001 — a broken server must never break agent boot
             _log.warning("MCP autoload: skipping server %r (%s)", cfg.name, type(exc).__name__)
     return connectors.into_tool_registry(registry)

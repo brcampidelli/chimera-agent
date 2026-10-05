@@ -78,6 +78,19 @@ MCP tools are ordinary `Tool` objects, so everything composes:
   done. Dropping it is **not** a boundary against server-written text: the same server's tool names
   and descriptions reach the model as the server wrote them, unfenced, so a server you connect is a
   server whose words the model reads.
+- **Manifest pinning** — the first time a server is mounted, its tool names, descriptions and input
+  schemas are remembered in `mcp_pins.json` beside `mcp.json`. If a later mount lists anything
+  different, the server is **held**: it is not mounted on any surface until you approve the change,
+  with the old and new text shown, through `chimera mcp approve NAME` or the MCP screen. `chimera mcp
+  list` names held servers. The mounted tools are the listing that was checked, so a server cannot
+  answer the check with one text and the model with another. Adding or removing the server through
+  `chimera mcp add/remove` or the app forgets its pin (the next mount is first sight again). Pinning
+  is trust on first use: it catches a description that **changes**, not one that was hostile from the
+  start.
+- **Selection cues** — `chimera mcp test` and the MCP screen annotate descriptions with phrases that
+  try to steer which tool the model picks ("always use this tool", "do not use other tools",
+  "ignore previous instructions", `<IMPORTANT>`). An annotation only: it refuses nothing, and how
+  often it fires on honest servers has not been measured.
 
 ## Chimera *as* an MCP server
 

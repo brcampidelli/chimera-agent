@@ -8599,6 +8599,74 @@
         "title": "McpLastTestOut",
         "type": "object"
       },
+      "McpManifestChangeOut": {
+        "description": "One tool whose advertised description or parameters differ from what the owner approved.",
+        "properties": {
+          "change": {
+            "title": "Change",
+            "type": "string"
+          },
+          "cues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cues",
+            "type": "array"
+          },
+          "description_changed": {
+            "title": "Description Changed",
+            "type": "boolean"
+          },
+          "new_description": {
+            "title": "New Description",
+            "type": "string"
+          },
+          "old_description": {
+            "title": "Old Description",
+            "type": "string"
+          },
+          "schema_changed": {
+            "title": "Schema Changed",
+            "type": "boolean"
+          },
+          "tool": {
+            "title": "Tool",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "change",
+          "description_changed",
+          "schema_changed",
+          "old_description",
+          "new_description"
+        ],
+        "title": "McpManifestChangeOut",
+        "type": "object"
+      },
+      "McpManifestHeldOut": {
+        "description": "A server held from every mount because its tools changed since they were approved.\n\nStudy 30, S30-24. The diff is what the owner approves with POST /api/mcp/{name}/approve-manifest.",
+        "properties": {
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/McpManifestChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "seen_at": {
+            "title": "Seen At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "changes",
+          "seen_at"
+        ],
+        "title": "McpManifestHeldOut",
+        "type": "object"
+      },
       "McpServerOut": {
         "properties": {
           "args": {
@@ -8623,6 +8691,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/McpLastTestOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "manifest_held": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpManifestHeldOut"
               },
               {
                 "type": "null"
@@ -8721,6 +8799,13 @@
       },
       "McpToolOut": {
         "properties": {
+          "cues": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cues",
+            "type": "array"
+          },
           "description": {
             "title": "Description",
             "type": "string"
@@ -18394,6 +18479,45 @@
           }
         },
         "summary": "Mcp Remove Endpoint"
+      }
+    },
+    "/api/mcp/{name}/approve-manifest": {
+      "post": {
+        "operationId": "mcp_approve_manifest_endpoint_api_mcp__name__approve_manifest_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/McpServersOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Mcp Approve Manifest Endpoint"
       }
     },
     "/api/mcp/{name}/test": {

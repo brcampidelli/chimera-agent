@@ -84,6 +84,7 @@ Subcommands of a group are listed under their full path (`agents list`, `cron ad
 | [`maturity`](#maturity) | Render the maturity scorecard: which coverage-IDs have their test file (presence, not passing). |
 | [`mcp`](#mcp) | Configure MCP servers (persisted to .chimera/mcp.json). Terminal-first source of truth. |
 | [`mcp add`](#mcp-add) | Add (or replace-by-name) an MCP server. Persists to .chimera/mcp.json — no connect. |
+| [`mcp approve`](#mcp-approve) | Show how a held server's tools changed since you approved them, and approve the change. |
 | [`mcp desktop`](#mcp-desktop) | Serve an MCP server on stdio that operates the RUNNING desktop app (for Claude Code/Desktop). |
 | [`mcp list`](#mcp-list) | List configured MCP servers (name, command + args, env key names). No connect. |
 | [`mcp remove`](#mcp-remove) | Remove a configured MCP server by name. |
@@ -1393,6 +1394,26 @@ chimera mcp add NAME
 | `--command`, `-c` | The launch command (e.g. npx, uvx, python). |  |
 | `--arg`, `-a` | A command argument (repeatable). |  |
 | `--env`, `-e` | An env var as K=V (repeatable). |  |
+
+## mcp approve
+
+Show how a held server's tools changed since you approved them, and approve the change.
+
+A server whose tool descriptions or parameters changed since they were approved is not mounted
+on any surface until approved here or on the app's MCP screen. File I/O only; the server is
+connected again on the next start.
+
+```bash
+chimera mcp approve NAME
+```
+
+| Argument | |
+| --- | --- |
+| `NAME` | The held server whose changed tools to approve. |
+
+| Option | | Default |
+| --- | --- | --- |
+| `--yes`, `-y` | Approve without asking (the diff still prints). |  |
 
 ## mcp desktop
 

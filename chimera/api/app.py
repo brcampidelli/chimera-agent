@@ -1244,6 +1244,22 @@ def build_api_app(
 
         return test_server(settings.home, name)
 
+    @app.post(
+        "/api/mcp/{name}/approve-manifest", dependencies=[guard], response_model=McpServersOut
+    )
+    def mcp_approve_manifest_endpoint(name: str) -> dict[str, Any]:
+        # The owner's answer to a held server: its tools changed since they were approved, the
+        # screen showed the diff, and this accepts it. 404 when nothing is held, so a stale click
+        # cannot approve a change it never saw. File I/O only; the server connects on the next
+        # process start, since the pool connects once per process. Deliberately NOT in the bridge's
+        # route table: approving third-party text into the model's tool list is the owner's call,
+        # not something an agent driving the app gets to make.
+        from chimera.api.mcp_api import approve_manifest, list_servers
+
+        if not approve_manifest(settings.home, name):
+            raise HTTPException(status_code=404, detail="no held change for this server")
+        return list_servers(settings.home)
+
     @app.get("/api/governance/injection", dependencies=[guard], response_model=InjectionReportOut)
     def governance_injection_endpoint() -> dict[str, Any]:
         # Cheap synthetic compute (no LLM, no side effects): the red-team corpus run with and without

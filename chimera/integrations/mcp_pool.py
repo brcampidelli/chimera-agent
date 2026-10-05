@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import threading
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from chimera.config import Settings
@@ -64,7 +65,8 @@ def _build(settings: Settings) -> Any:
     from chimera.integrations import ConnectorRegistry, MCPConnector, StdioMCPSession
     from chimera.integrations.mcp_config import load_servers
 
-    servers = load_servers(settings.home / "mcp.json")
+    mcp_path = settings.home / "mcp.json"
+    servers = load_servers(mcp_path)
     if not servers:
         return None
     pool = ConnectorRegistry()
@@ -73,10 +75,13 @@ def _build(settings: Settings) -> Any:
             session = StdioMCPSession(
                 cfg.command, cfg.args or None, cfg.env or None, connect_timeout=_CONNECT_TIMEOUT
             ).start()
+            pinned = pinned_session(mcp_path, cfg.name, session)
+            if pinned is None:
+                continue
             # Namespaced, so a server cannot publish a tool called `read_file` and shadow the one
             # that respects the write region. `into_tool_registry` skips collisions anyway, but a
             # prefix means there is nothing to collide over.
-            pool.register(MCPConnector(cfg.name, session, name_prefix=f"{cfg.name}_"))
+            pool.register(MCPConnector(cfg.name, pinned, name_prefix=f"{cfg.name}_"))
         except Exception as exc:  # noqa: BLE001 — a broken server must never break a turn
             # The MESSAGE, not just the class. `ModuleNotFoundError` on its own is the least useful
             # half of "the MCP SDK is not installed — install it with: pip install
@@ -89,6 +94,42 @@ def _build(settings: Settings) -> Any:
             # true forever.
             _log.warning("MCP: skipping server %r — %s", cfg.name, str(exc)[:300])
     return pool if pool.names() else None
+
+
+def pinned_session(mcp_path: Path, name: str, session: Any) -> Any:
+    """``session`` behind its checked tool listing, or ``None`` — and the session closed — if held.
+
+    The one gate every mount goes through (study 30, S30-24): a server whose tools no longer read as
+    they did when the owner accepted them is not handed to any surface until the owner approves the
+    change, which `chimera mcp approve` and the MCP screen show as a diff. See
+    :mod:`chimera.integrations.mcp_pins` for why first sight pins rather than asks.
+    """
+    from chimera.integrations.mcp_pins import PinnedSession, check_manifest
+
+    close = getattr(session, "close", None)
+    try:
+        specs = list(session.list_tools())
+    except Exception:
+        # Listing used to happen later, inside the registry; now it happens here, and a server that
+        # connects and then fails to list must not be left running by the caller's skip.
+        if callable(close):
+            close()
+        raise
+    verdict = check_manifest(mcp_path, name, specs)
+    if verdict.held:
+        if callable(close):
+            close()
+        # The tool NAMES only. The descriptions are the server's text, and the new ones are
+        # exactly the text being held back; a log line is not where they get read.
+        _log.warning(
+            "MCP: holding server %r — its tools changed since they were approved (%s); "
+            "review with `chimera mcp approve %s` or on the MCP screen",
+            name,
+            ", ".join(c["tool"] for c in verdict.changes)[:300],
+            name,
+        )
+        return None
+    return PinnedSession(session, specs)
 
 
 @dataclass(frozen=True)
