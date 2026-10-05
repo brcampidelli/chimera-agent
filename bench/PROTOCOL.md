@@ -216,6 +216,109 @@ at matched budget (2609.35875). As of 2026-10-02 only `hierarchy_equal_calls` me
 multi-agent mode without such an arm is *unmeasured*, whatever it scored against one call — the
 policy that follows from this is `docs/multi-agent-policy.md`.
 
+## 11. The interval is chosen by the data's shape, never by habit — and never a percentile bootstrap under N = 100
+
+*Added 2026-10-05, study 30 (S30-34).* A percentile bootstrap over a handful of tasks looks rigorous
+and is not: arXiv 2609.35815 (evalstats) measures it covering **88%** at a nominal 95% with N < 100,
+and on paired binary data no bootstrap variant reaches nominal even at N = 100. Six of our readers
+used one, four of them at N = 7–34. So the method is fixed by what is being compared, and every one
+of them is a closed-form function in **`chimera/eval/proportions.py`** — one home, inside the
+mutation gate, which `tests/test_stats_helpers_have_one_home.py` keeps the only home:
+
+| comparing | interval | function |
+|---|---|---|
+| one proportion | Wilson | `wilson` |
+| two independent proportions | Newcombe hybrid score | `newcombe_unpaired` |
+| two proportions on the **same** items | Bonett-Price adjusted Wald; exact McNemar for p | `bonett_price_paired`, `mcnemar_exact` |
+| a mean of per-task differences (continuous) | one-sample t | `mean_t_interval` |
+| two independent groups of such means (an interaction between strata) | Welch t | `welch_t_interval` |
+| a median of small integers | binomial order statistics | `median_interval` |
+| a difference of two independent estimates (e.g. ΔTPR − ΔFPR) | MOVER | `mover_difference` |
+| one AUROC | Hanley-McNeil | `auroc_hanley_mcneil` |
+| an equivalence or non-inferiority claim | TOST on the `1 − 2α` interval (§12) | `tost_paired`, `tost_unpaired`, `tost_mean` |
+
+The paired row is the one that bit us. Until this amendment `chimera/eval/paired.py` printed a Wilson
+interval on the discordant pairs scaled by the observed share of discordant pairs, as if that share
+were known. Its yes/no test was roughly calibrated; the interval it printed covered a real difference
+**41–88%** of the time and returned `[0, 0]` when the arms agreed on every pair
+(`tests/test_the_paired_interval_covers_the_difference.py`). Bonett-Price is what it prints now. The
+two sweeps of 2609.35815 disagreed on whether the paper attaches the Bonett-Price name to paired
+*binary* or paired *continuous* data; the choice here does not rest on either reading but on our own
+coverage simulation, in which Bonett-Price held 93% or more in every cell and the old interval fell
+to 41%.
+
+A bootstrap may still appear **beside** a closed-form interval, labelled as a cross-check, or above
+N = 100 where the registration says why. It does not decide. And the drift this rule ends is
+measured: three of six copies of Newcombe's paired interval had dropped his continuity correction to
+phi and printed **0.0182–0.2892** on his own worked example, where the paper prints 0.0112–0.2954.
+`bench/interval_reread` re-reads every published verdict that used the old methods and lists what
+moved.
+
+## 12. "No difference" is a claim with a margin, declared before the run
+
+*Added 2026-10-05, study 30 (S30-34).* An interval that spans zero is **not** evidence of equivalence
+(arXiv 2610.00047): it is what a bench too small to see anything also prints. A pre-registration that
+expects "the same", "no worse", "non-inferior" or "safe to simplify" declares, **before the first
+call**, the margin it would accept and which of the two it claims — equivalence (both sides) or
+non-inferiority (one side) — and the reading is a TOST: the `1 − 2α` interval inside the margin
+(`tost_paired`, `tost_unpaired`, `tost_mean`). Without a declared margin the only honest summary of a
+null is its interval and what it could have seen; "the factor does nothing" is not available.
+
+`bench/chat_history` is the model: it declared −10 pp before running and missed it by 0.2 pp.
+`bench/harness_bench`'s "simplify" was not — it read three spanning intervals as a null with power,
+and is re-read against a margin it never declared in `bench/interval_reread`.
+
+## 13. The controls a number needs before it means anything
+
+*Added 2026-10-05, study 30 (S30-34).* Each is a way a score arrives without the capability being
+present. A pre-registration says, for each that applies to its bench, that it runs the control or why
+the control cannot move its number.
+
+- **A trivial-agent arm.** An agent that does nothing, or returns the most common answer, is scored
+  by the same grader (ABC, arXiv 2507.02825: a do-nothing agent scores 38% on one airline benchmark).
+  The floor it reaches is the zero of the scale.
+- **A random arm at matched cost** for any selection mechanism — a router, a pruner, a reranker
+  (arXiv 2609.05933 for pruning multi-agent teams). For routing specifically, the random arm matches
+  the **share** of traffic each model receives, not just the total spend (arXiv 2608.14641), or the
+  comparison measures the mix.
+- **A grader-hijack probe.** The task tree a model can write to must not be able to change the
+  verdict: a probe writes a `conftest.py` (or the grader's equivalent) that forces a pass, before
+  any scored run, and the bench shows the verdict did not move (BenchJack, arXiv 2605.12673). This is
+  §1's wall, for the grader.
+- **Attack success read on the arguments, not the tool name.** A governance or injection bench that
+  counts an attack as succeeding when a sensitive *tool* is called reports what the paper calls
+  identity scoring — 21.7% where the true rate, read on whether the payload reached the arguments,
+  was 1.2% (arXiv 2609.32691). The predicate states what the attack had to put where.
+- **A detection probe beside any counterfactual judge score** (arXiv 2610.00111): when a judge is
+  shown an altered item and its score moves, a second probe asks whether it noticed the alteration;
+  a score that moved without detection is read as the judge's sensitivity to surface, not to content.
+- **Format-only and same-length placebo arms** for anything that adds a skill, card or lesson (arXiv
+  2607.02595), extending §6: one arm carries the same text re-formatted to the intervention's shape
+  without its content, one carries irrelevant text of the same length.
+- **A rule-withdrawn arm for instruction-following** (Harness-IF, arXiv 2608.11727): the score
+  counts only rules that go **against** the model's default, and an arm with the rule withdrawn shows
+  how often the model does the thing anyway. A rule the model already follows measures nothing.
+
+## 14. A component is removed only on evidence from two model families
+
+*Added 2026-10-05, study 30 (S30-34).* One harness change moved two models in opposite directions
+(57.1 → 30.2 and 49.2 → 60.3; arXiv 2610.00917), and a scaffold lift measured on a weak model was
++11.6 points and about nothing on strong ones (2609.20804). So a verdict that recommends **removing**
+or **defaulting off** a component — "simplify" — names the model it was measured on in the same
+sentence, and does not ship as a default until a second model **family** (not a second size of the
+same family) has been measured with the same registration. `bench/harness_bench`'s nulls are labelled
+"measured on deepseek-v3.2" for this reason; this rule makes that the requirement rather than the
+courtesy.
+
+## What a pre-registration written after 2026-10-05 must contain
+
+§11–§14 are enforced at the file level: `tests/test_a_preregistration_answers_the_protocol.py`
+fails on a `PREREGISTRATION*.md` that does not name each of **§11**, **§12**, **§13** and **§14** —
+the interval it will read, the margin (or "no equivalence claim"), the controls that apply and those
+that do not with the reason, and the model scope. Answering "not applicable, because …" is an answer;
+silence is not. The registrations written before this date are listed, frozen, in
+`bench/PREREGISTRATIONS-before-protocol-11.txt`; that list may shrink, never grow.
+
 ## Standing rules this file collects rather than adds
 
 - **Pre-register before the first call**, with the number the paper predicts written down so it can
