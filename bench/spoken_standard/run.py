@@ -25,6 +25,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
+from chimera.eval import proportions
+
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 if hasattr(sys.stdout, "reconfigure"):  # absent under pytest's capture
@@ -218,13 +220,7 @@ def exact_binomial_two_sided(k_small: int, n: int) -> float:
 
 
 def wilson(successes: int, n: int, z: float = 1.959964) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = successes / n
-    denom = 1 + z * z / n
-    centre = (p + z * z / (2 * n)) / denom
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / denom
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return proportions.wilson(successes, n, z)
 
 
 def newcombe_paired(a: int, b: int, c: int, d: int) -> tuple[float, float, float]:
@@ -234,15 +230,8 @@ def newcombe_paired(a: int, b: int, c: int, d: int) -> tuple[float, float, float
     n = a + b + c + d
     if n == 0:
         return (0.0, -1.0, 1.0)
-    p_a, p_b = (a + b) / n, (a + c) / n
-    l_a, u_a = wilson(a + b, n)
-    l_b, u_b = wilson(a + c, n)
-    denom = math.sqrt((a + b) * (c + d) * (a + c) * (b + d))
-    phi = (a * d - b * c) / denom if denom else 0.0
-    theta = p_b - p_a
-    lower = theta - math.sqrt(max(0.0, (p_b - l_b) ** 2 - 2 * phi * (p_b - l_b) * (u_a - p_a) + (u_a - p_a) ** 2))
-    upper = theta + math.sqrt(max(0.0, (u_b - p_b) ** 2 - 2 * phi * (u_b - p_b) * (p_a - l_a) + (p_a - l_a) ** 2))
-    return (theta, lower, upper)
+    low, high = proportions.newcombe_paired(a, b, c, d)  # B is the treatment
+    return ((c - b) / n, low, high)
 
 
 # --- report ------------------------------------------------------------------------------------------

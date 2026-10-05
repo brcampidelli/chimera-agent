@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import sys
 import threading
@@ -32,6 +31,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -213,12 +214,7 @@ def amendment_row(row: dict[str, Any], reasoning: str) -> dict[str, Any]:
 
 
 def wilson(k: int, n: int) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    z, p = 1.96, k / n
-    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return proportions.wilson(k, n, 1.96)
 
 
 def summary(rows: list[dict[str, Any]]) -> dict[str, Any]:

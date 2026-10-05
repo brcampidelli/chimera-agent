@@ -7,13 +7,14 @@ Reads `results/main_solves.jsonl`, `results/pilot_solves.jsonl` and the official
 from __future__ import annotations
 
 import json
-import math
 import random
 import re
 import statistics
 from typing import Any
 
 from run import GRADES, MAIN, PILOT, RESULTS, load_jsonl, solve_cost
+
+from chimera.eval import proportions
 
 MARGIN = 0.10  # H4 non-inferiority margin on the resolve rate (registered)
 BOOT = 10_000
@@ -55,13 +56,7 @@ def outcome(row: dict[str, Any], g: dict[str, set[str]] | None, *, timeout_is_ha
 
 
 def wilson(k: int, n: int, z: float = 1.959964) -> tuple[float, float]:
-    if n == 0:
-        return (0.0, 1.0)
-    p = k / n
-    den = 1 + z * z / n
-    mid = (p + z * z / (2 * n)) / den
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
-    return (mid - half, mid + half)
+    return proportions.wilson(k, n, z)
 
 
 def newcombe_paired(e: int, f: int, g: int, h: int) -> tuple[float, float, float]:
@@ -69,27 +64,12 @@ def newcombe_paired(e: int, f: int, g: int, h: int) -> tuple[float, float, float
 
     e: both resolved, f: new only, g: ref only, h: neither. Returns (delta, lower, upper)."""
     n = e + f + g + h
-    p1, p2 = (e + f) / n, (e + g) / n
-    l1, u1 = wilson(e + f, n)
-    l2, u2 = wilson(e + g, n)
-    den = (e + f) * (g + h) * (e + g) * (f + h)
-    # Newcombe's correction: a positive eh - fg is reduced by n/2, floored at 0. Checked against
-    # Fagerland, Lydersen & Laake (2014), Table V: counts 1, 1, 7, 12 give -0.507 to -0.026.
-    num = float(e * h - f * g)
-    if num > 0:
-        num = max(num - n / 2, 0.0)
-    phi = num / math.sqrt(den) if den else 0.0
-    d = p1 - p2
-    dl = math.sqrt(max(0.0, (p1 - l1) ** 2 - 2 * phi * (p1 - l1) * (u2 - p2) + (u2 - p2) ** 2))
-    du = math.sqrt(max(0.0, (u1 - p1) ** 2 - 2 * phi * (u1 - p1) * (p2 - l2) + (p2 - l2) ** 2))
-    return d, d - dl, d + du
+    low, high = proportions.newcombe_paired(e, g, f, h)  # the new arm is the treatment
+    return (f - g) / n, low, high
 
 
 def mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def sign_test(pos: int, neg: int) -> float:

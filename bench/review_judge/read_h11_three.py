@@ -19,12 +19,13 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import random
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
@@ -73,24 +74,12 @@ def pp(x: float) -> str:
 
 def wilson(k: int, n: int) -> tuple[float, float]:
     """`chimera/eval/anytime.py`'s Wilson interval."""
-    if n <= 0:
-        return (0.0, 1.0)
-    p = k / n
-    d = 1 + Z95 * Z95 / n
-    c = (p + Z95 * Z95 / (2 * n)) / d
-    m = (Z95 / d) * math.sqrt(p * (1 - p) / n + Z95 * Z95 / (4 * n * n))
-    return (max(0.0, c - m), min(1.0, c + m))
+    return proportions.wilson(k, n)
 
 
 def mcnemar_ci(only_base: int, only_treat: int, n: int) -> tuple[float, float]:
     """`chimera/eval/paired.py`'s interval (Wilson on the discordant pairs), as `read_full.py`."""
-    m = only_base + only_treat
-    if n == 0:
-        return (-1.0, 1.0)
-    if m == 0:
-        return (0.0, 0.0)
-    lo, hi = wilson(only_treat, m)
-    return ((m / n) * (2 * lo - 1), (m / n) * (2 * hi - 1))
+    return proportions.conditional_wilson_paired(only_base, only_treat, n)
 
 
 Pair = tuple[int, bool, bool]  # (label, kept by the baseline, kept by the treatment)

@@ -15,11 +15,12 @@ as in `read_full.py`.
 from __future__ import annotations
 
 import json
-import math
 import random
 import sys
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 RESULTS = Path(__file__).resolve().parent / "results"
 Z95 = 1.959963984540054
@@ -36,13 +37,7 @@ def load(arm: str) -> list[dict[str, Any]]:
 
 
 def wilson(k: int, n: int) -> tuple[float, float]:
-    if n <= 0:
-        return (0.0, 1.0)
-    p = k / n
-    d = 1 + Z95 * Z95 / n
-    c = (p + Z95 * Z95 / (2 * n)) / d
-    m = (Z95 / d) * math.sqrt(p * (1 - p) / n + Z95 * Z95 / (4 * n * n))
-    return (max(0.0, c - m), min(1.0, c + m))
+    return proportions.wilson(k, n)
 
 
 def counts(rows: list[dict[str, Any]]) -> tuple[int, int, int, int]:

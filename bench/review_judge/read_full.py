@@ -27,6 +27,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from chimera.eval import proportions
+
 HERE = Path(__file__).resolve().parent
 RESULTS = HERE / "results"
 ARMS = {"A": "cautious", "C": "split"}
@@ -69,13 +71,7 @@ def load(path: Path) -> list[dict[str, Any]]:
 
 def wilson(k: int, n: int) -> tuple[float, float]:
     """The Wilson score interval exactly as `chimera/eval/anytime.py` computes it."""
-    if n <= 0:
-        return (0.0, 1.0)
-    p = k / n
-    denom = 1.0 + Z95 * Z95 / n
-    center = (p + Z95 * Z95 / (2 * n)) / denom
-    margin = (Z95 / denom) * math.sqrt(p * (1 - p) / n + Z95 * Z95 / (4 * n * n))
-    return (max(0.0, center - margin), min(1.0, center + margin))
+    return proportions.wilson(k, n)
 
 
 def paired_ci(only_base: int, only_treat: int, n: int) -> tuple[float, float]:
@@ -83,13 +79,7 @@ def paired_ci(only_base: int, only_treat: int, n: int) -> tuple[float, float]:
 
     The method `PREREGISTRATION-arms.md` and `-rubric.md` fixed for every paired rate here.
     """
-    m = only_base + only_treat
-    if n == 0:
-        return (-1.0, 1.0)
-    if m == 0:
-        return (0.0, 0.0)
-    lo, hi = wilson(only_treat, m)
-    return ((m / n) * (2 * lo - 1), (m / n) * (2 * hi - 1))
+    return proportions.conditional_wilson_paired(only_base, only_treat, n)
 
 
 def rates(rows: list[dict[str, Any]]) -> dict[str, Any]:

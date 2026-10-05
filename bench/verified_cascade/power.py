@@ -20,16 +20,14 @@ from __future__ import annotations
 import math
 from math import comb
 
+from chimera.eval import proportions
+
 ALPHA = 0.025
 Q = 0.003
 
 
 def mcnemar_p(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    k = min(b, c)
-    return min(1.0, float(2 * sum(comb(n, i) for i in range(k + 1))) / float(2**n))
+    return proportions.mcnemar_exact(b, c)
 
 
 def power(n: int, p_a: float, r: float, q: float = Q, alpha: float = ALPHA) -> float:

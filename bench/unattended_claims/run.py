@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import math
 import os
 import random
 import shutil
@@ -30,6 +29,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
@@ -347,19 +348,11 @@ def run(corpus_name: str, ids: list[str], replicas: int, arms: list[str], out: P
 # --- statistics ---------------------------------------------------------------------------------------
 
 def mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def _wilson(x: int, n: int, z: float = 1.959964) -> tuple[float, float]:
-    if n == 0:
-        return 0.0, 1.0
-    p = x / n
-    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return centre - half, centre + half
+    return proportions.wilson(x, n, z)
 
 
 def newcombe_paired(a: int, b: int, c: int, d: int) -> tuple[float, float, float]:
@@ -370,15 +363,8 @@ def newcombe_paired(a: int, b: int, c: int, d: int) -> tuple[float, float, float
     n = a + b + c + d
     if n == 0:
         return 0.0, -1.0, 1.0
-    p1, p2 = (a + b) / n, (a + c) / n
-    l1, u1 = _wilson(a + b, n)
-    l2, u2 = _wilson(a + c, n)
-    den = (a + b) * (c + d) * (a + c) * (b + d)
-    phi = (a * d - b * c) / math.sqrt(den) if den > 0 else 0.0
-    theta = p2 - p1
-    delta = math.sqrt(max(0.0, (p2 - l2) ** 2 - 2 * phi * (p2 - l2) * (u1 - p1) + (u1 - p1) ** 2))
-    eps = math.sqrt(max(0.0, (u2 - p2) ** 2 - 2 * phi * (u2 - p2) * (p1 - l1) + (p1 - l1) ** 2))
-    return theta, theta - delta, theta + eps
+    low, high = proportions.newcombe_paired(a, b, c, d)  # Y is the treatment
+    return (c - b) / n, low, high
 
 
 def cluster_signflip(diffs: list[int]) -> float:

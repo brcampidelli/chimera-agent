@@ -32,6 +32,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from chimera.eval import proportions
+
 REPO = Path(__file__).resolve().parents[2]
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(REPO))
@@ -270,10 +272,7 @@ def cluster_bootstrap(
 
 
 def mcnemar_exact(b: int, c: int) -> float:
-    n = b + c
-    if n == 0:
-        return 1.0
-    return min(1.0, 2 * sum(math.comb(n, k) for k in range(0, min(b, c) + 1)) / 2**n)
+    return proportions.mcnemar_exact(b, c)
 
 
 def sign_test(diffs: list[float]) -> tuple[int, int, float]:

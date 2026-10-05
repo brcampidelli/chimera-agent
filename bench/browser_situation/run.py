@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import subprocess
 import sys
@@ -23,6 +22,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
+
+from chimera.eval import proportions
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
@@ -345,11 +346,7 @@ def paid_run(max_usd: float, workers: int) -> int:
 
 def _mcnemar(b: int, c: int) -> float:
     """Exact two-sided McNemar p-value on the discordant pairs."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    tail = sum(math.comb(n, k) for k in range(min(b, c) + 1)) / 2 ** n
-    return min(1.0, 2 * tail)
+    return proportions.mcnemar_exact(b, c)
 
 
 def report() -> dict[str, Any]:

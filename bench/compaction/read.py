@@ -13,8 +13,9 @@ from __future__ import annotations
 import json
 import sys
 from collections import Counter, defaultdict
-from math import comb
 from pathlib import Path
+
+from chimera.eval import proportions
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
@@ -24,12 +25,7 @@ from chimera.eval.paired import compare_paired  # noqa: E402
 
 def mcnemar_exact(b: int, c: int) -> float:
     """Two-sided exact McNemar on the discordant counts (b baseline-only, c treatment-only)."""
-    n = b + c
-    if n == 0:
-        return 1.0
-    k = min(b, c)
-    tail = sum(comb(n, i) for i in range(0, k + 1)) / 2**n
-    return min(1.0, 2 * tail)
+    return proportions.mcnemar_exact(b, c)
 
 
 def main(path: str) -> int:

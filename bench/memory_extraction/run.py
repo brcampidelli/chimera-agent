@@ -25,6 +25,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from chimera.eval import proportions
+
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -205,12 +207,7 @@ def run(out: Path, replicas: int, workers: int) -> None:
 
 
 def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float]:
-    if n == 0:
-        return (math.nan, math.nan)
-    p = k / n
-    centre = (p + z * z / (2 * n)) / (1 + z * z / n)
-    half = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / (1 + z * z / n)
-    return (max(0.0, centre - half), min(1.0, centre + half))
+    return proportions.wilson(k, n, z)
 
 
 def summarise(rows: list[dict[str, Any]], field: str) -> dict[str, Any]:
