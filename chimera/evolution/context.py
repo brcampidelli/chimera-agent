@@ -62,7 +62,7 @@ class EvolutionContext:
             "playbook": self.playbook,
         }
 
-    def record_external(self, task: str, answer: str, *, success: bool) -> None:
+    def record_external(self, task: str, answer: str, *, success: bool, tainted: bool) -> None:
         """Record an outcome from a NON-AutonomousAgent path (e.g. the hierarchy fan-out).
 
         Writes an advisory experience lesson ONLY. It does NOT credit skill-card success telemetry:
@@ -71,9 +71,15 @@ class EvolutionContext:
         an unverified success into that signal would make the promotion the project markets as
         "measured, never self-reported" self-reported. Card telemetry comes only from verified paths
         (solve/lifecycle, past the diff-gate). Skill DISTILLATION is likewise not done here.
+
+        ``tainted`` has no default on purpose: whether the answer was made from untrusted content is
+        the caller's to state. A clean default is how the hierarchy fan-out stored lessons from
+        workers that read fetched pages as clean, and the next autonomous run recalled them so.
         """
         if self.experience is not None:
-            self.experience.record(task, "success" if success else "failure", detail=answer[:500])
+            self.experience.record(
+                task, "success" if success else "failure", detail=answer[:500], tainted=tainted
+            )
 
 
 def build_evolution_context(

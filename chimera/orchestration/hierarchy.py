@@ -491,8 +491,14 @@ class HierarchicalOrchestrator:
                 task, shape, reason="all delegations failed", code="workers_failed"
             )
 
-        answer, synth_tokens, synth_estimated = self._synthesize(task, envelopes)
-        self._record_outcome(task, answer)
+        answer, synth_tokens, synth_estimated, recalled_tainted = self._synthesize(task, envelopes)
+        # Tainted when anything the answer was made from was: a worker that read a fetched page, or
+        # a tainted fact the top model was handed as prior knowledge. Stored clean, the lesson is
+        # recalled by the next autonomous run as clean - the laundering S30-25 closed for
+        # AutonomousAgent's own lessons, open here until this argument existed.
+        self._record_outcome(
+            task, answer, tainted=recalled_tainted or any(e.tainted for e in envelopes)
+        )
         # Meter the orchestrator's OWN overhead (decompose + synthesis) as receipts, or the
         # "saving" would credit the hierarchy for a measured cost that omits its overhead while
         # the counterfactual is a full inline agent. Counterfactual=0: a single inline agent pays
@@ -968,17 +974,18 @@ class HierarchicalOrchestrator:
 
     def _synthesize(
         self, task: str, envelopes: list[ResultEnvelope]
-    ) -> tuple[str, int, bool]:
+    ) -> tuple[str, int, bool, bool]:
         """Top model over SUMMARIES ONLY; fusion only on real conflict (Self-MoA rule).
 
-        Returns (answer, synth_tokens, estimated) — the tokens are metered as orchestrator overhead."""
+        Returns (answer, synth_tokens, estimated, recalled_tainted) — the tokens are metered as
+        orchestrator overhead; the last is whether the prior knowledge held a tainted fact."""
         summaries = "\n\n".join(
             f"### {env.task_id}\n{env.summary}"
             + (f"\n(gaps: {'; '.join(env.gaps)})" if env.gaps else "")
             for env in envelopes
         )
         prompt = f"## Task\n{task}\n\n## Worker summaries\n{summaries}"
-        recall = self._recall_block(task)
+        recall, recalled_tainted = self._recall_block(task)
         if recall:
             prompt = f"## Prior knowledge (advisory)\n{recall}\n\n{prompt}"
         fusion = (
@@ -1009,7 +1016,7 @@ class HierarchicalOrchestrator:
                 model=self.top_model,
             )
         tokens, estimated = _result_tokens(result, prompt + (result.content or ""))
-        return result.content, tokens, estimated
+        return result.content, tokens, estimated, recalled_tainted
 
     def _fallback(
         self, task: str, shape: TaskShape, *, reason: str, code: str = "shape"
@@ -1049,7 +1056,9 @@ class HierarchicalOrchestrator:
         )
         if self.receipts_path is not None:
             append_delegation(self.receipts_path, receipt)
-        self._record_outcome(task, result.content)
+        # Clean, and shown so: the fallback sends the top model the owner's instructions and the
+        # task, nothing a worker read and no recalled memory.
+        self._record_outcome(task, result.content, tainted=False)
         return self._finish(
             HierarchyResult(
                 answer=result.content,
@@ -1082,14 +1091,19 @@ class HierarchicalOrchestrator:
         )
         return result
 
-    def _recall_block(self, task: str) -> str:
+    def _recall_block(self, task: str) -> tuple[str, bool]:
         """Advisory prior-knowledge for the top model (M19-A4 read half): retrieved skill cards +
         recalled memory facts, sanitized. Empty without an evolution context or when nothing matches.
         Injected ONLY into the top model's synthesis prompt — never the byte-identical worker prefix.
+
+        Also returns whether a recalled fact was tainted. Such a fact is labelled as
+        ``AutonomousAgent`` labels it, and the run's recorded lesson is then stored tainted: the top
+        model wrote the answer having read it, and there is no ledger here to tell.
         """
         if self.evolution is None:
-            return ""
+            return "", False
         parts: list[str] = []
+        tainted = False
         cards = self.evolution.cards
         if cards is not None:
             ctx = cards.card_context(task)
@@ -1102,25 +1116,32 @@ class HierarchicalOrchestrator:
             except Exception as exc:  # noqa: BLE001 — recall is advisory, never fail the run
                 _log.debug("hierarchy memory readback failed: %s", exc)
                 hits = []
+            from chimera.core.autonomous import RECALLED_FACT_LABEL
+
+            kept = [h for h in (hits or []) if str(getattr(h, "content", "")).strip()]
+            marked = [getattr(h, "provenance", "clean") == "tainted" for h in kept]
+            tainted = any(marked)
             facts = "\n".join(
-                f"- {getattr(h, 'content', '')}"
-                for h in (hits or [])
-                if str(getattr(h, "content", "")).strip()
+                f"- {getattr(h, 'content', '')}" + (RECALLED_FACT_LABEL if bad else "")
+                for h, bad in zip(kept, marked, strict=True)
             )
             if facts:
                 parts.append("Relevant prior facts:\n" + facts)
         if not parts:
-            return ""
+            return "", False
         from chimera.governance.sanitize import sanitize_untrusted
 
-        return sanitize_untrusted("\n\n".join(parts))
+        return sanitize_untrusted("\n\n".join(parts)), tainted
 
-    def _record_outcome(self, task: str, answer: str) -> None:
+    def _record_outcome(self, task: str, answer: str, *, tainted: bool) -> None:
         """Record the run to the shared evolution context (M19-A4 write half): an experience lesson
         + skill-card credit. Never distils a skill — a fan-out has no verify-or-revert signal, so it
-        accrues telemetry only (the honest gate)."""
+        accrues telemetry only (the honest gate). ``tainted`` is required, not defaulted: each path
+        that records says whether what it answered from was clean."""
         if self.evolution is not None:
-            self.evolution.record_external(task, answer, success=bool(answer and answer.strip()))
+            self.evolution.record_external(
+                task, answer, success=bool(answer and answer.strip()), tainted=tainted
+            )
 
     def _owned(self, system: str) -> str:
         """``system`` with the owner's instructions after it, or unchanged when there are none.

@@ -154,16 +154,25 @@ def test_record_external_writes_experience_but_never_credits_card_telemetry(tmp_
 
     cards = _Cards()
     ctx = EvolutionContext(experience=exp, cards=cards)  # type: ignore[arg-type]
-    ctx.record_external("do a thing", "the answer", success=True)
+    ctx.record_external("do a thing", "the answer", success=True, tainted=False)
     all_rows = exp.all()
     assert len(all_rows) == 1
     assert all_rows[0].outcome == "success"
     assert cards.outcomes == []  # unverified success does NOT touch the promotion signal
 
 
+def test_record_external_stores_a_lesson_from_untrusted_content_tainted(tmp_path: Path) -> None:
+    exp = ExperienceBuffer(tmp_path / "experience.json")
+    EvolutionContext(experience=exp).record_external(
+        "compare the sites", "plan A costs 10", success=True, tainted=True
+    )
+    [row] = exp.all()
+    assert row.provenance == "tainted"
+
+
 def test_record_external_is_safe_without_seams() -> None:
     # a bare context (no experience, no cards) must not raise
-    EvolutionContext().record_external("t", "a", success=False)
+    EvolutionContext().record_external("t", "a", success=False, tainted=False)
 
 
 def test_collective_proposals_come_from_the_ladder_under_a_cheap_cost_mode(tmp_path: Path) -> None:
