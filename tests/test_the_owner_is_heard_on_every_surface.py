@@ -50,6 +50,7 @@ EXEMPT: dict[tuple[str, str], str] = {
     ("chimera/cli/main.py", "sandbox_bench"): "a bench: its prompt is part of the instrument",
     ("chimera/cli/main.py", "_right_hand_builder"): "the scenarios bench; the prompt is the instrument",
     ("chimera/core/agent.py", "Agent"): "the default config of the class itself",
+    ("chimera/eval/agents_md_carrier.py", "_row"): "a bench: composes a prompt no model reads",
     ("chimera/core/explorer.py", "ContextExplorer"): "answers the main agent with file locations",
     ("chimera/core/research.py", "WebResearcher"): "answers the main agent, which answers the person",
     ("chimera/core/subagent.py", "SubAgentTool"): "answers the main agent, which answers the person",
