@@ -29,7 +29,12 @@ from typing import Any
 from chimera.acp.agents import AcpAgentSpec, child_env
 from chimera.acp.client import AcpConnection, AcpError
 from chimera.telemetry import get_logger
-from chimera.tools.workspace import atomic_write_text, resolve_in_workspace
+from chimera.tools.workspace import (
+    atomic_write_text,
+    refuse_own_env_read,
+    refuse_own_files,
+    resolve_in_workspace,
+)
 from chimera.tools.write_region import WriteRegion
 
 _log = get_logger("acp.turn")
@@ -326,6 +331,9 @@ class AcpTurn:
 
     def _read_text_file(self, params: dict[str, Any]) -> dict[str, Any]:
         path = resolve_in_workspace(self.workspace, str(params.get("path") or ""))
+        # The same refusal the native read tools make: Chimera's own .env when the owner keeps it
+        # from the agent. This handler called `resolve_in_workspace` directly and skipped it.
+        refuse_own_env_read(path)
         if not path.is_file():
             raise AcpError(f"file not found: {params.get('path')}")
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -350,6 +358,13 @@ class AcpTurn:
         """
         raw = str(params.get("path") or "")
         target = resolve_in_workspace(self.workspace, raw)
+        # And the native write tools' refusal: Chimera's own .env and its data folder, which no
+        # agent writes, whoever it is. Recorded as refused, like a write outside the region.
+        try:
+            refuse_own_files(target, "write")
+        except ValueError as exc:
+            self._result.refused.append(self._relative(str(target)))
+            raise AcpError(str(exc)) from None
         relative = self._relative(str(target))
         if self.write_region is not None and (error := self.write_region.check(target)):
             self._result.refused.append(relative)
