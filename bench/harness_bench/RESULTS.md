@@ -223,3 +223,13 @@ SE 0.146 against other 0.082: the benchmark's own class is also its noise class.
   effect measured in `bench/design_effect` (ICC 0.706) says replicas of the *same* task buy little;
   a replication that wants power should spend on more hard tasks, not more replicas — and there are
   only 8 of them in this venue. That is the real limit, and it is the venue's, not the analysis's.
+
+## Addendum, 2026-10-05 — the stored solves as a false-positive corpus for verifier-integrity flags
+
+Study 30, S30-23 read the 547 solves' stored diffs through the record-only rule in
+`chimera/governance/verifier_integrity.py` (`bench/verifier_integrity/`, pre-registered, US$ 0).
+On the 323 oracle-passed solves: `tests_removed_or_skipped` **0/323**, `verifier_modified` 0/323
+(vacuous — no receipt here carries a `verify_command`), `tests_touched` **27/323 = 8.4%**, 40 of
+whose 52 firings across both oracle classes come from the two tasks that ask for tests (040, 087).
+Nothing in this venue was built to invite verifier tampering, so it bounds the interruption cost of
+the flags, not their catch rate.
