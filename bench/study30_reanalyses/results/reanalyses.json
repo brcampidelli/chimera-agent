@@ -1,10 +1,10 @@
 {
  "1_verify_abstention": {
-  "bench_scripts_running_verify": [],
   "computable": false,
+  "rows_with_abstained_passed_and_outcome": 0,
   "stored_files_with_an_abstained_field": [
-   "bench/manager_diff/results/summary.json",
-   "bench/manager_p/results/summary.json"
+   "manager_diff/results/summary.json",
+   "manager_p/results/summary.json"
   ]
  },
  "2_high_confidence_misses": {

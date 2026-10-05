@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -30,6 +31,52 @@ EXTRA_CALLS = {"hierarchy_no_synth": 0, "hierarchy": 1, "single_equal": 1}
 """The registered design: one call per document plus this many; ``single_1`` makes one call in all."""
 
 
+HIERARCHY_FILES = ("2026-09-11-3b-opus-synth.jsonl", "2026-09-11-3b.jsonl", "2026-09-11.jsonl",
+                   "2026-09-12-3b-30.jsonl", "pilot.jsonl")
+ABSTAINED_CENSUS = ("manager_diff/results/summary.json", "manager_p/results/summary.json")
+"""The files under `bench/` that held an ``"abstained"`` field when the census was registered."""
+
+INPUTS: dict[str, str] = {
+    "jev_decisions/results/2026-09-19-registered.jsonl": "41a1f1cc66a4d079cb1a54c524c221a472c1e899cd1345f786f79adb2e450abc",
+    "jev_decisions/results/2026-09-19-local-L.jsonl": "8db83593c2fd370646f1e7f7663fdd2bfe6bd711bfe3169dc94ed3290dc6c545",
+    "jev_decisions/results/2026-09-19-local-L2.jsonl": "0f22f089a474714b4103ce203b8e75b28998cddf28170637fc19733b4796df4f",
+    "verified_cascade/results/verifier_slice.jsonl": "71342a638dc4703deed313276bd0290799ddc7bbff6258eeb8d4c028d459ec2b",
+    "verified_cascade/results/run/calls.jsonl": "740d5de1750ca768005dbb4a4438f7cd9e9910b3072b8f0cd9162dfe42c73d83",
+    "hierarchy_equal_calls/results/2026-09-11-3b-opus-synth.jsonl": "5427ab95f5de376b78e13c0993532315648e573dd172f5ea8c8b8492a0e64e2f",
+    "hierarchy_equal_calls/results/2026-09-11-3b.jsonl": "11a3c3b74adcd5ea11dc57cba76d57b1f5e1e9dfbbb9a9a15914affdde9bf806",
+    "hierarchy_equal_calls/results/2026-09-11.jsonl": "386a831d9454ae52ed8f94431800256e50a2d3c20e169ee5679332f3ff267ca5",
+    "hierarchy_equal_calls/results/2026-09-12-3b-30.jsonl": "5c9b0cb89ecef4b3959050e3611d028e2c72ead58f96bf22f5822ca061da48bf",
+    "hierarchy_equal_calls/results/pilot.jsonl": "a8995bbffd00e65af14c79fa30c464200ac6783a5fc3f0eb017c67f7cd0d8203",
+    "web_research/results/run.json": "0312e2d4acae0a9d3ae656bfb80100c9cd52a7f465a6e7b16f0bf56a14eefaeb",
+    "manager_diff/results/summary.json": "f39e69d86efa73b19c1980ac02854804deaa8cde4b3aec25cc9ef46b9287f09a",
+    "manager_p/results/summary.json": "ee8d4dfe37d7b7a9023a571785d4f1f3938137bee2e471d62097beae5a95cab5",
+}
+"""Every file the four reanalyses read, relative to `bench/`, with its sha256 (LF line endings).
+
+The inputs used to be live globs — every `bench/**` file mentioning "abstained", every hierarchy run.
+Then an unrelated later commit (a new review bench, a new hierarchy run) changed the published
+numbers and broke the pin test although nothing in this analysis changed. Frozen here instead:
+:func:`check_inputs` refuses to compute on a file that differs, and a deliberate rerun on new data
+updates this table in the same commit as the numbers."""
+
+OUTCOME_KEYS = ("resolved", "outcome", "success", "solved", "correct")
+"""Fields that would carry the run's independent outcome next to a ``VerificationResult``."""
+
+
+def sha256_lf(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def check_inputs(bench: Path | None = None) -> None:
+    """Raise ``SystemExit`` naming every pinned input that is missing or differs from its pin."""
+    root = BENCH if bench is None else bench
+    bad = [f"{rel}: {'missing' if not (root / rel).exists() else 'sha256 ' + sha256_lf(root / rel)[:12]}"
+           for rel, digest in INPUTS.items()
+           if not (root / rel).exists() or sha256_lf(root / rel) != digest]
+    if bad:
+        raise SystemExit("inputs differ from the pins in reanalyze.INPUTS:\n  " + "\n  ".join(bad))
+
+
 def design_calls(arm: str, docs: int) -> int | None:
     if arm == "single_1":
         return 1
@@ -49,20 +96,31 @@ def rate(k: int, n: int) -> dict[str, Any]:
 # --- 1 · verify abstention ------------------------------------------------------------------------
 
 
-def verify_abstention() -> dict[str, Any]:
-    """Rows that carry ``VerificationResult.abstained`` next to a run outcome. The only stored
-    ``abstained`` fields are the reviewer's (``review.abstained``), a different instrument."""
-    def rel(p: Path) -> str:
-        return str(p.relative_to(REPO)).replace("\\", "/")
+def verify_rows(obj: Any) -> list[dict[str, Any]]:
+    """Every object in ``obj`` shaped like a stored ``VerificationResult`` next to a run outcome:
+    a boolean ``abstained`` and a boolean ``passed`` together (the result's own two fields) and one
+    of ``OUTCOME_KEYS``. An aggregate count such as the reviewer's ``{"abstained": 0}`` is not one."""
+    found: list[dict[str, Any]] = []
+    if isinstance(obj, dict):
+        if (isinstance(obj.get("abstained"), bool) and isinstance(obj.get("passed"), bool)
+                and any(k in obj for k in OUTCOME_KEYS)):
+            found.append(obj)
+        for v in obj.values():
+            found += verify_rows(v)
+    elif isinstance(obj, list):
+        for v in obj:
+            found += verify_rows(v)
+    return found
 
-    # A stored cross-tab needs a bench that ran chimera.core.verify; without one there is nothing to read.
-    runners = [rel(p) for p in sorted(BENCH.rglob("*.py"))
-               if re.search(r"chimera\.core\.verify|VerificationResult", p.read_text(encoding="utf-8", errors="replace"))
-               and p.resolve() != Path(__file__).resolve()]
-    stored = [rel(p) for p in sorted([*BENCH.rglob("*.jsonl"), *BENCH.rglob("*.json")])
-              if '"abstained"' in p.read_text(encoding="utf-8", errors="replace")]
-    return {"bench_scripts_running_verify": runners, "stored_files_with_an_abstained_field": stored,
-            "computable": bool(runners)}
+
+def verify_abstention() -> dict[str, Any]:
+    """Rows that carry ``VerificationResult.abstained`` next to a run outcome, in the files the census
+    registered. The only stored ``abstained`` fields are the reviewer's (aggregate counts of
+    ``review.abstained``), a different instrument; ``computable`` comes from the rows, not from
+    whether some script mentions ``verify``."""
+    rows = [r for rel in ABSTAINED_CENSUS for r in verify_rows(json.loads((BENCH / rel).read_text(encoding="utf-8")))]
+    return {"stored_files_with_an_abstained_field": list(ABSTAINED_CENSUS),
+            "rows_with_abstained_passed_and_outcome": len(rows), "computable": bool(rows)}
 
 
 # --- 2 · high-confidence misses -------------------------------------------------------------------
@@ -135,7 +193,7 @@ def carriers(groups: dict[str, dict[str, Any]], pooled: dict[str, Any], key: str
 
 
 def delegation() -> dict[str, Any]:
-    files = sorted((BENCH / "hierarchy_equal_calls" / "results").glob("*.jsonl"))
+    files = [BENCH / "hierarchy_equal_calls" / "results" / name for name in HIERARCHY_FILES]
     rows = [r for f in files for r in read_jsonl(f)]
     designed = [r for r in rows if design_calls(r["arm"], r["docs"]) is not None]
     off_design = [r for r in designed if r["calls"] != design_calls(r["arm"], r["docs"])]
@@ -145,7 +203,7 @@ def delegation() -> dict[str, Any]:
         r for r in no_synth
         if len({m for m in re.findall(rf"^### {re.escape(r['task_id'])}-(\d+)", r["answer"], flags=re.M)}) != r["docs"]
     ]
-    return {"files": [str(f.relative_to(REPO)).replace("\\", "/") for f in files], "rows": len(rows),
+    return {"files": [str(f.relative_to(BENCH.parent)).replace("\\", "/") for f in files], "rows": len(rows),
             "calls_off_design": len(off_design), "unknown_arms": unknown_arm,
             "no_synth_rows": len(no_synth), "no_synth_missing_a_section": len(missing_sections)}
 
@@ -169,6 +227,7 @@ def citations() -> dict[str, Any]:
 
 
 def build() -> dict[str, Any]:
+    check_inputs()
     jev = jev_misses()
     vc = vc_misses()
     return {
@@ -190,8 +249,9 @@ def _r(x: dict[str, Any]) -> str:
 
 
 def fmt(rep: dict[str, Any]) -> str:
-    lines = [f"1 verify abstention: computable {rep['1_verify_abstention']['computable']} "
-             f"runners {rep['1_verify_abstention']['bench_scripts_running_verify']} stored {rep['1_verify_abstention']['stored_files_with_an_abstained_field']}"]
+    va = rep["1_verify_abstention"]
+    lines = [f"1 verify abstention: computable {va['computable']} rows {va['rows_with_abstained_passed_and_outcome']} "
+             f"in {va['stored_files_with_an_abstained_field']}"]
     hc = rep["2_high_confidence_misses"]
     for arm, v in hc["jev_decisions"].items():
         lines.append(f"2 jev_decisions arm {arm}: miss {_r(v['pooled']['miss'])} high-conf {_r(v['pooled']['high_conf_miss'])}")

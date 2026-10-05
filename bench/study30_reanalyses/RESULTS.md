@@ -21,6 +21,13 @@ pass in ~16% of broken builds) stays open for us. A run that answers it has to l
 verify command, `abstained`, `passed`, and an independent outcome (the hidden tests), on builds known
 to be broken as well as good ones.
 
+How "not computable" is decided (corrected after review): from the **rows**, not from whether some
+script mentions `verify`. `reanalyze.py` counts objects in the registered census files that carry a
+boolean `abstained` and a boolean `passed` together (`VerificationResult`'s two fields) next to an
+outcome field; there are 0. Every file the four sections read is pinned by sha256 in
+`reanalyze.INPUTS`, so a later, unrelated bench that stores an `abstained` field or adds a hierarchy
+run cannot move these numbers; a changed input stops the script instead.
+
 ## 2 · High-confidence misses per attack group
 
 **`bench/jev_decisions`**, attacks only, P(danger) per row. A miss is p < 0.5; a high-confidence miss
