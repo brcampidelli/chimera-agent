@@ -38,11 +38,12 @@ class FakeBridge:
     """Answers bridge calls from a script: the conversation list, one turn's job, then its polls."""
 
     def __init__(self, polls: list[dict[str, Any]] | None = None, first: dict[str, Any] | None = None,
-                 answer_ok: bool = True) -> None:
+                 answer_ok: bool = True, answer_data: dict[str, Any] | None = None) -> None:
         self.calls: list[tuple[str, str, Any]] = []
         self.first = first or {"job_id": "j1", "done": False, "text": "", "events": []}
         self.polls = list(polls or [])
         self.answer_ok = answer_ok
+        self.answer_data = answer_data
 
     def routes(self) -> list[str]:
         return [body["route"] for _m, url, body in self.calls if url.endswith("/api/bridge/call")]
@@ -61,7 +62,8 @@ class FakeBridge:
             if route == "conversations.send":
                 return 200, {"route": route, "status": 200, "job": self.first}
             if route == "approve.approval":
-                return 200, {"route": route, "status": 200, "data": {"ok": self.answer_ok}}
+                data = self.answer_data if self.answer_data is not None else {"ok": self.answer_ok}
+                return 200, {"route": route, "status": 200, "data": data}
         if "/api/bridge/jobs/" in url:
             return 200, self.polls.pop(0)
         return 404, {"detail": "not scripted"}
@@ -197,6 +199,28 @@ def test_with_full_control_a_typed_yes_answers_through_the_apps_own_approval_rou
                   if u.endswith("/call") and b["route"] == "approve.approval")
     assert answer["params"] == {"request_id": "q-77"} and answer["body"] == {"approved": True}
     assert "approved" in result.output
+
+
+def test_a_yes_on_a_question_another_process_asked_prints_how_to_approve_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Study 30, S30-30: only the process that asked holds the code, so the app answers `needs_code`
+    # with the terminal line. Printing "already answered or timed out" here would be false: the
+    # question is still waiting.
+    waiting = {"job_id": "j1", "done": False, "text": "", "events": [_approval()]}
+    bridge = FakeBridge(
+        first=waiting, polls=[_done("removed")],
+        answer_data={"ok": False, "outcome": "needs_code",
+                     "detail": "chimera approve q-77 --yes --code <code>"},
+    )
+
+    result = _run(monkeypatch, bridge, ["resume", SESSION["id"], "-m", "clean up"], full=True,
+                  stdin="yes\n")
+
+    assert result.exit_code == 0, result.output
+    assert "another Chimera process asked this" in result.output
+    assert "chimera approve q-77 --yes --code <code>" in result.output
+    assert "already been answered" not in result.output
 
 
 def test_with_full_control_an_empty_answer_leaves_the_question_to_the_app(

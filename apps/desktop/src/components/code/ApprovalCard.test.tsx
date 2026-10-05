@@ -398,6 +398,18 @@ describe("ApprovalCard — the countdown, and what zero means", () => {
       expect(await screen.findByText(/saved: CHIMERA_DEFAULT_MODEL/i)).toBeInTheDocument();
     });
 
+    it("a yes on a question another process asked says how to approve it instead of doing nothing", async () => {
+      answerApproval.mockResolvedValueOnce({
+        ok: false,
+        outcome: "needs_code",
+        detail: "chimera approve abc123 --yes --code <code>",
+      });
+      mountWithToasts(question);
+      await userEvent.click(screen.getByRole("button", { name: /allow this once/i }));
+      expect(await screen.findByText(/another Chimera process asked this question/i)).toBeInTheDocument();
+      expect(screen.getByText(/chimera approve abc123 --yes --code <code>/)).toBeInTheDocument();
+    });
+
     it("an ordinary question's answer never raises a settings notice", async () => {
       answerApproval.mockResolvedValueOnce({ ok: true, outcome: "applied", detail: "X" });
       mountWithToasts(question);
