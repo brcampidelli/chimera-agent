@@ -10,9 +10,13 @@ solves on impossible tasks passing by exactly these moves; 2609.28614 found 30.5
 Three flags, each one rendered line per file:
 
 * ``tests_touched`` — a test file was added, changed or deleted;
-* ``verifier_modified`` — a file the verify command names (``pytest tests/test_a.py``,
-  ``bash check.sh``) or a test-runner configuration (``conftest.py``, the pytest section of
-  ``pyproject.toml``/``setup.cfg``/``tox.ini``, a ``jest``/``vitest`` config) changed;
+* ``verifier_modified`` — a FILE the verify command names (``pytest tests/test_a.py``,
+  ``bash check.sh``), the build file whose recipe it runs (``make test`` → ``Makefile``,
+  ``just``, ``tox``), the file it was inferred from, or a test-runner configuration
+  (``conftest.py``, the pytest section of ``pyproject.toml``/``setup.cfg``/``tox.ini``, a
+  ``jest``/``vitest`` config) changed. A DIRECTORY the command names (``pytest tests``,
+  ``cd backend && …``) is not the verifier: every edit beneath it would be flagged, and for a test
+  directory that only repeats ``tests_touched``;
 * ``tests_removed_or_skipped`` — a test function disappeared, or a test is under more
   skip/xfail/``.only`` markers than before, in a test file.
 
@@ -120,26 +124,114 @@ def is_test_path(path: str) -> bool:
     return any(part in _TEST_DIRS for part in path.split("/")[:-1])
 
 
-def _command_paths(verify_command: str) -> set[str]:
-    """The tokens of the verify command that could name a file or directory in the workspace."""
-    if not verify_command:
-        return set()
-    try:
-        tokens = shlex.split(verify_command, posix=True)
-    except ValueError:
-        tokens = verify_command.split()
-    out: set[str] = set()
-    for raw in tokens:
-        if raw.startswith("-") or any(ch in raw for ch in "*?$|;&<>()"):
+#: Options whose next token is a value, never a file: ``-k "not slow"``, ``python -m pytest``,
+#: ``-p no:cacheprovider``, ``make -j 4``. ``-c`` (pytest's config file) is absent on purpose: its
+#: operand IS a file the verifier reads.
+_VALUE_OPTIONS = frozenset(
+    {"-k", "-m", "-p", "-n", "-W", "-o", "-j", "--maxfail", "--rootdir", "--deselect", "--ignore",
+     "--timeout", "--tb", "--durations"}
+)
+_SEPARATORS = frozenset({"&&", "||", ";", "|", "&", "(", ")"})
+_REDIRECTS = frozenset({">", ">>", "<", ">&", "&>"})
+_CHDIR = frozenset({"cd", "pushd"})
+_ENV_ASSIGN = re.compile(r"^[A-Za-z_]\w*=")
+#: Programs whose recipe lives in a build file the command never names. ``make test`` runs
+#: whatever the Makefile's ``test:`` says, so rewriting that recipe to ``true`` rewrites the
+#: verifier, and ``verify_infer`` produces exactly ``make test`` from a Makefile.
+_BUILD_FILES: dict[str, tuple[str, ...]] = {
+    "make": ("Makefile", "makefile", "GNUmakefile"),
+    "gmake": ("Makefile", "makefile", "GNUmakefile"),
+    "just": ("justfile", "Justfile", ".justfile"),
+    "tox": ("tox.ini",),
+    "nox": ("noxfile.py",),
+}
+#: Where those programs are told to look instead: ``make -C sub``, ``make -f other.mk``.
+_BUILD_DIR_OPTIONS = frozenset({"-C", "--directory", "--working-directory"})
+_BUILD_FILE_OPTIONS = frozenset({"-f", "--file", "--makefile", "--justfile", "-c"})
+
+
+@dataclass(frozen=True)
+class _Verifier:
+    """What, in the workspace, IS the verifier, read off the command (and its origin)."""
+
+    named: frozenset[str] = frozenset()
+    build: frozenset[str] = frozenset()
+    origin: frozenset[str] = frozenset()
+
+
+def _join(cwd: str, token: str) -> str:
+    if token.startswith("/") or re.match(r"^[A-Za-z]:", token):
+        return ""  # absolute: outside anything a workspace-relative path can equal
+    return _norm(posixpath.normpath(posixpath.join(cwd, token)) if cwd else token)
+
+
+def _read_segment(words: list[str], cwd: str, named: set[str], build: set[str]) -> str:
+    """One simple command of the verify line; returns the directory the next one runs in."""
+    while words and _ENV_ASSIGN.match(words[0]):
+        words = words[1:]
+    if not words:
+        return cwd
+    program, args = words[0], words[1:]
+    base = posixpath.basename(program)
+    if base in _CHDIR:
+        # `cd backend && pytest`: `backend` is where the check runs, not a file it runs. Read as a
+        # path it put every edit under backend/ on the receipt as "the verifier".
+        target = next((a for a in args if not a.startswith("-")), "")
+        return _join(cwd, target) if target else ""
+    if "/" in program or "." in base:
+        named.add(_join(cwd, program))  # ./check.sh, scripts/test.py
+    files = _BUILD_FILES.get(base)
+    where = cwd
+    skip = ""
+    for arg in args:
+        if skip:
+            if skip == "dir":
+                where = _join(cwd, arg)
+            elif skip == "file":
+                build.add(_join(cwd, arg))
+            skip = ""
             continue
-        token = _norm(raw.split("::", 1)[0])
-        if token and token not in (".", ".."):
-            out.add(token)
-    return out
+        if files is not None and arg in _BUILD_DIR_OPTIONS:
+            skip = "dir"
+        elif files is not None and arg in _BUILD_FILE_OPTIONS:
+            skip = "file"
+        elif arg in _VALUE_OPTIONS or arg in _REDIRECTS:
+            skip = "value"
+        elif arg.startswith("-") or any(ch in arg for ch in "*?$"):
+            continue
+        else:
+            named.add(_join(cwd, arg.split("::", 1)[0]))
+    if files is not None:
+        build.update(_join(where, name) for name in files)
+    return cwd
 
 
-def _named_by_command(path: str, command_paths: set[str]) -> bool:
-    return any(path == t or path.startswith(t + "/") for t in command_paths)
+def _verifier_of(verify_command: str, verifier_files: Iterable[str] = ()) -> _Verifier:
+    origin = frozenset(p for p in (_norm(f) for f in verifier_files) if p)
+    if not verify_command.strip():
+        return _Verifier(origin=origin)
+    # Backslashes as separators, not as POSIX escapes: `scripts\test.cmd` is a path on Windows.
+    text = verify_command.replace("\\", "/")
+    try:
+        lexer = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        tokens = list(lexer)
+    except ValueError:
+        tokens = text.split()
+    named: set[str] = set()
+    build: set[str] = set()
+    cwd = ""
+    words: list[str] = []
+    for token in [*tokens, ";"]:
+        if token in _SEPARATORS:
+            cwd = _read_segment(words, cwd, named, build)
+            words = []
+        else:
+            words.append(token)
+    named.discard("")
+    named.discard(".")
+    build.discard("")
+    return _Verifier(frozenset(named), frozenset(build), origin)
 
 
 def _changed_lines(patch: str) -> tuple[list[str], list[str]]:
@@ -274,13 +366,20 @@ def _removed_or_skipped(sides: list[tuple[list[str], list[str]]]) -> str:
     return "; ".join(reasons)
 
 
-def flag_patch(path: str, patch: str, *, verify_command: str = "") -> list[IntegrityFlag]:
-    """The three flags for one file's unified-diff body. ``patch`` empty = no change, no flags."""
-    return _flag(path, patch, _hunk_sides(patch), verify_command=verify_command)
+def flag_patch(
+    path: str, patch: str, *, verify_command: str = "", verifier_files: Iterable[str] = ()
+) -> list[IntegrityFlag]:
+    """The three flags for one file's unified-diff body. ``patch`` empty = no change, no flags.
+
+    ``verifier_files``: files the verify command came out of, when the caller knows them — an
+    inferred ``make test`` names its Makefile here, so a rewritten recipe is the verifier changing.
+    """
+    verifier = _verifier_of(verify_command, verifier_files)
+    return _flag(path, patch, _hunk_sides(patch), verifier)
 
 
 def _flag(
-    path: str, patch: str, sides: list[tuple[list[str], list[str]]], *, verify_command: str
+    path: str, patch: str, sides: list[tuple[list[str], list[str]]], verifier: _Verifier
 ) -> list[IntegrityFlag]:
     path = _norm(path)
     if not path or not patch:
@@ -293,8 +392,12 @@ def _flag(
     test = is_test_path(path)
     if test:
         out.append(IntegrityFlag(TESTS_TOUCHED, path))
-    if _named_by_command(path, _command_paths(verify_command)):
+    if path in verifier.named:
         out.append(IntegrityFlag(VERIFIER_MODIFIED, path, "named by the verify command"))
+    elif path in verifier.build:
+        out.append(IntegrityFlag(VERIFIER_MODIFIED, path, "the build file the verify command runs"))
+    elif path in verifier.origin:
+        out.append(IntegrityFlag(VERIFIER_MODIFIED, path, "the verify command was inferred from it"))
     elif base in _RUNNER_FILES or _RUNNER_CONFIG.match(base):
         out.append(IntegrityFlag(VERIFIER_MODIFIED, path, "test-runner configuration"))
     elif base in _SHARED_CONFIG and any(_RUNNER_LINE.search(line) for line in added + removed):
@@ -307,17 +410,20 @@ def _flag(
 
 
 def flag_patches(
-    diffs: Iterable[tuple[str, str]], *, verify_command: str = ""
+    diffs: Iterable[tuple[str, str]], *, verify_command: str = "",
+    verifier_files: Iterable[str] = (),
 ) -> list[IntegrityFlag]:
     """Every flag over ``(path, patch)`` pairs — the shape a stored receipt keeps its diffs in."""
+    verifier = _verifier_of(verify_command, verifier_files)
     out: list[IntegrityFlag] = []
     for path, patch in diffs:
-        out.extend(flag_patch(path, patch, verify_command=verify_command))
+        out.extend(_flag(path, patch, _hunk_sides(patch), verifier))
     return _ordered(out)
 
 
 def flag_snapshots(
-    before: Mapping[str, str], after: Mapping[str, str], *, verify_command: str = ""
+    before: Mapping[str, str], after: Mapping[str, str], *, verify_command: str = "",
+    verifier_files: Iterable[str] = (),
 ) -> list[IntegrityFlag]:
     """Every flag over a workspace change: {relative path: text} before and after.
 
@@ -325,6 +431,7 @@ def flag_snapshots(
     only in ``before``. The diff is computed here in full, so a receipt's clipped patch never
     decides what counts as removed.
     """
+    verifier = _verifier_of(verify_command, verifier_files)
     out: list[IntegrityFlag] = []
     for path in sorted(set(before) | set(after)):
         old, new = before.get(path, ""), after.get(path, "")
@@ -336,7 +443,7 @@ def flag_snapshots(
         # The whole texts decide the skip rule, not the n=0 patch: without context a decorator
         # added above an unchanged ``def`` could not be attributed to that test.
         sides = [(old.splitlines(), new.splitlines())]
-        out.extend(_flag(path, patch, sides, verify_command=verify_command))
+        out.extend(_flag(path, patch, sides, verifier))
     return _ordered(out)
 
 

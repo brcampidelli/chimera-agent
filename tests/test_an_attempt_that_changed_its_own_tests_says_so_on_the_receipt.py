@@ -166,6 +166,55 @@ def test_a_pytest_node_id_names_its_file() -> None:
     assert VERIFIER_MODIFIED in {f.kind for f in flags}
 
 
+def test_rewriting_the_makefile_recipe_behind_make_test_is_the_verifier_changing() -> None:
+    # `verify_infer` produces `make test` from a Makefile; `test: pytest` -> `test: true` turns the
+    # check green without a test in sight, and neither `make` nor `test` is a path.
+    before = {"Makefile": "test:\n\tpytest -q\n"}
+    after = {"Makefile": "test:\n\ttrue\n"}
+    flags = flag_snapshots(before, after, verify_command="make test")
+    assert [(f.kind, f.path) for f in flags] == [(VERIFIER_MODIFIED, "Makefile")]
+    sub = flag_snapshots(
+        {"sub/Makefile": "test:\n\tpytest\n"}, {"sub/Makefile": "test:\n\ttrue\n"},
+        verify_command="make -C sub test",
+    )
+    assert [f.kind for f in sub] == [VERIFIER_MODIFIED]
+
+
+def test_a_justfile_is_the_verifier_of_just() -> None:
+    flags = flag_snapshots({"justfile": "test:\n  pytest\n"}, {"justfile": "test:\n  true\n"},
+                           verify_command="just test")
+    assert [f.kind for f in flags] == [VERIFIER_MODIFIED]
+
+
+def test_the_file_a_command_was_inferred_from_is_the_verifier() -> None:
+    flags = flag_snapshots({"build.mk": "a\n"}, {"build.mk": "b\n"},
+                           verify_command="make test", verifier_files=["build.mk"])
+    assert [(f.kind, f.path) for f in flags] == [(VERIFIER_MODIFIED, "build.mk")]
+
+
+def test_the_directory_a_command_changes_into_is_not_the_verifier() -> None:
+    # `cd backend && pytest` used to put every source edit under backend/ on the receipt as
+    # "the verifier"; `backend` is where the check runs, not what it runs.
+    flags = flag_snapshots({"backend/app.py": "x = 1\n"}, {"backend/app.py": "x = 2\n"},
+                           verify_command="cd backend && pytest")
+    assert flags == []
+    script = flag_snapshots({"backend/check.sh": "exit 1\n"}, {"backend/check.sh": "exit 0\n"},
+                            verify_command="cd backend && bash check.sh")
+    assert [(f.kind, f.path) for f in script] == [(VERIFIER_MODIFIED, "backend/check.sh")]
+
+
+def test_a_test_directory_the_command_names_does_not_duplicate_tests_touched() -> None:
+    after = _TESTS.replace("== 3", "== 3  # sum")
+    flags = flag_snapshots({"tests/test_m.py": _TESTS}, {"tests/test_m.py": after},
+                           verify_command="pytest tests -q")
+    assert [f.kind for f in flags] == [TESTS_TOUCHED]
+
+
+def test_an_option_value_is_not_a_file() -> None:
+    flags = flag_snapshots({"slow": "a\n"}, {"slow": "b\n"}, verify_command="pytest -k slow -q")
+    assert flags == []
+
+
 def test_conftest_is_the_runner_even_when_no_test_changed() -> None:
     flags = flag_snapshots({}, {"conftest.py": "collect_ignore = ['tests']\n"})
     assert [f.kind for f in flags] == [VERIFIER_MODIFIED]
@@ -232,7 +281,9 @@ def test_an_attempt_that_skipped_a_test_still_succeeds_and_says_so(tmp_path: Pat
     # Record-only: the verdict and the pause are exactly what they were before the flags existed.
     assert result.success is True and result.paused is False
     flags = result.attempts[-1].integrity_flags
-    assert {TESTS_TOUCHED, VERIFIER_MODIFIED, TESTS_REMOVED_OR_SKIPPED} <= _kinds(flags)
+    # `pytest tests -q` names a directory: the test file under it is touched and skipped, and is
+    # not "the verifier" (that would only repeat tests_touched for every test edit).
+    assert _kinds(flags) == {TESTS_TOUCHED, TESTS_REMOVED_OR_SKIPPED}
 
 
 def test_a_source_only_fix_carries_no_integrity_flag(tmp_path: Path) -> None:
@@ -252,7 +303,16 @@ def test_the_flags_reach_the_written_receipt(tmp_path: Path) -> None:
     result = _run(ws, {"tests/test_m.py": None})
     receipt = build_receipt(result, "fix add", "pytest tests -q", "2026-10-05T00:00:00Z")
     kinds = _kinds(receipt.attempts[-1].integrity_flags)
-    assert {TESTS_TOUCHED, VERIFIER_MODIFIED, TESTS_REMOVED_OR_SKIPPED} <= kinds
+    assert kinds == {TESTS_TOUCHED, TESTS_REMOVED_OR_SKIPPED}
+
+
+def test_a_verify_script_the_attempt_rewrote_reaches_the_receipt(tmp_path: Path) -> None:
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "check.sh").write_text("exit 1\n", encoding="utf-8")
+    result = _run(ws, {"check.sh": "exit 0\n"}, verifier=_CommandLikeVerifier("bash check.sh"))
+    receipt = build_receipt(result, "fix add", "bash check.sh", "2026-10-05T00:00:00Z")
+    assert _kinds(receipt.attempts[-1].integrity_flags) == {VERIFIER_MODIFIED}
 
 
 def test_the_verify_command_is_an_event_in_the_ledger(tmp_path: Path) -> None:

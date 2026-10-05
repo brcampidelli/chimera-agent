@@ -56,6 +56,22 @@ eligibility bar for a later opt-in pause (≤ 5% with Wilson upper ≤ 10% in bo
 - `tests_touched` — **not eligible** (Harness-Bench upper bound 11.9%), and it should never gate:
   on test-writing tasks it fires by design.
 
+**What the `verifier_modified` reading does not cover.** Its command arm was exercised here only by
+a single-file command (`python -m pytest … test_flatten.py`, fix history) or by no command at all
+(Harness-Bench, 0/547). Its false-positive rate on commands that name a DIRECTORY (`pytest tests`,
+`cd backend && pytest`) or run a build file (`make test`, `just test`, `tox`) is **unmeasured**.
+After review, the rule was amended so a directory is never "the verifier" (only a file the command
+names, the build file behind `make`/`just`/`tox`/`nox`, or the file the command was inferred from);
+that amendment is untested by this corpus for the same reason.
+
+**Re-read after review (same day, same corpora, same reader).** The rule was amended twice after
+this reading: skip markers are now attributed to the test they decorate and counted as a multiset
+(a bare `@pytest.mark.skip` moved onto the failing test used to read as "only moved"), and the
+command arm changed as above. `measure.py` re-run with the amended module produced a
+`readings.json` byte-identical to the committed one, so every number above stands for the amended
+rule too. That is expected and says little: the removed/skipped rule never fired in either corpus,
+and the only command was a single file.
+
 Eligible means a later PR may propose an opt-in REVIEW on that flag, still shipped OFF; neither
 corpus contains known verifier tampering, so no catch rate exists yet and nothing here says the
 flags catch anything.
