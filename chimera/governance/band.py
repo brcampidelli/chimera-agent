@@ -51,8 +51,11 @@ That premise has a hole, stated so nobody reads "the action alone" as "nothing t
 look like a harmless turn reaches the decider as part of the action, and nothing here strips it.
 Against per-action blocking monitors, injection written by the monitored agent ran arbitrary bash in
 79% of trials (arXiv 2609.19587). The band only ever adds a review card, never removes one, so the
-cost is a missed card rather than a wrong block; whether the envelope-as-comment moves ``p`` is open,
-test first on the governance corpus.
+cost is a missed card rather than a wrong block. Whether the envelope-as-comment, or a tail of forged
+chat-template tokens, moves ``p`` is still open: the experiment is registered in
+`bench/band_input/PREREGISTRATION.md` (S30-31, arms, decision rule and the control that must hold
+before anything is read), and its 275 local calls have not run yet. Until they do, nothing here
+changes what the decider reads.
 """
 
 from __future__ import annotations
