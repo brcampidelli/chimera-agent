@@ -145,7 +145,9 @@ def run() -> dict[str, Any]:
         no_gate_unmarked=summary["configs"]["no_gate"]["poison"]["unmarked"],
         n_poison=summary["configs"]["no_gate"]["poison"]["n"],
     )
-    (OUT / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    (OUT / "summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8", newline="\n"
+    )
     return summary
 
 
