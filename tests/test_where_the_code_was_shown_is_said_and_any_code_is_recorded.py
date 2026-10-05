@@ -109,7 +109,7 @@ def test_a_terminal_is_shown_the_code(
     assert pending.code_shown(tmp_path, request_id) == "terminal"
     pending.answer(tmp_path, request_id, False)
     thread.join(WAIT)
-    assert re.search(rf"--yes --code \d{{6}}", capsys.readouterr().err)
+    assert re.search(r"--yes --code \d{6}", capsys.readouterr().err)
 
 
 def test_stderr_that_is_not_a_terminal_is_never_shown_the_code(
