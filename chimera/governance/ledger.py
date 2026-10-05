@@ -260,13 +260,28 @@ def _url_tokens(url: str) -> list[str]:
 
 # --- S30-28: a clone of a repository, and the shell as a way of fetching --------------------------
 
-_CLONE = re.compile(r"\bgit\s+(?:-\S+\s+)*clone\b(?P<rest>[^\n;&|]*)|\bgh\s+repo\s+clone\b(?P<gh>[^\n;&|]*)")
+# git's global options before the subcommand. `-c <k=v>`, `-C <dir>` and the long ones that take a
+# value consume it, so `git -c http.sslVerify=false clone URL` and `git -C /tmp clone URL` are still
+# clones (the first version allowed only words starting with `-` and read both as no clone at all).
+_GIT_GLOBAL = (
+    r"(?:(?:-[cC]|--git-dir|--work-tree|--namespace|--config-env|--exec-path|--super-prefix)"
+    r"(?:=|\s+)\S+\s+|-\S+\s+)*"
+)
+_CLONE = re.compile(
+    rf"\bgit\s+{_GIT_GLOBAL}clone\b(?P<rest>[^\n;&|]*)"
+    rf"|\bgit\s+{_GIT_GLOBAL}submodule\s+add\b(?P<sub>[^\n;&|]*)"
+    r"|\bgh\s+repo\s+clone\b(?P<gh>[^\n;&|]*)"
+)
 # Options of `git clone` that take the next word as their value, so it is not the source.
 _CLONE_VALUE_OPTS = frozenset(
     {"-b", "--branch", "-o", "--origin", "--depth", "-c", "--config", "--reference",
      "--reference-if-able", "--separate-git-dir", "-u", "--upload-pack", "-j", "--jobs",
      "--template", "--shallow-since", "--shallow-exclude", "--filter", "--server-option"}
 )
+# Options of `git submodule add` that take a value.
+_SUBMODULE_VALUE_OPTS = frozenset({"-b", "--branch", "--name", "--reference", "--depth"})
+# The forge a bare `owner/repo` means. Anywhere else the user has to have named the host.
+_DEFAULT_FORGE = "github.com"
 _SCHEME_REMOTE = re.compile(
     r"^(?:https?|ssh|git)://(?:[^@/]+@)?(?P<host>[^/:]+)(?::\d+)?/(?P<path>[^?#]+)$", re.I
 )
@@ -282,7 +297,13 @@ def _clone_sources(command: str) -> list[tuple[str, bool]]:
     out: list[tuple[str, bool]] = []
     for match in _CLONE.finditer(command or ""):
         gh = match.group("gh") is not None
-        words = [w.strip("'\"") for w in (match.group("gh") if gh else match.group("rest")).split()]
+        if gh:
+            tail, value_opts = match.group("gh"), frozenset[str]()
+        elif match.group("sub") is not None:
+            tail, value_opts = match.group("sub"), _SUBMODULE_VALUE_OPTS
+        else:
+            tail, value_opts = match.group("rest"), _CLONE_VALUE_OPTS
+        words = [w.strip("'\"") for w in tail.split()]
         skip = False
         for word in words:
             if skip:
@@ -291,7 +312,7 @@ def _clone_sources(command: str) -> list[tuple[str, bool]]:
             if word == "--":
                 continue
             if word.startswith("-"):
-                skip = not gh and word in _CLONE_VALUE_OPTS
+                skip = word in value_opts
                 continue
             out.append((word, gh))
             break
@@ -318,9 +339,17 @@ def _remote_repo(source: str, *, gh: bool) -> tuple[str, str] | None:
 
 
 def _repo_forms(host: str, path: str) -> set[str]:
-    """The spellings of a repository a user could have written, each with and without `.git`/`/`."""
-    bases = {path, f"{host}/{path}", f"https://{host}/{path}", f"http://{host}/{path}",
+    """The spellings of a repository a user could have written, each with and without `.git`/`/`.
+
+    The bare ``owner/repo`` only on the default forge. Elsewhere it would let the host change under
+    the user's words: "Clone psf/requests" names a repository on GitHub, and counting it as a name
+    for `https://git.evil.test/psf/requests` let a model or an injection pick the host (study 30
+    review). Off the default forge the user has to have written the host too.
+    """
+    bases = {f"{host}/{path}", f"https://{host}/{path}", f"http://{host}/{path}",
              f"git@{host}:{path}", f"ssh://git@{host}/{path}"}
+    if host == _DEFAULT_FORGE:
+        bases.add(path)
     return {base + suffix for base in bases for suffix in ("", ".git", "/")}
 
 
