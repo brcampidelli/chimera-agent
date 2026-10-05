@@ -20,9 +20,12 @@ memory of it.
 layers, in order of confidence:
 1. every environment value whose variable *name* looks like a credential (`*API_KEY*`, `*SECRET*`,
    `*TOKEN*`, `*PASSWORD*`, `*CREDENTIAL*`, `*PRIVATE_KEY*`) is replaced verbatim wherever it appears,
-   and so are its base64, hex, character-code, escaped, reversed and percent-encoded copies
-   (`bench/encoded_secrets`: every form caught, no false positive in 7,240 texts); a copy split
-   across lines, ROT13'd or encoded twice is not;
+   and so are its encoded copies: base64 on one line (alone or inside a longer blob), hex with or
+   without separators, decimal character codes, `0x`/`\x`/JSON/HTML escapes, the reversed string,
+   and percent-encoding with any choice of escaped characters; a non-ASCII secret as UTF-8 bytes
+   and as code points (`bench/encoded_secrets`, Addendum A: every listed form caught, no false
+   positive in 12,912 texts; the module docstring is the exact list). A copy split across lines
+   (wrapped base64 included), ROT13'd, compressed or encoded twice is not;
 2. secrets given away by *where* they sit: URL userinfo, a query parameter named like a credential,
    an `Authorization` header, a cookie, a database DSN, a webhook path;
 3. narrow key shapes (`sk-…`, `ghp_…`, JWTs and a few others).

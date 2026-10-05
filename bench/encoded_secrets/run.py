@@ -21,6 +21,7 @@ import json
 import math
 import os
 import random
+import re
 import string
 import subprocess
 import sys
@@ -78,7 +79,10 @@ ENCODINGS: dict[str, Callable[[str], str]] = {
 PERCENT: dict[str, Callable[[str], str]] = {
     "percent": lambda s: quote(s, safe=""),
     "percent_default": lambda s: quote(s),
-    "percent_lower": lambda s: quote(s, safe="").lower(),
+    # The escapes in lower case, the characters kept: the first addendum run used `.lower()` on the
+    # whole string, which lowercases the secret's own letters and so encodes a DIFFERENT value
+    # (0/398 there, a corpus defect, kept in results/2026-10-05b-addendum-a.json).
+    "percent_lower": lambda s: re.sub(r"%[0-9A-F]{2}", lambda m: m.group().lower(), quote(s, safe="")),
 }
 #: Addendum A: forms over code points, which differ from the byte forms only for a non-ASCII secret.
 CODE_POINTS: dict[str, Callable[[str], str]] = {
