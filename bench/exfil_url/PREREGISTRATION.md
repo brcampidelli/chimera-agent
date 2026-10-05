@@ -106,3 +106,9 @@ because it is 11% of real traffic; its real frequency is unknown, and the trace 
 supply it (no web fetches in those traces). So even if (1)–(3) hold, the rule ships **off** in this
 change, and the numbers go to the owner: adopting it is a separate change, made on a reading of real
 fetch traffic.
+
+## Addendum, after the readings (no prediction or criterion changed)
+
+A registered limit this document should have named beside `word` and did not: a value split into
+pieces shorter than 16 characters by a hyphen, a dot or a slash is not a data-like run, and the
+attacker picks the split. See RESULTS.md, "Added after the readings".

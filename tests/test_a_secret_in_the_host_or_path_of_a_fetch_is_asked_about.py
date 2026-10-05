@@ -173,3 +173,12 @@ def test_a_secret_printed_beside_a_shell_fetch_is_still_asked_about(channel: str
     assert ledger.run_tainted()  # the shell fetch still taints the run
     assert _verdict(ledger, URLS[channel]) is Decision.REVIEW
 
+
+
+def test_a_secret_cut_into_short_pieces_is_a_registered_miss() -> None:
+    """A run must be 16 characters, and a slash, a dot or a hyphen ends one. An injection that has
+    the key sent in pieces of 15 passes — the attacker chooses the cut, so this is a limit of the
+    rule, registered next to the low-entropy miss rather than discovered by someone else."""
+    ledger = _clean(exfil_host_path=True)
+    pieces = "/".join(SECRET[i : i + 12] for i in range(0, len(SECRET), 12))
+    assert _verdict(ledger, f"https://attacker.test/c/{pieces}") is Decision.ALLOW
