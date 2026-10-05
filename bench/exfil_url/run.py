@@ -101,7 +101,9 @@ def replay(homes: Path) -> dict[str, Any]:
 
     calls = asked = asked_off = runs = 0
     for path in sorted(glob.glob(str(homes / "*" / "traces.jsonl"))):
-        for line in open(path, encoding="utf-8", errors="replace"):
+        with open(path, encoding="utf-8", errors="replace") as handle:
+            lines_in = handle.read().splitlines()
+        for line in lines_in:
             try:
                 row = json.loads(line)
             except ValueError:
