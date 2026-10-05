@@ -296,12 +296,35 @@ class GovernedTool(Tool):
                            f"The tool did NOT run. A fixed signature refused it, not the governance "
                            f"mode: no approver can release it. Do not report this as done.")
         if verdict.decision == Decision.REVIEW:
-            approved = self.approve(verdict, action) if self.approve else False
+            # What the words of a shell command do not say and decide what runs: which program each
+            # name resolves to, and which git hooks it sets off (study 30, S30-30). On the card, so
+            # the yes is to that; never to the kernel above, whose rules read what was written.
+            shown = action + self._what_it_runs(judged, judged_args)
+            approved = self.approve(verdict, shown) if self.approve else False
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
                                f"The tool did NOT run. {self._why_nobody_approved()} Do not "
                                f"report this as done.")
         return self.inner.run(**kwargs)
+
+    def _what_it_runs(self, name: str, kwargs: dict[str, Any]) -> str:
+        """The resolved programs and repository hooks of a ``run_shell`` call, or ""."""
+        if name != "run_shell" or not isinstance(kwargs.get("command"), str):
+            return ""
+        from pathlib import Path
+
+        from chimera.governance.exec_facts import block
+
+        workspace: Path | None = None
+        tool: Any = self.inner
+        while tool is not None and workspace is None:
+            found = getattr(tool, "workspace", None)
+            workspace = Path(found) if isinstance(found, (str, Path)) else None
+            tool = getattr(tool, "inner", None)
+        base = workspace or Path.cwd()
+        rel = kwargs.get("cwd")
+        cwd = (base / str(rel)) if rel else base
+        return block(str(kwargs["command"]), cwd, workspace)
 
     def _why_nobody_approved(self) -> str:
         """The sentence after "the tool did NOT run" — different per reason, because the fixes are.

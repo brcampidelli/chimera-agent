@@ -154,6 +154,13 @@ def _facts_of(*args: Any) -> dict[str, Any]:
     decision_id = getattr(head, "decision_id", "")
     if isinstance(decision_id, str) and decision_id:
         facts["decision_id"] = decision_id
+    # The programs and hooks the card named (`exec_facts`), onto the record: the record keeps the
+    # first 200 characters of the action, and the block is at its END by design.
+    from chimera.governance.exec_facts import programs_of
+
+    programs = programs_of(action)
+    if programs:
+        facts["programs"] = programs
     return facts
 
 

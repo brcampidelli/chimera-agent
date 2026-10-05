@@ -610,6 +610,9 @@ FACTS: tuple[str, ...] = ("run_id", "surface", "tool", "rule", "lineage", "sourc
 #: deployment's own data, where today the map comes from 55 bench items.
 NUMERIC_FACTS = ("p",)
 FACTS = FACTS + NUMERIC_FACTS + ("band", "decider_model", "decision_id")
+#: What the card said a shell command would run — each program as PATH resolved it and the git hooks
+#: it sets off (`exec_facts`, study 30 S30-30). A list, kept like ``sources``.
+FACTS = FACTS + ("programs",)
 
 
 def _record(
