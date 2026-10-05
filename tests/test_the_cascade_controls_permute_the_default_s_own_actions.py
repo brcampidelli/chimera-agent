@@ -83,3 +83,26 @@ def test_d_s_actions_reproduce_the_registered_replay_on_the_run() -> None:
 def test_the_published_controls_are_what_the_script_computes_now() -> None:
     assert json.loads((RUN / "controls.json").read_text(encoding="utf-8")) == json.loads(
         json.dumps(controls.build(RUN), sort_keys=True))
+
+
+def test_the_report_names_what_the_registered_set_leaves_out() -> None:
+    full = [_item(0, d="wrong", a="wrong"), _item(1), _item(2, action=DIVERT, d="handoff")]
+    rep = controls.excluded_from_p(full[1:], full)
+    assert rep["n"] == 1 and rep["by_action"][KEEP] == 1 and rep["d_wrong"] == 1 and rep["items"] == ["i0"]
+
+
+@needs_run
+def test_the_full_set_puts_back_the_d_keeps_the_registered_set_drops() -> None:
+    """P's cut is conditioned on D keeping d1: on this run all 11 items it drops are D-keeps and 5 of
+    them are D-wrong. The full-set reading must carry them, or it reports P a second time."""
+    from bench.verified_cascade.replay import RunData
+
+    rd = RunData(RUN)
+    registered = controls.build_items(rd)
+    sens = controls.sensitivity_full_set(rd, registered)
+    ex = sens["excluded_from_P"]
+    assert ex["n"] == 11 and ex["by_action"] == {KEEP: 11, ESCALATE: 0, DIVERT: 0} and ex["d_wrong"] == 5
+    for fill, r in sens["by_fill"].items():
+        assert r["n"] == len(registered) + 11, fill
+        assert r["all"]["wrong_d"] == 21 and r["all"]["wrong_a"] == 32
+        assert not r["R2"]["wrong"]["below_p5"] and r["R1"]["wrong"]["below_p5"]

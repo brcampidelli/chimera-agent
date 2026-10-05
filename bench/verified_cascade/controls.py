@@ -60,8 +60,16 @@ def _escalation_label(rd: RunData, item_id: str) -> str | None:
     return label
 
 
-def build_items(rd: RunData) -> list[Item]:
-    """The set P: A and D both labelled and the escalation outcome defined (preregistration §P)."""
+def build_items(rd: RunData, *, fill: str | None = None) -> list[Item]:
+    """The set P: A and D both labelled and the escalation outcome defined (preregistration §P).
+
+    With ``fill``, an item whose escalation outcome is undefined is kept and that outcome is set to
+    ``fill``. This is the post-hoc sensitivity check, not the registered set. P's cut is conditioned
+    on D's own decision: on this run every item it drops is one D *kept*, so f1 was never needed
+    there, and five of those eleven are D-wrong. Dropping them removes a quarter of D's errors while
+    removing 2.8% of the items. Only a random draw that happens to escalate such an item needs the
+    missing outcome, so bounding it (wrong / not answered / correct) gives the full-set reading.
+    """
     out: list[Item] = []
     for item in rd.items:
         iid = item["item_id"]
@@ -70,6 +78,8 @@ def build_items(rd: RunData) -> list[Item]:
         d_out = arms["D"][0]
         d_label = shipped_label(rd, item, d_out)
         esc = _escalation_label(rd, iid)
+        if esc is None:
+            esc = fill
         if a_label is None or d_label is None or esc is None:
             continue
         r1 = rd.reading("local", iid, "d1")
@@ -180,8 +190,41 @@ def replay_mismatches(items: Sequence[Item]) -> int:
     )
 
 
+FILLS = ("wrong", NOT_ANSWERED, "correct")
+"""The bounds for an undefined escalation outcome: the worst, the registered hand-off, the best."""
+
+
+def excluded_from_p(registered: Sequence[Item], full: Sequence[Item]) -> dict[str, Any]:
+    """What P leaves out of the full labelled set, by D's action and D's label."""
+    kept = {i.item_id for i in registered}
+    gone = [i for i in full if i.item_id not in kept]
+    return {
+        "n": len(gone),
+        "by_action": {a: sum(i.action == a for i in gone) for a in (KEEP, ESCALATE, DIVERT)},
+        "d_wrong": sum(i.d_label == "wrong" for i in gone),
+        "a_wrong": sum(i.a_label == "wrong" for i in gone),
+        "items": sorted(i.item_id for i in gone),
+    }
+
+
+def sensitivity_full_set(rd: RunData, registered: Sequence[Item]) -> dict[str, Any]:
+    """Post-hoc (study 30 review): the controls on every item where A and D are labelled, with the
+    missing escalation outcomes filled at each bound. Reported next to P, never in place of it."""
+    by_fill: dict[str, Any] = {}
+    full: list[Item] = []
+    for fill in FILLS:
+        full = build_items(rd, fill=fill)
+        bad = replay_mismatches(full)
+        if bad:
+            raise SystemExit(f"{bad} items (fill {fill}): D's action model does not reproduce the replay")
+        by_fill[fill] = {"n": len(full), "all": paired_d_minus_a(full),
+                         "R1": control_r1(full), "R2": control_r2(full)}
+    return {"excluded_from_P": excluded_from_p(registered, full), "by_fill": by_fill}
+
+
 def build(out: Path) -> dict[str, Any]:
-    items = build_items(RunData(out))
+    rd = RunData(out)
+    items = build_items(rd)
     bad = replay_mismatches(items)
     if bad:
         raise SystemExit(f"{bad} items: D's action model does not reproduce the registered replay")
@@ -189,6 +232,7 @@ def build(out: Path) -> dict[str, Any]:
         "n_P": len(items), "all": paired_d_minus_a(items),
         "R1": control_r1(items), "R2": control_r2(items),
         "leave_one_out": {f: leave_one_out(items, f) for f in ("family", "doc", "lang")},
+        "sensitivity_full_set": sensitivity_full_set(rd, items),
     }
 
 
@@ -204,6 +248,16 @@ def fmt(rep: dict[str, Any]) -> str:
              f"R1 (random escalation of k={rep['R1']['k_escalated']}): wrong {dist(rep['R1']['wrong'])}",
              f"R2 (D's shares {rep['R2']['shares']} permuted): wrong {dist(rep['R2']['wrong'])}",
              f"R2 ANS not answered: {dist(rep['R2']['ans_not_answered'])}"]
+    sens = rep["sensitivity_full_set"]
+    ex = sens["excluded_from_P"]
+    lines.append(f"\nnot in P: {ex['n']} items, D's actions {ex['by_action']}, D wrong {ex['d_wrong']}, A wrong {ex['a_wrong']}")
+    for fill, r in sens["by_fill"].items():
+        al = r["all"]
+        lines.append(f"full set, missing escalation outcome = {fill}: n {r['n']} D {al['wrong_d']} A {al['wrong_a']} "
+                     f"diff {al['diff']:+.4f} p {al['p']:.4f}")
+        lines.append(f"  R1 wrong: {dist(r['R1']['wrong'])}")
+        lines.append(f"  R2 wrong: {dist(r['R2']['wrong'])}")
+        lines.append(f"  R2 ANS not answered: {dist(r['R2']['ans_not_answered'])}")
     for field, groups in rep["leave_one_out"].items():
         lines.append(f"\nleave-one-{field}-out:")
         for g, r in groups.items():
