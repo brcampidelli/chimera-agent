@@ -22,6 +22,7 @@ no money spent.** Read `PREREGISTRATION.md` first; Amendment 0 at its end record
 | `run.py` | the stages S0–S6 with their gates, resumable, spend-capped |
 | `report.py`, `stats.py` | the registered metrics (exact McNemar, Holm, Newcombe, clustered bootstrap, verifier AUROC/ECE) |
 | `power.py` | the exact-McNemar power numbers §6 quotes |
+| `PREREGISTRATION-controls.md`, `controls.py` | study 30's content-blind controls and leave-one-category-out for the shipped default (`results/run/controls.json`; read in `RESULTS.md`) |
 | `results/excerpts.jsonl`, `skeleton.jsonl`, `sources.json` | the pool (365 chunks), 144 gold slots, source hashes |
 | `results/questions_ans.jsonl`, `questions_ncp.jsonl` | the authored questions (144 ANS, 112 NCP) |
 | `results/items.jsonl`, `verifier_slice.jsonl`, `freeze_report.txt`, `manifest.json` | the frozen 400 items, 1,230 V triples, and their hashes |
