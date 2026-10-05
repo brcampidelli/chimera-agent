@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
-from chimera.governance.ledger import WRITE_TOOLS
+from chimera.governance.ledger import WRITE_TOOLS, TaintLedger
 from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
@@ -314,6 +314,25 @@ def _find_tool(tools: ToolRegistry, name: str) -> Any:
     return found if hasattr(found, "bind") else None
 
 
+def _ledgers_of(tools: ToolRegistry) -> list[TaintLedger]:
+    """Every taint ledger the session's tools report to, once each.
+
+    The loop does not own a ledger; the surface wraps the registry in :class:`LedgeredTool`s that
+    hold one (and governance may wrap those again). So the ledger is found where the tools carry it,
+    walking each wrapper chain. Usually one; a list because nothing stops a caller from wrapping
+    twice, and an untrusted read must reach whichever one a later call is checked against.
+    """
+    found: dict[int, TaintLedger] = {}
+    for tool in tools.tools():
+        current: Any = tool
+        while current is not None:
+            ledger = getattr(current, "ledger", None)
+            if isinstance(ledger, TaintLedger):
+                found.setdefault(id(ledger), ledger)
+            current = getattr(current, "inner", None)
+    return list(found.values())
+
+
 @dataclass
 class AgentConfig:
     """Tunable behaviour for an :class:`Agent` run."""
@@ -452,6 +471,11 @@ class AgentConfig:
     # project's own conventions the way every other agent tool already does — see
     # chimera.core.agents_md for what is read, in what order, and why it can never grant capability.
     project_root: Path | None = None
+    #: Whether that workspace's AGENTS.md is the owner's conventions (True) or untrusted input
+    #: (False). None follows ``CHIMERA_TRUST_WORKSPACE``, the switch ``read_file`` and ``grep``
+    #: already obey, and that is what every surface passes; a bench or a test names it. False fences
+    #: the file and takes it into the run's taint ledger (study 30, S30-26).
+    trust_workspace: bool | None = None
     #: The owner's own instructions, already rendered (see chimera.core.instructions).
     #:
     #: Passed in rather than read from disk here, unlike ``project_root``: an AGENTS.md is workspace
@@ -872,7 +896,9 @@ class Agent:
             system_prompt = f"{system_prompt}\n\n{project_block}"
         # Last, and the ordering is the point: `agents_md` says in its own injected text that a
         # repository is a convention rather than an authority, and an AGENTS.md can come from a repo
-        # cloned an hour ago. This is the owner speaking, so it is read last and wins. Appended,
+        # cloned an hour ago. (Under CHIMERA_TRUST_WORKSPACE=0 it is also fenced and taints the run —
+        # `_project_context`; under the default that sentence is still all that guards it.) This
+        # is the owner speaking, so it is read last and wins. Appended,
         # never substituted — the default prompt carries the act-rather-than-describe rule and the
         # untrusted-data fence, and a customisation that could delete those would delete them
         # silently.
@@ -986,8 +1012,26 @@ class Agent:
         try:
             from chimera.core.agents_md import load_agent_instructions
 
+            trusted = self.config.trust_workspace
+            if trusted is None:
+                from chimera.config import get_settings
+
+                trusted = get_settings().trust_workspace
             focus = [self.run_state.open_file[0]] if self.run_state.open_file else []
-            found = load_agent_instructions(self.config.project_root, focus=focus)
+            found = load_agent_instructions(
+                self.config.project_root, focus=focus, untrusted=not trusted
+            )
+            if found and not trusted:
+                # The operator said this workspace holds code they do not control, so its AGENTS.md
+                # is what an untrusted `read_file` of it would be: taken in by every ledger the run's
+                # tools report to, before the first step, so the narrowing is armed from that step.
+                # Inside the try on purpose: if this raises, the block is dropped with it, and the
+                # file never reaches a prompt whose ledger does not know about it. With no ledger
+                # (no `--taint`) there is nothing to arm; the fence still applies, as it does not
+                # for `read_file`, because this text goes in the system prompt.
+                for ledger in _ledgers_of(self.tools):
+                    for rel, body in found.shown:
+                        ledger.record_project_instructions(rel, body)
             if found.truncated:
                 # Said out loud rather than swallowed: an agent silently handed half a rules file
                 # will follow half the rules, and the half it dropped is unknowable after the fact.

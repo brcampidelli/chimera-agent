@@ -1009,7 +1009,9 @@ class Settings(BaseSettings):
     # repo, and tainting every `read_file` would make `--taint` fire on every run (unusable). Set
     # False when running against code you do NOT control — a third-party repo, a PR branch, anything
     # downloaded — so a `read_file` of a poisoned source file taints the run like a fetched page does,
-    # arming the same tool-narrowing gate. Only takes effect under `--taint`. (The sandbox is still the
+    # arming the same tool-narrowing gate. The repository's AGENTS.md follows it too: False fences it
+    # in the system prompt and taints the run before step 1 (study 30, S30-26; the fence applies
+    # always, the taint under `--taint`). Only takes effect under `--taint`. (The sandbox is still the
     # real boundary for hostile code — see SECURITY.md.)
     trust_workspace: bool = Field(default=True, validation_alias="CHIMERA_TRUST_WORKSPACE")
 

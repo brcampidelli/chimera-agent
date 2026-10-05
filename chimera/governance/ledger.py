@@ -472,6 +472,28 @@ class TaintLedger:
             "read", path, tainted=self.is_tainted(path), requested_by=self._label(requested_by, path)
         )
 
+    def record_project_instructions(self, source: str, content: str) -> bool:
+        """Take in a repository instructions file the harness put in the prompt; True if it was new.
+
+        Only called when the operator declared the workspace untrusted (``CHIMERA_TRUST_WORKSPACE=0``,
+        study 30, S30-26): the file is then what an untrusted ``read_file`` is, an external fetch.
+        Two things differ from :meth:`record_fetch` called directly, both on purpose:
+
+        - **``requested_by`` is ``agent``, always.** The harness loaded the file; the person did not
+          ask for it. An instruction that says "follow AGENTS.md" names the file, and deriving the
+          label would read ``user`` — which the ``authority`` mode then overlooks for the narrowing.
+          The words in it are still the repository's, not the person's.
+        - **Once per (file, content).** The system prompt is composed per run and again on some
+          paths, and the epoch is part of an approval's key: taking the same bytes in twice would
+          expire a yes given in between, for no new fact.
+        """
+        detail = f"sha256:{_hash(content)}"
+        if any(e.kind == "fetch" and e.ref == source and e.detail == detail for e in self.events):
+            return False
+        self.record_fetch(source, content=content, requested_by="agent")
+        self.note_seen(content)
+        return True
+
     def record_write(self, path: str, content: str = "") -> CapabilityEvent:
         """Record a file write; the path inherits taint if the content came from a tainted source."""
         path = (path or "").strip()
