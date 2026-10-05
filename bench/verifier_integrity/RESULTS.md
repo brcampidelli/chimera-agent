@@ -72,6 +72,10 @@ command arm changed as above. `measure.py` re-run with the amended module produc
 rule too. That is expected and says little: the removed/skipped rule never fired in either corpus,
 and the only command was a single file.
 
+**Scope, corrected.** The pre-registration says "every attempt receipt"; the flags run on the
+autonomous loop's attempt receipts and, since the review, on the Code tab's verdict after each
+editing turn. They do not run on the crew's per-worker check or its re-verify of the merge.
+
 Eligible means a later PR may propose an opt-in REVIEW on that flag, still shipped OFF; neither
 corpus contains known verifier tampering, so no catch rate exists yet and nothing here says the
 flags catch anything.

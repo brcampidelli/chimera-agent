@@ -26,6 +26,13 @@ its false-positive rate, measured on stored solves in `bench/verifier_integrity/
 that a reader of the receipt can tell "verified against the user's tests" from "verified against
 tests this same attempt rewrote" without re-reading the diff.
 
+Where it runs, and where it does not: on the autonomous loop's attempt receipts (``chimera solve``,
+the desktop Run, everything built on `AutonomousAgent`) and on the Code tab's verdict after each
+editing turn (``integrity_flags`` on the ``verified`` event and the stored receipt). NOT on the
+crew's per-worker check or its re-verify of the merge (`chimera/orchestration/crew.py`): a worker
+runs in its own worktree with no snapshot taken here, so nothing there says these flags were
+checked, and an absent field must not be read as a clean one.
+
 Lexical by design and declared as such: no model, no network, no ``ast`` (test files are Python,
 JavaScript, Go…). A test renamed in the same patch reads as removed; a skip added through a helper
 the regexes do not know is missed. Both limits are the price of a rule cheap enough to run on every

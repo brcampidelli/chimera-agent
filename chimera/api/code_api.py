@@ -2392,29 +2392,71 @@ def register_code_api(
                         token = _undo_offers.offer(session_id, (guard, guard.diff_since(before)))
                         outcome["token"] = token
                         command, source = resolve_verify(None, ws)
+                        # The file an inferred command came out of (`inferred:Makefile`): the
+                        # verifier only keeps `inferred`, so this is the one place that knows it.
+                        origin = source.split(":", 1)[1] if source.startswith("inferred:") else ""
+                        # Did this turn change what is about to judge it — a test rewritten,
+                        # deleted or skipped, the Makefile behind `make test`? Measured on the
+                        # turn's own change, BEFORE the verifier runs (its caches are not the
+                        # turn's work). Record-only, as on the autonomous loop's attempt receipts:
+                        # a green check beside one of these is a pass against tests this same turn
+                        # rewrote, and the reader should not have to re-read the diff to know.
+                        #
+                        # `origin` is NOT passed as a verifier file. Every origin that decides what
+                        # runs is already covered by the command itself (`make test` -> Makefile,
+                        # `npm test` -> the "test" line of package.json, pytest.ini/pyproject/
+                        # setup.cfg -> their runner section), and the rest — Cargo.toml, go.mod,
+                        # `tests/` — would flag every dependency edit as "the verifier changed".
+                        from chimera.governance.verifier_integrity import flag_snapshots
+
+                        integrity = [
+                            f.render()
+                            for f in flag_snapshots(
+                                before.files, guard.snapshot().files,
+                                verify_command=command or "",
+                            )
+                        ][:50]
                         if command is None:
                             outcome["verified"] = "none"
                             emit("verified", {
                                 "command": None, "source": source, "state": "none",
-                                "revert_token": token,
+                                "revert_token": token, "integrity_flags": integrity,
                             })
                         else:
-                            verified_run = CommandVerifier(
-                                command, ws, source=verifier_source(source)
-                            ).verify()
+                            # The command that decides the turn ran outside the tool registry,
+                            # so the ledger watching every other shell call never saw it (S30-23).
+                            # Recorded before it runs, settled with what came of it.
+                            event = (
+                                ledger.record_verify(
+                                    command, source=verifier_source(source), origin=origin
+                                )
+                                if ledger is not None else None
+                            )
+                            try:
+                                verified_run = CommandVerifier(
+                                    command, ws, source=verifier_source(source)
+                                ).verify()
+                            except BaseException:
+                                if ledger is not None and event is not None:
+                                    ledger.settle_verify(event, "raised")
+                                raise
                             state = (
                                 "abstained" if verified_run.abstained
                                 else "passed" if verified_run.passed
                                 else "failed"
                             )
+                            if ledger is not None and event is not None:
+                                ledger.settle_verify(event, state)
                             outcome["verified"] = state
                             emit("verified", {
                                 "command": command, "source": source, "state": state,
                                 "output": verified_run.output[:4000], "revert_token": token,
+                                "integrity_flags": integrity,
                             })
                             verdict = {
                                 "command": command, "source": source, "state": state,
                                 "output": verified_run.output[:4000],
+                                "integrity_flags": integrity,
                             }
                     # Stored before it is announced, and stored HERE for the same reason usage is:
                     # every path out of a turn comes through this function. The receipt is this
