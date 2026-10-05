@@ -5,6 +5,97 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+### Security
+
+- **A value saved to `.env` reads back as exactly that value, through every writer** (#775). This holds whether or not
+  the desktop bridge is on: the owner's own save, key pools, connectors, vault moves and `chimera init` all went through
+  the same gaps.
+  - **Line breaks** (shipped in 0.64.3): every writer refused `\r` and `\n` and nothing else, and the file was re-read
+    with `splitlines()`, which also splits on U+2028, U+0085 and five more. A value carrying one was written as one line
+    and became a second assignment (a real `CHIMERA_REACH=workspace_shell`) at the next save of any key. Every character
+    in Unicode categories Cc, Cf, Zl and Zp is now refused at the one sink every write goes through, and the file is
+    split on `\n` only.
+  - **Syntax** (present in 0.64.3 and earlier): values were written bare after `KEY=`, which python-dotenv does not read
+    literally. A value opening a double quote swallowed the lines after it, so the owner's `CHIMERA_REACH`,
+    `CHIMERA_APPROVAL`, `CHIMERA_HOST_EXEC` and tool denylist fell back to wider defaults, and a `${NAME}` was expanded
+    from the process environment at the next start. A value is now single-quoted when a bare one would not read back; a
+    `${...}` and a quoted value ending in a backslash are refused with the reason. Real API keys are written unchanged,
+    and the desktop shell reads the server token by the same rule.
+  - **Unparseable values:** one that Settings could not read back (`CHIMERA_BROWSER_SITUATION='x"'`) was saved, and the
+    app would not start until `.env` was edited by hand. Every save, the owner's included, now parses the candidate
+    first and answers 400 naming the key; credentials never enter that probe, so a key save writes the key nowhere else.
+- **Chimera's own `.env` and data folder are known by what they are, not by how a path spells them** (#775). Present
+  since the desktop bridge arrived in 0.62.2, and reachable only with the bridge turned on (off by default, owner-only).
+  `.env `, `.env.`, `.env::$DATA` and the 8.3 name `ENV~1` passed the credential-file check and read and wrote the real
+  `.env` at the operate tier. A workspace spelled `\\?\…`, `\\localhost\C$\…` or `\\127.0.0.1\C$\…` compared unequal to
+  the data folder, and a call naming no workspace was never checked at all, so a `files.write` of
+  `<home>/approvals/<id>.answer.json` answered an approval at the operate tier. Files are now compared by file identity,
+  device and UNC spellings are refused outright, and every path a call names is checked where the route would resolve
+  it. The app's own file routes now refuse Chimera's `.env` and data folder for every caller, so the owner's file viewer
+  no longer opens them either; Settings, approvals and memory keep their own screens, and another project's `.env` opens
+  as before.
+- **No repository, listing or scheduled job the bridge reaches hands out Chimera's `.env` or data** (#775). Present
+  since 0.62.2, with the bridge on only. With a workspace that held them, such as the install folder: `files.search`
+  returned lines from the data folder and `files.tree` and `files.browse` named it and the `.env`; `git.init` committed
+  the `.env` and `git.diff` then printed its changed lines; `git.revert` of `.` ran `git clean -fd` over the data
+  folder. `cron.create` also took a `deliver_to` webhook, an outbound channel the client chose for a job's unattended
+  answers. A workspace inside the data folder, or holding it or the `.env`, is now refused at every tier; git routes
+  hold the app's own folder to the same rule and refuse a `.` or `..` that would contain them; status, diff and listings
+  leave those files out; and `deliver_to` is refused, so the owner adds a webhook in the app.
+- **The agent's write tools, and an external agent through ACP, cannot write Chimera's own `.env` or into its data
+  folder** (#775). Shipped in 0.64.3 and earlier, and independent of the bridge. The write tools refused only the
+  desktop shell's two preference files, so a turn whose workspace contained the install folder could write the `.env` or
+  an answer into `<home>/approvals`; ACP's `fs/read_text_file` and `fs/write_text_file` skipped the checks the native
+  tools make. Both now refuse those places, a person's yes included, a refused ACP write is recorded in the turn's
+  `refused`, and ACP's read follows `CHIMERA_AGENT_READS_OWN_ENV` (see Added). An external agent with file tools of its
+  own still reads and writes without asking us, as its posture note says; `run_shell` and `execute_code` are untouched,
+  the posture governs them.
+
+### Added
+
+- **`CHIMERA_AGENT_READS_OWN_ENV` lets the owner keep Chimera's own `.env` from the agent's read tools** (#775). Default
+  on, today's behaviour, and the Security screen's privacy row now says what that means: the provider keys saved in that
+  file can be read by the agent and reach the model and its provider. Off, `read_file` and the document and media
+  readers refuse the file, and `grep`, `glob` and `list_dir` leave it out, recognised by file identity so `.ENV`,
+  `.env.` and `ENV~1` are the same file; other projects' `.env` files are unaffected, and `run_shell` and `execute_code`
+  are not read tools. Owner-only: the bridge refuses the key, since turning it back on loosens privacy. Read on each
+  tool call, and exposed as `privacy.agent_reads_own_env` on `GET /api/config`.
+- **A skill card for checking the provider before cataloguing a model** (#734), contributed by @GreedyC, with thanks.
+  `check-the-provider-before-you-catalog` takes the slug, price and served context window from the live OpenRouter index
+  through `chimera.providers.listing`, keeps a superseded price in `also_seen` instead of overwriting it, leaves an
+  unknown value as `None`, and checks with `tests/test_catalog_is_live.py`; an advertised window is not taken for the
+  one the route serves. Translated into the nine other languages the app offers.
+
+### Changed
+
+- **Which model answers, and whether the app runs scheduled jobs, are the owner's to set; the bridge may only suggest**
+  (#775). In 0.64.3 these stayed bridge-writable, a judgment call stated then, so a client that read one poisoned page
+  could move every prompt to another vendor or start the unattended scheduler in one call. Sixteen keys (eight `*_MODEL`
+  keys, `CHIMERA_FALLBACK_MODELS`, the fusion panel, judge and synthesizer, the cost mode, the cascade, verified answers
+  and `CHIMERA_APP_CRON`) are now suggestable: a bridge `settings.edit` naming them writes nothing, runs every check a
+  save would, and answers 202 with a card in the approval queue showing each key, its value now, the value proposed and
+  the bridge's token hint. Only the owner's app applies it: the bridge's approve route, a forwarded request, a chat
+  code, an answer file and `chimera approve --yes` cannot (`--no` retires it). A yes writes only if the card has not
+  expired (24 h), every key is still suggestable and still holds the value the card showed (otherwise `stale`), the
+  change still passes every check (otherwise `invalid`), and the card still hashes to the digest the screen was shown
+  (otherwise `changed`, and the card stays waiting). `CHIMERA_DECISION_MODEL` stays a flat refusal, and a body mixing a
+  suggestable key with any other is refused whole.
+- **Four Full-control routes that widened reach are closed to the bridge** (#775). `settings.folder_grant`,
+  `settings.exec`, `settings.messaging_start` and `settings.agent_upsert` answer 403 at every tier with a sentence
+  saying where the owner does it in the app, and the MCP server neither lists nor forwards them. The owner's own routes
+  are unchanged.
+- **A run the bridge starts uses the owner's models and posture, and never gets Chimera's `.env`** (#775). A `model`,
+  `roles`, `profile`, `fuse`, fusion seat, `provider`, `cascade`, `verifier_model` or `retry_of` anywhere in a bridge
+  body is refused at every tier; an unset or false value passes. A reach past the owner's, an approval looser than the
+  owner's (a left-out approval counts as the default `suspicious`), `allow_host_exec` or a `verify` command where the
+  owner's reach has no shell, and `auto_approve` are refused; an equal or narrower posture passes. A turn, run, batch,
+  crew or lifecycle the bridge starts keeps Chimera's `.env` out of its read tools whatever
+  `CHIMERA_AGENT_READS_OWN_ENV` says, and the routes that start work without those seams (`chat.send`, `kanban.run`,
+  `orchestration.hierarchy`, `cron.create`, `spec_projects`) refuse, through the bridge, a folder holding Chimera's
+  files. On the desktop the default workspace holds neither, so they run as before. Still open, and pre-existing: the
+  app starts without `CHIMERA_SERVER_TOKEN`, so any local process that loads its page gets the token.
+- **`chimera code resume` loses `--model`, and the MCP `desktop_send` no longer offers a model** (#775). Both go through
+  the bridge, which now refuses a model choice, so the flag would have failed on every use.
 
 ## [0.64.3] - 2026-10-04
 ### Security
