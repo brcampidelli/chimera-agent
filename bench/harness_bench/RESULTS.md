@@ -33,6 +33,23 @@ move the outcome.**
 > The verdict is not a statement about every stratum, and it is weakest where the model is furthest
 > from the ceiling. Section "Read by declared partitions" below.
 
+> **2026-10-05, correction — re-read under `bench/PROTOCOL.md` §11 (`bench/interval_reread`).** Every
+> interval in this file was a percentile bootstrap over 7–23 tasks, the method §11 retires below
+> N = 100. Re-read with closed-form intervals on the same per-task deltas (each bootstrap first
+> reproduced to the published digit): the three **main effects** still span zero — A −0.012 [−0.037,
+> +0.013], B +0.005 [−0.051, +0.060], C +0.003 [−0.025, +0.031] (one-sample t over 23 tasks) — so the
+> aggregate null stands. **The checklist × tercile interaction does not**: Welch t over the 8 and 7
+> tasks gives **+0.059 [−0.016, +0.135]** (Bonferroni over six [−0.054, +0.173]). "Row 3 fires by the
+> letter" is **withdrawn**: under the interval §11 prescribes, the registered rule does not fire at
+> all, corrected or not, and the +0.002 lower bound was the bootstrap's undercoverage at n = 8 and 7 —
+> the possibility point 3 of "Three things that make the firing weaker" raised. All 21 stratum and
+> interaction intervals now span zero. Two further notes from the same re-read: (a) the verdict
+> table's C lower bound reads −0.022 where the data give −0.023 (`DEAD-TASKS.md` printed −0.023); (b)
+> §12 now requires a declared margin before "simplify" can read as "the factor does nothing" — none
+> was declared here, and the 90% t intervals would have needed margins of ±0.033 (A), ±0.050 (B) and
+> ±0.026 (C). §14 keeps "simplify" labelled as measured on deepseek-v3.2 until a second model family
+> is measured.
+
 ## Cost — the factors are not free
 
 USD per arm (mean per solve), and the point of the whole exercise:
@@ -190,6 +207,9 @@ Within-cell SD: bottom **0.154**, middle **0.154**, top **0.037**; all 23 tasks 
    hypothesis's own signature (§2s: measure the signature beside the aggregate) is absent.
 3. **The lower bound is +0.002** on a bootstrap with 10,000 draws over 8 and 7 tasks. A different seed
    would move it across zero; that is what "fires by the letter" means and no more.
+
+   > **2026-10-05:** it was. The closed-form Welch interval on the same deltas is [−0.016, +0.135];
+   > see the correction at the top of this file and `bench/interval_reread/RESULTS.md`.
 
 ### Predictions
 

@@ -1,0 +1,954 @@
+[
+ {
+  "bench": "harness_bench",
+  "verdict": "main effect A repo-map spans 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.036,
+   0.01
+  ],
+  "reread": [
+   -0.037,
+   0.0125
+  ],
+  "method": "t on per-task deltas",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "main effect B checklist spans 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.052,
+   0.052
+  ],
+  "reread": [
+   -0.0506,
+   0.0598
+  ],
+  "method": "t on per-task deltas",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "main effect C planner spans 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.022,
+   0.029
+  ],
+  "reread": [
+   -0.0248,
+   0.0313
+  ],
+  "method": "t on per-task deltas",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "FAMILY × A repo-map interaction (95%)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.052,
+   0.029
+  ],
+  "reread": [
+   -0.0563,
+   0.0336
+  ],
+  "method": "Welch t, 95%",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "FAMILY × A repo-map interaction (Bonferroni over 6)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.067,
+   0.042
+  ],
+  "reread": [
+   -0.0746,
+   0.0518
+  ],
+  "method": "Welch t, 1 − 0.05/6",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "FAMILY × B checklist interaction (95%)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.084,
+   0.074
+  ],
+  "reread": [
+   -0.0849,
+   0.0899
+  ],
+  "method": "Welch t, 95%",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "FAMILY × B checklist interaction (Bonferroni over 6)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.114,
+   0.097
+  ],
+  "reread": [
+   -0.1202,
+   0.1251
+  ],
+  "method": "Welch t, 1 − 0.05/6",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "FAMILY × C planner interaction (95%)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.001,
+   0.096
+  ],
+  "reread": [
+   -0.0121,
+   0.101
+  ],
+  "method": "Welch t, 95%",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "FAMILY × C planner interaction (Bonferroni over 6)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.014,
+   0.114
+  ],
+  "reread": [
+   -0.0366,
+   0.1255
+  ],
+  "method": "Welch t, 1 − 0.05/6",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "TERCILE × A repo-map interaction (95%)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.04,
+   0.038
+  ],
+  "reread": [
+   -0.0552,
+   0.0453
+  ],
+  "method": "Welch t, 95%",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "TERCILE × A repo-map interaction (Bonferroni over 6)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.047,
+   0.053
+  ],
+  "reread": [
+   -0.0818,
+   0.0719
+  ],
+  "method": "Welch t, 1 − 0.05/6",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "TERCILE × B checklist interaction (95%)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.002,
+   0.122
+  ],
+  "reread": [
+   -0.0161,
+   0.1349
+  ],
+  "method": "Welch t, 95%",
+  "reproduced": true,
+  "crosses_criterion": true
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "TERCILE × B checklist interaction (Bonferroni over 6)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.013,
+   0.144
+  ],
+  "reread": [
+   -0.0543,
+   0.1732
+  ],
+  "method": "Welch t, 1 − 0.05/6",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "TERCILE × C planner interaction (95%)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.041,
+   0.074
+  ],
+  "reread": [
+   -0.0578,
+   0.0881
+  ],
+  "method": "Welch t, 95%",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "harness_bench",
+  "verdict": "TERCILE × C planner interaction (Bonferroni over 6)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.062,
+   0.094
+  ],
+  "reread": [
+   -0.0942,
+   0.1245
+  ],
+  "method": "Welch t, 1 − 0.05/6",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "chat_history",
+  "verdict": "REAL non-inferior to FLAT (lower >= -0.10)",
+  "criterion": -0.1,
+  "side": "low",
+  "published": [
+   -0.1016,
+   0.0156
+  ],
+  "reread": [
+   -0.1043,
+   0.0261
+  ],
+  "method": "t on per-task differences",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "chat_history",
+  "verdict": "paired REAL − FLAT spans 0 (descriptive)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1034,
+   0.0221
+  ],
+  "reread": [
+   -0.105,
+   0.024
+  ],
+  "method": "Newcombe method 10",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "all ΔTPR excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.4088,
+   0.4538
+  ],
+  "reread": [
+   0.3777,
+   0.5084
+  ],
+  "method": "Bonett-Price",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "all ΔFPR excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.3338,
+   0.3633
+  ],
+  "reread": [
+   0.3154,
+   0.3901
+  ],
+  "method": "Bonett-Price",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "all C − A in J excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.019,
+   0.169
+  ],
+  "reread": [
+   0.0149,
+   0.1656
+  ],
+  "method": "MOVER over two Bonett-Price intervals",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "in-sample ΔTPR excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.2695,
+   0.4461
+  ],
+  "reread": [
+   0.2522,
+   0.5478
+  ],
+  "method": "Bonett-Price",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "in-sample ΔFPR excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.1505,
+   0.3201
+  ],
+  "reread": [
+   0.138,
+   0.4176
+  ],
+  "method": "Bonett-Price",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "in-sample C − A in J excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.064,
+   0.318
+  ],
+  "reread": [
+   -0.0812,
+   0.3273
+  ],
+  "method": "MOVER over two Bonett-Price intervals",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "out-of-sample ΔTPR excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.4157,
+   0.456
+  ],
+  "reread": [
+   0.3776,
+   0.5245
+  ],
+  "method": "Bonett-Price",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "out-of-sample ΔFPR excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.3387,
+   0.3682
+  ],
+  "reread": [
+   0.3192,
+   0.3969
+  ],
+  "method": "Bonett-Price",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "out-of-sample C − A in J excludes 0",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.017,
+   0.178
+  ],
+  "reread": [
+   0.0099,
+   0.1762
+  ],
+  "method": "MOVER over two Bonett-Price intervals",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "review_judge",
+  "verdict": "C's edge shrank in vs out of sample",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.176,
+   0.24
+  ],
+  "reread": [
+   -0.1927,
+   0.2484
+  ],
+  "method": "MOVER over the two ΔJ intervals",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/hierarchy/results/paired.json",
+  "verdict": "/summary significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0587,
+   0.1
+  ],
+  "reread": [
+   -0.1956,
+   0.3623
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/hierarchy_multistep/results/paired.json",
+  "verdict": "/summary significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1956,
+   0.3333
+  ],
+  "reread": [
+   -0.4559,
+   0.8559
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_hard_paired/learning.json",
+  "verdict": "/paired significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0867,
+   0.0721
+  ],
+  "reread": [
+   -0.0947,
+   0.0783
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_hard_semantic/learning.json",
+  "verdict": "/paired significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0526,
+   0.0806
+  ],
+  "reread": [
+   -0.0589,
+   0.0917
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.824",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_recurring/learning.json",
+  "verdict": "/paired significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0102,
+   0.0752
+  ],
+  "reread": [
+   -0.0191,
+   0.123
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.219",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_recurring/learning.json",
+  "verdict": "/family_transfer/first_member significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1081,
+   0.1081
+  ],
+  "reread": [
+   -0.2306,
+   0.2306
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_recurring/learning.json",
+  "verdict": "/family_transfer/later_member significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0013,
+   0.0667
+  ],
+  "reread": [
+   -0.0112,
+   0.1403
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.125",
+  "reproduced": true,
+  "crosses_criterion": true
+ },
+ {
+  "bench": "bench/learning_lift/results_recurring_hard/learning.json",
+  "verdict": "/paired significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0505,
+   0.0774
+  ],
+  "reread": [
+   -0.0566,
+   0.0881
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.824",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_recurring_hard/learning.json",
+  "verdict": "/family_transfer/first_member significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1499,
+   0.1499
+  ],
+  "reread": [
+   -0.2053,
+   0.2053
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/learning_lift/results_recurring_hard/learning.json",
+  "verdict": "/family_transfer/later_member significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0487,
+   0.0801
+  ],
+  "reread": [
+   -0.0572,
+   0.0964
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.791",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/local_lift/_reverify_6/paired.json",
+  "verdict": "/summary significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0978,
+   0.1667
+  ],
+  "reread": [
+   -0.2904,
+   0.5404
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/local_lift/_reverify_n100/paired.json",
+  "verdict": "/summary significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.1259,
+   0.2861
+  ],
+  "reread": [
+   0.1206,
+   0.3304
+  ],
+  "method": "Bonett-Price; exact McNemar p=6.62e-05",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/memory_graph/results/graph_ab.json",
+  "verdict": "/slices/multihop/delta_vs_baseline significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.1851,
+   0.2417
+  ],
+  "reread": [
+   0.1588,
+   0.3166
+  ],
+  "method": "Bonett-Price; exact McNemar p=3.73e-09",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/memory_graph/results/graph_ab.json",
+  "verdict": "/slices/multihop/delta_vs_budget significant=True",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.3991,
+   -0.2963
+  ],
+  "reread": [
+   -0.4631,
+   -0.2746
+  ],
+  "method": "Bonett-Price; exact McNemar p=4.36e-12",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/memory_graph/results/graph_ab.json",
+  "verdict": "/slices/single/delta_vs_baseline significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0,
+   0.0
+  ],
+  "reread": [
+   -0.0227,
+   0.0227
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/memory_graph/results/graph_ab.json",
+  "verdict": "/slices/single/delta_vs_budget significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0,
+   0.0
+  ],
+  "reread": [
+   -0.0227,
+   0.0227
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/memory_graph/results/graph_ab.json",
+  "verdict": "/slices/traverse/delta_vs_baseline significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0,
+   0.0
+  ],
+  "reread": [
+   -0.0227,
+   0.0227
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/memory_graph/results/graph_ab.json",
+  "verdict": "/slices/traverse/delta_vs_budget significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   0.0,
+   0.0
+  ],
+  "reread": [
+   -0.0227,
+   0.0227
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/retry_lift/results/retry.json",
+  "verdict": "/report/comparisons/i1/pooled significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1184,
+   0.0448
+  ],
+  "reread": [
+   -0.1301,
+   0.0482
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.458",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/retry_lift/results/retry.json",
+  "verdict": "/report/comparisons/i1/retried_lens significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1769,
+   0.0638
+  ],
+  "reread": [
+   -0.2077,
+   0.0721
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.454",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/retry_lift/results/retry.json",
+  "verdict": "/report/comparisons/i2/pooled significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.0688,
+   0.0832
+  ],
+  "reread": [
+   -0.0753,
+   0.0917
+  ],
+  "method": "Bonett-Price; exact McNemar p=1",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "bench/retry_lift/results/retry.json",
+  "verdict": "/report/comparisons/i2/retried_lens significant=False",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.084,
+   0.1382
+  ],
+  "reread": [
+   -0.0971,
+   0.1637
+  ],
+  "method": "Bonett-Price; exact McNemar p=0.791",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "edit_tools",
+  "verdict": "edit_calls median CI excludes 0 (upper < 0)",
+  "criterion": 0.0,
+  "side": "high",
+  "published": [
+   -2.0,
+   -1.0
+  ],
+  "reread": [
+   -3,
+   -1
+  ],
+  "method": "binomial order statistics",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "edit_tools",
+  "verdict": "completion_tokens median CI excludes 0 (upper < 0)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -85.5,
+   70.0
+  ],
+  "reread": [
+   -101,
+   75
+  ],
+  "method": "binomial order statistics",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "wake_gate",
+  "verdict": "AUROC inside the predicted band 0.70-0.85 (point)",
+  "criterion": 0.5,
+  "side": "low",
+  "published": [
+   0.6364,
+   0.9333
+  ],
+  "reread": [
+   0.6431,
+   0.9486
+  ],
+  "method": "Hanley-McNeil",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "stop_gate",
+  "verdict": "ΔAUROC >= +0.08 with lower > +0.02",
+  "criterion": 0.02,
+  "side": "low",
+  "published": [
+   0.0,
+   0.0
+  ],
+  "reread": [
+   0.0,
+   0.0
+  ],
+  "method": "identical arms: Δ = 0 by construction",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "sharded_recap",
+  "verdict": "pilot gate F − A (stops under +10 pp)",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1253,
+   0.19
+  ],
+  "reread": [
+   -0.1253,
+   0.19
+  ],
+  "method": "Newcombe method 10",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "spoken_standard",
+  "verdict": "speakable B − A",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.1975,
+   0.0059
+  ],
+  "reread": [
+   -0.2008,
+   0.0094
+  ],
+  "method": "Newcombe method 10",
+  "reproduced": true,
+  "crosses_criterion": false
+ },
+ {
+  "bench": "spoken_standard",
+  "verdict": "format-speakable B − A",
+  "criterion": 0.0,
+  "side": "both",
+  "published": [
+   -0.3397,
+   -0.1207
+  ],
+  "reread": [
+   -0.3427,
+   -0.1173
+  ],
+  "method": "Newcombe method 10",
+  "reproduced": true,
+  "crosses_criterion": false
+ }
+]
