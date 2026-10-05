@@ -14,8 +14,9 @@ hash of the instrument — the fixed text around the state. Change the wording a
 loudly (``calibrated=False`` on every answer), rather than applied to numbers it was never fitted on.
 
 The fit is pure Python: Newton's method on the two-parameter log-likelihood with a small ridge
-(``prior``) so a perfectly separable set still converges, and a backtracking step so it never
-overshoots. Agrees with scikit-learn's ``LogisticRegression(C=1e6)`` on the bench rows to four
+(``prior``) and a backtracking step so it never overshoots. A set the raw ``p`` separates perfectly is
+refused rather than fitted (the ridge would only stop the slope at a step), and a deployment's refit
+uses Platt's smoothed targets so a near-separation does not make a cliff either (see ``fit_platt``). Agrees with scikit-learn's ``LogisticRegression(C=1e6)`` on the bench rows to four
 decimals (a = 0.7207, b = −2.6412 on the local arm) without the dependency.
 """
 
@@ -74,11 +75,21 @@ def perfectly_separated(pairs: Sequence[tuple[float, int]]) -> bool:
     return max(neg) <= min(pos) or max(pos) <= min(neg)
 
 
-def fit_platt(pairs: Sequence[tuple[float, int]], *, prior: float = 1e-4, iterations: int = 200) -> tuple[float, float]:
+def fit_platt(
+    pairs: Sequence[tuple[float, int]], *, prior: float = 1e-4, iterations: int = 200, smoothed: bool = False,
+) -> tuple[float, float]:
     """``(a, b)`` such that ``sigmoid(a·logit(p) + b)`` is the calibrated probability.
 
     ``pairs`` are ``(p, label)`` with the label 1 for the event. Both labels must be present — a
-    map fitted on one class is a constant, and a constant is not a calibration.
+    map fitted on one class is a constant, and a constant is not a calibration — and they must not be
+    separated by ``p`` (:func:`perfectly_separated`): there the slope only stops where the ridge stops
+    it, at a step the labels cannot support. Refused here, so no caller gets that step silently.
+
+    ``smoothed`` fits Platt's own targets, ``(N₊+1)/(N₊+2)`` for a positive and ``1/(N₋+2)`` for a
+    negative, instead of 1 and 0: they cap how sure a fit on N labels may be, and the cap scales with
+    n. The plain fit stays the default (and the 1e-4 ridge stays as it is) because the shipped map was
+    fitted that way and a refit on its rows must reproduce it to the ninth decimal — the refit loop's
+    gate. :func:`target_sensitivity` uses the smoothed fit to catch the cliff the plain one makes.
     """
     if len(pairs) < 4:
         raise ValueError(f"at least four labelled answers are needed, got {len(pairs)}")
@@ -86,20 +97,29 @@ def fit_platt(pairs: Sequence[tuple[float, int]], *, prior: float = 1e-4, iterat
     ys = [1 if y else 0 for _, y in pairs]
     if all(ys) or not any(ys):
         raise ValueError("both labels are needed to fit a map")
+    if perfectly_separated(pairs):
+        raise ValueError(
+            "the raw p separates the labels perfectly, so a Platt fit would run to a step at ~0 and ~1 — "
+            "certainty these labels cannot support"
+        )
+    n_pos = sum(ys)
+    n_neg = len(ys) - n_pos
+    hi, lo = ((n_pos + 1) / (n_pos + 2), 1 / (n_neg + 2)) if smoothed else (1.0, 0.0)
+    ts = [hi if y else lo for y in ys]
 
     def nll(a: float, b: float) -> float:
         total = 0.0
-        for x, y in zip(xs, ys, strict=True):
+        for x, t in zip(xs, ts, strict=True):
             z = a * x + b
-            total += (max(z, 0.0) + math.log1p(math.exp(-abs(z)))) - y * z
+            total += (max(z, 0.0) + math.log1p(math.exp(-abs(z)))) - t * z
         return total + 0.5 * prior * (a * a + b * b)
 
     a, b = 1.0, 0.0
     for _ in range(iterations):
         g_a = g_b = h_aa = h_ab = h_bb = 0.0
-        for x, y in zip(xs, ys, strict=True):
+        for x, t in zip(xs, ts, strict=True):
             s = sigmoid(a * x + b)
-            d, w = s - y, s * (1.0 - s)
+            d, w = s - t, s * (1.0 - s)
             g_a += d * x
             g_b += d
             h_aa += w * x * x
@@ -122,6 +142,26 @@ def fit_platt(pairs: Sequence[tuple[float, int]], *, prior: float = 1e-4, iterat
         if step * (abs(da) + abs(db)) < 1e-10:
             break
     return a, b
+
+
+MAX_TARGET_SENSITIVITY = 0.15
+"""How far the plain fit's probabilities may sit from the smoothed fit's before a refit is refused.
+
+Exact separation is not the only cliff. 25 + 25 rows with one negative at p = 0.61, just above the
+lowest positive (0.60), are not separated, and the plain fit gave a = 19.2 (p = 0.55 → 0.02, p = 0.62 →
+0.85); with Platt's targets the same rows give a = 2.7, and the two maps differ by 0.40 at a row. That
+gap is the certainty the plain fit takes from treating every label as exact. Measured on 2026-10-05:
+the shipped bench rows 0.052, well-calibrated draws 0.076 (n = 20), 0.045 (n = 50), 0.009 (n = 200);
+the near-separations 0.40 (overlap at 0.61) and 0.22 (at 0.70). 0.15 is twice the n = 20 noise."""
+
+
+def target_sensitivity(pairs: Sequence[tuple[float, int]]) -> float:
+    """The largest gap, over the rows' own ``p``, between the plain fit and Platt's smoothed-target fit.
+
+    Raises ``ValueError`` where :func:`fit_platt` would."""
+    a, b = fit_platt(pairs)
+    c, d = fit_platt(pairs, smoothed=True)
+    return max(abs(sigmoid(a * logit(float(p)) + b) - sigmoid(c * logit(float(p)) + d)) for p, _ in pairs)
 
 
 @dataclass(frozen=True)
@@ -160,8 +200,9 @@ class PlattMap:
     def fit(
         cls, pairs: Sequence[tuple[float, int]], *, decision: str, backend: str, model: str,
         prompt_hash: str, source: str = "", note: str = "", fitted_at: str = "", resolved_model: str = "",
+        smoothed: bool = False,
     ) -> PlattMap:
-        a, b = fit_platt(pairs)
+        a, b = fit_platt(pairs, smoothed=smoothed)
         when = fitted_at or time.strftime("%Y-%m-%d")
         return cls(
             id=f"{decision}/{backend}/{model}/{prompt_hash}/{when}", decision=decision, backend=backend,

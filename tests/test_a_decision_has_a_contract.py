@@ -121,6 +121,11 @@ def test_platt_refuses_a_set_that_cannot_calibrate() -> None:
         fit_platt([(0.9, 1), (0.8, 1), (0.7, 1), (0.6, 1)])
     with pytest.raises(ValueError):
         fit_platt([(0.9, 1), (0.1, 0)])
+    # Separated by p: the plain fit would only stop at the ridge, a step at ~0 and ~1.
+    with pytest.raises(ValueError, match="separates"):
+        fit_platt([(0.9, 1), (0.8, 1), (0.2, 0), (0.1, 0)])
+    with pytest.raises(ValueError, match="separates"):
+        PlattMap.fit([(0.9, 1), (0.8, 1), (0.2, 0), (0.1, 0)], decision="d", backend="b", model="m", prompt_hash="h")
 
 
 def test_a_map_survives_a_probability_of_exactly_one_and_zero() -> None:
@@ -129,8 +134,13 @@ def test_a_map_survives_a_probability_of_exactly_one_and_zero() -> None:
     assert m.apply(1.0) > m.apply(0.0)
 
 
+# The fixtures below put one label of each class across the boundary: `fit_platt` refuses a set the
+# raw p separates perfectly (study 30), and these tests are about keys and files, not about that.
+_OVERLAP = [(0.9, 1), (0.8, 1), (0.3, 1), (0.7, 0), (0.2, 0), (0.1, 0)]
+
+
 def test_a_map_applies_only_to_its_own_four_keys() -> None:
-    m = PlattMap.fit([(0.9, 1), (0.8, 1), (0.2, 0), (0.1, 0)], decision="d", backend="b", model="m", prompt_hash="h")
+    m = PlattMap.fit(_OVERLAP, decision="d", backend="b", model="m", prompt_hash="h")
     maps = CalibrationMaps([m])
     assert maps.find("d", "b", "m", "h") is m
     for keys in (("x", "b", "m", "h"), ("d", "x", "m", "h"), ("d", "b", "x", "h"), ("d", "b", "m", "x")):
@@ -138,8 +148,8 @@ def test_a_map_applies_only_to_its_own_four_keys() -> None:
 
 
 def test_maps_round_trip_through_a_file_and_a_later_fit_supersedes(tmp_path: Path) -> None:
-    first = PlattMap.fit([(0.9, 1), (0.8, 1), (0.2, 0), (0.1, 0)], decision="d", backend="b", model="m", prompt_hash="h", fitted_at="2026-01-01")
-    second = PlattMap.fit([(0.9, 1), (0.7, 1), (0.3, 0), (0.1, 0), (0.5, 0)], decision="d", backend="b", model="m", prompt_hash="h", fitted_at="2026-02-02")
+    first = PlattMap.fit(_OVERLAP, decision="d", backend="b", model="m", prompt_hash="h", fitted_at="2026-01-01")
+    second = PlattMap.fit([(0.9, 1), (0.7, 1), (0.3, 0), (0.1, 0), (0.5, 0), (0.6, 0), (0.4, 1)], decision="d", backend="b", model="m", prompt_hash="h", fitted_at="2026-02-02")
     maps = CalibrationMaps([first, second])
     assert len(maps) == 1 and maps.find("d", "b", "m", "h") == second
     maps.save(tmp_path / "maps.json")

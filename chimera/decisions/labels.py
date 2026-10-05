@@ -34,7 +34,13 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from chimera.decisions.calibration import CalibrationMaps, PlattMap, perfectly_separated
+from chimera.decisions.calibration import (
+    MAX_TARGET_SENSITIVITY,
+    CalibrationMaps,
+    PlattMap,
+    perfectly_separated,
+    target_sensitivity,
+)
 from chimera.decisions.log import Row
 from chimera.decisions.maps import SHIPPED_MAPS, SHIPPED_ROWS
 
@@ -150,6 +156,20 @@ def refit(
                 + (f", + {len(pooled)} pooled rows" if pooled else "")
                 + "), so a Platt fit would run to a step at ~0 and ~1 — certainty these labels cannot "
                 "support; label answers from the uncertain middle of the band and refit",
+                brier(before), None, ece(before), None,
+            ))
+            continue
+        gap = target_sensitivity(fit_rows)
+        if gap > MAX_TARGET_SENSITIVITY:
+            # Not separated, but close: one label across the boundary still lets the plain fit build
+            # a cliff (calibration.MAX_TARGET_SENSITIVITY has the measured case).
+            out.append(Refit(
+                key, len(own), positives, len(pooled), None,
+                f"no map: the labels nearly separate on the raw p ({positives} positive, {negatives} negative"
+                + (f", + {len(pooled)} pooled rows" if pooled else "")
+                + f"), and the fit moves by {gap:.2f} (more than {MAX_TARGET_SENSITIVITY}) when the labels are "
+                "not treated as certain — its steepness comes from the 0/1 targets, not from the data; "
+                "label answers from the uncertain middle of the band and refit",
                 brier(before), None, ece(before), None,
             ))
             continue
