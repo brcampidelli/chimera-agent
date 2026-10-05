@@ -274,6 +274,14 @@ _HOOKS_NAME = re.compile(r"chimera-hooks\.json\b", re.IGNORECASE)
 #: The hooks module's own code, imported — `code_interpreter` runs in the server's process, where a
 #: loader is one import away. A mention (`rg chimera.governance.hooks`) is how the agent works on
 #: Chimera's own repository, so only an import refuses.
+#:
+#: This catches the literal import SPELLINGS and nothing more, and it does not contain
+#: `code_interpreter`. That tool is in-process host execution: once its host-execution gate is
+#: passed, `sys.modules['chimera.governance.hooks']`, an attribute reached through
+#: `chimera.governance`, an `import_module` whose name is built from parts, or
+#: `get_settings().hooks = False` all change what later assemblies install, and none of them is an
+#: import this pattern can see. The threat model's A1 residual says so; the boundary for
+#: `code_interpreter` is `CHIMERA_HOST_EXEC`, not this regex.
 _HOOKS_CODE = re.compile(
     r"\bimport\s+chimera\.governance\.hooks\b"
     r"|\bfrom\s+chimera\.governance\.hooks\s+import\b"
@@ -291,7 +299,9 @@ def reaches_hooks_file(text: str, *, home: Path | None, cwd: Path) -> str | None
     kept out by the data folder they live in (`own_files.py`); this keeps out the three tools that
     run arbitrary text, with the same reading the approval queue gets above — quoting removed,
     variables expanded, the file compared by identity — and the same stated limit: a path the
-    command assembles at run time is not seen.
+    command assembles at run time is not seen. For ``code_interpreter`` the limit is wider: it runs
+    in this process, and code there can reach the hooks without naming them (see ``_HOOKS_CODE``),
+    so this is a tripwire for the obvious spelling, not a boundary.
     """
     variants = _as_shells_read_it(text)
     if any(_HOOKS_NAME.search(v) for v in variants):

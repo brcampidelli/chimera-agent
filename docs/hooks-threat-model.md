@@ -64,6 +64,17 @@ closed, wherever the owner has also let the agent's shell run unconfirmed on the
 invocation's receipt carries the SHA-256 of the file it was read from, so a change the owner did not
 make is visible in the audit.
 
+**Residual, `code_interpreter`.** That tool is not contained by the fence at all, and the import
+pattern in `queue_fence._HOOKS_CODE` should not be read as if it were. `code_interpreter` runs
+Python *in the server's own process*: once its host-execution gate is passed, it can reach the
+hooks module without any import the pattern sees — `sys.modules['chimera.governance.hooks']`, an
+attribute through `chimera.governance`, `importlib.import_module` with a name built from parts —
+or simply set `get_settings().hooks = False`, and every assembly built afterwards in that process
+installs no hooks, or hooks that do nothing. The pattern catches the literal import spellings and
+nothing more. The boundary for this tool is `CHIMERA_HOST_EXEC` (`deny` refuses it; `ask` puts each
+program in front of the owner), not the fence: an owner who relies on hooks should not also let
+`code_interpreter` run unconfirmed.
+
 ### A2. A hook runs a shell command on the host
 
 The paper's execution edge: the hook's command runs with the harness's privileges.
@@ -104,6 +115,12 @@ taint ledger records it as a fetch (`hook:<id>`), so the run is tainted from tha
 narrowing that follows untrusted input applies. Text written in a static hook is the owner's own
 words in the owner's own file, and is fenced but does not taint.
 
+**Residual.** "Taints the run" needs a ledger to taint. On the surfaces built by `governed_profile`
+(the cron jobs, the Kanban lanes, the messaging bots, the ACP server) with the governance mode
+`off`, no taint ledger wraps the registry — `governed_profile` builds one and drops it when the mode
+is off — so a shell hook's words are still sanitised and fenced but taint nothing, and no narrowing
+follows them. Under `observe` and `enforce` the ledger is there and the paragraph above holds.
+
 ### A5. The event payload injects into the hook's command
 
 A hook command that interpolates the tool's arguments (`echo {command}`) is a command-injection
@@ -112,6 +129,15 @@ point for whatever the model chose to send.
 **Contained by:** nothing is ever interpolated into a hook's command. The command runs exactly as
 the owner wrote it; the event — event name, tool, arguments with document bodies elided — is
 written to `event.json` in a fresh, empty working directory, and the hook reads it from there.
+
+That working directory is the price of the containment, and it is stated here because the example
+below would otherwise mislead: it holds **only** `event.json`. The hook does not run in the
+workspace and cannot see it, so a relative path (`python lint_hook.py`) finds nothing and fails on
+every call — silently forever with `on_error: ignore`. Name the hook's program by absolute path.
+Under `CHIMERA_SANDBOX=docker` that temporary folder is the container's only mount, so no program
+on the host is reachable at all: only what the image contains can run. A `post_tool` hook that is
+meant to lint the files the agent wrote cannot, in either sandbox, see those files; it sees the
+call's arguments (with document bodies replaced by their size) and nothing else.
 
 ### A6. A hook exfiltrates
 
@@ -134,7 +160,10 @@ serves on the Security screen — with the hook's id, event, tool, kind, where i
 backend and whether it isolates), whether it ran, its exit code and time, what it asked for, what
 was applied, what was refused, and the SHA-256 of the hooks file. A hook that was refused because no
 sandbox exists writes a receipt too. An invalid hooks file with hooks switched on refuses every
-tool call with the parse error, rather than running without the hooks the owner believes are there.
+tool call with the parse error, rather than running without the hooks the owner believes are there,
+and writes one `hook` line with `event: load`, `applied: deny`, the error and the file's digest per
+assembly — the refusals themselves write no receipt, so without that line every cron job and bot
+run would be refused with nothing on the Security screen to say why.
 
 ### A8. A hook takes the agent down (availability)
 
@@ -161,11 +190,17 @@ Every assembly that goes through `govern_step` (`chimera/governance/profile.py`)
 screen and the API's runs (`code_api.assemble_registry`), `chimera chat`/`assist`/`tui`
 (`right_hand.py`), every surface built by `governed_profile` (among them the ACP server, the cron
 jobs, the Kanban lanes and the messaging bots) and a guarded
-`chimera solve` started inside a conversation. The app's chat installs no kernel, so its guard
-(`api/posture.guard_chat_registry`, on by default through `CHIMERA_GUARD_CHAT`) installs the hooks
-itself, asking the same person on the same card. A `chimera solve` without `--guard`, and the app's
-chat with its guard switched off, assemble no protection layer at all and run without hooks; that
-is stated as a residual in the audit's row 13. Hooks apply whatever the governance mode is — off,
+`chimera solve` started inside a conversation. `chimera agent --guard` and a `chimera solve --guard`
+started on its own build their kernel directly rather than through `govern_step`, and call the same
+installer after it (`profile.owner_hooks`), with the solve's own approver and its taint ledger. The
+app's chat installs no kernel, so its guard (`api/posture.guard_chat_registry`, on by default
+through `CHIMERA_GUARD_CHAT`) installs the hooks itself, asking the same person on the same card.
+
+**Residual — where hooks do not run.** `chimera agent` and `chimera solve` without `--guard`, the
+app's chat with `CHIMERA_GUARD_CHAT` off, and the OpenAI-compatible `/v1/chat/completions` endpoint
+(the unguarded assembly of `chimera serve`) build no protection layer at all, and run without
+hooks. Switching hooks on does not change that: an owner who needs a hook to hold must use a
+surface listed above. The same list is the audit's row 13 residual. Hooks apply whatever the governance mode is — off,
 observe or enforce — because the owner switched them on separately; and a hook's `ask` goes to the
 owner's approver, never to `observe`'s approve-everything one, which would turn a hook's question
 into a yes.
@@ -178,7 +213,7 @@ into a yes.
     {"id": "no-push", "event": "pre_tool", "tools": ["run_shell"], "pattern": "git\\s+push",
      "decision": "deny", "reason": "pushes go through me"},
     {"id": "lint", "event": "post_tool", "tools": ["write_file", "edit_file"],
-     "command": "python lint_hook.py", "timeout": 20, "on_error": "ignore"}
+     "command": "python3 /home/me/hooks/lint_hook.py", "timeout": 20, "on_error": "ignore"}
   ]
 }
 ```
@@ -190,7 +225,7 @@ into a yes.
 | `tools` | tool names the hook applies to; `["*"]` (the default) is every tool |
 | `pattern` | optional regular expression (case-insensitive) over the call as the kernel reads it |
 | `decision` + `reason` / `note` | a static hook: `deny`, `ask` or `annotate` (`post_tool`: `deny` or `annotate`) |
-| `command` | a shell hook: run as written, in an empty folder holding `event.json` |
+| `command` | a shell hook: run as written, in an empty folder holding only `event.json` — name its program by absolute path (A5) |
 | `timeout` | seconds, 1–60, default 10 |
 | `on_error` | `deny` (default) or `ignore` |
 
