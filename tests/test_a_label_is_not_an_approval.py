@@ -267,3 +267,23 @@ def test_the_cli_labels_and_refits_only_with_write(cli_home: Path) -> None:
     assert saved is not None and saved.n == 55
     out = runner.invoke(app, ["decisions", "report"])
     assert out.exit_code == 0 and DECISION in out.output
+
+
+def test_a_refused_refit_says_an_earlier_written_map_stays_active(cli_home: Path) -> None:
+    """A deployment that ran `refit --write` before the separation guards may hold the step they now
+    refuse. The refit prints "no map" for that group, but maps.json still carries the old one and the
+    Decider applies it — the output must say so, or "no map" reads as "none active"."""
+    from chimera.cli.main import app
+
+    _log_rows(log_path(cli_home), [(0.9, 1)] * 20 + [(0.1, 0)] * 20)  # separated: refused
+    maps = cli_home / "decisions" / "maps.json"
+    step = PlattMap(id=f"{DECISION}/local_logprob/qwen3:4b/{DIGEST}/2026-09-30", decision=DECISION,
+                    backend="local_logprob", model="qwen3:4b", prompt_hash=DIGEST, a=38.0, b=0.0, n=40,
+                    positives=20, fitted_at="2026-09-30", resolved_model=RESOLVED)
+    CalibrationMaps([step]).save(maps)
+    out = CliRunner().invoke(app, ["decisions", "refit"], terminal_width=400)
+    assert out.exit_code == 0
+    text = " ".join(out.output.split())
+    assert "separates the labels perfectly" in text
+    assert "stays active" in text and "2026-09-30" in text and step.id in text
+    assert CalibrationMaps.load(maps).find(DECISION, "local_logprob", "qwen3:4b", DIGEST) == step  # untouched
