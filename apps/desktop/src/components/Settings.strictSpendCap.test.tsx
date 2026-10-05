@@ -20,8 +20,11 @@ vi.mock("@/lib/api", () => ({
 
 /**
  * The strict spend cap (owner's decision, 2026-10-05). Off as shipped, named "strict" on the row so
- * the refusal it can cause is never a surprise, and the hint says both what off allows (one call
- * past a typed ceiling) and that a run with no ceiling is untouched, since limits are warnings.
+ * the refusal it can cause is never a surprise, and the hint says both what off allows (a run can
+ * end past a typed ceiling, usually by about one call, since the reservation is an estimate) and
+ * that a run with no ceiling is untouched, since limits are warnings. On, it names the runs it
+ * refuses outright: a fused or cascade run cannot be priced in advance, so with a ceiling it does
+ * not start, and someone who switches strict on must read that before the run fails, not after.
  */
 const CONFIG = {
   models: {
@@ -83,7 +86,9 @@ describe("Settings — the strict spend cap", () => {
 
     const toggle = await screen.findByRole("switch", SWITCH);
     expect(toggle).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByText(/passed by at most one call's cost/i)).toBeInTheDocument();
+    // Off is an estimate, not a bound: the text may not promise "at most one call".
+    expect(screen.getByText(/usually by about one call's cost/i)).toBeInTheDocument();
+    expect(screen.getByText(/every fused or cascade run with a ceiling/i)).toBeInTheDocument();
     expect(screen.getByText(/Runs without a ceiling are not affected/i)).toBeInTheDocument();
   });
 

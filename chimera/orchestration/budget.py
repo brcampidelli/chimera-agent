@@ -230,10 +230,16 @@ class SpendBudget:
         if why is not None or not (self.strict and self.capped):
             return why
         if worst_case is None:
+            # Names the common case first. A fused or cascade backend picks its models and how many
+            # calls to make as it goes, so nothing can price it before it starts, and with a strict
+            # ceiling every such run stops here at its first call. "Give the call a bound" was the
+            # old advice, and nobody running a fused turn from the app has a way to follow it.
             return (
-                "spend cap (strict): this call's worst case cannot be priced (no completion bound, "
-                "or a backend that cannot name the models it may answer on), so it could pass the "
-                f"${self.max_usd:.4f} ceiling; turn strict off or give the call a bound"
+                "spend cap (strict): this call's worst case cannot be priced in advance (a fused or "
+                "cascade run, which picks its models and how many calls to make as it goes; a call "
+                "with no completion bound; or a model with no price), so it could pass the "
+                f"${self.max_usd:.4f} ceiling. Under a strict ceiling such a run does not start: "
+                "turn strict off to run it"
             )
         committed = self._spent + self._reserved
         if committed + worst_case > self.max_usd:

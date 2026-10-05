@@ -894,9 +894,11 @@ class SpendCfgOut(BaseModel):
     daily_usd_cap: float | None = None
     strict_cap: bool = False
     """Whether a typed dollar ceiling is strict (``CHIMERA_STRICT_SPEND_CAP``, off as shipped): on,
-    a call starts only when its worst case still fits, so the run's spend never passes the ceiling;
-    off, the last call admitted may pass it by its own worst case. Unlike the daily cap above, it
-    applies to every run with a ``max_usd``, and to no run without one."""
+    a call starts only when its worst case (every retry and fallback counted) still fits, so the
+    run's spend never passes the ceiling, and a fused or cascade run, which cannot be priced in
+    advance, does not start; off, the ceiling is an estimate and a run usually ends past it by about
+    one call. Unlike the daily cap above, it applies to every run with a ``max_usd``, and to no run
+    without one."""
 
 
 class KeepAwakeCfgOut(BaseModel):

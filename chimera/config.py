@@ -1136,12 +1136,15 @@ class Settings(BaseSettings):
     daily_usd_cap: float | None = Field(default=None, validation_alias="CHIMERA_DAILY_USD_CAP")
 
     # Whether a typed dollar ceiling (`max_usd` on a turn, a crew, a hierarchy, an autonomous run) is
-    # STRICT: a call is dispatched only when its worst case (prompt + completion bound, priced over
-    # the whole fallback chain) still fits what is left, so the run's spend never passes the
-    # ceiling. Off (the default, and the owner's decision of 2026-10-05) keeps the reservation cap:
-    # the last call admitted may end the run past the ceiling by at most its own worst case. On, a
-    # call whose worst case cannot be priced (a composite backend, no completion bound) is refused
-    # rather than run. A run with no ceiling is untouched either way: the 2026-09-27 decision that
+    # STRICT: a call is dispatched only when its worst case (prompt bounded by its bytes + completion
+    # bound, summed over every attempt the fallback chain and the key pool may make) still fits what
+    # is left, and attempts that failed after billing are charged, so the run's spend never passes
+    # the ceiling. Off (the default, and the owner's decision of 2026-10-05) keeps the reservation
+    # cap, which is an estimate: a run usually ends past the ceiling by about one call, and can pass
+    # it by more when the prompt estimate was low, calls ran together, or a call had no price. On, a
+    # call whose worst case cannot be priced is refused rather than run, and that is every FUSED or
+    # CASCADE run with a ceiling (they pick their models as they go), and a call with no completion
+    # bound. A run with no ceiling is untouched either way: the 2026-09-27 decision that
     # limits are warnings stands, and this only decides how hard a ceiling the person typed holds.
     # Owner-only (`bridge_routes.GUARD_SETTINGS`): it changes a limit. Read when each run builds its
     # budget (`orchestration/budget.py`), so it applies from the next run.
