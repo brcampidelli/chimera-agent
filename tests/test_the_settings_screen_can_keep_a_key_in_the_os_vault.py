@@ -626,9 +626,10 @@ def test_the_way_back_reads_each_key_from_the_file_before_the_vault_copy_goes(
 
     assert sorted(result["failed"]) == ["OPENROUTER_API_KEY", "TAVILY_API_KEY"]
     assert sorted(result["moved"]) == ["GROQ_API_KEY", "MISTRAL_API_KEY"]
-    assert dotenv_values(tmp_path / ".env")["MISTRAL_API_KEY"] == cortada
-    assert dotenv_values(tmp_path / ".env")["GROQ_API_KEY"] == CHAVE
-    assert _env(tmp_path).startswith(marcador)
+    # The whole file, as before the rewrite: the marker that was there, and exactly the two keys that
+    # moved — the refused ones leave no line at all, not even a partial one.
+    assert _env(tmp_path) == f"{marcador}GROQ_API_KEY={CHAVE}\nMISTRAL_API_KEY='{cortada}'\n"
+    assert dotenv_values(tmp_path / ".env") == {"GROQ_API_KEY": CHAVE, "MISTRAL_API_KEY": cortada}
     assert cofre.tem("OPENROUTER_API_KEY") == expandida and cofre.tem("TAVILY_API_KEY") == expandida
 
 

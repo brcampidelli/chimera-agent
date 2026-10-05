@@ -1058,7 +1058,18 @@ def check_parses(updates: dict[str, str]) -> None:
         str(f.validation_alias or name).upper()
         for name, f in Settings.model_fields.items()
     }
-    probe = {k: str(v) for k, v in updates.items() if k.upper() in fields}
+    from chimera.api.bridge_routes import is_secret_setting
+
+    # NEVER a credential. The probe is a file, and a key written to the temp folder for a moment is a
+    # key in clear text outside `.env` and the vault — left there for good if the process dies first
+    # (review of 2026-10-04: every key save did it, defeating CHIMERA_KEY_VAULT). Credentials are
+    # plain strings (one key) or comma lists (a pool) that cannot fail to parse, and their spelling
+    # is already checked by `encode_env_value`; nothing is lost by leaving them out.
+    probe = {
+        k: str(v)
+        for k, v in updates.items()
+        if k.upper() in fields and not is_secret_setting(k) and k not in SCREEN_STORABLE
+    }
     if not probe:
         return
 
