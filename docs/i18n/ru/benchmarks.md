@@ -1,5 +1,5 @@
 ---
-source_sha256: d6a62d29618f1f5cd5c1604bace2215da0688ce486abd1de9aabc19e9910adad
+source_sha256: a25c0da214aeb1f446c531e8f1f33c331a8e51e20781746e2dc818b95108bde7
 ---
 
 # Замеры — доказать подъём слабой модели
