@@ -24,6 +24,19 @@ the program runs (``echo … > .git/hooks/pre-commit && git commit``) — the co
 the folder did not hold it yet; names behind a shell function, an alias or ``$(…)``; and a ``PATH``
 the command changes (``PATH=./bin:$PATH git …``, ``export PATH=…``), which is flagged rather than
 followed.
+
+A folder change earlier in the same command is followed when it is plain: ``cd sub && git commit``
+names ``sub``'s ``git`` (cmd.exe looks in the NEW folder first) and ``sub``'s hooks. A ``cd`` it
+cannot follow — to ``$VAR``, ``-``, nowhere, inside ``( … )`` or a pipe, or a ``popd`` — is said,
+and after it the card never says "no repository hook will run".
+
+The hooks folder is read the way git reads ``core.hooksPath``: ``-c`` on the command, the
+worktree's ``config.worktree`` (when ``extensions.worktreeConfig`` is on), the repository's config,
+``~/.gitconfig``, ``~/.config/git/config``, then the usual system files (``/etc/gitconfig``; on
+Windows the Git install under Program Files). A plain ``[include]`` is followed. What is NOT
+evaluated, and is said on the card instead of a hooks line: an ``[includeIf]`` whose file could set
+the hooks folder, and ``GIT_CONFIG_*``/``GIT_DIR``-family variables in the environment or on the
+command line. A system config a git build keeps somewhere else is not read.
 """
 
 from __future__ import annotations
@@ -41,8 +54,6 @@ HEADER = "[what this runs, as this machine resolves it now]"
 
 #: Prefix words that run the NEXT word as the program.
 _LAUNCHERS = frozenset({"sudo", "env", "exec", "nohup", "time", "command", "builtin", "nice", "xargs"})
-#: Shell operators that start a new simple command.
-_SPLIT = re.compile(r"&&|\|\||[;&|\n]")
 _ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 _SETS_PATH = re.compile(r"(?:^|[\s;&|])(?:export\s+|set\s+|\$env:)?PATH\s*[+]?=", re.IGNORECASE)
 
@@ -70,16 +81,42 @@ def _words(segment: str) -> list[str]:
         return segment.split()
 
 
-def _program_words(command: str) -> list[list[str]]:
-    """Each simple command's words from its program on, assignments and launchers skipped."""
-    out: list[list[str]] = []
-    for segment in _SPLIT.split(command):
-        words = _words(segment.strip())
+#: Builtins that move the shell to another folder for the rest of the command.
+_CHANGES_FOLDER = frozenset({"cd", "pushd", "popd", "chdir"})
+#: The operators kept when splitting, so a segment knows whether a pipe put it in a subshell.
+_SPLIT_KEEP = re.compile(r"(&&|\|\||[;&|\n])")
+
+
+def _commands(command: str) -> list[tuple[list[str], bool]]:
+    """Each simple command's words from its program on, and whether it runs in a subshell.
+
+    A segment on either side of a single ``|``, or opened with ``(``, runs in a subshell, so a
+    ``cd`` there does not move the rest of the command; it is reported, not followed.
+    """
+    parts = _SPLIT_KEEP.split(command)
+    out: list[tuple[list[str], bool]] = []
+    for i in range(0, len(parts), 2):
+        segment = parts[i].strip()
+        before = parts[i - 1] if i > 0 else ""
+        after = parts[i + 1] if i + 1 < len(parts) else ""
+        subshell = "|" in (before, after) or segment.startswith("(")
+        words = _words(segment.lstrip("(").rstrip(")").strip())
         while words and (_ASSIGNMENT.match(words[0]) or words[0] in _LAUNCHERS):
             words = words[1:]
         if words:
-            out.append(words)
+            out.append((words, subshell))
     return out
+
+
+def _cd_target(words: list[str]) -> str | None:
+    """The folder a ``cd``/``pushd`` goes to when it is a plain path, else None (not followed)."""
+    args = [w for w in words[1:] if w.lower() not in ("/d", "-l", "-p", "--")]
+    if len(args) != 1:
+        return None  # `cd` alone goes home (POSIX) or prints the folder (cmd.exe)
+    target = args[0]
+    if target == "-" or any(mark in target for mark in ("$", "`", "%", "*", "?", "{")):
+        return None
+    return target
 
 
 def resolve(name: str, cwd: Path) -> str | None:
@@ -129,12 +166,26 @@ def _git_dirs(start: Path) -> tuple[Path, Path, Path] | None:
     return None
 
 
-def _config_hooks_path(config: Path) -> str | None:
-    """``core.hooksPath`` in one git config file, or None. A small reader: sections and keys."""
+class _Unsure(Exception):
+    """The hooks folder cannot be read off the config files without evaluating what git evaluates."""
+
+
+def _config_hooks_path(config: Path, depth: int = 0) -> str | None:
+    """``core.hooksPath`` in one git config file, or None. A small reader: sections and keys.
+
+    A plain ``[include] path = …`` is followed (relative to the including file, as git does). An
+    ``[includeIf "…"]`` is not evaluated — its condition is git's to decide — so when the file it
+    names could set ``core.hooksPath`` (it says ``hooksPath`` or includes further), this raises
+    :class:`_Unsure` rather than letting the card say "no repository hook will run" for a folder
+    git may not be using. Review of S30-30: a repo config including a file that set
+    ``hooksPath = evil-hooks`` made the card name ``.git/hooks`` while git ran ``evil-hooks``.
+    """
     try:
         lines = config.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return None
+    if depth > 5:
+        raise _Unsure(f"includes nested deeper than this reader follows ({config})")
     section = ""
     value: str | None = None
     for raw in lines:
@@ -144,11 +195,68 @@ def _config_hooks_path(config: Path) -> str | None:
         if line.startswith("["):
             section = line.strip("[]").strip().lower()
             continue
-        if section == "core" and "=" in line:
-            key, _, rest = line.partition("=")
-            if key.strip().lower() == "hookspath":
-                value = rest.strip().strip('"')
+        key, eq, rest = line.partition("=")
+        if not eq:
+            continue
+        key = key.strip().lower()
+        rest = rest.strip().strip('"')
+        if section == "core" and key == "hookspath":
+            value = rest
+        elif section.startswith("include") and key == "path" and rest:
+            target = Path(os.path.expanduser(rest))
+            target = target if target.is_absolute() else config.parent / target
+            if section == "include":
+                included = _config_hooks_path(target, depth + 1)
+                if included is not None:
+                    value = included
+            elif _may_set_hooks_path(target):
+                raise _Unsure(f"{config} includes {target} under a condition git evaluates")
     return value
+
+
+def _may_set_hooks_path(config: Path) -> bool:
+    try:
+        text = config.read_text(encoding="utf-8", errors="replace").lower()
+    except OSError:
+        return False
+    return "hookspath" in text or "[include" in text
+
+
+#: Environment variables that change which config git reads, or which repository it is in. Set in
+#: this process's environment (which the command inherits) or on the command line, they make the
+#: config files this module reads not the ones git reads.
+_GIT_ENV = ("GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM",
+            "GIT_CONFIG", "GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE")
+_GIT_ENV_IN_COMMAND = re.compile(r"\bGIT_(?:CONFIG\w*|DIR|COMMON_DIR|WORK_TREE)\b")
+
+
+def _worktree_config(gitdir: Path, common: Path) -> list[Path]:
+    """``config.worktree``, which git reads only with ``extensions.worktreeConfig`` on."""
+    extra = gitdir / "config.worktree"
+    if not extra.is_file():
+        return []
+    try:
+        shared = re.sub(r"\s+", "", (common / "config").read_text(encoding="utf-8", errors="replace"))
+    except OSError:
+        shared = ""
+    if "worktreeconfig=true" in shared.lower():
+        return [extra]
+    if _may_set_hooks_path(extra):
+        # Read or ignored depending on an extension this small reader does not fully evaluate.
+        raise _Unsure(f"{extra} may set the hooks folder")
+    return []
+
+
+def _system_configs() -> list[Path]:
+    """Where git's system config usually is. Lowest precedence; a build that keeps it elsewhere
+    is a limit the module docstring names."""
+    found = [Path("/etc/gitconfig")]
+    if sys.platform == "win32":
+        for base in (os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMW6432")):
+            if base:
+                found += [Path(base) / "Git" / "etc" / "gitconfig",
+                          Path(base) / "Git" / "mingw64" / "etc" / "gitconfig"]
+    return found
 
 
 def _hooks_dir(words: list[str], cwd: Path) -> tuple[Path | None, Path | None]:
@@ -176,12 +284,18 @@ def _hooks_dir(words: list[str], cwd: Path) -> tuple[Path | None, Path | None]:
     found = _git_dirs(where)
     if found is None:
         return None, None
-    worktree, _gitdir, common = found
+    worktree, gitdir, common = found
     configured = override
     if configured is None:
-        configured = _config_hooks_path(common / "config")
-    if configured is None:
-        for config in (Path.home() / ".gitconfig", Path.home() / ".config" / "git" / "config"):
+        # Highest precedence first, as git applies them: the worktree's own config, the
+        # repository's, the user's (~/.gitconfig over the XDG file), then the system's.
+        for config in (
+            *_worktree_config(gitdir, common),
+            common / "config",
+            Path.home() / ".gitconfig",
+            Path.home() / ".config" / "git" / "config",
+            *_system_configs(),
+        ):
             configured = _config_hooks_path(config)
             if configured is not None:
                 break
@@ -206,12 +320,30 @@ def _subcommand(words: list[str]) -> tuple[str, list[str]]:
     return "", []
 
 
-def _hook_line(words: list[str], cwd: Path) -> str | None:
+def _unsure_line(sub: str, why: str) -> str:
+    return (
+        f"git {sub}: which repository hooks run could NOT be determined ({why}); "
+        "they may run and can do more than the command says"
+    )
+
+
+def _hook_line(words: list[str], cwd: Path, *, command: str = "", lost: str = "") -> str | None:
+    """The hooks fact for one git invocation. ``lost`` says why the folder it runs in is unknown."""
     sub, rest = _subcommand(words)
     names = _HOOKS_BY_SUBCOMMAND.get(sub)
     if not names:
         return None
-    folder, worktree = _hooks_dir(words, cwd)
+    if lost:
+        # Never "no repository hook will run" about a folder the command may not be in.
+        return _unsure_line(sub, lost)
+    env_set = [name for name in _GIT_ENV if os.environ.get(name)]
+    if env_set or _GIT_ENV_IN_COMMAND.search(command):
+        return _unsure_line(sub, f"git's config or repository is set by the environment "
+                                 f"({', '.join(env_set) or 'on the command line'})")
+    try:
+        folder, worktree = _hooks_dir(words, cwd)
+    except _Unsure as exc:
+        return _unsure_line(sub, str(exc))
     if worktree is None:
         return None
     if folder is None:
@@ -234,28 +366,46 @@ def _hook_line(words: list[str], cwd: Path) -> str | None:
 def describe(command: str, cwd: Path, workspace: Path | None = None) -> list[str]:
     """One line per fact the card should carry about ``command`` run in ``cwd``; empty if none."""
     lines: list[str] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, Path]] = set()
     hook_lines: list[str] = []
-    for words in _program_words(command):
+    here = cwd
+    lost = ""  # why the folder the rest of the command runs in is not known, once it is not
+    for words, piped in _commands(command):
         name = words[0]
+        if name.lower() in _CHANGES_FOLDER:
+            # `cd sub && git commit` runs `sub`'s git (cmd.exe looks in the NEW folder first) and
+            # `sub`'s hooks. Followed when the target is a plain path; anything else is said.
+            target = _cd_target(words)
+            if lost or piped or target is None or name.lower() == "popd":
+                lost = lost or f"it changes folder ({' '.join(words)[:60]}) in a way this card does not follow"
+            else:
+                moved = Path(os.path.expanduser(target))
+                here = moved if moved.is_absolute() else here / moved
+            continue
         base = os.path.basename(name).lower()
         if base in ("git", "git.exe", "git.cmd", "git.bat"):
-            line = _hook_line(words, cwd)
+            line = _hook_line(words, here, command=command, lost=lost)
             if line is not None and line not in hook_lines:
                 hook_lines.append(line)
-        if name in seen or len(seen) >= _MAX_PROGRAMS:
+        if lost or (name, here) in seen or len(seen) >= _MAX_PROGRAMS:
             continue
-        seen.add(name)
-        path = resolve(name, cwd)
+        seen.add((name, here))
+        path = resolve(name, here)
         if path is None:
-            continue  # a builtin (`cd`, `echo`), a function, or not installed: nothing to name
+            continue  # a builtin (`echo`), a function, or not installed: nothing to name
         note = ""
         if workspace is not None and _inside(path, workspace):
             note = "  (INSIDE the project folder, where the agent can write)"
+        if here != cwd:
+            note += f"  (run from {here}, after the command's cd)"
         lines.append(f"{name} -> {path}{note}")
     if _SETS_PATH.search(command):
         lines.append(
             "this command changes PATH itself, so the programs above may not be the ones that run"
+        )
+    if lost:
+        lines.append(
+            f"{lost}, so the programs and hooks after it may not be the ones named here"
         )
     return lines + hook_lines
 
