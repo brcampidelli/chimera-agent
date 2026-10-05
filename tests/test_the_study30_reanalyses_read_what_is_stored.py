@@ -11,12 +11,23 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from bench.study30_reanalyses import reanalyze  # noqa: E402
 
+# The stored rows are committed; a checkout that leaves `bench/*/results*` out (the WSL gate copies
+# without them) has nothing to reanalyse, which says nothing about the code. Skipped there only.
+needs_results = pytest.mark.skipif(
+    not (reanalyze.BENCH / "verified_cascade" / "results" / "run" / "calls.jsonl").exists()
+    or not reanalyze.OUT.exists(),
+    reason="bench results are not in this checkout",
+)
 
+
+@needs_results
 def test_the_published_reanalyses_are_what_the_script_computes_now() -> None:
     published = json.loads(reanalyze.OUT.read_text(encoding="utf-8"))
     assert published == json.loads(json.dumps(reanalyze.build(), sort_keys=True))
@@ -34,6 +45,7 @@ def test_a_group_carries_confident_misses_only_when_its_interval_clears_the_pool
     assert out == [g for g in groups if g in out]  # order kept
 
 
+@needs_results
 def test_the_url_check_and_the_content_check_are_counted_separately() -> None:
     cit = reanalyze.citations()
     for arm in ("A", "B"):
@@ -41,6 +53,7 @@ def test_the_url_check_and_the_content_check_are_counted_separately() -> None:
         assert ok["n"] + bad["n"] <= cit[arm]["turns"]
 
 
+@needs_results
 def test_the_verifier_slice_acceptance_reproduces_the_published_rates() -> None:
     # bench/verified_cascade/RESULTS.md: Jev accepts 1.2% of the 686 unsupported constructions, the
     # local verifier 22.2%. Reading the noise-floor rereads (`replay|`) in place of the originals gave

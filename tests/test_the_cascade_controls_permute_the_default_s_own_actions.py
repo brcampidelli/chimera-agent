@@ -12,6 +12,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
@@ -19,6 +21,9 @@ from bench.verified_cascade import controls  # noqa: E402
 from bench.verified_cascade.controls import DIVERT, ESCALATE, KEEP, NOT_ANSWERED, Item  # noqa: E402
 
 RUN = REPO / "bench" / "verified_cascade" / "results" / "run"
+# The run's rows are committed; a checkout that leaves `results/` out (the WSL gate copies without it)
+# has nothing to replay, and that says nothing about the code. Skipped there, run everywhere else.
+needs_run = pytest.mark.skipif(not (RUN / "calls.jsonl").exists(), reason="results/run is not in this checkout")
 
 
 def _item(n: int, *, family: str = "NCR", a: str = "correct", d: str = "correct", action: str = KEEP,
@@ -65,6 +70,7 @@ def test_leave_one_out_flags_a_category_whose_removal_flips_the_sign() -> None:
     assert loo["bad"]["carried_by_this"] is False and loo["good"]["carried_by_this"] is True
 
 
+@needs_run
 def test_d_s_actions_reproduce_the_registered_replay_on_the_run() -> None:
     from bench.verified_cascade.replay import RunData
 
@@ -73,6 +79,7 @@ def test_d_s_actions_reproduce_the_registered_replay_on_the_run() -> None:
     assert {i.action for i in items} == {KEEP, ESCALATE, DIVERT}
 
 
+@needs_run
 def test_the_published_controls_are_what_the_script_computes_now() -> None:
     assert json.loads((RUN / "controls.json").read_text(encoding="utf-8")) == json.loads(
         json.dumps(controls.build(RUN), sort_keys=True))
