@@ -2366,10 +2366,12 @@ class ApprovalAnswerIn(BaseModel):
 class ApprovalAnswerOut(BaseModel):
     ok: bool  # False when no question with that id is waiting — a stale click, 200, not a 404
     outcome: str | None = None
-    """For a settings suggestion only: ``applied`` | ``refused`` | ``stale`` (a key no longer holds
+    """For a settings suggestion: ``applied`` | ``refused`` | ``stale`` (a key no longer holds
     the value the card showed) | ``changed`` (the card's file changed after it was shown) |
     ``invalid`` (the value fails a check now) | ``expired``. Only
-    ``applied`` wrote anything. Absent for every other question, whose answer stays ``{ok}``."""
+    ``applied`` wrote anything. For any other question it is absent, except ``needs_code``: an
+    approval of a question another process asked, which this app cannot vouch for — ``detail`` is
+    then the ``chimera approve`` line that approves it with the code the owner was sent."""
 
     detail: str | None = None
     """The keys applied, the keys that moved, or the check that refused — for the sentence the

@@ -1650,6 +1650,19 @@ def build_api_app(
                     "never through the desktop bridge",
                 )
             return _resolve_suggestion(home, request_id, bool(req.approved), req.digest)
+        from chimera.governance.pending import approvable_here, pending
+
+        if req.approved and not approvable_here(request_id):
+            # Asked by ANOTHER process (a terminal run, a separate scheduler): only that process
+            # holds the code an approval must carry (study 30, S30-30), and this one cannot vouch
+            # for a click. Said, rather than reported as a stale click, when the question exists.
+            if any(q.id == request_id for q in pending(home)):
+                return {
+                    "ok": False,
+                    "outcome": "needs_code",
+                    "detail": f"chimera approve {request_id} --yes --code <code>",
+                }
+            return {"ok": False}
         return {"ok": answer(home, request_id, bool(req.approved), via="app")}
 
     def _resolve_suggestion(
