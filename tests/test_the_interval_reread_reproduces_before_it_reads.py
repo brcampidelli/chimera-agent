@@ -15,10 +15,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_the_reread_reproduces_everything_and_crosses_where_its_results_say(tmp_path: Path) -> None:
+    # The re-read reads committed results files. A copy of the tree made without them (the WSL gate
+    # rsyncs with `--exclude 'bench/*/results*'`) cannot run it, and says so instead of failing.
+    if not (ROOT / "bench" / "harness_bench" / "results" / "2026-09-13-factorial.jsonl").is_file():
+        pytest.skip("bench results are not in this checkout; the re-read reads them")
     out = tmp_path / "reread.json"
     proc = subprocess.run(
         [sys.executable, str(ROOT / "bench" / "interval_reread" / "reread.py"), "--json", str(out)],
