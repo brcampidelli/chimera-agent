@@ -63,6 +63,8 @@ OWNER_ONLY: dict[str, tuple[str, str]] = {
     "CHIMERA_DECISION_BACKEND": ("local_logprob", "hosted_verbalized"),
     "CHIMERA_DECISION_MODEL": ("qwen3:4b", ""),
     "CHIMERA_DAILY_USD_CAP": ("1", ""),
+    # A strict spend ceiling (owner's decision, 2026-10-05): off lets a run pass the cap by a call.
+    "CHIMERA_STRICT_SPEND_CAP": ("true", "false"),
     # Reach (P5.2, P5.4).
     "CHIMERA_SANDBOX": ("docker", "local"),
     "CHIMERA_SANDBOX_NETWORK": ("none", "bridge"),

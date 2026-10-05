@@ -1135,6 +1135,18 @@ class Settings(BaseSettings):
     # position guardian silenced at 2 p.m. until midnight costs more than it saves.
     daily_usd_cap: float | None = Field(default=None, validation_alias="CHIMERA_DAILY_USD_CAP")
 
+    # Whether a typed dollar ceiling (`max_usd` on a turn, a crew, a hierarchy, an autonomous run) is
+    # STRICT: a call is dispatched only when its worst case (prompt + completion bound, priced over
+    # the whole fallback chain) still fits what is left, so the run's spend never passes the
+    # ceiling. Off (the default, and the owner's decision of 2026-10-05) keeps the reservation cap:
+    # the last call admitted may end the run past the ceiling by at most its own worst case. On, a
+    # call whose worst case cannot be priced (a composite backend, no completion bound) is refused
+    # rather than run. A run with no ceiling is untouched either way: the 2026-09-27 decision that
+    # limits are warnings stands, and this only decides how hard a ceiling the person typed holds.
+    # Owner-only (`bridge_routes.GUARD_SETTINGS`): it changes a limit. Read when each run builds its
+    # budget (`orchestration/budget.py`), so it applies from the next run.
+    strict_spend_cap: bool = Field(default=False, validation_alias="CHIMERA_STRICT_SPEND_CAP")
+
     # Who says yes when governance escalates an action to review: `ask` | `deny` | `allow`.
     #
     # Both governance layers have taken an approver since they were written and never been given

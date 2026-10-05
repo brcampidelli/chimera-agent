@@ -345,6 +345,21 @@ function AutonomyCard({
           </div>
         </div>
       )}
+      {/* How hard a dollar ceiling the person typed holds (owner's decision, 2026-10-05). Off, as
+          shipped: the last call admitted may pass it by its own worst case. On, a call starts only
+          if its worst case still fits, and one that cannot be priced is refused. Named "strict" on
+          the row so the refusal it can cause is never a surprise; a run with no ceiling is
+          untouched either way, since limits are warnings. The desktop bridge cannot write it. */}
+      <Row
+        label={t("settings.row.strictSpendCap")}
+        hint={t("settings.hint.strictSpendCap")}
+        env="CHIMERA_STRICT_SPEND_CAP"
+      >
+        <Toggle
+          on={c.spend?.strict_cap ?? false}
+          onChange={(v) => save({ CHIMERA_STRICT_SPEND_CAP: String(v) })}
+        />
+      </Row>
       {/* The agent's `open_pull_request` (study 29, P8.1). Off unless the owner turns it on, and
           worded as a warning: it widens where the owner's code can go. Each pull request still asks
           on a card whatever this row says, so the switch decides whether the agent may PROPOSE one,

@@ -26,7 +26,7 @@ from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance.ledger import WRITE_TOOLS
-from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded
+from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded, worst_case_usd
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import is_refusal, tool_raised
@@ -1645,8 +1645,20 @@ class Agent:
         Checked before the call and charged after it: a cap consulted afterwards would be a receipt,
         not a ceiling.
         """
+        asked = {} if self.config.thinking is None else {"thinking": self.config.thinking}
         if spend is not None:
-            reason = spend.blocked()
+            # Strict (the owner's `CHIMERA_STRICT_SPEND_CAP`, off by default) also asks whether THIS
+            # call's worst case still fits; priced only then, so a run without it pays nothing for
+            # the question and refuses exactly as before.
+            worst = (
+                worst_case_usd(
+                    self.backend, messages,
+                    {"model": model or self.config.model, "tools": tools, **asked}, strict=True,
+                )
+                if spend.strict and spend.capped
+                else None
+            )
+            reason = spend.admit(worst)
             if reason is not None:
                 # `SpendExceeded`, not the parent: a `SpendBudget` refusing is always about the
                 # money, so `stopped_reason` reads "spend" and a reader can tell which ceiling was
@@ -1656,7 +1668,6 @@ class Agent:
                 # reported "budget" through the agent and "spend" through the backend.
                 raise SpendExceeded(reason)
         result: CompletionResult
-        asked = {} if self.config.thinking is None else {"thinking": self.config.thinking}
         if on_token is not None and hasattr(self.backend, "stream_complete"):
             result = self.backend.stream_complete(  # type: ignore[attr-defined]
                 messages, model=model or self.config.model, temperature=self.config.temperature,
