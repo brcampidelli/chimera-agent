@@ -311,3 +311,33 @@ def test_the_control_constants_are_the_table_results_md_publishes():
     page["run 4 gate vs scaffold"] = (_pct(gate[1]), (_pct(gate[2]), _pct(gate[3])))
 
     assert page == {label: (delta, ci) for label, (_, _, delta, ci) in audit.PUBLISHED.items()}
+
+
+_AUDIT_ANCHOR = "audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35"
+
+
+@pytest.mark.parametrize("lang", ["en", "de", "es", "fr", "it", "ja", "pl", "pt", "ru", "zh"])
+def test_every_page_that_quotes_the_lift_says_it_is_not_yet_read_under_stronger_tests(lang: str):
+    """Amendment 6: until the dynamic gradings run, the lift is quoted with that caveat beside it.
+
+    `docs/benchmarks.md` and its nine translations republish the table, so the caveat sits under the
+    table there too, linking to the audit section, not only in RESULTS.md.
+    """
+    root = _AUDIT.parents[2]
+    page = root / "docs" / ("benchmarks.md" if lang == "en" else f"i18n/{lang}/benchmarks.md")
+    lines = page.read_text(encoding="utf-8").splitlines()
+    table_end = next(i for i, ln in enumerate(lines) if ln.startswith("| 4"))
+    caveat = lines[table_end + 2]
+    assert caveat.startswith("> ") and f"RESULTS.md#{_AUDIT_ANCHOR})" in caveat, caveat
+    if lang == "en":
+        assert "has not yet been read under stronger tests" in caveat
+
+
+def test_the_anchor_the_pages_link_to_is_the_audit_heading():
+    heading = next(
+        ln[3:]
+        for ln in (_AUDIT.parent / "RESULTS.md").read_text(encoding="utf-8").splitlines()
+        if ln.startswith("## Audit:")
+    )
+    slug = re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
+    assert slug == _AUDIT_ANCHOR

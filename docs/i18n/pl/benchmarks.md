@@ -76,6 +76,8 @@ w Dockerze. Pełne opracowanie:
 | **zbiorczo (drugorzędne)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **istotne** |
 | 4 (atrybucja) | te 41 z uruchomienia 3 | 34.1% | *samo rusztowanie* 39.0% | +4.9% | [−7.6%, +14.2%] | nieistotne |
 
+> **Zaudytowane, jeszcze nie ocenione ponownie (badanie 30, S30-35).** Pięć rozwiązanych poprawek w uruchomieniach 3 i 4 edytuje też pliki testów. Wszystkie pięć zmian dotyczy plików, które harness przywraca przed oceną, a liczenie każdej z nich jako porażki nie odwraca żadnego znaku ani nie odbiera żadnej istotności ([audyt](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Zysk **nie został jeszcze odczytany pod silniejszymi testami** (pełne zestawy testów deweloperów, SWE-ABS); te oceny są należne, nie szacowane.
+
 Uruchomienie 1 to **dokładne zero** i jest opublikowane bez zmian. Uruchomienie 2 naprawiło dwie
 wady, które były *nasze* — rusztowanie działało bez swojego najsilniejszego mechanizmu, a 8 kroków
 wywołań narzędzi to za mało, by nawigować po 250 MB repozytorium — i wyszło z wynikiem **3

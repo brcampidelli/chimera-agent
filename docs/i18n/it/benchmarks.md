@@ -75,6 +75,8 @@ valutate **solo** dall'harness ufficiale `swebench` 4.1.0 in Docker. Resoconto c
 | **aggregato (secondario)** | **60** | 36.7% (22/60) | 48.3% (29/60) | **+11.7%** | **[+0.8%, +16.4%]** | **significativo** |
 | 4 (attribuzione) | le 41 della run 3 | 34.1% | *solo impalcatura* 39.0% | +4.9% | [−7.6%, +14.2%] | non significativo |
 
+> **Verificato, non ancora rivalutato (studio 30, S30-35).** Cinque patch risolte nelle run 3 e 4 modificano anche file di test. Tutte e cinque le modifiche sono in file che l'harness ripristina prima della valutazione, e contare ciascuna come fallimento non inverte alcun segno né ritira alcuna significatività ([l'audit](../../../bench/swe_bench/RESULTS.md#audit-does-the-lift-rest-on-patches-that-edited-tests-study-30-s30-35)). Il guadagno **non è ancora stato letto con test più forti** (le suite complete degli sviluppatori, SWE-ABS); quelle valutazioni sono dovute, non stimate.
+
 La run 1 è uno **zero esatto** ed è pubblicata invariata. La run 2 ha corretto due difetti che
 erano **nostri** — lo scaffold girava senza il suo meccanismo più forte, e 8 passi di
 tool-calling non bastano per navigare un repository da 250 MB — ed è uscita con **3 istanze
