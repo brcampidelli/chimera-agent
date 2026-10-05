@@ -676,6 +676,18 @@ class Settings(BaseSettings):
     # turning it back on loosens privacy. Read per tool call, so it applies from the next one.
     agent_reads_own_env: bool = Field(default=True, validation_alias="CHIMERA_AGENT_READS_OWN_ENV")
 
+    # Lifecycle hooks (owner's decision, 2026-10-05; `docs/hooks-threat-model.md`). Off by default:
+    # until that decision the channel was closed on purpose (`docs/audits/sleeper-channels.md` row
+    # 13). On, the hooks in `<home>/chimera-hooks.json` run around every tool call of the
+    # assemblies that go through `govern_step` — and they can only tighten: deny, ask, annotate,
+    # never allow (`chimera/governance/hooks.py`). Owner-only: the bridge refuses both switches
+    # (`bridge_routes.GUARD_SETTINGS`). Read when a run's tools are assembled.
+    hooks: bool = Field(default=False, validation_alias="CHIMERA_HOOKS")
+    # Whether a SHELL hook may run on the host where no sandbox isolates (Windows, a Linux without
+    # bubblewrap, Docker with the daemon down). Off by default: there, a shell hook is refused and
+    # the tool call with it, because a hook the owner configured that cannot run is a missing guard.
+    hooks_host_exec: bool = Field(default=False, validation_alias="CHIMERA_HOOKS_HOST_EXEC")
+
     # `CHIMERA_REVIEW_MODEL` names the model `chimera review` reviews with. Empty (the default) lets
     # the command pick the first model measured as a reviewer whose family differs from the
     # author's (`MEASURED_REVIEWERS` in `chimera/review/family.py`, chosen by `bench/review_reviewer`),

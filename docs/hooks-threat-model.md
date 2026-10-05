@@ -158,22 +158,66 @@ cost per tool call is measured, not assumed (below).
 ## Where hooks apply
 
 Every assembly that goes through `govern_step` (`chimera/governance/profile.py`): the desktop Code
-screen and `POST /api/runs`, `chimera chat`/`assist`/`tui`, `chimera solve --guard`, the cron jobs,
-the Kanban lanes and the messaging bots. Hooks apply whatever the governance mode is — off,
+screen and the API's runs (`code_api.assemble_registry`), `chimera chat`/`assist`/`tui`
+(`right_hand.py`), every surface built by `governed_profile` (among them the ACP server, the cron
+jobs, the Kanban lanes and the messaging bots) and a guarded
+`chimera solve` started inside a conversation. The app's chat installs no kernel, so its guard
+(`api/posture.guard_chat_registry`, on by default through `CHIMERA_GUARD_CHAT`) installs the hooks
+itself, asking the same person on the same card. A `chimera solve` without `--guard`, and the app's
+chat with its guard switched off, assemble no protection layer at all and run without hooks; that
+is stated as a residual in the audit's row 13. Hooks apply whatever the governance mode is — off,
 observe or enforce — because the owner switched them on separately; and a hook's `ask` goes to the
 owner's approver, never to `observe`'s approve-everything one, which would turn a hook's question
 into a yes.
 
+## The file
+
+```json
+{
+  "hooks": [
+    {"id": "no-push", "event": "pre_tool", "tools": ["run_shell"], "pattern": "git\\s+push",
+     "decision": "deny", "reason": "pushes go through me"},
+    {"id": "lint", "event": "post_tool", "tools": ["write_file", "edit_file"],
+     "command": "python lint_hook.py", "timeout": 20, "on_error": "ignore"}
+  ]
+}
+```
+
+| key | meaning |
+|---|---|
+| `id` | the name the receipts and the model see |
+| `event` | `pre_tool` or `post_tool` |
+| `tools` | tool names the hook applies to; `["*"]` (the default) is every tool |
+| `pattern` | optional regular expression (case-insensitive) over the call as the kernel reads it |
+| `decision` + `reason` / `note` | a static hook: `deny`, `ask` or `annotate` (`post_tool`: `deny` or `annotate`) |
+| `command` | a shell hook: run as written, in an empty folder holding `event.json` |
+| `timeout` | seconds, 1–60, default 10 |
+| `on_error` | `deny` (default) or `ignore` |
+
+A key not in this table makes the file invalid, and with hooks on an invalid file refuses every
+call: `"allow": true` must be an error the owner sees, not a line that silently does nothing.
+
+A shell hook reads `event.json` — `{"event", "tool", "arguments"}` with document bodies replaced by
+their size, plus `{"result": {"chars", "failed"}}` after the call — and answers on stdout with
+nothing (no opinion) or one JSON object: `{"decision": "deny" | "ask" | "annotate", "reason": "…",
+"note": "…"}`. Exit code 0 is required; anything else is a failure and follows `on_error`.
+
 ## The cost, measured
 
 Per tool call, on the reference Windows machine (no OS sandbox), from
-`tests/test_hooks_only_tighten.py::test_the_overhead_per_tool_call_is_measured`:
+`tests/test_hooks_only_tighten.py::test_the_overhead_per_tool_call_is_measured`, which prints the
+numbers on every run so they can be re-read anywhere:
 
-- hooks off: no wrapper is installed — the registry is the one the kernel built, identical object
-  for object, so the overhead is zero by construction;
-- hooks on, a static hook that matches: the wrapper plus one regular expression;
-- a shell hook: one sandboxed process start per matching call, which dominates. A shell hook on
-  `pre_tool` for every tool is the expensive configuration and the hint says so.
+| configuration | per call |
+|---|---|
+| hooks off | no wrapper installed — the registry is the object the kernel built, so zero by construction |
+| ten static hooks, none matching | +10.7 µs over a bare call of 0.7 µs |
+| one shell hook, sandbox faked (temporary folder + `event.json` only) | +18.8 ms |
+| one shell hook that starts a real Python process on the host | ~300 ms |
+
+A shell hook on `pre_tool` for every tool is therefore the expensive configuration: the process
+start dominates, and on Windows it is a large fraction of a second per call. Static hooks cost
+nothing a person would notice.
 
 ## The tests that hold this document
 

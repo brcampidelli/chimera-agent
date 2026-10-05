@@ -366,6 +366,16 @@ def guard_chat_registry(registry: Any, *, audit: Any = None, approve: Any = None
     # Not passing `audit` from `restrict_registry` above, for the reason `code_api` gives at the
     # same spot: the posture excludes the exec tools on every turn, so that would append an
     # identical entry per turn and bury the rare events someone opens this log to find.
+    #
+    # The owner's lifecycle hooks (`docs/hooks-threat-model.md`), the same as every assembly that goes
+    # through `govern_step`: this chat installs no kernel, so it never reaches that function, and
+    # without this line the app's chat — the screen a person is sitting at — would be the one surface
+    # where the owner's hooks silently did not run. Inside the ledger, and asking the same person.
+    from chimera.governance.hooks import apply_hooks
+
+    registry = apply_hooks(
+        registry, settings=get_settings(), audit=audit, approve=approve, taint=ledger.record_fetch
+    )
     return ledger_registry(
         registry, ledger, narrow_on_taint=resolved.narrow_on_taint, audit=audit, approve=approve
     ), ledger

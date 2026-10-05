@@ -242,7 +242,13 @@ def reaches_queue(text: str, *, home: Path | None, cwd: Path) -> str | None:
         return "it runs `chimera approve`"
     if home is None:
         return None
-    queue = _Queue(Path(home).expanduser() / "approvals")
+    if _names(tokens, _Queue(Path(home).expanduser() / "approvals"), cwd):
+        return "it names Chimera's approval folder"
+    return None
+
+
+def _names(tokens: list[str], target: _Queue, cwd: Path) -> bool:
+    """Whether any word of ``tokens`` resolves to ``target`` or below it, by any spelling."""
     bases = [Path(cwd), Path.home()]
     seen: set[tuple[str, int]] = set()
     for token in tokens:
@@ -252,10 +258,49 @@ def reaches_queue(text: str, *, home: Path | None, cwd: Path) -> str | None:
             continue
         seen.add((token, len(bases)))
         for candidate in _candidates(token, bases):
-            if queue.holds(candidate):
-                return "it names Chimera's approval folder"
+            if target.holds(candidate):
+                return True
             # A folder the command names may be one it changes into (`cd home && cd approvals`), so
             # what follows is also read relative to it.
-            if len(bases) < _MAX_BASES and candidate not in bases and queue.is_dir(candidate):
+            if len(bases) < _MAX_BASES and candidate not in bases and target.is_dir(candidate):
                 bases.append(candidate)
+    return False
+
+
+#: The owner's hooks file, by the name `chimera/governance/hooks.py` gives it. Kept as a literal
+#: rather than imported, so this fence loads nothing from the module it protects.
+_HOOKS_FILE = "chimera-hooks.json"
+_HOOKS_NAME = re.compile(r"chimera-hooks\.json\b", re.IGNORECASE)
+#: The hooks module's own code, imported — `code_interpreter` runs in the server's process, where a
+#: loader is one import away. A mention (`rg chimera.governance.hooks`) is how the agent works on
+#: Chimera's own repository, so only an import refuses.
+_HOOKS_CODE = re.compile(
+    r"\bimport\s+chimera\.governance\.hooks\b"
+    r"|\bfrom\s+chimera\.governance\.hooks\s+import\b"
+    r"|\bfrom\s+chimera\.governance\s+import\b[^\n]*\bhooks\b"
+    r"|\b(?:import_module|__import__)\s*\(\s*['\"]?chimera\.governance\.hooks\b",
+    re.IGNORECASE,
+)
+
+
+def reaches_hooks_file(text: str, *, home: Path | None, cwd: Path) -> str | None:
+    """Why ``text`` — a shell command or a program — reaches the owner's hooks file, or None.
+
+    The hook-update path of `docs/hooks-threat-model.md` (A1): a hook the agent could write is a
+    command that fires on every later call with no injection needed any more. The write tools are
+    kept out by the data folder they live in (`own_files.py`); this keeps out the three tools that
+    run arbitrary text, with the same reading the approval queue gets above — quoting removed,
+    variables expanded, the file compared by identity — and the same stated limit: a path the
+    command assembles at run time is not seen.
+    """
+    variants = _as_shells_read_it(text)
+    if any(_HOOKS_NAME.search(v) for v in variants):
+        return "it names the owner's hooks file"
+    if any(_HOOKS_CODE.search(v) for v in variants):
+        return "it imports the hooks module"
+    if home is None:
+        return None
+    tokens = list(dict.fromkeys(t for v in variants for t in _SEPARATORS.split(_expand(v)) if t))
+    if _names(tokens, _Queue(Path(home).expanduser() / _HOOKS_FILE), cwd):
+        return "it names the owner's hooks file"
     return None

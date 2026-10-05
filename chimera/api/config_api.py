@@ -249,6 +249,11 @@ _EDITABLE_SETTINGS = {
     # Whether the agent's read tools may read Chimera's own `.env` (owner's decision, 2026-10-04).
     # On by default. Owner-only (`bridge_routes.PRIVACY_SETTINGS`): on is the direction that loosens.
     "CHIMERA_AGENT_READS_OWN_ENV",
+    # Lifecycle hooks (owner's decision, 2026-10-05; `docs/hooks-threat-model.md`). Off by default.
+    # Owner-only (`bridge_routes.GUARD_SETTINGS`): on, a hook can only tighten, but turning hooks
+    # off removes the guards the owner wrote, and the host switch lets shell hooks leave the sandbox.
+    "CHIMERA_HOOKS",
+    "CHIMERA_HOOKS_HOST_EXEC",
 }
 # The settings that turn a tool ON, which the Tools screen switches (`chimera/tools/conditional.py`).
 # Named there, once, and read here, so the screen can never offer a switch this endpoint refuses.
@@ -328,6 +333,10 @@ APPLIES_WHEN: dict[str, str] = {
     # a chat already running keeps the instrument it started with; the next one reads the new pair.
     # `POST /api/decide` and the `decide` tool rebuild on the next call.
     "CHIMERA_DECISION_BACKEND": NEXT_CONVERSATION,
+    # Read where the registry is assembled (`govern_step`): per conversation in the chat, per turn on
+    # the Code screen, per job on cron. "Next conversation" is the scope true on all of them.
+    "CHIMERA_HOOKS": NEXT_CONVERSATION,
+    "CHIMERA_HOOKS_HOST_EXEC": NEXT_CONVERSATION,
     "CHIMERA_DECISION_MODEL": NEXT_CONVERSATION,
     # These start something at boot — a daemon thread and a set of MCP subprocesses. Re-reading the
     # value would not undo that, so the honest answer is the relaunch, not a re-read.
@@ -650,6 +659,10 @@ def read_config(settings: Settings, *, env_path: Path | None = None) -> dict[str
             "approval_webhook_set": bool(settings.approval_webhook.strip()),
             # Whether the agent may propose a pull request at all. Every proposal asks the owner.
             "pull_requests": settings.pull_requests,
+            # The owner's lifecycle hooks and whether a shell hook may run on the host
+            # (`docs/hooks-threat-model.md`). Both off by default; both owner-only.
+            "hooks": settings.hooks,
+            "hooks_host_exec": settings.hooks_host_exec,
             # The destinations the owner declared as not-a-way-out. A plain list, not a secret:
             # it is a statement the owner made and has to be able to read back, and a row that
             # cannot show what it holds is a row nobody can correct.
@@ -995,6 +1008,8 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_OPENROUTER_ZDR": _check_boolean("CHIMERA_OPENROUTER_ZDR"),
     "CHIMERA_KEY_VAULT": _check_boolean("CHIMERA_KEY_VAULT"),
     "CHIMERA_AGENT_READS_OWN_ENV": _check_boolean("CHIMERA_AGENT_READS_OWN_ENV"),
+    "CHIMERA_HOOKS": _check_boolean("CHIMERA_HOOKS"),
+    "CHIMERA_HOOKS_HOST_EXEC": _check_boolean("CHIMERA_HOOKS_HOST_EXEC"),
     "CHIMERA_PULL_REQUESTS": _check_boolean("CHIMERA_PULL_REQUESTS"),
     "CHIMERA_BRANCH_PREFIX": _check_branch_prefix,
 }

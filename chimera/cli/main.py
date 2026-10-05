@@ -5121,6 +5121,7 @@ def solve(
                 attended=True,
                 audit_allows=False,
                 lineage=inherited.ledger.lineage,
+                taint=inherited.ledger.record_fetch,
             ).registry
         elif guard:
             from chimera.governance import TrustKernel, govern_registry

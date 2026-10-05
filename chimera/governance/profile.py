@@ -106,6 +106,73 @@ def _via_screen(screen: Callable[..., bool], approvals: Any) -> Callable[..., bo
     return approve
 
 
+def _owner_approver(
+    settings: Settings,
+    approvals: Any,
+    *,
+    attended: bool,
+    home: Path | None,
+    screen: Callable[..., bool] | None,
+) -> tuple[Any, str, str]:
+    """``(approve, no_approver, approver_name)`` for the owner's own approval mode.
+
+    The ``enforce`` branch of :func:`govern_step`, moved out unchanged so the owner's hooks can ask
+    the same approver under every mode. Under ``observe`` the kernel is handed an approver that says
+    yes to everything, which is right for measuring the kernel and wrong for a hook: a hook's ``ask``
+    is a question the owner wrote, and answering it with a measuring yes would turn it into an allow.
+    """
+    from chimera.governance.approval import approver_for, deliverer_for, nobody_is_at_a_terminal
+
+    no_approver = ""
+    approver_name = ""
+    # Normalised the way `approver_for` and `_owner_allows` already read it: an owner whose
+    # variable is set but empty meant `ask`, and an unnormalised `""` used to slip past the
+    # unattended check below straight into `approver_for("")` — which is `ask`, on the server's
+    # console, for an HTTP caller: the exact prompt the flag exists to prevent.
+    wanted = (settings.approval_mode or "ask").strip().lower()
+    # Where a question would go if one had to be asked, resolved before the mode is: on an
+    # unattended surface it is what decides whether "ask" has anywhere to go at all.
+    deliver = deliverer_for(settings)
+    if wanted == "deny":
+        no_approver = "owner_denies"
+    if screen is not None and wanted == "ask":
+        # The person who made the request is reachable through the surface itself.
+        approver_name = "screen"
+        approve = _via_screen(screen, approvals)
+    elif not attended and wanted == "ask":
+        no_approver = "unattended"
+        # `deny` is what `approver_for` picks for itself once it finds no terminal; this reaches
+        # the same fail-closed answer one step earlier, before a tty that belongs to somebody
+        # else can be mistaken for the requester.
+        wanted = "deny"
+    elif (
+        wanted == "ask"
+        and home is not None
+        and deliver is None
+        and nobody_is_at_a_terminal()
+    ):
+        # The caller opted into asking somebody who is not at the keyboard — and this deployment
+        # has not said where such a question would go. Refusing HERE rather than letting
+        # `ask_durably` write a file and wait is the difference between a refusal and the same
+        # refusal fifteen minutes later, which `pending.py` names as the thing to avoid. The
+        # reason travels so the message can name the setting that turns asking on, instead of
+        # inviting a retry that will be refused identically.
+        no_approver = "unreachable"
+        wanted = "deny"
+    if approver_name != "screen":
+        approver_name = wanted
+        # `home` travels unconditionally, and the branch above is the only thing deciding
+        # whether it can be used: with no destination `wanted` is already `deny`, and
+        # `approver_for` returns before it reads a home at all. An earlier draft ALSO withheld
+        # `home` here, and the sabotage matrix found that no test could tell the two versions
+        # apart — because in every reachable path the branch had already answered. A second
+        # guard that cannot be observed to fail is not depth; it is a line the next reader has
+        # to reason about twice.
+        approve = approver_for(wanted, approvals, home=home, deliver=deliver)
+
+    return approve, no_approver, approver_name
+
+
 def govern_step(
     registry: Any,
     *,
@@ -118,6 +185,7 @@ def govern_step(
     home: Path | None = None,
     lineage: Callable[[], str] | None = None,
     screen: Callable[..., bool] | None = None,
+    taint: Callable[[str, str], object] | None = None,
 ) -> GovernanceStep:
     """Apply the deployment's trust kernel to ``registry``, under the deployment's mode.
 
@@ -171,11 +239,6 @@ def govern_step(
     """
     from chimera.governance import ApprovalLedger, TrustKernel
     from chimera.governance.approval import allow as allow_everything
-    from chimera.governance.approval import (
-        approver_for,
-        deliverer_for,
-        nobody_is_at_a_terminal,
-    )
     from chimera.governance.band import band_enabled, build_band
     from chimera.governance.governed_tool import govern_registry
 
@@ -185,8 +248,30 @@ def govern_step(
         resolved = "off"
 
     approvals = ApprovalLedger()
+    def with_hooks(governed: Any, kernel_approve: Any) -> Any:
+        # The owner's lifecycle hooks (`chimera/governance/hooks.py`), whatever the mode: the owner
+        # switched them on separately. Outside the kernel, so a hook can stop what the kernel would
+        # let through and release nothing; inside the taint ledger every caller wraps around this.
+        if not getattr(settings, "hooks", False):
+            return governed
+        from chimera.governance.hooks import apply_hooks
+
+        # A hook's `ask` goes to the OWNER's approver — under `enforce` the kernel's own, under
+        # `off` and `observe` the same one built here. Never `observe`'s approve-everything: that
+        # would answer the owner's question with a measuring yes.
+        hook_approve = (
+            kernel_approve
+            if resolved == "enforce"
+            else _owner_approver(
+                settings, ApprovalLedger(), attended=attended, home=home, screen=screen
+            )[0]
+        )
+        return apply_hooks(
+            governed, settings=settings, audit=audit, approve=hook_approve, taint=taint
+        )
+
     if resolved == "off":
-        return GovernanceStep(registry, approvals, None, resolved)
+        return GovernanceStep(with_hooks(registry, None), approvals, None, resolved)
 
     # In observe the approver says yes to everything and writes down that it did. Every call that
     # reaches an approver is one the policy WOULD have refused, so `approvals` is the report a
@@ -206,50 +291,9 @@ def govern_step(
         approver_name = "allow"
         approve = allow_everything(approvals)
     else:
-        # Normalised the way `approver_for` and `_owner_allows` already read it: an owner whose
-        # variable is set but empty meant `ask`, and an unnormalised `""` used to slip past the
-        # unattended check below straight into `approver_for("")` — which is `ask`, on the server's
-        # console, for an HTTP caller: the exact prompt the flag exists to prevent.
-        wanted = (settings.approval_mode or "ask").strip().lower()
-        # Where a question would go if one had to be asked, resolved before the mode is: on an
-        # unattended surface it is what decides whether "ask" has anywhere to go at all.
-        deliver = deliverer_for(settings)
-        if wanted == "deny":
-            no_approver = "owner_denies"
-        if screen is not None and wanted == "ask":
-            # The person who made the request is reachable through the surface itself.
-            approver_name = "screen"
-            approve = _via_screen(screen, approvals)
-        elif not attended and wanted == "ask":
-            no_approver = "unattended"
-            # `deny` is what `approver_for` picks for itself once it finds no terminal; this reaches
-            # the same fail-closed answer one step earlier, before a tty that belongs to somebody
-            # else can be mistaken for the requester.
-            wanted = "deny"
-        elif (
-            wanted == "ask"
-            and home is not None
-            and deliver is None
-            and nobody_is_at_a_terminal()
-        ):
-            # The caller opted into asking somebody who is not at the keyboard — and this deployment
-            # has not said where such a question would go. Refusing HERE rather than letting
-            # `ask_durably` write a file and wait is the difference between a refusal and the same
-            # refusal fifteen minutes later, which `pending.py` names as the thing to avoid. The
-            # reason travels so the message can name the setting that turns asking on, instead of
-            # inviting a retry that will be refused identically.
-            no_approver = "unreachable"
-            wanted = "deny"
-        if approver_name != "screen":
-            approver_name = wanted
-            # `home` travels unconditionally, and the branch above is the only thing deciding
-            # whether it can be used: with no destination `wanted` is already `deny`, and
-            # `approver_for` returns before it reads a home at all. An earlier draft ALSO withheld
-            # `home` here, and the sabotage matrix found that no test could tell the two versions
-            # apart — because in every reachable path the branch had already answered. A second
-            # guard that cannot be observed to fail is not depth; it is a line the next reader has
-            # to reason about twice.
-            approve = approver_for(wanted, approvals, home=home, deliver=deliver)
+        approve, no_approver, approver_name = _owner_approver(
+            settings, approvals, attended=attended, home=home, screen=screen
+        )
 
     # The REVIEW band, when the deployment turned it on (`band.py`): built here, once per assembly,
     # for the same reason the kernel is — every surface goes through this function, and a band
@@ -265,6 +309,7 @@ def govern_step(
         no_approver=no_approver,
         lineage=lineage,
     )
+    registry = with_hooks(registry, approve)
     # One line per assembly, and the only place the deployment's mode is written where a reader can
     # find it. Two holes close here.
     #
@@ -480,7 +525,7 @@ def governed_profile(
     ledger = TaintLedger(authority=settings.taint_authority)
     step = govern_step(
         registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home,
-        lineage=ledger.lineage,
+        lineage=ledger.lineage, taint=ledger.record_fetch,
     )
     if step.mode == "off":
         return step.registry, step.approvals

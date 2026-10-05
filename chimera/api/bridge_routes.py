@@ -583,6 +583,11 @@ GUARD_SETTINGS = frozenset(
         # The project-pack switch narrows: on, an accepted pack takes skills, servers and tools
         # away; switching it off hands them back (study 29, P7.6).
         "CHIMERA_PROJECT_PACK",
+        # The owner's lifecycle hooks (`docs/hooks-threat-model.md`). On, a hook only tightens; a
+        # client that could switch hooks off would remove the guards the owner wrote, and one that
+        # could switch the host companion on would let shell hooks run outside the sandbox.
+        "CHIMERA_HOOKS",
+        "CHIMERA_HOOKS_HOST_EXEC",
     }
 )
 

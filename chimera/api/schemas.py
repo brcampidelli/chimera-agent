@@ -639,6 +639,13 @@ class AutonomyCfgOut(BaseModel):
     pull_requests: bool = False
     """``CHIMERA_PULL_REQUESTS``: whether the agent has ``open_pull_request``. Off by default, and a
     server without the field is off. On or off, every pull request the agent proposes asks the owner."""
+    hooks: bool = False
+    """``CHIMERA_HOOKS``: whether the owner's lifecycle hooks (``<home>/chimera-hooks.json``) run
+    around tool calls. Off by default; on, a hook can only deny, ask or annotate
+    (`docs/hooks-threat-model.md`). A server without the field is off."""
+    hooks_host_exec: bool = False
+    """``CHIMERA_HOOKS_HOST_EXEC``: whether a shell hook may run on the host where no sandbox
+    isolates. Off by default: there, a shell hook is refused and the tool call with it."""
 
 
 class ServerCfgOut(BaseModel):
