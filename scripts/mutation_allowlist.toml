@@ -19,7 +19,6 @@
 "chimera.api.version_api.x__fetch_latest__mutmut_10" = "HTTP header name case: 'Accept' -> 'accept'. Case-insensitive per RFC 7230 3.2."
 "chimera.api.version_api.x__fetch_latest__mutmut_11" = "HTTP header name case: 'Accept' -> 'ACCEPT'. Case-insensitive per RFC 7230 3.2."
 "chimera.api.version_api.x__fetch_latest__mutmut_22" = "Codec alias: decode('utf-8') -> decode('UTF-8'). Python codec names are case-insensitive aliases; identical bytes."
-"chimera.api.version_api.x_check_version__mutmut_11" = "Dead branch: `bool(latest) and _is_newer(latest or \"\", current)` short-circuits when latest is falsy, so `_is_newer` never sees the `or` fallback; mutating \"\" -> \"XXXX\" is unreachable."
 
 # --- runs: file encoding. On the CI platform (Linux, UTF-8 locale) the default IS utf-8, so these are
 #     indistinguishable there. The explicit encoding='utf-8' is correct defensive code for a non-UTF-8
@@ -44,7 +43,6 @@
 # --- sandbox.confirm: the host-execution gate (the posture that decides run-vs-refuse).
 "chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_6" = "Default posture string 'ask' -> 'XXaskXX'. The branch order is allow / deny / else-ask, so ANY unrecognised value already falls through to the ask path — mutating the default cannot change the resolved gate. Equivalent by construction (and that fall-through is itself tested)."
 "chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_7" = "Default posture string 'ask' -> 'ASK'. `.lower()` is applied on the next expression, so the two are the same value. Equivalent."
-"chimera.sandbox.confirm.x_resolve_host_exec_confirm__mutmut_25" = "getattr default `lambda: False` -> `lambda: None`. The call is wrapped in bool(), and bool(None) == bool(False) == False, so the resolved posture is identical. Equivalent."
 # _prompt's terminal output: wording, capitalisation and colour. All 14 are presentation-only —
 # none changes what the function RETURNS. The behavioural mutants of this same function (return
 # True, bool(None), default=True, dropping the confirm text) are all KILLED by
@@ -70,7 +68,4 @@
 # fail-safe is asserted by test_prompt_returns_the_human_answer, so what remains here is prose.
 "chimera.sandbox.confirm.x__prompt__mutmut_10" = "Warning colour 'yellow' -> 'XXyellowXX'. Terminal colour only."
 "chimera.sandbox.confirm.x__prompt__mutmut_19" = "Confirm question text -> None. Wording only; the default (False) and the returned answer are asserted."
-"chimera.sandbox.confirm.x__prompt__mutmut_21" = "Confirm question text argument dropped. Wording only; default=False preserved and asserted."
-"chimera.sandbox.confirm.x__prompt__mutmut_23" = "Confirm question wrapped in mutmut's XX..XX marker. Wording only."
 "chimera.sandbox.confirm.x__prompt__mutmut_24" = "Confirm question lower-cased. Wording only."
-"chimera.sandbox.confirm.x__prompt__mutmut_25" = "Confirm question upper-cased. Wording only."
