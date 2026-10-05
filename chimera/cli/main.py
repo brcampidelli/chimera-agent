@@ -8923,6 +8923,18 @@ def memory_poison() -> None:
             "cannot tell the quote from the command."
         )
 
+    # The second hop (study 30 S30-25, pre-registered 2026-10-05): a clean run recalls the fact,
+    # writes back what it concluded, and a third run recalls that. Same threshold as above.
+    from chimera.eval.memory_poison import run_two_hop
+
+    hop = run_two_hop()
+    hop_passed, hop_why = hop.gate()
+    console.print(f"[{'green' if hop_passed else 'red'}]two hops: {'pass' if hop_passed else 'FAIL'}[/] — {hop_why}")
+    if hop.unmarked():
+        console.print(
+            f"[yellow]Survives one clean rewrite with no origin:[/yellow] {', '.join(hop.unmarked())}"
+        )
+
 
 @app.command("probe-select")
 def probe_select(

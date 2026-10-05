@@ -1,0 +1,5 @@
+two-hop row, code at 4597a6d0 (after the fix)
+{'two_hop_unmarked_rate': 0.0, 'honest_runs_armed_rate': 1.0}
+unmarked: []
+benign armed: ['upgrade_timeout', 'issue_repro', 'api_pagination', 'release_step', 'user_language', 'deploy_window', 'security_doc_quoting_an_attack', 'ticket_forwarding_an_attempt']
+(True, '0.0% of poison unmarked after two hops; 100.0% of honest runs armed')
