@@ -99,6 +99,60 @@ def test_a_renamed_marker_that_only_moved_is_not_a_new_skip() -> None:
     assert [f.kind for f in flags] == [TESTS_TOUCHED]
 
 
+_FLAKY = _TESTS.replace("def test_adds", "@pytest.mark.skip\ndef test_adds")
+
+
+def test_moving_a_bare_skip_from_a_passing_test_to_the_failing_one_is_a_new_skip() -> None:
+    # The same marker text removed above one test and added above another: compared as text it
+    # "only moved", and the test that fails is now the one nobody runs.
+    swapped = _TESTS.replace("def test_negative", "@pytest.mark.skip\ndef test_negative")
+    flags = flag_snapshots({"tests/test_m.py": _FLAKY}, {"tests/test_m.py": swapped})
+    skipped = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert skipped and "test_negative" in skipped[0].detail
+
+
+def test_the_same_swap_in_a_stored_patch_with_context_is_a_new_skip() -> None:
+    patch = (
+        "@@ -1,8 +1,8 @@\n import pytest\n \n \n-@pytest.mark.skip\n def test_adds():\n"
+        "     assert add(1, 2) == 3\n \n \n+@pytest.mark.skip\n def test_negative():\n"
+    )
+    flags = flag_patches([("tests/test_m.py", patch)])
+    skipped = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert skipped and "test_negative" in skipped[0].detail
+
+
+def test_one_skip_removed_and_two_added_is_a_net_new_skip() -> None:
+    patch = "@@ -1,1 +1,2 @@\n-@pytest.mark.skip\n+@pytest.mark.skip\n+@pytest.mark.skip\n"
+    flags = flag_patches([("tests/test_m.py", patch)])
+    assert TESTS_REMOVED_OR_SKIPPED in {f.kind for f in flags}
+
+
+def test_a_skip_that_stays_on_its_test_while_the_test_moves_is_not_new() -> None:
+    # The skipped test moved below the other one, marker and all: the same test is skipped.
+    reordered = (
+        "import pytest\n\n\ndef test_negative():\n    assert add(-1, -2) == -3\n\n\n"
+        "@pytest.mark.skip\ndef test_adds():\n    assert add(1, 2) == 3\n"
+    )
+    flags = flag_snapshots({"tests/test_m.py": _FLAKY}, {"tests/test_m.py": reordered})
+    assert TESTS_REMOVED_OR_SKIPPED not in {f.kind for f in flags}
+
+
+def test_a_skip_call_in_a_body_is_attributed_to_its_test() -> None:
+    before = "def test_a():\n    pytest.skip('x')\n\n\ndef test_b():\n    assert f()\n"
+    after = "def test_a():\n    assert g()\n\n\ndef test_b():\n    pytest.skip('x')\n"
+    flags = flag_snapshots({"tests/test_m.py": before}, {"tests/test_m.py": after})
+    skipped = [f for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED]
+    assert skipped and "test_b" in skipped[0].detail
+
+
+def test_a_javascript_only_is_a_skip_and_not_a_removed_test() -> None:
+    before = "it('adds', () => {});\nit('subtracts', () => {});\n"
+    after = "it.only('adds', () => {});\nit('subtracts', () => {});\n"
+    flags = flag_snapshots({"src/m.test.js": before}, {"src/m.test.js": after})
+    detail = next(f.detail for f in flags if f.kind == TESTS_REMOVED_OR_SKIPPED)
+    assert "removed" not in detail and "adds" in detail
+
+
 def test_the_file_the_verify_command_runs_is_the_verifier() -> None:
     flags = flag_snapshots({"check.sh": "exit 1\n"}, {"check.sh": "exit 0\n"}, verify_command="bash check.sh")
     assert [(f.kind, f.path) for f in flags] == [(VERIFIER_MODIFIED, "check.sh")]
