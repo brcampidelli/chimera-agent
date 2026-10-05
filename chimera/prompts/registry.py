@@ -480,6 +480,10 @@ SECTIONS: tuple[PromptSection, ...] = (
 #: Constants whose names look like prompts but are never sent to a model. Each says why, so the scan
 #: in the test cannot be satisfied by quietly adding a name here.
 NOT_PROMPTS: dict[str, str] = {
+    "chimera.eval.memory_poison:_FACTS_HEADER": (
+        "a parse anchor: the memory-poison bench's scripted worker finds the recalled facts by the "
+        "header `AutonomousAgent._recall_facts` writes; no model reads this copy"
+    ),
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
     "chimera.tools.pull_request:REASON": (
         "the verdict reason on the pull-request approval question (card, chat or `chimera approve`);"
