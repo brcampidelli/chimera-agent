@@ -180,6 +180,13 @@ def _no_dotenv(
     # the shipped default is a fact a test can read rather than a property of whose machine ran it.
     monkeypatch.setenv("CHIMERA_REACH", "")
     monkeypatch.delenv("CHIMERA_REACH")
+    # Same reason, a newer switch: `SpendBudget()` reads CHIMERA_STRICT_SPEND_CAP when it is built,
+    # and `patch_config` exports what it saves into os.environ. A shell that inherited `true` made
+    # every phase-0 test that builds `SpendBudget(max_usd)` without `strict=` red on that machine
+    # only (the $1.20 reservation tests, the agent loop's four calls). Owned, so off is the default
+    # every test sees, and a test that wants strict says so.
+    monkeypatch.setenv("CHIMERA_STRICT_SPEND_CAP", "")
+    monkeypatch.delenv("CHIMERA_STRICT_SPEND_CAP")
     # The desktop bridge's discovery file lives in the user's REAL home (`~/.chimera`), outside
     # `CHIMERA_HOME` on purpose (`chimera/api/desktop_bridge.py`). Every test gets a private
     # directory for it, so no test can write — or delete — the file of an app the developer has
