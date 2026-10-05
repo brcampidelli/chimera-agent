@@ -81,6 +81,13 @@ Ending = Literal[
 #: recalled into a later run's context, so its size is a recurring cost, not a one-off.
 _FACT_CHARS = 160
 
+#: The line above the long-term facts a run recalls into its prompt, and the label a tainted one
+#: carries. Named so the memory-poison bench's scripted worker parses the same bytes: a copy there
+#: went inert silently if this were reworded (the worker found nothing to launder, and the two-hop
+#: row passed on nothing).
+RECALLED_FACTS_HEADER = "Relevant prior facts (advisory):"
+RECALLED_FACT_LABEL = " [unverified: learned from untrusted content]"
+
 # --diff-feedback wording and bound. Fixed in bench/retry_lift/PREREGISTRATION.md BEFORE the run that
 # measures it, because framing and truncation are the most temptingly tunable knobs in the whole
 # experiment — "it didn't work, let me reword the prompt" is how a null becomes a fabricated win.
@@ -2021,12 +2028,10 @@ class AutonomousAgent:
             tainted = getattr(item, "provenance", "clean") == "tainted"
             if tainted:
                 self._arm_on_recall(item, content)
-            lines.append(
-                f"- {content}" + (" [unverified: learned from untrusted content]" if tainted else "")
-            )
+            lines.append(f"- {content}" + (RECALLED_FACT_LABEL if tainted else ""))
         if not lines:
             return ""
-        return "Relevant prior facts (advisory):\n" + "\n".join(lines)
+        return f"{RECALLED_FACTS_HEADER}\n" + "\n".join(lines)
 
     def _arm_on_recall(self, item: object, content: str) -> None:
         """A tainted fact entering this run's prompt is untrusted content entering this run.

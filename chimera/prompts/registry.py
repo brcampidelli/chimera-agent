@@ -295,6 +295,10 @@ SECTIONS: tuple[PromptSection, ...] = (
        "bench/harness_bench: repo-map −0.012, checklist +0.005, planner +0.003 (SD 0.073); "
        "measured on deepseek-v3.2, 23 tasks"),
     _i("solve.feedback_fragments", "chimera.core.autonomous:AutonomousAgent.run", "turn", ("S1",)),
+    _c("solve.recalled_facts_header", "chimera.core.autonomous:RECALLED_FACTS_HEADER", "volatile",
+       ("S1",), "unmeasured",
+       note="heads the long-term facts a solve run recalls; a tainted one carries the [unverified] "
+            "label. The memory-poison bench parses for these bytes by importing them"),
     _c("solve.diff_feedback_header", "chimera.core.autonomous:_DIFF_FEEDBACK_HEADER", "turn", ("S1",),
        "null", "bench/retry_lift (closed without proof: +6% and −4%); measured on mistral-small-3.2-24b"),
     _i("solve.recovery_briefs", "chimera.core.failure_class:targeted_feedback", "turn", ("S1",),
@@ -480,10 +484,6 @@ SECTIONS: tuple[PromptSection, ...] = (
 #: Constants whose names look like prompts but are never sent to a model. Each says why, so the scan
 #: in the test cannot be satisfied by quietly adding a name here.
 NOT_PROMPTS: dict[str, str] = {
-    "chimera.eval.memory_poison:_FACTS_HEADER": (
-        "a parse anchor: the memory-poison bench's scripted worker finds the recalled facts by the "
-        "header `AutonomousAgent._recall_facts` writes; no model reads this copy"
-    ),
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
     "chimera.tools.pull_request:REASON": (
         "the verdict reason on the pull-request approval question (card, chat or `chimera approve`);"
