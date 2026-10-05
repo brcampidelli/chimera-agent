@@ -14,6 +14,7 @@ itself:
 | module | why it's in scope |
 |---|---|
 | `chimera/eval/paired.py` | the McNemar/Wilson statistic behind every published benchmark number |
+| `chimera/eval/proportions.py` | the interval arithmetic every bench reader calls (Wilson, Newcombe, Bonett-Price, exact McNemar, t, TOST) — one home since study 30, and `tests/test_stats_helpers_have_one_home.py` refuses a copy |
 | `chimera/api/version_api.py` | the "update available" signal shown in the app |
 | `chimera/core/verify.py` | the pass/fail authority of verify-or-revert |
 | `chimera/evolution/diff_gate.py` | the "did it actually change anything" gate |
