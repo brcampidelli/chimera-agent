@@ -210,7 +210,9 @@ def test_thin_labels_with_no_shipped_instrument_get_no_map(tmp_path: Path) -> No
 
 def test_the_refit_reads_raw_p_not_the_calibrated_p(tmp_path: Path) -> None:
     # Every logged `p` is 0.5; a refit that read it would see one value and could not separate labels.
-    _log_rows(tmp_path / "d.jsonl", [(0.9, 1)] * 20 + [(0.1, 0)] * 20)
+    # One label of each class sits on the wrong side: perfectly separated rows get no map at all
+    # (study 30, S30-38), and a raw-p reading must still show — 19 of 20 events at 0.9, 1 at 0.1.
+    _log_rows(tmp_path / "d.jsonl", [(0.9, 1)] * 19 + [(0.9, 0)] + [(0.1, 0)] * 19 + [(0.1, 1)])
     (result,) = refit(read(tmp_path / "d.jsonl"), CalibrationMaps.shipped())
     assert result.map is not None and result.map.apply(0.9) > 0.9 and result.map.apply(0.1) < 0.1
 

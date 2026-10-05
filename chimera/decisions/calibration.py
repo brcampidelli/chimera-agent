@@ -55,6 +55,25 @@ def prompt_hash(backend: str, model: str, instrument: str) -> str:
     return digest[:12]
 
 
+def perfectly_separated(pairs: Sequence[tuple[float, int]]) -> bool:
+    """True when a threshold on ``p`` puts every label on its own side (ties at the boundary allowed).
+
+    On such a set the likelihood keeps rising as the slope grows, and the ridge in :func:`fit_platt`
+    (prior 1e-4) is too weak to stop it: 25 + 25 separated rows gave ``a`` = 38, a map that sends
+    p = 0.50 to 0.00001 and p = 0.60 to 0.988. The labels show the classes did not overlap in this
+    sample; they cannot say how sure to be, so a fit on them would invent certainty. Compared on the
+    clamped logit, the scale the fit reads. Every row at one value is not separation (no threshold
+    splits it), and neither is a set with one label only.
+    """
+    pos = [logit(float(p)) for p, y in pairs if y]
+    neg = [logit(float(p)) for p, y in pairs if not y]
+    if not pos or not neg:
+        return False
+    if min(pos) == max(pos) == min(neg) == max(neg):
+        return False
+    return max(neg) <= min(pos) or max(pos) <= min(neg)
+
+
 def fit_platt(pairs: Sequence[tuple[float, int]], *, prior: float = 1e-4, iterations: int = 200) -> tuple[float, float]:
     """``(a, b)`` such that ``sigmoid(a·logit(p) + b)`` is the calibrated probability.
 
