@@ -3819,9 +3819,14 @@ def _serve_platform(
             on_tainted_recall=None if turn_ledger is None else turn_ledger.record_fetch,
         )
 
+    from chimera.server.allowlist import is_listed_owner
+
     gateway = MessageGateway(
         factory, warnings_in_reply=True, name_the_channel=True,
         intercept=_chat_approvals(settings, adapter.platform),
+        # Who the owner is, so a "remember that..." from anyone else is written tainted and
+        # names its sender (study 30 S30-29). Read live, as the allowlist is.
+        owner_of=lambda message: is_listed_owner(get_settings(), message),
         attach=_turn_attachments(adapter, settings, workspace_path),
     )
     console.print(

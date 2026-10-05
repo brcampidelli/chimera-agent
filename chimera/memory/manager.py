@@ -11,8 +11,9 @@ from __future__ import annotations
 import re
 import time
 import uuid
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from chimera.core.redact import redact
 from chimera.memory.models import EVERY_PROJECT, MemoryItem, MemoryKind
@@ -69,6 +70,7 @@ class MemoryManager:
         source: str = "chimera",
         provenance: str = "clean",
         project: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> MemoryItem:
         """Store a fact. ``project=None`` means it belongs everywhere.
 
@@ -88,6 +90,7 @@ class MemoryManager:
             provenance=provenance,
             project=project,
             created_at=self._clock(),
+            metadata=dict(metadata or {}),
         )
         self.store.add(item)
         return item
@@ -135,6 +138,7 @@ class MemoryManager:
         source: str = "chimera",
         provenance: str = "clean",
         project: str | None = None,
+        metadata: Mapping[str, Any] | None = None,
     ) -> tuple[str, MemoryItem]:
         """ADD a new fact, UPDATE an existing one (same key), or NOOP a duplicate.
 
@@ -156,7 +160,8 @@ class MemoryManager:
         duplicate = self._find_duplicate(content, key)
         if duplicate is None:
             return "ADD", self.add(
-                content, kind, key=key, source=source, provenance=provenance, project=project
+                content, kind, key=key, source=source, provenance=provenance, project=project,
+                metadata=metadata,
             )
         if _normalize(duplicate.content) == _normalize(content):
             return "NOOP", duplicate

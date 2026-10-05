@@ -1267,7 +1267,7 @@ def _with_metered_call(payload: dict[str, Any], meter: MeteredBackend | None) ->
 
 
 def _remember_and_tidy(
-    message: str, memory: Any, settings: Settings, *, backend: Any = None
+    message: str, memory: Any, settings: Settings, *, backend: Any = None, author: str = ""
 ) -> tuple[str | None, int]:
     """Honour an explicit "remember that…" from the user's own message, then tidy if asked.
 
@@ -1288,6 +1288,11 @@ def _remember_and_tidy(
     ``backend`` is what the tidy's merge asks, a fresh gateway when None. The Code turn passes a
     :class:`~chimera.orchestration.metering.MeteredBackend` over its own gateway, because the merge
     is a model call the turn pays for and nothing else was recording it.
+
+    ``author`` is the guest's name on a turn sent through a share link, empty for the owner. A
+    guest's "remember that..." was written exactly like the owner's: clean, into the owner's
+    global memory. It is now written tainted, with the guest named (study 30 S30-29), and not
+    written at all by a backend that cannot record that.
     """
     if not getattr(settings, "remember_from_chat", False) or memory is None:
         return None, 0
@@ -1295,12 +1300,21 @@ def _remember_and_tidy(
     if not callable(write):
         return None, 0
     try:
+        from chimera.core.code_session import _accepts
         from chimera.memory.capture import parse_remember_request
 
         fact = parse_remember_request(message)
         if fact is None:
             return None, 0
-        write(fact, source="chat")  # deduped by the manager; provenance is clean — the user typed it
+        if not author:
+            write(fact, source="chat")  # deduped by the manager; clean: the owner typed it
+        elif _accepts(write, "provenance") and _accepts(write, "metadata"):
+            from chimera.memory.models import SENDER_KEY
+
+            write(fact, source="chat", provenance="tainted",
+                  metadata={SENDER_KEY: f"guest:{author}"})
+        else:
+            return None, 0
     except Exception as exc:  # noqa: BLE001 -- see the docstring
         _log.debug("remember-from-chat skipped: %s", exc)
         return None, 0
@@ -2366,7 +2380,7 @@ def register_code_api(
                     # Before the row, not after it as it once was: the tidy's merge is a model call
                     # this turn pays for, and a row already written cannot carry it.
                     saved, tidied = _remember_and_tidy(
-                        req.message, turn_memory, live(), backend=tidy_meter
+                        req.message, turn_memory, live(), backend=tidy_meter, author=author
                     )
                     # Before the row, the receipt and `done` are written from it, so all three
                     # carry the planning call and the merge: every way out of a turn passes here.

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from chimera.config import Settings
+    from chimera.server.gateway import InboundMessage
 
 #: Platform -> the settings attribute holding its allowlist, and the env var that sets it.
 ALLOWLIST_FIELDS: dict[str, tuple[str, str]] = {
@@ -57,6 +58,20 @@ def allowed_ids(settings: Settings, platform: str) -> list[str]:
     attr, _env = ALLOWLIST_FIELDS[platform]
     raw = getattr(settings, attr, None) or []
     return [str(item).strip() for item in raw if str(item).strip()]
+
+
+def is_listed_owner(settings: Settings, message: InboundMessage) -> bool:
+    """Whether ``message`` was written by an id the owner listed for its platform: the owner.
+
+    The same rule `chat_approval` applies before it lets a chat answer an approval, and for the
+    same reason: a listed id is the only statement the owner has made about who they are on that
+    platform. A bot account is never the owner, and with no allowlist NOBODY is, because "anyone
+    may talk to it" says nothing about who the owner is. Used for the provenance of a
+    "remember that..." (study 30 S30-29), where answering wrongly costs only a label.
+    """
+    if message.from_bot or message.platform not in ALLOWLIST_FIELDS:
+        return False
+    return str(message.user).strip() in allowed_ids(settings, message.platform)
 
 
 def allowed_users_for(settings: Settings, platform: str) -> set[str] | None:

@@ -227,9 +227,14 @@ class MessagingManager:
             from chimera.server.attachments import turn_attachments
 
             attach = partial(turn_attachments, workspace=self._workspace)
+        from chimera.server.allowlist import is_listed_owner
+
         return MessageGateway(
             factory, warnings_in_reply=True, name_the_channel=True,
             intercept=ChatApprovals(self._settings, self._settings.home).intercept,
+            # As `_serve_platform`: a "remember that..." from anyone but the owner is written
+            # tainted and names its sender (study 30 S30-29).
+            owner_of=lambda message: is_listed_owner(self._settings, message),
             attach=attach,
         ).on_message
 

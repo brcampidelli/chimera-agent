@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from chimera.core.code_session import _accepts
 from chimera.interface import ChatSession, render
+from chimera.interface.session import ChatSender
 from chimera.providers.failover import policy_block
 from chimera.telemetry import get_logger
 
@@ -183,8 +184,15 @@ class MessageGateway:
         name_the_channel: bool = False,
         intercept: Callable[[InboundMessage], str | None] | None = None,
         attach: Callable[[list[Any]], Attachments] | None = None,
+        owner_of: Callable[[InboundMessage], bool] | None = None,
     ) -> None:
         self._factory = session_factory
+        #: Whether a message was written by the owner (`allowlist.is_listed_owner`, bound to the
+        #: settings), or ``None``. A chat bot passes it, and each turn is then told its sender, so
+        #: a "remember that..." from anyone else is written tainted and names them (study 30
+        #: S30-29). ``None`` for the HTTP ``/chat`` route, whose ``user`` is whatever the
+        #: authenticated caller put in its JSON body: no sender, and memory writes as it did.
+        self._owner_of = owner_of
         #: Which of a turn's written files go back with the reply (``attachments.turn_attachments``
         #: bound to the workspace), or ``None``: no attachment, and the turn's tool calls are not
         #: even collected. Passed only by a bot that attaches — today, Discord with the switch on
@@ -257,9 +265,11 @@ class MessageGateway:
                 return handled
         session = self.session_for(message.key)
         note = channel_note(message) if self._name_the_channel else ""
+        sender = self._sender(message)
         verbose = getattr(session, "send_verbose", None)
         if not self._warnings_in_reply or verbose is None or not _accepts(verbose, "on_notice"):
-            return session.send(message.text, **_noted(session.send, note))
+            plain: dict[str, Any] = {**_noted(session.send, note), **_sent_by(session.send, sender)}
+            return session.send(message.text, **plain)
         # The bot used to call `send`, which takes no callbacks, so a warning sent while the turn
         # ran went nowhere and a reply cut off by a limit read exactly like a finished one. The
         # terminal prints both; on a chat platform the reply is the only place left to say them.
@@ -274,7 +284,9 @@ class MessageGateway:
         extra: dict[str, Any] = {}
         if self._attach is not None and _accepts(verbose, "on_tool"):
             extra["on_tool"] = activities.append
-        report = verbose(message.text, on_notice=hear, **extra, **_noted(verbose, note))
+        extra.update(_noted(verbose, note))
+        extra.update(_sent_by(verbose, sender))
+        report = verbose(message.text, on_notice=hear, **extra)
         cut = render.cut_short_text(report)
         if cut:
             said.append(cut)
@@ -286,9 +298,23 @@ class MessageGateway:
         said.extend(f"not attached: {why}" for why in attached.skipped)
         return Reply(with_warnings(report.answer, said), attached.files)
 
+    def _sender(self, message: InboundMessage) -> ChatSender | None:
+        """Who wrote ``message`` and whether it is the owner, when this gateway knows its owner."""
+        if self._owner_of is None:
+            return None
+        return ChatSender(
+            id=str(message.user), platform=message.platform,
+            owner=not message.from_bot and bool(self._owner_of(message)), chat=message.key,
+        )
+
     @property
     def active_chats(self) -> int:
         return len(self._sessions)
+
+
+def _sent_by(send: Callable[..., Any], sender: ChatSender | None) -> dict[str, ChatSender]:
+    """``sender=sender`` for a send that declares it; nothing otherwise, as :func:`_noted`."""
+    return {"sender": sender} if sender is not None and _accepts(send, "sender") else {}
 
 
 def _noted(send: Callable[..., Any], note: str) -> dict[str, str]:

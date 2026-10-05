@@ -167,6 +167,26 @@ def _turn_messages(result: AgentResult, message: str) -> list[dict[str, Any]] | 
 
 
 @dataclass(frozen=True)
+class ChatSender:
+    """Who wrote a message on a chat platform, and whether that is the owner.
+
+    Decided by the gateway, which knows the platform's allowlist, and handed to the turn so that
+    a "remember that..." is written with the provenance its author earns (study 30 S30-29):
+    clean for the owner, tainted for anyone else. ``chat`` is the conversation it was said in,
+    recorded for an audience filter that does not exist yet.
+    """
+
+    id: str
+    platform: str
+    owner: bool
+    chat: str = ""
+
+    @property
+    def label(self) -> str:
+        return f"{self.platform}:{self.id}"
+
+
+@dataclass(frozen=True)
 class DeclinedTool:
     """A tool call that did NOT do what it was asked: a gate refused it, or it errored.
 
@@ -491,12 +511,17 @@ class ChatSession:
             extra = ""
         return "\n\n".join(part for part in (note, extra) if part)
 
-    def send(self, message: str, *, channel_note: str = "") -> str:
+    def send(
+        self, message: str, *, channel_note: str = "", sender: ChatSender | None = None
+    ) -> str:
         """Run one user message through the agent and record the exchange.
 
         ``channel_note`` says where the message came from (:func:`chimera.server.gateway.channel_note`)
         and travels like the other per-turn notes: in the turn, never in the system prompt and never
         in the record.
+
+        ``sender`` is who wrote it, from a chat gateway that knows its owner; ``None`` on a surface
+        where the person typing is the owner (a terminal, the desktop app).
         """
         self._begin_turn(message)
         note = self._note_for_turn(channel_note)
@@ -517,7 +542,7 @@ class ChatSession:
         # answered "Got it, I'll remember" with the flag ON and wrote nothing — a setting that is
         # true in the config and false in the product. The extraction below is called from both
         # for the same reason.
-        self._maybe_remember(message)
+        self._maybe_remember(message, sender)
         self._maybe_extract(message, result.answer, provenance)
         return result.answer
 
@@ -530,6 +555,7 @@ class ChatSession:
         on_notice: Callable[[str, str, dict[str, Any]], None] | None = None,
         documents: Sequence[tuple[str, str]] = (),
         channel_note: str = "",
+        sender: ChatSender | None = None,
     ) -> TurnReport:
         """Like :meth:`send`, but returns a :class:`TurnReport` (answer + tools/tokens/cost/memory)
         and forwards live ``on_token``/``on_tool`` callbacks to the agent. Recall runs once here and
@@ -542,7 +568,7 @@ class ChatSession:
         the coding turn folds them. With :attr:`grounded_answers` set, the answer is checked against
         them before it is recorded (`chimera/fusion/verified.py`).
 
-        ``channel_note`` is as in :meth:`send`."""
+        ``channel_note`` and ``sender`` are as in :meth:`send`."""
         self._begin_turn(message)
         facts, layer = self._recall(message)
         grounded_turn, turn_message, note = self._ground(message, documents)
@@ -591,7 +617,7 @@ class ChatSession:
         )
         self._record(turn_message, answer, provenance)
         self._keep_messages(turn_message, messages)
-        saved = self._maybe_remember(message)
+        saved = self._maybe_remember(message, sender)
         self._maybe_extract(message, answer, provenance)
         return TurnReport(
             answer=answer,
@@ -645,7 +671,7 @@ class ChatSession:
             stopped_reason=result.stopped_reason, drafter_model=result.model,
         )
 
-    def _maybe_remember(self, message: str) -> str | None:
+    def _maybe_remember(self, message: str, sender: ChatSender | None = None) -> str | None:
         """If enabled and the user explicitly asked to remember something, write it durably.
 
         Conservative by design: only an explicit "remember that…" instruction is captured (see
@@ -656,6 +682,12 @@ class ChatSession:
         Written with no project on purpose, even when the conversation has one. Recall narrows and
         must not hide: a fact the user asked for in one folder is theirs everywhere, and filing it
         under this folder would make it unreachable from the next one with nothing to say so.
+
+        With a ``sender`` the fact carries who wrote it, and only the owner's is clean (study 30
+        S30-29). The comment on the old write said "the user asked for it directly", which is true
+        in a terminal and false on a bot anyone can reach: there it was the owner's global memory,
+        written clean by whoever sent the message. A backend that cannot record the provenance
+        does not get a non-owner's fact at all, rather than store it clean.
         """
         if not self.remember_from_chat or self.memory is None:
             return None
@@ -667,7 +699,22 @@ class ChatSession:
         fact = parse_remember_request(message)
         if fact is None:
             return None
-        write(fact, source="chat")  # deduped; clean provenance (the user asked for it directly)
+        if sender is None:
+            write(fact, source="chat")  # deduped; clean: the person typing here is the owner
+            return fact
+        from chimera.memory.models import CHAT_KEY, SENDER_KEY
+
+        metadata = {SENDER_KEY: sender.label}
+        if sender.chat:
+            metadata[CHAT_KEY] = sender.chat
+        if sender.owner and _accepts(write, "metadata"):
+            write(fact, source="chat", metadata=metadata)
+        elif sender.owner:
+            write(fact, source="chat")
+        elif _accepts(write, "provenance") and _accepts(write, "metadata"):
+            write(fact, source="chat", provenance="tainted", metadata=metadata)
+        else:
+            return None
         return fact
 
     def _maybe_extract(self, message: str, answer: str, provenance: str) -> None:
