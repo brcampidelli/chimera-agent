@@ -26,7 +26,13 @@ from chimera.core.context_budget import ContextBudget, RunState, compact
 from chimera.core.steplog import StepLog, StepRecord, clip, tool_record
 from chimera.core.tool_loop import ToolLoopDetector
 from chimera.governance.ledger import WRITE_TOOLS
-from chimera.orchestration.budget import BudgetExceeded, SpendBudget, SpendExceeded, worst_case_usd
+from chimera.orchestration.budget import (
+    BudgetExceeded,
+    SpendBudget,
+    SpendExceeded,
+    settle_failed_attempts,
+    worst_case_usd,
+)
 from chimera.providers.gateway import CompletionResult, MessageLike, SupportsComplete
 from chimera.telemetry import get_logger
 from chimera.tools.base import is_refusal, tool_raised
@@ -1683,6 +1689,11 @@ class Agent:
             # The model that ANSWERED: a cascade or a failover can reply on a different one, and
             # charging the requested model invents a price for a call that never happened.
             spend.record_result(result)
+            # Strict only: an attempt the gateway gave up on before this one answered may have been
+            # billed, and the result above prices only the one that answered.
+            settle_failed_attempts(
+                spend, result, messages, {"model": model or self.config.model, "tools": tools, **asked}
+            )
         return result
 
     def _result(
