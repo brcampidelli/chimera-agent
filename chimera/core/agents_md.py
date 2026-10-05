@@ -384,14 +384,14 @@ def _render_untrusted(chosen: list[tuple[str, str]]) -> str:
     says why.
 
     The same fence and the same sanitiser an untrusted tool result gets
-    (:func:`chimera.governance.ledger_tool.fence_observation`), so a chat-template token in the file
+    (:func:`chimera.governance.ledger_tool.fence_observation`; both halves live in
+    :mod:`chimera.governance.sanitize`), so a chat-template token in the file
     cannot open a turn of its own and a copy of the public close marker cannot end the fence early.
     The ``### path`` heading stays outside the fence: it is ours, and the model needs it to know
     which file it can go and read whole. The fence is a known-imperfect mitigation here as everywhere;
     what holds is the taint the loop records alongside it, which narrows the dangerous tools.
     """
-    from chimera.governance.ledger_tool import fence
-    from chimera.governance.sanitize import sanitize_untrusted
+    from chimera.governance.sanitize import fence, sanitize_untrusted
 
     blocks = "\n\n".join(f"### {rel}\n{fence(sanitize_untrusted(body))}" for rel, body in chosen)
     return (
