@@ -22,6 +22,7 @@ What is pinned here:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time as real_time
 from pathlib import Path
@@ -44,7 +45,12 @@ from tests.test_a_conversation_can_be_shared_by_a_token_that_reaches_only_it imp
 )
 
 URL = "http://127.0.0.1:65002"
-SERVER_TOKEN = "srv-Kq7Zp2Wx9Lm4Tn8Rb3Vc6Yd1Hf5Gj0Es"
+# Derived, not written out. A random-looking literal assigned to a name ending in TOKEN is exactly
+# what gitleaks' `generic-api-key` rule reports, and the first version of this line was reported on
+# main's history (see .gitleaksignore). The test needs a token with many distinct five-character
+# slices for `_no_token_in` to mean something, so a low-entropy placeholder would weaken it; a
+# deterministic digest keeps the strength and leaves no key-shaped string in the source.
+SERVER_TOKEN = "srv-" + hashlib.sha256(b"the server token of this test").hexdigest()[:32]
 
 
 def _build(
