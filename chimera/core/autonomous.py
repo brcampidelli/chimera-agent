@@ -838,6 +838,11 @@ class AutonomousAgent:
         # ACE playbook: accumulated, delta-curated strategy bullets, injected as advisory context
         # so the worker/planner reuse what has worked across runs (grow-and-refine, anti-collapse).
         playbook_ctx = self.playbook.render() if self.playbook is not None else ""
+        if self.playbook is not None:
+            # The bullets that rendered are the ones in the prompt; a tainted one arms the ledger.
+            for bullet in self.playbook.top():
+                if bullet.provenance == "tainted":
+                    self._arm_on_recall_ref(f"playbook:{bullet.id}", bullet.content)
         # Requirement checklist (opt-in): extract the task's atomic requirements ONCE up front and
         # inject them into context, so the worker targets every requirement from the FIRST attempt
         # (not just discovers the dropped ones via a failed coverage grade on retry). Extraction is
@@ -1337,7 +1342,11 @@ class AutonomousAgent:
             attempts.append(attempt)
             outcome: Outcome = "success" if ok else "failure"
             if self.experience is not None:
-                self.experience.record(task, outcome, detail=(fb or vout)[:500])
+                # The lesson carries the run's taint, as the memory fact and the card do.
+                self.experience.record(
+                    task, outcome, detail=(fb or vout)[:500],
+                    tainted=self.taint.run_tainted() if self.taint is not None else False,
+                )
             if self.trajectories is not None:
                 # Each attempt is a (task -> answer) trajectory; multiple attempts on
                 # one task give success/failure pairs — the raw signal for DPO. The
@@ -1980,7 +1989,13 @@ class AutonomousAgent:
     def _recall_lessons(self, task: str) -> str:
         if self.experience is None:
             return ""
-        return format_lessons(self.experience.relevant(task))
+        lessons = self.experience.relevant(task)
+        # A lesson recorded under taint reaches this prompt like a tainted memory fact does, and
+        # tells the ledger the same way (see `_arm_on_recall`).
+        for exp in lessons:
+            if exp.provenance == "tainted":
+                self._arm_on_recall_ref(f"experience:{exp.seq}", f"{exp.task} {exp.detail}")
+        return format_lessons(lessons)
 
     def _recall_facts(self, task: str, *, k: int = 5) -> str:
         """Read back relevant long-term memory facts for this task (M19-A3).
@@ -2023,9 +2038,12 @@ class AutonomousAgent:
         2026-09-08, rows 6, 8 and 9). Recorded WITH the text, so a call that copies the planted value
         is a tainted flow and not only a tainted run.
         """
+        self._arm_on_recall_ref(f"memory:{getattr(item, 'id', '') or 'recalled'}", content)
+
+    def _arm_on_recall_ref(self, ref: str, content: str) -> None:
+        """Record one recalled tainted artifact (a memory fact, a lesson, a playbook bullet)."""
         if self.taint is None:
             return
-        ref = f"memory:{getattr(item, 'id', '') or 'recalled'}"
         try:
             self.taint.record_fetch(ref, content)
         except Exception as exc:  # noqa: BLE001 - recall is advisory; a ledger fault must be loud, not fatal

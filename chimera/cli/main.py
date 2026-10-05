@@ -5055,6 +5055,9 @@ def solve(
     # never chose for it. None for a plain `chimera solve`, which keeps every default it had.
     inherited = _CONVERSATION_GOVERNANCE.get()
     approvals = inherited.approvals if inherited is not None else ApprovalLedger()
+    # Whether any attempt of this solve consumed untrusted content, read after `_run_solve` by the
+    # playbook curation below: the ledger is built inside it, per workspace attempt.
+    run_tainted: list[bool] = []
 
     def _run_solve(ws: Path) -> AutonomousResult:
         from chimera.tools.write_region import WriteRegion
@@ -5351,6 +5354,7 @@ def solve(
                 {"task": task[:200], "model": tool_router, **_worker_cfg.tool_router.stats.as_dict()},
             )
         if ledger is not None:
+            run_tainted.append(ledger.run_tainted())
             ledger.dump(settings.home / "ledger.jsonl")
             summary = ledger.capability_summary()
             console.print(
@@ -5427,7 +5431,10 @@ def solve(
         # fixing diff), not just verdict+final-answer — so the curator distils process pitfalls.
         outcome_text = _curation_outcome(result, from_errors=settings.playbook_curate_from_errors)
         applied = PlaybookCurator(BackendDeltaProposer(gateway, model)).curate(
-            stored_playbook, task, outcome_text
+            stored_playbook, task, outcome_text,
+            # A run that consumed untrusted content (a fetch, or since S30-25 a tainted recall)
+            # adds bullets that every later run reads: they are stored tainted and labelled.
+            tainted=any(run_tainted),
         )
         _save_playbook(stored_playbook)
         console.print(

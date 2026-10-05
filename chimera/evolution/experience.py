@@ -36,6 +36,8 @@ _log = get_logger("evolution.experience")
 Outcome = Literal["success", "failure"]
 
 _WORD = re.compile(r"[a-z0-9]+")
+#: The label memory facts, skill cards and playbook bullets wear on the way into a prompt.
+UNVERIFIED = " [unverified: learned from untrusted content]"
 
 #: How many attempts stay in the buffer. ``relevant()`` scores every entry on every planning step,
 #: so this is a latency ceiling as much as a memory one, and the oldest attempts are the least
@@ -54,6 +56,11 @@ class Experience(BaseModel):
     task: str
     outcome: Outcome
     detail: str = ""
+    #: ``"tainted"`` when the attempt ran after its run consumed untrusted content (study 30
+    #: S30-25). A lesson is read back into every later planner on a similar task, so it is the
+    #: same channel a memory fact is, and it carries the same label. A record written before the
+    #: field existed is clean, which is what it always read as.
+    provenance: str = "clean"
 
 
 class ExperienceBuffer:
@@ -128,7 +135,9 @@ class ExperienceBuffer:
         with self._lock, exclusively(self.path):
             self._write()
 
-    def record(self, task: str, outcome: Outcome, detail: str = "") -> Experience:
+    def record(
+        self, task: str, outcome: Outcome, detail: str = "", *, tainted: bool = False
+    ) -> Experience:
         """Append one attempt, re-reading first so a second writer's lessons are not erased.
 
         The reload matters here for the same reason it does in the memory store: ``chimera serve``
@@ -137,7 +146,10 @@ class ExperienceBuffer:
         """
         with self._lock, exclusively(self.path):
             self.load()
-            exp = Experience(seq=self._next_seq, task=task, outcome=outcome, detail=detail)
+            exp = Experience(
+                seq=self._next_seq, task=task, outcome=outcome, detail=detail,
+                provenance="tainted" if tainted else "clean",
+            )
             self._next_seq += 1
             self._items.append(exp)
             self._trim()
@@ -191,5 +203,6 @@ def format_lessons(items: list[Experience]) -> str:
     for exp in items:
         tag = "FAILED" if exp.outcome == "failure" else "ok"
         detail = f" — {exp.detail}" if exp.detail else ""
-        lines.append(f"- [{tag}] {exp.task}{detail}")
+        label = UNVERIFIED if exp.provenance == "tainted" else ""
+        lines.append(f"- [{tag}] {exp.task}{detail}{label}")
     return "\n".join(lines)

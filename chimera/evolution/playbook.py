@@ -31,6 +31,9 @@ ItemStatus = Literal["active", "deprecated"]
 _WS = re.compile(r"\s+")
 _JSON = re.compile(r"\{.*\}", re.DOTALL)
 _SLUG = re.compile(r"[^a-z0-9]+")
+#: The label memory facts and skill cards already wear, for the same reason: a bullet a tainted run
+#: proposed reaches every later run's prompt, and must not read there as something verified.
+UNVERIFIED = " [unverified: learned from untrusted content]"
 
 
 def _norm(text: str) -> str:
@@ -49,6 +52,11 @@ class PlaybookItem:
     helpful: int = 0
     harmful: int = 0
     status: ItemStatus = "active"
+    #: ``"tainted"`` when the bullet was ADDED by a curation of a run that consumed untrusted
+    #: content (study 30 S30-25). Reinforcing an existing bullet does not change it in either
+    #: direction: a tainted run restating a clean bullet adds no text, and a clean run restating a
+    #: tainted one does not vouch for where it came from.
+    provenance: str = "clean"
 
     @property
     def score(self) -> int:
@@ -62,6 +70,7 @@ class PlaybookItem:
             "helpful": self.helpful,
             "harmful": self.harmful,
             "status": self.status,
+            "provenance": self.provenance,
         }
 
     @classmethod
@@ -74,6 +83,9 @@ class PlaybookItem:
             helpful=int(data.get("helpful", 0)),
             harmful=int(data.get("harmful", 0)),
             status=status,
+            # A bullet saved before the field existed is clean: that is what it always read as, and
+            # nothing recorded otherwise.
+            provenance="tainted" if data.get("provenance") == "tainted" else "clean",
         )
 
 
@@ -120,7 +132,9 @@ class Playbook:
         target = _norm(content)
         return next((i for i in self.active() if _norm(i.content) == target), None)
 
-    def add(self, content: str, section: str = "general") -> PlaybookItem | None:
+    def add(
+        self, content: str, section: str = "general", *, tainted: bool = False
+    ) -> PlaybookItem | None:
         """Add a new bullet — or, if an active one already says the same thing, reinforce it."""
         if not content.strip():
             return None
@@ -129,13 +143,18 @@ class Playbook:
             existing.helpful += 1
             return existing
         self._seq += 1
-        item = PlaybookItem(id=f"{_slug(section)}-{self._seq}", content=content.strip(), section=section)
+        # `tainted`: the run behind this curation consumed untrusted content, so a NEW bullet is
+        # stored tainted. A reinforced one above keeps its own (see `PlaybookItem.provenance`).
+        item = PlaybookItem(
+            id=f"{_slug(section)}-{self._seq}", content=content.strip(), section=section,
+            provenance="tainted" if tainted else "clean",
+        )
         self.items.append(item)
         return item
 
-    def apply(self, delta: Delta) -> bool:
+    def apply(self, delta: Delta, *, tainted: bool = False) -> bool:
         if delta.op == "add":
-            return self.add(delta.content, delta.section) is not None
+            return self.add(delta.content, delta.section, tainted=tainted) is not None
         item = self._find(delta.target)
         if item is None:
             return False
@@ -147,8 +166,8 @@ class Playbook:
                 item.status = "deprecated"
         return True
 
-    def apply_all(self, deltas: list[Delta]) -> int:
-        applied = sum(1 for delta in deltas if self.apply(delta))
+    def apply_all(self, deltas: list[Delta], *, tainted: bool = False) -> int:
+        applied = sum(1 for delta in deltas if self.apply(delta, tainted=tainted))
         self.refine()
         return applied
 
@@ -168,15 +187,21 @@ class Playbook:
             for item in sorted(active, key=lambda i: (i.score, i.id))[: len(active) - self.max_items]:
                 item.status = "deprecated"
 
+    def top(self, max_items: int = 20) -> list[PlaybookItem]:
+        """The active bullets :meth:`render` shows, best first. Public so a caller can tell which
+        of them reached a prompt: the ones whose provenance a run's ledger has to hear about."""
+        return sorted(self.active(), key=lambda i: (-i.score, i.id))[:max_items]
+
     def render(self, max_items: int = 20, *, with_ids: bool = False) -> str:
         """Render the top active bullets as an advisory block (with ids when curating)."""
-        active = sorted(self.active(), key=lambda i: (-i.score, i.id))[:max_items]
+        active = self.top(max_items)
         if not active:
             return ""
         lines = ["Playbook (learned strategies — advisory):"]
         for item in active:
             tag = f"{item.id} " if with_ids else ""
-            lines.append(f"- {tag}[{item.section}] {item.content}")
+            label = UNVERIFIED if item.provenance == "tainted" else ""
+            lines.append(f"- {tag}[{item.section}] {item.content}{label}")
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
@@ -270,13 +295,15 @@ class PlaybookCurator:
     def __init__(self, proposer: SupportsProposeDeltas) -> None:
         self.proposer = proposer
 
-    def curate(self, playbook: Playbook, task: str, outcome: str) -> int:
+    def curate(self, playbook: Playbook, task: str, outcome: str, *, tainted: bool = False) -> int:
         """Reflect on the outcome and apply the proposed deltas; return how many landed.
 
         Only ever *applies deltas* to the existing playbook — it structurally cannot replace it,
         which is exactly the anti-context-collapse guarantee.
         """
+        # `tainted`: the run this outcome describes consumed untrusted content, so the bullets it
+        # adds are stored tainted and wear the label in every later prompt (study 30 S30-25).
         deltas = self.proposer.propose(task, outcome, playbook.render(with_ids=True))
-        applied = playbook.apply_all(deltas)
+        applied = playbook.apply_all(deltas, tainted=tainted)
         _log.debug("curated playbook: %d/%d deltas applied", applied, len(deltas))
         return applied
