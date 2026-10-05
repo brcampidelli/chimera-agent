@@ -481,6 +481,11 @@ SECTIONS: tuple[PromptSection, ...] = (
 #: in the test cannot be satisfied by quietly adding a name here.
 NOT_PROMPTS: dict[str, str] = {
     "chimera.api.plan_gate:REASON": "shown to the person on the approval card; no model reads it",
+    "chimera.governance.exec_facts:HEADER": (
+        "the title of the 'what this runs' block appended to a shell command's approval card and "
+        "read back for the record line; the approver is a person, the tool answers the model with "
+        "its own result or refusal, never this"
+    ),
     "chimera.tools.pull_request:REASON": (
         "the verdict reason on the pull-request approval question (card, chat or `chimera approve`);"
         " the tool answers the model with its own refusal text, never this one"
