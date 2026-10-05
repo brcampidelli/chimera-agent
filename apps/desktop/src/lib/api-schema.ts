@@ -7970,6 +7970,11 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** McpApproveManifestRequest */
+        McpApproveManifestRequest: {
+            /** Digest */
+            digest: string;
+        };
         /**
          * McpCatalogEntry
          * @description A verified way to run one MCP server.
@@ -8081,10 +8086,25 @@ export interface components {
             cues?: string[];
             /** Description Changed */
             description_changed: boolean;
+            /**
+             * Duplicate
+             * @default false
+             */
+            duplicate: boolean;
             /** New Description */
             new_description: string;
+            /**
+             * New Schema
+             * @default
+             */
+            new_schema: string;
             /** Old Description */
             old_description: string;
+            /**
+             * Old Schema
+             * @default
+             */
+            old_schema: string;
             /** Schema Changed */
             schema_changed: boolean;
             /** Tool */
@@ -8099,6 +8119,8 @@ export interface components {
         McpManifestHeldOut: {
             /** Changes */
             changes: components["schemas"]["McpManifestChangeOut"][];
+            /** Digest */
+            digest: string;
             /** Seen At */
             seen_at: number;
         };
@@ -14239,7 +14261,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["McpApproveManifestRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

@@ -8432,6 +8432,19 @@
         "title": "McpAddRequest",
         "type": "object"
       },
+      "McpApproveManifestRequest": {
+        "properties": {
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "digest"
+        ],
+        "title": "McpApproveManifestRequest",
+        "type": "object"
+      },
       "McpCatalogEntry": {
         "description": "A verified way to run one MCP server.\n\n``available`` is resolved on the SERVER, because only this process can see the machine's PATH \u2014\nan entry offered where its runner is missing is the failure the catalogue exists to remove.\n\n``containment`` is the field that carries its weight: for most servers what limits the damage is\nthe CREDENTIAL (a database grant, a token scope), not the tool list, and a \"read-only\" badge\nwould say the opposite.",
         "properties": {
@@ -8617,12 +8630,27 @@
             "title": "Description Changed",
             "type": "boolean"
           },
+          "duplicate": {
+            "default": false,
+            "title": "Duplicate",
+            "type": "boolean"
+          },
           "new_description": {
             "title": "New Description",
             "type": "string"
           },
+          "new_schema": {
+            "default": "",
+            "title": "New Schema",
+            "type": "string"
+          },
           "old_description": {
             "title": "Old Description",
+            "type": "string"
+          },
+          "old_schema": {
+            "default": "",
+            "title": "Old Schema",
             "type": "string"
           },
           "schema_changed": {
@@ -8655,6 +8683,10 @@
             "title": "Changes",
             "type": "array"
           },
+          "digest": {
+            "title": "Digest",
+            "type": "string"
+          },
           "seen_at": {
             "title": "Seen At",
             "type": "number"
@@ -8662,7 +8694,8 @@
         },
         "required": [
           "changes",
-          "seen_at"
+          "seen_at",
+          "digest"
         ],
         "title": "McpManifestHeldOut",
         "type": "object"
@@ -18495,6 +18528,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpApproveManifestRequest"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "content": {

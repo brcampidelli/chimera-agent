@@ -60,19 +60,39 @@ const CHANGE_TEXT: Record<string, string> = {
   changed: "mcp.held.changed",
 };
 
+/** One side of a changed parameter schema, as the indented JSON the server sent. */
+function SchemaText({ label, text, old = false }: { label: string; text: string; old?: boolean }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-muted-foreground">{label}</span>
+      <pre
+        className={`max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-chip bg-surface-2 p-1.5 font-mono text-xs ${
+          old ? "text-muted-foreground" : "text-foreground"
+        }`}
+      >
+        {text}
+      </pre>
+    </div>
+  );
+}
+
 /** A server held from every run because its tools changed since the owner approved them.
  *
  *  The diff is the point: an Approve button without the old and new text beside it would be a
- *  rubber stamp on third-party text that goes straight into the model's tool list. */
+ *  rubber stamp on third-party text that goes straight into the model's tool list. That includes
+ *  the parameter schema, shown whole: parameter descriptions are read by the model like the tool
+ *  description, and "parameters changed" alone asked the owner to approve text nobody displayed. */
 function HeldBlock({
   held,
   onApprove,
   approving,
+  stale,
   t,
 }: {
   held: NonNullable<McpServer["manifest_held"]>;
   onApprove: () => void;
   approving: boolean;
+  stale: boolean;
   t: TFunc;
 }) {
   return (
@@ -81,22 +101,31 @@ function HeldBlock({
         <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>{t("mcp.held.title")}</span>
       </div>
-      {held.changes.map((c) => (
-        <div key={c.tool} className="flex flex-col gap-0.5">
+      {/* Keyed by position: a server can list two tools with one name, and each is its own line. */}
+      {held.changes.map((c, i) => (
+        <div key={`${c.tool}-${i}`} className="flex flex-col gap-0.5">
           <span>
             <span className="font-mono font-bold text-foreground">{c.tool}</span>{" "}
             {CHANGE_TEXT[c.change] ? t(CHANGE_TEXT[c.change]) : c.change}
             {c.change === "changed" && c.schema_changed ? ` · ${t("mcp.held.params")}` : ""}
           </span>
+          {c.duplicate && <span>{t("mcp.held.duplicate")}</span>}
           {c.change !== "added" && c.description_changed && c.old_description && (
             <span className="text-muted-foreground line-through">{c.old_description}</span>
           )}
           {c.change !== "removed" && c.description_changed && c.new_description && (
             <span className="text-foreground">{c.new_description}</span>
           )}
+          {c.schema_changed && c.change !== "added" && c.old_schema && (
+            <SchemaText label={t("mcp.held.oldParams")} text={c.old_schema} old />
+          )}
+          {c.schema_changed && c.change !== "removed" && c.new_schema && (
+            <SchemaText label={t("mcp.held.newParams")} text={c.new_schema} />
+          )}
           <CueLine cues={c.cues} t={t} />
         </div>
       ))}
+      {stale && <span className="text-foreground">{t("mcp.held.stale")}</span>}
       <div className="flex items-center gap-2">
         <Button size="sm" variant="outline" disabled={approving} onClick={onApprove}>
           {approving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("mcp.held.approve")}
@@ -133,6 +162,7 @@ function ServerRow({
   onRemove,
   onApprove,
   approving = false,
+  stale = false,
   t,
 }: {
   server: McpServer;
@@ -141,6 +171,7 @@ function ServerRow({
   onRemove: () => void;
   onApprove?: () => void;
   approving?: boolean;
+  stale?: boolean;
   t: TFunc;
 }) {
   const { lang } = useI18n();
@@ -193,6 +224,7 @@ function ServerRow({
           held={server.manifest_held}
           onApprove={() => onApprove?.()}
           approving={approving}
+          stale={stale}
           t={t}
         />
       )}
@@ -573,7 +605,12 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mcp"] });
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
-  const approve = useMutation({ mutationFn: approveMcpManifest, onSuccess: invalidate });
+  // Settled, not just success: a 409 means the held listing changed after it was rendered, and the
+  // refetch is what puts the NEW diff on the screen for the owner to read before trying again.
+  const approve = useMutation({ mutationFn: approveMcpManifest, onSettled: invalidate });
+  const approveStale = (name: string) =>
+    approve.variables?.name === name &&
+    (approve.error as { status?: number } | null)?.status === 409;
 
   const runTest = async (name: string) => {
     setTests((s) => ({ ...s, [name]: { loading: true, result: s[name]?.result } }));
@@ -652,8 +689,11 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
                 });
                 remove.mutate(s.name);
               }}
-              onApprove={() => approve.mutate(s.name)}
-              approving={approve.isPending && approve.variables === s.name}
+              onApprove={() =>
+                s.manifest_held && approve.mutate({ name: s.name, digest: s.manifest_held.digest })
+              }
+              approving={approve.isPending && approve.variables?.name === s.name}
+              stale={approveStale(s.name)}
               t={t}
             />
           ))

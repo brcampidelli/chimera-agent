@@ -173,24 +173,21 @@ def list_servers(home: Path) -> dict[str, Any]:
 def _held(home: Path, name: str) -> dict[str, Any] | None:
     """The change waiting for the owner, each changed tool annotated with the cues of its NEW text.
 
-    The cues are computed on the new description because that is the text the owner is being asked
-    to let through; the old one was already approved.
+    The cues come with the diff (:func:`chimera.integrations.mcp_pins.manifest_diff`), computed on
+    the new description and every string of the new schema: that is the text the owner is being
+    asked to let through; the old one was already approved.
     """
-    held = held_change(_mcp_path(home), name)
-    if held is None:
-        return None
-    for change in held["changes"]:
-        change["cues"] = selection_cues(change["new_description"])
-    return held
+    return held_change(_mcp_path(home), name)
 
 
-def approve_manifest(home: Path, name: str) -> bool:
-    """Accept the held tool manifest of ``name``. False when nothing was held for it.
+def approve_manifest(home: Path, name: str, digest: str) -> bool:
+    """Accept the held tool manifest of ``name`` — the one whose diff carried ``digest``.
 
-    Takes effect on the next connect: the servers are connected once per process
-    (:mod:`chimera.integrations.mcp_pool`), and the held one was not.
+    False when nothing was held; raises :class:`~chimera.integrations.mcp_pins.StaleApproval` when
+    the held listing is no longer the one shown. Takes effect on the next connect: the servers are
+    connected once per process (:mod:`chimera.integrations.mcp_pool`), and the held one was not.
     """
-    return approve_change(_mcp_path(home), name)
+    return approve_change(_mcp_path(home), name, digest)
 
 
 def add(home: Path, name: str, command: str, args: list[str], env: dict[str, str]) -> dict[str, Any]:

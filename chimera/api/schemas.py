@@ -2894,7 +2894,14 @@ class McpManifestChangeOut(BaseModel):
     schema_changed: bool  # the input schema, where parameter descriptions live
     old_description: str  # "" for an added tool
     new_description: str  # "" for a removed tool
-    # Codes for phrases in the NEW description that try to steer tool choice (see McpToolOut.cues).
+    # The whole input schema, as indented JSON ("" when absent). Shown, not summarised: parameter
+    # descriptions live here and the model reads them like the tool description.
+    old_schema: str = ""
+    new_schema: str = ""
+    # The server lists more than one tool with this name; only the first of them is mounted.
+    duplicate: bool = False
+    # Codes for phrases in the NEW text — description and every string of the schema — that try to
+    # steer tool choice (see McpToolOut.cues).
     cues: list[str] = Field(default_factory=list)
 
 
@@ -2906,6 +2913,13 @@ class McpManifestHeldOut(BaseModel):
 
     changes: list[McpManifestChangeOut]
     seen_at: float  # unix seconds — when the changed listing was first seen
+    # Names the listing this diff shows. The approve route takes it back and answers 409 if the
+    # held listing changed since, so a click approves only text that was on the screen.
+    digest: str
+
+
+class McpApproveManifestRequest(BaseModel):
+    digest: str  # the McpManifestHeldOut.digest the owner was shown
 
 
 class McpServerOut(BaseModel):

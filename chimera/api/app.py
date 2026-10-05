@@ -96,6 +96,7 @@ from chimera.api.schemas import (
     LocalRuntimesOut,
     MaturityOut,
     McpAddRequest,
+    McpApproveManifestRequest,
     McpCatalogOut,
     McpServersOut,
     McpTestOut,
@@ -1247,16 +1248,25 @@ def build_api_app(
     @app.post(
         "/api/mcp/{name}/approve-manifest", dependencies=[guard], response_model=McpServersOut
     )
-    def mcp_approve_manifest_endpoint(name: str) -> dict[str, Any]:
+    def mcp_approve_manifest_endpoint(name: str, req: McpApproveManifestRequest) -> dict[str, Any]:
         # The owner's answer to a held server: its tools changed since they were approved, the
-        # screen showed the diff, and this accepts it. 404 when nothing is held, so a stale click
-        # cannot approve a change it never saw. File I/O only; the server connects on the next
-        # process start, since the pool connects once per process. Deliberately NOT in the bridge's
-        # route table: approving third-party text into the model's tool list is the owner's call,
-        # not something an agent driving the app gets to make.
+        # screen showed the diff, and this accepts THAT diff — the body carries the digest of the
+        # listing that was rendered. 404 when nothing is held; 409 when what is held now is not
+        # what was shown (a mount in another process replaced it after the screen loaded), so a
+        # click cannot approve text that was never on the screen. File I/O only; the server
+        # connects on the next process start, since the pool connects once per process.
+        # Deliberately NOT in the bridge's route table: approving third-party text into the
+        # model's tool list is the owner's call, not something an agent driving the app gets to make.
         from chimera.api.mcp_api import approve_manifest, list_servers
+        from chimera.integrations.mcp_pins import StaleApproval
 
-        if not approve_manifest(settings.home, name):
+        try:
+            approved = approve_manifest(settings.home, name, req.digest)
+        except StaleApproval as exc:
+            raise HTTPException(
+                status_code=409, detail="the held tools changed since they were shown"
+            ) from exc
+        if not approved:
             raise HTTPException(status_code=404, detail="no held change for this server")
         return list_servers(settings.home)
 
