@@ -2111,6 +2111,9 @@ def chat(
             # The setting existed and no terminal surface passed it, so "remember that…" was
             # answered "Got it, I'll remember" and wrote nothing, with the flag on or off.
             remember_from_chat=settings.remember_from_chat,
+            # A tainted fact recalled into this conversation arms its ledger like a fetched page
+            # (study 30 S30-25): the [unverified] label alone narrows nothing.
+            on_tainted_recall=hand.ledger.record_fetch,
             real_history=settings.chat_real_history,
             # Recall narrowed to the folder this conversation is open on, exactly as the coding
             # turn does it. `--workspace` decided which files the tools could touch and said
@@ -2330,6 +2333,9 @@ def assist(
         graph=_recall_graph(mem),
         profile=_session_profile(mem),
         remember_from_chat=settings.remember_from_chat,
+        # A tainted fact recalled into this conversation arms its ledger like a fetched page
+        # (study 30 S30-25): the [unverified] label alone narrows nothing.
+        on_tainted_recall=hand.ledger.record_fetch,
         real_history=settings.chat_real_history,
         # Same narrowing as `chat` and the coding turn: this folder's facts plus the ones that
         # belong everywhere. Both terminal surfaces take a `--workspace` and neither used it here.
@@ -2653,6 +2659,9 @@ def tui(
             graph=_recall_graph(mem),
             profile=_session_profile(mem),
             remember_from_chat=settings.remember_from_chat,
+            # A tainted fact recalled into this conversation arms its ledger like a fetched page
+            # (study 30 S30-25): the [unverified] label alone narrows nothing.
+            on_tainted_recall=hand.ledger.record_fetch,
             real_history=settings.chat_real_history,
             # Recall narrowed to the folder this app was opened on, exactly as `chat` and `assist`
             # do it. This surface takes a `--workspace` too, and until now that argument decided
@@ -2833,6 +2842,9 @@ def serve(
                     message, workspace=workspace_path
                 )
             ),
+            # The same ledger learns of a tainted fact the recall hands the prompt (study 30
+            # S30-25), so the narrowing arms as it would for a fetched page.
+            on_tainted_recall=None if turn_ledger is None else turn_ledger.record_fetch,
         )
 
     # Before anything binds. A gateway that starts and then 401s has already told the internet
@@ -3261,6 +3273,9 @@ def desktop_app(
                     message, workspace=workspace_path
                 )
             ),
+            # The same ledger learns of a tainted fact the recall hands the prompt (study 30
+            # S30-25), so the narrowing arms as it would for a fetched page.
+            on_tainted_recall=None if chat_ledger is None else chat_ledger.record_fetch,
             # The other end of the same lifetime problem. The approver above closed over this
             # announcer when the registry was built; `chat_stream` needs to reach it when a turn
             # starts, and the session is the only object both of them hold.
@@ -3799,6 +3814,9 @@ def _serve_platform(
                     message, workspace=workspace_path
                 )
             ),
+            # The same ledger learns of a tainted fact the recall hands the prompt (study 30
+            # S30-25), so the narrowing arms as it would for a fetched page.
+            on_tainted_recall=None if turn_ledger is None else turn_ledger.record_fetch,
         )
 
     gateway = MessageGateway(

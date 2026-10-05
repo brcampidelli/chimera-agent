@@ -1998,19 +1998,38 @@ class AutonomousAgent:
         except Exception as exc:  # noqa: BLE001 — recall is advisory, never fail the run
             _log.debug("memory readback failed: %s", exc)
             return ""
-        lines = [
-            f"- {getattr(item, 'content', '')}"
-            + (
-                " [unverified: learned from untrusted content]"
-                if getattr(item, "provenance", "clean") == "tainted"
-                else ""
+        lines: list[str] = []
+        for item in hits or []:
+            content = str(getattr(item, "content", ""))
+            if not content.strip():
+                continue
+            tainted = getattr(item, "provenance", "clean") == "tainted"
+            if tainted:
+                self._arm_on_recall(item, content)
+            lines.append(
+                f"- {content}" + (" [unverified: learned from untrusted content]" if tainted else "")
             )
-            for item in (hits or [])
-            if str(getattr(item, "content", "")).strip()
-        ]
         if not lines:
             return ""
         return "Relevant prior facts (advisory):\n" + "\n".join(lines)
+
+    def _arm_on_recall(self, item: object, content: str) -> None:
+        """A tainted fact entering this run's prompt is untrusted content entering this run.
+
+        The label alone was the whole defence, and it is a sentence to the model, not a fact to the
+        run: the ledger read clean, so the dangerous tools stayed un-narrowed and everything the run
+        then wrote (its memory fact, its card, its playbook delta) was stored clean. One clean
+        rewrite and the poison had no origin left (study 30 S30-25; the sleeper-channels audit,
+        2026-09-08, rows 6, 8 and 9). Recorded WITH the text, so a call that copies the planted value
+        is a tainted flow and not only a tainted run.
+        """
+        if self.taint is None:
+            return
+        ref = f"memory:{getattr(item, 'id', '') or 'recalled'}"
+        try:
+            self.taint.record_fetch(ref, content)
+        except Exception as exc:  # noqa: BLE001 - recall is advisory; a ledger fault must be loud, not fatal
+            _log.warning("could not record a tainted memory recall in the ledger: %s", exc)
 
     def _count_prior_successes(self, task: str) -> int:
         if self.experience is None:

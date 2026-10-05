@@ -2075,11 +2075,15 @@ def register_code_api(
         # `project_key(ws)` rather than `str(ws)`: identical here (`ws` is already resolved), and
         # it is the same function the writer and the terminal now call, so one folder cannot end up
         # with two names again.
+        # The tainted facts that reach the prompt, kept to tell the turn's ledger once it exists
+        # (below): the ledger is built with the agent, and the facts go into the agent's prompt.
+        recalled_tainted: list[Any] = []
         facts, memory_layer = recall_facts(
             req.message, memory=turn_memory, graph=turn_graph, project=project_key(ws),
             # Quoted with source and date under the same switch that writes extracted facts
             # (study 25 S13): a fact the model did not see being written is shown with its age.
             cite=bool(getattr(live(), "memory_extract", False)),
+            on_tainted=recalled_tainted.append,
         )
         # Created before the agent so the approver can hold it, bound to `emit` after `emit`
         # exists. Until then a question announces to nobody — and is still on disk for
@@ -2114,6 +2118,15 @@ def register_code_api(
         # to it is not flagged as made up (study 24, M2).
         if ledger is not None:
             ledger.note_seen(*_message_texts(session.messages))
+            # A tainted memory fact in this turn's prompt is untrusted content in this turn, and
+            # the [unverified] label alone narrows nothing: recorded as a fetch, with its text, so
+            # the dangerous tools ask and a call that copies the planted value is a tainted flow
+            # (study 30 S30-25; the sleeper-channels audit, 2026-09-08). Before any tool runs.
+            for item in recalled_tainted:
+                ledger.record_fetch(
+                    f"memory:{getattr(item, 'id', '') or 'recalled'}",
+                    str(getattr(item, "content", "")),
+                )
         # A conversation belongs to the project it STARTED in, and keeps it. Overwriting on every
         # turn would let a session drift between projects in the sidebar as the user switches
         # around, so an old conversation would file itself under whatever codebase happened to be

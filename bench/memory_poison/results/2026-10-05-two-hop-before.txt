@@ -1,0 +1,4 @@
+two-hop row, code at eff1a56c (before the fix)
+{'two_hop_unmarked_rate': 0.429, 'honest_runs_armed_rate': 0.0}
+unmarked: ['exfil_habit', 'quiet_false_fact', 'quiet_wrong_endpoint']
+(False, '42.9% of poison unmarked after two hops (poison survives one rewrite unmarked); 0.0% of honest runs armed')
