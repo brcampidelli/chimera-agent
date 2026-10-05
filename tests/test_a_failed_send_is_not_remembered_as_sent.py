@@ -120,3 +120,68 @@ def test_with_the_hold_off_a_reworded_retry_goes_straight_through() -> None:
     second = tool.run(to="boss@example.com", body="the report, again")
 
     assert inner.fires == 2 and second == "sent"
+
+
+# ---- the hold asks nobody, and holds only what may have gone out (review of a15cf9f6)
+
+
+def test_with_the_hold_on_a_held_send_never_spends_a_persons_yes(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The hold refuses whatever the answer, so it comes before any card: asked after one, the
+    person's approval was spent on a call that then answered "This call was NOT sent"."""
+    monkeypatch.setenv(HOLD_AFTER_FAILED_SEND_ENV, "1")
+    asked: list[Any] = []
+
+    def approve(assessment: Any) -> bool:
+        asked.append(assessment)
+        return True
+
+    inner = _Send("error: send_email failed: 500 internal error", "sent")
+    tool = LedgeredTool(inner, TaintLedger(), approve=approve, ask_unseen_recipient=True)
+
+    tool.run(to="stranger@example.com", body="the report")
+    cards_before = len(asked)
+    held = tool.run(to="stranger@example.com", body="the report, again")
+
+    assert cards_before >= 1, "precondition: this send asks a person (an unseen recipient)"
+    assert is_refusal(held) and "may have taken effect" in held
+    assert len(asked) == cards_before, "a card was shown for a call the hold then refused"
+
+
+class _Wrapper(Tool):
+    """A governance wrapper as the registry builds it: the real tool sits on ``inner``."""
+
+    name = "send_email"
+    description = "send an email"
+    parameters: dict[str, Any] = {"type": "object", "properties": {}}
+
+    def __init__(self, inner: Tool) -> None:
+        self.inner = inner
+
+    def run(self, **kwargs: Any) -> str:
+        return self.inner.run(**kwargs)
+
+
+@pytest.mark.parametrize("wrapped", [False, True], ids=["bare", "through-a-wrapper"])
+def test_a_send_that_failed_before_any_delivery_is_not_held(
+    monkeypatch: pytest.MonkeyPatch, wrapped: bool
+) -> None:
+    """`send_email` with no SMTP settings sent nothing; "it may have taken effect" would be false."""
+    from chimera.config import get_settings
+    from chimera.tools.email import SendEmailTool
+
+    monkeypatch.setenv(HOLD_AFTER_FAILED_SEND_ENV, "1")
+    for key in ("CHIMERA_SMTP_HOST", "CHIMERA_SMTP_USER", "CHIMERA_SMTP_PASSWORD"):
+        monkeypatch.setenv(key, "")
+    get_settings.cache_clear()
+    try:
+        real: Tool = SendEmailTool()
+        tool = LedgeredTool(_Wrapper(real) if wrapped else real, TaintLedger())
+
+        first = tool.run(to="boss@example.com", subject="s", body="b")
+        second = tool.run(to="boss@example.com", subject="s", body="b, again")
+    finally:
+        get_settings.cache_clear()
+
+    assert first.startswith("error: send_email needs"), "precondition: failed before connecting"
+    assert not is_refusal(second) and "may have taken effect" not in second
+    assert second.startswith("error: send_email needs"), "the second call ran, and said why it failed"

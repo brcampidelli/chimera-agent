@@ -271,6 +271,13 @@ class LedgeredTool(Tool):
             "anything this run read" if unseen else ""
         )
         asked = False
+        # The hold after a failed send (off by default) comes BEFORE any question: it refuses the
+        # call whatever the answer, and asked after a card it spent the person's yes on a call that
+        # then did not run, with "This call was NOT sent" under the approval they had just given.
+        if name in SIDE_EFFECT_TOOLS:
+            held = self._held_after_failure(name)
+            if held is not None:
+                return held
         # 0. Taint-adaptive narrowing: a dangerous tool is off-limits once the run is
         #    tainted (needs approval), even without a direct tainted reference.
         #    `for_narrowing` is the one place the ledger's `authority` mode can answer differently
@@ -369,15 +376,12 @@ class LedgeredTool(Tool):
                 if self.audit is not None:
                     self.audit.record("idempotent_skip", {"tool": name})
                 return f"[idempotent: {name} already executed with these args; not repeated]"
-            held = self._held_after_failure(name)
-            if held is not None:
-                return held
 
         # 2. Run the real tool, then record its effect for later steps to reason about.
         try:
             result = self.inner.run(**kwargs)
         except Exception as exc:
-            if idem_key is not None:
+            if idem_key is not None and self._may_have_taken_effect(str(exc)):
                 self._failed_sends[name] = str(exc).splitlines()[0][:200] if str(exc) else repr(exc)
             # A taint source's exception is one more thing it returned. Its message can be remote
             # text: an MCP server writes the JSON-RPC error `StdioMCPSession.call_tool` raises. Let
@@ -397,7 +401,8 @@ class LedgeredTool(Tool):
             # the marker as an action that happened. A failure, returned or raised, is tried again.
             if idem_key is not None:
                 if isinstance(result, Refusal) or result.startswith("error:"):
-                    self._failed_sends[name] = result.splitlines()[0][:200] if result else ""
+                    if self._may_have_taken_effect(result):
+                        self._failed_sends[name] = result.splitlines()[0][:200] if result else ""
                 else:
                     self._idempotency_cache[idem_key] = result
                     self._failed_sends.pop(name, None)
@@ -410,6 +415,33 @@ class LedgeredTool(Tool):
             # so taint is recorded as it always was. Only what the model reads is decided here.
             return fence_observation(result)
         return result
+
+    def _may_have_taken_effect(self, failure: str) -> bool:
+        """Whether a failed send could have gone out before it failed — what the hold is about.
+
+        Not a refusal (the tool declined; nothing was handed over), and not a failure the tool says
+        came before any delivery was attempted: ``send_email`` without ``to`` or without SMTP
+        settings returns an error that certainly sent nothing, and holding the next call with "it
+        may have taken effect" was a false warning. A tool says so through
+        ``failed_before_delivery(result)``, found through the wrappers (with ``--guard`` this wraps
+        ``GovernedTool(SendEmailTool)``); one that does not (or reached through the deferral proxy)
+        is assumed to have tried, which is the side the hold exists to be on.
+        """
+        if isinstance(failure, Refusal):
+            return False
+        tool: Any = self.inner
+        probe = getattr(tool, "failed_before_delivery", None)
+        for _ in range(6):
+            if probe is not None or getattr(tool, "inner", None) is None:
+                break
+            tool = tool.inner
+            probe = getattr(tool, "failed_before_delivery", None)
+        if not callable(probe):
+            return True
+        try:
+            return not bool(probe(failure))
+        except Exception:  # noqa: BLE001 — a probe that breaks says nothing; assume it tried
+            return True
 
     def _held_after_failure(self, name: str) -> str | None:
         """The refusal that holds a send after the same tool failed, once — or None.
