@@ -871,6 +871,10 @@ export const removeMcpServer = (name: string) =>
   json<{ deleted: boolean }>(`/api/mcp/${encodeURIComponent(name)}`, { method: "DELETE" });
 export const testMcpServer = (name: string) =>
   json<McpTest>(`/api/mcp/${encodeURIComponent(name)}/test`, { method: "POST" });
+// The owner's answer to a held server (its tools changed since they were approved). File I/O only;
+// 404 when nothing is held, so a stale click cannot approve a change it never saw.
+export const approveMcpManifest = (name: string) =>
+  json<McpServers>(`/api/mcp/${encodeURIComponent(name)}/approve-manifest`, { method: "POST" });
 
 // --- Tasks (kanban + projects, HITL) ---
 export const getKanban = () => json<Record<string, TaskCard[]>>("/api/kanban");

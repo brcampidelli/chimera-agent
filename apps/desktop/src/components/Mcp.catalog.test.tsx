@@ -8,6 +8,7 @@ import { renderWithProviders } from "@/test/utils";
 
 vi.mock("@/lib/api", () => ({
   addMcpServer: vi.fn(),
+  approveMcpManifest: vi.fn(),
   getConfig: vi.fn(),
   getMcpCatalog: vi.fn(),
   getMcpServers: vi.fn(),

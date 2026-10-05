@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   addMcpServer,
+  approveMcpManifest,
   getConfig,
   getMcpCatalog,
   getMcpServers,
@@ -26,6 +27,85 @@ import { Button } from "@/components/ui/button";
 import { useI18n, useT, type TFunc } from "@/lib/i18n";
 import type { McpCatalogEntry } from "@/lib/api";
 import type { McpServer, McpTest } from "@/lib/types";
+
+/** What each cue code means, as dictionary keys written out so `i18n.reachable.test.ts` sees them.
+ *  The codes come from `chimera/integrations/mcp_cues.py`; one the dictionary does not know is shown
+ *  as the code itself rather than dropped, because a cue the owner cannot see is the failure. */
+const CUE_TEXT: Record<string, string> = {
+  imperative: "mcp.cue.imperative",
+  exclusivity: "mcp.cue.exclusivity",
+  override: "mcp.cue.override",
+  emphasis: "mcp.cue.emphasis",
+};
+
+/** The selection-cue screen (study 30, S30-24): phrases in a description that try to steer which
+ *  tool the model picks. An annotation beside the server's own text, never a refusal — a regular
+ *  expression is the wrong instrument to refuse anything on, and nothing has measured how often it
+ *  fires on honest servers. */
+function CueLine({ cues, t }: { cues?: string[] | null; t: TFunc }) {
+  if (!cues || cues.length === 0) return null;
+  return (
+    <span className="mt-0.5 flex items-start gap-1 text-xs text-warn-foreground">
+      <TriangleAlert className="mt-0.5 h-3 w-3 shrink-0" />
+      <span>
+        {t("mcp.cue.title")} {cues.map((c) => (CUE_TEXT[c] ? t(CUE_TEXT[c]) : c)).join(", ")}
+      </span>
+    </span>
+  );
+}
+
+const CHANGE_TEXT: Record<string, string> = {
+  added: "mcp.held.added",
+  removed: "mcp.held.removed",
+  changed: "mcp.held.changed",
+};
+
+/** A server held from every run because its tools changed since the owner approved them.
+ *
+ *  The diff is the point: an Approve button without the old and new text beside it would be a
+ *  rubber stamp on third-party text that goes straight into the model's tool list. */
+function HeldBlock({
+  held,
+  onApprove,
+  approving,
+  t,
+}: {
+  held: NonNullable<McpServer["manifest_held"]>;
+  onApprove: () => void;
+  approving: boolean;
+  t: TFunc;
+}) {
+  return (
+    <div className="flex flex-col gap-2 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
+      <div className="flex items-start gap-1.5">
+        <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <span>{t("mcp.held.title")}</span>
+      </div>
+      {held.changes.map((c) => (
+        <div key={c.tool} className="flex flex-col gap-0.5">
+          <span>
+            <span className="font-mono font-bold text-foreground">{c.tool}</span>{" "}
+            {CHANGE_TEXT[c.change] ? t(CHANGE_TEXT[c.change]) : c.change}
+            {c.change === "changed" && c.schema_changed ? ` · ${t("mcp.held.params")}` : ""}
+          </span>
+          {c.change !== "added" && c.description_changed && c.old_description && (
+            <span className="text-muted-foreground line-through">{c.old_description}</span>
+          )}
+          {c.change !== "removed" && c.description_changed && c.new_description && (
+            <span className="text-foreground">{c.new_description}</span>
+          )}
+          <CueLine cues={c.cues} t={t} />
+        </div>
+      ))}
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="outline" disabled={approving} onClick={onApprove}>
+          {approving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : t("mcp.held.approve")}
+        </Button>
+        <span className="text-muted-foreground">{t("mcp.held.after")}</span>
+      </div>
+    </div>
+  );
+}
 
 /** Per-server test state, keyed by name. `undefined` = never tested (no "connected" claim by default). */
 type TestState = Record<string, { loading: boolean; result?: McpTest }>;
@@ -51,12 +131,16 @@ function ServerRow({
   state,
   onTest,
   onRemove,
+  onApprove,
+  approving = false,
   t,
 }: {
   server: McpServer;
   state?: { loading: boolean; result?: McpTest };
   onTest: () => void;
   onRemove: () => void;
+  onApprove?: () => void;
+  approving?: boolean;
   t: TFunc;
 }) {
   const { lang } = useI18n();
@@ -104,6 +188,15 @@ function ServerRow({
         </div>
       </div>
 
+      {server.manifest_held && (
+        <HeldBlock
+          held={server.manifest_held}
+          onApprove={() => onApprove?.()}
+          approving={approving}
+          t={t}
+        />
+      )}
+
       {/* "It works" and "the agent can use it" are different facts. A server can connect, list its
           tools, and still reach no run — autoload is off by default, and the servers are connected
           once per process. Measured: a server tested green and the next run made twenty-two tool
@@ -113,9 +206,11 @@ function ServerRow({
         <div className="flex items-start gap-1.5 rounded-chip border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn-foreground">
           <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>
-            {result.reaches_agent_reason === "added_after_connect"
-              ? t("mcp.reach.addedAfterConnect")
-              : t("mcp.reach.autoloadOff")}
+            {result.reaches_agent_reason === "manifest_held"
+              ? t("mcp.reach.manifestHeld")
+              : result.reaches_agent_reason === "added_after_connect"
+                ? t("mcp.reach.addedAfterConnect")
+                : t("mcp.reach.autoloadOff")}
           </span>
         </div>
       )}
@@ -133,6 +228,7 @@ function ServerRow({
                     {tool.description}
                   </span>
                 )}
+                <CueLine cues={tool.cues} t={t} />
               </div>
             ))}
           </div>
@@ -477,6 +573,7 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["mcp"] });
   const remove = useMutation({ mutationFn: removeMcpServer, onSuccess: invalidate });
+  const approve = useMutation({ mutationFn: approveMcpManifest, onSuccess: invalidate });
 
   const runTest = async (name: string) => {
     setTests((s) => ({ ...s, [name]: { loading: true, result: s[name]?.result } }));
@@ -555,6 +652,8 @@ export function Mcp({ embedded = false }: { embedded?: boolean } = {}) {
                 });
                 remove.mutate(s.name);
               }}
+              onApprove={() => approve.mutate(s.name)}
+              approving={approve.isPending && approve.variables === s.name}
               t={t}
             />
           ))
