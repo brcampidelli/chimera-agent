@@ -116,7 +116,9 @@ class AttemptReceipt(BaseModel):
     #: ``tests_removed_or_skipped``, one rendered line per file
     #: (`chimera/governance/verifier_integrity.py`). Record-only — a ``verified: True`` beside one
     #: of these is a pass against tests this same attempt rewrote, which is weaker evidence, and
-    #: nothing paused on it. Empty on rows written before the rule existed: "not checked".
+    #: nothing paused on it. Empty means "nothing flagged" ONLY when ``diff_summary`` is set: a
+    #: run with no workspace guard (or a row written before the rule existed) was never checked,
+    #: and its empty list is "not checked", not "clean".
     integrity_flags: list[str] = []
     #: Every tool this attempt called, in order — the last leg of a wire that used to end at the
     #: loop. A receipt said what an attempt COST and never what it DID, so "how many edits did this

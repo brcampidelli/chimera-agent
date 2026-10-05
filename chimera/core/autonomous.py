@@ -383,7 +383,8 @@ class Attempt:
     #: (`chimera/governance/verifier_integrity.py`). RECORD-ONLY: no surface pauses on it, because
     #: legitimate work edits tests and the false-positive rate of a pause has not been measured
     #: (`bench/verifier_integrity`). Empty when nothing was flagged OR there was no guard to
-    #: snapshot with; a row written before the field reads as "not checked".
+    #: snapshot with — the two are told apart by ``diff_summary``, which is None exactly when no
+    #: snapshot was taken; a row written before the field reads as "not checked".
     integrity_flags: list[str] = field(default_factory=list)
     #: The class this failure was given before it was fed back — ``failing_test``, ``tool_skip``,
     #: ``reverted``… (see :mod:`chimera.core.failure_class`) — as the enum's value, because this
@@ -2134,13 +2135,29 @@ class AutonomousAgent:
             self.verifier.base_snapshot = snapshot
         command = str(getattr(self.verifier, "command", "") or "")
         # `getattr` on self too: a runner built with `__new__` (a test, a subclass) has no ledger.
-        record_verify = getattr(getattr(self, "taint", None), "record_verify", None)
-        if command and callable(record_verify):
+        ledger = getattr(self, "taint", None)
+        record = getattr(ledger, "record_verify", None)
+        settle = getattr(ledger, "settle_verify", None)
+        event = None
+        if command and callable(record):
             # The verifier is built outside the tool registry, so its command — the one that decides
             # the run — never reached the ledger that sees every other shell call (S30-23).
-            # Recorded BEFORE it runs, so a verifier that hangs or raises is still on the record.
-            record_verify(command, source=str(getattr(self.verifier, "source", "") or "unknown"))
-        result = self.verifier.verify()
+            # Recorded BEFORE it runs, so a verifier that hangs or raises is still on the record,
+            # and settled after, so a declined or abstaining one does not read as a command run.
+            event = record(
+                command, source=str(getattr(self.verifier, "source", "") or "unknown")
+            )
+        try:
+            result = self.verifier.verify()
+        except BaseException:
+            if event is not None and callable(settle):
+                settle(event, "raised")
+            raise
+        if event is not None and callable(settle):
+            settle(
+                event,
+                "abstained" if result.abstained else "passed" if result.passed else "failed",
+            )
         return result.passed, result.output, result.abstained
 
     @staticmethod

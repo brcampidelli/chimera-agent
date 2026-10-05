@@ -484,14 +484,24 @@ class TaintLedger:
         _, refs = self._content_is_tainted(command)
         return self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
 
-    def record_verify(self, command: str, *, source: str) -> CapabilityEvent:
-        """Record the verify command the loop ran, and who authored it. RECORD-ONLY.
+    def record_verify(self, command: str, *, source: str, origin: str = "") -> CapabilityEvent:
+        """Record the verify command the loop is ABOUT TO RUN, and who authored it. RECORD-ONLY.
 
         The verifier is built outside the tool registry, so the command it runs on the workspace —
         often on the host — never reached this ledger: the replay of a run showed every shell call
         the agent made and not the one that decided whether the run succeeded (study 30, S30-23).
-        ``source`` is ``CommandVerifier.source``: ``user`` (typed, authorised by construction) or
-        ``inferred:<file>`` (read out of a file the agent may have written).
+
+        Recorded BEFORE the command runs, so a verifier that hangs or raises is still on the
+        record; :meth:`settle_verify` then appends what happened (``passed`` / ``failed`` /
+        ``abstained`` / ``raised``). An event with no outcome is a command that never returned. An
+        ``abstained`` one may never have run at all (a declined host exec, nothing collected).
+
+        ``source`` is ``CommandVerifier.source``, one of
+        :data:`chimera.core.verify.VERIFY_SOURCES`: ``user`` (typed with the run, authorised by
+        construction) or where else the string came from (``inferred``, ``job``, ``card``,
+        ``workflow``, ``spec_test``, ``crew``, ``eval``, ``lifecycle``). The verifier does not know
+        WHICH file an inferred command came out of; a caller that does passes it as ``origin``
+        (``Makefile``, ``package.json``), and it is recorded beside the source.
 
         The event names any tainted ref the command carries in ``provenance`` and does NOT set
         ``tainted``, on purpose: a tainted event arms ``run_tainted`` and with it pause-on-taint and
@@ -501,9 +511,19 @@ class TaintLedger:
         """
         _, refs = self._content_is_tainted(command)
         who = "user" if source == "user" else "unknown"
+        detail = f"source={source}" + (f" origin={origin}" if origin else "")
         return self._add(
-            "verify", command[:200], detail=f"source={source}", provenance=refs, requested_by=who
+            "verify", command[:200], detail=detail, provenance=refs, requested_by=who
         )
+
+    def settle_verify(self, event: CapabilityEvent, outcome: str) -> None:
+        """Append the outcome to a ``verify`` event :meth:`record_verify` wrote before the run.
+
+        On the same event, not a second one: the replay counts one verify per command run, and a
+        reader of the event sees in one line both what was about to run and what came of it.
+        """
+        with self._events_lock:
+            event.detail = f"{event.detail} outcome={outcome}".strip()
 
     def record_send(self, tool: str, target: str = "") -> CapabilityEvent:
         """Record a non-idempotent OUTBOUND side effect (send_email/http_post/...).
