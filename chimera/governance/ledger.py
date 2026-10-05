@@ -35,12 +35,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 import threading
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, unquote, urlsplit
 
 from chimera.core.redact import redact
 from chimera.governance.policy import Decision
@@ -207,6 +210,139 @@ def _named_in(instruction: str, target: str) -> bool:
     return False
 
 
+# --- S30-27: a value carried out in the host, the path or the query of a fetch -----------------
+#
+# `bench/exfil_url/PREREGISTRATION.md` registers these four numbers before they were written here.
+# A run of URL characters long enough, mixed enough and random enough to be an encoded value — a
+# hex, base32 or base64url key — rather than a word, a slug, a date or a version. The hyphen and the
+# dot separate runs, so a slug (`how-we-reduced-build-times`) and a UUID's groups stay short.
+_DATA_RUN = re.compile(r"[A-Za-z0-9+=_]{16,}")
+_DATA_MIN_DIGITS = 2
+_DATA_MIN_LETTERS = 2
+_DATA_MIN_BITS = 3.0
+
+
+def _entropy(text: str) -> float:
+    """Shannon entropy of ``text`` in bits per character."""
+    counts = Counter(text)
+    total = len(text)
+    return -sum(n / total * math.log2(n / total) for n in counts.values())
+
+
+def _data_like(run: str) -> bool:
+    digits = sum(ch.isdigit() for ch in run)
+    letters = sum(ch.isalpha() for ch in run)
+    return (
+        digits >= _DATA_MIN_DIGITS and letters >= _DATA_MIN_LETTERS
+        and _entropy(run) >= _DATA_MIN_BITS
+    )
+
+
+def _url_tokens(url: str) -> list[str]:
+    """What a fetch to ``url`` hands to someone else: host labels, path segments, query, userinfo.
+
+    The host's last two labels are left out — an approximation of the registrable domain, so
+    `x.attacker.test` gives `x`. The labels before them are the DNS channel: resolving the name
+    alone delivers them to whoever runs the zone's name server, before any HTTP request. The fragment
+    is left out because it is never sent.
+    """
+    parts = urlsplit(url)
+    tokens: list[str] = []
+    host = (parts.hostname or "").rstrip(".")
+    if host:
+        tokens.extend(host.split(".")[:-2])
+    tokens.extend(v for v in (parts.username, parts.password) if v)
+    tokens.extend(unquote(segment) for segment in parts.path.split("/") if segment)
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        tokens.extend((key, value))
+    return tokens
+
+
+# --- S30-28: a clone of a repository, and the shell as a way of fetching --------------------------
+
+_CLONE = re.compile(r"\bgit\s+(?:-\S+\s+)*clone\b(?P<rest>[^\n;&|]*)|\bgh\s+repo\s+clone\b(?P<gh>[^\n;&|]*)")
+# Options of `git clone` that take the next word as their value, so it is not the source.
+_CLONE_VALUE_OPTS = frozenset(
+    {"-b", "--branch", "-o", "--origin", "--depth", "-c", "--config", "--reference",
+     "--reference-if-able", "--separate-git-dir", "-u", "--upload-pack", "-j", "--jobs",
+     "--template", "--shallow-since", "--shallow-exclude", "--filter", "--server-option"}
+)
+_SCHEME_REMOTE = re.compile(
+    r"^(?:https?|ssh|git)://(?:[^@/]+@)?(?P<host>[^/:]+)(?::\d+)?/(?P<path>[^?#]+)$", re.I
+)
+# `git@github.com:owner/repo.git` — scp-like. A user part or a dotted host is required, so a Windows
+# drive (`C:\src\repo`) is not read as a host called `C`.
+_SCP_REMOTE = re.compile(r"^(?:[\w.-]+@(?P<uhost>[\w.-]+)|(?P<host>[\w-]+\.[\w.-]+)):(?P<path>[^/\\].*)$")
+_GH_SLUG = re.compile(r"^[\w.-]+/[\w.-]+$")
+_SHELL_URL_FETCH = re.compile(r"\b(?:curl|wget)\b[^\n]*?(?P<url>(?:https?|ftp)://[^\s'\"|;&)<>]+)", re.I)
+
+
+def _clone_sources(command: str) -> list[tuple[str, bool]]:
+    """Each clone source in ``command``, with whether it came from ``gh repo clone``."""
+    out: list[tuple[str, bool]] = []
+    for match in _CLONE.finditer(command or ""):
+        gh = match.group("gh") is not None
+        words = [w.strip("'\"") for w in (match.group("gh") if gh else match.group("rest")).split()]
+        skip = False
+        for word in words:
+            if skip:
+                skip = False
+                continue
+            if word == "--":
+                continue
+            if word.startswith("-"):
+                skip = not gh and word in _CLONE_VALUE_OPTS
+                continue
+            out.append((word, gh))
+            break
+    return out
+
+
+def _remote_repo(source: str, *, gh: bool) -> tuple[str, str] | None:
+    """``(host, path)`` of a remote clone source, lower-cased, without ``.git`` or a trailing slash;
+    None for a local one (`.`, `..`, an absolute or home path, a bare directory name)."""
+    host = path = ""
+    if (m := _SCHEME_REMOTE.match(source)) is not None:
+        host, path = m.group("host"), m.group("path")
+    elif (m := _SCP_REMOTE.match(source)) is not None:
+        host, path = m.group("uhost") or m.group("host"), m.group("path")
+    elif gh and _GH_SLUG.match(source):
+        host, path = "github.com", source
+    else:
+        return None
+    path = path.strip("/").lower()
+    path = path[:-4] if path.endswith(".git") else path
+    if "/" not in path:
+        return None
+    return host.lower(), path
+
+
+def _repo_forms(host: str, path: str) -> set[str]:
+    """The spellings of a repository a user could have written, each with and without `.git`/`/`."""
+    bases = {path, f"{host}/{path}", f"https://{host}/{path}", f"http://{host}/{path}",
+             f"git@{host}:{path}", f"ssh://git@{host}/{path}"}
+    return {base + suffix for base in bases for suffix in ("", ".git", "/")}
+
+
+def _shell_fetch_sources(command: str) -> list[str]:
+    """What a shell command fetched from outside: remote clones and `curl`/`wget` URLs."""
+    sources: list[str] = []
+    for source, gh in _clone_sources(command):
+        repo = _remote_repo(source, gh=gh)
+        if repo is not None:
+            sources.append(source if not gh else f"https://{repo[0]}/{repo[1]}")
+    sources.extend(m.group("url") for m in _SHELL_URL_FETCH.finditer(command or ""))
+    return sources
+
+
+def _setting(name: str) -> bool:
+    """A boolean setting, for a ledger whose caller did not say. Imported here: the ledger is built
+    by modules `chimera.config` must not import."""
+    from chimera.config import get_settings
+
+    return bool(getattr(get_settings(), name))
+
+
 def _hash(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:12]
 
@@ -356,6 +492,8 @@ class TaintLedger:
         shared: SharedTaint | None = None,
         authority: str = "provenance",
         egress_allow: Iterable[str] = (),
+        exfil_host_path: bool | None = None,
+        shell_fetch_guard: bool | None = None,
     ) -> None:
         if authority not in AUTHORITY_MODES:
             raise ValueError(
@@ -374,6 +512,24 @@ class TaintLedger:
         self.egress_allow = frozenset(
             host.strip().lower().rstrip(".") for host in egress_allow if host and host.strip()
         )
+        # S30-27 and S30-28, both off until `bench/exfil_url` and `bench/shell_fetch` recommend
+        # otherwise. Every production construction site holds a `Settings` and passes both, as it
+        # passes `authority` (a surface handed a `Settings` must not read the process-wide one:
+        # `test_governed_profile_reads_the_settings_it_is_given`). None is for a caller with no
+        # `Settings` at hand, which then reads the process's rather than silently staying off — the
+        # failure `api/posture.py` records for CHIMERA_TAINT_AUTHORITY, which did nothing on that
+        # surface for as long as it existed. The eval harnesses pin both off: they reproduce
+        # numbers published against the shipped rules.
+        self.exfil_host_path = (
+            _setting("exfil_host_path") if exfil_host_path is None else exfil_host_path
+        )
+        self.shell_fetch_guard = (
+            _setting("shell_fetch_guard") if shell_fetch_guard is None else shell_fetch_guard
+        )
+        # Every long run of URL characters in what the run FETCHED, lower-cased, whole — not the
+        # 2,000-character flow snippet, because a link at the end of a long page is still a link the
+        # page gave. Only kept while `exfil_host_path` is on.
+        self._fetched_runs: set[str] = set()
         self._tainted: set[str] = set()  # normalized tainted refs (urls, paths, hashes)
         self._snippets: list[str] = []  # bounded tainted content, for verbatim-flow detection
         # Every whole email address the conversation has shown: the instruction, each tool result,
@@ -455,6 +611,8 @@ class TaintLedger:
             self._tainted.add(digest)
         if content:
             self._snippets.append(content[: self.snippet_chars])
+            if self.exfil_host_path:
+                self._fetched_runs.update(run.lower() for run in _DATA_RUN.findall(content))
         self._add(
             "fetch", source, tainted=True, detail=f"sha256:{digest}" if digest else "",
             requested_by=who,
@@ -480,9 +638,23 @@ class TaintLedger:
             self._tainted.add(path)
         return self._add("write", path, tainted=tainted, provenance=refs)
 
-    def record_exec(self, command: str) -> CapabilityEvent:
+    def record_exec(self, command: str, output: str = "") -> CapabilityEvent:
+        """Record a command; with ``shell_fetch_guard`` on, a command that fetched is a fetch too.
+
+        ``git clone``, ``curl URL`` and ``wget URL`` bring outside content in exactly as ``http_get``
+        does, and ``run_shell`` is not in :data:`FETCH_TOOLS`, so a cloned README or a page ``curl``
+        printed left the run clean (study 30, S30-28). The output is the fetched content: it joins
+        the flow snippets, so written into a script it is a self-modifying write. A cloned
+        repository's files are not tracked one by one — the run is tainted, which is what arms the
+        narrowing; a file read from the clone later is not itself a tainted path.
+        """
         _, refs = self._content_is_tainted(command)
-        return self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+        event = self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+        if self.shell_fetch_guard:
+            for source in _shell_fetch_sources(command):
+                self.record_fetch(source, content=output)
+                output = ""  # one command's output belongs to one fetch, not to each source again
+        return event
 
     def record_send(self, tool: str, target: str = "") -> CapabilityEvent:
         """Record a non-idempotent OUTBOUND side effect (send_email/http_post/...).
@@ -658,6 +830,45 @@ class TaintLedger:
                 out.append(label)
         return out
 
+    def unseen_data_in_url(self, url: str) -> list[str]:
+        """The data-like runs in ``url`` that neither the instruction nor any fetched content holds.
+
+        Case-insensitive, because a hostname is. A value the run read from a local file or command
+        is NOT seen here: that is where a secret comes from, and a commit hash from ``git log`` is
+        asked about for the same reason (`bench/exfil_url`, the ``local`` class).
+        """
+        instruction = self._instruction or ""
+        out: list[str] = []
+        for token in _url_tokens(url):
+            for run in _DATA_RUN.findall(token):
+                low = run.lower()
+                if not _data_like(run) or low in instruction or low in self._fetched_runs:
+                    continue
+                if run not in out:
+                    out.append(run)
+        return out
+
+    def unnamed_clones(self, command: str) -> list[str]:
+        """Each remote repository ``command`` clones that the user's instruction never named.
+
+        Empty when the ledger was never told the instruction — the ``unknown`` the authority label
+        uses — so a surface that does not tell its ledger is unchanged rather than asking about
+        every clone. A repository is named when any spelling of it (:func:`_repo_forms`) occurs in
+        the instruction whole, bounded as :func:`_named_in` bounds a path: ``r/rich`` inside
+        ``vendor/rich`` is a directory the user wrote, not that repository.
+        """
+        if self._instruction is None:
+            return []
+        out: list[str] = []
+        for source, gh in _clone_sources(command):
+            repo = _remote_repo(source, gh=gh)
+            if repo is None:
+                continue
+            forms = _repo_forms(*repo) | {_normalise(source)}
+            if not any(_named_in(self._instruction, form) for form in forms):
+                out.append(f"{repo[0]}/{repo[1]}")
+        return out
+
     def is_tainted(self, ref: str) -> bool:
         return bool(ref) and ref.strip() in self._tainted
 
@@ -751,6 +962,22 @@ def assess_action(
                 span=span,
                 proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
+        if ledger.shell_fetch_guard:
+            # A clone of a remote the user never named (study 30, S30-28). Clean run or not: the
+            # owner a model infers for a repository is wrong most of the time for recent ones
+            # (arXiv 2607.07433), and whoever registered that owner serves what the run reads next.
+            unnamed = ledger.unnamed_clones(command)
+            if unnamed:
+                return SequenceAssessment(
+                    True, Decision.REVIEW,
+                    f"clones {', '.join(unnamed)}, a repository the task never named — a name the "
+                    f"model inferred resolves to whoever registered it first, and its README and "
+                    f"scripts are what the run reads and runs next",
+                    [],
+                    action=describe_call(tool_name, args, command),
+                    span=", ".join(unnamed),
+                    proposal=proposal_of(tool_name, args, ledger.taint_epoch),
+                )
     if tool_name in write_tools:
         path = _first(args, _PATH_KEYS)
         content = _first(args, _CONTENT_KEYS)
@@ -765,6 +992,25 @@ def assess_action(
                 action=describe_call(tool_name, args, path),
                 sources=sources,
                 span=span,
+                proposal=proposal_of(tool_name, args, ledger.taint_epoch),
+            )
+    if tool_name in fetch_tools and ledger.exfil_host_path:
+        url = _first(args, _URL_KEYS)
+        host = (urlsplit(url).hostname or "").rstrip(".") if url else ""
+        unseen = ledger.unseen_data_in_url(url) if url and host not in ledger.egress_allow else []
+        if unseen and not (ledger.run_tainted() and urlsplit(url).query):
+            # The query-string branch below keeps answering the call it always answered, with the
+            # words it always used; this one takes the host, the path and a clean run's query.
+            shown = ", ".join(_masked(_excerpt(run, 60)) for run in unseen[:3])
+            return SequenceAssessment(
+                True, Decision.REVIEW,
+                f"fetches {host or url!r} carrying {shown} in its address, a value that appears "
+                f"neither in the instruction nor in anything this run fetched — a hostname, a path "
+                f"or a query carries data out as easily as a body",
+                [],
+                action=describe_call(tool_name, args, url),
+                sources=ledger.taint_sources(),
+                span=shown,
                 proposal=proposal_of(tool_name, args, ledger.taint_epoch),
             )
     if tool_name in fetch_tools and ledger.run_tainted():

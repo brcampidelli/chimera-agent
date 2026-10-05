@@ -22,6 +22,7 @@ fixed signature is not the thing `observe` stages — but it is now recorded lik
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 from chimera.governance.approval import ApprovalLedger
@@ -296,6 +297,7 @@ class GovernedTool(Tool):
                            f"The tool did NOT run. A fixed signature refused it, not the governance "
                            f"mode: no approver can release it. Do not report this as done.")
         if verdict.decision == Decision.REVIEW:
+            verdict = _with_package_facts(verdict, action)
             approved = self.approve(verdict, action) if self.approve else False
             if not approved:
                 return refusal(f"[governance: needs review — {verdict.reason}] "
@@ -366,6 +368,27 @@ class GovernedTool(Tool):
             return str(self.context() or "")
         except Exception:  # noqa: BLE001 — see docstring: never block a tool over a missing reason
             return ""
+
+
+def _with_package_facts(verdict: Verdict, action: str) -> Verdict:
+    """``verdict`` with what PyPI says of each package, when it is the install rule's question.
+
+    Study 30, S30-28, under `CHIMERA_SHELL_FETCH_GUARD` only. Display only: the decision, the rule
+    and the action are the verdict's own, so an approval is keyed exactly as it was. Read at the call
+    because the wrapper is built once and the setting can change between conversations.
+    """
+    if verdict.rule != "package_install":
+        return verdict
+    from chimera.config import get_settings
+
+    if not get_settings().shell_fetch_guard:
+        return verdict
+    from chimera.governance.package_facts import card_lines
+
+    lines = card_lines(action)
+    if not lines:
+        return verdict
+    return replace(verdict, reason="\n".join([verdict.reason, *lines]))
 
 
 def govern_registry(

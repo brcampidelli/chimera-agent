@@ -477,7 +477,11 @@ def governed_profile(
     # in the signature, so the omission read as wiring rather than as a decision.
     # Built BEFORE the kernel, whatever the mode: the kernel keys its case law on this ledger's
     # lineage, read at each call. On `off` it is discarded below, handed to nobody.
-    ledger = TaintLedger(authority=settings.taint_authority)
+    ledger = TaintLedger(
+        authority=settings.taint_authority,
+        exfil_host_path=settings.exfil_host_path,
+        shell_fetch_guard=settings.shell_fetch_guard,
+    )
     step = govern_step(
         registry, settings=settings, audit=audit, mode=mode, surface=surface, home=home,
         lineage=ledger.lineage,

@@ -874,6 +874,8 @@ def assemble_registry(
         shared=shared,
         authority=settings.taint_authority,
         egress_allow=settings.egress_allow.split(","),
+        exfil_host_path=settings.exfil_host_path,
+        shell_fetch_guard=settings.shell_fetch_guard,
     )
     if instruction is not None:
         ledger.set_instruction(instruction, workspace=ws)

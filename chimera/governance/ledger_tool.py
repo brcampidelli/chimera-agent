@@ -468,7 +468,9 @@ class LedgeredTool(Tool):
         elif name in READ_TOOLS:
             self.ledger.record_read(_first(args, _PATH_KEYS))
         elif name in EXEC_TOOLS:
-            self.ledger.record_exec(_first(args, _COMMAND_KEYS))
+            # The output goes too: with the shell-fetch guard on, what `curl` printed is fetched
+            # content (S30-28); off, the ledger reads only the command, as it always did.
+            self.ledger.record_exec(_first(args, _COMMAND_KEYS), output=result)
         elif name in SIDE_EFFECT_TOOLS:
             # An outbound side effect (send/post) is an exfiltration SINK — record it so the
             # aggregate cross-agent monitor can catch a split flow (A fetches, B sends it out).

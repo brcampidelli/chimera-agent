@@ -292,7 +292,7 @@ def run_equivalence(
     mode = resolve_authority(authority)
     report = EquivalenceReport()
     for row in rows:
-        ledger = TaintLedger(authority=mode)
+        ledger = TaintLedger(authority=mode, exfil_host_path=False, shell_fetch_guard=False)
         _establish(row.source, ledger, row.read_content)
         # Snapshot the gate's view with the shipped predicates, before the action records anything.
         # `tainted` is the durable bit; `narrowed` asks the question `LedgeredTool` asks, with the

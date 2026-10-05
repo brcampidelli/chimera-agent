@@ -204,6 +204,13 @@ _EDITABLE_SETTINGS = {
     # allow`, which says yes to everything escalated — a setting only reachable by reading the source
     # would make the blunt answer the only discoverable one.
     "CHIMERA_EGRESS_ALLOW",
+    # Study 30, S30-27 and S30-28: two governance rules that ship off until their benches recommend
+    # them (`bench/exfil_url`, `bench/shell_fetch`). Editable for the reason the experimental group
+    # is: a switch only `.env` can reach is a choice only people who read the source can make. Both
+    # only add questions, and both are owner-only (`bridge_routes.GUARD_SETTINGS`): switching one
+    # off is the direction that widens.
+    "CHIMERA_EXFIL_HOST_PATH",
+    "CHIMERA_SHELL_FETCH_GUARD",
     # The Experimental group: three study-25 modules whose measurements did not recommend them, so
     # they stay off. Editable anyway, because a switch that only exists in `.env` is a choice only
     # people who read the source can make — the screen shows each one with what was measured.
@@ -294,6 +301,9 @@ APPLIES_WHEN: dict[str, str] = {
     # underneath it would make its transcript describe two different agents.
     "CHIMERA_CASCADE": NEXT_CONVERSATION,
     "CHIMERA_GUARD_CHAT": NEXT_CONVERSATION,
+    # Read when a run's taint ledger is built, and a chat builds one for the whole conversation.
+    "CHIMERA_EXFIL_HOST_PATH": NEXT_CONVERSATION,
+    "CHIMERA_SHELL_FETCH_GUARD": NEXT_CONVERSATION,
     "CHIMERA_CHAT_MEMORY": NEXT_CONVERSATION,
     # Read once, when `default_registry` constructs the browser tool — and the tool then keeps the
     # Chromium it launched for as long as it lives. Re-reading the value could not pull a window
@@ -987,6 +997,8 @@ _VALUE_CHECKS: dict[str, Callable[[str], None]] = {
     "CHIMERA_DEFER_TOOLS": _check_boolean("CHIMERA_DEFER_TOOLS"),
     "CHIMERA_MCP_DEFER": _check_boolean("CHIMERA_MCP_DEFER"),
     "CHIMERA_PROJECT_PACK": _check_boolean("CHIMERA_PROJECT_PACK"),
+    "CHIMERA_EXFIL_HOST_PATH": _check_boolean("CHIMERA_EXFIL_HOST_PATH"),
+    "CHIMERA_SHELL_FETCH_GUARD": _check_boolean("CHIMERA_SHELL_FETCH_GUARD"),
     # CHIMERA_WORKTREE_DIR is checked in `patch_config` itself: its check needs the workspace.
     "CHIMERA_SANDBOX_NETWORK": _check_sandbox_network,
     "CHIMERA_SHARING": _check_boolean("CHIMERA_SHARING"),
