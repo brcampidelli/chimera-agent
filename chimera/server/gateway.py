@@ -184,7 +184,7 @@ class MessageGateway:
         name_the_channel: bool = False,
         intercept: Callable[[InboundMessage], str | None] | None = None,
         attach: Callable[[list[Any]], Attachments] | None = None,
-        owner_of: Callable[[InboundMessage], bool] | None = None,
+        owner_of: Callable[[InboundMessage], bool | None] | None = None,
     ) -> None:
         self._factory = session_factory
         #: Whether a message was written by the owner (`allowlist.is_listed_owner`, bound to the
@@ -192,6 +192,13 @@ class MessageGateway:
         #: a "remember that..." from anyone else is written tainted and names them (study 30
         #: S30-29). ``None`` for the HTTP ``/chat`` route, whose ``user`` is whatever the
         #: authenticated caller put in its JSON body: no sender, and memory writes as it did.
+        #:
+        #: The rule itself may also answer ``None`` — "this message has no sender I can judge" —
+        #: which is how ``serve``'s one gateway carries both kinds: the WhatsApp webhook mounted on
+        #: it is a chat bot like any other and gets an answer, while the HTTP route and the
+        #: scheduler's webhooks get ``None`` and write as they did. A gateway with no rule at all
+        #: used to be how ``serve`` built it, and every WhatsApp number then wrote clean facts into
+        #: the owner's memory with no sender.
         self._owner_of = owner_of
         #: Which of a turn's written files go back with the reply (``attachments.turn_attachments``
         #: bound to the workspace), or ``None``: no attachment, and the turn's tool calls are not
@@ -302,9 +309,12 @@ class MessageGateway:
         """Who wrote ``message`` and whether it is the owner, when this gateway knows its owner."""
         if self._owner_of is None:
             return None
+        owner = self._owner_of(message)
+        if owner is None:
+            return None
         return ChatSender(
             id=str(message.user), platform=message.platform,
-            owner=not message.from_bot and bool(self._owner_of(message)), chat=message.key,
+            owner=not message.from_bot and owner, chat=message.key,
         )
 
     @property

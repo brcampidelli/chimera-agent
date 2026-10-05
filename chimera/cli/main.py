@@ -2857,7 +2857,15 @@ def serve(
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(code=1) from exc
 
-    message_gateway = MessageGateway(factory)
+    from chimera.server.allowlist import owner_on
+
+    # One gateway for three routes. The WhatsApp webhook is a chat bot, so a "remember that..."
+    # from a number the owner did not list is written tainted and names it (study 30 S30-29), the
+    # same as on the platform bots; the HTTP `/chat` route and the scheduler's webhooks have no
+    # sender to judge and the rule answers `None` for them. Read live, as the allowlist is.
+    message_gateway = MessageGateway(
+        factory, owner_of=lambda message: owner_on("whatsapp", get_settings(), message)
+    )
     a2a_pair = _build_a2a(backend, model, max_steps, workspace_path, host, port) if a2a else None
     server = make_server(
         message_gateway, host, port,

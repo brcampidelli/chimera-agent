@@ -74,6 +74,20 @@ def is_listed_owner(settings: Settings, message: InboundMessage) -> bool:
     return str(message.user).strip() in allowed_ids(settings, message.platform)
 
 
+def owner_on(platform: str, settings: Settings, message: InboundMessage) -> bool | None:
+    """:func:`is_listed_owner` for a message of ``platform``; ``None`` (no sender) for any other.
+
+    For a gateway that carries a chat bot alongside routes whose ``user`` means nothing — ``serve``
+    mounts the WhatsApp webhook on the same gateway as the HTTP ``/chat`` route and the scheduler's
+    webhooks. Keyed on the platform the transport stamps: the WhatsApp webhook always writes
+    ``"whatsapp"``. An HTTP caller may write it too, but that caller holds the server token, and
+    the worst it gets is its own fact labelled ``[unverified]``.
+    """
+    if message.platform != platform:
+        return None
+    return is_listed_owner(settings, message)
+
+
 def allowed_users_for(settings: Settings, platform: str) -> set[str] | None:
     """The adapter's ``allowed_users``: a set when the owner listed anyone, ``None`` (anyone) when not.
 
