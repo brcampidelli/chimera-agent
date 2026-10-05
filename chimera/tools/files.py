@@ -269,6 +269,6 @@ class ListDirTool(_WorkspaceTool):
             for p in path.iterdir()
             # Chimera's own .env, when the owner keeps it from the agent's read tools: not even its
             # name, so a listing is not an invitation to try another spelling.
-            if not hides_own_env(p)
+            if not hides_own_env(p, forced=bool(getattr(self, "hide_own_env", False)))
         )
         return "\n".join(entries) if entries else "(empty)"

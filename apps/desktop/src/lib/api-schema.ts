@@ -4253,6 +4253,11 @@ export interface components {
             /** Fusion Synthesizer */
             fusion_synthesizer?: string | null;
             /**
+             * Hide Own Env
+             * @default false
+             */
+            hide_own_env: boolean;
+            /**
              * Max Attempts
              * @default 3
              */
@@ -5445,6 +5450,11 @@ export interface components {
             fusion_panel?: string[] | null;
             /** Fusion Synthesizer */
             fusion_synthesizer?: string | null;
+            /**
+             * Hide Own Env
+             * @default false
+             */
+            hide_own_env: boolean;
             /** Max Steps */
             max_steps?: number | null;
             /** Max Usd */
@@ -5886,6 +5896,11 @@ export interface components {
             fusion_panel?: string[] | null;
             /** Fusion Synthesizer */
             fusion_synthesizer?: string | null;
+            /**
+             * Hide Own Env
+             * @default false
+             */
+            hide_own_env: boolean;
             /** Max Steps */
             max_steps?: number | null;
             /** Max Usd */
@@ -7786,6 +7801,11 @@ export interface components {
             /** Fusion Synthesizer */
             fusion_synthesizer?: string | null;
             /**
+             * Hide Own Env
+             * @default false
+             */
+            hide_own_env: boolean;
+            /**
              * Max Attempts
              * @default 2
              */
@@ -9191,6 +9211,11 @@ export interface components {
              * @default false
              */
             gen_tests: boolean;
+            /**
+             * Hide Own Env
+             * @default false
+             */
+            hide_own_env: boolean;
             /**
              * Max Attempts
              * @default 3

@@ -1896,6 +1896,8 @@ def build_api_app(
                 max_usd=req.max_usd,
                 repo_map=req.repo_map,
                 explorer=req.explorer,
+                # A batch the bridge started hides Chimera's .env from every task, like one run.
+                hide_own_env=req.hide_own_env,
             )
             # Each task runs in a worktree cut from `ws`, a temporary folder no grant names. The
             # shell grant is the project's, so it is looked up there — set here, server-side,

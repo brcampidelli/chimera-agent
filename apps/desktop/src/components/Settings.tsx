@@ -1663,7 +1663,9 @@ export function Settings({
                     means in plain words, because the keys there would reach the model. */}
                   <Row
                     label={t("settings.row.agentReadsOwnEnv")}
-                    hint={t("settings.hint.agentReadsOwnEnv")}
+                    // The second sentence is the bridge's: a run Claude starts never gets the file,
+                    // whatever this row says (owner's decision of 2026-10-04).
+                    hint={`${t("settings.hint.agentReadsOwnEnv")} ${t("settings.hint.agentReadsOwnEnvBridge")}`}
                     env="CHIMERA_AGENT_READS_OWN_ENV"
                   >
                     <Toggle

@@ -507,8 +507,46 @@ def _job_out(job: BridgeJob, since: int, tokens: list[str]) -> dict[str, Any]:
     )
 
 
+#: Routes that start or schedule work and carry no `CodeSeams` (see `guard_places`).
+_UNSEAMED_STARTS = frozenset(
+    {
+        "chat.send",
+        "kanban.run",
+        "orchestration.hierarchy",
+        "cron.create",
+        "spec_projects.create",
+        "spec_projects.step",
+    }
+)
+
 #: Body and query fields that name a place on disk, at any depth.
 _PATH_FIELDS = frozenset({"workspace", "path", "paths", "cwd"})
+
+
+def _patch_without(patch: str, hidden: Callable[[str], bool]) -> str:
+    """``patch`` without the per-file sections whose path ``hidden`` names (`diff --git a/X b/Y`)."""
+    kept: list[str] = []
+    skip = False
+    for line in patch.splitlines(keepends=True):
+        if line.startswith("diff --git "):
+            names = re.findall(r"(?:^| )[ab]/(\S+)", line[len("diff --git ") :])
+            skip = any(hidden(name) for name in names)
+        if not skip:
+            kept.append(line)
+    return "".join(kept)
+
+
+def _named_fields(node: Any) -> list[tuple[str, Any]]:
+    """Every ``(key, value)`` of every dict in ``node``, however deep."""
+    found: list[tuple[str, Any]] = []
+    if isinstance(node, dict):
+        for key, value in node.items():
+            found.append((str(key), value))
+            found += _named_fields(value)
+    elif isinstance(node, list):
+        for item in node:
+            found += _named_fields(item)
+    return found
 
 
 def _path_texts(node: Any) -> list[str]:
@@ -595,6 +633,7 @@ def register_bridge_api(
             is_device_or_unc,
             is_own_env,
             normal_name,
+            own_env_file,
             within,
         )
 
@@ -613,7 +652,22 @@ def register_bridge_api(
                     detail="device and network paths (\\\\?\\, \\\\.\\, \\\\server\\share) are not "
                     "reachable through the bridge",
                 )
-        places = [fields.get("workspace")]
+        own_env = own_env_file()
+
+        def holds_chimeras_files(folder: Path) -> bool:
+            """Whether ``folder`` is or contains Chimera's own `.env` or its data folder."""
+            return contains(folder, own_env) or any(contains(folder, r) for r in roots)
+
+        refusal = HTTPException(
+            status_code=403,
+            detail="that folder holds the app's own data or its .env; it is not reachable through "
+            "the bridge",
+        )
+        # Every workspace the call names, at any depth (a batch names one per task): inside the
+        # data folder, or holding it or Chimera's `.env`. Holding the `.env` was let through until
+        # the final review of 2026-10-04: `git.init` on the install folder ran `git add -A` and
+        # committed it, and `git.diff` then returned its changed lines.
+        places = [v for k, v in _named_fields(query) + _named_fields(body) if k == "workspace"]
         if route_id in {"projects.add", "projects.remove", "files.mkdir"}:
             places.append(fields.get("path"))
         for place in places:
@@ -621,17 +675,35 @@ def register_bridge_api(
                 continue
             target = Path(place).expanduser()
             # By file identity (`own_files`), both ways: a workspace inside the data, or holding it.
-            if any(within(target, r) or contains(target, r) for r in roots):
-                raise HTTPException(
-                    status_code=403,
-                    detail="that folder holds the app's own data; it is not reachable through the bridge",
-                )
+            if any(within(target, r) for r in roots) or holds_chimeras_files(target):
+                raise refusal
+        explicit_ws = fields.get("workspace")
+        effective = Path(
+            explicit_ws if isinstance(explicit_ws, str) and explicit_ws.strip() else workspace
+        ).expanduser()
+        # Git works on the whole tree whatever the path: `init` adds everything, `status` lists what
+        # is untracked, `revert` cleans. So the app's OWN workspace is held to the rule too when the
+        # call names none — an app started in its install folder holds the `.env`.
+        if route_id.startswith("git.") and holds_chimeras_files(effective):
+            raise refusal
+        # The routes that start or schedule work WITHOUT the run seams, so without the per-run
+        # `hide_own_env` the seams carry: a chat, a board run, a hierarchy, a cron job, a spec
+        # project. Their tools get no approver for paths outside the folder, so keeping the folder
+        # clear of Chimera's files keeps the file out of their reach (owner's decision, 2026-10-04).
+        if route_id in _UNSEAMED_STARTS and holds_chimeras_files(effective):
+            raise refusal
         files = [fields.get("path")] if route_id.startswith(("files.", "git.")) else []
         files += list(fields.get("paths") or []) if route_id.startswith("git.") else []
         if any(isinstance(f, str) and is_secret_file(f) for f in files):
             raise HTTPException(
                 status_code=403, detail="credential files are not reachable through the bridge"
             )
+        if route_id.startswith("git."):
+            # A path that CONTAINS Chimera's files is them too: `git.revert {paths: ["."]}` ran
+            # `git clean -fd -- .` over the data folder, and `git.commit` of "." committed the .env.
+            for f in files:
+                if isinstance(f, str) and f.strip() and holds_chimeras_files(effective / f):
+                    raise refusal
         # The FILE, not only the workspace. A call that names no workspace runs in the app's own,
         # and when that folder contains the data directory (an app started from the home folder,
         # the test suite's temporary folder) a plain `files.write` of
@@ -767,6 +839,11 @@ def register_bridge_api(
             reach, approval = owner_posture(body)
             body = {**body, "posture": {"reach": reach, "approval": approval}}
             body.setdefault("allow_host_exec", reach == "workspace_shell")
+        if route.seams and isinstance(body, dict):
+            # The owner's decision of 2026-10-04: a run the bridge starts never gets Chimera's own
+            # `.env`, whatever CHIMERA_AGENT_READS_OWN_ENV says for the owner's own runs. Set, never
+            # read from the client: a body that sent `false` gets `true` like every other.
+            body = {**body, "hide_own_env": True}
         return body
 
     def owner_posture(body: Any) -> tuple[str, str]:
@@ -927,6 +1004,20 @@ def register_bridge_api(
                     if not is_secret_file(str(h.get("path", "")))
                     and not hidden_place(query, req.body, str(h.get("path", "")))
                 ]
+            if req.route == "git.status" and isinstance(data, dict):
+                # Behind the workspace refusal above, and kept anyway: what git reports is the
+                # repository's view, and a repository can hold more than the workspace named.
+                data["files"] = [
+                    f
+                    for f in data.get("files") or []
+                    if not is_secret_file(str(f.get("path", "")))
+                    and not hidden_place(query, req.body, str(f.get("path", "")))
+                ]
+            if req.route == "git.diff" and isinstance(data, dict):
+                data["patch"] = _patch_without(
+                    str(data.get("patch") or ""),
+                    lambda p: is_secret_file(p) or hidden_place(query, req.body, p),
+                )
             if req.route in {"files.tree", "files.browse"} and isinstance(data, dict):
                 # A listing names what it lists. The app's own data folder and Chimera's `.env` are
                 # not the bridge's to see, so they are not named to it either (review of 2026-10-04,

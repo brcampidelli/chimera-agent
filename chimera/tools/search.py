@@ -84,7 +84,7 @@ class GrepTool(_WorkspaceTool):
         for file in files:
             if glob and not file.match(str(glob)):
                 continue
-            if hides_own_env(file):
+            if hides_own_env(file, forced=bool(getattr(self, "hide_own_env", False))):
                 continue  # Chimera's own .env, kept from the agent by the owner
             try:
                 if file.stat().st_size > _MAX_FILE_BYTES:
@@ -126,7 +126,7 @@ class GlobTool(_WorkspaceTool):
             resolved = path.resolve()
             if resolved != root and root not in resolved.parents:
                 continue
-            if hides_own_env(resolved):
+            if hides_own_env(resolved, forced=bool(getattr(self, "hide_own_env", False))):
                 continue
             if resolved.is_file():
                 out.append(resolved.relative_to(root).as_posix())

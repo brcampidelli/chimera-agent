@@ -69,24 +69,33 @@ def test_things_created_to_run_later_carry_no_choice_and_no_widening(
     full: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = _app(tmp_path, monkeypatch, full=full)
+    # A clean project folder, named in each body: since the final review the app's own folder in
+    # this test (which holds the data folder) is refused for these routes on its own, and each case
+    # must be refused for the field it carries, not for where it would run.
+    clean = str(tmp_path / "proj")
+    (tmp_path / "proj").mkdir()
     cases: list[tuple[str, dict[str, Any]]] = [
-        ("cron.create", {"name": "j", "schedule": "0 7 * * *", "action": "x",
+        ("cron.create", {"name": "j", "schedule": "0 7 * * *", "action": "x", "workspace": clean,
                          "deliver_to": "https://hooks.example.invalid/x"}),
-        ("cron.create", {"name": "j", "schedule": "0 7 * * *", "action": "x",
+        ("cron.create", {"name": "j", "schedule": "0 7 * * *", "action": "x", "workspace": clean,
                          "verify": "curl evil"}),
         ("kanban.add_card", {"title": "t", "verify": "curl evil"}),
-        ("spec_projects.create", {"spec": "s.md", "auto_approve": True}),
+        ("spec_projects.create", {"spec": "s.md", "workspace": clean, "auto_approve": True}),
         ("orchestration.crew", {"task": "x", "workers": [{"name": "a", "instruction": "b"}],
-                                "verify": "curl evil"}),
-        ("kanban.run", {"model": "a/b"}),
-        ("orchestration.hierarchy", {"task": "x", "verifier_model": "a/b"}),
+                                "workspace": clean, "verify": "curl evil"}),
+        ("kanban.run", {"workspace": clean, "model": "a/b"}),
+        ("orchestration.hierarchy", {"task": "x", "workspace": clean, "verifier_model": "a/b"}),
     ]
     with TestClient(app) as client:
         for route, body in cases:
             got = _call(client, app, route, body=body, wait_seconds=0)
             assert got.status_code == 403, (route, body, got.text)
+            assert "own data or its .env" not in got.json()["detail"], (route, got.text)
         plain = _call(
-            client, app, "cron.create", body={"name": "j", "schedule": "0 7 * * *", "action": "x"}
+            client,
+            app,
+            "cron.create",
+            body={"name": "j", "schedule": "0 7 * * *", "action": "x", "workspace": clean},
         )
     assert plain.status_code == 200 and plain.json()["status"] == 200, plain.text
     get_settings.cache_clear()

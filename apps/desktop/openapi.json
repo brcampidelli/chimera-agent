@@ -626,6 +626,11 @@
             ],
             "title": "Fusion Synthesizer"
           },
+          "hide_own_env": {
+            "default": false,
+            "title": "Hide Own Env",
+            "type": "boolean"
+          },
           "max_attempts": {
             "default": 3,
             "title": "Max Attempts",
@@ -2973,6 +2978,11 @@
             ],
             "title": "Fusion Synthesizer"
           },
+          "hide_own_env": {
+            "default": false,
+            "title": "Hide Own Env",
+            "type": "boolean"
+          },
           "max_steps": {
             "anyOf": [
               {
@@ -4113,6 +4123,11 @@
               }
             ],
             "title": "Fusion Synthesizer"
+          },
+          "hide_own_env": {
+            "default": false,
+            "title": "Hide Own Env",
+            "type": "boolean"
           },
           "max_steps": {
             "anyOf": [
@@ -7977,6 +7992,11 @@
             ],
             "title": "Fusion Synthesizer"
           },
+          "hide_own_env": {
+            "default": false,
+            "title": "Hide Own Env",
+            "type": "boolean"
+          },
           "max_attempts": {
             "default": 2,
             "title": "Max Attempts",
@@ -11066,6 +11086,11 @@
           "gen_tests": {
             "default": false,
             "title": "Gen Tests",
+            "type": "boolean"
+          },
+          "hide_own_env": {
+            "default": false,
+            "title": "Hide Own Env",
             "type": "boolean"
           },
           "max_attempts": {
