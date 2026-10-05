@@ -378,6 +378,13 @@ class Attempt:
     #: (`bench/test_gate_two_sided`) and a receipt-only flag is the record-only surface the kernel
     #: docstring said the judge never had.
     diff_flags: list[str] = field(default_factory=list)
+    #: Whether this attempt changed the instrument that judged it — ``tests_touched``,
+    #: ``verifier_modified``, ``tests_removed_or_skipped``, one rendered line per file
+    #: (`chimera/governance/verifier_integrity.py`). RECORD-ONLY: no surface pauses on it, because
+    #: legitimate work edits tests and the false-positive rate of a pause has not been measured
+    #: (`bench/verifier_integrity`). Empty when nothing was flagged OR there was no guard to
+    #: snapshot with; a row written before the field reads as "not checked".
+    integrity_flags: list[str] = field(default_factory=list)
     #: The class this failure was given before it was fed back — ``failing_test``, ``tool_skip``,
     #: ``reverted``… (see :mod:`chimera.core.failure_class`) — as the enum's value, because this
     #: record goes through ``asdict`` → JSON → ``Attempt(**saved)`` on a resume. ``""`` means
@@ -1072,6 +1079,7 @@ class AutonomousAgent:
             diff_summary: str | None = None
             diffs: list[FileDiff] = []
             diff_flags: list[str] = []
+            integrity_flags: list[str] = []
             # Per attempt, not `last_after`: that one survives the loop for `--keep-workspace`, so
             # on a second attempt without a capture it would still hold the FIRST attempt's tree and
             # this receipt would attest to a verdict about somebody else's files.
@@ -1097,6 +1105,17 @@ class AutonomousAgent:
                 from chimera.governance.diff_rules import flag_snapshots
 
                 diff_flags = [f.render() for f in flag_snapshots(snapshot.files, after.files)]
+                # Same snapshots, one more record-only rule: did this attempt change the
+                # instrument that just judged it? Never a pause (see `verifier_integrity`).
+                from chimera.governance.verifier_integrity import flag_snapshots as integrity_of
+
+                integrity_flags = [
+                    f.render()
+                    for f in integrity_of(
+                        snapshot.files, after.files,
+                        verify_command=str(getattr(self.verifier, "command", "") or ""),
+                    )
+                ]
                 # The tree AS VERIFIED: `_verify()` ran just above, so this capture is the state the
                 # verdict is about — not a fresh read a later write could already have changed.
                 from chimera.core.checkpoint import fingerprint as _impressao
@@ -1296,6 +1315,7 @@ class AutonomousAgent:
             attempt.cache_read_tokens = _cache_read_tokens(steplog)
             attempt.provider = _provider(steplog)
             attempt.diff_flags = diff_flags
+            attempt.integrity_flags = integrity_flags
             # The key that joins this outcome to the trace line the same run just wrote. Read off
             # the worker's result, like  above and for the same reason: it is the worker that
             # knows, and re-deriving it here would be a second place for the two to disagree.
@@ -2112,6 +2132,14 @@ class AutonomousAgent:
             return True, "", True
         if snapshot is not None and hasattr(self.verifier, "base_snapshot"):
             self.verifier.base_snapshot = snapshot
+        command = str(getattr(self.verifier, "command", "") or "")
+        # `getattr` on self too: a runner built with `__new__` (a test, a subclass) has no ledger.
+        record_verify = getattr(getattr(self, "taint", None), "record_verify", None)
+        if command and callable(record_verify):
+            # The verifier is built outside the tool registry, so its command — the one that decides
+            # the run — never reached the ledger that sees every other shell call (S30-23).
+            # Recorded BEFORE it runs, so a verifier that hangs or raises is still on the record.
+            record_verify(command, source=str(getattr(self.verifier, "source", "") or "unknown"))
         result = self.verifier.verify()
         return result.passed, result.output, result.abstained
 

@@ -292,7 +292,7 @@ class CapabilityEvent:
     """One recorded capability use in a run (the replayable unit)."""
 
     seq: int
-    kind: str  # fetch | read | write | exec | send | escalation
+    kind: str  # fetch | read | write | exec | verify | send | escalation
     """What the agent did. There is no ``env`` kind, and there was one for a while with no producer.
 
     Nothing ever called ``record_env``, and nothing ever would have: the two real channels by which
@@ -483,6 +483,27 @@ class TaintLedger:
     def record_exec(self, command: str) -> CapabilityEvent:
         _, refs = self._content_is_tainted(command)
         return self._add("exec", command[:200], tainted=bool(refs), provenance=refs)
+
+    def record_verify(self, command: str, *, source: str) -> CapabilityEvent:
+        """Record the verify command the loop ran, and who authored it. RECORD-ONLY.
+
+        The verifier is built outside the tool registry, so the command it runs on the workspace —
+        often on the host — never reached this ledger: the replay of a run showed every shell call
+        the agent made and not the one that decided whether the run succeeded (study 30, S30-23).
+        ``source`` is ``CommandVerifier.source``: ``user`` (typed, authorised by construction) or
+        ``inferred:<file>`` (read out of a file the agent may have written).
+
+        The event names any tainted ref the command carries in ``provenance`` and does NOT set
+        ``tainted``, on purpose: a tainted event arms ``run_tainted`` and with it pause-on-taint and
+        the durable-provenance gates, and a verify command that pauses a run is a behaviour change no
+        measurement has recommended yet. What it buys today is that the question can be asked of
+        the record.
+        """
+        _, refs = self._content_is_tainted(command)
+        who = "user" if source == "user" else "unknown"
+        return self._add(
+            "verify", command[:200], detail=f"source={source}", provenance=refs, requested_by=who
+        )
 
     def record_send(self, tool: str, target: str = "") -> CapabilityEvent:
         """Record a non-idempotent OUTBOUND side effect (send_email/http_post/...).
