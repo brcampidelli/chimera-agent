@@ -125,17 +125,25 @@ def rule_summariser(
         if not body.strip():
             return to_note(older)
         try:
+            from chimera.orchestration.budget import settle_failed_attempts, strict_refusal
             from chimera.providers.gateway import Message
 
-            result = backend.complete(
-                [Message(role="system", content=SYSTEM), Message(role="user", content=body)],
-                model=model,
-                temperature=0.0,
-            )
+            prompt = [Message(role="system", content=SYSTEM), Message(role="user", content=body)]
+            asked: dict[str, Any] = {"model": model, "temperature": 0.0}
+            # A strict ceiling (the owner's `CHIMERA_STRICT_SPEND_CAP`) is asked here too: this call
+            # spends from the run's budget between two steps, and a ceiling only the steps asked
+            # could be passed by it. Refused, the span gets the structural note, as on a failure.
+            # Off this answers None and nothing changes.
+            why = strict_refusal(spend, backend, prompt, asked)
+            if why is not None:
+                _log.info("compaction summariser not called: %s", why)
+                return to_note(older)
+            result = backend.complete(prompt, **asked)
             if usage is not None:
                 usage.add(result)
             if spend is not None:
                 spend.record_result(result)
+                settle_failed_attempts(spend, result, prompt, asked)
             answer = result.content
         except Exception as exc:  # noqa: BLE001 — a compaction must not fail on a summariser
             _log.warning("compaction summariser failed, using the structural note: %s", exc)

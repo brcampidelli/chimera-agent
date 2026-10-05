@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import math
 import threading
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -448,7 +449,7 @@ def _strict_setting() -> bool:
 _STRICT_TOKENS_PER_MESSAGE = 16
 
 
-def _prompt_bound(messages: list[MessageLike], kwargs: dict[str, Any], *, strict: bool) -> int:
+def _prompt_bound(messages: Sequence[MessageLike], kwargs: dict[str, Any], *, strict: bool) -> int:
     """The prompt side of a call's worst case, in tokens: chars/4 off, an upper bound when strict
     (every UTF-8 byte a token, plus a margin per message for the chat template)."""
     text = "\n".join(str(m) for m in messages)
@@ -466,7 +467,7 @@ def _strict_and_capped(spend: object) -> bool:
 
 
 def settle_failed_attempts(
-    spend: object, result: object, messages: list[MessageLike], kwargs: dict[str, Any]
+    spend: object, result: object, messages: Sequence[MessageLike], kwargs: dict[str, Any]
 ) -> None:
     """Under a strict ceiling, charge each attempt that raised inside the call that answered.
 
@@ -495,7 +496,7 @@ def settle_failed_attempts(
 
 
 def strict_refusal(
-    spend: object, backend: object, messages: list[MessageLike], kwargs: dict[str, Any]
+    spend: object, backend: object, messages: Sequence[MessageLike], kwargs: dict[str, Any]
 ) -> str | None:
     """Why a call must not start under a STRICT ceiling, or None (always None when not strict).
 
@@ -514,7 +515,7 @@ def strict_refusal(
 
 
 def worst_case_usd(
-    backend: object, messages: list[MessageLike], kwargs: dict[str, Any], *, strict: bool = False
+    backend: object, messages: Sequence[MessageLike], kwargs: dict[str, Any], *, strict: bool = False
 ) -> float | None:
     """The most one ``backend.complete(messages, **kwargs)`` can cost, in dollars, or None when that
     cannot be known.

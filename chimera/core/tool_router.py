@@ -199,10 +199,20 @@ class ToolRouter:
             return None
         names = {name for name, _ in menu}
         self.stats.calls += 1
+        from chimera.orchestration.budget import settle_failed_attempts, strict_refusal
+
+        prompt = self._prompt(task, messages, menu)
+        asked: dict[str, Any] = {"model": self.model, "temperature": self.temperature}
+        # Under a strict ceiling this call asks first, like every step does: it spends from the same
+        # budget, and a ceiling only the steps asked could be passed by the router. Refused, the
+        # step runs with every tool, exactly as on a failure. Off this answers None.
+        why = strict_refusal(spend, self.backend, prompt, asked)
+        if why is not None:
+            _log.debug("tool router not called: %s", why)
+            self.stats.fallbacks += 1
+            return None
         try:
-            result = self.backend.complete(
-                self._prompt(task, messages, menu), model=self.model, temperature=self.temperature
-            )
+            result = self.backend.complete(prompt, **asked)
         except Exception as exc:  # noqa: BLE001 - an optimisation may not take the run down
             _log.debug("tool router call failed: %s", exc)
             self.stats.fallbacks += 1
@@ -211,6 +221,7 @@ class ToolRouter:
             usage.add(result)
         if spend is not None:
             spend.record_result(result)
+            settle_failed_attempts(spend, result, prompt, asked)
         # Priced the way every other call in this repository is priced. `CompletionResult` carries
         # TOKENS, not money — `result.usd` is not a field, so reading it would have made the
         # router's cost read 0.00 on every row while it really spent, and the arm this experiment
