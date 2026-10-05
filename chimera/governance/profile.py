@@ -264,6 +264,12 @@ def govern_step(
         ledger=approvals,
         no_approver=no_approver,
         lineage=lineage,
+        # The PyPI line on a pip card (S30-28): from the `Settings` this surface was given, and only
+        # where a person reads the card. `observe`, an `allow` or `deny` owner and an unattended
+        # surface answer without anyone reading it, and the lookup sends the name to PyPI anyway.
+        # `getattr`: the duck-typed settings some callers and tests hand in predate the field.
+        package_facts=bool(getattr(settings, "shell_fetch_guard", False))
+        and approver_name in ("ask", "screen"),
     )
     # One line per assembly, and the only place the deployment's mode is written where a reader can
     # find it. Two holes close here.

@@ -8,31 +8,81 @@ more: it never changes a verdict, and when PyPI cannot be reached it says **unkn
 guessing in either direction.
 
 One GET to `https://pypi.org/pypi/<name>/json` per package, with a short timeout and a per-process
-cache. The name is the one the agent is about to install, and the request goes to the index the
-install would reach anyway, so it tells PyPI nothing the install would not.
+cache (an answer for good; "could not be reached" for a minute, so an offline machine does not pay
+the timeout on every question).
+
+What the lookup tells PyPI, said plainly because the first version of this docstring got it wrong
+(study 30 review): the name goes to PyPI **when the question is asked, before anyone answers it** —
+so a refused install still reached PyPI, and the card exists to be read before the answer. For a
+public package that is what the install would have sent. For a private one it is the reconnaissance
+dependency confusion needs, so the lookup is skipped, and the card says so, whenever the command or
+the environment names another index: `-i`/`--index-url`/`--extra-index-url`/`--index`/
+`--default-index`/`-f`/`--find-links`/`--no-index` on the command, or `PIP_INDEX_URL`,
+`PIP_EXTRA_INDEX_URL`, `PIP_FIND_LINKS`, `UV_INDEX_URL`, `UV_EXTRA_INDEX_URL`, `UV_INDEX`,
+`UV_DEFAULT_INDEX` or `UV_FIND_LINKS` in the environment. **Not detected:** an index set in
+`pip.conf`/`pip.ini` or in `uv.toml`/`[tool.uv.index]` — a deployment with a private index configured
+that way should leave `CHIMERA_SHELL_FETCH_GUARD` off, or accept that the names of refused installs
+reach PyPI. The assembly also skips the lookup where no person reads the card (`observe`, an `allow`
+or `deny` approver, an unattended surface): `governance.profile.govern_step`.
+
+The request is made by this process, not from the agent's sandbox, so `CHIMERA_SANDBOX_NETWORK` (the
+container's network) does not govern it; the guard setting does.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import re
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Mapping
 from typing import Any
 
 _PIP = re.compile(r"\b(?:pip3?|pipx|uv\s+pip|uv\s+tool)\s+install\b(?P<rest>[^\n;&|]*)|\buv\s+add\b(?P<uv>[^\n;&|]*)")
 # Options that take the next word as their value, so it is not a package.
+# A missing one reads its value as a package: `pip install --trusted-host pypi.internal --timeout
+# 60 foo` put `pypi.internal` and `60` on the card and sent both to PyPI (study 30 review). pip's,
+# then uv's (`uv pip install`, `uv add`, `uv tool install`).
 _VALUE_OPTS = frozenset(
     {"-r", "--requirement", "-c", "--constraint", "-e", "--editable", "-i", "--index-url",
      "--extra-index-url", "-f", "--find-links", "-t", "--target", "--prefix", "--root",
-     "--python", "-p", "--group", "--optional", "--extra"}
+     "--python", "-p", "--group", "--optional", "--extra",
+     "--trusted-host", "--timeout", "--retries", "--proxy", "--cache-dir", "--src", "--log",
+     "--log-file", "--platform", "--python-version", "--implementation", "--abi", "--only-binary",
+     "--no-binary", "--upgrade-strategy", "--progress-bar", "--report", "--config-settings",
+     "-C", "--global-option", "--build-option", "--exists-action", "--cert", "--client-cert",
+     "--keyring-provider", "--use-feature", "--use-deprecated", "--root-user-action",
+     "--index", "--default-index", "--index-strategy", "--resolution", "--prerelease",
+     "--exclude-newer", "--refresh-package", "--reinstall-package", "--upgrade-package", "-P",
+     "--no-build-isolation-package", "--link-mode", "--directory",
+     "--project", "--package", "--with", "--with-requirements", "--with-editable",
+     "--config-file", "--build-constraint", "--overrides", "--constraints",
+     "--marker", "--rev", "--tag", "--branch", "--script", "--bounds",
+     "--color", "--python-platform", "--torch-backend", "--allow-insecure-host"}
+)
+# Options that name another source of packages: with one of these the name may be private, and the
+# lookup would hand it to PyPI.
+_INDEX_OPTS = frozenset(
+    {"-i", "--index-url", "--extra-index-url", "--index", "--default-index", "-f",
+     "--find-links", "--no-index"}
+)
+_INDEX_ENV = (
+    "PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "PIP_FIND_LINKS", "PIP_NO_INDEX",
+    "UV_INDEX_URL", "UV_EXTRA_INDEX_URL", "UV_INDEX", "UV_DEFAULT_INDEX", "UV_FIND_LINKS",
+    "UV_NO_INDEX",
 )
 _NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
 TIMEOUT_S = 3.0
+# How long "PyPI could not be reached" is remembered. Long enough that a run asking about ten
+# installs offline pays the timeout once, short enough that a network that comes back is used.
+UNKNOWN_TTL_S = 60.0
 
 _cache: dict[str, str] = {}
+_unknown_until: dict[str, float] = {}
 _lock = threading.Lock()
 
 
@@ -59,6 +109,20 @@ def pypi_packages(command: str) -> list[str]:
             if name is not None and name.group(0).lower() not in (n.lower() for n in names):
                 names.append(name.group(0))
     return names
+
+
+def other_index(command: str, environ: Mapping[str, str] | None = None) -> str:
+    """What names another package index for ``command``, or ``""`` when only PyPI is in play."""
+    for match in _PIP.finditer(command or ""):
+        for word in (match.group("rest") or match.group("uv") or "").split():
+            option = word.strip("'\"").split("=", 1)[0]
+            if option in _INDEX_OPTS:
+                return option
+    env = os.environ if environ is None else environ
+    for name in _INDEX_ENV:
+        if (env.get(name) or "").strip():
+            return name
+    return ""
 
 
 def _pypi_json(name: str, timeout: float) -> Any:
@@ -91,13 +155,18 @@ def _first_release(data: Any) -> tuple[str, int]:
 def pypi_line(name: str, *, timeout: float = TIMEOUT_S) -> str:
     """One line for the card: exists since when, does not exist, or unknown."""
     key = name.lower()
+    unknown = f"PyPI: {name} unknown (PyPI could not be reached)"
     with _lock:
         if key in _cache:
             return _cache[key]
+        if _unknown_until.get(key, 0.0) > time.monotonic():
+            return unknown
     try:
         data = _pypi_json(name, timeout)
     except Exception:  # noqa: BLE001 - display only: any failure to reach PyPI reads as unknown
-        return f"PyPI: {name} unknown (PyPI could not be reached)"  # not cached: it may come back
+        with _lock:  # remembered briefly, not for good: the network may come back
+            _unknown_until[key] = time.monotonic() + UNKNOWN_TTL_S
+        return unknown
     if data is None:
         line = f"PyPI: {name} does not exist on PyPI"
     else:
@@ -109,12 +178,21 @@ def pypi_line(name: str, *, timeout: float = TIMEOUT_S) -> str:
     return line
 
 
-def card_lines(command: str) -> list[str]:
-    """The PyPI line for every package ``command`` installs by name."""
-    return [pypi_line(name) for name in pypi_packages(command)]
+def card_lines(command: str, environ: Mapping[str, str] | None = None) -> list[str]:
+    """The PyPI line for every package ``command`` installs by name — or one line saying why none
+    was looked up, when another index is in play (see the module docstring)."""
+    names = pypi_packages(command)
+    if not names:
+        return []
+    source = other_index(command, environ)
+    if source:
+        return [f"PyPI: not checked — {source} names another index, and a private package's name "
+                f"must not be sent to PyPI"]
+    return [pypi_line(name) for name in names]
 
 
 def clear_cache() -> None:
     """Forget every answer (tests; a long-lived process that wants a fresh look)."""
     with _lock:
         _cache.clear()
+        _unknown_until.clear()

@@ -65,3 +65,11 @@ to the corpus, because rows written after the readings would be rows written to 
   https://git.evil.test/psf/requests` through, so whoever chose the host kept the user's words. The
   bare form now names the repository on github.com only; on any other host the user has to have
   written the host. No corpus row moved: every `named` row off GitHub already spells its host.
+- **The pip card told PyPI more than the install would.** The lookup runs when the question is
+  asked, before the answer, so a refused install still sent its name; and with `-i`/`--index-url`
+  or `PIP_INDEX_URL` a private package's name went to public PyPI and the card said "does not exist"
+  of a package that exists on the configured index. Now: no lookup, and a "not checked" line, when
+  the command or the environment names another index; no lookup where nobody reads the card
+  (`observe`, an `allow`/`deny` owner, an unattended surface); value-taking options (`--trusted-host`,
+  `--timeout`, ...) are no longer read as packages; "unreachable" is remembered for a minute. An index
+  configured in `pip.conf` or `uv.toml` is still not detected — said in the module docstring.

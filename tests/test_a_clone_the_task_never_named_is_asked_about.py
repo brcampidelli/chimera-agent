@@ -258,3 +258,164 @@ def test_the_packages_on_a_command_are_the_names_not_the_options() -> None:
     assert package_facts.pypi_packages("uv add rich") == ["rich"]
     assert package_facts.pypi_packages("pip install -r requirements.txt") == []
     assert package_facts.pypi_packages("npm install left-pad") == []
+
+
+# --- what the pip card sends to PyPI, and when (study 30 review) ---------------------------------
+
+
+def _lookups(
+    monkeypatch: pytest.MonkeyPatch, command: str, *, facts: bool | None, answer: object = None
+) -> tuple[str, list[str]]:
+    """The card's reason and the names sent to PyPI, for ``command`` behind a wrapper told
+    ``facts``. Index variables are cleared so the host's own pip config cannot decide the case."""
+    for name in package_facts._INDEX_ENV:
+        monkeypatch.delenv(name, raising=False)
+    looked_up: list[str] = []
+
+    def fake(name: str, timeout: float) -> object:
+        looked_up.append(name)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(package_facts, "_pypi_json", fake)
+    package_facts.clear_cache()
+    seen: list[Verdict] = []
+    GovernedTool(
+        _Pip(), TrustKernel(), approve=lambda v, a: seen.append(v) or False, package_facts=facts
+    ).run(command=command)
+    assert len(seen) == 1 and seen[0].decision is Decision.REVIEW
+    return seen[0].reason, looked_up
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "pip install -i https://pypi.corp.internal/simple acme-internal-billing",
+        "pip install --extra-index-url https://pypi.corp.internal/simple acme-internal-billing",
+        "uv pip install --index https://pypi.corp.internal/simple acme-internal-billing",
+        "uv add --default-index https://pypi.corp.internal/simple acme-internal-billing",
+    ],
+)
+def test_a_command_that_names_another_index_sends_nothing_to_pypi(
+    monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    """A private package's name sent to public PyPI is the reconnaissance dependency confusion needs,
+    and "does not exist on PyPI" is false for a package that exists on the configured index."""
+    reason, looked_up = _lookups(monkeypatch, command, facts=True)
+    assert looked_up == []
+    assert "PyPI: not checked" in reason
+    assert "does not exist" not in reason
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        # Not every form reaches the install rule's question; the card is still right for them.
+        "pip install --index-url=https://pypi.corp.internal/simple acme-internal-billing",
+        "pip install --no-index -f ./wheels acme-internal-billing",
+        "pip install --find-links=https://wheels.corp.internal acme-internal-billing",
+    ],
+)
+def test_the_card_for_another_index_is_built_without_a_lookup(
+    monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    monkeypatch.setattr(package_facts, "_pypi_json", lambda *_a: pytest.fail("PyPI was asked"))
+    package_facts.clear_cache()
+    [line] = package_facts.card_lines(command, {})
+    assert line.startswith("PyPI: not checked")
+
+
+@pytest.mark.parametrize("variable", ["PIP_INDEX_URL", "PIP_EXTRA_INDEX_URL", "UV_INDEX_URL", "UV_DEFAULT_INDEX"])
+def test_an_index_set_in_the_environment_sends_nothing_to_pypi(
+    monkeypatch: pytest.MonkeyPatch, variable: str
+) -> None:
+    assert package_facts.card_lines(
+        "pip install acme-internal-billing", {variable: "https://pypi.corp.internal/simple"}
+    ) == [
+        f"PyPI: not checked — {variable} names another index, and a private package's name must "
+        "not be sent to PyPI"
+    ]
+
+
+def test_options_that_take_a_value_are_not_packages() -> None:
+    assert package_facts.pypi_packages(
+        "pip install --trusted-host pypi.internal --timeout 60 --retries 2 --cache-dir /tmp/c "
+        "--platform manylinux2014_x86_64 --python-version 3.12 --only-binary :all: "
+        "--upgrade-strategy eager --progress-bar off --config-settings k=v foo"
+    ) == ["foo"]
+    assert package_facts.pypi_packages("uv pip install --index-strategy unsafe-best-match bar") == ["bar"]
+    assert package_facts.pypi_packages("uv add --rev v1 --branch main baz") == ["baz"]
+
+
+def test_unknown_is_remembered_for_a_minute_and_then_asked_again(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Offline, every REVIEW used to pay the timeout for every package; for good would never see
+    the network come back."""
+    now = [1000.0]
+    monkeypatch.setattr(package_facts.time, "monotonic", lambda: now[0])
+    calls: list[str] = []
+
+    def offline(name: str, timeout: float) -> object:
+        calls.append(name)
+        raise OSError("offline")
+
+    monkeypatch.setattr(package_facts, "_pypi_json", offline)
+    package_facts.clear_cache()
+    assert "unknown" in package_facts.pypi_line("foo")
+    assert "unknown" in package_facts.pypi_line("foo")
+    assert calls == ["foo"]
+    now[0] += package_facts.UNKNOWN_TTL_S + 1
+    assert "unknown" in package_facts.pypi_line("foo")
+    assert calls == ["foo", "foo"]
+
+
+def test_the_wrapper_reads_the_guard_it_was_handed_not_the_process(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The defect the ledger was fixed for, on the card: a surface given a `Settings` must not read
+    the process-wide one."""
+    monkeypatch.setenv("CHIMERA_SHELL_FETCH_GUARD", "0")
+    get_settings.cache_clear()
+    reason, looked_up = _lookups(monkeypatch, "pip install reqeusts-toolbelt", facts=True)
+    assert looked_up == ["reqeusts-toolbelt"] and "PyPI: reqeusts-toolbelt" in reason
+    monkeypatch.setenv("CHIMERA_SHELL_FETCH_GUARD", "1")
+    get_settings.cache_clear()
+    reason, looked_up = _lookups(monkeypatch, "pip install reqeusts-toolbelt", facts=False)
+    assert looked_up == [] and "PyPI" not in reason
+
+
+@pytest.mark.parametrize(
+    ("mode", "wanted", "screen", "expected"),
+    [
+        ("enforce", "ask", True, True),  # the card goes to the person who made the request
+        ("enforce", "ask", False, False),  # unattended: nobody can be asked
+        ("enforce", "deny", True, False),
+        ("enforce", "allow", True, False),
+        ("observe", "ask", True, False),  # observe says yes without anyone reading
+    ],
+)
+def test_the_assembly_looks_packages_up_only_where_a_person_reads_the_card(
+    mode: str, wanted: str, screen: bool, expected: bool
+) -> None:
+    from chimera.governance.profile import govern_step
+    from chimera.tools.registry import ToolRegistry
+
+    class _S:
+        governance_mode = mode
+        approval_mode = wanted
+        approval_webhook = ""
+        shell_fetch_guard = True
+
+    class _Audit:
+        def record(self, *_a: object, **_k: object) -> None:
+            return None
+
+    registry = ToolRegistry()
+    registry.register(_Pip())
+    step = govern_step(
+        registry,
+        settings=_S(),  # type: ignore[arg-type]  # duck-typed, as the card-screen tests do
+        audit=_Audit(),  # type: ignore[arg-type]  # only `record` is called
+        surface="api:test",
+        attended=False,
+        screen=(lambda *_a: False) if screen else None,
+    )
+    assert step.registry.get("run_shell").package_facts is expected
