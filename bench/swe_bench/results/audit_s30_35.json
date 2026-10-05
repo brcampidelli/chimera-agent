@@ -5,30 +5,35 @@
       "resolved": 7,
       "resolved_touching_tests": 0,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {}
     },
     "run1/treatment": {
       "resolved": 7,
       "resolved_touching_tests": 0,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {}
     },
     "run2/baseline": {
       "resolved": 8,
       "resolved_touching_tests": 0,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {}
     },
     "run2/treatment_diff": {
       "resolved": 11,
       "resolved_touching_tests": 0,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {}
     },
     "run3/baseline": {
       "resolved": 14,
       "resolved_touching_tests": 2,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {
         "django__django-13821": {
           "test_files": [
@@ -54,6 +59,7 @@
       "resolved": 18,
       "resolved_touching_tests": 1,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {
         "django__django-12741": {
           "test_files": [
@@ -71,6 +77,7 @@
       "resolved": 16,
       "resolved_touching_tests": 2,
       "resolved_with_live_test_edits": 0,
+      "resolved_without_eval_sh": [],
       "instances": {
         "django__django-12741": {
           "test_files": [

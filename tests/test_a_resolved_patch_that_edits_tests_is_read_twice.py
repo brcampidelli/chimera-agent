@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -206,3 +207,107 @@ def test_the_test_editing_resolutions_the_critic_listed_are_the_ones_found():
         ("run4/treatment", "django__django-12741"),
         ("run4/treatment", "django__django-14373"),
     }
+
+
+def test_a_header_written_with_crlf_is_still_read():
+    """A Windows-written patch ends `diff --git` in CRLF; unread, its test edit would pass as clean."""
+    audit = _audit()
+    crlf = _patch("django/a.py", "tests/x/test_y.py").replace("\n", "\r\n")
+    assert audit.edited_files(crlf) == ["django/a.py", "tests/x/test_y.py"]
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        # git C-quotes a non-ASCII path; the regex for bare paths cannot read it.
+        r'diff --git "a/tests/t\303\251.py" "b/tests/t\303\251.py"' + "\n",
+        "diff --git a/tests/my test.py b/tests/my test.py\n",
+    ],
+)
+def test_a_diff_header_that_cannot_be_parsed_refuses_rather_than_reading_clean(header: str):
+    audit = _audit()
+    with pytest.raises(ValueError, match="could not be parsed"):
+        audit.edited_files(_patch("django/a.py") + header)
+
+
+def test_an_arm_with_an_unparseable_patch_aborts_naming_the_instance(tmp_path: Path):
+    audit = _audit()
+    quoted = r'diff --git "a/tests/t\303\251.py" "b/tests/t\303\251.py"' + "\n"
+    _fake_run(tmp_path, "r", "t", ["a"], {"a": quoted})
+    with pytest.raises(SystemExit, match="r/t a: .*cannot be audited"):
+        audit.audit_arm(
+            audit.Arm("r/t", "r", "predictions_t.jsonl", "report_t.json", "logs/t"), tmp_path
+        )
+
+
+def test_a_resolved_instance_without_an_eval_sh_is_listed_not_buried(tmp_path: Path):
+    """Amendment 6: a missing `eval.sh` is reported as such — for every resolved instance."""
+    audit = _audit()
+    _fake_run(
+        tmp_path,
+        "r",
+        "t",
+        ["a", "b", "c"],
+        {"a": _patch("tests/q/test_x.py"), "b": _patch("django/y.py"), "c": "", "d": ""},
+    )
+    logs = tmp_path / "r" / "logs" / "t" / "model" / "c"
+    logs.mkdir(parents=True)
+    # A log whose script has no checkout line is "unknown reset", NOT "no eval.sh".
+    (logs / "eval.sh").write_text("git status\n", encoding="utf-8")
+
+    got = audit.summarize_arm(
+        audit.audit_arm(
+            audit.Arm("r/t", "r", "predictions_t.jsonl", "report_t.json", "logs/t"), tmp_path
+        )
+    )
+
+    # "d" has no eval.sh either but was not resolved, so it cannot have passed for any reason.
+    assert got["resolved_without_eval_sh"] == ["a", "b"]
+    assert got["instances"]["a"]["reset_by_harness"] is None
+
+
+def test_two_arms_over_different_instances_are_never_paired():
+    """zip() over two sorted, different id sets would pair strangers and print a plausible Δ."""
+    audit = _audit()
+    left = {"x": audit.InstanceAudit("x", True), "y": audit.InstanceAudit("y", False)}
+    right = {"x": audit.InstanceAudit("x", True), "z": audit.InstanceAudit("z", True)}
+    with pytest.raises(SystemExit, match="cannot be paired"):
+        audit.compare({"b": left, "t": right}, ["b"], ["t"], "as_graded")
+
+
+def _pct(cell: str) -> float:
+    return round(float(cell.replace("−", "-").strip("*% ")) / 100, 3)
+
+
+def test_the_control_constants_are_the_table_results_md_publishes():
+    """PUBLISHED is a hand copy; the control is only a control if the copy IS the page.
+
+    Read from the page itself: the five table rows, and run 4's gate-vs-scaffold line, which RESULTS.md
+    prints in the run-4 block rather than in the table.
+    """
+    audit = _audit()
+    text = (_AUDIT.parent / "RESULTS.md").read_text(encoding="utf-8")
+    table_label = {
+        "run 1": "1 (",
+        "run 2": "2 (",
+        "run 3": "3 (replication)",
+        "pooled": "pooled (secondary)",
+        "run 4 scaffold vs baseline": "4 (attribution)",
+    }
+    rows = [
+        [c.strip() for c in line.strip().strip("|").split("|")]
+        for line in text.splitlines()[:20]
+        if line.startswith("| ") and "%" in line
+    ]
+    page: dict[str, tuple[float, tuple[float, float]]] = {}
+    for label, prefix in table_label.items():
+        row = next(r for r in rows if r[0].strip("*").startswith(prefix))
+        lo, hi = row[5].strip("*[] ").split(",")
+        page[label] = (_pct(row[4]), (_pct(lo), _pct(hi)))
+    gate = re.search(
+        r"gate\s+vs scaffold :\s+([+-]\d+\.\d)%\s+95% CI \[([+-]?\d+\.\d)%, ([+-]?\d+\.\d)%\]", text
+    )
+    assert gate is not None, "RESULTS.md no longer prints run 4's gate-vs-scaffold line"
+    page["run 4 gate vs scaffold"] = (_pct(gate[1]), (_pct(gate[2]), _pct(gate[3])))
+
+    assert page == {label: (delta, ci) for label, (_, _, delta, ci) in audit.PUBLISHED.items()}

@@ -36,7 +36,10 @@ from chimera.eval.paired import PairedResult, compare_paired  # noqa: E402
 RESULTS = Path(__file__).resolve().parent / "results"
 OUT = RESULTS / "audit_s30_35.json"
 
-_DIFF_HEADER = re.compile(r"^diff --git a/(\S+) b/(\S+)$", re.MULTILINE)
+# `\r?` because a patch written on Windows ends its headers in CRLF; without it the header is not
+# matched at all and the test edit vanishes on the NON-conservative side (read as "touches no test").
+_DIFF_HEADER = re.compile(r"^diff --git a/(\S+) b/(\S+)\r?$", re.MULTILINE)
+_ANY_HEADER = re.compile(r"^diff --git ", re.MULTILINE)
 _TEST_NAME = re.compile(r"^(test_.*|.*_tests?|tests)\.py$")
 
 
@@ -132,9 +135,17 @@ def edited_files(patch: str) -> list[str]:
     """Every path a unified git diff touches, old and new side, in order, without duplicates.
 
     Both sides count: a rename OUT of a test file and a rename INTO one both edit tests.
+
+    Raises ValueError when a `diff --git` header is not parsed — a path git quoted (non-ASCII), a path
+    with a space. A header that is silently skipped is a file read as "not a test", which turns a
+    possible test edit into a pass; refusing is the only safe answer the parser can give.
     """
+    headers = _DIFF_HEADER.findall(patch)
+    total = len(_ANY_HEADER.findall(patch))
+    if total != len(headers):
+        raise ValueError(f"{total - len(headers)} of {total} diff headers could not be parsed")
     seen: dict[str, None] = {}
-    for old, new in _DIFF_HEADER.findall(patch):
+    for old, new in headers:
         seen.setdefault(old)
         seen.setdefault(new)
     return list(seen)
@@ -170,6 +181,7 @@ class InstanceAudit:
     resolved: bool
     test_files: list[str] = field(default_factory=list)
     reset: set[str] | None = None
+    has_eval_sh: bool = True
 
     @property
     def touches_tests(self) -> bool:
@@ -193,10 +205,14 @@ def audit_arm(arm: Arm, root: Path = RESULTS) -> dict[str, InstanceAudit]:
             continue
         pred = json.loads(line)
         iid = pred["instance_id"]
-        tests = [p for p in edited_files(pred.get("model_patch") or "") if is_test_path(p)]
+        try:
+            files = edited_files(pred.get("model_patch") or "")
+        except ValueError as exc:
+            raise SystemExit(f"{arm.key} {iid}: {exc}; the patch cannot be audited") from exc
+        tests = [p for p in files if is_test_path(p)]
         eval_sh = next((run_dir / arm.logs).glob(f"*/{iid}/eval.sh"), None)
         reset = reset_files(eval_sh.read_text(encoding="utf-8")) if eval_sh else None
-        out[iid] = InstanceAudit(iid, iid in resolved, tests, reset)
+        out[iid] = InstanceAudit(iid, iid in resolved, tests, reset, eval_sh is not None)
     unknown = resolved - set(out)
     if unknown:
         raise SystemExit(
@@ -250,6 +266,32 @@ def check_control(audited: Mapping[str, Mapping[str, InstanceAudit]]) -> list[st
     return failures
 
 
+def summarize_arm(audits: Mapping[str, InstanceAudit]) -> dict[str, object]:
+    """One arm's counts for the report.
+
+    `resolved_without_eval_sh` is listed for EVERY resolved instance, not only the test-touching ones:
+    Amendment 6 promises that a missing `eval.sh` is reported, and a `reset_by_harness: null` buried in
+    the per-instance block cannot tell "no log" from "a log with no checkout line".
+    """
+    touching = {i: a for i, a in audits.items() if a.resolved and a.touches_tests}
+    return {
+        "resolved": sum(a.resolved for a in audits.values()),
+        "resolved_touching_tests": len(touching),
+        "resolved_with_live_test_edits": sum(bool(a.live_test_edits) for a in touching.values()),
+        "resolved_without_eval_sh": sorted(
+            i for i, a in audits.items() if a.resolved and not a.has_eval_sh
+        ),
+        "instances": {
+            i: {
+                "test_files": a.test_files,
+                "reset_by_harness": sorted(a.reset) if a.reset is not None else None,
+                "live_test_edits": a.live_test_edits,
+            }
+            for i, a in sorted(touching.items())
+        },
+    }
+
+
 def main() -> int:
     audited = {key: audit_arm(arm) for key, arm in ARMS.items()}
     failures = check_control(audited)
@@ -261,24 +303,7 @@ def main() -> int:
             print("  " + f)
         return 1
 
-    arms_out = {}
-    for key, audits in audited.items():
-        touching = {i: a for i, a in audits.items() if a.resolved and a.touches_tests}
-        arms_out[key] = {
-            "resolved": sum(a.resolved for a in audits.values()),
-            "resolved_touching_tests": len(touching),
-            "resolved_with_live_test_edits": sum(
-                bool(a.live_test_edits) for a in touching.values()
-            ),
-            "instances": {
-                i: {
-                    "test_files": a.test_files,
-                    "reset_by_harness": sorted(a.reset) if a.reset is not None else None,
-                    "live_test_edits": a.live_test_edits,
-                }
-                for i, a in sorted(touching.items())
-            },
-        }
+    arms_out = {key: summarize_arm(audits) for key, audits in audited.items()}
     paired = {
         reading: {
             label: compare(audited, b, t, reading) for label, (b, t, _, _) in PUBLISHED.items()
@@ -304,6 +329,7 @@ def main() -> int:
         print(
             f"{key:22} resolved {a['resolved']:2}  touching tests {a['resolved_touching_tests']}"
             f"  live test edits {a['resolved_with_live_test_edits']}"
+            f"  resolved without eval.sh {sum(x.resolved and not x.has_eval_sh for x in audited[key].values())}"
         )
     for reading, results in paired.items():
         print(f"\n[{reading}]")
