@@ -28,6 +28,43 @@ n=60 is, and it was pre-registered as **secondary** precisely because it mixes s
 > reported to differ by 2.2-6.0 points (arXiv 2602.07150). Each row here is one run per arm, so a
 > difference of that size between rows is inside what a re-run alone could produce.
 
+## Audit: does the lift rest on patches that edited tests? (study 30, S30-35)
+
+Registered as [Amendment 6](PREREGISTRATION.md) before the script existed; computed by
+[`audit.py`](audit.py) from the predictions, the harness reports and the harness's own `eval.sh` logs
+already in `results/`, written to `results/audit_s30_35.json`. No model call, US$ 0. The script first
+reproduces every Δ and CI in the table above from the raw reports, and refuses to read anything if one
+does not reproduce; all six did.
+
+**Five resolved patches also edit test files**, none in runs 1 and 2: run 3 baseline django-13821 and
+django-14373, run 3 scaffold+gate django-12741, run 4 scaffold django-12741 and django-14373. Every one
+of those edits is to a file the harness checks out from the base commit before applying the official
+test patch, so all five were overwritten before grading and could not have produced the pass.
+
+```
+reading         run 3 delta    95% CI              pooled delta   95% CI
+as graded       +9.8%          [-3.5%, +16.7%]     +11.7%         [+0.8%, +16.4%]  significant
+strict          +12.2%         [-0.4%, +16.2%]     +13.3%         [+3.2%, +16.1%]  significant
+harness-aware   +9.8%          [-3.5%, +16.7%]     +11.7%         [+0.8%, +16.4%]  significant
+```
+
+*Strict* counts every resolved patch that touches a test as a failure; *harness-aware* counts only test
+edits the harness did not overwrite (there are none, so it equals the table). Under strict, run 4's
+scaffold-vs-baseline stays at +4.9% and gate-vs-scaffold rises to +7.3%. **No sign flips and nothing
+published as significant stops being so** — the pre-committed reading is that the lift does not rest
+on test-editing patches. Both registered predictions held: strict moved run 3 by exactly one
+discordant pair (+2.4 pp), and the harness-aware reading moved less (not at all). It moved *up*
+because two of the three test-editing resolutions in run 3 were the baseline's.
+
+**Owed, not estimated.** This audit cannot see a patch that passes the official tests while being
+wrong — the weakness SWE-ABS (arXiv 2603.00520) and PatchDiff (arXiv 2503.15223) measure. The three
+dynamic gradings registered in Amendment 6 — a re-grade under the official harness, the full django
+developer suite of each touched module, and the SWE-ABS strengthened tests — need per-instance Docker
+images and, for the last, the SWE-ABS test release. On the machine that ran this audit the `swebench`
+harness is not installed, the Docker engine was not running, no full-suite runner exists yet, and the
+SWE-ABS tests are not on disk, so they were not run; they are a separate run, with each image deleted
+after its instance is graded (the 2026-09-26 disk incident). **Until they are, the lift has not been read under stronger tests.**
+
 ---
 
 ## Run 3: the out-of-sample replication

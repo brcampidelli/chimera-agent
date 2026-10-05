@@ -1,0 +1,381 @@
+{
+  "registration": "bench/swe_bench/PREREGISTRATION.md, Amendment 6",
+  "arms": {
+    "run1/baseline": {
+      "resolved": 7,
+      "resolved_touching_tests": 0,
+      "resolved_with_live_test_edits": 0,
+      "instances": {}
+    },
+    "run1/treatment": {
+      "resolved": 7,
+      "resolved_touching_tests": 0,
+      "resolved_with_live_test_edits": 0,
+      "instances": {}
+    },
+    "run2/baseline": {
+      "resolved": 8,
+      "resolved_touching_tests": 0,
+      "resolved_with_live_test_edits": 0,
+      "instances": {}
+    },
+    "run2/treatment_diff": {
+      "resolved": 11,
+      "resolved_touching_tests": 0,
+      "resolved_with_live_test_edits": 0,
+      "instances": {}
+    },
+    "run3/baseline": {
+      "resolved": 14,
+      "resolved_touching_tests": 2,
+      "resolved_with_live_test_edits": 0,
+      "instances": {
+        "django__django-13821": {
+          "test_files": [
+            "tests/backends/sqlite/tests.py"
+          ],
+          "reset_by_harness": [
+            "tests/backends/sqlite/tests.py"
+          ],
+          "live_test_edits": []
+        },
+        "django__django-14373": {
+          "test_files": [
+            "tests/utils_tests/test_dateformat.py"
+          ],
+          "reset_by_harness": [
+            "tests/utils_tests/test_dateformat.py"
+          ],
+          "live_test_edits": []
+        }
+      }
+    },
+    "run3/treatment_diff": {
+      "resolved": 18,
+      "resolved_touching_tests": 1,
+      "resolved_with_live_test_edits": 0,
+      "instances": {
+        "django__django-12741": {
+          "test_files": [
+            "tests/backends/base/test_operations.py"
+          ],
+          "reset_by_harness": [
+            "tests/backends/base/test_operations.py",
+            "tests/backends/tests.py"
+          ],
+          "live_test_edits": []
+        }
+      }
+    },
+    "run4/treatment": {
+      "resolved": 16,
+      "resolved_touching_tests": 2,
+      "resolved_with_live_test_edits": 0,
+      "instances": {
+        "django__django-12741": {
+          "test_files": [
+            "tests/backends/base/test_operations.py",
+            "tests/backends/tests.py"
+          ],
+          "reset_by_harness": [
+            "tests/backends/base/test_operations.py",
+            "tests/backends/tests.py"
+          ],
+          "live_test_edits": []
+        },
+        "django__django-14373": {
+          "test_files": [
+            "tests/utils_tests/test_dateformat.py"
+          ],
+          "reset_by_harness": [
+            "tests/utils_tests/test_dateformat.py"
+          ],
+          "live_test_edits": []
+        }
+      }
+    }
+  },
+  "readings": {
+    "as_graded": {
+      "run 1": {
+        "n": 19,
+        "baseline_rate": 0.3684,
+        "treatment_rate": 0.3684,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 1,
+          "treatment_only": 1
+        },
+        "diff_ci": [
+          -0.0854,
+          0.0854
+        ],
+        "significant": false
+      },
+      "run 2": {
+        "n": 19,
+        "baseline_rate": 0.4211,
+        "treatment_rate": 0.5789,
+        "delta": 0.1579,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 3
+        },
+        "diff_ci": [
+          -0.0194,
+          0.1579
+        ],
+        "significant": false
+      },
+      "run 3": {
+        "n": 41,
+        "baseline_rate": 0.3415,
+        "treatment_rate": 0.439,
+        "delta": 0.0976,
+        "discordant": {
+          "baseline_only": 2,
+          "treatment_only": 6
+        },
+        "diff_ci": [
+          -0.0354,
+          0.1672
+        ],
+        "significant": false
+      },
+      "pooled": {
+        "n": 60,
+        "baseline_rate": 0.3667,
+        "treatment_rate": 0.4833,
+        "delta": 0.1167,
+        "discordant": {
+          "baseline_only": 2,
+          "treatment_only": 9
+        },
+        "diff_ci": [
+          0.0084,
+          0.1645
+        ],
+        "significant": true
+      },
+      "run 4 scaffold vs baseline": {
+        "n": 41,
+        "baseline_rate": 0.3415,
+        "treatment_rate": 0.3902,
+        "delta": 0.0488,
+        "discordant": {
+          "baseline_only": 3,
+          "treatment_only": 5
+        },
+        "diff_ci": [
+          -0.0758,
+          0.1417
+        ],
+        "significant": false
+      },
+      "run 4 gate vs scaffold": {
+        "n": 41,
+        "baseline_rate": 0.3902,
+        "treatment_rate": 0.439,
+        "delta": 0.0488,
+        "discordant": {
+          "baseline_only": 3,
+          "treatment_only": 5
+        },
+        "diff_ci": [
+          -0.0758,
+          0.1417
+        ],
+        "significant": false
+      }
+    },
+    "strict": {
+      "run 1": {
+        "n": 19,
+        "baseline_rate": 0.3684,
+        "treatment_rate": 0.3684,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 1,
+          "treatment_only": 1
+        },
+        "diff_ci": [
+          -0.0854,
+          0.0854
+        ],
+        "significant": false
+      },
+      "run 2": {
+        "n": 19,
+        "baseline_rate": 0.4211,
+        "treatment_rate": 0.5789,
+        "delta": 0.1579,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 3
+        },
+        "diff_ci": [
+          -0.0194,
+          0.1579
+        ],
+        "significant": false
+      },
+      "run 3": {
+        "n": 41,
+        "baseline_rate": 0.2927,
+        "treatment_rate": 0.4146,
+        "delta": 0.122,
+        "discordant": {
+          "baseline_only": 1,
+          "treatment_only": 6
+        },
+        "diff_ci": [
+          -0.0045,
+          0.162
+        ],
+        "significant": false
+      },
+      "pooled": {
+        "n": 60,
+        "baseline_rate": 0.3333,
+        "treatment_rate": 0.4667,
+        "delta": 0.1333,
+        "discordant": {
+          "baseline_only": 1,
+          "treatment_only": 9
+        },
+        "diff_ci": [
+          0.0319,
+          0.1607
+        ],
+        "significant": true
+      },
+      "run 4 scaffold vs baseline": {
+        "n": 41,
+        "baseline_rate": 0.2927,
+        "treatment_rate": 0.3415,
+        "delta": 0.0488,
+        "discordant": {
+          "baseline_only": 2,
+          "treatment_only": 4
+        },
+        "diff_ci": [
+          -0.0585,
+          0.118
+        ],
+        "significant": false
+      },
+      "run 4 gate vs scaffold": {
+        "n": 41,
+        "baseline_rate": 0.3415,
+        "treatment_rate": 0.4146,
+        "delta": 0.0732,
+        "discordant": {
+          "baseline_only": 3,
+          "treatment_only": 6
+        },
+        "diff_ci": [
+          -0.064,
+          0.1666
+        ],
+        "significant": false
+      }
+    },
+    "harness_aware": {
+      "run 1": {
+        "n": 19,
+        "baseline_rate": 0.3684,
+        "treatment_rate": 0.3684,
+        "delta": 0.0,
+        "discordant": {
+          "baseline_only": 1,
+          "treatment_only": 1
+        },
+        "diff_ci": [
+          -0.0854,
+          0.0854
+        ],
+        "significant": false
+      },
+      "run 2": {
+        "n": 19,
+        "baseline_rate": 0.4211,
+        "treatment_rate": 0.5789,
+        "delta": 0.1579,
+        "discordant": {
+          "baseline_only": 0,
+          "treatment_only": 3
+        },
+        "diff_ci": [
+          -0.0194,
+          0.1579
+        ],
+        "significant": false
+      },
+      "run 3": {
+        "n": 41,
+        "baseline_rate": 0.3415,
+        "treatment_rate": 0.439,
+        "delta": 0.0976,
+        "discordant": {
+          "baseline_only": 2,
+          "treatment_only": 6
+        },
+        "diff_ci": [
+          -0.0354,
+          0.1672
+        ],
+        "significant": false
+      },
+      "pooled": {
+        "n": 60,
+        "baseline_rate": 0.3667,
+        "treatment_rate": 0.4833,
+        "delta": 0.1167,
+        "discordant": {
+          "baseline_only": 2,
+          "treatment_only": 9
+        },
+        "diff_ci": [
+          0.0084,
+          0.1645
+        ],
+        "significant": true
+      },
+      "run 4 scaffold vs baseline": {
+        "n": 41,
+        "baseline_rate": 0.3415,
+        "treatment_rate": 0.3902,
+        "delta": 0.0488,
+        "discordant": {
+          "baseline_only": 3,
+          "treatment_only": 5
+        },
+        "diff_ci": [
+          -0.0758,
+          0.1417
+        ],
+        "significant": false
+      },
+      "run 4 gate vs scaffold": {
+        "n": 41,
+        "baseline_rate": 0.3902,
+        "treatment_rate": 0.439,
+        "delta": 0.0488,
+        "discordant": {
+          "baseline_only": 3,
+          "treatment_only": 5
+        },
+        "diff_ci": [
+          -0.0758,
+          0.1417
+        ],
+        "significant": false
+      }
+    }
+  },
+  "owed": [
+    "official re-grade",
+    "full developer suites",
+    "SWE-ABS strengthened tests"
+  ]
+}
