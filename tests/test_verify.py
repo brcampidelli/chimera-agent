@@ -736,6 +736,22 @@ def test_an_unquoted_backslash_path_is_one_token_under_the_real_lexer(
     assert program_missing("a\\b --flag", tmp_path) is False
 
 
+@pytest.mark.skipif(os.name == "nt", reason="a backslash is a path separator on Windows")
+def test_the_lexer_keeps_a_backslash_on_the_real_platform(tmp_path: Path) -> None:
+    """The same property as the test above, with no stand-in for `os`.
+
+    `./a\\b` is an explicit path on POSIX (it has a `/`), naming a file whose name contains a
+    backslash. Under `posix=False` the token survives whole and the file is found; under the
+    posix lexer (`posix=True`, or the keyword left out — its default) the backslash is eaten, the
+    token becomes `./ab`, and a present program reads as missing. The CI mutation run of
+    2026-10-06 let both of those mutants live while a local run killed them through the test
+    above; this one asks the question without patching the module, so its verdict cannot depend
+    on how a stand-in interacts with the runner."""
+    (tmp_path / "a\\b").write_text("#", encoding="utf-8")
+    assert program_missing("./a\\b --flag", tmp_path) is False
+    assert program_missing("./ab --flag", tmp_path) is True  # the name the posix lexer would build
+
+
 def test_module_missing_with_a_quoted_module_name() -> None:
     """`python -m "pytest"`: the quotes come off the module name before it is matched against the
     interpreter's message."""
