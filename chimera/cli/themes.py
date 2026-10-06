@@ -80,7 +80,7 @@ THEMES: tuple[Theme, ...] = (
         ),
     ),
     Theme("cli.themeFusion", ("fuse", "fusion-receipts", "orchestrate", "brief", "delegations")),
-    Theme("cli.themeMemory", ("memory", "profile", "playbook", "skills", "tools")),
+    Theme("cli.themeMemory", ("memory", "profile", "playbook", "lessons", "skills", "tools")),
     Theme(
         "cli.themeSkills",
         (
