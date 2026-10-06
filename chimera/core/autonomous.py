@@ -392,7 +392,9 @@ class Attempt:
     #: legitimate work edits tests and the false-positive rate of a pause has not been measured
     #: (`bench/verifier_integrity`). Empty when nothing was flagged OR there was no guard to
     #: snapshot with — the two are told apart by ``diff_summary``, which is None exactly when no
-    #: snapshot was taken; a row written before the field reads as "not checked".
+    #: snapshot was taken; a row written before the field reads as "not checked". Measured on the
+    #: workspace as the worker left it, BEFORE the verifier ran — the same moment as the Code tab's
+    #: ``integrity_flags`` — so files the verifier writes are not the attempt's.
     integrity_flags: list[str] = field(default_factory=list)
     #: The class this failure was given before it was fed back — ``failing_test``, ``tool_skip``,
     #: ``reverted``… (see :mod:`chimera.core.failure_class`) — as the enum's value, because this
@@ -1068,6 +1070,11 @@ class AutonomousAgent:
             # failing attempt. Otherwise the Manager's approval is the gate. This
             # stops a strict reviewer from vetoing — and reverting — verified-correct
             # work just because it judged the narration rather than the artifact.
+            # The workspace as the WORKER left it, before the verifier can write to it: the
+            # integrity flags are "did this attempt change its instrument", and a verifier that
+            # writes (`jest` outside `--ci` adds `__tests__/__snapshots__/*.snap`) would otherwise
+            # put `tests_touched` on the attempt. Same moment the Code tab measures at.
+            before_verify = self.guard.snapshot() if snapshot is not None and self.guard else None
             verified, vout, abstained = self._verify(snapshot)
             # A verifier that ABSTAINED (e.g. spec-test generation produced no tests) is NOT
             # authoritative — treat this attempt as if there were no verifier, so the Manager review
@@ -1114,14 +1121,17 @@ class AutonomousAgent:
                 from chimera.governance.diff_rules import flag_snapshots
 
                 diff_flags = [f.render() for f in flag_snapshots(snapshot.files, after.files)]
-                # Same snapshots, one more record-only rule: did this attempt change the
-                # instrument that just judged it? Never a pause (see `verifier_integrity`).
+                # One more record-only rule: did this attempt change the instrument that just
+                # judged it? Never a pause (see `verifier_integrity`). Read on the tree BEFORE the
+                # verifier ran (`before_verify`), not `after`: what the verifier wrote is not the
+                # attempt's work.
                 from chimera.governance.verifier_integrity import flag_snapshots as integrity_of
 
+                measured = before_verify if before_verify is not None else after
                 integrity_flags = [
                     f.render()
                     for f in integrity_of(
-                        snapshot.files, after.files,
+                        snapshot.files, measured.files,
                         verify_command=_verify_command_of(self.verifier),
                     )
                 ]
