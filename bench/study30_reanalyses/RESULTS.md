@@ -66,7 +66,8 @@ separates perfectly (commit `486a890a`); it would otherwise fit a step to ~0 and
 Only `bench/hierarchy_equal_calls/results/*.jsonl` stores per-run rows (784 over five files). Every row
 of the four registered arms makes exactly the designed number of calls (0 off design), and every
 `hierarchy_no_synth` answer carries one `### <task>-<i>` section per document (151 rows, 0 missing).
-The unregistered arm `hierarchy_verbatim` (150 rows) also makes docs + 1 calls in every row. That is
+The unregistered arm `hierarchy_verbatim` (150 rows) also makes docs + 1 calls in every row — counted
+post hoc, outside the registered rule, and stored under `unregistered_arms` in `reanalyses.json`. That is
 adherence **by construction**: the harness fans out one worker per document, and no model declares a
 plan, so the paper's question — whether a manager does what it said it would delegate — cannot be asked
 of these rows. A run that asks it must log the manager's declared plan next to the calls that ran.

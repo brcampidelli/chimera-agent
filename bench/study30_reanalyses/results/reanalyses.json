@@ -2820,10 +2820,19 @@
   ],
   "no_synth_missing_a_section": 0,
   "no_synth_rows": 151,
+  "registered_rows": 634,
   "rows": 784,
   "unknown_arms": [
    "hierarchy_verbatim"
-  ]
+  ],
+  "unregistered_arms": {
+   "hierarchy_verbatim": {
+    "calls_off_docs_plus_extra": 0,
+    "extra_calls": 1,
+    "post_hoc": true,
+    "rows": 150
+   }
+  }
  },
  "4_citations": {
   "A": {

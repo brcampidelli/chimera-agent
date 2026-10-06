@@ -30,6 +30,11 @@ VC_ACCEPT_P = 0.8
 EXTRA_CALLS = {"hierarchy_no_synth": 0, "hierarchy": 1, "single_equal": 1}
 """The registered design: one call per document plus this many; ``single_1`` makes one call in all."""
 
+UNREGISTERED_EXTRA_CALLS = {"hierarchy_verbatim": 1}
+"""Arms in the stored rows that the preregistration did not name. Counted against the same design
+(docs + this many) and reported apart, as post-hoc data: RESULTS.md and the bench addendum quote
+the count, so it has to come out of this script rather than from a hand check."""
+
 
 HIERARCHY_FILES = ("2026-09-11-3b-opus-synth.jsonl", "2026-09-11-3b.jsonl", "2026-09-11.jsonl",
                    "2026-09-12-3b-30.jsonl", "pilot.jsonl")
@@ -203,8 +208,16 @@ def delegation() -> dict[str, Any]:
         r for r in no_synth
         if len({m for m in re.findall(rf"^### {re.escape(r['task_id'])}-(\d+)", r["answer"], flags=re.M)}) != r["docs"]
     ]
+    unregistered = {
+        arm: {"rows": len(arm_rows),
+              "calls_off_docs_plus_extra": sum(r["calls"] != r["docs"] + extra for r in arm_rows),
+              "extra_calls": extra, "post_hoc": True}
+        for arm, extra in UNREGISTERED_EXTRA_CALLS.items()
+        for arm_rows in [[r for r in rows if r["arm"] == arm]]
+    }
     return {"files": [str(f.relative_to(BENCH.parent)).replace("\\", "/") for f in files], "rows": len(rows),
             "calls_off_design": len(off_design), "unknown_arms": unknown_arm,
+            "registered_rows": len(designed), "unregistered_arms": unregistered,
             "no_synth_rows": len(no_synth), "no_synth_missing_a_section": len(missing_sections)}
 
 

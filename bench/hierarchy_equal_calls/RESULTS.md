@@ -234,7 +234,8 @@ and three runs per task read the bias, not the coin.
 ## Addendum, 2026-10-05: delegation adherence (study 30, S30-38)
 
 Registered in `bench/study30_reanalyses/PREREGISTRATION.md`; details in
-`bench/study30_reanalyses/RESULTS.md` §3. All 784 stored rows make exactly the designed number of calls,
-and all 151 `hierarchy_no_synth` answers carry one section per document. That is adherence **by
+`bench/study30_reanalyses/RESULTS.md` §3. The 634 rows of the four registered arms make exactly the
+designed number of calls; the 150 rows of `hierarchy_verbatim`, an arm the preregistration did not name,
+also make docs + 1 in every row (counted post hoc, `unregistered_arms` in `reanalyses.json`). All 151 `hierarchy_no_synth` answers carry one section per document. That is adherence **by
 construction** — the harness fans out one worker per document and no model declares a plan — so these
 rows cannot say whether a manager delegates what it declared.

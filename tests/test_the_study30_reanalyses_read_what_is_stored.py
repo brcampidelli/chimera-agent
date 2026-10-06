@@ -124,3 +124,15 @@ def test_the_reanalysis_refuses_to_compute_on_a_changed_input(tmp_path: Path, mo
     monkeypatch.setattr(reanalyze, "BENCH", bench)
     with pytest.raises(SystemExit, match="pilot.jsonl"):
         reanalyze.build()
+
+
+@needs_results
+def test_every_published_delegation_count_comes_out_of_the_script_including_the_unregistered_arm() -> None:
+    # The bench addendum says all 784 rows make the designed number of calls; 150 of them belong to
+    # `hierarchy_verbatim`, which the preregistration never named. That half of the sentence used to
+    # rest on a hand check the JSON did not carry.
+    d = reanalyze.delegation()
+    verbatim = d["unregistered_arms"]["hierarchy_verbatim"]
+    assert verbatim == {"rows": 150, "calls_off_docs_plus_extra": 0, "extra_calls": 1, "post_hoc": True}
+    assert d["registered_rows"] + verbatim["rows"] == d["rows"] == 784
+    assert d["unknown_arms"] == ["hierarchy_verbatim"]
