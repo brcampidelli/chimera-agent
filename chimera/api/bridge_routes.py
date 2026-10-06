@@ -843,14 +843,17 @@ def scrub(value: Any, secrets: Iterable[str] = ()) -> Any:
     values and the common key shapes; and any exact ``secrets`` passed in — the bridge token — are
     masked wherever they appear.
     """
-    from chimera.core.redact import redact
+    from chimera.core import redact as redaction
 
     extra = sorted({s for s in secrets if s}, key=len, reverse=True)
 
     def text(s: str) -> str:
-        for secret in extra:
-            s = s.replace(secret, MASK)
-        return redact(s)
+        # The token is minted at runtime and is not in the environment, so `redact` does not know
+        # it: it gets the same net as a known secret here, encoded copies included. Masking it only
+        # verbatim let its base64 or hex through to the MCP client (study 30 review).
+        if extra:
+            s = redaction.mask_known(s, extra, encoded=redaction.MASK_ENCODED)
+        return redaction.redact(s)
 
     def walk(node: Any) -> Any:
         if isinstance(node, dict):

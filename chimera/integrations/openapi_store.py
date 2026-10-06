@@ -67,6 +67,7 @@ from urllib.parse import quote, quote_plus, unquote, urljoin, urlsplit
 
 import yaml
 
+from chimera.core import redact as redaction
 from chimera.integrations.openapi import RestApiTool, _retry_delay, _sanitize, tools_from_openapi
 from chimera.telemetry import get_logger
 from chimera.tools.base import Tool, refusal
@@ -802,13 +803,21 @@ class ConnectorTool(Tool):
         ``ab%2Bcd%2Fef%3D%3Dghij1234``, unmasked. The encoded forms are matched without regard to
         case, because an echo may lower-case the hex digits (``%2b``).
 
+        And in every encoding the known-secret net computes (base64 alone or inside ``user:key``,
+        hex, character codes, escapes, the reversed string). The key is read from ``.env`` when it
+        is not in the process environment — the normal case after a restart — so ``redact`` does
+        not know it, and this mask was its only net: a base64 echo (Basic auth, a JWT, an encoded
+        body) reached the model and the trace whole. The bridge token had the same gap (study 30
+        review of S30-32); both now go through :func:`~chimera.core.redact.mask_known`.
+
         A key shorter than six characters is not masked: replacing every occurrence of a
         four-character string corrupts the answer the agent reads, and a credential that short is
-        not one this mask could protect anyway.
+        not one this mask could protect anyway. (The encoded pass has its own floor of eight, for
+        the same reason; a six- or seven-character key gets the verbatim and percent forms.)
         """
         if not self._key or len(self._key) < 6:
             return text
-        text = text.replace(self._key, _MASK)
+        text = redaction.mask_known(text, [self._key], encoded=redaction.MASK_ENCODED)
         encoded = {quote(self._key, safe=""), quote(self._key), quote_plus(self._key)} - {self._key}
         for form in sorted(encoded, key=len, reverse=True):
             text = re.sub(re.escape(form), _MASK, text, flags=re.IGNORECASE)
