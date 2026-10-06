@@ -416,7 +416,9 @@ def test_welch_interval_matches_the_hand_computed_interval() -> None:
 
 
 def test_welch_interval_without_a_spread_says_so() -> None:
-    assert welch_t_interval([1.0, 1.0], [2.0, 2.0]) == (-1.0, -1.0, -1.0)  # no variance at all
+    # No variance at all. This used to pin (-1.0, -1.0, -1.0): a zero-width interval, the certainty
+    # from two items per group that the module's own rule refuses for one item. Undefined instead.
+    assert welch_t_interval([1.0, 1.0], [2.0, 2.0]) == (-1.0, -math.inf, math.inf)
     diff, low, high = welch_t_interval([1.0], [2.0, 3.0])
     assert diff == -1.5 and low == -math.inf and high == math.inf
     diff, low, high = welch_t_interval([1.0, 2.0], [3.0])
@@ -482,3 +484,13 @@ def test_mover_keeps_an_asymmetric_interval_asymmetric() -> None:
     assert diff == pytest.approx(0.4)
     assert low == pytest.approx(0.4 - math.sqrt(0.1**2 + 0.02**2))
     assert high == pytest.approx(0.4 + math.sqrt(0.3**2 + 0.05**2))
+
+
+def test_values_with_no_spread_give_an_undefined_interval_not_a_zero_width_one() -> None:
+    # governance_axes printed "t over 3 tasks [71.4%, 71.4%]": three identical shares read as a
+    # certain 71.4%. Two or three equal values carry no spread, exactly like one value.
+    for values in ([0.5, 0.5], [0.5, 0.5, 0.5], [5 / 7] * 3):
+        mean, low, high = mean_t_interval(values)
+        assert mean == pytest.approx(values[0])
+        assert (low, high) == (-math.inf, math.inf)
+    assert not tost_mean([0.0, 0.0, 0.0], margin=0.05).equivalent  # no spread is not equivalence

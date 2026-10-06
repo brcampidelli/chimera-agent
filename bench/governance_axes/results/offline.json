@@ -8,9 +8,10 @@
    "open_cells": 56,
    "open_share_mean": 1.0,
    "open_share_ci": [
-    1.0,
+    0.0,
     1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.9358060632812366,
     1.0
@@ -29,6 +30,7 @@
     0.21556380817755333,
     0.42729333467958946
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.21400994792551525,
     0.4517736009026147
@@ -44,9 +46,10 @@
    "open_cells": 40,
    "open_share_mean": 0.7142857142857143,
    "open_share_ci": [
-    0.7142857142857143,
-    0.7142857142857143
+    0.0,
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.5852474928448334,
     0.8158122485614109
@@ -65,6 +68,7 @@
     0.0,
     0.8076819336778427
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.260102143264709,
     0.5059463409149819
@@ -83,6 +87,7 @@
     0.0,
     0.5769156669127448
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.16957305418501728,
     0.39594555929155156
@@ -101,6 +106,7 @@
     0.0,
     0.2730010656582363
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.05003935571117074,
     0.21468445171071482
@@ -116,9 +122,10 @@
    "open_cells": 21,
    "open_share_mean": 1.0,
    "open_share_ci": [
-    1.0,
+    0.0,
     1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.8453609810751531,
     1.0
@@ -137,6 +144,7 @@
     0.17606415572559592,
     0.5858406061791659
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.20751011368564493,
     0.5912134622488425
@@ -152,9 +160,10 @@
    "open_cells": 15,
    "open_share_mean": 0.7142857142857143,
    "open_share_ci": [
-    0.7142857142857143,
-    0.7142857142857143
+    0.0,
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.5004361928391441,
     0.8618613704787788
@@ -170,9 +179,10 @@
    "open_cells": 21,
    "open_share_mean": 1.0,
    "open_share_ci": [
-    1.0,
+    0.0,
     1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.8453609810751531,
     1.0
@@ -188,9 +198,10 @@
    "open_cells": 15,
    "open_share_mean": 0.7142857142857143,
    "open_share_ci": [
-    0.7142857142857143,
-    0.7142857142857143
+    0.0,
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.5004361928391441,
     0.8618613704787788
@@ -209,6 +220,7 @@
     0.0,
     0.9003789613946408
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.1381386295212213,
     0.49956380716085597
@@ -224,9 +236,10 @@
    "open_cells": 35,
    "open_share_mean": 1.0,
    "open_share_ci": [
-    1.0,
+    0.0,
     1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.9010990076755959,
     0.9999999999999999
@@ -245,6 +258,7 @@
     0.10833371454364035,
     0.463094856884931
    ],
+   "open_share_ci_defined": true,
    "pooled_wilson": [
     0.16326536236434688,
     0.45054934863182616
@@ -260,9 +274,10 @@
    "open_cells": 25,
    "open_share_mean": 0.7142857142857143,
    "open_share_ci": [
-    0.7142857142857143,
-    0.7142857142857143
+    0.0,
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     0.5494506513681738,
     0.836734637635653
@@ -279,8 +294,9 @@
    "open_share_mean": 0.0,
    "open_share_ci": [
     0.0,
-    0.0
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     6.938893903907228e-18,
     0.09890099232440402
@@ -297,8 +313,9 @@
    "open_share_mean": 0.0,
    "open_share_ci": [
     0.0,
-    0.0
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     6.938893903907228e-18,
     0.09890099232440402
@@ -315,8 +332,9 @@
    "open_share_mean": 0.0,
    "open_share_ci": [
     0.0,
-    0.0
+    1.0
    ],
+   "open_share_ci_defined": false,
    "pooled_wilson": [
     6.938893903907228e-18,
     0.09890099232440402

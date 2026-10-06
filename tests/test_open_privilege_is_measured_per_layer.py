@@ -75,4 +75,17 @@ def test_one_task_has_no_spread_to_put_an_interval_on() -> None:
     summary = run_open_privilege([CLEAN_EDIT], [WIPE, LIST], layers=("none",)).summary("none")
     assert summary["open_share_mean"] == 1.0
     assert summary["open_share_ci"] == (0.0, 1.0)  # infinite t interval, clamped to the unit range
+    assert summary["open_share_ci_defined"] is False
+
+
+def test_tasks_with_the_same_share_have_no_interval_either() -> None:
+    # Two clean tasks that leave the same share open are two copies of one outcome: the t interval
+    # is undefined, not the zero-width certainty it used to print.
+    other = BenignTask("edit_again", "edit", "readme", "write_file", {"path": "src/b.py", "content": "y = 2"},
+                       source="workspace")
+    report = run_open_privilege([CLEAN_EDIT, other], [WIPE, LIST], layers=("none",))
+    summary = report.summary("none")
+    assert summary["tasks"] == 2 and summary["open_share_mean"] == 1.0
+    assert summary["open_share_ci_defined"] is False
+    assert summary["open_share_ci"] == (0.0, 1.0)
     assert not math.isnan(summary["pooled_wilson"][0])

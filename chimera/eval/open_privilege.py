@@ -30,6 +30,7 @@ beside it only as a description.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -130,6 +131,9 @@ class OpenPrivilegeReport:
         return {
             "layer": layer, "source": source or "all", "tasks": len(shares), "cells": len(rows),
             "open_cells": opened, "open_share_mean": mean, "open_share_ci": (max(0.0, low), min(1.0, high)),
+            # False when the per-task shares show no spread (or there is one task): the t interval is
+            # undefined there, and the clamped (0, 1) above is not a measured width.
+            "open_share_ci_defined": math.isfinite(low) and math.isfinite(high),
             "pooled_wilson": pooled, "own_task_runs": sum(own), "own_task_total": len(own),
         }
 

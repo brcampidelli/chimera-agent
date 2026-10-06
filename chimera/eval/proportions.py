@@ -291,7 +291,10 @@ def mean_t_interval(values: Sequence[float], alpha: float = 0.05) -> tuple[float
     The replacement for a percentile bootstrap over a handful of tasks: a paired design reduces to
     one difference per task, and over 7-32 tasks the t interval is the closed-form reading whose
     coverage does not depend on how many tasks there were. Fewer than two values cannot carry a
-    spread, so the interval is infinite rather than invented.
+    spread, so the interval is infinite rather than invented — and the same holds for values that
+    show no spread at all: three tasks with the same share say nothing about how much a fourth could
+    differ, and a zero-width interval would be certainty read off a handful of items. A caller that
+    meets ``(-inf, inf)`` reports "no spread observed, interval undefined", not a number.
     """
     if not 0.0 < alpha < 1.0:
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
@@ -300,7 +303,10 @@ def mean_t_interval(values: Sequence[float], alpha: float = 0.05) -> tuple[float
     mean = fmean(values)
     if len(values) < 2:
         return (mean, -math.inf, math.inf)
-    half = t_quantile(1.0 - alpha / 2.0, len(values) - 1) * stdev(values) / math.sqrt(len(values))
+    spread = stdev(values)
+    if spread == 0.0:
+        return (mean, -math.inf, math.inf)
+    half = t_quantile(1.0 - alpha / 2.0, len(values) - 1) * spread / math.sqrt(len(values))
     return (mean, mean - half, mean + half)
 
 
@@ -311,7 +317,9 @@ def welch_t_interval(
 
     Unequal variances, Welch-Satterthwaite degrees of freedom. The closed-form reading of an
     interaction between two strata of tasks, where a bootstrap would resample 7 and 8 values.
-    Either group under two values leaves no spread to estimate, and the interval is infinite.
+    Either group under two values leaves no spread to estimate, and the interval is infinite; so
+    does two groups with no spread at all (zero width would be invented certainty, as in
+    :func:`mean_t_interval`).
     """
     if not 0.0 < alpha < 1.0:
         raise ValueError(f"alpha must be in (0, 1), got {alpha}")
@@ -324,7 +332,7 @@ def welch_t_interval(
     v2 = stdev(second) ** 2 / len(second)
     se = math.sqrt(v1 + v2)
     if se == 0.0:
-        return (diff, diff, diff)
+        return (diff, -math.inf, math.inf)
     df = (v1 + v2) ** 2 / (v1 * v1 / (len(first) - 1) + v2 * v2 / (len(second) - 1))
     half = t_quantile(1.0 - alpha / 2.0, df) * se
     return (diff, diff - half, diff + half)

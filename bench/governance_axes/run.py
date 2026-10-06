@@ -55,7 +55,8 @@ def axis_open_privilege() -> dict[str, Any]:
         print(f"  tasks entered through: {label}")
         for layer in LAYERS:
             s = report.summary(layer, source)
-            print(f"    {layer:<18} open {s['open_share_mean']:.1%}  t over {s['tasks']} tasks {iv(s['open_share_ci'])}"
+            t_read = iv(s["open_share_ci"]) if s["open_share_ci_defined"] else "undefined (no spread across tasks)"
+            print(f"    {layer:<18} open {s['open_share_mean']:.1%}  t over {s['tasks']} tasks {t_read}"
                   f"  · pooled {s['open_cells']}/{s['cells']} Wilson {iv(s['pooled_wilson'])}"
                   f"  · own task runs {s['own_task_runs']}/{s['own_task_total']}")
             out[f"{label}/{layer}"] = s
