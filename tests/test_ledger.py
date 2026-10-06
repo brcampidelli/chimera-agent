@@ -63,6 +63,14 @@ def test_rope_lite_flags_untrusted_effect_arguments_but_is_opt_in(tmp_path: Path
     assert not enabled.identifying_effects_without_trusted_provenance({"amount": "80"})
 
 
+def test_rope_lite_off_keeps_no_workspace_text(tmp_path: Path) -> None:
+    ledger = TaintLedger()
+    ledger.set_instruction("Use the current file", workspace=tmp_path)
+    ledger.note_trusted_workspace_read("approved.txt", "Approved total: 80")
+    ledger.rope_lite = True
+    assert ledger.identifying_effects_without_trusted_provenance({"amount": "80"}) == ["80"]
+
+
 def test_rope_lite_rejects_workspace_read_outside_workspace(tmp_path: Path) -> None:
     ledger = TaintLedger(rope_lite=True)
     ledger.set_instruction("Use the current file", workspace=tmp_path)
@@ -255,6 +263,15 @@ def test_ledger_registry_wraps_every_tool() -> None:
     wrapped = ledger_registry(reg, TaintLedger())
     assert set(wrapped.names()) == {"run_shell", "http_get"}
     assert all(isinstance(t, LedgeredTool) for t in wrapped.tools())
+
+
+def test_ledger_registry_keeps_the_ledgers_rope_lite_when_not_told() -> None:
+    # `solve_batch` builds TaintLedger(rope_lite=...) and calls ledger_registry without the flag.
+    reg = ToolRegistry()
+    reg.register(FakeTool("write_file"))
+    ledger = TaintLedger(rope_lite=True)
+    ledger_registry(reg, ledger)
+    assert ledger.rope_lite is True
 
 
 def test_assessment_dataclass_defaults() -> None:

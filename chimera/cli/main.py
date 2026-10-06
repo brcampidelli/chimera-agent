@@ -5743,6 +5743,7 @@ def crew_isolated(
                 shared=shared_taint,
                 authority=settings.taint_authority,
                 egress_allow=settings.egress_allow.split(","),
+                rope_lite=settings.taint_rope_lite,
             )
             # Both halves are the person's own words: the shared task and this worker's brief.
             ledger.set_instruction(f"{task}\n{prompt}", workspace=ws)

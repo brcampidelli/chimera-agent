@@ -550,8 +550,12 @@ class TaintLedger:
         return out
 
     def note_trusted_workspace_read(self, path: str, content: str) -> None:
-        """Record literal provenance from a successful read inside the task workspace."""
-        if not self._workspace or not path or not content:
+        """Record literal provenance from a successful read inside the task workspace.
+
+        Nothing is kept while the check is off: every workspace read's full text would otherwise
+        pile up for the life of the ledger (a chat keeps one across turns) for a check never run.
+        """
+        if not self.rope_lite or not self._workspace or not path or not content:
             return
         root = Path(self._workspace).resolve()
         candidate = Path(path)

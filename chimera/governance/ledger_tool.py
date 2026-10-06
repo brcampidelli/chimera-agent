@@ -490,7 +490,9 @@ def ledger_registry(
     audit: AuditLog | None = None,
     narrow_on_taint: bool = False,
     ask_unseen_recipients: bool = False,
-    rope_lite: bool = False,
+    # None keeps whatever the ledger was built with. A False default here overwrote it: a caller
+    # that built `TaintLedger(rope_lite=True)` and did not repeat the flag got the check silently off.
+    rope_lite: bool | None = None,
     warn_workspace_writes: bool = False,
     notify: Callable[[str, str, dict[str, Any]], None] | None = None,
 ) -> ToolRegistry:
